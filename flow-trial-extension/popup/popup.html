@@ -5,6 +5,7 @@
 <title>Glance</title>
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="popup.css">
+<link rel="stylesheet" href="../design/step-states-v1/scoped.css">
 </head>
 <body>
   <header class="hdr">
@@ -12,6 +13,7 @@
     <h1>Glance</h1>
     <span class="ver" id="statusPill">Not connected</span>
   </header>
+  <p id="reloadGlance" class="saved-note err" hidden>Reload Glance</p>
 
   <nav class="tabs" role="tablist">
     <button class="tab" data-tab="setup" role="tab" aria-selected="true">Setup</button>
@@ -202,6 +204,7 @@
   <!-- Wires execution-memory.js and close-memory.js to chrome.storage.local.
        Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>
+  <script src="../core/proof-of-close.js"></script>
   <script src="../src/receipt-copy.js"></script>
   <script src="../core/lang-normalize.js"></script>
   <script src="../core/request-types.js"></script>
@@ -245,6 +248,14 @@
   <script src="../core/meeting-debrief.js"></script>
   <script src="../core/recurrence.js"></script>
   <script src="../core/entitlements.js"></script>
+  <script src="../core/build-stamp.js"></script>
+  <script src="../core/commitment-title.js"></script>
+  <script src="../core/display-copy.js"></script>
+  <script src="../core/step-list.js"></script>
+  <script src="../core/suggest-save.js"></script>
+  <script src="../design/step-states-v1/glyphs.js"></script>
+  <script src="../src/step-kit.js"></script>
+  <script src="../src/step-list-view.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

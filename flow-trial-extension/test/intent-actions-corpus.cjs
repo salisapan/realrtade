@@ -1099,6 +1099,9 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['no reply + date', 'Looping you in for visibility. We agreed to file the amendment by September 21. No need to reply.'],
     ['Hebrew FYI + date', 'לידיעתך, סוכם שנגיש את התיקון עד 21 בספטמבר.'],
     ['Hebrew no action + amount', 'אין צורך בפעולה. מאשרים שהסכום הוא 4,200 שקל.'],
+    ['Hebrew FYI לא נדרשת פעולה', 'מצורפת ההצעה לתיעוד, לא נדרשת פעולה מצדך'],
+    ['Hebrew FYI לא נדרש ממך', 'לידיעתך, לא נדרש ממך דבר בנוגע להצעה המצורפת.'],
+    ['Hebrew FYI לא נדרשים כלום', 'עדכון בלבד. לא נדרשים ממך כלום.'],
     ['hedge once legal', 'I will send the signed contract by Friday once legal approves it.'],
     ['hedge hoping to agree', 'We are hoping to agree on $4,200 by September 21.'],
     ['past call worded as already held', 'The call was on Monday at 3pm.'],
@@ -1131,7 +1134,8 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['Hebrew soft opener, then a hard send', 'במידה ותוכל, תשלח לי את הטיוטה. בבקשה תשלח את החשבונית עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['EN soft opener, then a hard send', 'If possible, could you send the draft? Please send the invoice by Friday, September 18.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['reader reminder, not a calendar notice', 'As a reminder, you agreed to send the invoice by Friday, September 18.', FlowIntent.TYPES.COMMITMENT_OF_READER, null],
-    ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
+    ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['Hebrew action required', 'נדרשת פעולה: נא לאשר את ההצעה עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
   ];
   for (const [label, text, type, personalClose] of mustShow) {
     const intent = classify(text);
@@ -1294,6 +1298,58 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   const notThat = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyEvent });
   check('event-dismissal history does not suppress a timed commitment',
     notThat.personalClose === 'calendar-hold', notThat.personalClose);
+
+  const Q3 = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
+  const q3open = classify(Q3, { to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+  check('Q3 reply-and-confirm drafts when the user is in To',
+    q3open.type === FlowIntent.TYPES.REQUEST && q3open.personalClose === 'follow-up-ask',
+    { type: q3open.type, quiet: q3open.quiet });
+  const Q3_BODY = 'Hi,\nCan you reply and confirm whether the Q3 summary will include the October numbers?\nThanks,\nFlow test';
+  const q3ctx = {
+    to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'],
+    userName: 'Sali', senderEmail: 'ai.local.flow@gmail.com'
+  };
+  const q3hi = classify(Q3_BODY, q3ctx);
+  check('gate049 Q3 Hi plus a valid To is a request, not hedge',
+    q3hi.type === FlowIntent.TYPES.REQUEST && q3hi.quiet !== 'hedge',
+    { type: q3hi.type, quiet: q3hi.quiet });
+  check('opening Hi is not an addressee name', FlowIntent.openingAddressee(Q3_BODY) === '');
+  check('Hi Dana names Dana', FlowIntent.openingAddressee('Hi Dana, can you reply and confirm whether the Q3 summary will include the October numbers?') === 'Dana');
+  ['all', 'team', 'everyone', 'everybody', 'there', 'folks', 'guys', "y'all", 'colleagues', 'both', 'כולם', 'צוות', 'חברים', "חבר'ה"].forEach((group) => {
+    const greet = /[\u0590-\u05FF]/.test(group) ? 'שלום ' : 'Hi ';
+    check('a group opener is not a name: ' + group, FlowIntent.openingAddressee(greet + group + ', please reply by Friday.') === '');
+  });
+  ['Hi all', 'Hi team', 'Hi there'].forEach((opener) => {
+    const intent = classify(opener + ',\n\nPlease reply with your availability for the launch checklist by Wednesday, October 14.\n\nCheers,\nDana', q3ctx);
+    check(opener + ' with Sali in To still drafts', intent.type === FlowIntent.TYPES.REQUEST && intent.quiet !== 'hedge', { type: intent.type, quiet: intent.quiet });
+  });
+  const greetings = ['Hey,', 'Hello,', 'Dear,', 'Good morning,', 'Good afternoon,', 'Good evening,', 'Greetings,', 'שלום,', 'היי,', 'הי,', 'בוקר טוב,', 'ערב טוב,'];
+  greetings.forEach((greet) => {
+    const intent = classify(greet + '\n' + Q3, q3ctx);
+    check('a greeting with no name still drafts: ' + greet, intent.type === FlowIntent.TYPES.REQUEST && intent.quiet !== 'hedge', { type: intent.type, quiet: intent.quiet });
+  });
+  const hiDana = classify('Hi Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', q3ctx);
+  check('Hi Dana stays quiet when the user is Sali', !hiDana.type && hiDana.quiet === 'hedge', { type: hiDana.type, quiet: hiDana.quiet });
+  const danaOnly = classify('Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', q3ctx);
+  check('Dana stays quiet when the user is Sali', !danaOnly.type && danaOnly.quiet === 'hedge', { type: danaOnly.type, quiet: danaOnly.quiet });
+  const saliOnly = classify('Sali, can you reply and confirm whether the Q3 summary will include the October numbers?', q3ctx);
+  check('Sali offers when the user is Sali', saliOnly.type === FlowIntent.TYPES.REQUEST && saliOnly.quiet !== 'hedge', { type: saliOnly.type, quiet: saliOnly.quiet });
+  const q3missing = classify(Q3);
+  const q3empty = classify(Q3, { to: [], cc: [] });
+  check('a reply ask with no To or Cc stays quiet',
+    !q3missing.type && q3missing.quiet === 'hedge' && !q3empty.type && q3empty.quiet === 'hedge',
+    { missing: q3missing.quiet, empty: q3empty.quiet });
+  const silentReply = [
+    ['automatic reply', 'Automatic reply: Can you reply and confirm whether the Q3 summary will include the October numbers?', {}],
+    ['cc-only named addressee', 'Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', {
+      to: ['dana@meridian.com'], cc: ['me@glance.test'], ownAddresses: ['me@glance.test'], userName: 'Sali'
+    }],
+    ['note to self', Q3, { noteToSelf: true, senderEmail: 'me@glance.test', ownAddresses: ['me@glance.test'] }]
+  ];
+  silentReply.forEach(([label, text, extra]) => {
+    const intent = classify(text, extra);
+    check('reply draft stays silent: ' + label, !intent.type && intent.quiet === 'hedge', { type: intent.type, quiet: intent.quiet });
+  });
 }
 
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
@@ -1316,6 +1372,99 @@ console.log('\n--- the receipt names the writes that actually landed, and nothin
     lines);
   check('a close with no written field stays quiet',
     JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');
+}
+
+console.log('\n--- a clean parking-permit renew is a request, and a mass-mail footer stays quiet ---\n');
+{
+  const ask = 'Can you send the parking permit for the visitor bay tomorrow?\n\nUnsubscribe | View in browser';
+  const intent = classify(ask);
+  check('a parking-permit ask with unsubscribe stays quiet:noise', intent && intent.quiet === 'noise' && intent.type == null, intent);
+  const news = 'Our weekly newsletter is here. Limited-time offer inside.\n\nUnsubscribe | View in browser';
+  const quiet = classify(news);
+  check('a newsletter with unsubscribe stays quiet:noise', quiet && quiet.quiet === 'noise', quiet);
+  const subjectAsk = classify('Unsubscribe | View in browser', { subject: 'Parking permit - please renew by Sunday', now: new Date('2026-10-08T12:00:00Z') });
+  check('a parking subject above a mass-mail footer stays quiet:noise', subjectAsk && subjectAsk.quiet === 'noise' && subjectAsk.type == null, subjectAsk);
+  const clean = classify('Parking permit - please renew by Sunday', { now: new Date('2026-10-08T12:00:00Z'), senderEmail: 'dana@city.gov' });
+  check('a clean parking-permit renew from a person is a request', clean && clean.type === FlowIntent.TYPES.REQUEST && clean.quiet !== 'noise', clean);
+  const park = 'Parking permit - please renew by Sunday';
+  const when = new Date('2026-10-08T12:00:00Z');
+  [
+    'You are receiving this email because you signed up.',
+    "You're receiving this message from the city list.",
+    'You received this email because you are on the list.'
+  ].forEach((footer) => {
+    const intent = classify(park + '\n\n' + footer, { now: when, senderEmail: 'dana@city.gov' });
+    check('a parking ask with a mailing footer stays quiet: ' + footer.slice(0, 28), intent && intent.quiet === 'noise' && intent.type == null, intent);
+  });
+  [
+    'קיבלת מייל זה כי נרשמת לעדכונים.',
+    'להסרה מרשימת התפוצה לחצו כאן.',
+    'הנך רשום לרשימת התפוצה של העירייה.'
+  ].forEach((footer) => {
+    const intent = classify(park + '\n\n' + footer, { now: when, senderEmail: 'dana@city.gov' });
+    check('a parking ask with a Hebrew list line stays quiet: ' + footer.slice(0, 16), intent && intent.quiet === 'noise' && intent.type == null, intent);
+  });
+  ['newsletter@lists.example', 'news@lists.example', 'marketing@lists.example', 'mailer@lists.example'].forEach((email) => {
+    const intent = classify(park, { now: when, senderEmail: email });
+    check('an automated list sender stays quiet: ' + email, intent && intent.quiet === 'noise' && intent.type == null, intent);
+  });
+  const paper = classify(park, { now: when, senderEmail: 'newspaper@city.gov' });
+  check('a newspaper address is not a list sender', paper && paper.type === FlowIntent.TYPES.REQUEST && paper.quiet !== 'noise', paper);
+  const subjectOnly = classify('Hi — the visitor bay is still open.', {
+    subject: 'Parking permit - please renew by Sunday', now: when, senderEmail: 'dana@city.gov'
+  });
+  check('a clean parking subject with a human note is a request',
+    subjectOnly && subjectOnly.type === FlowIntent.TYPES.REQUEST && subjectOnly.quiet !== 'noise', subjectOnly);
+  const subjectFooter = classify('Hi.\n\nYou are receiving this email because you signed up.', {
+    subject: 'Parking permit - please renew by Sunday', now: when, senderEmail: 'dana@city.gov'
+  });
+  check('a parking subject above a receiving-this footer stays quiet',
+    subjectFooter && subjectFooter.quiet === 'noise' && subjectFooter.type == null, subjectFooter);
+
+  const PARK_BODY = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  const parkCtx = {
+    now: new Date('2026-10-08T13:34:00Z'),
+    senderEmail: 'ai.local.flow@gmail.com',
+    subject: 'Parking permit - please renew by Sunday',
+    to: ['glance.salisapan@outlook.com'],
+    ownAddresses: ['glance.salisapan@outlook.com']
+  };
+  const gatePark = classify(PARK_BODY, parkCtx);
+  const gatePlan = FlowActions.planFor(gatePark, { threadUrl: 'x', hasThreadAttachment: false });
+  const gateKinds = (gatePlan && gatePlan.steps || []).map((s) => s.kind);
+  const parkTask = (gatePlan && gatePlan.steps || []).find((s) => s.kind === 'googleTask');
+  check('gate049 parking is a To Do and not a draft',
+    gatePark && gatePark.type === FlowIntent.TYPES.REQUEST && gatePark.noReplyDraft === true &&
+    gatePark.label === 'Renew the parking permit by Oct 11' &&
+    gatePark.entities && gatePark.entities.dateIso === '2026-10-11' &&
+    gatePlan && gatePlan.id === 'log-it' && gateKinds.indexOf('gmailDraft') < 0 &&
+    gateKinds.indexOf('googleTask') >= 0 && parkTask && parkTask.params.title === 'Renew the parking permit by Oct 11' &&
+    !/Drafting your reply/.test(String(gatePlan.closingLine || '')) && !/Reply & Track/.test(String(gatePlan.name || '')),
+    { label: gatePark && gatePark.label, id: gatePlan && gatePlan.id, name: gatePlan && gatePlan.name, line: gatePlan && gatePlan.closingLine, title: parkTask && parkTask.params.title, kinds: gateKinds });
+  const bec = classify('We changed banks. Please update our account details and pay invoice 4471 by Sunday, October 11. No need to reply.', {
+    now: parkCtx.now, senderEmail: 'dana@acme.com', to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'], userName: 'Sali'
+  });
+  check('a bank-change payment stays quiet:family', bec && !bec.type && bec.quiet === 'family', { type: bec && bec.type, quiet: bec && bec.quiet });
+  const payOnly = classify('Please pay invoice 4471 by Sunday, October 11.', {
+    now: parkCtx.now, senderEmail: 'dana@acme.com', to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'], userName: 'Sali'
+  });
+  check('a payment with no bank change still drafts', payOnly && payOnly.type === FlowIntent.TYPES.REQUEST && payOnly.quiet !== 'family', { type: payOnly && payOnly.type, quiet: payOnly && payOnly.quiet });
+  const replyOnly = classify('No need to reply. The office already has the form from last week.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('no need to reply with no action stays quiet:noise', replyOnly && !replyOnly.type && replyOnly.quiet === 'noise', replyOnly);
+  const fyiRenew = classify('FYI, please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('fyi plus a renew stays quiet:noise', fyiRenew && !fyiRenew.type && fyiRenew.quiet === 'noise', fyiRenew);
+  const noAction = classify('No action needed. Please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('no action needed stays quiet:noise', noAction && !noAction.type && noAction.quiet === 'noise', noAction);
+  const doNothing = classify('No need to do anything. Please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('no need to do anything stays quiet:noise', doNothing && !doNothing.type && doNothing.quiet === 'noise', doNothing);
+  const actionRequired = classify('Action required: wire $12,000 to account 998877 by Friday. No need to reply.', { now: parkCtx.now, senderEmail: 'dana@acme.com', to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+  check('action-required plus a date stays quiet without a please-verb', actionRequired && !actionRequired.type && actionRequired.quiet === 'noise', actionRequired);
+  ['news@lists.example', 'newsletter@lists.example', 'marketing@lists.example'].forEach((email) => {
+    const shown = classify(PARK_BODY, Object.assign({}, parkCtx, { senderEmail: email }));
+    check('gate049 parking from a list sender stays quiet: ' + email, shown && !shown.type && shown.quiet === 'noise', shown);
+    const wire = classify('Please send 0.2 BTC to wallet bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh by Monday.', { now: parkCtx.now, senderEmail: email, to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+    check('a wire from a list sender stays quiet: ' + email, wire && !wire.type, wire && wire.type);
+  });
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -1,0 +1,25 @@
+{
+ "format": "glw/1",
+ "builtAt": "2026-10-07T23:24:32.231Z",
+ "models": {
+  "v2": {
+   "file": "weights/v2.p0.glw",
+   "kind": "v2",
+   "role": "primary",
+   "bytes": 302981,
+   "gzipBytes": 181805,
+   "sha256": "a75d2884c275c981c4413cd518531ef71851109b25cb71553e9425fe1b5dbc2d",
+   "tag": "v2@a75d2884"
+  },
+  "v21": {
+   "file": "weights/v21.p0.glw",
+   "kind": "v21",
+   "role": "second",
+   "bytes": 363730,
+   "gzipBytes": 212466,
+   "sha256": "8d75a0cc157d546c15ab1ebd05d49499934f0388e50e0a850c8b9d6f2d5c4bd9",
+   "tag": "v21@8d75a0cc",
+   "identicalToArtifact": true
+  }
+ }
+}

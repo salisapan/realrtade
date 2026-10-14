@@ -1,5 +1,0 @@
-{
-  "folder": "vault/sessions",
-  "format": "YYYY-MM-DD",
-  "template": "vault/templates/session"
-}

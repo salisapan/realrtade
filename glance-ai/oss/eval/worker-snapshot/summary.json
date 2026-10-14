@@ -1,0 +1,69 @@
+{
+  "builtAt": "2026-10-07T19:57:37.570Z",
+  "teacher": "0.9.34-unpacked (deterministic engine)",
+  "perTemplate": 40,
+  "total": 13069,
+  "synthetic": 9320,
+  "repoFixtures": 1986,
+  "repoTestStrings": 1763,
+  "ownerVerified": 0,
+  "splits": {
+    "train": {
+      "n": 8274,
+      "show": 1775,
+      "synthetic": 6040,
+      "repo": 1152,
+      "rtest": 1082,
+      "he": 3025
+    },
+    "test": {
+      "n": 3344,
+      "show": 810,
+      "synthetic": 2200,
+      "repo": 640,
+      "rtest": 504,
+      "he": 1276
+    },
+    "val": {
+      "n": 1451,
+      "show": 244,
+      "synthetic": 1080,
+      "repo": 194,
+      "rtest": 177,
+      "he": 435
+    }
+  },
+  "teacherLabels": {
+    "SILENT": 10240,
+    "follow-up-ask|draft": 1312,
+    "commitment|task": 181,
+    "dated-commitment|task": 196,
+    "event|calendar": 458,
+    "calendar-hold|calendar": 184,
+    "drive-file|file_save": 220,
+    "confirmed-amount|task": 211,
+    "calendar-cancel|calendar": 9,
+    "decision|task": 57,
+    "calendar-move|calendar": 1
+  },
+  "silenceReasons": {
+    "own-sender": 740,
+    "file-chain-not-run": 182,
+    "file": 341,
+    "intent-null": 6571,
+    "note-to-self": 437,
+    "quiet:hedge": 114,
+    "quiet:low": 22,
+    "no-draft-close": 476,
+    "quiet:noise": 457,
+    "quiet:google": 282,
+    "google-wait(drive-lookup)": 65,
+    "calendar-wait(file-lookup)": 43,
+    "quiet:family": 225,
+    "too-short": 270,
+    "fact-reply-block": 6,
+    "calendar-google-silence": 7,
+    "third-party": 2
+  },
+  "gold22": 22
+}

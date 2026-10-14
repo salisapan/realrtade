@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Glance · step states, scoped</title>
+<link rel="stylesheet" href="scoped.css">
+</head>
+<body>
+<div class="flow-step-card ss" id="card">
+  <button type="button" id="btn-theme">Dark</button>
+  <div class="ss-card" data-card="f1"></div>
+  <div class="ss-card" data-card="f1b"></div>
+  <div class="ss-card" data-card="f2"></div>
+  <div class="ss-card" data-card="f2done"></div>
+  <div class="ss-card" data-card="f3"></div>
+  <div class="ss-card" data-card="f3x"></div>
+  <div class="ss-card" data-card="f4a"></div>
+  <div class="ss-card" data-card="f4b"></div>
+  <div class="ss-card" data-card="f4c"></div>
+  <div class="ss-card" data-card="f4d"></div>
+  <div class="ss-card" data-card="f5"></div>
+  <div class="ss-card" data-card="f5b"></div>
+  <div class="ss-card" data-card="f5b-done"></div>
+  <div class="ss-card" data-card="f6"></div>
+</div>
+<script src="glyphs.js"></script>
+<script src="step-states.js"></script>
+<script>
+document.getElementById('btn-theme').addEventListener('click', function () {
+  var card = document.getElementById('card');
+  if (card.getAttribute('data-theme') === 'dark') card.removeAttribute('data-theme');
+  else card.setAttribute('data-theme', 'dark');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+PASS gate:unsupported-kind:create-doc  :: Please create a new doc for the budget notes.
+PASS gate:unsupported-kind:create-doc  :: Sali, please make a spreadsheet tracking the migration by Fr
+PASS gate:unsupported-kind:create-doc  :: בבקשה לפתוח מסמך חדש לסיכום הפיילוט.
+PASS gate:unsupported-kind:create-doc  :: תכין הצעת מחיר לנורת׳ווינד על 4,000 ₪ עד יום שני.
+PASS gate:unsupported-kind:attach-to-invite  :: בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00.
+PASS gate:unsupported-kind:attach-to-invite  :: Please attach the deck to the kickoff invite for Monday at 1
+PASS gate:money-offer-acceptance  :: אתה מסכים להצעה על סך 3,900 שקל עד יום שני?
+PASS gate:money-offer-acceptance  :: Do you agree to the $4,000 quote from Contoso by Friday?
+PASS gate:undated  :: Can you approve the pre-authorization request for the MRI?
+PASS gate:undated  :: I need the serial number of the laptop, could you find it an
+PASS gate:unsupported-kind:book_flight  :: Please book me a flight to Berlin.
+PASS gate:save-suggest:attachments-unread  :: Please store the attached file in the Drive.
+PASS pass  :: סאלי, אפשר את האישור שלך על התקציב עד יום חמישי?
+PASS pass  :: עדכון קצר: אכין את החשבונית עד רביעי בבוקר.
+PASS pass  :: I will prepare the invoice by Friday.
+PASS pass  :: Can we meet Monday at 10:00 to go over the deck?
+PASS pass  :: Can you approve the travel budget by Friday?
+PASS pass  :: Sali, can you prepare the deck before Sunday?
+PASS pass  :: gmail Please store the attached file in the Drive. -> drive
+PASS pass  :: outlook Please save the attachment to OneDrive. -> onedrive
+PASS gate:save-suggest:onedrive-target-on-gmail  :: gmail Please save the attachment to OneDrive. 
+PASS gate:save-suggest:drive-target-on-outlook  :: outlook pls תשמור את הקובץ המצורף ב-Google Drive 
+PASS gate:save-target-mismatch  :: outlook סאלי, pls תשמור את הקובץ המצורף לדרייב 
+PASS gate:save-suggest:no-files  :: outlook Please save the attachment to OneDrive. 
+PASS gate:save-suggest:no-files  :: outlook Please save the attachment to OneDrive. 
+PASS gate:save-suggest:negated  :: outlook Please don't save the attachment to OneDrive. 
+ALL PASS

@@ -62,6 +62,7 @@ function load(stored, opts) {
       if (!byId.has(id)) { const n = makeNode('div'); n.id = id; byId.set(id, n); }
       return byId.get(id);
     },
+    querySelector: () => null,
     querySelectorAll: () => [],
     createElement: (t) => makeNode(t),
     createTextNode: (t) => { const n = makeNode('#text'); n.textContent = String(t); return n; }
@@ -97,12 +98,24 @@ function load(stored, opts) {
       }
     },
     identity: { getRedirectURL: () => 'https://testextensionidtestextensionid12.chromiumapp.org/' },
+    permissions: { contains: async () => false, request: async () => false, remove: async () => true },
     runtime: {
       sendMessage: (msg, cb) => {
+        (opts.messages = opts.messages || []).push(msg && msg.type);
         // popup.js's only two-way call is flow:connector-status; everything
         // else (flow:pending-count, flow:track) is fire-and-forget in the
         // real extension too, so an empty reply is a faithful stub.
         // flow:undo-action is the exception the Activity row waits on.
+        if (msg && msg.type === 'flow:execute-action') {
+          (opts.executes = opts.executes || []).push(msg.payload);
+          if (cb) cb(opts.executeReply || {
+            ok: true,
+            written: 'To Do',
+            ref: { externalId: 'TASK9', taskListId: 'DEF', taskId: 'TASK9' },
+            proof: { system: 'microsoft/todo', externalId: 'TASK9', fetchedBack: true, verifiedAt: '2026-10-08T07:00:00.000Z' }
+          });
+          return;
+        }
         if (msg && msg.type === 'flow:undo-action') {
           if (cb) cb({ ok: opts.undoOk !== false });
           return;
@@ -111,6 +124,10 @@ function load(stored, opts) {
         if (msg && msg.type === 'flow:hybrid-status') { if (cb) cb(opts.hybridStatus || { ok: true }); return; }
         if (msg && msg.type === 'flow:hybrid-consent') { (opts.hybridConsents = opts.hybridConsents || []).push(msg.patch); if (cb) cb({ ok: true }); return; }
         if (msg && msg.type === 'flow:follow-draft') { (opts.drafts = opts.drafts || []).push(msg.payload); if (cb) cb({ ok: true }); return; }
+        if (msg && msg.type === 'flow:build-stamp') {
+          if (cb) cb(opts.workerBuild == null ? { ok: true } : { ok: true, build: opts.workerBuild });
+          return;
+        }
         if (cb) cb(msg && msg.type === 'flow:connector-status' ? {} : { ok: true });
       }
     }
@@ -121,6 +138,7 @@ function load(stored, opts) {
   // just enough surface that the call doesn't throw ReferenceError.
   const sandbox = {
     module: undefined, console, document, chrome: chromeStub,
+    FlowBuild: opts.pageStamp ? { STAMP: opts.pageStamp } : undefined,
     crypto: { randomUUID: () => 'test-uuid' },
     navigator: { clipboard: { writeText: async () => {} } },
     Blob: class { constructor(parts, opts) { this.parts = parts; this.type = opts && opts.type; } },
@@ -128,7 +146,11 @@ function load(stored, opts) {
     // Both button-confirmation resets (referralCopy's "Copied", and this
     // session's referralExportRecipe's "Exported") use the real setTimeout —
     // Node's own is a faithful stand-in, not a stub that needs its own logic.
-    setTimeout, clearTimeout
+    setTimeout, clearTimeout,
+    fetch: async (url) => {
+      (opts.fetches = opts.fetches || []).push(String(url));
+      return { ok: false, status: 401, json: async () => ({}), text: async () => '' };
+    }
   };
   vm.createContext(sandbox);
   // Same file list, same order popup.html actually loads them in — core/
@@ -147,7 +169,9 @@ function load(stored, opts) {
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
     [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'local-lm.js'], [CORE, 'local-lm-audit.js'], [CORE, 'local-lm-server.js'], [CORE, 'hybrid-status.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
-    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
+    [CORE, 'proof-of-close.js'],
+    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'incoming-judge.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js'],
+    [CORE, 'display-copy.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -495,11 +519,7 @@ async function run() {
     const probe = load({});
     const Quiet = vm.runInContext('FlowQuietMetrics', probe.sandbox);
     const now = Date.now();
-    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), {
-      messageId: 'm1', ts: now, app: 'gmail', product: 'free',
-      proposed: 1, succeeded: 1, receiptFull: true, receiptStatus: 'Handled.',
-      kinds: ['googleTask']
-    });
+    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), { messageId: 'm1', ts: now });
     quietMetrics = Quiet.noteSilence(quietMetrics, { messageId: 's1', reason: 'family', ts: now });
     const { sandbox, document } = load({ quietMetrics: quietMetrics });
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
@@ -681,7 +701,7 @@ async function run() {
     // says what it reads, that it never sends, and that nothing goes to Glance.
     check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Never sends/.test(t) && /reply draft/.test(t) && /nothing is sent to Glance/.test(t)), notes);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
+    check('and offers Connect once a client id is set', buttons.includes('Connect'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
   }
 
@@ -733,6 +753,164 @@ async function run() {
     const buttons = find(host, 'ghost').map((b) => b.textContent);
     check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /English: on \(precision 0\.98, recall 0\.61\)/.test(t) && /Hebrew: off \(precision 0\.91, needs 0\.97\)/.test(t)), notes);
     check('and offers Test again and Turn off', buttons.includes('Test again') && buttons.includes('Turn off'), buttons);
+  }
+
+  console.log('\n--- popup.js: a stale worker asks for Reload Glance ---\n');
+  {
+    const fresh = load({}, {});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), fresh.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('without a page stamp the reload line stays hidden', fresh.document.getElementById('reloadGlance').hidden === true);
+    const stale = load({}, { pageStamp: '0.9.40', workerBuild: '0.9.34' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), stale.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const staleLine = stale.document.getElementById('reloadGlance');
+    check('a worker still on the previous stamp shows Reload Glance', staleLine.hidden === false && staleLine.textContent === 'Reload Glance', staleLine.textContent);
+    const quiet = load({}, { pageStamp: '0.9.40', workerBuild: '' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), quiet.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('a worker that does not answer the stamp shows Reload Glance', quiet.document.getElementById('reloadGlance').hidden === false && quiet.document.getElementById('reloadGlance').textContent === 'Reload Glance');
+    const same = load({}, { pageStamp: '0.9.40', workerBuild: '0.9.40' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), same.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('matching stamps keep the reload line hidden', same.document.getElementById('reloadGlance').hidden === true);
+  }
+
+  console.log('\n--- popup.js: Outlook Do It with Google disconnected ---\n');
+  {
+    const iso = isoDaysFromNow(1);
+    const text = 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate';
+    const base = {
+      ts: Date.now(),
+      kind: 'shown',
+      app: 'outlook',
+      messageId: 'todo-mail',
+      threadId: 'ol:ctodo',
+      threadUrl: 'https://outlook.live.com/mail/0/inbox/id/AQQKtodo',
+      subject: 'Gate 0.9.35 To Do title',
+      text: text,
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      outlookIncomingId: 'todo-mail',
+      intent: {
+        type: 'decision',
+        label: 'Log commitment for Oct 9',
+        confidence: 'high',
+        personalClose: 'dated-commitment',
+        facts: { date: { iso: iso } },
+        entities: { what: 'renew the passport application' },
+        signals: { score: 80 }
+      }
+    };
+    const taskStored = {
+      log: [Object.assign({}, base, {
+        process: {
+          id: 'log-it',
+          name: 'Log It',
+          steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the passport application', dateIso: iso } }]
+        }
+      })]
+    };
+    const taskOpts = {};
+    const task = load(taskStored, taskOpts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), task.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const taskHost = task.document.getElementById('open-list');
+    const taskBtn = find(taskHost, 'primary')[0];
+    check('the commitment card is on the Open list', Boolean(taskBtn), find(taskHost, 'log-label').map((n) => n.textContent));
+    if (taskBtn) await Promise.all((taskBtn.listeners.click || []).map((fn) => Promise.resolve().then(fn)));
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const taskExec = (taskOpts.executes || [])[0] || {};
+    const taskWritten = (task.store().log || []).filter((e) => e && e.kind === 'written');
+    check('Do It writes Microsoft To Do, not a reply draft, with Google disconnected',
+      taskExec.connectorId === 'outlookTask'
+      && !(taskOpts.fetches || []).some((u) => /createReply/i.test(u))
+      && !(taskOpts.messages || []).includes('flow:follow-task')
+      && taskWritten.some((e) => e.fetchedBack === true && e.system === 'microsoft/todo' && e.connectorId === 'outlookTask')
+      && taskWritten.every((e) => !/Reply draft ready/.test(String(e.label || ''))),
+      { exec: taskExec.connectorId, fetches: taskOpts.fetches, messages: taskOpts.messages, written: taskWritten.map((e) => ({ label: e.label, system: e.system, fetchedBack: e.fetchedBack, connectorId: e.connectorId })) });
+
+    const fileOpts = {
+      executeReply: {
+        ok: true,
+        written: 'Saved on OneDrive.',
+        ref: { externalId: 'FILE9', driveId: 'me', itemId: 'FILE9' },
+        proof: { system: 'microsoft/onedrive', externalId: 'FILE9', fetchedBack: true, verifiedAt: '2026-10-08T07:00:00.000Z' }
+      }
+    };
+    const fileStored = {
+      log: [Object.assign({}, base, {
+        messageId: 'file-mail',
+        subject: 'Gate 0.9.37 OneDrive save',
+        intent: Object.assign({}, base.intent, { label: 'Save the file' }),
+        process: {
+          id: 'save-file',
+          name: 'Save the file',
+          closedLine: 'Saved on OneDrive.',
+          steps: [
+            { kind: 'onedriveFile', id: 'onedriveFile', params: { name: 'signed-NDA.pdf' } },
+            { kind: 'outlookDraft', id: 'outlookDraft', params: {} }
+          ]
+        }
+      })]
+    };
+    const file = load(fileStored, fileOpts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), file.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const fileBtn = find(file.document.getElementById('open-list'), 'primary')[0];
+    check('the file card is on the Open list', Boolean(fileBtn));
+    if (fileBtn) await Promise.all((fileBtn.listeners.click || []).map((fn) => Promise.resolve().then(fn)));
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const fileExec = (fileOpts.executes || [])[0] || {};
+    check('Do It on a file card writes OneDrive, not a reply draft',
+      fileExec.connectorId === 'onedriveFile' && !(fileOpts.fetches || []).some((u) => /createReply/i.test(u)),
+      { exec: fileExec.connectorId, fetches: fileOpts.fetches });
+
+    const draftOpts = {};
+    const draftStored = {
+      outlookAuth: { token: { accessToken: 'AT', grantedScopes: ['Mail.Read', 'Mail.ReadWrite'] }, account: { address: 'me@contoso.com' } },
+      log: [Object.assign({}, base, {
+        messageId: 'draft-mail',
+        subject: 'Please reply',
+        intent: Object.assign({}, base.intent, { label: 'Reply' }),
+        process: { id: 'reply', name: 'Reply', steps: [{ kind: 'outlookDraft', id: 'outlookDraft', params: {} }] }
+      })]
+    };
+    const draft = load(draftStored, draftOpts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), draft.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const draftBtn = find(draft.document.getElementById('open-list'), 'primary')[0];
+    check('the reply card is on the Open list', Boolean(draftBtn));
+    if (draftBtn) {
+      try { await Promise.all((draftBtn.listeners.click || []).map((fn) => Promise.resolve().then(fn))); }
+      catch (e) { /* a refused Graph call must not become a To Do write */ }
+    }
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const handledStored = {
+      log: [{
+        kind: 'written', app: 'outlook', messageId: 'handled-park', ts: Date.now(),
+        connectorId: 'outlookTask', fetchedBack: true, system: 'microsoft/todo',
+        label: 'Renew the parking permit by Oct 11',
+        actionTitle: 'Renew the parking permit by Oct 11'
+      }, Object.assign({}, base, {
+        messageId: 'still-park',
+        subject: 'Parking permit - please renew by Sunday',
+        text: 'Please renew the parking permit by Sunday, October 11.',
+        intent: Object.assign({}, base.intent, { label: 'Renew the parking permit by Oct 11', personalClose: 'follow-up-ask', type: 'request', noReplyDraft: true }),
+        process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit by Oct 11' } }] }
+      })]
+    };
+    const handled = load(handledStored, {});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), handled.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const heads = find(handled.document.getElementById('open-list'), 'loops-section').map((n) => n.getAttribute('data-glance-section'));
+    check('Loops shows Added for a Handled row and Suggested for the open Do It',
+      heads.indexOf('added') >= 0 && heads.indexOf('suggested') >= 0, heads);
+    const doIts = find(handled.document.getElementById('open-list'), 'primary');
+    check('that open parking row is one Do It', doIts.length === 1, doIts.length);
+
+    check('a reply ask still does not write Microsoft To Do',
+      !(draftOpts.executes || []).some((p) => p && (p.connectorId === 'outlookTask' || p.connectorId === 'onedriveFile')),
+      draftOpts.executes);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

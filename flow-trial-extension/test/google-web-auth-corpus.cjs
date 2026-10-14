@@ -147,6 +147,7 @@ function load(opts) {
           }
         }
       },
+      contextMenus: { removeAll(cb) { if (cb) cb(); }, create(o, cb) { if (cb) cb(); }, onClicked: { addListener() {} } },
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       tabs: { sendMessage: () => {} },
       alarms: { create: () => {}, onAlarm: { addListener() {} } }
@@ -280,7 +281,10 @@ async function run() {
   {
     const env = load({
       stored: { googleTasksAuth: { taskListId: 'LIST_A' } },
-      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_ok' }) } }]]
+      routes: [
+        [/\/lists\/LIST_A\/tasks$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_ok' }) } }],
+        [/\/lists\/LIST_A\/tasks\/task_ok$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_ok' }) } }]
+      ]
     });
     const out = await attempt(env.fn('googleTasksWrite')({ label: 'Send the SOW', facts: {}, senderName: 'Dana' }));
     check('a chrome-token write succeeds', out.ok === true && out.value && out.value.ok === true, out);
@@ -293,14 +297,17 @@ async function run() {
     let n = 0;
     const env = load({
       stored: { googleTasksAuth: { taskListId: 'LIST_A' } },
-      routes: [[/\/lists\/LIST_A\/tasks$/, {
-        get reply() {
-          n += 1;
-          return n === 1
-            ? { ok: false, status: 401, json: async () => ({}) }
-            : { ok: true, status: 200, json: async () => ({ id: 'task_4' }) };
-        }
-      }]]
+      routes: [
+        [/\/lists\/LIST_A\/tasks\/task_4$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_4' }) } }],
+        [/\/lists\/LIST_A\/tasks$/, {
+          get reply() {
+            n += 1;
+            return n === 1
+              ? { ok: false, status: 401, json: async () => ({}) }
+              : { ok: true, status: 200, json: async () => ({ id: 'task_4' }) };
+          }
+        }]
+      ]
     });
     const out = await attempt(env.fn('googleTasksWrite')({ label: 'Send the SOW', facts: {}, senderName: 'Dana' }));
     check('a 401 on a chrome token still succeeds after one refresh', out.ok && out.value && out.value.ok === true, out);
@@ -378,14 +385,17 @@ async function run() {
         googleTasksAuth: { taskListId: 'LIST_A' },
         googleWebAuth: { accessToken: 'ya29.for-tasks', expiresAt: Date.now() + 3600e3 }
       },
-      routes: [[/\/lists\/LIST_A\/tasks$/, {
-        get reply() {
-          posts += 1;
-          return posts === 1
-            ? { ok: false, status: 401, json: async () => ({}) }
-            : { ok: true, status: 200, json: async () => ({ id: 'task_web' }) };
-        }
-      }]]
+      routes: [
+        [/\/lists\/LIST_A\/tasks\/task_web$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_web' }) } }],
+        [/\/lists\/LIST_A\/tasks$/, {
+          get reply() {
+            posts += 1;
+            return posts === 1
+              ? { ok: false, status: 401, json: async () => ({}) }
+              : { ok: true, status: 200, json: async () => ({ id: 'task_web' }) };
+          }
+        }]
+      ]
     });
     // The loader returns answer.reply once, evaluated when the route matches.
     // A getter on the route object is read each match if we look up answer.reply each time.

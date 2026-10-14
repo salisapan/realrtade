@@ -321,7 +321,8 @@ const FlowActions = (() => {
     } else if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
       id = sig.handoff ? 'schedule-confirm' : 'schedule';
     } else if (intent.type === FlowIntent.TYPES.REQUEST) {
-      id = 'reply-track';
+      // "No need to reply" is the task, not Reply & Track.
+      id = intent.noReplyDraft ? 'log-it' : 'reply-track';
     } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
       id = 'follow-through';
     } else {
@@ -437,11 +438,12 @@ const FlowActions = (() => {
       };
     }
     if (g.personalClose === 'drive-file') {
+      const onedrive = g.target === 'onedrive';
       const fileStep = {
         id: 'file',
         kind: 'driveFile',
-        label: 'Drive',
-        hint: 'Save the attached file',
+        label: onedrive ? 'OneDrive' : 'Drive',
+        hint: onedrive ? 'Save the attached file to OneDrive' : 'Save the attached file',
         dependsOn: null,
         params: { copyAttachment: true, googleClose: g }
       };
@@ -457,7 +459,7 @@ const FlowActions = (() => {
         id: 'file-it',
         name: 'File it',
         closingLine: g.cardLine,
-        closedLine: 'Saved to Drive, link drafted.',
+        closedLine: onedrive ? 'Saved on OneDrive.' : 'Saved to Drive, link drafted.',
         steps: [fileStep, draftStep]
       };
     }
@@ -518,9 +520,11 @@ const FlowActions = (() => {
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 
-    const steps = orderedKinds
+    let steps = orderedKinds
       .map((kind) => buildStep(kind, intent, e, ctx, hasAttachment))
       .filter(Boolean);
+    // "No need to reply" drops the draft. The task stays.
+    if (intent.noReplyDraft) steps = steps.filter((s) => s && s.kind !== 'gmailDraft' && s.kind !== 'outlookDraft');
     if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
 
     return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };

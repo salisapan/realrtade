@@ -69,6 +69,10 @@ function load(opts) {
           return typeof answer.reply === 'function' ? answer.reply(calls.length, bodies[bodies.length - 1]) : answer.reply;
         }
       }
+      // googleTasksWrite reads the created task back. A test that needs the
+      // GET to fail registers its own route; anything else confirms the id.
+      const taskRead = method === 'GET' && String(url).match(/\/lists\/[^/]+\/tasks\/([^/?]+)(?:\?.*)?$/);
+      if (taskRead) return res(200, { id: decodeURIComponent(taskRead[1]), status: 'needsAction' });
       return res(500, { error: { message: 'unrouted: ' + method + ' ' + url } });
     },
     chrome: {
@@ -169,8 +173,12 @@ async function run() {
     check('a connected write succeeds', out.ok === true, out);
     check('it writes to the stored list', env.calls.includes('POST /lists/LIST_A/tasks'), env.calls);
     check('the undo ref names the list it actually wrote to',
-      (out.ref || {}).taskListId === 'LIST_A' && (out.ref || {}).taskId === 'task_1', out);
-    check('one request, no speculative extra round trips', env.calls.length === 1, env.calls);
+      (out.ref || {}).taskListId === 'LIST_A' && (out.ref || {}).taskId === 'task_1' && (out.ref || {}).externalId === 'task_1', out);
+    check('POST then one read-back, no extra round trips',
+      env.calls.length === 2 && env.calls[0] === 'POST /lists/LIST_A/tasks' && env.calls[1] === 'GET /lists/LIST_A/tasks/task_1', env.calls);
+    check('the read-back is a proof',
+      out.proof && out.proof.fetchedBack === true && out.proof.system === 'google/tasks' && out.proof.externalId === 'task_1' && typeof out.proof.verifiedAt === 'string',
+      out.proof);
   }
 
   console.log('\n--- background.js: the task actually carries what was decided, not just metadata ---\n');
@@ -247,7 +255,7 @@ async function run() {
     });
     const out = await attempt(env.fn('googleTasksWrite')(PAYLOAD));
     check('the write recovers instead of failing permanently', out.ok === true, out);
-    check('the new list id is persisted, so the next write is one request again',
+    check('the new list id is persisted for the next write',
       env.stored.googleTasksAuth.taskListId === 'LIST_B', env.stored.googleTasksAuth);
     check('the undo ref points at the list the task really landed in',
       (out.ref || {}).taskListId === 'LIST_B', out);
@@ -362,6 +370,72 @@ async function run() {
     const out = await attempt(env.fn('googleTasksUndo')({ taskListId: 'LIST_OLD', taskId: 'task_9' }));
     check('the ref\'s own list wins over the currently stored one',
       out.ok === true && env.calls.includes('DELETE /lists/LIST_OLD/tasks/task_9'), env.calls);
+  }
+
+  console.log('\n--- background.js: Google Tasks Handled only after the task is read back ---\n');
+  {
+    const side = { console };
+    vm.createContext(side);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'proof-of-close.js'), 'utf8'), side, { filename: 'proof-of-close.js' });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'receipt-copy.js'), 'utf8'), side, { filename: 'receipt-copy.js' });
+    const Proof = vm.runInContext('FlowProofOfClose', side);
+    const Receipt = vm.runInContext('FlowReceipt', side);
+
+    const miss = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/lists\/LIST_A\/tasks$/, { method: 'POST', reply: res(200, { id: 'task_miss' }) }],
+        [/\/lists\/LIST_A\/tasks\/task_miss$/, { method: 'GET', reply: res(404, {}) }]
+      ]
+    });
+    const missed = await attempt(miss.fn('googleTasksWrite')(PAYLOAD));
+    check('a GET miss is not ok', missed.ok === false && missed.reason === 'verify_failed' && !missed.proof, missed);
+    check('POST still happened, then the GET that missed',
+      miss.calls[0] === 'POST /lists/LIST_A/tasks' && miss.calls[1] === 'GET /lists/LIST_A/tasks/task_miss', miss.calls);
+    const missCopy = Receipt.confirmation({
+      succeeded: 0, total: 1, priorCloses: 0, requireProof: true, proofs: [], verifyStatus: missed.reason
+    });
+    check('a verify miss is not Handled',
+      Proof.allowsHandled(missed) === false && missCopy.status !== 'Handled.' && missCopy.status !== 'טופל.' && missCopy.full === false,
+      missCopy);
+
+    const pending = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { method: 'POST', reply: res(200, {}) }]]
+    });
+    const unconfirmed = await attempt(pending.fn('googleTasksWrite')(PAYLOAD));
+    check('a create with no id is proof_pending and does not GET',
+      unconfirmed.ok === false && unconfirmed.reason === 'proof_pending' && pending.calls.length === 1 && pending.calls[0].startsWith('POST '),
+      { out: unconfirmed, calls: pending.calls });
+
+    const mismatch = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/lists\/LIST_A\/tasks$/, { method: 'POST', reply: res(200, { id: 'task_ok' }) }],
+        [/\/lists\/LIST_A\/tasks\/task_ok$/, { method: 'GET', reply: res(200, { id: 'other' }) }]
+      ]
+    });
+    const wrong = await attempt(mismatch.fn('googleTasksWrite')(PAYLOAD));
+    check('a GET that returns a different id is verify_failed', wrong.ok === false && wrong.reason === 'verify_failed', wrong);
+
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/lists\/LIST_A\/tasks$/, { method: 'POST', reply: res(200, { id: 'task_proved', status: 'needsAction' }) }],
+        [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'GET', reply: res(200, { id: 'task_proved', status: 'needsAction' }) }],
+        [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'DELETE', reply: res(204, {}) }]
+      ]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')(PAYLOAD));
+    const copy = Receipt.confirmation({
+      succeeded: 1, total: 1, priorCloses: 4, requireProof: true, proofs: [out.proof]
+    });
+    check('POST and GET ok is a proof and the receipt says Handled',
+      out.ok === true && Proof.allowsHandled(out) === true && out.proof.system === 'google/tasks' && out.proof.fetchedBack === true && copy.status === 'Handled.' && copy.full === true,
+      { out, copy });
+    const undo = await attempt(env.fn('googleTasksUndo')({ taskListId: out.ref.taskListId, externalId: out.proof.externalId }));
+    check('Undo deletes that task by externalId',
+      undo.ok === true && env.calls.includes('DELETE /lists/LIST_A/tasks/task_proved'), env.calls);
   }
 
   console.log('\n--- background.js: a Calendar undo tolerates 410 Gone ---\n');
@@ -824,6 +898,28 @@ async function run() {
       out.written === 'Google Task · due Sep 21', out.written);
   }
 
+  console.log('\n--- background.js: a Gmail task title ignores Hi and the subject ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_hi' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Log commitment for Oct 9',
+      senderName: 'flow',
+      subject: 'Gate 0.9.34 To Do title',
+      bodyText: 'Hi, We agreed to renew the passport application by Friday.',
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/abc',
+      now: '2026-10-07T12:00:00.000Z',
+      params: { dateIso: '2026-10-09', what: 'renew the passport application' }
+    }));
+    const body = env.bodies.find((b) => b && b.title) || {};
+    check('Gmail posts the commitment, not the subject or the greeting',
+      out.ok === true && body.title === 'Renew the passport application' &&
+      body.title.indexOf('Gate') < 0 && body.title.indexOf('Hi') < 0 && body.title.indexOf('flow') < 0,
+      body);
+  }
+
   console.log('\n--- background.js: a confirmed amount with no date is the close, and only that ---\n');
   {
     const env = load({
@@ -1043,6 +1139,67 @@ async function run() {
       params: { title: 'Sync', dateIso: '2026-09-21', hour: 15, minute: 0 }
     }));
     check('a Calendar API error is not a success', apiFail.ok === false && !apiFail.written, apiFail);
+  }
+
+  console.log('\n--- background.js: file-on-hold puts the one Drive file on the event ---\n');
+  {
+    const file = { id: 'pdf1', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' };
+    const one = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/drive\/v3\/files\?/, { reply: res(200, { files: [file] }) }],
+        [/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_hold', htmlLink: 'https://calendar.google.com/event?eid=hold' }) }]
+      ]
+    });
+    const out = await attempt(one.fn('googleCalendarWrite')({
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/thread1',
+      params: {
+        title: 'glance-pricing-q4.pdf',
+        dateIso: '2026-10-08',
+        hour: 10,
+        minute: 0,
+        requireTime: true,
+        fileTerm: 'glance-pricing-q4.pdf',
+        quote: 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.'
+      }
+    }));
+    const postAt = one.bodies.findIndex((b) => b && b.summary);
+    const posted = postAt >= 0 ? one.bodies[postAt] : null;
+    check('one Drive file becomes a calendar event', out.ok === true && out.ref && out.ref.eventId === 'ev_hold', out);
+    check('the event is 8 Oct 2026 at 10:00',
+      posted && posted.start && posted.start.dateTime === '2026-10-08T10:00:00', posted);
+    check('the description carries the Drive link',
+      posted && posted.description.indexOf('File: glance-pricing-q4.pdf') !== -1 &&
+      posted.description.indexOf('https://drive.google.com/file/d/pdf1/view') !== -1,
+      posted && posted.description);
+    check('a missing file is a failure and does not create an event', await (async () => {
+      const none = load({
+        stored: CONNECTED,
+        routes: [
+          [/\/drive\/v3\/files\?/, { reply: res(200, { files: [] }) }],
+          [/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]
+        ]
+      });
+      const missed = await attempt(none.fn('googleCalendarWrite')({
+        params: { title: 'Hold', dateIso: '2026-10-08', hour: 10, minute: 0, requireTime: true, fileTerm: 'glance-pricing-q4.pdf' }
+      }));
+      return missed.ok === false && missed.reason === 'unclear' && /No single file/.test(missed.error || '') &&
+        !none.calls.some((c) => c.indexOf('POST /calendars/primary/events') === 0);
+    })());
+    check('two Drive files are a failure and do not create an event', await (async () => {
+      const many = load({
+        stored: CONNECTED,
+        routes: [
+          [/\/drive\/v3\/files\?/, { reply: res(200, { files: [file, { id: 'pdf2', name: 'copy-glance-pricing-q4.pdf', mimeType: 'application/pdf' }] }) }],
+          [/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]
+        ]
+      });
+      const both = await attempt(many.fn('googleCalendarWrite')({
+        params: { title: 'Hold', dateIso: '2026-10-08', hour: 10, minute: 0, requireTime: true, fileTerm: 'glance-pricing-q4.pdf' }
+      }));
+      return both.ok === false && both.reason === 'unclear' &&
+        !many.calls.some((c) => c.indexOf('POST /calendars/primary/events') === 0);
+    })());
   }
 
   console.log('\n--- background.js: a named cancel deletes one event, and a named move patches it ---\n');

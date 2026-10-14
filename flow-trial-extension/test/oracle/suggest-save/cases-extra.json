@@ -1,0 +1,1348 @@
+[
+ {
+  "desc": "x01 doc with a cid the body references (inline-by-cid)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "terms.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": "terms@x",
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [
+    "terms@x"
+   ],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x02 doc with an unreferenced Content-ID (Gmail parts often carry one)",
+  "input": {
+   "surface": "gmail",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "terms.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": "<f_abc>",
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:show"
+  }
+ },
+ {
+  "desc": "x03 png 300KB but has a cid",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "p",
+     "name": "photo.png",
+     "contentType": "image/png",
+     "size": 307200,
+     "isInline": false,
+     "contentId": "ii_1",
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x04 Outlook-*.png 300KB",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "p",
+     "name": "Outlook-abc123.png",
+     "contentType": "image/png",
+     "size": 307200,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x05 jpg 60KB (under 100KB)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "p",
+     "name": "receipt.jpg",
+     "contentType": "image/jpeg",
+     "size": 61440,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x06 gif 500KB (not in image allowlist)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "p",
+     "name": "anim.gif",
+     "contentType": "image/gif",
+     "size": 512000,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x07 1KB txt (under 2KB)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "t",
+     "name": "note.txt",
+     "contentType": "text/plain",
+     "size": 1024,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x08 winmail.dat + vcf + referenceAttachment",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "w",
+     "name": "winmail.dat",
+     "contentType": "application/ms-tnef",
+     "size": 40960,
+     "kind": "file"
+    },
+    {
+     "id": "v",
+     "name": "dana.vcf",
+     "contentType": "text/vcard",
+     "size": 3072,
+     "kind": "file"
+    },
+    {
+     "id": "r",
+     "name": "Budget.xlsx",
+     "size": 0,
+     "kind": "reference"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x09 zip 2MB (not in allowlist)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "z",
+     "name": "files.zip",
+     "contentType": "application/zip",
+     "size": 2097152,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x10 Precedence: bulk without List-Unsubscribe",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": "bulk"
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:bulk"
+  }
+ },
+ {
+  "desc": "x11 engine quiet:noise",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "quiet:noise",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:bulk"
+  }
+ },
+ {
+  "desc": "x12 noreply sender alone does not block",
+  "input": {
+   "surface": "gmail",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Thanks for your payment. Receipt attached.",
+   "subject": "Receipt",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:show"
+  }
+ },
+ {
+  "desc": "x13 too large: every file over the upload limit",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "big.pdf",
+     "contentType": "application/pdf",
+     "size": 31457280,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": 4194304
+  },
+  "expect": {
+   "reason": "suggest:too-large"
+  }
+ },
+ {
+  "desc": "x14 too large: one of two dropped, chip for the other",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "big.pdf",
+     "contentType": "application/pdf",
+     "size": 31457280,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    },
+    {
+     "id": "a2",
+     "name": "small.pdf",
+     "contentType": "application/pdf",
+     "size": 92160,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": 4194304
+  },
+  "expect": {
+   "reason": "suggest:show",
+   "count": 1
+  }
+ },
+ {
+  "desc": "x15 explicit save n=1 + an inline logo (still n=1 real file)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "contract.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    },
+    {
+     "id": "i",
+     "name": "image001.png",
+     "contentType": "image/png",
+     "size": 5120,
+     "isInline": true,
+     "contentId": "image001",
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "show",
+    "explicit": {
+     "step": "file_save"
+    },
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:other-card"
+  }
+ },
+ {
+  "desc": "x16 explicit reply draft + 2 PDFs",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "a.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    },
+    {
+     "id": "a2",
+     "name": "b.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "show",
+    "explicit": {
+     "step": "draft"
+    },
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:other-card"
+  }
+ },
+ {
+  "desc": "x17 one of two already saved -> chip for the other",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "a.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    },
+    {
+     "id": "a2",
+     "name": "b.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [
+    "a1"
+   ],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:show",
+   "count": 1
+  }
+ },
+ {
+  "desc": "x18 Outlook mail names Google Drive",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Please save the attachment to Google Drive",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:drive-target-on-outlook"
+  }
+ },
+ {
+  "desc": "x19 HE \"אין צורך לשמור\"",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "אין צורך לשמור את זה, רק לידיעתך",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:negated"
+  }
+ },
+ {
+  "desc": "x20 HE \"לא לשמור\"",
+  "input": {
+   "surface": "gmail",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "בבקשה לא לשמור בדרייב",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:negated"
+  }
+ },
+ {
+  "desc": "x21 draft (not sent) by someone else in Drafts",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": true,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:not-inbound"
+  }
+ },
+ {
+  "desc": "x22 attachments read but list empty (hasAttachments was true)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x23 marketing words in body, no header",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Exclusive offer: 30% off, register now",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:bulk"
+  }
+ },
+ {
+  "desc": "x24 file with no size",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a",
+     "name": "x.pdf",
+     "contentType": "application/pdf",
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:no-files"
+  }
+ },
+ {
+  "desc": "x25 dismissed via Undo key (not message id)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [
+    "msg-x|a1"
+   ],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:dismissed"
+  }
+ },
+ {
+  "desc": "x26 names a shared location as the target",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Attached is the CV. Please save it to our shared files by October 15.",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:other-target"
+  }
+ },
+ {
+  "desc": "x27 SharePoint target, HE surface Gmail",
+  "input": {
+   "surface": "gmail",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "תעלה את הקובץ לשרפוינט בבקשה",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:other-target"
+  }
+ },
+ {
+  "desc": "x28 engine handed the mail to the file chain",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "file",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:other-card"
+  }
+ },
+ {
+  "desc": "x30 \"you don't need to save\" (core SAVE_NO misses it)",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "You don't need to save the attachment. Regards",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:negated"
+  }
+ },
+ {
+  "desc": "x31 HE upload refusal \"אל תעלי את המצורף\"",
+  "input": {
+   "surface": "outlook",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "אל תעלי את המצורף ל-OneDrive",
+   "subject": "",
+   "judgment": {
+    "reason": "intent-null",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:negated"
+  }
+ },
+ {
+  "desc": "x29 engine waits on a Drive lookup",
+  "input": {
+   "surface": "gmail",
+   "direction": "inbound",
+   "senderIsUser": false,
+   "isDraft": false,
+   "inSent": false,
+   "consent": true,
+   "attachmentsRead": true,
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Q3-report.pdf",
+     "contentType": "application/pdf",
+     "size": 245760,
+     "isInline": false,
+     "contentId": null,
+     "kind": "file"
+    }
+   ],
+   "bodyCids": [],
+   "headers": {
+    "listUnsubscribe": null,
+    "precedence": null
+   },
+   "text": "Hi, attached is the Q3 report. Thanks",
+   "subject": "",
+   "judgment": {
+    "reason": "google-wait(drive-lookup)",
+    "explicit": null,
+    "marketing": false
+   },
+   "messageId": "msg-x",
+   "savedFileIds": [],
+   "dismissed": [],
+   "uploadLimitBytes": null
+  },
+  "expect": {
+   "reason": "suggest:other-card"
+  }
+ }
+]

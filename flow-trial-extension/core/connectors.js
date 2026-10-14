@@ -56,7 +56,7 @@ const FLOW_CONNECTORS = [
     // The rest still work (see WRITERS/UNDOERS in background.js) but aren't
     // part of onboarding until the core loop has proven itself.
     mvp: true,
-    note: 'One Google sign-in, covering Tasks, Calendar, Gmail drafts, and Drive files Glance itself creates — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; prepares (never sends) draft replies; and, when the close is a file, creates that Doc, Sheet, or Drive file from what the email already says. Undo removes it.'
+    note: 'One native Google sign-in, covering Tasks, Calendar, Gmail drafts, and Drive files Glance itself creates — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; prepares (never sends) draft replies; and, when the close is a file, creates that Doc, Sheet, or Drive file from what the email already says. Undo removes it.'
   },
   {
     id: 'notion',

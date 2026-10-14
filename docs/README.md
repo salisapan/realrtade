@@ -27,7 +27,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | **The recognition order and the one external step** | `ai-ladder.md` (owns it), `when-recognition-fails.md`, `intent-model.md` | `core/ai-ladder.js`, `glance-assist/ladder.js`, `src/background.js`, `src/follow.js` | `test/ai-ladder-*-corpus.cjs`, `glance-assist/ladder.test.cjs`, `scripts/ai-ladder/eval.cjs` |
 | **A review of every model and AI layer: what runs where, what is on or off, what was tested and failed, the numbers and their limits** (for David and any agent) | `ai-models-overview.md` (Hebrew) | see the table in that file | - |
 | The on-device engine and how it learns | `intent-model.md`, `ai-engine-upgrade.md`, `reply-model.md`, `human-eval.md` | `core/request-types.js`, `intent-model.js`, `intent-pipeline.js`, `reply-model.js` | `intent-model-corpus`, `reply-model-corpus`, `request-types-corpus` |
-| **True close: when a loop is closed** | `true-close.md`, `open-loops.md`, `reply-model.md` | `core/follow-up.js` (`classifyReplyText`), `core/reply-meaning.js` | `test/true-close-corpus.cjs`, `reply-closure-corpus` |
+| **True close: when a loop is closed** | `true-close.md`, `open-loops.md`, `reply-model.md`, `computer-proof-gate.md` | `core/follow-up.js` (`classifyReplyText`), `core/reply-meaning.js`, `core/proof-of-close.js`, `core/commitment-title.js`, `core/display-copy.js`, `core/step-list.js`, `core/onedrive-file.js`, `core/suggest-save.js` | `test/true-close-corpus.cjs`, `reply-closure-corpus`, `test/proof-of-close-corpus.cjs`, `test/outlook-todo-corpus.cjs`, `test/commitment-title-corpus.cjs`, `test/onedrive-file-corpus.cjs`, `test/computer-proof-corpus.cjs`, `test/suggest-save-corpus.cjs`, `test/suggest-save-parity-corpus.cjs`, `test/display-0941-corpus.cjs` |
 | Multi-step resolution (receipts, contract, quote, proposal, signed copy) | `resolution-paths.md`, `true-close.md` §4, `file-backed-closure-plan.md` | `core/resolution.js`, `src/follow.js` | `test/resolution-corpus.cjs`, harness section 32 and 32j |
 | Close chains: one requirement (file, fact, date, approval, answer), search connected sources, draft or needs-you, close only on real completion. An ask that gets someone else to act is silence, not a file prepare. Gmail and Outlook pass the same Drive and thread evidence | `true-close.md` §4, `resolution-paths.md`, `multi-platform.md`, `reply-model.md` | `core/close-chains.js`, `core/file-attach.js`, `core/source-text.js`, `src/content-gmail.js`, `src/content-outlook.js`, `src/outlook.js` | `test/close-chains-corpus.cjs`, `test/third-party-ask-corpus.cjs`, `test/source-parity-corpus.cjs`, `test/gmail-outlook-parity-corpus.cjs`, `test/owa-page-harness.cjs` |
 | A model on the person's own computer | `local-model-server.md` | `core/local-lm.js`, `local-lm-server.js` | `local-lm-corpus`, `local-lm-server-corpus` |
@@ -37,6 +37,11 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Community (cross-user) learning (**dormant**) | `community-learning.md` | `core/community.js` | `community-corpus` |
 | Packaging, the Chrome Web Store, setup | `flow-trial-extension/docs/SETUP.md`, `chrome-web-store-submission.md`, `hybrid-execution-architecture.md` §0c | `scripts/package_trial_extension.py` (lite/full), `scripts/verify_trial_install.py` | `verify_trial_install.py` |
 | Open work, blockers, decisions | `open-tasks.md` | - | - |
+| Glance's own model lab (offline; v2 default, v2.1 in shadow). Flow is not this lab. Per-user profile relevance is lab-only (`docs/glance-ai/user-context-v0.md`) | `docs/glance-ai/STATE.md`, `docs/glance-ai/user-context-v0.md` | `glance-ai/README.md`, `glance-ai/labeling/README.md`, `glance-ai/profile/schema.json` | `glance-ai/oss/veto/test-hebrew-amount.cjs`, `glance-ai/model/suggest-save/test-corpus.cjs`, `glance-ai/model/suggest-save/check_dataset.py`, `glance-ai/labeling/test-ingest.cjs`, `glance-ai/labeling/test-score.cjs`, `glance-ai/profile/test-profile.cjs` |
+| **Glance as an AI product** (owner 2026-10-09: levels 2 and 3, cloud + device): the Understanding and the Plan, the three tiers, the floor that stays locked, owner decisions, milestones M1–M7 built by the daily Claude routine | `docs/glance-ai/ai-product.md` (spec, awaiting owner approval) | `core/exec-router.js`, `core/ai-ladder.js`, `core/json-enforce.js`, `core/local-lm.js`, `glance-assist/` | `ai-ladder-*-corpus`, `exec-router-corpus`, lab sets in `glance-ai/eval-data/` |
+| **Client requests** (owner wedge 2026-10-10: accountants and lawyers): what a firm asked its clients for, item by item, until it really arrived (engine only; no surface yet) | `docs/glance-ai/client-requests.md` | `core/client-requests.js`, `src/client-requests-store.js`, `config/client-requests.public.js` | `client-requests-corpus`, `client-requests-store-corpus`, `follow-items-corpus` |
+| Which personal loops Glance can close, what this tip covers, and the slices after the steps list. Flow is not this map | `docs/glance-ai/holistic-close-map.md` | `core/proof-of-close.js`, `core/close-chains.js`, `core/request-types.js`, `src/background.js` | - |
+| When Glance is worth paying for. The chief of staff reads the yaml. Flow is not this bar | `docs/glance-ai/paid-readiness-bar.md` | `core/pmf-metrics.js`, `core/close-quality-metrics.js`, `docs/human-eval.md`, `docs/real-mail-eval/2026-10-08.md` | - |
 
 ## 2. When X changes, update these in the SAME commit
 
@@ -51,7 +56,15 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | A new multi-step document class | `core/resolution.js` `CLASSES`, `resolution-paths.md`, `true-close.md` §4, corpus + harness |
 | A new surface (an app) | `multi-platform.md`, the privacy page, the store text, in the same commit |
 | Anything decided, blocked or finished | `open-tasks.md` (and its "Last updated") |
+| Owner labels for the Glance model lab | `docs/glance-ai/STATE.md`, `glance-ai/labeling/README.md`, `open-tasks.md` |
+| Who an email is relevant to (profile role, history, work style). There is no blanket "Hi all" silence | `docs/glance-ai/user-context-v0.md`, `glance-ai/profile/schema.json`, `CLAUDE.md` "Owner product locks", one line in `vault/decisions.md` |
+| Which personal loops Glance should close next | `docs/glance-ai/holistic-close-map.md`, one line in `vault/decisions.md`. The release order stays in `open-tasks.md` |
+| Whether Glance is worth paying for, or a money step should wait | `docs/glance-ai/paid-readiness-bar.md` (the yaml `current` and `status`), one line in `vault/decisions.md` when `overall` changes |
+| A product fact or the release order | the truth file that owns it (`CLAUDE.md`, `open-tasks.md`, and the topic doc) and one dated line in `vault/decisions.md`, in the same change |
 | Anything David or the owner should do about money | `revenue-routines.md` |
+| An owner lock on product scope (what Glance or Flow is, consent, send rules, holds) | `CLAUDE.md` "Owner product locks", `open-tasks.md` if it changes work, and one dated line in `vault/decisions.md` that links here |
+| Who the person is, and whether group or Cc mail is offered or quiet | `docs/glance-ai/user-context-v0.md`, `CLAUDE.md` "Owner product locks", one line in `vault/decisions.md`. Product quiets (cc-only, addressed-to-other, the #118 no-To/Cc hedge) stay until the contrast-pair shadow test |
+| Flow sales and outreach rules, CoS routines | `revenue-routines.md` §8-§9, and one dated line in `vault/decisions.md` |
 
 ## 3. Every document, one line
 
@@ -61,8 +74,9 @@ Any description of Glance starts from the sentence above, and any report keeps t
 `hybrid-execution-architecture.md` device model + server for Do It proposals, dormant, packaging profiles, GPU diagnostics · `intent-model.md` the local engine and its tiers · `lm-fallback-evaluation-plan.md` small on-device model experiment (not met) ·
 `local-detection-plan.md` outcome identity and local closure · `local-first-principle.md` our code recognises first · `local-model-server.md` Ollama / LM Studio · `magic-moment.md` the first real close ·
 `monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
-`product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
-**`true-close.md` when a loop is closed, what was found and fixed** · `when-recognition-fails.md` the steps when a sentence is not recognised.
+`product-identity.md` an AI product; the close is what we sell · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
+**`true-close.md` when a loop is closed, what was found and fixed** · `computer-proof-gate.md` CoS checklist for the own-computer ProofOfClose wedge (one allowlisted page, DOM re-read; live driver not wired; local-file gate later) · `when-recognition-fails.md` the steps when a sentence is not recognised ·
+`docs/glance-ai/STATE.md` Glance model lab: candidates, headline metrics, gated Qwen table, blockers, owner-label path (still 0/200), next stages. The preview write-up is `docs/glance-ai/owner-gold-preview-2026-10-08.md`. · `docs/glance-ai/user-context-v0.md` UserContext v0: per-user profile, relevance of a mail to that person, and the offer or quiet lock. Offer when relevant and the close is feasible; silent when not relevant; unknown falls back to today. There is no blanket "Hi all" silence rule (Sali, 2026-10-08). Not wired into the extension. · `docs/glance-ai/holistic-close-map.md` personal close catalog, coverage on this tip, three slices after the steps list, five scenario Gates. · `docs/glance-ai/paid-readiness-bar.md` the worth-paying bar, today's scorecard, and the yaml a routine reads before any charge. · `vault/decisions.md` one dated line when a product fact or the release order changes.
 Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the numbers cited in the documents come from them.
 
 ## 4. Run everything (what "the tests pass" means)
@@ -71,6 +85,7 @@ Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the 
 cd flow-trial-extension
 for t in test/*-corpus.cjs; do node $t || echo "FAILED $t"; done          # 66 corpora, no network
 node test/follow-gmail-harness.cjs && node test/whatsapp-harness.cjs      # real content scripts in Chromium (takes ~10 minutes; SKIPPED without Playwright)
+npx playwright test                                                # headless unpacked-extension suite (CI: .github/workflows/glance-e2e.yml; live Gate stays, open-tasks row 56)
 cd ../flow-landing/netlify/functions/glance-assist
 for t in ladder model-router scrub-e2e style-hints; do node $t.test.cjs; done
 cd ../../../.. && python3 scripts/verify_trial_install.py                  # both packaging profiles, size guard, download handler
@@ -78,3 +93,7 @@ node scripts/ai-ladder/eval.cjs                                           # SKIP
 ```
 
 Nothing here can drive a real Gmail, a real provider, Stripe or Supabase: those checks are the owner's (`open-tasks.md` rows 34 and 35).
+
+## 5. The Obsidian vault (`docs/` is the vault)
+
+Open `docs/` as the vault in Obsidian, so these truth files show up there too. `docs/vault/` is only a view and a cache over them: `vault/Home.md` links here, and `vault/decisions.md` is a short dated log with one line per decision that links to the truth file. A vault note never holds a fact that is not in a truth file. Rule: `vault/when-to-write-to-vault.md`.

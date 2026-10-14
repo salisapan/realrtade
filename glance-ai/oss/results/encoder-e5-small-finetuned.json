@@ -1,0 +1,178 @@
+{
+ "model": "intfloat/multilingual-e5-small fine-tuned: top 6 of 12 layers + linear head (embeddings + lower 6 layers frozen), CPU, 3000 teacher-labeled examples, 2 epochs",
+ "ntrain": 3000,
+ "epochs": 2,
+ "train_s": 209,
+ "per_case_ms_bs1": 24.2,
+ "rss_peak_mb": 1384,
+ "results": {
+  "worker-test (teacher labels) t=0.5": {
+   "wrongDoIt%": 24.1,
+   "wrong_n": "274/1137",
+   "missed%": 22.6,
+   "missed_n": "82/363",
+   "acc%": 76.3
+  },
+  "eval ALL t=0.5": {
+   "wrongDoIt%": 12.6,
+   "wrong_n": "21/167",
+   "missed%": 36.1,
+   "missed_n": "39/108",
+   "acc%": 78.2
+  },
+  "eval EN t=0.5": {
+   "wrongDoIt%": 15.1,
+   "wrong_n": "14/93",
+   "missed%": 24.1,
+   "missed_n": "14/58",
+   "acc%": 81.5
+  },
+  "eval HE t=0.5": {
+   "wrongDoIt%": 9.5,
+   "wrong_n": "7/74",
+   "missed%": 50.0,
+   "missed_n": "25/50",
+   "acc%": 74.2
+  },
+  "SetB adversarial t=0.5": {
+   "wrongDoIt%": 15.6,
+   "wrong_n": "5/32",
+   "missed%": 63.6,
+   "missed_n": "7/11",
+   "acc%": 72.1
+  },
+  "SetC worker-adv t=0.5": {
+   "wrongDoIt%": 25.8,
+   "wrong_n": "8/31",
+   "missed%": 33.3,
+   "missed_n": "3/9",
+   "acc%": 72.5
+  },
+  "SetD gold22 t=0.5": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/20",
+   "missed%": 50.0,
+   "missed_n": "1/2",
+   "acc%": 95.5
+  },
+  "eval ALL + veto t=0.5": {
+   "wrongDoIt%": 2.4,
+   "wrong_n": "4/167",
+   "missed%": 36.1,
+   "missed_n": "39/108",
+   "acc%": 84.4
+  },
+  "worker-test (teacher labels) t=0.8": {
+   "wrongDoIt%": 8.7,
+   "wrong_n": "99/1137",
+   "missed%": 46.6,
+   "missed_n": "169/363",
+   "acc%": 82.1
+  },
+  "eval ALL t=0.8": {
+   "wrongDoIt%": 6.0,
+   "wrong_n": "10/167",
+   "missed%": 67.6,
+   "missed_n": "73/108",
+   "acc%": 69.8
+  },
+  "eval EN t=0.8": {
+   "wrongDoIt%": 9.7,
+   "wrong_n": "9/93",
+   "missed%": 48.3,
+   "missed_n": "28/58",
+   "acc%": 75.5
+  },
+  "eval HE t=0.8": {
+   "wrongDoIt%": 1.4,
+   "wrong_n": "1/74",
+   "missed%": 90.0,
+   "missed_n": "45/50",
+   "acc%": 62.9
+  },
+  "SetB adversarial t=0.8": {
+   "wrongDoIt%": 12.5,
+   "wrong_n": "4/32",
+   "missed%": 72.7,
+   "missed_n": "8/11",
+   "acc%": 72.1
+  },
+  "SetC worker-adv t=0.8": {
+   "wrongDoIt%": 3.2,
+   "wrong_n": "1/31",
+   "missed%": 66.7,
+   "missed_n": "6/9",
+   "acc%": 82.5
+  },
+  "SetD gold22 t=0.8": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/20",
+   "missed%": 50.0,
+   "missed_n": "1/2",
+   "acc%": 95.5
+  },
+  "eval ALL + veto t=0.8": {
+   "wrongDoIt%": 0.6,
+   "wrong_n": "1/167",
+   "missed%": 67.6,
+   "missed_n": "73/108",
+   "acc%": 73.1
+  },
+  "worker-test (teacher labels) t=0.9": {
+   "wrongDoIt%": 3.0,
+   "wrong_n": "34/1137",
+   "missed%": 71.9,
+   "missed_n": "261/363",
+   "acc%": 80.3
+  },
+  "eval ALL t=0.9": {
+   "wrongDoIt%": 3.0,
+   "wrong_n": "5/167",
+   "missed%": 84.3,
+   "missed_n": "91/108",
+   "acc%": 65.1
+  },
+  "eval EN t=0.9": {
+   "wrongDoIt%": 5.4,
+   "wrong_n": "5/93",
+   "missed%": 70.7,
+   "missed_n": "41/58",
+   "acc%": 69.5
+  },
+  "eval HE t=0.9": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/74",
+   "missed%": 100.0,
+   "missed_n": "50/50",
+   "acc%": 59.7
+  },
+  "SetB adversarial t=0.9": {
+   "wrongDoIt%": 3.1,
+   "wrong_n": "1/32",
+   "missed%": 90.9,
+   "missed_n": "10/11",
+   "acc%": 74.4
+  },
+  "SetC worker-adv t=0.9": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/31",
+   "missed%": 88.9,
+   "missed_n": "8/9",
+   "acc%": 80.0
+  },
+  "SetD gold22 t=0.9": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/20",
+   "missed%": 50.0,
+   "missed_n": "1/2",
+   "acc%": 95.5
+  },
+  "eval ALL + veto t=0.9": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/167",
+   "missed%": 84.3,
+   "missed_n": "91/108",
+   "acc%": 66.9
+  }
+ }
+}

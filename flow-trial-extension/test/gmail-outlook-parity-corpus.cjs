@@ -207,7 +207,13 @@ const CASES = [
     const gDraft = gShown && g.process.steps.some((s) => s.kind === 'gmailDraft');
     if (g.show === 'drive' || (gShown && !gDraft)) {
       // The planner has no Drive list. Until the mailbox check searches, a file ask is file-chain-not-run.
-      // A close with no reply in it (an event, a Task) is written by Gmail's Google writers. Outlook stays quiet, never weaker.
+      // A calendar close with no reply stays quiet. A task-only close is a To Do task, not a draft.
+      const steps = (gShown && g.process && g.process.steps) || [];
+      const taskOnly = steps.length > 0 && steps.every((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      if (taskOnly && oShown) {
+        check(m.name + ': Outlook writes a To Do task, not a draft', entry.process.steps.every((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => /draft|send/i.test(s.kind)), entry.process.steps.map((s) => s.kind));
+        continue;
+      }
       const why = (r.diagnostics || []).map((d) => d.reason);
       check(m.name + ': Gmail ' + (g.show === 'drive' ? 'searches Drive first' : 'closes it with ' + g.process.steps.map((s) => s.kind).join('+')) + '; Outlook stays quiet and says why', !oShown && why.some((x) => x === 'file-chain-not-run' || x === 'no-draft-close'), { gmail: g.show, outlook: oShown, why });
       continue;

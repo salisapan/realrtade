@@ -12,9 +12,34 @@
 // What Outlook cannot do yet, and therefore stays silent on (never a weaker substitute): a request that needs a file from
 // Drive (Gmail searches Drive first; the Outlook draft writer attaches nothing), and a fact ask that Gmail answers from one
 // Sheet cell (FlowFactReply.blocksInbox: no lookup happened, so no generic reply stands in for the fact), and a close with no
-// reply draft in it (a calendar event or a Task: Gmail writes those with the Google writers; Outlook's Do It is a draft).
+// reply draft and no task in it (a calendar event: Gmail writes that with the Google writer). A task-only close is a
+// Microsoft To Do task. A process that still has a draft stays a draft.
 const FlowIncomingJudge = (() => {
   const MIN_TEXT = 20;
+
+  // Invisible formatting is not part of the sentence. One pass, before the
+  // decision, on every mail path that calls this (the Gmail page, the Outlook
+  // page, the mailbox check, and judge itself). The same characters give the
+  // same decision as the text without them.
+  function prepareForJudge(text) {
+    return String(text == null ? '' : text)
+      .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/[\u00A0\u202F]/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+  }
+
+  // A line that is only a phone signature is not part of the ask.
+  // "Sent from my iPhone" and "נשלח מה-iPhone שלי" drop.
+  // A request on that same line stays: the line is the ask.
+  function withoutPhoneSignature(text) {
+    return String(text || '').split('\n').filter((line) => {
+      if (/^\s*sent from my (?:iphone|ipad|android)\s*\.?\s*$/i.test(line)) return false;
+      if (/^\s*נשלח מה[-\u05BE\s]*(?:iphone|אייפון|אנדרואיד)(?:\s+שלי)?\s*\.?\s*$/i.test(line)) return false;
+      return true;
+    }).join('\n').trim();
+  }
 
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
@@ -39,7 +64,7 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
-    const text = String(i.text || '').trim();
+    const text = withoutPhoneSignature(prepareForJudge(i.text));
     const factProbe = (text.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(text) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
@@ -52,7 +77,17 @@ const FlowIncomingJudge = (() => {
       calibration: i.calibration || null,
       calibrationByType: i.calibrationByType || null,
       attachmentCount: i.attachmentCount || 0,
-      now
+      now,
+      to: i.to || i.toRecipients || null,
+      cc: i.cc || i.ccRecipients || null,
+      ownAddresses: i.ownAddresses || i.own || null,
+      userName: i.userName || null,
+      autoReply: i.autoReply === true,
+      noteToSelf: i.noteToSelf === true,
+      senderIsUser: i.senderIsUser === true,
+      inbound: i.inbound,
+      direction: i.direction || null,
+      inSent: i.inSent === true
     });
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
@@ -80,20 +115,54 @@ const FlowIncomingJudge = (() => {
       executionMemory: i.executionMemory || null
     });
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
-    // Outlook's Do It writes one thing: a reply draft. A close whose process has no draft step (a calendar event, a Task
-    // with no reply) is Gmail's Google writers' job; Outlook stays quiet rather than offering a reply in its place.
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process)) return { show: false, reason: 'no-draft-close', intent };
+    // Outlook's Do It writes a reply draft when the process has one. A task-only
+    // close writes Microsoft To Do. A calendar event with no draft and no task
+    // stays quiet rather than offering a reply in its place.
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process)) {
+      return { show: false, reason: 'no-draft-close', intent };
+    }
+    // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
+    const asked = intent.googleClose;
+    if ((i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
+      return { show: false, reason: 'onedrive-target-on-gmail', intent };
+    }
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
+  function taskOnlyProcess(process) {
+    const steps = (process && process.steps) || [];
+    return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
+  }
+
   // The connector is the only difference: Outlook writes its reply draft through Graph instead of the Gmail API.
+  // A task-only process writes Microsoft To Do. A process that still has a draft keeps its task step unused.
   function forSurface(process, surface) {
     if (!process || surface !== 'outlook') return process;
-    return Object.assign({}, process, {
-      steps: (process.steps || []).map((s) => (s && s.kind === 'gmailDraft')
-        ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
-        : s)
+    const tasks = taskOnlyProcess(process);
+    const steps = (process.steps || []).map((s) => {
+      if (s && s.kind === 'gmailDraft') {
+        return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
+      }
+      if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
+        return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
+      }
+      if (s && s.kind === 'driveFile') {
+        return Object.assign({}, s, {
+          kind: 'onedriveFile',
+          id: 'onedriveFile',
+          label: 'OneDrive',
+          hint: 'Save the attached file to OneDrive'
+        });
+      }
+      return s;
     });
+    const out = Object.assign({}, process, { steps: steps });
+    if (steps.some((s) => s && s.kind === 'onedriveFile')) {
+      out.closedLine = 'Saved on OneDrive.';
+      const he = /[\u0590-\u05FF]/.test(String(out.closingLine || ''));
+      out.closingLine = he ? 'שומר את הקובץ המצורף ב-OneDrive.' : 'Saving the attached file to OneDrive.';
+    }
+    return out;
   }
 
   function draftStepOf(process) {
@@ -118,7 +187,7 @@ const FlowIncomingJudge = (() => {
     return D.draftBodyText(draftPayload(process, ctx), null, null, null);
   }
 
-  return { MIN_TEXT, judge, forSurface, draftStepOf, draftPayload, draftText };
+  return { MIN_TEXT, prepareForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

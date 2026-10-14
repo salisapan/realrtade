@@ -23,11 +23,12 @@ const FlowOutlook = (() => {
   const PENDING_KEY = 'outlookPending';
   const MIN_INTERVAL_MS = 10 * 60 * 1000;
   const SILENT_REAUTH_AFTER_MS = 16 * 60 * 60 * 1000; // first silent renewal at hour 16 of the 24h SPA window (outlook-auth SILENT_AFTER_MS)
-  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink,hasAttachments,internetMessageId';
+  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,bodyPreview,webLink,hasAttachments,internetMessageId';
   const OWN_LEARNED_CAP = 20;
   // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug; 0.9.14: own addresses learned from
-  // other people's To lines and asks swallowed by a loop in another app).
-  const STATE_VERSION = 3;
+  // other people's To lines and asks swallowed by a loop in another app; 0.9.19: a schedule card
+  // kept after the mail was rejudged as a file ask).
+  const STATE_VERSION = 4;
 
   // Non-GET Graph paths Glance is allowed to call. Anything else throws.
   const WRITE_ALLOW = [
@@ -138,7 +139,7 @@ const FlowOutlook = (() => {
         incoming: (pending.incoming || []).length,
         diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],
         // What the Outlook-on-the-web card could not show, and why (src/content-outlook.js pageReason).
-        pageDiagnostics: (await read('outlookPageDiag', [])).slice(0, 20),
+        pageDiagnostics: (await read('outlookPageDiag', [])).slice(0, 40),
         fromAliasHint: st.fromAliasHint || null,
         origins: ORIGINS
       };
@@ -190,6 +191,49 @@ const FlowOutlook = (() => {
       try { return JSON.parse(text); } catch (e) { return null; }
     }
 
+    function attachmentMessageText(msg) {
+      const g = gm();
+      const raw = (msg && msg.body && msg.body.content) || (msg && msg.bodyPreview) || '';
+      const text = typeof raw === 'string' ? raw : '';
+      if (g && g.htmlToText) {
+        const plain = g.htmlToText(text);
+        return g.ownText ? g.ownText(plain) : plain;
+      }
+      return g && g.ownText ? g.ownText(text) : text;
+    }
+
+    function googleCloses() {
+      if (typeof FlowGoogleCloses !== 'undefined') return FlowGoogleCloses;
+      try {
+        if (typeof globalThis !== 'undefined' && globalThis.FlowGoogleCloses) return globalThis.FlowGoogleCloses;
+      } catch (e) { /* node tests inject the global; the page has the script binding */ }
+      return null;
+    }
+
+    // Mail.Read is already on the mail sign-in. This does not ask Files.ReadWrite.
+    // Only a save-shaped sentence is worth a per-message GET. Cap so one check
+    // cannot walk the whole mailbox. Overflow stays unread, same as a failed GET.
+    async function readMessageAttachments(token, messages) {
+      const closes = googleCloses();
+      const needs = closes && typeof closes.needsOneAttachment === 'function' ? closes.needsOneAttachment : null;
+      let reads = 0;
+      const CAP = 20;
+      for (const msg of messages || []) {
+        if (!msg || !msg.id || msg.isDraft || msg.hasAttachments !== true) continue;
+        if (Array.isArray(msg.attachments) || msg.attachmentsUnread) continue;
+        if (needs && !needs(attachmentMessageText(msg))) continue;
+        if (reads >= CAP) { msg.attachmentsUnread = true; continue; }
+        reads += 1;
+        const url = cfg.GRAPH + '/me/messages/' + encodeURIComponent(msg.id) + '/attachments?$select=id,name,contentType,size,isInline';
+        try {
+          const data = await graphGet(token, url);
+          msg.attachments = data && Array.isArray(data.value) ? data.value : [];
+        } catch (e) {
+          msg.attachmentsUnread = true;
+        }
+      }
+    }
+
     async function folder(token, name, sinceIso) {
       let url = cfg.GRAPH + '/me/mailFolders/' + name + '/messages?$top=' + cfg.PAGE_SIZE + '&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + sinceIso) + '&$select=' + SELECT;
       const out = [];
@@ -239,7 +283,16 @@ const FlowOutlook = (() => {
       const granted = await deps.permissions.request({ origins: ORIGINS.concat(OWA_ORIGINS) });
       if (!granted) return { ok: false, error: 'permission' };
       const o = opts || {};
-      const r = await deps.auth.signIn(authDeps(), cfg, deps.redirectUri(), { prompt: o.prompt, loginHint: o.loginHint });
+      const prev = await read(AUTH_KEY, null);
+      const chosen = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
+      // Mail scopes stay on every sign-in. Tasks.ReadWrite is included only when
+      // the Connect screen passed it (the To Do checkbox). Mail.Send is never added.
+      const scopes = [];
+      (chosen || []).concat(cfg.SCOPES || []).forEach((s) => {
+        if (!s || /Mail\.Send/i.test(s) || /\.Send$/i.test(s)) return;
+        if (scopes.indexOf(s) < 0) scopes.push(s);
+      });
+      const r = await deps.auth.signIn(authDeps(), cfg, deps.redirectUri(), { prompt: o.prompt, loginHint: o.loginHint, scopes: scopes });
       if (!r.ok) return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null };
       const profile = await fetchProfile(r.token.accessToken);
       if (!profile) return { ok: false, error: 'profile' };
@@ -247,7 +300,7 @@ const FlowOutlook = (() => {
       const primary = ownAddresses[0] || String(profile.mail || profile.userPrincipalName || '').toLowerCase();
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
+      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
       // Register the OWA content script (same chip as Gmail) while Outlook is on.
@@ -283,7 +336,8 @@ const FlowOutlook = (() => {
         return f.ok ? { ok: true, token: f.token, auth: Object.assign({}, auth, { token: f.token }) } : { ok: false, error: f.error, needsSignIn: Boolean(f.reauth), aadsts: f.aadsts || null, description: f.description || null };
       }
       const r = await deps.auth.session(authDeps(), cfg, auth, {
-        redirectUri: deps.redirectUri(), loginHint: primaryAddress(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null
+        redirectUri: deps.redirectUri(), loginHint: primaryAddress(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null,
+        scopes: (auth.requestedScopes && auth.requestedScopes.length) ? auth.requestedScopes : cfg.SCOPES
       });
       const now = deps.now();
       let nextAuth = auth;
@@ -298,6 +352,9 @@ const FlowOutlook = (() => {
       if (r.ok) {
         if (st.needsSignIn || st.error) Object.assign(patch, { needsSignIn: false, error: null, aadsts: null, errorDetail: null });
         if (r.how === 'silent') patch.lastRenewedAt = now;
+      } else if (r.transient && !r.needsSignIn) {
+        // A reload, a worker that is not ready, or a dropped network call is not Turn off.
+        // The token stays. The next check tries again. Check now never reaches disconnect().
       } else {
         Object.assign(patch, { error: r.error || 'expired', needsSignIn: Boolean(r.needsSignIn), aadsts: r.aadsts || null, errorDetail: r.description || null });
         if (r.error === 'consent_required') patch.draftConsentNeeded = true;
@@ -506,6 +563,10 @@ const FlowOutlook = (() => {
           auth = await read(AUTH_KEY, null);
         }
         messages = inbox.concat(sent);
+        // A save-shaped message lists hasAttachments and not the files. Read
+        // that list here, before the planner, or a real file stays
+        // outlook:attachments-unread. A failed read marks that message only.
+        await readMessageAttachments(tok, messages);
       } catch (e) {
         // A 401 that survived one forced renewal: the session state was already written by ensureSession.
         const cur = await read(STATE_KEY, {});
@@ -567,7 +628,9 @@ const FlowOutlook = (() => {
         // The planner already ran Gmail's chain (core/incoming-judge.js) and mapped the draft step to Outlook.
         const outlookProcess = inc.process;
         if (!intent || !outlookProcess) continue;
-        const text = (inc.base.subject ? inc.base.subject + '\n' : '') + (inc.base.text || '');
+        // The subject stays on its own field. Gluing it onto the body made
+        // the task title the subject plus the greeting.
+        const text = inc.base.text || '';
         const entry = {
           messageId: inc.messageId,
           threadId: inc.base.threadId,
@@ -579,6 +642,7 @@ const FlowOutlook = (() => {
           intent: intent,
           process: outlookProcess,
           text: text,
+          bodyText: text,
           outlookIncomingId: inc.messageId,
           outlookConversationId: inc.conversationId,
           internetMessageId: inc.internetMessageId || null,
@@ -618,15 +682,50 @@ const FlowOutlook = (() => {
         incomingCards.push(entry);
       });
 
-      // Keep prior incoming cards that were not re-emitted this pass (until Not now / close).
-      const priorIncoming = (pending.incoming || []).filter((x) => x && x.messageId && !incomingCards.some((y) => y.messageId === x.messageId) && !isOwnEmail(x.sender && x.sender.email, ownList));
+      // A conversation this check judged and did not show again must not keep an older card.
+      // That is how a schedule card stayed up after the mail became a file ask (Why not shown
+      // already said drive-search-failed). Cards for mail outside this window are kept.
+      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).slice(0, 40);
+      function convOfEntry(x) {
+        if (!x) return '';
+        if (x.outlookConversationId) return String(x.outlookConversationId);
+        const t = String(x.threadId || '');
+        return t.indexOf('ol:') === 0 ? t.slice(3) : '';
+      }
+      const silenced = new Set();
+      diagnostics.forEach((d) => { if (d && d.conversationId) silenced.add(String(d.conversationId)); });
+      // A file prepare drops the stall row (the open message attaches on Do It).
+      // That conversation was still judged this pass, so an older schedule card
+      // must not stay beside a prepare or a drive-not-granted line.
+      const judgedNow = new Set(silenced);
+      (chained.silence || []).forEach((row) => { if (row && row.conversationId) judgedNow.add(String(row.conversationId)); });
+      incomingCards.forEach((x) => { const c = convOfEntry(x); if (c) judgedNow.add(c); });
+      const priorIncoming = (pending.incoming || []).filter((x) => {
+        if (!x || !x.messageId) return false;
+        if (incomingCards.some((y) => y.messageId === x.messageId)) return false;
+        if (isOwnEmail(x.sender && x.sender.email, ownList)) return false;
+        const conv = convOfEntry(x);
+        if (conv && judgedNow.has(conv)) return false;
+        return true;
+      });
       const incoming = incomingCards.concat(priorIncoming).slice(0, 5);
+      if (typeof deps.storage.forgetStillOpenScan === 'function') {
+        try {
+          const bag = await deps.storage.get();
+          const scan = (bag && bag.stillOpenScan) || [];
+          for (const row of scan) {
+            const conv = convOfEntry(row);
+            if (!row || !row.messageId || !conv || !judgedNow.has(conv)) continue;
+            if (incomingCards.some((y) => y.messageId === row.messageId)) continue;
+            await deps.storage.forgetStillOpenScan(null, row.messageId);
+          }
+        } catch (e) { /* still-open is optional in tests */ }
+      }
 
       await write(PENDING_KEY, { offers: offers.slice(-5), asks: asks.slice(-5), incoming: incoming });
 
       const offeredKeys = Object.keys(offered);
       if (offeredKeys.length > 200) offeredKeys.slice(0, offeredKeys.length - 200).forEach((k) => { delete offered[k]; });
-      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).slice(0, 40);
       await write(STATE_KEY, {
         lastAt: now, lastCount: p.stats.conversations, lastIncoming: (p.incoming || []).length, lastOffers: offers.length,
         error: null, needsSignIn: false, draftConsentNeeded: Boolean(st.draftConsentNeeded),

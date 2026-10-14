@@ -57,20 +57,81 @@ async function runPage(opts) {
     outlookSync: { stateVersion: 3 }
   }, o.store || {});
   const sent = [];
-  const graphMsg = { id: MSG, conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: false, internetMessageId: '<pilot@mail.gmail.com>',
-    from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+  const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
+    from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   function reply(msg) {
     sent.push(msg);
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth.token, changed: false, how: 'fresh' };
     if (msg.type === 'flow:outlook-fetch') {
       const u = String(msg.url);
+      const hdrs = (msg.init && msg.init.headers) || {};
+      const bearer = /^Bearer\s+\S+/.test(String(hdrs.Authorization || ''));
+      const immutable = /IdType="ImmutableId"/.test(String(hdrs.Prefer || ''));
       if (o.graphDown) return { ok: false, status: 0, error: 'network' };
+      if (o.requireOutlookAuth && !bearer) return { ok: false, status: 401, body: '{"error":{"code":"InvalidAuthenticationToken"}}' };
       if (/\/me\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ mail: ME, displayName: 'Glance' }) };
-      if (/mailFolders\/inbox\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      if (/mailFolders\/inbox\/messages/.test(u)) {
+        if (o.inboxLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
+        return { ok: true, status: 200, body: JSON.stringify({ value }) };
+      }
       if (/mailFolders\/sentitems\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
-      if (/\/me\/messages\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      if (/\/me\/messages\?/.test(u)) {
+        // Live Graph often answers the conversationId filter with an empty page (or refuses it).
+        // The inbox list above is the fallback the open page must use.
+        if (o.convFilterEmpty && /conversationId/.test(decodeURIComponent(u))) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
+        return { ok: true, status: 200, body: JSON.stringify({ value }) };
+      }
+      // Attachments are not the message. A conversation id on this path is a 400.
+      // Handle it before the message GET, which would otherwise swallow "/attachments".
+      if (o.gateAttachments && /\/me\/messages\/[^?]+\/attachments/.test(u)) {
+        const asked = decodeURIComponent((u.match(/\/me\/messages\/([^?]+)\/attachments/) || [])[1] || '');
+        const conv = String(o.urlId || o.listedConversationId || '');
+        const canon = (s) => String(s || '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+        if (conv && (asked === conv || canon(asked) === canon(conv))) {
+          return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
+        }
+        if (o.attachmentReads === 'fail') return { ok: false, status: 0, error: 'network' };
+        if (asked === graphMsg.id) {
+          return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
+        }
+        return { ok: false, status: 404, body: '{}' };
+      }
+      const directMsg = u.match(/\/me\/messages\/([^?]+)/);
+      if (directMsg) {
+        if (o.pathRestMissUntilClick && !o._doIt) return { ok: false, status: 404, body: '{}' };
+        if (o.pathRestNeedsImmutable && !immutable) return { ok: false, status: 404, body: '{}' };
+        if (typeof o.pathRestMisses === 'number' && o.pathRestMisses > 0) {
+          o.pathRestMisses -= 1;
+          return { ok: false, status: 404, body: '{}' };
+        }
+        if (o.pathRestHit) {
+          const asked = decodeURIComponent(directMsg[1]);
+          const want = String(o.pathRestId || '');
+          const canon = want.replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+          if (asked === want || (canon && asked === canon)) {
+            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: o.pathRestGraphId || canon || graphMsg.id, conversationId: o.listedConversationId || CONV })) };
+          }
+        }
+        return { ok: false, status: 404, body: '{}' };
+      }
       return { ok: false, status: 404, body: '{}' };
+    }
+    if (msg.type === 'flow:drive-find-one') return o.driveFind || { match: 'none' };
+    if (msg.type === 'flow:execute-action') {
+      const p = msg.payload || {};
+      if (p.connectorId === 'outlookCalendar') {
+        return { ok: true, ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar', url: 'https://outlook.live.com/calendar/item/ev-hold-1', written: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00' };
+      }
+      if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
+      return { ok: true, ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
+    }
+    if (msg.type === 'flow:undo-action') {
+      if (msg.connectorId === 'outlookCalendar') return { ok: true, written: 'Calendar event removed.' };
+      return { ok: true, written: 'Reply draft removed. Not sent.' };
     }
     if (msg.type === 'flow:search-drive') {
       const base = o.driveResult
@@ -113,10 +174,46 @@ async function runPage(opts) {
   if (typeof o.mutate === 'function') o.mutate(w.document);
   // Keep the page churning with the card up, to see whether the open message is judged again on every tick.
   if (o.afterMs) await new Promise((r) => setTimeout(r, o.afterMs));
+  let chipMessage = null;
+  if (o.clickDoIt) {
+    o._doIt = true;
+    const hostBefore = w.document.querySelector('.flow-chip-host');
+    chipMessage = hostBefore && hostBefore.getAttribute('data-glance-message');
+    const btn = w.document.querySelector('.flow-chip-host .flow-chip');
+    if (btn) btn.click();
+    const until = Date.now() + 2500;
+    while (Date.now() < until && !sent.some((m) => m.type === 'flow:execute-action')) await new Promise((r) => setTimeout(r, 40));
+    await new Promise((r) => setTimeout(r, 200));
+    if (o.shadowShown) {
+      const live = w.document.querySelector('.flow-chip-host');
+      const id = (live && live.getAttribute('data-glance-message')) || chipMessage;
+      const log = Array.isArray(store.log) ? store.log.slice() : [];
+      log.unshift({ ts: Date.now() + 50, kind: 'shown', messageId: id, app: 'outlook', label: 'Hold the file' });
+      store.log = log;
+    }
+    if (o.rescan) {
+      try { vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx); } catch (e) { /* page script missing */ }
+      await new Promise((r) => setTimeout(r, o.afterClickMs || 1200));
+    }
+    if (o.clickUndo) {
+      const undo = w.document.querySelector('.flow-chip-undo');
+      if (undo) undo.click();
+      const untilUndo = Date.now() + 2000;
+      while (Date.now() < untilUndo && !sent.some((m) => m.type === 'flow:undo-action')) await new Promise((r) => setTimeout(r, 40));
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  } else if (o.clickUndo) {
+    const undo = w.document.querySelector('.flow-chip-undo');
+    if (undo) undo.click();
+    const untilUndo = Date.now() + 2000;
+    while (Date.now() < untilUndo && !sent.some((m) => m.type === 'flow:undo-action')) await new Promise((r) => setTimeout(r, 40));
+    await new Promise((r) => setTimeout(r, 150));
+  }
   clearInterval(ad);
+  if (typeof o.beforeClose === 'function') await o.beforeClose({ window: w, document: w.document, store, ctx, sent });
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
-  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), doc: w.document };
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document };
   w.close();
   return res;
 }
@@ -341,6 +438,469 @@ async function runPage(opts) {
       && payload.final === 'prepare', payload);
     check('the armed search asks the worker for scopes', traced.sent.some((m) => m.type === 'flow:search-drive' && m.trace === true), traced.sent.filter((m) => m.type === 'flow:search-drive'));
     check('the trace still prepares the file', traced.chip && traced.chip.getAttribute('data-glance-chain') === 'prepare', traced.chip && traced.chip.getAttribute('data-glance-chain'));
+
+    const staleSchedule = {
+      messageId: MSG,
+      outlookIncomingId: MSG,
+      outlookConversationId: CONV,
+      threadId: 'ol:' + CONV,
+      subject: 'Pilot proposal',
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      intent: { type: 'event', label: 'Schedule the meeting' },
+      process: {
+        id: 'schedule-confirm',
+        name: 'Schedule & Confirm',
+        closingLine: 'Scheduling this, drafting a reply to confirm, and setting a follow-up.',
+        steps: []
+      }
+    };
+    const stuckFailed = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
+      driveResult: { ok: false, reason: 'drive-search-failed', status: 503, error: 'backend', files: [], fileCount: 0 },
+      store: { outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }, outlookSync: { stateVersion: 4 } }
+    });
+    const stuckFailedWhy = reasonsOf(stuckFailed);
+    check('a stored Scheduling card does not stay up when the search fails', !stuckFailed.chip && !/Scheduling/.test((stuckFailed.doc && stuckFailed.doc.body && stuckFailed.doc.body.textContent) || ''), stuckFailed.chip && stuckFailed.chip.textContent);
+    check('that failed search and the page agree on drive-search-failed', stuckFailedWhy.page.indexOf('drive-search-failed') >= 0, stuckFailedWhy);
+
+    const stuckDenied = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
+      driveResult: { ok: false, reason: 'drive-not-granted', status: 403, error: 'insufficientPermissions', files: [], fileCount: 0 },
+      store: { outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }, outlookSync: { stateVersion: 4 } }
+    });
+    const stuckDeniedWhy = reasonsOf(stuckDenied);
+    check('Google disconnected: no schedule card, drive-not-granted', !stuckDenied.chip && !/Scheduling/.test((stuckDenied.doc && stuckDenied.doc.body && stuckDenied.doc.body.textContent) || '') && stuckDeniedWhy.page.indexOf('drive-not-granted') >= 0, stuckDeniedWhy);
+
+    const stuckOne = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], afterMs: 800, waitMs: 6000,
+      store: { outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }, outlookSync: { stateVersion: 4 } }
+    });
+    check('one Drive file replaces the stored Scheduling card with prepare', stuckOne.chip && stuckOne.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(stuckOne.chip.textContent) && !/Scheduling/.test(stuckOne.chip.textContent), stuckOne.chip && stuckOne.chip.textContent);
+
+    const alias = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 4500,
+      graphFrom: { name: 'Sali', address: ME },
+      store: {
+        outlookAuth: {
+          token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
+          account: { address: ME, name: 'Glance' },
+          ownAddresses: [ME, 'salisapan1@gmail.com']
+        },
+        outlookSync: { stateVersion: 4, diagnostics: [{ conversationId: CONV, subject: 'Pilot proposal', reason: 'own-sender', counterpart: ME }] },
+        outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }
+      }
+    });
+    const aliasWhy = reasonsOf(alias);
+    check('mail from the same account stays silent, schedule card included', !alias.chip && !/Scheduling/.test((alias.doc && alias.doc.body && alias.doc.body.textContent) || ''), alias.chip && alias.chip.textContent);
+    check('the page records own-sender or note-to-self', aliasWhy.page.indexOf('own-sender') >= 0 || aliasWhy.page.indexOf('note-to-self') >= 0 || aliasWhy.plan.indexOf('own-sender') >= 0 || aliasWhy.plan.indexOf('note-to-self') >= 0, aliasWhy);
+
+    // Live 0.9.19: itemId null, conversationId set, Drive fileCount 1, prepare chosen,
+    // conversationId $filter returned nothing, showFilePrepare returned false, final outlook:file-found-no-attach.
+    const convOnly = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000,
+      convFilterEmpty: true, listedConversationId: CONV + '==', listedSubject: 'Q4 pricing sheet - retest 3',
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const convLine = convOnly.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let convPayload = null;
+    try { convPayload = JSON.parse(convLine.slice('Glance: file-trace '.length)); } catch (e) { convPayload = { parse: e.message, line: convLine }; }
+    const convWhy = reasonsOf(convOnly);
+    check('conversation id only, filter empty, inbox list has the mail: floating Do It', convOnly.chip && convOnly.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(convOnly.chip.textContent) && !/Scheduling/.test(convOnly.chip.textContent), convOnly.chip && convOnly.chip.textContent);
+    check('that card is not silenced as outlook:file-found-no-attach', convWhy.page.indexOf('outlook:file-found-no-attach') < 0 && convPayload && convPayload.final === 'prepare', { why: convWhy, payload: convPayload });
+    check('the trace names how the message id was resolved and that showFilePrepare showed', convPayload && convPayload.messageIdFrom === 'inbox-list' && convPayload.showFilePrepare === 'shown', convPayload);
+    check('the resolved id is the Graph message, not the conversation id', convOnly.chip && convOnly.chip.getAttribute('data-glance-message') === MSG, convOnly.chip && convOnly.chip.getAttribute('data-glance-message'));
+
+    const noId = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 5500,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const noIdLine = noId.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let noIdPayload = null;
+    try { noIdPayload = JSON.parse(noIdLine.slice('Glance: file-trace '.length)); } catch (e) { noIdPayload = { parse: e.message, line: noIdLine }; }
+    const noIdWhy = reasonsOf(noId);
+    check('Drive hit with no Graph message id still floats Do It, not a blank or a schedule card', noId.chip && noId.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(noId.chip.textContent) && !/Scheduling/.test((noId.doc && noId.doc.body && noId.doc.body.textContent) || ''), noId.chip && noId.chip.textContent);
+    check('a missing message id is logged and is not outlook:file-found-no-attach', noIdPayload && noIdPayload.showFilePrepare === 'shown-without-message-id' && noIdPayload.messageIdFrom === 'none' && noIdPayload.final === 'prepare' && noIdWhy.page.indexOf('outlook:file-found-no-attach') < 0, { why: noIdWhy, payload: noIdPayload });
+
+    const clicked = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000,
+      convFilterEmpty: true, listedConversationId: CONV + '==', listedSubject: 'Q4 pricing sheet - retest 3', clickDoIt: true, clickUndo: true
+    });
+    const drafted = clicked.sent.filter((m) => m.type === 'flow:execute-action');
+    const draft = drafted[0] && drafted[0].payload;
+    check('Do It writes one Outlook draft with the Drive file and does not send', drafted.length === 1 && draft && draft.connectorId === 'outlookDraft' && draft.driveFileId === file.id && draft.outlookIncomingId === MSG && !clicked.sent.some((m) => /\/(send|sendMail)/.test(String(m.type)) || m.type === 'flow:send'), { types: clicked.sent.map((m) => m.type), draft: draft && { connectorId: draft.connectorId, driveFileId: draft.driveFileId, outlookIncomingId: draft.outlookIncomingId } });
+    check('Undo deletes that draft', clicked.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookDraft' && m.ref === 'draft-1'), clicked.sent.filter((m) => m.type === 'flow:undo-action'));
+
+    // Live 0.9.20: /inbox/id/<AQQk…/…> mounted the card, Do It said "Could not find that message".
+    // CoS: that path RestId is the Graph message id. GET it (canon spelling), keep the conversation fallbacks.
+    const PATH_REST = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEADOYVBZWJ53SZbHJB/BYaEW';
+    const PATH_GRAPH = PATH_REST.replace(/\//g, '_');
+    const pathHit = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH,
+      clickDoIt: true, clickUndo: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const pathLine = pathHit.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let pathPayload = null;
+    try { pathPayload = JSON.parse(pathLine.slice('Glance: file-trace '.length)); } catch (e) { pathPayload = { parse: e.message, line: pathLine }; }
+    const pathDrafts = pathHit.sent.filter((m) => m.type === 'flow:execute-action');
+    const pathDraft = pathDrafts[0] && pathDrafts[0].payload;
+    const pathGets = pathHit.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)));
+    check('path /inbox/id/{restId} resolves by GET /me/messages/{canon id}', pathPayload && pathPayload.messageIdFrom === 'path-rest-id' && pathPayload.showFilePrepare === 'shown' && pathHit.chipMessage === PATH_GRAPH, { messageIdFrom: pathPayload && pathPayload.messageIdFrom, show: pathPayload && pathPayload.showFilePrepare, message: pathHit.chipMessage, gets: pathGets.map((m) => m.url) });
+    check('that Do It writes one draft with the Drive file on the Graph id and does not send', pathDrafts.length === 1 && pathDraft && pathDraft.connectorId === 'outlookDraft' && pathDraft.driveFileId === file.id && pathDraft.outlookIncomingId === PATH_GRAPH && !pathHit.sent.some((m) => m.type === 'flow:send'), { types: pathHit.sent.map((m) => m.type), id: pathDraft && pathDraft.outlookIncomingId });
+    check('Undo deletes the path-id draft', pathHit.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookDraft' && m.ref === 'draft-1'));
+    check('Do It does not clear an armed file trace', pathHit.store.glanceOutlookFileTrace === 1, pathHit.store.glanceOutlookFileTrace);
+
+    // The card mounted with no id (show-time GETs missed). The click must still resolve the same path id.
+    const pathLate = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH, pathRestMissUntilClick: true,
+      clickDoIt: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const lateDrafts = pathLate.sent.filter((m) => m.type === 'flow:execute-action');
+    const lateDraft = lateDrafts[0] && lateDrafts[0].payload;
+    const lateDoIt = pathLate.logs.filter((l) => l.indexOf('Glance: file-trace ') === 0).map((l) => {
+      try { return JSON.parse(l.slice('Glance: file-trace '.length)); } catch (e) { return null; }
+    }).find((p) => p && p.phase === 'do-it');
+    check('a card that mounted without a message id still drafts on Do It from the path RestId', pathLate.chip && pathLate.chip.getAttribute('data-glance-message') === '' && lateDrafts.length === 1 && lateDraft && lateDraft.outlookIncomingId === PATH_GRAPH && lateDraft.driveFileId === file.id && lateDraft.connectorId === 'outlookDraft', { attr: pathLate.chip && pathLate.chip.getAttribute('data-glance-message'), id: lateDraft && lateDraft.outlookIncomingId, text: pathLate.chip && pathLate.chip.textContent });
+    check('the click trace names path-rest-id and the flag stays armed', lateDoIt && lateDoIt.messageIdFrom === 'path-rest-id' && lateDoIt.resolved === true && pathLate.store.glanceOutlookFileTrace === 1, { lateDoIt, flag: pathLate.store.glanceOutlookFileTrace });
+
+    // Live 0.9.21: the same path id, Drive hit, messageIdFrom none. The page GET carried no bearer.
+    function traceLines(r) {
+      return r.logs.filter((l) => l.indexOf('Glance: file-trace ') === 0).map((l) => {
+        try { return JSON.parse(l.slice('Glance: file-trace '.length)); } catch (e) { return null; }
+      }).filter(Boolean);
+    }
+    const authed = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      requireOutlookAuth: true, pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH,
+      clickDoIt: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const authDoIt = traceLines(authed).find((p) => p.phase === 'do-it');
+    const authScan = traceLines(authed).find((p) => p.final === 'prepare');
+    const authGets = authed.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)));
+    const authDraft = (authed.sent.find((m) => m.type === 'flow:execute-action') || {}).payload;
+    check('the path GET carries the mailbox bearer and Do It drafts that message', authGets.length >= 1 && authGets.every((m) => /^Bearer\s+AT$/.test(String((m.init && m.init.headers && m.init.headers.Authorization) || ''))) && authDraft && authDraft.outlookIncomingId === PATH_GRAPH && authDraft.driveFileId === file.id && authDraft.connectorId === 'outlookDraft', { gets: authGets.map((m) => m.init && m.init.headers), id: authDraft && authDraft.outlookIncomingId });
+    check('the click trace records status, pathId, conversationId, and itemId', authDoIt && authDoIt.resolved === true && authDoIt.messageIdFrom === 'path-rest-id' && authDoIt.pathId === PATH_REST && authDoIt.conversationId === PATH_REST && authDoIt.itemId == null && Array.isArray(authDoIt.graph) && authDoIt.graph.some((a) => a && a.status === 200 && a.how === 'path-rest-id'), authDoIt);
+    check('the scan trace names the same path id', authScan && authScan.pathId === PATH_REST && authScan.conversationId === PATH_REST && authScan.messageIdFrom === 'path-rest-id', authScan);
+
+    const imm = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      requireOutlookAuth: true, pathRestNeedsImmutable: true,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH,
+      clickDoIt: true, clickUndo: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const immDraft = (imm.sent.find((m) => m.type === 'flow:execute-action') || {}).payload;
+    const immGets = imm.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)) && /IdType="ImmutableId"/.test(String((m.init && m.init.headers && m.init.headers.Prefer) || '')));
+    const immUndo = imm.sent.find((m) => m.type === 'flow:undo-action');
+    check('an AQQk id that Graph only accepts as an immutable id still drafts, and Undo keeps that header flag', immGets.length >= 1 && immDraft && immDraft.outlookIncomingId === PATH_GRAPH && immDraft.outlookImmutableId === true && immUndo && immUndo.outlookImmutableId === true, { prefer: immGets.length, immutable: immDraft && immDraft.outlookImmutableId, undo: immUndo && immUndo.outlookImmutableId });
+  }
+
+  console.log('\n--- Family B file on the calendar (engineering gate, 0.9.27) ---\n');
+  {
+    const GATE = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+    const gateHtml = (h) => h
+      .replace('flow &lt;ai.local.flow@gmail.com&gt;', 'Glance &lt;' + ME + '&gt;')
+      .replace('aria-label="מאת: flow">flow', 'aria-label="מאת: Glance">Glance')
+      .replace(/<div>Hi Sali,<\/div>[\s\S]*?<div>Flow team<\/div>/, '<div>' + GATE + '</div>');
+    const file = { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' };
+    const blocked = await runPage({
+      htmlPatch: gateHtml, waitMs: 2500,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.Read', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    const blockedWhy = (blocked.store.outlookPageDiag || []).map((d) => d.reason);
+    check('without Calendars.ReadWrite the note stays quiet and names the missing scope', !blocked.chip && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0, blockedWhy);
+    check('that quiet path does not draft a reply', !blocked.sent.some((m) => m.type === 'flow:execute-action'), blocked.sent.map((m) => m.type));
+
+    const shown = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    check('a note to yourself with one Drive file shows Hold it',
+      Boolean(shown.chip) && /Hold it/.test(shown.chip.textContent) && shown.chip.getAttribute('data-glance-chain') === 'calendar-hold' && /Do It/.test(shown.chip.textContent),
+      shown.chip && shown.chip.textContent);
+    const acted = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, rescan: true,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    const holdPayload = (acted.sent.find((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar') || {}).payload;
+    const params = holdPayload && holdPayload.params;
+    check('Do It posts the calendar event with the file link and the clock',
+      params && params.fileUrl === file.url && params.fileName === file.name && params.dateIso === '2026-10-08' && params.hour === 10 && params.minute === 0 && params.fileTerm === 'glance-pricing-q4.pdf',
+      params);
+    const actedWhy = (acted.store.outlookPageDiag || []).map((d) => d.reason);
+    check('the on-page receipt still says Handled after the next scan',
+      Boolean(acted.chip) && acted.chip.classList.contains('flow-chip-settled') && /Handled\./.test(acted.chip.textContent) && /Open event/.test(acted.chip.textContent) && /Undo/.test(acted.chip.textContent) && actedWhy.indexOf('page:already-handled') < 0 && !acted.sent.some((m) => m.payload && m.payload.connectorId === 'outlookDraft'),
+      { text: acted.chip && acted.chip.textContent, why: actedWhy });
+    const holdId = shown.chip && shown.chip.getAttribute('data-glance-message');
+    const reloaded = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000,
+      store: {
+        outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] },
+        log: [{
+          ts: Date.now(), kind: 'written', messageId: holdId, app: 'outlook', connectorId: 'outlookCalendar',
+          ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar',
+          url: 'https://outlook.live.com/calendar/item/ev-hold-1',
+          label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00'
+        }]
+      },
+      driveFind: { match: 'one', file: file }
+    });
+    check('opening the thread again shows Handled on the page, from the written row',
+      Boolean(holdId) && Boolean(reloaded.chip) && reloaded.chip.classList.contains('flow-chip-settled') && /Handled\./.test(reloaded.chip.textContent) && /Open event/.test(reloaded.chip.textContent) && /Undo/.test(reloaded.chip.textContent) && !/Hold it/.test(reloaded.chip.textContent),
+      { id: holdId, text: reloaded.chip && reloaded.chip.textContent, why: (reloaded.store.outlookPageDiag || []).map((d) => d.reason) });
+    const shadowed = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, shadowShown: true, rescan: true,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    check('a newer shown row does not put Hold back over Handled',
+      Boolean(shadowed.chip) && shadowed.chip.classList.contains('flow-chip-settled') && /Handled\./.test(shadowed.chip.textContent) && /Undo/.test(shadowed.chip.textContent) && !/Hold it/.test(shadowed.chip.textContent) && !/Do It/.test(shadowed.chip.textContent),
+      shadowed.chip && shadowed.chip.textContent);
+    const auth = { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] };
+    const shownOnTop = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000,
+      store: {
+        outlookAuth: auth,
+        log: [
+          { ts: Date.now(), kind: 'shown', messageId: holdId, app: 'outlook', label: 'Hold the file' },
+          {
+            ts: Date.now() - 1000, kind: 'written', messageId: holdId, app: 'outlook', connectorId: 'outlookCalendar',
+            ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar',
+            url: 'https://outlook.live.com/calendar/item/ev-hold-1',
+            label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00',
+            calendarHoldKey: 'glance-pricing-q4.pdf|2026-10-08|10|0'
+          }
+        ]
+      },
+      driveFind: { match: 'one', file: file }
+    });
+    check('reopen with shown newest still mounts Handled, not Hold',
+      Boolean(shownOnTop.chip) && shownOnTop.chip.classList.contains('flow-chip-settled') && /Handled\./.test(shownOnTop.chip.textContent) && /Open event/.test(shownOnTop.chip.textContent) && /Undo/.test(shownOnTop.chip.textContent) && !/Hold it/.test(shownOnTop.chip.textContent),
+      shownOnTop.chip && shownOnTop.chip.textContent);
+    // Live Exchange ids differ by alphabet and padding (REST _/- versus EWS / and +, ol: prefix, trailing =).
+    // The page address uses one spelling. The written row keeps the spelling Do It stored.
+    // That stored string is the key Undo used on the leftover 0.9.25 receipt. Reload must
+    // mount Handled from it, and Undo must convert that same row, even when a newer shown
+    // line carries the page spelling.
+    const pageSpell = 'AQQkADAwAT_M0MDAA_MS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBp';
+    const storedSpell = 'ol:AQQkADAwAT_M0MDAA/MS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBp=';
+    const canonSpell = (id) => String(id || '').replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+    const spellLog = [
+      { ts: Date.now(), kind: 'shown', messageId: pageSpell, app: 'outlook', label: 'Hold the file' },
+      {
+        ts: Date.now() - 1000, kind: 'written', messageId: storedSpell, app: 'outlook', connectorId: 'outlookCalendar',
+        ref: { eventId: 'ev-spell-1' }, where: 'Outlook Calendar',
+        url: 'https://outlook.live.com/calendar/item/ev-spell-1',
+        label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00'
+      }
+    ];
+    const spelled = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, urlId: pageSpell,
+      store: { outlookAuth: auth, log: spellLog },
+      driveFind: { match: 'one', file: file }
+    });
+    check('reload mounts Handled from the stored message id when the page spelling differs',
+      storedSpell !== pageSpell && canonSpell(storedSpell) === canonSpell(pageSpell) &&
+      Boolean(spelled.chip) && spelled.chip.classList.contains('flow-chip-settled') &&
+      spelled.chip.getAttribute('data-glance-message') === storedSpell &&
+      /Handled\./.test(spelled.chip.textContent) && /Open event/.test(spelled.chip.textContent) && /Undo/.test(spelled.chip.textContent) &&
+      !/Hold it/.test(spelled.chip.textContent),
+      { page: pageSpell, stored: spelled.chip && spelled.chip.getAttribute('data-glance-message'), text: spelled.chip && spelled.chip.textContent });
+    const spelledUndo = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, urlId: pageSpell, clickUndo: true,
+      store: { outlookAuth: auth, log: spellLog.map((row) => Object.assign({}, row)) },
+      driveFind: { match: 'one', file: file }
+    });
+    const storedAfter = (spelledUndo.store.log || []).filter((e) => e && e.connectorId === 'outlookCalendar' && e.messageId === storedSpell);
+    check('Undo on that reloaded receipt converts the stored row, the same key the leftover Handled used',
+      spelledUndo.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-spell-1') &&
+      storedAfter.length === 1 && storedAfter[0].kind === 'undone' && storedAfter[0].outlookReopen === true &&
+      !(spelledUndo.store.log || []).some((e) => e && e.kind === 'written' && e.connectorId === 'outlookCalendar' && e.messageId === storedSpell),
+      storedAfter.map((e) => ({ kind: e.kind, messageId: e.messageId })));
+    const undone = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, rescan: true, clickUndo: true,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    check('Undo on the on-page receipt deletes that calendar event', undone.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-hold-1'), undone.sent.filter((m) => m.type === 'flow:undo-action'));
+    const undoneReload = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickUndo: true,
+      store: {
+        outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] },
+        log: [{
+          ts: Date.now(), kind: 'written', messageId: holdId, app: 'outlook', connectorId: 'outlookCalendar',
+          ref: { eventId: 'ev-from-log' }, where: 'Outlook Calendar',
+          url: 'https://outlook.live.com/calendar/item/ev-from-log',
+          label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00'
+        }]
+      },
+      driveFind: { match: 'one', file: file }
+    });
+    check('Undo on a reopened thread deletes the event from that receipt', undoneReload.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-from-log'), undoneReload.sent.filter((m) => m.type === 'flow:undo-action'));
+  }
+
+  console.log('\n--- Gate 0.9.36: a conversation id is not the attachment message ---\n');
+  {
+    const GATE_CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX/C+aXV';
+    const SAVE = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
+    const DONT = "Hi, Please don't save the attachment to OneDrive. Thanks";
+    const file = { id: 'att1', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
+    const gateHtml = (text) => (h) => h
+      .replace('title="Pilot proposal">Pilot proposal', 'title="Gate 0.9.35 OneDrive save">Gate 0.9.35 OneDrive save')
+      .replace(/<div>Hi Sali,<\/div>[\s\S]*?<div>Flow team<\/div>/, '<div>' + text + '</div>');
+    const gate = {
+      htmlPatch: gateHtml(SAVE), urlId: GATE_CONV, listedConversationId: GATE_CONV,
+      listedSubject: 'Gate 0.9.35 OneDrive save', messageId: 'M1', mailBody: SAVE,
+      gateAttachments: true, attachmentFiles: [file], hasAttachments: true, waitMs: 4500
+    };
+    const shown = await runPage(gate);
+    const shownLog = (shown.store.log || []).find((e) => e && e.kind === 'shown');
+    const kinds = shownLog && shownLog.process && shownLog.process.steps && shownLog.process.steps.map((s) => s.kind);
+    const fetches = shown.sent.filter((m) => m.type === 'flow:outlook-fetch').map((m) => String(m.url));
+    const att = fetches.filter((u) => /\/attachments/.test(u));
+    check('the open page resolves M1 and shows OneDrive plus the Outlook draft',
+      Boolean(shown.chip) && /OneDrive/.test(shown.chip.textContent) && /Do It/.test(shown.chip.textContent) &&
+      kinds && kinds[0] === 'onedriveFile' && kinds[1] === 'outlookDraft' &&
+      att.some((u) => /\/messages\/M1\/attachments/.test(u)) &&
+      !att.some((u) => /AQQk/.test(decodeURIComponent(u))),
+      { text: shown.chip && shown.chip.textContent, kinds: kinds, att: att, why: (shown.store.outlookPageDiag || []).map((d) => d.reason), parsed: shown.parsed && { itemId: shown.parsed.itemId, pathId: shown.parsed.pathId, subject: shown.parsed.subject, text: shown.parsed.text } });
+    const refused = await runPage(Object.assign({}, gate, { htmlPatch: gateHtml(DONT), mailBody: DONT, waitMs: 3500 }));
+    const refusedWhy = (refused.store.outlookPageDiag || []).map((d) => d.reason);
+    check('don\'t save stays quiet when the resolved message has one file',
+      !refused.chip && refusedWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
+      { text: refused.chip && refused.chip.textContent, why: refusedWhy });
+    const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
+    const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
+    check('an unreadable attachment count is logged and is not a silent zero',
+      !unread.chip && (unreadWhy.indexOf('page:attachment-count-unread') >= 0 || unreadWhy.indexOf('outlook:attachments-unread') >= 0) &&
+      !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
+      { text: unread.chip && unread.chip.textContent, why: unreadWhy });
+    function fileIncoming(store) {
+      return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {
+        return ((e && e.process && e.process.steps) || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
+      });
+    }
+    const twoFiles = [file, Object.assign({}, file, { id: 'att2', name: 'other.pdf' })];
+    const two = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, waitMs: 3500 }));
+    check('two files on the resolved message stay off the card and off Loops',
+      !two.chip && fileIncoming(two.store).length === 0,
+      { text: two.chip && two.chip.textContent, incoming: fileIncoming(two.store).length, why: (two.store.outlookPageDiag || []).map((d) => d.reason) });
+    const twoFail = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, attachmentReads: 'fail', waitMs: 3500 }));
+    check('two files with an unreadable list stay off the card and off Loops',
+      !twoFail.chip && fileIncoming(twoFail.store).length === 0,
+      { text: twoFail.chip && twoFail.chip.textContent, incoming: fileIncoming(twoFail.store).length, why: (twoFail.store.outlookPageDiag || []).map((d) => d.reason) });
+    const itemOnly = await runPage(Object.assign({}, gate, {
+      attachmentFiles: [{ id: 'mail1', name: 'Forwarded', isInline: false, '@odata.type': '#microsoft.graph.itemAttachment' }],
+      waitMs: 3500
+    }));
+    check('an attached message is not a file, so the card stays off',
+      !itemOnly.chip && fileIncoming(itemOnly.store).length === 0,
+      { text: itemOnly.chip && itemOnly.chip.textContent, incoming: fileIncoming(itemOnly.store).length, why: (itemOnly.store.outlookPageDiag || []).map((d) => d.reason) });
+  }
+
+  console.log('\n--- Gate 0.9.38: the newest message is not the open sender ---\n');
+  {
+    const older = new Date(Date.now() - 60 * 60e3).toISOString();
+    const newer = new Date(Date.now() - 5 * 60e3).toISOString();
+    const threadMessages = [
+      {
+        id: 'M-open', conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: false,
+        from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } },
+        toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+        receivedDateTime: older, body: { contentType: 'text', content: BODY }
+      },
+      {
+        id: 'M-other', conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: true,
+        from: { emailAddress: { name: 'Noa', address: 'noa@acme.com' } },
+        toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+        receivedDateTime: newer,
+        body: { contentType: 'text', content: 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks' }
+      }
+    ];
+    const mixed = await runPage({ threadMessages, waitMs: 4500, urlId: CONV, listedConversationId: CONV, store: { glanceDebug: true } });
+    const why = (mixed.store.outlookPageDiag || []).map((d) => d.reason);
+    const shownId = mixed.chip && mixed.chip.getAttribute('data-glance-message');
+    check('two messages, newest from someone else: no card for that message',
+      !mixed.chip && shownId !== 'M-other' && why.indexOf('page:sender-mismatch') >= 0,
+      { text: mixed.chip && mixed.chip.textContent, id: shownId, why, logs: mixed.logs.filter((l) => /sender-mismatch|resolved|decision/.test(l)) });
+  }
+
+  console.log('\n--- Gate 0.9.38: one receipt, on its own message ---\n');
+  {
+    const OTHER = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBpTbOTHER';
+    const proof = {
+      kind: 'written', system: 'microsoft/onedrive', connectorId: 'onedriveFile',
+      messageId: CONV, threadId: CONV, outlookConversationId: CONV,
+      externalId: 'FILE1', fetchedBack: true, verifiedAt: '2026-10-07T12:00:00.000Z',
+      url: 'https://example.com/file',
+      ref: { fileId: 'FILE1', itemId: 'FILE1', externalId: 'FILE1', created: true },
+      writtenLine: 'OneDrive · Q3-report.pdf'
+    };
+    const undone = await runPage({
+      store: { log: [proof], glanceDebug: true },
+      clickUndo: true,
+      waitMs: 4500,
+      beforeClose: async ({ window: w, document: doc, ctx }) => {
+        const hosts = doc.querySelectorAll('.flow-chip-host');
+        const text = Array.from(hosts).map((h) => h.textContent).join(' ');
+        check('Undo on A leaves the Undone line on A', hosts.length === 1 && /Undone/.test(text), { n: hosts.length, text: text.slice(0, 180) });
+        w.history.pushState({}, '', 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(OTHER));
+        const title = doc.querySelector('[title="Pilot proposal"]');
+        if (title) { title.setAttribute('title', 'Other mail'); title.textContent = 'Other mail'; }
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1500));
+        const onB = Array.from(doc.querySelectorAll('.flow-chip-host')).map((h) => h.textContent).join(' ');
+        check('open B shows no Undone banner from A', !/Undone/.test(onB), { text: onB.slice(0, 180) });
+        w.history.pushState({}, '', 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV));
+        if (title) { title.setAttribute('title', 'Pilot proposal'); title.textContent = 'Pilot proposal'; }
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1500));
+        const back = Array.from(doc.querySelectorAll('.flow-chip-host'));
+        const backText = back.map((h) => h.textContent).join(' ');
+        check('reopen A shows Undone on A only', back.length === 1 && /Undone/.test(backText) && back[0].querySelectorAll('.flow-chip-undo').length === 0, { n: back.length, text: backText.slice(0, 180) });
+      }
+    });
+    const twice = await runPage({
+      store: { log: [Object.assign({}, proof)] },
+      waitMs: 4500,
+      beforeClose: async ({ document: doc, ctx }) => {
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1200));
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1200));
+        const hosts = doc.querySelectorAll('.flow-chip-host[data-glance-chain="task-proof"]');
+        const undos = doc.querySelectorAll('.flow-chip-undo');
+        check('remount A twice keeps one receipt and one Undo', hosts.length === 1 && undos.length === 1, { hosts: hosts.length, undos: undos.length });
+      }
+    });
+    const shownWhy = await runPage({
+      store: {
+        outlookSync: {
+          stateVersion: 3,
+          diagnostics: [{ reason: 'outlook:attachments-unread', conversationId: CONV, subject: 'Pilot proposal' }]
+        }
+      },
+      waitMs: 4500
+    });
+    const left = ((shownWhy.store.outlookSync && shownWhy.store.outlookSync.diagnostics) || []).filter((d) => d && d.reason === 'outlook:attachments-unread' && d.conversationId === CONV);
+    const pageLeft = (shownWhy.store.outlookPageDiag || []).filter((d) => d && /attachments-unread/.test(String(d.reason || '')) && (d.conversationId === CONV || String(d.key || '').indexOf(CONV) >= 0));
+    check('a mail with a card is not listed under Why not shown for attachments-unread',
+      Boolean(shownWhy.chip) && left.length === 0 && pageLeft.length === 0,
+      { chip: Boolean(shownWhy.chip), left: left.length, pageLeft: pageLeft.map((d) => d.reason) });
+    void undone;
+    void twice;
   }
 
   console.log('\nTOTAL FAILURES:', failures);

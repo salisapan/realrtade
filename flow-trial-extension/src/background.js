@@ -11,10 +11,16 @@
 // "don't let this personal commitment slip." Re-promote them once Google
 // Tasks + Notion have proven the core loop, not before.
 //
-//   Google Tasks authenticates via chrome.identity.getAuthToken — Chrome's own
-//   Google account chooser, driven by an OAuth Client ID registered for this
-//   extension. No server-side exchange, no Client Secret, because Chrome
-//   itself is the OAuth client.
+//   Google authenticates first via chrome.identity.getAuthToken — Chrome's
+//   own Google account chooser, driven by the Chrome-extension OAuth client
+//   in manifest.json. When that fails because browser sign-in is off (or
+//   the identity API is otherwise unavailable, and the user did not cancel),
+//   the same grant is obtained with chrome.identity.launchWebAuthFlow and
+//   the Web application client in config/oauth.public.js (WEB_OAUTH_CLIENT_ID).
+//   That consent window opens only after an explicit Connect click. Do It,
+//   a 401 retry, and Gmail auto-connect stay silent and, if they cannot
+//   mint a token, report not-connected instead of popping a window.
+//   No server-side exchange and no Client Secret either way.
 //
 //   Notion authenticates with an internal integration token the user creates
 //   themselves, so there is no app registration, no review queue and no
@@ -35,12 +41,19 @@
 // to undo it. Nothing here ever edits or deletes something the user already
 // had.
 
-import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
+import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
+import { GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
+import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
+import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
+import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
+import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
+import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -184,13 +197,15 @@ chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 const SURFACES = {
   whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
+  slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
+  telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
   outlook: {
     label: 'Outlook on the web',
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
     extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
-      'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
-    css: ['src/chip.css']
+      'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
+    css: ['design/step-states-v1/scoped.css', 'src/chip.css']
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
@@ -218,22 +233,31 @@ async function registerSurfaceNow(id) {
   if (!granted) return { ok: false, reason: 'no-permission' };
   const css = (def.css && def.css.length) ? def.css : ['src/follow.css'];
   const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: css, runAt: 'document_idle', persistAcrossSessions: true };
+  const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || chrome.runtime.getManifest().version || '';
+  let remembered = {};
+  try { remembered = (await chrome.storage.local.get({ glanceSurfaceStamp: {} })).glanceSurfaceStamp || {}; } catch (e) { remembered = {}; }
   let current = null;
   try { current = ((await chrome.scripting.getRegisteredContentScripts({ ids: [script.id] })) || [])[0] || null; } catch (e) { current = null; }
-  const same = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
+  const listSame = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
     && JSON.stringify((current.matches || []).slice().sort()) === JSON.stringify(script.matches.slice().sort());
+  // The file list can stay the same across a package. The previous registration
+  // would keep injecting the old greeting path. A new stamp registers again.
+  const same = listSame && remembered[id] === stamp;
   if (!same) {
     if (current) { try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered */ } }
     await chrome.scripting.registerContentScripts([script]);
-    console.info('Glance: ' + id + ' surface registered', chrome.runtime.getManifest().version, script.js.length + ' files');
+    remembered[id] = stamp;
+    try { await chrome.storage.local.set({ glanceSurfaceStamp: remembered }); } catch (e) { /* the page still got this registration */ }
+    console.info('Glance: ' + id + ' surface registered', stamp, script.js.length + ' files');
   }
-  const injected = await injectSurfaceIntoOpenTabs(id, script);
+  const injected = await injectSurfaceIntoOpenTabs(id, script, stamp);
   return { ok: true, registered: !same, injected };
 }
 
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
-async function injectSurfaceIntoOpenTabs(id, script) {
+async function injectSurfaceIntoOpenTabs(id, script, stamp) {
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
+  const want = stamp || ((typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '');
   let tabs = [];
   try { tabs = await chrome.tabs.query({ url: script.matches }); } catch (e) { return 0; }
   let n = 0;
@@ -243,17 +267,25 @@ async function injectSurfaceIntoOpenTabs(id, script) {
       const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
         let alive = false;
         try { alive = Boolean(chrome.runtime && chrome.runtime.id); } catch (e) { alive = false; }
-        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive };
+        const pageStamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive, stamp: pageStamp };
       } });
       const seen = (probe && probe[0] && probe[0].result) || {};
+      if (seen.globals && want && seen.stamp && seen.stamp !== want && chrome.tabs.reload) {
+        // The open page is an older package. Rescan would keep its greeting path.
+        console.warn('Glance: reloading an open ' + id + ' tab still on ' + seen.stamp);
+        try { await chrome.tabs.reload(tab.id); } catch (e) { /* the next navigation picks up the new scripts */ }
+        continue;
+      }
       if (seen.globals && !seen.alive) {
         // A copy from before an update, cut off from the extension: its declarations block a second copy. Only a reload
         // of that tab clears it.
         console.warn('Glance: an open ' + id + ' tab runs an old copy; reload that tab once');
+        if (chrome.tabs.reload) { try { await chrome.tabs.reload(tab.id); } catch (e) { /* left for the person */ } }
         continue;
       }
       if (seen.globals) {
-        // A copy from this or an earlier load is there: ask it to look again rather than declaring everything twice.
+        // A copy from this package is there: ask it to look again rather than declaring everything twice.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } } });
         continue;
       }
@@ -999,12 +1031,39 @@ async function mondayUndo(ref) {
 
 /* ------------------------------------------------------------ Google Tasks */
 //
-// The MVP write path: no token to paste, no vendor app to authorize —
-// chrome.identity.getAuthToken drives Chrome's own Google account chooser
-// against the OAuth Client ID registered in manifest.json's oauth2 key. The
-// only thing this needs from the account owner is that one Client ID, not a
-// server-side exchange or a Client Secret at all, because Chrome itself is
-// the OAuth client here rather than a page Flow has to build.
+// The MVP write path: no token to paste. chrome.identity.getAuthToken is
+// primary — Chrome's own Google account chooser against the Chrome-extension
+// client in manifest.json's oauth2 key. When that call fails because browser
+// sign-in is off, or Chrome's identity API is unavailable and the user did
+// not cancel, launchWebAuthFlow runs the implicit grant against
+// WEB_OAUTH_CLIENT_ID (one Web client, both extension IDs). No client secret
+// and no token endpoint: Google web clients need a secret to redeem an
+// authorization code, and this service worker does not have one.
+
+const GOOGLE_WEB_CLIENT_ID = publicClientId(WEB_OAUTH_CLIENT_ID);
+let googleWebAuthInteractiveFlight = null;
+// Bumped on Disconnect so a consent window that is already open cannot
+// save googleWebAuth after the user has cleared it. The write chain keeps
+// that save and the clear from interleaving.
+let googleWebAuthEpoch = 0;
+let googleWebAuthWriteChain = Promise.resolve();
+
+function enqueueGoogleWebAuthWrite(task) {
+  const run = googleWebAuthWriteChain.then(task, task);
+  googleWebAuthWriteChain = run.then(() => {}, () => {});
+  return run;
+}
+
+function invalidateGoogleWebAuthFlight() {
+  googleWebAuthEpoch += 1;
+  googleWebAuthInteractiveFlight = null;
+}
+
+// A Gmail content-script flow:connect is ensureGoogleAutoConnect. The
+// popup Connect button has no tab. Only the latter may open a window.
+function googleConnectWantsInteractive(sender) {
+  return !(sender && sender.tab);
+}
 
 function googleTasksConfigured() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
@@ -1013,7 +1072,19 @@ function googleTasksConfigured() {
 
 // Callback-based even inside an MV3 service worker — there is no Promise
 // form of this specific identity method.
+//
+// Headless regression only. The suite sets globalThis.__glanceE2e.googleAuthToken
+// inside this worker because chrome.identity cannot be replaced there.
+// Production never sets __glanceE2e, so the Chrome call below is unchanged.
+function glanceE2eGoogleAuth(interactive) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || typeof e2e.googleAuthToken !== 'function') return null;
+  return e2e.googleAuthToken(Boolean(interactive));
+}
+
 function getGoogleAuthToken(interactive) {
+  const hooked = glanceE2eGoogleAuth(interactive);
+  if (hooked && typeof hooked.then === 'function') return hooked;
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive: Boolean(interactive) }, (token) => {
       if (chrome.runtime.lastError || !token) {
@@ -1026,27 +1097,240 @@ function getGoogleAuthToken(interactive) {
 }
 
 function removeCachedGoogleAuthToken(token) {
+  const e2e = globalThis.__glanceE2e;
+  if (e2e && e2e.installed === true) {
+    e2e.authCalls = e2e.authCalls || [];
+    e2e.authCalls.push({ removeCached: true, at: Date.now() });
+    return Promise.resolve();
+  }
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
-// Base-URL-parameterized so Calendar and Gmail can reuse the exact same
-// token-fetch-and-401-retry logic instead of each writer function
-// duplicating it — this is what Google Tasks' own authed fetch became once
-// two more Google APIs needed the identical dance.
+function launchGoogleWebAuthFlow(details) {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.identity.launchWebAuthFlow(details, (responseUrl) => {
+        const err = chrome.runtime.lastError;
+        if (err || !responseUrl) {
+          reject(new Error((err && err.message) || 'Google sign-in was closed or denied.'));
+          return;
+        }
+        resolve(responseUrl);
+      });
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}
+
+function googleManifestScopes() {
+  const oauth2 = chrome.runtime.getManifest().oauth2;
+  return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+}
+
+async function readGoogleWebAuth() {
+  const stored = await chrome.storage.local.get(GOOGLE_WEB_AUTH_STORAGE_KEY);
+  return stored[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
+}
+
+async function clearGoogleWebAuth() {
+  await chrome.storage.local.remove(GOOGLE_WEB_AUTH_STORAGE_KEY);
+}
+
+function googleWebRedirectUri() {
+  const identity = chrome.identity;
+  if (identity && typeof identity.getRedirectURL === 'function') {
+    try {
+      const url = identity.getRedirectURL();
+      if (url) return url;
+    } catch (e) { /* fall through to the hand-built chromiumapp origin */ }
+  }
+  return googleRedirectUriForExtension(chrome.runtime && chrome.runtime.id);
+}
+
+async function commitGoogleWebAuth(record, epoch) {
+  return enqueueGoogleWebAuthWrite(async () => {
+    if (epoch !== googleWebAuthEpoch) return false;
+    await chrome.storage.local.set({ [GOOGLE_WEB_AUTH_STORAGE_KEY]: record });
+    if (epoch !== googleWebAuthEpoch) {
+      const stored = await readGoogleWebAuth();
+      if (stored && stored.accessToken === record.accessToken) await clearGoogleWebAuth();
+      return false;
+    }
+    return true;
+  });
+}
+
+async function runGoogleWebAuth(interactive) {
+  if (!GOOGLE_WEB_CLIENT_ID) {
+    throw new Error('Glance’s backup Google sign-in isn’t configured on this build yet.');
+  }
+  const epoch = googleWebAuthEpoch;
+  const redirectUri = googleWebRedirectUri();
+  if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
+  const state = randomOAuthState();
+  const url = googleImplicitAuthUrl({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+    redirectUri,
+    scopes: googleManifestScopes(),
+    state,
+    prompt: interactive ? 'select_account' : 'none'
+  });
+  const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
+  if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
+  const parsed = parseGoogleImplicitRedirect(resultUrl, state);
+  const record = { accessToken: parsed.accessToken };
+  if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
+  const committed = await commitGoogleWebAuth(record, epoch);
+  if (!committed) throw new Error('Google sign-in was closed or denied.');
+  return record;
+}
+
+// Stored web-flow token when it is still inside its expiry. A lapsed token
+// tries a silent prompt=none grant. The interactive window runs only when
+// the caller passed interactive — an explicit Connect. A silent caller
+// with nothing to reuse fails instead of opening that window.
+async function getGoogleWebAccessToken(interactive) {
+  const existing = await readGoogleWebAuth();
+  if (webTokenUsable(existing)) return { token: existing.accessToken, source: 'web' };
+  const hadToken = Boolean(existing && existing.accessToken);
+  if (hadToken) await clearGoogleWebAuth();
+  if (hadToken) {
+    try {
+      const silent = await runGoogleWebAuth(false);
+      return { token: silent.accessToken, source: 'web' };
+    } catch (silentErr) {
+      if (!interactive) throw silentErr;
+    }
+  }
+  if (!interactive) throw new Error('Google sign-in needs you to connect again.');
+  if (!googleWebAuthInteractiveFlight) {
+    let flight;
+    flight = runGoogleWebAuth(true).finally(() => {
+      if (googleWebAuthInteractiveFlight === flight) googleWebAuthInteractiveFlight = null;
+    });
+    googleWebAuthInteractiveFlight = flight;
+  }
+  const saved = await googleWebAuthInteractiveFlight;
+  return { token: saved.accessToken, source: 'web' };
+}
+
+// getAuthToken first. The web flow runs only after a non-cancel failure.
+async function getGoogleAccessToken(interactive) {
+  const wantUi = Boolean(interactive);
+  try {
+    const token = await getGoogleAuthToken(wantUi);
+    return { token, source: 'chrome' };
+  } catch (err) {
+    const message = err && err.message;
+    if (!shouldFallbackFromGetAuthToken(message, { interactive: wantUi })) throw err;
+    try {
+      return await getGoogleWebAccessToken(wantUi);
+    } catch (fallbackErr) {
+      if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
+      throw fallbackErr;
+    }
+  }
+}
+
+async function invalidateGoogleCredential(cred) {
+  if (!cred) return;
+  if (cred.source === 'web') {
+    const stored = await readGoogleWebAuth();
+    if (stored && stored.accessToken === cred.token) await clearGoogleWebAuth();
+    return;
+  }
+  if (cred.token) await removeCachedGoogleAuthToken(cred.token);
+}
+
+// Evicts Chrome's getAuthToken cache only. Does not open the web flow —
+// Disconnect must not pop a consent window when browser sign-in is off.
+async function clearCachedChromeGoogleTokens() {
+  try {
+    const token = await getGoogleAuthToken(false);
+    if (token) await removeCachedGoogleAuthToken(token);
+  } catch (e) {
+    // Browser sign-in off, or no cached token. The web-flow token is cleared
+    // by the caller along with googleTasksAuth.
+  }
+  const identity = chrome.identity;
+  if (identity && typeof identity.clearAllCachedAuthTokens === 'function') {
+    try {
+      await new Promise((resolve) => identity.clearAllCachedAuthTokens(resolve));
+    } catch (e) { /* already empty, or the API rejected the call */ }
+  }
+}
+
+async function disconnectConnector(connectorId) {
+  const STORAGE_KEYS = {
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
+    googleTasks: 'googleTasksAuth'
+  };
+  const key = STORAGE_KEYS[connectorId] || null;
+  if (!key) return { ok: false };
+  // Google also evicts Chrome's cached getAuthToken AND the stored web-flow
+  // token. Otherwise "Disconnect" then "Connect" silently reuses the same
+  // grant instead of letting the user pick a different Google account.
+  if (connectorId === 'googleTasks') {
+    // Invalidate before the clear. A consent window that resolves after
+    // this point sees a new epoch and must not write googleWebAuth back.
+    invalidateGoogleWebAuthFlight();
+    await clearCachedChromeGoogleTokens();
+    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY]));
+    return { ok: true };
+  }
+  await chrome.storage.local.remove(key);
+  return { ok: true };
+}
+
+// Writers already treat 401/403 as not-connected. A silent grant that cannot
+// be minted mid–Do It uses that same status so the chip asks for Connect
+// instead of opening a consent window or throwing a raw auth error.
+function googleAuthUnavailableResponse() {
+  return {
+    ok: false,
+    status: 401,
+    json: async () => ({}),
+    text: async () => '',
+    arrayBuffer: async () => new ArrayBuffer(0)
+  };
+}
+
+// Base-URL-parameterized so Calendar, Gmail, and Drive reuse the same
+// token-fetch-and-401-retry logic. The bearer is a getAuthToken result when
+// Chrome can mint one, and the stored web-flow token otherwise. Both the
+// first fetch and the 401 retry are silent — interactive:true is reserved
+// for an explicit Connect click.
 async function googleAuthedFetch(baseUrl, path, options) {
-  const token = await getGoogleAuthToken(true);
+  let cred;
+  try {
+    cred = await getGoogleAccessToken(false);
+  } catch (e) {
+    return googleAuthUnavailableResponse();
+  }
   const doFetch = (t) => fetch(baseUrl + path, Object.assign({}, options, {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
-  const res = await doFetch(token);
+  const res = await doFetch(cred.token);
   if (res.status !== 401) return res;
   // A cached token can go stale (revoked access from the Google Account
   // permissions page, expired) without Chrome knowing yet — evict it and
   // request a fresh one once before surfacing the failure, the same
   // "refresh once, then fail loudly" shape every OAuth connector above uses.
-  await removeCachedGoogleAuthToken(token);
-  const freshToken = await getGoogleAuthToken(true);
-  return doFetch(freshToken);
+  // The refresh stays silent. prompt=none may run for a web token; a
+  // consent window may not.
+  await invalidateGoogleCredential(cred);
+  try {
+    if (cred.source === 'web') {
+      const saved = await runGoogleWebAuth(false);
+      cred = { token: saved.accessToken, source: 'web' };
+    } else {
+      cred = await getGoogleAccessToken(false);
+    }
+  } catch (e) {
+    return googleAuthUnavailableResponse();
+  }
+  return doFetch(cred.token);
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -1089,22 +1373,25 @@ async function findOrCreateGlanceTaskList() {
   return (await createRes.json()).id;
 }
 
-async function connectGoogleTasks() {
+async function connectGoogleTasks(interactive) {
   if (!googleTasksConfigured()) {
     throw new Error('Google isn’t configured on this build yet — manifest.json’s oauth2.client_id still needs a real Google OAuth Client ID (see the README’s “Set up Google” section).');
   }
-  // interactive:true is the one moment Chrome may show the account chooser
-  // or consent screen; every later call in this file passes interactive:true
-  // too, but resolves instantly from Chrome's own cache once granted.
-  await getGoogleAuthToken(true);
+  // interactive is false for ensureGoogleAutoConnect (the Gmail content
+  // script). The popup Connect click passes true. That is the one moment
+  // Chrome may show the account chooser or, if browser sign-in is off, the
+  // web-flow consent window. Later API calls stay silent.
+  await getGoogleAccessToken(interactive !== false);
   const taskListId = await findOrCreateGlanceTaskList();
   await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
   return true;
 }
 
 function googleTaskTitle(p) {
-  const identity = (p.senderName || '').trim();
-  return identity ? identity + ' — ' + p.label : p.label;
+  const Title = globalThis.FlowCommitmentTitle;
+  const span = Title && typeof Title.fromPayload === 'function' ? Title.fromPayload(p) : '';
+  if (span) return String(span).slice(0, 255);
+  return String((p && p.label) || '').replace(/\s+/g, ' ').trim().slice(0, 255);
 }
 
 // A date the close is willing to write. Anything else — a month that
@@ -1261,29 +1548,71 @@ async function googleTasksWrite(p) {
     try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
     throw new Error('Google Tasks write failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
   }
-  const task = await res.json();
-  return {
-    ok: true,
+  let task = null;
+  try { task = await res.json(); } catch (e) { task = null; }
+  const taskUrl = 'https://tasks.google.com/embed/list/' + encodeURIComponent(taskListId) + '?pli=1';
+  const written = taskWrittenLine(close.dueIso, close.amount);
+  const base = {
     where: 'Google Tasks',
     target: GLANCE_TASK_LIST_TITLE + ' list',
-    // What the receipt says was written. Built from the same due and amount
-    // that went into the request body, so the line cannot name a date or a
-    // figure the task does not have.
-    written: taskWrittenLine(close.dueIso, close.amount),
-    // The id actually written to, not the one this function started with —
-    // Undo has to delete from the list the task really landed in.
-    ref: { taskListId, taskId: task.id },
-    url: 'https://tasks.google.com/embed/list/' + encodeURIComponent(taskListId) + '?pli=1'
+    written: written,
+    url: taskUrl
   };
+  // Creating the task is not the close. Handled waits for a GET of that id.
+  const Proof = globalThis.FlowProofOfClose;
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  if (!task || typeof task.id !== 'string' || !task.id) {
+    return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+  }
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
+  const fetched = await googleTasksFetchBack(taskListId, task.id);
+  if (!fetched.ok) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  }
+  const proof = Proof && Proof.buildProof({
+    system: Proof.SYSTEM_GOOGLE_TASKS,
+    externalId: task.id,
+    url: taskUrl,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) {
+    return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  }
+  return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+// Read the task that was just created. fetchedBack is true only when this
+// GET returns that same id and the task is not deleted. A miss stays
+// verify_failed — the loop is not Handled.
+async function googleTasksFetchBack(taskListId, taskId) {
+  let res;
+  try {
+    res = await googleTasksAuthedFetch(
+      '/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId),
+      { method: 'GET' }
+    );
+  } catch (e) {
+    return { ok: false };
+  }
+  if (!res || !res.ok) return { ok: false };
+  let body = null;
+  try { body = await res.json(); } catch (e) { return { ok: false }; }
+  if (!body || body.id !== taskId || body.deleted) return { ok: false };
+  return { ok: true, task: body };
 }
 
 async function googleTasksUndo(ref) {
   const auth = await getGoogleTasksAuth();
-  if (!ref || !ref.taskId) return { ok: false };
+  if (!ref) return { ok: false };
+  // externalId is the id the proof fetched back. Older rows only have taskId.
+  const taskId = ref.externalId || ref.taskId;
+  if (!taskId) return { ok: false };
   const listId = ref.taskListId || (auth && auth.taskListId);
   if (!listId) return { ok: false };
   const res = await googleTasksAuthedFetch(
-    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId),
+    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId),
     { method: 'DELETE' }
   );
   return { ok: res.ok || res.status === 404 };
@@ -1949,7 +2278,8 @@ async function readDriveFailure(res) {
 // file trace asks. The access token is not returned and not logged.
 async function googleTokenScopes() {
   try {
-    const token = await getGoogleAuthToken(false);
+    const cred = await getGoogleAccessToken(false);
+    const token = cred && cred.token;
     const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token));
     if (!res.ok) return { ok: false, status: res.status };
     const data = await res.json();
@@ -1965,9 +2295,9 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
-// One 403 for a missing Drive scope drops the cached token and asks Chrome
-// once more (interactive), so a grant that predates drive.readonly can pick
-// up the scope already listed in the manifest. A second 403 stops.
+// One 403 for a missing Drive scope drops the cached Chrome token and asks
+// once more, silently. A grant that already includes drive.readonly can be
+// reused. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
@@ -1989,7 +2319,7 @@ async function searchDriveFiles(q, detail) {
         try {
           const stale = await getGoogleAuthToken(false);
           if (stale) await removeCachedGoogleAuthToken(stale);
-        } catch (e) { /* the retry below asks Chrome again */ }
+        } catch (e) { /* the silent retry below asks again; it does not open a window */ }
         continue;
       }
       if (detail) { detail.status = fail.status; detail.reason = fail.reason; detail.error = fail.error; }
@@ -2995,29 +3325,13 @@ function lmServerLoopback(url) {
   return h === '127.0.0.1' || h === 'localhost' || h === '[::1]' || h === '::1';
 }
 
-// Must match core/local-lm-server.js schemaHint: name the JSON keys (esp. act) in the prompt.
-function lmServerSchemaHint(schema) {
-  if (!schema || typeof schema !== 'object') return '';
-  const props = schema.properties || {};
-  const keys = Object.keys(props);
-  if (!keys.length) return '';
-  const lines = keys.map((k) => {
-    const p = props[k] || {};
-    if (Array.isArray(p.enum)) return k + ': one of ' + p.enum.join('|');
-    if (Array.isArray(p.type)) return k + ': ' + p.type.join('|');
-    if (p.type) return k + ': ' + p.type;
-    return k;
-  });
-  return 'Return one JSON object with exactly these keys:\n' + lines.join('\n') + '\n\n';
-}
-
 async function lmServerPromptNow(text, schema) {
   const stored = await new Promise((r) => chrome.storage.local.get('localLmServer', r));
   const c = stored && stored.localLmServer;
   if (!c || c.enabled !== true || !c.model || !c.status) return { ok: false, reason: 'off' };
   const base = String(c.baseUrl || (c.provider === 'lmstudio' ? 'http://127.0.0.1:1234' : 'http://127.0.0.1:11434')).replace(/\/+$/, '');
   if ((c.provider !== 'ollama' && c.provider !== 'lmstudio') || !lmServerLoopback(base)) return { ok: false, reason: 'refused' };
-  const content = (lmServerSchemaHint(schema) + String(text || '')).slice(0, 4000);
+  const content = String(text || '').slice(0, 4000);
   let url, body;
   if (c.provider === 'ollama') {
     url = base + '/api/chat';
@@ -3113,7 +3427,7 @@ async function outlookSession(opts) {
       fetch: (u, i) => fetch(u, i), now: () => Date.now(),
       random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b),
       launchSilent: outlookLaunchSilent
-    }, cfg, auth, { redirectUri: chrome.identity.getRedirectURL(), loginHint: outlookPrimaryHint(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null });
+    }, cfg, auth, { redirectUri: chrome.identity.getRedirectURL(), loginHint: outlookPrimaryHint(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null, scopes: (auth.requestedScopes && auth.requestedScopes.length) ? auth.requestedScopes : cfg.SCOPES });
     const now = Date.now();
     if (r.ok && r.changed) {
       const cur = (await chrome.storage.local.get(OUTLOOK_AUTH_KEY))[OUTLOOK_AUTH_KEY] || auth;
@@ -3195,7 +3509,8 @@ async function outlookFetch(url, init) {
 // The Outlook-on-the-web page runs the same planner as the panel (src/outlook.js). Its session comes from here
 // (flow:outlook-session: one renewal at a time, from this worker, with this extension's origin on the token request), and
 // its Graph reads go through here (flow:outlook-fetch) so the page never makes a cross-origin call of its own. Reads only:
-// Graph GETs under /me. Every write stays in flow:execute-action (outlookDraftWrite), which refuses anything that sends.
+// Graph GETs under /me. Writes stay in flow:execute-action: outlookDraftWrite (a draft, never a send)
+// and outlookCalendarWrite (one event, only when the token has Calendars.ReadWrite).
 const OUTLOOK_PROXY_GET = /^https:\/\/graph\.microsoft\.com\/v1\.0\/me([?\/(]|$)/;
 async function outlookProxyFetch(msg, sender) {
   if (!sender || sender.id !== chrome.runtime.id) return { ok: false, status: 0, error: 'foreign-sender' };
@@ -3204,11 +3519,13 @@ async function outlookProxyFetch(msg, sender) {
   if (method !== 'GET' || !OUTLOOK_PROXY_GET.test(url)) return { ok: false, status: 0, error: 'refused' };
   const headers = {};
   const h = (msg.init && msg.init.headers) || {};
-  if (h.Authorization) headers.Authorization = String(h.Authorization);
   if (h.Prefer) headers.Prefer = String(h.Prefer);
+  // The page used to forward an empty header set. The bearer is the mailbox
+  // session, with one 401 retry, the same as outlookFetch.
   try {
-    const res = await fetch(url, { method: 'GET', headers });
-    return { ok: res.ok, status: res.status, body: await res.text() };
+    const res = await outlookFetch(url, { method: 'GET', headers: headers });
+    if (res && res.notConnected) return { ok: false, status: 0, error: 'not-connected' };
+    return { ok: Boolean(res && res.ok), status: (res && res.status) || 0, body: res && res.text ? await res.text() : '' };
   } catch (e) {
     return { ok: false, status: 0, error: 'network' };
   }
@@ -3271,7 +3588,9 @@ async function outlookDraftWrite(p) {
   }
   const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
   outlookAssertNotSend(url);
-  const res = await outlookFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: comment }) });
+  const immutable = p && p.outlookImmutableId === true;
+  const prefer = immutable ? { Prefer: 'IdType="ImmutableId"' } : {};
+  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }) });
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
   if (res.status === 401) return { ok: false, reason: 'not-connected' };
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
@@ -3291,11 +3610,11 @@ async function outlookDraftWrite(p) {
   }
   if (draft.isDraft !== false) {
     try {
-      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) });
+      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
       fromSet = Boolean(pr && pr.ok && patchBody.from);
       if (pr && !pr.ok && patchBody.from) {
         // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
-        await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: patchBody.body }) });
+        await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
@@ -3303,14 +3622,14 @@ async function outlookDraftWrite(p) {
   if (p && (p.driveFileId || (p.attachment && p.attachment.base64))) {
     const file = await outlookFileForDraft(p);
     if (!file) {
-      await outlookDeleteDraft(draft.id);
+      await outlookDeleteDraft(draft.id, prefer);
       return { ok: false, reason: 'outlook-file-found-no-attach', attached: false };
     }
     const attUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id) + '/attachments';
     outlookAssertNotSend(attUrl);
     const att = await outlookFetch(attUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, prefer),
       body: JSON.stringify({
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: file.filename,
@@ -3321,7 +3640,7 @@ async function outlookDraftWrite(p) {
     let created = null;
     if (att && att.ok) { try { created = await att.json(); } catch (e) { created = null; } }
     if (!created || !created.id) {
-      await outlookDeleteDraft(draft.id);
+      await outlookDeleteDraft(draft.id, prefer);
       return { ok: false, reason: 'outlook-file-found-no-attach', attached: false };
     }
     attachmentId = created.id;
@@ -3357,17 +3676,207 @@ async function outlookFileForDraft(p) {
     base64: raw
   };
 }
-async function outlookDeleteDraft(draftId) {
+async function outlookDeleteDraft(draftId, prefer) {
   if (!draftId) return;
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draftId);
   outlookAssertNotSend(delUrl);
-  try { await outlookFetch(delUrl, { method: 'DELETE' }); } catch (e) { /* already gone */ }
+  const headers = prefer || {};
+  try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
-async function outlookDraftUndo(ref) {
+// One calendar event for a Family B file-on-hold. The Calendar checkbox asks
+// for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
+// The body never includes attendees, so the write does not invite anyone.
+async function outlookCalendarWrite(p) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  if (!Cal || typeof Cal.eventBody !== 'function') return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  if (!Cal.hasWriteScope(session.token.grantedScopes)) {
+    return { ok: false, reason: 'calendar-write-not-granted' };
+  }
+  const params = (p && p.params) || {};
+  const body = Cal.eventBody({
+    dateIso: params.dateIso,
+    hour: params.hour,
+    minute: params.minute,
+    timeZone: localTimeZone(),
+    fileName: params.fileName || params.fileTerm,
+    fileTerm: params.fileTerm,
+    fileUrl: params.fileUrl,
+    quote: params.quote
+  });
+  if (!body) return { ok: false, reason: 'unclear', error: 'No single file and time for this event.' };
+  // Graph fields posted as-is: subject, body.contentType Text, body.content
+  // (quote, "File: name", https link), start, end, showAs busy, attendees [].
+  // A non-empty attendees list or isOnlineMeeting would invite someone.
+  const invited = Array.isArray(body.attendees) ? body.attendees.length : (body.attendees ? 1 : 0);
+  if (invited > 0 || body.isOnlineMeeting) return { ok: false, reason: 'refused' };
+  const url = OUTLOOK_GRAPH + '/me/events';
+  outlookAssertNotSend(url);
+  const res = await outlookFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res.status === 403) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+  let event = null;
+  try { event = await res.json(); } catch (e) { event = null; }
+  if (!event || typeof event.id !== 'string' || !event.id) {
+    return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
+  }
+  const summary = body.subject;
+  const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
+  return {
+    ok: true,
+    where: 'Outlook Calendar',
+    target: 'your calendar',
+    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
+    ref: { eventId: event.id },
+    url: event.webLink || null
+  };
+}
+
+async function outlookCalendarUndo(ref) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const id = ref && typeof ref === 'object' ? ref.eventId : ref;
+  const req = Cal && Cal.undoRequest(id);
+  if (!req || req.method !== 'DELETE' || !/^\/me\/events\/[^/]+$/.test(req.path)) return { ok: false };
+  const url = OUTLOOK_GRAPH + req.path;
+  outlookAssertNotSend(url);
+  const del = await outlookFetch(url, { method: 'DELETE' });
+  if (del.notConnected) return { ok: false, reason: 'not-connected' };
+  if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Calendar event removed.' };
+  return { ok: false, reason: 'http-' + (del.status || 0) };
+}
+
+// One Microsoft To Do task on the person's default list. Creating it is not
+// the close: Handled waits for a GET of that id. Never Mail.Send.
+function outlookGrantedScopes(token) {
+  const raw = token && token.grantedScopes;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') return raw.split(/\s+/).filter(Boolean);
+  return null;
+}
+
+function outlookHasTasksScope(token) {
+  const list = outlookGrantedScopes(token);
+  if (!list) return null;
+  return list.some((s) => s === 'Tasks.ReadWrite' || s === 'https://graph.microsoft.com/Tasks.ReadWrite');
+}
+
+function outlookTodoListIdFrom(body) {
+  const lists = body && Array.isArray(body.value) ? body.value : [];
+  const named = lists.find((l) => l && l.id && l.wellknownListName === 'defaultList');
+  if (named) return named.id;
+  const first = lists.find((l) => l && l.id);
+  return first ? first.id : '';
+}
+
+async function outlookTaskWrite(p) {
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const scope = outlookHasTasksScope(session.token);
+  if (scope === false) return { ok: false, reason: 'tasks-not-granted' };
+
+  const listUrl = OUTLOOK_GRAPH + '/me/todo/lists';
+  outlookAssertNotSend(listUrl);
+  const listed = await outlookFetch(listUrl, { method: 'GET' });
+  if (listed && listed.notConnected) return { ok: false, reason: 'not-connected' };
+  if (listed && (listed.status === 401 || listed.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (!listed || !listed.ok) return { ok: false, reason: 'http-' + ((listed && listed.status) || 0) };
+  let lists = null;
+  try { lists = await listed.json(); } catch (e) { lists = null; }
+  const taskListId = outlookTodoListIdFrom(lists);
+  if (!taskListId) return { ok: false, reason: 'no-list' };
+
+  const close = taskClosePayload(p || {});
+  const titled = googleTaskTitle(p || {});
+  const title = (typeof titled === 'string' ? titled : '').trim().slice(0, 255);
+  if (!title) return { ok: false, reason: 'unclear', error: 'Nothing to put on the task.' };
+  const notesLines = factLines(close.forNotes);
+  if (p && p.threadUrl) notesLines.push(['Open in Outlook', p.threadUrl]);
+  const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n').slice(0, 8000);
+  const body = { title: title };
+  if (notes) body.body = { contentType: 'text', content: notes };
+  if (close.dueIso) body.dueDateTime = { dateTime: close.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+
+  const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
+  outlookAssertNotSend(postUrl);
+  const res = await outlookFetch(postUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && (res.status === 401 || res.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  let task = null;
+  try { task = await res.json(); } catch (e) { task = null; }
+  const written = taskWrittenLine(close.dueIso, close.amount).replace(/^Google Task/, 'To Do');
+  const base = { where: 'Microsoft To Do', target: 'default list', written: written, url: null };
+  const Proof = globalThis.FlowProofOfClose;
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  if (!task || typeof task.id !== 'string' || !task.id) {
+    return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+  }
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
+  const fetched = await outlookTaskFetchBack(taskListId, task.id);
+  if (!fetched.ok) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  }
+  const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
+  if (link) base.url = link;
+  const proof = Proof && Proof.buildProof({
+    system: Proof.SYSTEM_MICROSOFT_TODO,
+    externalId: task.id,
+    url: link || undefined,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) {
+    return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  }
+  return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+async function outlookTaskFetchBack(taskListId, taskId) {
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  let res;
+  try {
+    res = await outlookFetch(url, { method: 'GET' });
+  } catch (e) {
+    return { ok: false };
+  }
+  if (!res || !res.ok) return { ok: false };
+  let body = null;
+  try { body = await res.json(); } catch (e) { return { ok: false }; }
+  if (!body || body.id !== taskId) return { ok: false };
+  return { ok: true, task: body };
+}
+
+async function outlookTaskUndo(ref) {
+  const taskId = ref && (ref.externalId || ref.taskId);
+  const listId = ref && ref.taskListId;
+  if (!taskId || !listId) return { ok: false };
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const del = await outlookFetch(url, { method: 'DELETE' });
+  if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
+  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'To Do task removed.' };
+  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+}
+
+async function outlookDraftUndo(ref, hint) {
   if (!ref) return { ok: false };
+  const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
   outlookAssertNotSend(getUrl);
-  const got = await outlookFetch(getUrl, {});
+  const got = await outlookFetch(getUrl, { headers: prefer });
   if (got.notConnected) return { ok: false, reason: 'not-connected' };
   if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
   if (!got.ok) return { ok: false, reason: 'http-' + got.status };
@@ -3375,9 +3884,244 @@ async function outlookDraftUndo(ref) {
   if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
   outlookAssertNotSend(delUrl);
-  const del = await outlookFetch(delUrl, { method: 'DELETE' });
+  const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });
   if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
   return { ok: true, written: 'Draft removed from Outlook Drafts.' };
+}
+
+function outlookHasFilesScope(token) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || typeof Files.hasWriteScope !== 'function') return false;
+  return Files.hasWriteScope(outlookGrantedScopes(token));
+}
+
+async function outlookReadJson(res) {
+  if (!res || typeof res.json !== 'function') return null;
+  try { return await res.json(); } catch (e) { return null; }
+}
+
+// Exactly one non-inline file on the message. Zero or two-plus is unclear.
+// The list call often omits contentBytes; the item call has them.
+async function outlookOneFileAttachment(messageId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !messageId) return null;
+  const listUrl = OUTLOOK_GRAPH + Files.attachmentsPath(messageId) + '?$select=id,name,contentType,size,isInline';
+  outlookAssertNotSend(listUrl);
+  const listed = await outlookFetch(listUrl, { method: 'GET' });
+  if (!listed || !listed.ok) return null;
+  const body = await outlookReadJson(listed);
+  const rows = body && Array.isArray(body.value) ? body.value : [];
+  const files = rows.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || '')));
+  if (files.length !== 1) return null;
+  const one = files[0];
+  if (one.size && Number(one.size) > Files.MAX_BYTES) return null;
+  let b64 = one.contentBytes || '';
+  if (!b64 && one.id) {
+    const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(messageId, one.id);
+    outlookAssertNotSend(itemUrl);
+    const item = await outlookFetch(itemUrl, { method: 'GET' });
+    const itemBody = await outlookReadJson(item);
+    b64 = itemBody && itemBody.contentBytes;
+  }
+  const bytes = Files.bytesFromBase64(b64);
+  if (!bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return null;
+  return { bytes: bytes, name: one.name || '', contentType: one.contentType || 'application/octet-stream' };
+}
+
+// One file on the person's OneDrive. Creating or replacing it is not the
+// close: Handled waits for a GET of that item id. A file that already
+// exists is replaced only when a previous version can be restored. Never
+// Mail.Send. A mail does not search the drive.
+async function outlookFileWrite(p) {
+  const Files = globalThis.FlowOnedriveFile;
+  const Proof = globalThis.FlowProofOfClose;
+  if (!Files || typeof Files.prepare !== 'function') return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const scope = outlookHasFilesScope(session.token);
+  if (scope === false) return { ok: false, reason: 'files-not-granted' };
+
+  const prepared = Files.prepare(p || {});
+  if (!prepared || !prepared.ok) return { ok: false, reason: (prepared && prepared.reason) || 'unclear' };
+  let name = prepared.name;
+  let bytes = prepared.bytes;
+  let contentType = prepared.contentType || 'application/octet-stream';
+  if (prepared.fetchOne) {
+    const got = await outlookOneFileAttachment(prepared.messageId);
+    if (!got) return { ok: false, reason: 'unclear' };
+    bytes = got.bytes;
+    contentType = got.contentType || contentType;
+    if (!prepared.nameLocked) {
+      const fromFile = Files.safeName(got.name);
+      if (fromFile) name = fromFile.indexOf('.') < 0 ? Files.safeName(fromFile + '.txt') : fromFile;
+    }
+  }
+  if (!name || !bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return { ok: false, reason: 'unclear' };
+
+  const lookupUrl = OUTLOOK_GRAPH + Files.rootItemPath(name);
+  outlookAssertNotSend(lookupUrl);
+  const looked = await outlookFetch(lookupUrl, { method: 'GET' });
+  if (looked && looked.notConnected) return { ok: false, reason: 'not-connected' };
+  if (looked && (looked.status === 401 || looked.status === 403)) return { ok: false, reason: 'files-not-granted' };
+  const missing = !looked || looked.status === 404;
+  const existing = !missing && looked.ok ? await outlookReadJson(looked) : null;
+  if (!missing && (!existing || !existing.id)) return { ok: false, reason: 'http-' + ((looked && looked.status) || 0) };
+
+  let created = true;
+  let previousVersionId = '';
+  let putUrl = OUTLOOK_GRAPH + Files.createContentPath(name);
+  if (!missing) {
+    const versionsUrl = OUTLOOK_GRAPH + Files.versionsPath(existing.id);
+    outlookAssertNotSend(versionsUrl);
+    const vers = await outlookFetch(versionsUrl, { method: 'GET' });
+    if (vers && (vers.status === 401 || vers.status === 403)) return { ok: false, reason: 'files-not-granted' };
+    const versionId = Files.versionIdOf(await outlookReadJson(vers));
+    if (!versionId) return { ok: false, reason: 'unclear', error: 'No previous version to restore.' };
+    created = false;
+    previousVersionId = versionId;
+    putUrl = OUTLOOK_GRAPH + Files.itemContentPath(existing.id);
+  }
+  outlookAssertNotSend(putUrl);
+  const put = await outlookFetch(putUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: bytes
+  });
+  if (put && put.notConnected) return { ok: false, reason: 'not-connected' };
+  if (put && (put.status === 401 || put.status === 403)) return { ok: false, reason: 'files-not-granted' };
+  if (!put || !put.ok) return { ok: false, reason: 'http-' + ((put && put.status) || 0) };
+  const writtenItem = await outlookReadJson(put);
+  const itemId = (writtenItem && writtenItem.id) || (existing && existing.id) || '';
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  const base = { where: 'OneDrive', target: name, written: 'OneDrive · ' + name, url: null };
+  if (!itemId) return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+
+  const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
+  if (previousVersionId) ref.previousVersionId = previousVersionId;
+  const fetched = await outlookFileFetchBack(itemId);
+  if (!fetched.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  const link = fetched.item && fetched.item.webUrl && String(fetched.item.webUrl).slice(0, 8) === 'https://' ? fetched.item.webUrl : null;
+  if (link) base.url = link;
+  const proof = Proof && Proof.buildProof({
+    system: (Proof && Proof.SYSTEM_MICROSOFT_ONEDRIVE) || 'microsoft/onedrive',
+    externalId: itemId,
+    url: link || undefined,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+async function outlookFileFetchBack(itemId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !itemId) return { ok: false };
+  const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { return { ok: false }; }
+  if (!res || !res.ok) return { ok: false };
+  const body = await outlookReadJson(res);
+  if (!body || body.id !== itemId) return { ok: false };
+  return { ok: true, item: body };
+}
+
+async function outlookFileUndo(ref) {
+  const Files = globalThis.FlowOnedriveFile;
+  const itemId = ref && (ref.externalId || ref.fileId || ref.itemId);
+  if (!Files || !itemId) return { ok: false };
+  if (ref.created === false && ref.previousVersionId) {
+    const url = OUTLOOK_GRAPH + Files.restorePath(itemId, ref.previousVersionId);
+    outlookAssertNotSend(url);
+    const res = await outlookFetch(url, { method: 'POST' });
+    if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+    if (res && (res.ok || res.status === 204)) return { ok: true, written: 'Previous OneDrive file restored.' };
+    return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  }
+  if (ref.created !== true) return { ok: false, reason: 'unclear' };
+  const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(url);
+  const del = await outlookFetch(url, { method: 'DELETE' });
+  if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
+  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'OneDrive file removed.' };
+  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+}
+
+// The attachmentSave step's writer. The page does not call it in 0.9.38.
+// Bytes have to be on the file. A multi-file step does not fetch "the one file".
+async function outlookAttachmentBytes(messageId, attachmentId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !messageId || !attachmentId) return null;
+  const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(messageId, attachmentId);
+  outlookAssertNotSend(itemUrl);
+  const res = await outlookFetch(itemUrl, { method: 'GET' });
+  if (!res || !res.ok) return null;
+  const body = await outlookReadJson(res);
+  if (!body || !body.contentBytes) return null;
+  return { base64: body.contentBytes, name: body.name || '', contentType: body.contentType || 'application/octet-stream' };
+}
+
+async function attachmentSaveWrite(p) {
+  const Save = globalThis.FlowSuggestSave;
+  if (!Save || typeof Save.saveAttachments !== 'function') return { ok: false, reason: 'not-configured' };
+  const params = (p && p.params) || {};
+  const files = params.files || [];
+  const target = params.target === 'drive' ? 'drive' : 'onedrive';
+  const messageId = (p && (p.messageId || p.outlookIncomingId)) || params.messageId || null;
+  // AQQK/AQQk is a conversation id. Attachment bytes are on the Graph message.
+  function graphBytesId(id) {
+    const s = String(id || '');
+    if (!s || /^A[AQ]Qk/i.test(s)) return '';
+    return s;
+  }
+  const bytesId = graphBytesId(p && p.graphMessageId) || graphBytesId(params.graphMessageId) || graphBytesId(messageId);
+  const out = await Save.saveAttachments(files, target, {
+    writeOne: async (file) => {
+      let b64 = file && (file.base64 || file.contentBytes);
+      let name = file && file.name;
+      let contentType = file && file.contentType;
+      if (!b64 && target === 'onedrive' && bytesId && file && file.id) {
+        const got = await outlookAttachmentBytes(bytesId, file.id);
+        if (got) {
+          b64 = got.base64;
+          name = name || got.name;
+          contentType = contentType || got.contentType;
+        }
+      }
+      if (!b64) return { ok: false, reason: 'no-bytes' };
+      if (target !== 'onedrive') return { ok: false, reason: 'no-bytes' };
+      const written = await outlookFileWrite({
+        fileName: name,
+        attachment: { filename: name, mimeType: contentType, base64: b64 }
+      });
+      const proof = written && written.proof && written.proof.fetchedBack === true ? written.proof : null;
+      const ref = written && written.ref ? Object.assign({ created: written.ref.created !== false }, written.ref) : null;
+      return { ok: !!proof, proof: proof, ref: ref, reason: (written && written.reason) || (proof ? null : 'verify_failed') };
+    }
+  });
+  const oneName = files.length === 1 && files[0] && files[0].name;
+  const writtenLine = (out && out.handled && oneName)
+    ? ('Saved ' + oneName + ' to OneDrive')
+    : (out && (out.line || (out.handled ? 'Saved.' : null)));
+  const proof = out && out.handled && out.proofs && out.proofs[0] ? out.proofs[0] : null;
+  return Object.assign({
+    ok: !!(out && out.handled),
+    written: writtenLine,
+    proof: proof,
+    ref: out ? { undo: out.undo || [], created: true } : null
+  }, out);
+}
+
+async function attachmentSaveUndo(ref) {
+  const Save = globalThis.FlowSuggestSave;
+  const list = Array.isArray(ref) ? ref : (ref && Array.isArray(ref.undo) ? ref.undo : (ref ? [ref] : []));
+  if (!Save || typeof Save.undoSaved !== 'function') return { ok: false };
+  const out = await Save.undoSaved(list, {
+    undoOne: (one) => outlookFileUndo(one)
+  });
+  const wanted = list.filter((r) => r && r.created !== false).length;
+  return { ok: out.deleted === wanted && wanted > 0, written: 'Undone.', deleted: out.deleted };
 }
 
 const WRITERS = {
@@ -3385,14 +4129,20 @@ const WRITERS = {
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
-  outlookDraft: outlookDraftWrite
+  outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
+  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
+  onedriveFile: outlookFileWrite,
+  attachmentSave: attachmentSaveWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
-  outlookDraft: outlookDraftUndo
+  outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
+  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
+  onedriveFile: outlookFileUndo,
+  attachmentSave: attachmentSaveUndo
 };
 
 async function connectorStatus() {
@@ -3449,8 +4199,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:connector-status') return reply(sendResponse, connectorStatus());
 
+  if (msg.type === 'flow:build-stamp') {
+    const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+    return reply(sendResponse, Promise.resolve({ ok: true, build: stamp }));
+  }
+
   if (msg.type === 'flow:connect') {
-    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks().then(() => ({ ok: true })));
+    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
@@ -3460,20 +4215,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'flow:disconnect') {
-    const STORAGE_KEYS = {
-      hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
-      googleTasks: 'googleTasksAuth'
-    };
-    const key = STORAGE_KEYS[msg.connectorId] || null;
-    if (!key) return reply(sendResponse, Promise.resolve({ ok: false }));
-    // Google Tasks also evicts Chrome's own cached token, not just Flow's
-    // local record of which list to write to — otherwise "Disconnect" then
-    // "Connect" again silently reuses the same grant instead of giving the
-    // user a real chance to pick a different Google account.
-    const extra = msg.connectorId === 'googleTasks'
-      ? getGoogleAuthToken(false).then(removeCachedGoogleAuthToken).catch(() => {})
-      : Promise.resolve();
-    return reply(sendResponse, extra.then(() => chrome.storage.local.remove(key)).then(() => ({ ok: true })));
+    return reply(sendResponse, disconnectConnector(msg.connectorId));
   }
 
   if (msg.type === 'flow:fact-sources') {
@@ -3489,7 +4231,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:undo-action') {
     const undoer = UNDOERS[msg.connectorId];
     if (!undoer) return reply(sendResponse, Promise.resolve({ ok: false }));
-    return reply(sendResponse, undoer(msg.ref));
+    return reply(sendResponse, undoer(msg.ref, msg));
   }
 
   if (msg.type === 'flow:draft-reply') {
@@ -3527,6 +4269,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // Outlook: the durable session and the page's read-only network (see outlookProxyFetch).
+  if (msg.type === 'flow:outlook-file-trace') {
+    if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
+    try { console.info('Glance: file-trace', JSON.stringify(msg.payload || {})); } catch (e) { /* console gone */ }
+    return reply(sendResponse, Promise.resolve({ ok: true }));
+  }
   if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
   if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
   if (msg.type === 'flow:outlook-keepalive') {

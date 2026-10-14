@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glance.local/schemas/user-context-v0.json",
+  "title": "UserContext v0",
+  "description": "Per-user profile Glance uses for every offer or silence. Features and counts only. No mail bodies. Training consent is off unless the person turns it on. The store is per user, encrypted, and the person can view, edit, and delete it. Lab contract; not wired into the extension.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "userId", "trainingConsent"],
+  "properties": {
+    "schemaVersion": { "const": "user-context-v0" },
+    "userId": { "type": "string", "minLength": 1 },
+    "trainingConsent": {
+      "type": "boolean",
+      "description": "Off by default. A true value is an explicit opt-in to use this profile in training. The contrast set and every lab fixture stay false."
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "title": { "type": "string" },
+        "department": { "type": "string" },
+        "manager": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": { "type": "string" },
+                "email": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role"],
+            "properties": {
+              "address": { "type": "string" },
+              "role": { "type": "string", "enum": ["member", "owner", "approver"] },
+              "topics": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "email": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "kind"],
+        "properties": {
+          "key": { "type": "string", "description": "Sender address, group address, or a covered person's name. Not a mail body." },
+          "kind": { "type": "string", "enum": ["sender", "group", "person"] },
+          "name": { "type": "string" },
+          "replyCount": { "type": "integer", "minimum": 0 },
+          "seenCount": { "type": "integer", "minimum": 0 },
+          "replyRate": { "type": ["number", "null"] },
+          "medianLatencyHours": { "type": ["number", "null"] },
+          "answersGroupMail": { "type": ["boolean", "null"] },
+          "covers": { "type": "boolean" }
+        }
+      }
+    },
+    "decisionHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["intentFamily", "party"],
+        "properties": {
+          "intentFamily": { "type": "string" },
+          "party": { "type": "string" },
+          "approvedFetchedBack": { "type": "integer", "minimum": 0 },
+          "dismissed": { "type": "integer", "minimum": 0 },
+          "undo": { "type": "integer", "minimum": 0 },
+          "edited": { "type": "integer", "minimum": 0 },
+          "missedClose": { "type": "integer", "minimum": 0 },
+          "lastAt": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "workStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hours": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": { "type": "string" },
+            "end": { "type": "string" },
+            "timezone": { "type": "string" }
+          }
+        },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "preferredTools": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "files": { "type": "string", "enum": ["drive", "onedrive", "either"] },
+            "tasks": { "type": "string", "enum": ["todo", "tasks", "either"] }
+          }
+        },
+        "savesFiles": { "type": "string", "enum": ["always", "never", "unknown"] },
+        "answersGroupMailRate": { "type": ["number", "null"] }
+      }
+    },
+    "preferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "value"],
+        "properties": {
+          "key": { "type": "string", "enum": ["group", "cc", "fyi", "save", "vendor"] },
+          "value": { "type": "string", "enum": ["offer", "silent"] }
+        }
+      }
+    }
+  }
+}

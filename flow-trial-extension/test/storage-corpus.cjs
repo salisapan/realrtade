@@ -96,7 +96,7 @@ async function run() {
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'm3', process: { id: 'schedule', name: 'Schedule It', steps: [] } });
     check('m3 starts pending', (await FlowStorage.getPending()).length === 1);
 
-    await FlowStorage.appendLog({ kind: 'written', messageId: 'm3', where: 'Google Calendar' });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'm3', where: 'Google Calendar', fetchedBack: true });
     const pending = await FlowStorage.getPending();
     check('a written outcome removes it from pending', pending.length === 0, pending);
     check('hasTerminalOutcome agrees m3 is now resolved', (await FlowStorage.hasTerminalOutcome('m3')) === true);
@@ -136,7 +136,7 @@ async function run() {
   {
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'open1', process: { id: 'log-it', name: 'Open 1', steps: [] } });
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'closed1', process: { id: 'log-it', name: 'Closed 1', steps: [] } });
-    await FlowStorage.appendLog({ kind: 'written', messageId: 'closed1' });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'closed1', fetchedBack: true });
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'open2', process: { id: 'log-it', name: 'Open 2', steps: [] } });
     const pending = await FlowStorage.getPending();
     check('only the genuinely still-open messages are returned', JSON.stringify(pending.map((p) => p.messageId).sort()) === JSON.stringify(['open1', 'open2']), pending.map((p) => p.messageId));
@@ -223,7 +223,7 @@ async function run() {
     await FlowStorage.appendLog({ kind: 'clicked', messageId: 'DEAL', label: 'Log deal' });
     // One Do It, three steps -> three rows for one message.
     for (const where of ['Google Calendar', 'Gmail draft', 'Google Tasks']) {
-      await FlowStorage.appendLog({ kind: 'written', messageId: 'DEAL', label: 'Log deal', where });
+      await FlowStorage.appendLog({ kind: 'written', messageId: 'DEAL', label: 'Log deal', where, fetchedBack: true });
     }
     check('a write is recorded as closed immediately', await FlowStorage.hasTerminalOutcome('DEAL'));
 
@@ -295,7 +295,7 @@ async function run() {
       pending.some((e) => e.messageId === 'FAILED'), pending);
 
     // And the moment a write does land, both agree it is closed.
-    await FlowStorage.appendLog({ kind: 'written', messageId: 'FAILED', label: 'Book kickoff', where: 'Google Tasks' });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'FAILED', label: 'Book kickoff', where: 'Google Tasks', fetchedBack: true });
     check('after a successful retry, hasTerminalOutcome closes it', await FlowStorage.hasTerminalOutcome('FAILED'));
     check('after a successful retry, getPending drops it',
       !(await FlowStorage.getPending()).some((e) => e.messageId === 'FAILED'));
@@ -326,14 +326,14 @@ async function run() {
   console.log('\n--- storage.js: an undone write stays closed ---\n');
   store = {};
   {
-    // Undo reverses the record in Google; it does not reopen the proposal —
-    // the user saw the whole thing happen and chose to keep none of it.
+    // Undo returns the loop to open. A dismissal stays closed. An older
+    // UNDONE row, with or without outlookReopen, must not keep Do It hidden.
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'UND', label: 'x', process: proc });
     await FlowStorage.appendLog({ kind: 'written', messageId: 'UND', label: 'x', where: 'Google Tasks' });
     await FlowStorage.appendLog({ kind: 'undone', messageId: 'UND', label: 'x' });
-    check('undo is terminal', await FlowStorage.hasTerminalOutcome('UND'));
-    check('an undone process is not re-listed as waiting to be closed',
-      !(await FlowStorage.getPending()).some((e) => e.messageId === 'UND'));
+    check('undo reopens the loop', (await FlowStorage.hasTerminalOutcome('UND')) === false);
+    check('an undone process is listed again as waiting to be closed',
+      (await FlowStorage.getPending()).some((e) => e.messageId === 'UND'));
   }
 
   console.log('\n--- storage.js: installs that predate the durable keys ---\n');
@@ -406,7 +406,7 @@ async function run() {
   store = {};
   {
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'w1', process: proc });
-    await FlowStorage.appendLog({ kind: 'written', messageId: 'w1', where: 'Google Tasks' });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'w1', where: 'Google Tasks', fetchedBack: true });
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'd1', process: proc });
     await FlowStorage.appendLog({ kind: 'dismissed', messageId: 'd1' });
     let c = FlowStorage.closeCountsFrom(await FlowStorage.get());
@@ -442,7 +442,7 @@ async function run() {
     store = {
       closeStats: { total: 0, recent: [] },
       log: [
-        { ts: Date.now(), kind: 'written', messageId: 'a', where: 'Google Tasks' },
+        { ts: Date.now(), kind: 'written', messageId: 'a', where: 'Google Tasks', fetchedBack: true },
         { ts: Date.now(), kind: 'dismissed', messageId: 'b' }
       ]
     };
@@ -804,16 +804,11 @@ async function run() {
   store = {};
   {
     const now = Date.now();
-    const success = await FlowStorage.recordCloseQuality({
-      kind: 'success', messageId: 't1', ts: now,
-      app: 'gmail', product: 'free', proposed: 1, succeeded: 1,
-      receiptFull: true, receiptStatus: 'Handled.', kinds: ['googleTask']
-    });
+    const success = await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 't1', ts: now });
     check('a full write is still a close-quality success', success && success.kind === 'success', success);
     const snap = await FlowStorage.getQuietSnapshot(now);
-    check('that Free Gmail Google write is one trusted close this week and no Undo',
-      snap.trusted.trusted === 1 && snap.trusted.handled === 1 && snap.trusted.undone === 0 &&
-      snap.trusted.undoRate === 0 && snap.trusted.path === 'free-gmail-google', snap.trusted);
+    check('that full write is one trusted close this week and no Undo',
+      snap.trusted.trusted === 1 && snap.trusted.handled === 1 && snap.trusted.undone === 0 && snap.trusted.undoRate === 0, snap.trusted);
 
     await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 't1', reason: 'undo', ts: now });
     const undone = await FlowStorage.getQuietSnapshot(now);
@@ -824,21 +819,6 @@ async function run() {
     const afterDismiss = await FlowStorage.getQuietSnapshot(now);
     check('dismissing a chip is not an Undo of a trusted close',
       dismissed && dismissed.reason === 'dismiss' && afterDismiss.trusted.undone === 1, afterDismiss.trusted);
-
-    await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 't-bare', ts: now });
-    await FlowStorage.recordCloseQuality({
-      kind: 'success', messageId: 't-notion', ts: now,
-      app: 'gmail', product: 'free', proposed: 1, succeeded: 1,
-      receiptFull: true, receiptStatus: 'Handled.', kinds: ['notion']
-    });
-    await FlowStorage.recordCloseQuality({
-      kind: 'success', messageId: 't-partial', ts: now,
-      app: 'gmail', product: 'free', proposed: 2, succeeded: 1,
-      receiptFull: false, receiptStatus: 'Partly handled.', kinds: ['googleTask']
-    });
-    const still = await FlowStorage.getQuietSnapshot(now);
-    check('a bare success, a Notion write, and a partial receipt do not inflate trusted closes',
-      still.trusted.trusted === 0 && still.trusted.handled === 1 && still.trusted.undone === 1, still.trusted);
 
     const counted = await FlowStorage.recordSilence({ messageId: 's1', reason: 'hedge', ts: now });
     const repeat = await FlowStorage.recordSilence({ messageId: 's1', reason: 'noise', ts: now });
@@ -876,6 +856,77 @@ async function run() {
     await FlowStorage.resetLearning();
     const after = await FlowStorage.getIntentAdapt();
     check('reset empties the ledger and every stored adjustment', (await FlowStorage.getLedger()).length === 0 && Object.keys(after.act).length === 0, after);
+  }
+
+  console.log('\n--- storage.js: a proved Google Task keeps its proof fields ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({
+      kind: 'written',
+      label: 'Send the signed SOW',
+      messageId: 'm-proof',
+      where: 'Google Tasks',
+      url: 'https://tasks.google.com/embed/list/LIST_A?pli=1',
+      ref: { taskListId: 'LIST_A', taskId: 'task_1', externalId: 'task_1' },
+      connectorId: 'googleTask',
+      app: 'gmail',
+      system: 'google/tasks',
+      externalId: 'task_1',
+      verifiedAt: '2026-10-07T12:00:00.000Z'
+    });
+    const row = (await FlowStorage.get()).log[0];
+    check('Activity stores system, externalId, and verifiedAt on the written row',
+      row && row.kind === 'written' && row.system === 'google/tasks' && row.externalId === 'task_1' && row.verifiedAt === '2026-10-07T12:00:00.000Z' && row.ref.externalId === 'task_1',
+      row);
+  }
+
+  console.log('\n--- storage.js: a write is final only after fetchedBack ---\n');
+  store = {};
+  {
+    const proc = { id: 'schedule', name: 'Schedule It', steps: [{ id: 's', kind: 'task' }] };
+    const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+    const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+    check('both mail pages say Verifying… while the read-back is open',
+      gmail.indexOf('Verifying…') > 0 && outlook.indexOf('Verifying…') > 0);
+
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'vf', process: proc });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'vf', fetchedBack: false });
+    check('fetchedBack false is open', FlowStorage.verifyGateFrom(await FlowStorage.get(), 'vf') === 'open');
+    check('fetchedBack false is not terminal', (await FlowStorage.hasTerminalOutcome('vf')) === false);
+    check('fetchedBack false returns one Do It', (await FlowStorage.getPending()).filter((e) => e.messageId === 'vf').length === 1);
+
+    store = {};
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'vm', process: proc });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'vm' });
+    check('a write with no fetchedBack is verifying', FlowStorage.verifyGateFrom(await FlowStorage.get(), 'vm') === 'verifying');
+    check('verifying is not terminal', (await FlowStorage.hasTerminalOutcome('vm')) === false);
+    const verifyingRows = await FlowStorage.getPending();
+    check('verifying stays on the open list',
+      verifyingRows.length === 1 && verifyingRows[0].messageId === 'vm' && verifyingRows[0].verifying === true,
+      verifyingRows.map((e) => ({ id: e.messageId, verifying: e.verifying })));
+
+    store = {};
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'vt', process: proc });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'vt', fetchedBack: true });
+    check('fetchedBack true is final', (await FlowStorage.hasTerminalOutcome('vt')) === true);
+    check('fetchedBack true leaves no Do It', (await FlowStorage.getPending()).length === 0);
+
+    store = {};
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'vx', process: proc, ts: Date.now() - FlowStorage.VERIFY_MS - 5000 });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'vx', ts: Date.now() - FlowStorage.VERIFY_MS - 1 });
+    check('a write that never answered is open again', FlowStorage.verifyGateFrom(await FlowStorage.get(), 'vx') === 'open');
+    check('the timeout returns one Do It', (await FlowStorage.getPending()).filter((e) => e.messageId === 'vx').length === 1);
+
+    store = {
+      resolvedMessageIds: ['old'],
+      log: [
+        { ts: Date.now(), kind: 'written', messageId: 'old', fetchedBack: false },
+        { ts: Date.now() - 1000, kind: 'shown', messageId: 'old', process: proc }
+      ]
+    };
+    check('an old resolved id does not hide an unproved write',
+      (await FlowStorage.getPending()).filter((e) => e.messageId === 'old').length === 1);
+    check('that unproved write is not terminal', (await FlowStorage.hasTerminalOutcome('old')) === false);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

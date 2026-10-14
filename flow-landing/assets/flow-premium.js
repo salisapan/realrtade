@@ -21,12 +21,9 @@
   progress();
 
   /* ------------------------------------------------------------- reveals */
-  // Anything that reads as a block of content gets revealed, except content
-  // already inside the first viewport. Selecting by role rather than by
-  // hand-tagging each element keeps this working on all 40-odd pages without
-  // touching their markup. Above-the-fold text must paint at opacity 1:
-  // adding .p-reveal (opacity 0) and waiting out the fade was the mobile LCP
-  // on pricing and Glance.
+  // Anything that reads as a block of content gets revealed. Selecting by role
+  // rather than by hand-tagging each element keeps this working on all 40-odd
+  // pages without touching their markup.
   var targets = document.querySelectorAll(
     'main .eyebrow, main h1.title, main .updated, main .lead, main article > p, main article > h2,' +
     'main article > ul, main article > ol, main article > blockquote, main article > table,' +
@@ -42,15 +39,19 @@
       });
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.02 });
 
-    Array.prototype.forEach.call(targets, function (el) {
-      // Already in the first viewport: leave it painted. Do not add .p-reveal.
-      if (el.getBoundingClientRect().top < innerHeight) return;
+    Array.prototype.forEach.call(targets, function (el, i) {
       el.classList.add('p-reveal');
       // Stagger only within a group of siblings, so a long article does not
       // accumulate a delay that leaves the last paragraph waiting a second.
       var sibs = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.children, el) : 0;
       el.setAttribute('data-d', String((sibs % 4) + 1));
-      io.observe(el);
+      // Anything already on screen at load reveals immediately rather than
+      // waiting for a scroll that may never come on a short page.
+      if (el.getBoundingClientRect().top < innerHeight) {
+        setTimeout(function () { el.classList.add('p-in'); }, 40 + (i % 6) * 55);
+      } else {
+        io.observe(el);
+      }
     });
   }
 
@@ -59,9 +60,6 @@
   // full-viewport canvases on one page is the layer count the zoom fix exists
   // to avoid, so defer to whichever is already there.
   if (reduced || document.getElementById('bgcanvas')) return;
-  // Narrow viewports paint one static frame. The looping O(n²) pass stays on
-  // desktop, and pauses while the tab is hidden. Redesigns should keep this cap.
-  var narrow = window.matchMedia('(max-width: 640px)').matches;
   var cv = document.createElement('canvas');
   cv.id = 'p-net';
   cv.setAttribute('aria-hidden', 'true');
@@ -85,7 +83,7 @@
   }
   function init() {
     size();
-    var n = narrow ? Math.min(16, Math.floor(innerWidth / 40)) : Math.min(48, Math.floor(innerWidth / 30));
+    var n = Math.min(48, Math.floor(innerWidth / 30));
     pts = [];
     for (var i = 0; i < n; i++) {
       pts.push({
@@ -113,29 +111,14 @@
       g.fillStyle = 'rgba(' + NET + ',' + NA + ')';
       g.beginPath(); g.arc(p.x, p.y, 1.2 * DPR, 0, 6.283); g.fill();
     }
-    if (!narrow && !document.hidden) raf = requestAnimationFrame(draw);
-    else raf = null;
+    raf = requestAnimationFrame(draw);
   }
   function stop() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
-  function start() { if (narrow) { draw(); return; } if (!raf) draw(); }
+  function start() { if (!raf) draw(); }
 
   colors(); init(); start();
-  addEventListener('resize', function () {
-    narrow = window.matchMedia('(max-width: 640px)').matches;
-    stop(); init(); start();
-  });
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) stop();
-    else if (!narrow) start();
-  });
-  if ('IntersectionObserver' in window) {
-    new IntersectionObserver(function (es) {
-      es.forEach(function (e) {
-        if (!e.isIntersecting) stop();
-        else if (!document.hidden && !narrow) start();
-      });
-    }, { threshold: 0 }).observe(cv);
-  }
+  addEventListener('resize', function () { stop(); init(); start(); });
+  document.addEventListener('visibilitychange', function () { document.hidden ? stop() : start(); });
   // The theme toggle swaps the palette tokens; the canvas has to follow.
   new MutationObserver(colors).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 })();
