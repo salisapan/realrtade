@@ -3573,9 +3573,42 @@ async function outlookPreferredFrom(explicit) {
   }
   return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
 }
+async function outlookDraftMap() {
+  const bag = await chrome.storage.local.get(OUTLOOK_STATE_KEY);
+  const st = bag[OUTLOOK_STATE_KEY] || {};
+  return { st: st, map: Object.assign({}, st.glanceDraftByMessage || {}) };
+}
+async function outlookSaveDraftMap(st, map) {
+  await chrome.storage.local.set({ [OUTLOOK_STATE_KEY]: Object.assign({}, st, { glanceDraftByMessage: map }) });
+}
 async function outlookDraftWrite(p) {
   const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   if (!incomingId) return { ok: false, reason: 'no-message' };
+  const remembered = await outlookDraftMap();
+  const priorId = remembered.map[String(incomingId)] || '';
+  if (priorId) {
+    const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(priorId) + '?$select=id,isDraft,webLink';
+    outlookAssertNotSend(getUrl);
+    const got = await outlookFetch(getUrl, { method: 'GET' });
+    if (got && got.ok) {
+      let existing = null;
+      try { existing = await got.json(); } catch (e) { existing = null; }
+      if (existing && existing.isDraft !== false) {
+        return {
+          ok: true,
+          ref: existing.id || priorId,
+          where: existing.webLink || null,
+          url: existing.webLink || null,
+          reused: true,
+          reason: 'draft-already',
+          written: 'Reply draft already in Outlook Drafts. Not sent.'
+        };
+      }
+    } else if (!got || got.status === 404) {
+      delete remembered.map[String(incomingId)];
+      await outlookSaveDraftMap(remembered.st, remembered.map);
+    }
+  }
   // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
   // same composer gmailDraftWrite uses (FlowDraftReply.draftBodyText). A ready-made body is only a fallback for older callers.
   let comment = '';
@@ -3643,6 +3676,11 @@ async function outlookDraftWrite(p) {
     }
     attachmentId = created.id;
   }
+  const saved = await outlookDraftMap();
+  saved.map[String(incomingId)] = String(draft.id);
+  const keys = Object.keys(saved.map);
+  if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
+  await outlookSaveDraftMap(saved.st, saved.map);
   return {
     ok: true,
     ref: draft.id,

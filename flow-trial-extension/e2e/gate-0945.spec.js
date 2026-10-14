@@ -120,8 +120,8 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '800 B' }]
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
-  await expect(skipPane.getByText('northwind-agreement-signed.pdf · skipped · small-doc')).toBeVisible();
-  await expect(skipPane.getByText('Save the file?')).toHaveCount(0);
+  await expect(skipPane.getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
+  await expect(skipPane.locator('.flow-chip-process-name')).toHaveText('Save the file?');
 });
 
 test('a no-ask attachment mail shows the file that is open', async ({ glance }) => {

@@ -245,6 +245,43 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
     { acts: acts.length, ignored: ignored, logs: click.logs.filter((l) => /stale|decision|Glance:/.test(l)).slice(-6) });
   click.w.close();
 
+  const rapid = await boot({ holdAfterRead: false });
+  const mails = [];
+  for (let i = 1; i <= 20; i++) {
+    const id = 'MSG-SWITCH-' + String(i).padStart(2, '0');
+    mails.push({
+      id: id,
+      subject: 'Switch ' + i + ' confirm the figure',
+      toHtml: 'אל: <span>' + ME + '</span>',
+      ccHtml: '',
+      bodyHtml: lines('Hi,\nCan you reply and confirm the figure for switch ' + i + '?\nThanks,\nFlow')
+    });
+  }
+  let foreign = '';
+  const started = Date.now();
+  for (let i = 0; i < mails.length; i++) {
+    showMail(rapid.doc, rapid.w, mails[i]);
+    const host = rapid.doc.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    if (!host) continue;
+    const raw = host.getAttribute('data-glance-message') || '';
+    const ids = raw.split('|').filter(Boolean);
+    if (ids.length && ids.indexOf(mails[i].id) < 0) foreign = raw;
+  }
+  let host20 = null;
+  while (Date.now() < started + 2000 && !host20) {
+    const host = rapid.doc.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    if (host && boundTo(host, mails[19].id)) host20 = host;
+    else if (host) {
+      const raw = host.getAttribute('data-glance-message') || '';
+      const ids = raw.split('|').filter(Boolean);
+      if (ids.length && ids.indexOf(mails[19].id) < 0) foreign = foreign || raw;
+    }
+    if (!host20) await sleep(20);
+  }
+  check('20 fast switches never show another mail\'s card', !foreign, { foreign: foreign, text: chipText(rapid.doc) });
+  check('mail 20\'s card is up within 2 seconds', Boolean(host20) && (Date.now() - started) <= 2000, { ms: Date.now() - started, text: chipText(rapid.doc) });
+  rapid.w.close();
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })().catch((e) => {

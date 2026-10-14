@@ -385,6 +385,15 @@ async function run() {
       JSON.stringify(await FlowStorage.getWriteCounts()) === JSON.stringify(c));
   }
 
+  console.log('\n--- storage.js: one draft under two message ids is one write ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'scan-id', ref: 'draft-9', where: 'Outlook Drafts' });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'open-id', ref: 'draft-9', where: 'Outlook Drafts' });
+    const c = FlowStorage.writeCountsFrom(await FlowStorage.get());
+    check('two message ids for one draft count once, this week', c.total === 1 && c.week === 1, c);
+  }
+
   console.log('\n--- storage.js: counters never regress on upgrade ---\n');
   store = {};
   {

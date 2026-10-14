@@ -79,6 +79,8 @@
   let mailEpoch = 0;
   let openMailToken = '';
   let renderEpoch = 0;
+  let scanMessageId = '';
+  let switchPending = false;
   let scanning = false;
   let again = false;
   let lastKey = '';
@@ -866,23 +868,38 @@
     return mailEpoch;
   }
 
+  function urlMessageId() {
+    try {
+      const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? (FlowOwaParse.urlIds(location.href) || {}) : {};
+      return ids.kind === 'message' && ids.itemId ? String(ids.itemId) : '';
+    } catch (e) { return ''; }
+  }
+
   function noteOpenMail() {
     const token = openMailTokenNow();
-    if (!token || token === '|||') return mailEpoch;
-    if (!openMailToken) { openMailToken = token; return mailEpoch; }
-    if (token === openMailToken) return mailEpoch;
+    if (!token || token === '|||') return false;
+    if (!openMailToken) { openMailToken = token; return false; }
+    if (token === openMailToken) return false;
     openMailToken = token;
-    return bumpMailEpoch('open-mail');
+    switchPending = true;
+    bumpMailEpoch('open-mail');
+    return true;
   }
 
   function armRender() {
     noteOpenMail();
     renderEpoch = mailEpoch;
+    scanMessageId = urlMessageId();
     return renderEpoch;
   }
 
   function renderLive() {
-    return renderEpoch === mailEpoch;
+    if (renderEpoch !== mailEpoch) return false;
+    if (scanMessageId) {
+      const now = urlMessageId();
+      if (now && now !== scanMessageId) return false;
+    }
+    return true;
   }
 
   // The card records the open mail it was painted for. A Graph message id
@@ -2523,7 +2540,12 @@
   // OWA never stops changing the page (ads, presence, "x min ago"). A debounce that restarts on every change never fires
   // there, which is how 0.9.14 stayed silent: so this is a throttle. One scan at a time; a change during a scan runs one more.
   function schedule() {
-    noteOpenMail();
+    const switched = noteOpenMail();
+    if (switched) {
+      if (timer) { clearTimeout(timer); timer = null; }
+      timer = setTimeout(runScan, 40);
+      return;
+    }
     if (timer) return;
     timer = setTimeout(runScan, SCAN_EVERY_MS);
   }
@@ -2644,7 +2666,6 @@
       Object.keys(hydrateCache).forEach((k) => { delete hydrateCache[k]; });
     }
     hydratePane.mailKey = mailKey;
-    if (!needSender && !needAudience && pane.subject) return pane;
     const conv = String(pane.conversationId || '').trim();
     const item = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId) : '';
     if (!conv && !item) return pane;
@@ -2660,9 +2681,14 @@
       const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate', null);
       rows = body && Array.isArray(body.value) ? body.value : [];
     }
+    let subjectFallback = false;
     if (!rows.length && pane.subject) {
       const bySubject = await graphJson('/me/messages?$filter=' + encodeURIComponent(subjectFilter(pane.subject)) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate-subject', null);
-      rows = bySubject && Array.isArray(bySubject.value) ? bySubject.value : [];
+      const raw = bySubject && Array.isArray(bySubject.value) ? bySubject.value : [];
+      rows = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.subjectFallbackRows === 'function')
+        ? FlowOwaParse.subjectFallbackRows(pane, raw)
+        : [];
+      subjectFallback = true;
     }
     if (!rows.length) return pane;
     const minute = minuteOf(pane.receivedDateTime);
@@ -2675,14 +2701,14 @@
       });
       if (timed.length === 1) picked = timed[0];
     }
-    if (!picked && pane.subject) {
+    if (!picked && pane.subject && !subjectFallback) {
       const want = String(pane.subject).trim().toLowerCase();
       const named = rows.filter((r) => String(r.subject || '').trim().toLowerCase() === want);
       if (named.length === 1) picked = named[0];
     }
     const patch = {};
     const froms = rows.map((r) => graphAddress(r.from)).filter(Boolean);
-    if (needSender && froms.length && froms.every((e) => e === froms[0])) {
+    if (!subjectFallback && needSender && froms.length && froms.every((e) => e === froms[0])) {
       patch.senderEmail = froms[0];
       const name = rows[0] && rows[0].from && rows[0].from.emailAddress && rows[0].from.emailAddress.name;
       if (!pane.senderName && name) patch.senderName = String(name).slice(0, 80);
@@ -2697,9 +2723,11 @@
           patch.cc = gcc;
         }
       }
-      if (needSender && !patch.senderEmail) {
-        const one = graphAddress(picked.from);
-        if (one) patch.senderEmail = one;
+      const one = graphAddress(picked.from);
+      if (one) {
+        patch.senderEmail = one;
+        const name = picked.from && picked.from.emailAddress && picked.from.emailAddress.name;
+        if (name) patch.senderName = String(name).slice(0, 80);
       }
     }
     hydrateCache[key] = patch;
@@ -3328,7 +3356,8 @@
       try { await recordSuggestNote(); } catch (e) { /* the note is not the card */ }
       try { await paintStoredUndoneIfQuiet(); } catch (e) { /* the banner is not the card */ }
       scanning = false;
-      if (again) { again = false; schedule(); }
+      if (renderLive()) switchPending = false;
+      if (again || switchPending) { again = false; schedule(); }
     }
   }
 
@@ -3337,7 +3366,25 @@
   window.addEventListener('hashchange', schedule);
   window.addEventListener('popstate', schedule);
   // OWA moves between messages with pushState (no event): notice the address changing.
-  setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; lastSig = ''; schedule(); } }, 1000);
+  setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; lastSig = ''; schedule(); } }, 200);
+  try {
+    const origPush = history.pushState;
+    const origReplace = history.replaceState;
+    if (typeof origPush === 'function') {
+      history.pushState = function () {
+        const out = origPush.apply(this, arguments);
+        if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; lastSig = ''; schedule(); }
+        return out;
+      };
+    }
+    if (typeof origReplace === 'function') {
+      history.replaceState = function () {
+        const out = origReplace.apply(this, arguments);
+        if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; lastSig = ''; schedule(); }
+        return out;
+      };
+    }
+  } catch (e) { /* history is sealed */ }
   globalThis.__glanceOutlookPage = { rescan: () => { lastKey = ''; lastSig = ''; schedule(); } };
   // A check from the panel (or another Outlook tab) lands here at once.
   try {

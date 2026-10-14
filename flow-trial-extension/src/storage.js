@@ -350,6 +350,22 @@ const FlowStorage = (() => {
     return head.concat(carried);
   }
 
+  // One Outlook draft can be logged under the scan id and the open id.
+  // The draft id is the decision. A write with no ref stays per message.
+  function writeIdentity(row) {
+    if (!row) return '';
+    const ref = row.ref;
+    let key = '';
+    if (typeof ref === 'string' && ref) key = ref;
+    else if (ref && typeof ref === 'object') {
+      key = ref.draftId || ref.taskId || ref.eventId || ref.externalId || ref.id || '';
+      if (key && typeof key !== 'string') key = String(key);
+    }
+    if (key) return 'ref:' + String(key);
+    if (row.messageId) return 'msg:' + String(row.messageId);
+    return '';
+  }
+
   // The single place the durable derived state above is maintained, so it can
   // never drift from the log it is derived from: one read, one write, inside
   // the same serialized queue that already protects `log`.
@@ -389,10 +405,15 @@ const FlowStorage = (() => {
     if (row.kind === 'written' && row.messageId) {
       const ws = state.writeStats || { total: 0, recent: [] };
       const recent = ws.recent || [];
-      if (!recent.some((w) => w && w.id === row.messageId)) {
+      const ident = writeIdentity(row);
+      const prior = (state.log || []).some((e) => e && e.kind === 'written' && (
+        e.messageId === row.messageId || (ident && writeIdentity(e) === ident)
+      ));
+      const seen = recent.some((w) => w && (w.id === row.messageId || (ident && (w.key === ident || w.id === ident))));
+      if (!seen && !prior) {
         patch.writeStats = {
           total: (ws.total || 0) + 1,
-          recent: [{ id: row.messageId, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
+          recent: [{ id: row.messageId, key: ident, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
         };
       }
     }
@@ -809,13 +830,30 @@ const FlowStorage = (() => {
   function writeCountsFrom(state) {
     const ws = (state && state.writeStats) || { total: 0, recent: [] };
     const log = (state && state.log) || [];
-    const legacy = new Set(log.filter((e) => e.kind === 'written' && e.messageId).map((e) => e.messageId));
+    function identOf(e) {
+      return writeIdentity(e) || (e && e.messageId ? 'msg:' + e.messageId : '');
+    }
+    const legacy = new Set();
+    log.forEach((e) => {
+      if (e && e.kind === 'written' && e.messageId) {
+        const id = identOf(e);
+        if (id) legacy.add(id);
+      }
+    });
 
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const week = new Set((ws.recent || []).filter((w) => w && w.ts >= weekAgo).map((w) => w.id));
+    const week = new Set();
+    (ws.recent || []).forEach((w) => {
+      if (!w || w.ts < weekAgo) return;
+      week.add(w.key || (w.id ? 'msg:' + w.id : ''));
+    });
     for (const e of log) {
-      if (e.kind === 'written' && e.messageId && e.ts >= weekAgo) week.add(e.messageId);
+      if (e && e.kind === 'written' && e.messageId && e.ts >= weekAgo) {
+        const id = identOf(e);
+        if (id) week.add(id);
+      }
     }
+    week.delete('');
 
     return { total: Math.max(ws.total || 0, legacy.size), week: week.size };
   }

@@ -120,11 +120,21 @@ console.log('\n--- rows 1-22 ---\n');
   const smallPdf = S.suggestSave(mail({
     attachments: [file({ name: 'northwind-agreement-signed.pdf', size: 800 })]
   }));
-  check('a too-small pdf is a named skipped row',
-    smallPdf.eligible === false && smallPdf.reason === 'suggest:no-files' &&
-    smallPdf.step === null && Array.isArray(smallPdf.skipped) && smallPdf.skipped.length === 1 &&
-    S.skippedLabel(smallPdf.skipped[0]) === 'northwind-agreement-signed.pdf · skipped · small-doc',
+  check('a real pdf under 2KB is still the file',
+    smallPdf.eligible === true && smallPdf.reason === 'suggest:eligible-hidden' && smallPdf.step !== null,
     smallPdf);
+  const emptyPdf = S.suggestSave(mail({
+    attachments: [file({ name: 'empty.pdf', size: 0 })]
+  }));
+  check('an empty file stays small-doc',
+    emptyPdf.eligible === false && emptyPdf.reason === 'suggest:no-files' &&
+    Array.isArray(emptyPdf.skipped) && emptyPdf.skipped.length === 1 &&
+    S.skippedLabel(emptyPdf.skipped[0]) === 'empty.pdf · skipped · small-doc',
+    emptyPdf);
+  const labeled = S.suggestSave(mail({
+    attachments: [{ name: 'note.txt', sizeLabel: '1 KB' }]
+  }));
+  check('a 1 KB label is a file', labeled.eligible === true && labeled.reason === 'suggest:eligible-hidden', labeled);
 
   check('16 an attached message is not a file', S.suggestSave(mail({
     attachments: [{ id: 'm', name: 'Forwarded', size: 20 * KB, '@odata.type': '#microsoft.graph.itemAttachment' }]

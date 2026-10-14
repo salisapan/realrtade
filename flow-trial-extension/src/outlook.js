@@ -526,6 +526,7 @@ const FlowOutlook = (() => {
       const tok = holderFor(sess.token);
 
       let messages;
+      let draftRows = [];
       try {
         const since = new Date(now - cfg.LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
         const inbox = await folder(tok, 'inbox', since);
@@ -563,6 +564,9 @@ const FlowOutlook = (() => {
           auth = await read(AUTH_KEY, null);
         }
         messages = inbox.concat(sent);
+        // Drafts are explanatory only. A missing folder must not fail the check.
+        try { draftRows = await folder(tok, 'drafts', since); }
+        catch (e) { draftRows = []; }
         // A save-shaped message lists hasAttachments and not the files. Read
         // that list here, before the planner, or a real file stays
         // outlook:attachments-unread. A failed read marks that message only.
@@ -685,7 +689,27 @@ const FlowOutlook = (() => {
       // A conversation this check judged and did not show again must not keep an older card.
       // That is how a schedule card stayed up after the mail became a file ask (Why not shown
       // already said drive-search-failed). Cards for mail outside this window are kept.
-      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).slice(0, 40);
+      const knownConvs = [];
+      (messages || []).forEach((m) => { if (m && m.conversationId && !m.isDraft) knownConvs.push(m.conversationId); });
+      const knownRefs = Object.keys(st.glanceDraftByMessage || {}).map((k) => st.glanceDraftByMessage[k]);
+      let draftNotes = [];
+      let syncApi = null;
+      if (typeof FlowOutlookSync !== 'undefined') syncApi = FlowOutlookSync;
+      else {
+        try { syncApi = require('../core/outlook-sync.js').FlowOutlookSync; } catch (e) { syncApi = null; }
+      }
+      if (syncApi && typeof syncApi.explainDrafts === 'function') {
+        draftNotes = syncApi.explainDrafts(draftRows, { conversations: knownConvs, refs: knownRefs });
+      }
+      const unexplained = draftNotes.filter((d) => d && d.reason === 'draft-unexplained').map((d) => ({
+        conversationId: null,
+        messageId: d.id || null,
+        subject: '(draft)',
+        reason: 'draft-unexplained',
+        direction: null,
+        draftConversationId: d.conversationId || null
+      }));
+      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).concat(unexplained).slice(0, 40);
       function convOfEntry(x) {
         if (!x) return '';
         if (x.outlookConversationId) return String(x.outlookConversationId);
@@ -772,6 +796,25 @@ const FlowOutlook = (() => {
       const sess = await ensureSession({});
       if (!sess.ok) return { ok: false, error: sess.error, needsSignIn: Boolean(sess.needsSignIn) };
       const token = holderFor(sess.token);
+      const remembered = st.glanceDraftByMessage && st.glanceDraftByMessage[incomingId];
+      if (remembered) {
+        try {
+          const existing = await graphGet(token, cfg.GRAPH + '/me/messages/' + encodeURIComponent(remembered) + '?$select=id,isDraft,webLink');
+          if (existing && existing.isDraft !== false) {
+            return {
+              ok: true,
+              ref: existing.id || remembered,
+              where: existing.webLink || null,
+              reused: true,
+              reason: 'draft-already',
+              written: 'Reply draft already in Outlook Drafts. Not sent.'
+            };
+          }
+        } catch (e) {
+          if (!(e.status === 404 || e.message === 'http-404')) throw e;
+          await forgetDraftMap(incomingId, remembered);
+        }
+      }
       const url = cfg.GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
       let draft;
       try {
@@ -837,10 +880,12 @@ const FlowOutlook = (() => {
         const attached = await attachDraftFile(token, draft.id, o.file);
         if (!attached) {
           await removeDraft(token, draft.id);
+          await forgetDraftMap(incomingId, draft.id);
           return { ok: false, error: 'outlook-file-found-no-attach', reason: 'outlook-file-found-no-attach', attached: false };
         }
         attachmentId = attached.id;
       }
+      await rememberDraft(incomingId, draft.id);
       return {
         ok: true,
         ref: draft.id,
@@ -885,6 +930,27 @@ const FlowOutlook = (() => {
       return { id: created.id };
     }
 
+    async function rememberDraft(incomingId, draftId) {
+      if (!incomingId || !draftId) return;
+      const cur = await read(STATE_KEY, {});
+      const map = Object.assign({}, cur.glanceDraftByMessage || {});
+      map[String(incomingId)] = String(draftId);
+      const keys = Object.keys(map);
+      if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete map[k]; });
+      await write(STATE_KEY, Object.assign({}, cur, { glanceDraftByMessage: map }));
+    }
+
+    async function forgetDraftMap(incomingId, draftId) {
+      const cur = await read(STATE_KEY, {});
+      const map = Object.assign({}, cur.glanceDraftByMessage || {});
+      let changed = false;
+      if (incomingId && map[incomingId]) { delete map[incomingId]; changed = true; }
+      Object.keys(map).forEach((k) => {
+        if (draftId && map[k] === draftId) { delete map[k]; changed = true; }
+      });
+      if (changed) await write(STATE_KEY, Object.assign({}, cur, { glanceDraftByMessage: map }));
+    }
+
     async function removeDraft(token, draftId) {
       if (!draftId) return;
       try {
@@ -912,6 +978,7 @@ const FlowOutlook = (() => {
       if (!msg) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
       if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
       await graphWrite(token, 'DELETE', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId), null);
+      await forgetDraftMap(null, draftId);
       return { ok: true, written: 'Draft removed from Outlook Drafts.' };
     }
 
