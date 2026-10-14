@@ -162,3 +162,19 @@ Already right, so no change: the sign ask (rm-107), the amount note (rm-108), th
 Still open: rm-003 (unchanged; the masked sentence does not say who the feminine imperative addresses). dg-105 ("save it to our shared files") stays silent; that phrase is not an OneDrive write. dg-108 (put a file on the calendar) stays silent in this pipeline; the calendar card lives in `core/intent.js`, which another open pull request is editing. rm-116 and dg-103 are unsure and are not in the headline; both were silent.
 
 No precision gate was lowered. After these rules the same gates read: teacher-eval ASK 1.00 / 0.92 and PROMISE 1.00 / 0.87; the second evaluation set ASK 0.97 / 0.82 and PROMISE 1.00 / 0.75; the blind pipeline ASK 1.00 / 0.94 and PROMISE 1.00 / 0.83.
+
+## 8. A first look at replies to the owner (2026-10-12, owner's explicit word, read-only)
+
+The Gmail connected to this session is the Flow outreach account, not a personal inbox. Of about 80 threads listed (senders, dates and subjects only), almost all are the team's own test mails, product notifications, out-of-office replies and the outreach mails themselves; real human replies are a handful. Bodies were read for three outreach threads. Nothing from them was saved in the repository.
+
+The follow loop's reply classifier (`classifyReply`, which now includes the progress rule of `docs/true-close.md` §9) was run on the three real replies a lead wrote to an outreach mail: a forward to a colleague ("we should talk"), a question back about what the product does, and a forward that is only a signature. All three kept the loop open, with the right reading: handed on (`promised`), the ball is yours (`yours`, question asked back), and "a signature is not an answer" (`ack`). n = 3: it shows no rate, only that the cases the rule exists for look right on real text.
+
+What this does not give: any number for Do It on mail written to the owner. For that the owner's personal inbox, or a forwarded sample, is needed.
+
+## 9. The owner's personal inbox, replies to his own asks (2026-10-12, owner connected it, read-only, aggregates only)
+
+The owner connected his personal Gmail and asked for the model tests to run on it. Of the threads listed (senders, dates, subjects), the large majority are automated (notifications, receipts, marketing). Only a handful are a person answering an ask the owner sent. No mail text is committed; the sentences used for regression are invented (`test/follow-up-corpus.cjs`).
+
+Eight real replies in four threads (a service removal request, a university course request, a parcel enquiry, a share that got "cannot open") were labelled by hand: open or closed. `classifyReply` before the fix: **4 of 8 right**. The three wrong ones were all **false closes**, the worst error: a reply that hands the asker a task ("please attach a photo of the licence", "submit both by 26/7"), a reply that says no ("no need, and not possible, to approve"), and "it arrived, check back in a few days". After the fix (a reply that asks you for something, with nothing delivered, stays with you; "no need and not possible" is a no; "check back in a few days" waits): **8 of 8**, with every existing corpus unchanged (`outlook-calendar` is red on a date, unrelated).
+
+Caveats, stated plainly: n is 8, the same person labelled and fixed (so 8 of 8 is a regression guard, not a measure); one language mix (Hebrew and English); no number for Do It on mail written to the owner, since too few real asks arrived in the sampled threads. More history or a forwarded sample would be needed for that.

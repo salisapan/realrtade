@@ -590,7 +590,7 @@ const FlowFollowUp = (() => {
   const PROMISE_HE = /(?:העבר(?:תי|נו) (?:את )?(?:זה |הכל )?ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי|עורך)|אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אטפל|נטפל|אברר|נברר|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
-  const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^paid\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
+  const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^(?:paid|transferred|wired)\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
   const PAID_HE = /(?:העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
   const GUARD_EN = /\b(?:not|never|once|if|when|unless|until)\b|n't\b/i;
   const GUARD_HE = /(?:^|\s)(?:לא|טרם|אם|כש\S*|ברגע)(?=\s|$)/;
@@ -630,6 +630,36 @@ const FlowFollowUp = (() => {
       x.setDate(x.getDate() + ((5 - x.getDay() + 7) % 7));
       return isoDay(x);
     }
+    return laterWords(text, t0);
+  }
+  // The ways people say "later" that core/extract.js does not read (kept here so extract.js, which open PRs change, is untouched):
+  // a bare weekday ("I'll send it Thursday", «עד חמישי», «עד יום ה׳»), "next week" / «בשבוע הבא», «סוף השבוע», "end of the month", and a
+  // day/month with no year («20/10»). Only a future day is returned; anything else is null and the loop keeps its normal chase day.
+  const WEEKDAYS_EN = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6 };
+  const WEEKDAYS_HE = [['ראשון', 0], ['שני', 1], ['שלישי', 2], ['רביעי', 3], ['חמישי', 4], ['שישי', 5], ['שבת', 6]];
+  const LETTER_HE = { 'א': 0, 'ב': 1, 'ג': 2, 'ד': 3, 'ה': 4, 'ו': 5 };
+  function nextWeekday(t0, wd) { const x = new Date(t0.getTime()); let k = (wd - x.getDay() + 7) % 7; if (k === 0) k = 7; x.setDate(x.getDate() + k); return isoDay(x); }
+  function laterWords(text, t0) {
+    const t = String(text || '');
+    let m = t.match(/\b(?:on |by |until |before |this |next )?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
+    if (m) return nextWeekday(t0, WEEKDAYS_EN[m[1].toLowerCase()]);
+    m = t.match(/(?:^|[^֐-׿])(?:עד |ב|ליום |לקראת )?יום (ראשון|שני|שלישי|רביעי|חמישי|שישי)|(?:^|[^֐-׿])(?:עד |ב)(ראשון|שני|שלישי|רביעי|חמישי|שישי)(?![֐-׿])/);
+    if (m) { const name = m[1] || m[2]; return nextWeekday(t0, WEEKDAYS_HE.find((w) => w[0] === name)[1]); }
+    m = t.match(/יום ([אבגדהו])['׳]/);
+    if (m) return nextWeekday(t0, LETTER_HE[m[1]]);
+    if (/\bnext week\b|בשבוע הבא|שבוע הבא/i.test(t)) { const x = new Date(t0.getTime()); x.setDate(x.getDate() + 7); return isoDay(x); }
+    if (/סוף (?:ה)?שבוע/.test(t)) { const x = new Date(t0.getTime()); x.setDate(x.getDate() + ((4 - x.getDay() + 7) % 7)); return isoDay(x); }
+    if (/\bend of (?:the )?month\b|סוף (?:ה)?חודש/i.test(t)) { const x = new Date(t0.getFullYear(), t0.getMonth() + 1, 0); return isoDay(x) >= isoDay(t0) ? isoDay(x) : null; }
+    m = t.match(/(?<!\d)(\d{1,2})[\/.](\d{1,2})(?![\d\/.])/);
+    if (m) {
+      let dd = +m[1], mm = +m[2];
+      if (mm > 12 && dd <= 12) { const z = dd; dd = mm; mm = z; }
+      if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) {
+        let y = t0.getFullYear(); let d = new Date(y, mm - 1, dd);
+        if (isoDay(d) < isoDay(t0)) d = new Date(y + 1, mm - 1, dd);
+        if (d.getMonth() === mm - 1) return isoDay(d);
+      }
+    }
     return null;
   }
 
@@ -668,6 +698,14 @@ const FlowFollowUp = (() => {
 
     // Waiting on someone else is an interim, not a delivery, unless the message also hands something over.
     if (kind === KINDS.REPLY && (WAITING_EN.test(body) || WAITING_HE.test(body)) && !DELIVERY_WORDS.test(body)) return { outcome: 'ack', promisedIso: null, basis: 'rule', why: 'waiting on someone else' };
+    // Progress and preparation are not completion: "I started", "half done", "found it, sending shortly", "it is ready, I just need an
+    // approval", «מוכן, רק צריך אישור». The thing asked for has not been handed over, so the loop stays owned: it moves to 'promised'
+    // (visible, minimal) and the next look is a couple of business days out, or the day they named. Delivery evidence in the same
+    // message (attached, here is, sent it, a number, a date) wins and the normal rules decide.
+    if (kind === KINDS.REPLY && n <= PROGRESS_MAX_WORDS && inProgress(body)) {
+      const pIso = (PROMISE_EN.test(body) || PROMISE_HE.test(body)) ? promisedDay(body, c.now, c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null)) : null;
+      return { outcome: 'promised', promisedIso: pIso, progress: true, basis: 'rule', why: 'in progress or prepared, not delivered' };
+    }
     // For a request for a reply, "confirmed / attached / signed" means the thing
     // was delivered even if a promise about something else is in the message.
     const delivered = kind === KINDS.REPLY && CONFIRM.test(body);
@@ -697,8 +735,25 @@ const FlowFollowUp = (() => {
   }
 
   // A reply that says the thing is WITH someone else, or in progress, is an interim, even when it names the act ("waiting for the CFO to approve"). Delivery words win.
-  const WAITING_EN = /\b(?:waiting (?:for|on)|awaiting|pending (?:approval|signature|review|legal)|(?:it|this) is (?:still )?with|still with|in progress|being (?:reviewed|processed|worked on))\b/i;
+  const WAITING_EN = /\b(?:waiting (?:for|on)|awaiting|pending (?:approval|signature|review|legal)|(?:it|this) is (?:still )?with|still with|in progress|being (?:reviewed|processed|worked on)|(?:check|try) (?:back|again)(?: again)? (?:in|after|later|within)|(?:wait|allow) (?:a )?(?:few|some|\d+) (?:more )?(?:days|hours|weeks))\b/i;
   const WAITING_HE = /(?:ממתין|ממתינה|ממתינים|מחכה ל|מחכים ל|בהמתנה|בטיפול|בבדיקה|מטפל בזה|מטפלת בזה)/;
+  const PROGRESS_MAX_WORDS = 25;
+  const PROGRESS_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just )?(?:started|begun)|(?:half|partly|partially|mostly) (?:done|finished|ready|there)|halfway|(?:almost|nearly) (?:there|done|finished|ready|complete|set)|close to (?:done|finished|ready)|(?:i|we)(?:'ve| have)? (?:just |now )?(?:found|located|dug up|tracked down) (?:it|them|the \w+)|(?:found|located) (?:it|them)|(?:it|this|that|they|everything)(?:'s| is| are)? (?:all )?(?:ready|prepared|drafted|set)\b[^.!?]{0,30}\b(?:need|waiting|pending|once|after|just)|(?:drafted|prepared|put together|pulled together|gathered|compiled) (?:it|them|the \w+)|(?:all )?(?:set|ready) on my (?:side|end)|got most of it|just need(?:s)? (?:an? )?(?:approval|signature|sign[- ]?off|confirmation|a few))\b/i;
+  const PROGRESS_HE = /(?:התחלתי|התחלנו|כמעט (?:סיימתי|סיימנו|גמרתי|מוכן|מוכנה|שם)|חצי (?:מוכן|גמור)|באמצע(?: העבודה| זה)?|מצאתי(?: את)?|(?:זה|הכל|הוא|היא|ההסכם|המסמך|החוזה|הקובץ|החשבונית) (?:אצל|מוכן|מוכנה)|מוכן(?:ה)?,? (?:רק|אבל)|רק צריך(?: לקבל)? (?:אישור|חתימה)|הכנתי(?: טיוטה| את)?)/;
+  // "half done" and "almost done" contain "done" but are the opposite of it: removed before looking for delivery words.
+  const NOT_YET_DONE = /\b(?:half|partly|partially|mostly|almost|nearly|not|not yet) (?:done|finished|completed|sent)\b|\bnot (?:yet )?(?:attached|signed)\b|כמעט (?:סיימתי|סיימנו|גמרתי|שלחתי|חתמתי)|(?:עוד )?לא (?:סיימתי|סיימנו|שלחתי|חתמתי)/gi;
+  function inProgress(body) {
+    if (!(PROGRESS_EN.test(body) || PROGRESS_HE.test(body))) return false;
+    // "Never mind, found it" / «לא משנה, מצאתי בעצמי»: the asker settled it themselves. That is the end of the request, not progress on it.
+    if (/\b(?:never ?mind|no longer (?:need|needed)|figured (?:it )?out|sorted (?:it )?out|already (?:have|found)|solved|resolved)\b|לא משנה|מצאתי בעצמי|כבר מצאתי|כבר יש לי|פתרתי/i.test(body)) return false;
+    const cleaned = body.replace(NOT_YET_DONE, ' ');
+    if (DELIVERY_WORDS.test(cleaned) || CONFIRM.test(cleaned)) return false;
+    // An answer in the same breath (an amount, a number, a link) is not "still working on it".
+    // A day named for the next step ("will attach it tomorrow") is a promise, not an answer.
+    const namesDay = /\b(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|sunday|next week|end of (?:the )?week)\b|מחר|היום|יום (?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|שבוע הבא/i.test(cleaned);
+    if (/\d|https?:\/\/|@/.test(cleaned) && !namesDay) return false;
+    return true;
+  }
   const DELIVERY_WORDS = /\b(?:attached|enclosed|here(?:'s| is| are)|done|signed and|sent it|completed)\b|(?:מצורף|צירפתי|שלחתי|סיימתי|בוצע)/i;
   // Under this many words, a reply that carries no answer at all (no yes or no, no date, no amount, no number, no link) is "they wrote back", not "they answered".
   // Held open and silent: the loop stays, the next chase day decides. A one-word "Perfect" can be a yes or a courtesy; a wrong close is never reminded about again.
@@ -871,8 +926,10 @@ const FlowFollowUp = (() => {
   const CARRY_RELEASE_MIN_AGE = 10;     // ... and never before this many business days
   const CARRY_RELEASE_AGE = 20;         // business days open, three nudges and no personal evidence: ask
   const CARRY_APPS = ['gmail', 'outlook', 'whatsapp'];
-  const APP_NAME = { gmail: 'Gmail', outlook: 'Outlook', whatsapp: 'WhatsApp', teams: 'Teams' };
-  const APP_NAME_HE = { gmail: 'ג׳ימייל', outlook: 'אאוטלוק', whatsapp: 'וואטסאפ', teams: 'טימס' };
+  const MAIL_APPS = ['gmail', 'outlook'];
+  const COLLEAGUE_NO_DAYS = 90;         // "don't ask Yossi" about this person is remembered this long, across loops
+  const APP_NAME = { gmail: 'Gmail', outlook: 'Outlook', whatsapp: 'WhatsApp', slack: 'Slack', telegram: 'Telegram', teams: 'Teams' };
+  const APP_NAME_HE = { gmail: 'ג׳ימייל', outlook: 'אאוטלוק', whatsapp: 'וואטסאפ', slack: 'סלאק', telegram: 'טלגרם', teams: 'טימס' };
 
   function carryKey(w, opts) {
     const keyOf = opts && typeof opts.keyOf === 'function' ? opts.keyOf : null;
@@ -888,6 +945,28 @@ const FlowFollowUp = (() => {
     const out = [];
     (Array.isArray(watches) ? watches : []).forEach((x) => {
       if (closedForReal(x) && !isMine(x) && !isClock(x) && carryKey(x, opts) === key && (x.kind === KINDS.PAYMENT) === false) out.push(bizBetween(x.createdAt, x.resolvedAt));
+    });
+    return out;
+  }
+  // Real closes with one colleague, by address or by the identity key the caller maps that address to.
+  function colleagueCloses(watches, email, opts) {
+    const key = carryKey({ counterpart: { email } }, opts);
+    let n = 0;
+    (Array.isArray(watches) ? watches : []).forEach((x) => {
+      if (!closedForReal(x) || isMine(x) || isClock(x)) return;
+      const xe = String((x.counterpart && x.counterpart.email) || '').toLowerCase();
+      if (xe === email || (key && carryKey(x, opts) === key)) n++;
+    });
+    return n;
+  }
+  // Colleagues the person already said no to, for loops with this same counterpart, in the last 90 days.
+  function colleaguesDismissed(watches, key, now) {
+    const out = {};
+    (Array.isArray(watches) ? watches : []).forEach((x) => {
+      if (!x || !Array.isArray(x.moves)) return;
+      const cp = (x.counterpart && x.counterpart.email) || '';
+      if (key && String(x.personKey || cp).toLowerCase() !== key && String(cp).toLowerCase() !== key) return;
+      x.moves.forEach((m) => { if (m && m.type === 'colleague' && m.dismissed && m.to && now - (m.at || 0) <= COLLEAGUE_NO_DAYS * DAY_MS) out[String(m.to).toLowerCase()] = true; });
     });
     return out;
   }
@@ -950,7 +1029,7 @@ const FlowFollowUp = (() => {
     if (!opts || opts.enabled !== true) return null;
     const t = typeof now === 'number' ? now : Date.now();
     if (!isActive(w) || isMine(w) || isClock(w) || isYours(w) || hasItems(w)) return null;
-    if (stageOf(w) === 'promised') return null;                 // they gave a day: wait for it
+    if (stageOf(w) === 'promised' && (!w.promisedIso || w.promisedIso >= isoDay(today(t)))) return null; // they gave a day: wait for it
     if ((w.nudges || 0) < MAX_NUDGE_LEVEL) return null;         // the three nudges come first
     if (!w.chaseIso || w.chaseIso > isoDay(today(t))) return null; // not due today
     const tried = {};
@@ -967,6 +1046,7 @@ const FlowFollowUp = (() => {
       let best = null;
       Object.keys(by).forEach((a) => {
         if (a === app || can.indexOf(a) < 0) return;
+        if (MAIL_APPS.indexOf(a) >= 0 && MAIL_APPS.indexOf(app) >= 0) return;   // two mail apps are the same way to reach them
         const s = by[a];
         if (s.closes < CARRY_MIN_CLOSES) return;
         if (here.closes > 0 && !(here.closes < s.closes && (here.typical === null || s.typical * 2 <= here.typical))) return;
@@ -979,13 +1059,14 @@ const FlowFollowUp = (() => {
       const cpEmail = String((w.counterpart && w.counterpart.email) || '').toLowerCase();
       const org = orgOf(cpEmail);
       if (org) {
-        const fits = opts.threadPeople.filter((p) => {
+        const saidNo = colleaguesDismissed(watches, key, t);
+        const scored = opts.threadPeople.map((p) => {
           const e = String((p && p.email) || '').toLowerCase();
-          if (!e || e === cpEmail || orgOf(e) !== org) return false;
-          const by = closesByApp(watches, e, null);
-          return Object.keys(by).reduce((s, a) => s + by[a].closes, 0) >= CARRY_MIN_CLOSES;
-        });
-        if (fits.length === 1) move = { type: 'colleague', to: { email: String(fits[0].email).toLowerCase(), name: fits[0].name || null }, evidence: { closes: Object.values(closesByApp(watches, String(fits[0].email).toLowerCase(), null)).reduce((s, x) => s + x.closes, 0) } };
+          if (!e || e === cpEmail || orgOf(e) !== org || saidNo[e]) return null;
+          const closes = colleagueCloses(watches, e, opts);
+          return closes >= CARRY_MIN_CLOSES ? { p, e, closes } : null;
+        }).filter(Boolean);
+        if (scored.length === 1) move = { type: 'colleague', to: { email: scored[0].e, name: scored[0].p.name || null }, evidence: { closes: scored[0].closes } };
       }
     }
     // 3. "Still need this?" Never for money. With personal evidence (>= 3 real closes): the silence is now three times the
@@ -1015,7 +1096,7 @@ const FlowFollowUp = (() => {
   // The person said no to a move: never proposed again on this loop; the old chase rhythm goes on.
   function moveDismissPatch(w, move, now) {
     const t = typeof now === 'number' ? now : Date.now();
-    return { moves: (Array.isArray(w.moves) ? w.moves : []).concat([{ type: move.type, app: move.app || null, at: t, dismissed: true }]) };
+    return { moves: (Array.isArray(w.moves) ? w.moves : []).concat([{ type: move.type, app: move.app || null, to: move.to ? move.to.email : null, at: t, dismissed: true }]) };
   }
   // "Let it go": a deliberate release by the person. A true close of the loop, never Glance's own.
   function releasePatch(w, now) {

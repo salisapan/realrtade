@@ -94,7 +94,7 @@ deletes anything that was already there.
 | Receipts and documents (contract, quote, proposal, signed copy) as a path to a real delivery | `docs/resolution-paths.md`, `docs/true-close.md` §4 |
 | Other apps (WhatsApp Web, Outlook through Graph + Outlook on the web Do It card, right-click capture), opt-in; Outlook drafts on Do It (never send) | Store listing + `src/content-outlook.js` |
 | **Client requests** for accountants and lawyers: what is missing from whom, reminders as drafts. Engine and ledger only, no surface yet (owner rejected a standalone page 2026-10-10); reading mail is **off**, `config/client-requests.public.js` | `docs/glance-ai/client-requests.md` |
-| **Carry until closed**: after the third unanswered nudge, one proposed next move (the app where they answer you, one colleague on the thread, or "Still need this?"). Engine only, never closes or sends; **off**, `config/carry.public.js` | `docs/glance-ai/proposals/2026-10-11-next-move.md` |
+| **Carry until closed**: after the third unanswered nudge, one proposed next move (the app where they answer you, one colleague on the thread, or "Still need this?"). Engine only, never closes or sends; **off**, `config/carry.public.js` (`nextMove`; the real-user A/B `abLive`, counts only, also **off**) | `docs/glance-ai/proposals/2026-10-11-next-move.md` |
 | Hybrid on-device model + masked server for Do It proposals (**dormant**, `config/hybrid.public.js`) | `docs/hybrid-execution-architecture.md` |
 | Pro (Stripe, licence key, server-enforced paid features) | `docs/monetization.md`, `docs/revenue-routines.md` |
 | What is open, blocked or decided | `docs/open-tasks.md` |

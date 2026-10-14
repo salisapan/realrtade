@@ -56,6 +56,8 @@ node glance-ai/labeling/apply-owner-answers.cjs --answers glance-ai/labeling/bat
 
 `make-batch-001.cjs` rebuilds the sheet from `../model/dataset/out-v2/test.jsonl` and `../model/shadow/out-v2/test-preds.jsonl`. Those files come from `../model/run-all-v2.sh` and are not in git. The committed `batch-001.json` and `batch-001.md` are the snapshot. Re-running the generator overwrites them.
 
+Batch-003 (2026-10-11) is 200 cases labelled blind by Claude: `BATCH-003.md`. `labeledBy` is `claude`, never owner-verified.
+
 Tests: `node glance-ai/labeling/test-ingest.cjs` and `node glance-ai/labeling/test-score.cjs`. Both run at the start of `bash glance-ai/run-cpu-checks.sh`. They do not need the feature files.
 
 Glance is a **close fabric** (detect → carry → execute → true close) — not a draft helper. Labeling teaches *judgment*: when to surface a single Do It vs stay silent. **Silence beats a wrong Do It.** Sending in the user's name is never automatic. Prepare/draft/attach/calendar-hold are intermediate steps on the path to Handled — never the definition of done.

@@ -2,10 +2,10 @@
 // decide(input) follows the suggest-save spec §1–§7 and §9 reason codes, in the
 // reference oracle's check order. suggestSave is the page adapter: a shown
 // decision is logged as suggest:eligible-hidden. The step's copy follows
-// spec §9 and names the file. 0.9.38 does not render the step. The steps-list
-// UI is 0.9.40, before Mail.Send.
-// The reference oracle's one-file chip still says "Save file to …". Spec §9
-// wins for the stored copy only. That wording is not part of parity.
+// spec §9 and names the file. decide().chip uses that same sentence.
+// 0.9.41 draws the step on the checklist. The card title is "Save the file?".
+// An excluded file keeps its name and size. The row is "name · skipped · why".
+// Mail.Send is not this step.
 const FlowSuggestSave = (() => {
   const KIND = 'attachmentSave';
   // SAVE_NO exactly as in core/google-closes.js. NEG_SAVE is the v2 product-rule
@@ -67,14 +67,14 @@ const FlowSuggestSave = (() => {
   }
 
   function chip(files, surface) {
+    const copy = specCopy(files, surface);
     const tgt = surface === 'outlook' ? 'OneDrive' : 'Drive';
-    const n = files.length;
     return {
-      count: n,
+      count: files.length,
       target: tgt,
-      names: files.map((f) => f.name),
-      en: n === 1 ? 'Save file to ' + tgt + '?' : 'Save ' + n + ' files to ' + tgt + '?',
-      he: n === 1 ? 'לשמור את הקובץ ב-' + tgt + '?' : 'לשמור ' + n + ' קבצים ב-' + tgt + '?'
+      names: copy.names,
+      en: copy.en,
+      he: copy.he
     };
   }
 
@@ -95,6 +95,45 @@ const FlowSuggestSave = (() => {
       he: 'לשמור ' + n + ' קבצים ב-' + tgt + '?',
       names: names
     };
+  }
+
+  function formatSize(n) {
+    const v = Number(n);
+    if (!isFinite(v) || v <= 0) return '';
+    if (v < 1024) return Math.round(v) + ' B';
+    if (v < 1048576) {
+      const kb = v / 1024;
+      const shown = kb >= 10 ? String(Math.round(kb)) : String(Math.round(kb * 10) / 10);
+      return shown + ' KB';
+    }
+    const mb = v / 1048576;
+    const shown = mb >= 10 ? String(Math.round(mb)) : String(Math.round(mb * 10) / 10);
+    return shown + ' MB';
+  }
+
+  function namedFile(file) {
+    const f = file || {};
+    const id = String(f.id == null ? '' : f.id).trim();
+    const name = String(f.name || '').trim();
+    return Boolean(name) && name !== id && !/^[A-Za-z0-9+/=_-]{24,}$/.test(name);
+  }
+
+  // A name, with the size when we have one. Never an id.
+  function fileLabel(file) {
+    const f = file || {};
+    if (!namedFile(f)) return '';
+    const size = formatSize(f.size);
+    const name = String(f.name || '').trim();
+    return size ? (name + ' (' + size + ')') : name;
+  }
+
+  // An excluded file keeps its name. The row is "contract.pdf · skipped · inline".
+  // A file with no real name is "File skipped · <why>", never a blank and never an id.
+  function skippedLabel(file) {
+    const f = file || {};
+    const why = String(f.why || f.reason || 'not saved').trim() || 'not saved';
+    if (!namedFile(f)) return 'File skipped · ' + why;
+    return String(f.name || '').trim() + ' · skipped · ' + why;
   }
 
   function quiet(reason, extra) {
@@ -126,10 +165,10 @@ const FlowSuggestSave = (() => {
     const big = [];
     input.attachments.forEach((a) => {
       const why = excludeWhy(a, cids);
-      if (why) { excluded.push({ id: a.id, why: why }); return; }
+      if (why) { excluded.push({ id: a.id, name: a.name, size: a.size, why: why }); return; }
       if (typeof input.uploadLimitBytes === 'number' && a.size > input.uploadLimitBytes) {
         big.push(a);
-        excluded.push({ id: a.id, why: 'too-large' });
+        excluded.push({ id: a.id, name: a.name, size: a.size, why: 'too-large' });
         return;
       }
       files.push({ id: a.id, name: a.name, size: a.size });
@@ -344,10 +383,12 @@ const FlowSuggestSave = (() => {
   }
 
   function pageResult(out) {
+    const skipped = (out && Array.isArray(out.excluded)) ? out.excluded : [];
     if (!out || out.suggest !== true) {
       return {
         eligible: false,
         files: [],
+        skipped: skipped,
         target: null,
         reason: (out && out.reason) || 'suggest:no-files',
         fileCount: 0,
@@ -364,10 +405,11 @@ const FlowSuggestSave = (() => {
       reason: 'suggest:eligible-hidden',
       fileCount: files.length,
       mode: out.mode || 'suggest',
+      skipped: skipped,
       step: {
         kind: KIND,
         id: KIND,
-        params: { target: out.target, files: files },
+        params: { target: out.target, files: files, excluded: out.excluded || [] },
         copy: specCopy(files, surface)
       }
     };
@@ -458,6 +500,8 @@ const FlowSuggestSave = (() => {
     fromGmailPayload: fromGmailPayload,
     bodyCidsOf: bodyCidsOf,
     decide: decide,
+    fileLabel: fileLabel,
+    skippedLabel: skippedLabel,
     suggestSave: suggestSave,
     saveAttachments: saveAttachments,
     undoSaved: undoSaved

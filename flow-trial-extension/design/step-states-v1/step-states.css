@@ -1,0 +1,196 @@
+/* =====================================================================
+   Glance · Step states v1 — layered on corner.css + corner-v19.css + corner-v20.css (v20 look, unchanged).
+   Adds only: sheet chrome · Suggested / Added / Manual rows · file pills · + Add a step ·
+   ProofOfClose row states · disabled Approve · RTL.  Palette: #0071e3 (+ tints) and grays only.
+   ===================================================================== */
+
+/* ---------- sheet chrome ---------- */
+html:not([data-theme="dark"]) body.ss{background:#f5f5f7}
+body.ss{min-height:100vh}
+.ss-top-in{max-width:1080px;margin:0 auto;padding:30px 24px 0;display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.ss-kicker{display:block;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#86868b;margin-bottom:6px}
+.ss-title h1{font-family:var(--disp);font-size:28px;line-height:1.1;font-weight:650;letter-spacing:-.03em;color:#1d1d1f}
+.ss-title h1 span{color:#86868b;font-weight:500}
+.ss-sheet{max-width:1080px;margin:0 auto;padding:30px 24px 56px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:52px 44px;align-items:start}
+.ss-frame{min-width:0}
+.ss-wide{grid-column:1/-1}
+.ss-lbl{display:flex;align-items:baseline;gap:9px;margin:0 2px 12px;min-width:0}
+.ss-lbl b{flex:none;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;color:#0071e3;background:rgba(0,113,227,.08);border:1px solid rgba(0,113,227,.16);padding:1px 7px;border-radius:6px}
+.ss-lbl span{min-width:0;font-size:12.5px;line-height:1.4;color:#6e6e73;letter-spacing:-.008em}
+.ss-sub{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#86868b;margin:18px 2px 8px}
+.ss-lbl + .ss-sub{margin-top:4px}
+.ss-q > .ss-sub:first-child{margin-top:0}
+.ss-quad{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 44px;align-items:start}
+.ss-q{min-width:0}
+.ss-stage{max-width:500px}
+.ss-stage .glance-surface{margin:0}
+.ss-foot{text-align:center;font-size:11.5px;color:#86868b;padding:0 24px 40px;letter-spacing:-.005em}
+@media (max-width:900px){
+  .ss-sheet,.ss-quad{grid-template-columns:minmax(0,1fr)}
+  .ss-sheet{gap:44px}
+}
+@media (max-width:560px){
+  .ss-top-in{padding:22px 16px 0}
+  .ss-sheet{padding:24px 16px 48px}
+  .ss-title h1{font-size:24px}
+}
+
+/* ---------- chip: gray "+1 suggested" · standalone chip (F2) ---------- */
+.chip-txt .chip-sugg{color:#86868b;font-weight:500}
+.ss-bare{background:none !important;border:0 !important;box-shadow:none !important;padding:0 !important}
+.ss-bare::before{display:none !important}
+.ss-bare .chip{margin:0}
+.ss-bare .receipt-stack{margin:0}
+.ss-chip-glyph{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;color:#0071e3;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,113,227,.16),0 1px 2px rgba(0,30,80,.06)}
+.ss-chip-glyph svg{width:13px;height:13px;display:block}
+
+/* ---------- Suggested · unticked = quiet (~60% emphasis), never struck through ---------- */
+.act-suggested .act-row:has(.act-check:not(:checked)){opacity:1;background:linear-gradient(180deg,#ffffff 0%,#fcfcfd 100%);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.025)}
+.act-suggested .act-row:has(.act-check:not(:checked)) .act-text{text-decoration:none;color:#1d1d1f}
+.act-suggested .act-row:has(.act-check:not(:checked)) .act-glyph,
+.act-suggested .act-row:has(.act-check:not(:checked)) .act-body{opacity:.62}
+.act-suggested .act-row:has(.act-check:not(:checked)) .act-out{color:#3a3a3c}
+.act-suggested .act-row:has(.act-check:not(:checked)) .act-app{color:#1d1d1f}
+.ss-tag{color:#6e6e73;background:#f5f5f7;border-color:rgba(0,0,0,.06)}
+
+/* ---------- Manual · for you (no execution checkbox, not counted) ---------- */
+.act-none{visibility:hidden}
+.act-manual .act-row{cursor:default;background:#fafafb;box-shadow:none;border-color:rgba(0,0,0,.08)}
+.act-manual .act-glyph{color:#86868b;background:#f5f5f7}
+.act-manual .act-glyph svg{width:14px;height:14px}
+.act-manual .act-text{font-weight:550;color:#3a3a3c}
+.stage-live[data-state="propose"] .act-manual .act-row:hover{transform:none;border-color:rgba(0,0,0,.08);box-shadow:none}
+.act-manual .act-row:hover .act-glyph{color:#86868b}
+
+/* ---------- + Add a step ---------- */
+.ss-add{margin:-4px 0 10px}
+.ss-add-btn{font-family:var(--ui);font-size:12.5px;font-weight:500;letter-spacing:-.01em;color:#86868b;background:none;border:0;padding:2px 3px;cursor:pointer;border-radius:6px;transition:color .15s ease}
+.ss-add-btn:hover{color:#0071e3}
+.ss-add-btn:focus-visible{outline:2px solid rgba(0,113,227,.45);outline-offset:2px}
+.ss-add-row{display:none;cursor:text;background:#fff;border-color:rgba(0,113,227,.42);box-shadow:0 0 0 3px rgba(0,113,227,.08)}
+.ss-add[data-open="true"] .ss-add-row{display:grid}
+.ss-add[data-open="true"] .ss-add-btn{display:none}
+.ss-add-row .act-glyph{color:#0071e3;background:rgba(0,113,227,.08)}
+.ss-add-input{min-width:0;width:100%;border:0;outline:0;background:transparent;font-family:var(--ui);font-size:13px;font-weight:500;letter-spacing:-.012em;color:#1d1d1f;caret-color:#0071e3;padding:6px 0}
+.ss-add-input::placeholder{color:#a1a1a6}
+.ss-kbd{font-family:var(--mono);font-size:10px;line-height:1;color:#86868b;background:#f5f5f7;border:1px solid rgba(0,0,0,.08);border-radius:5px;padding:3px 6px}
+
+/* ---------- F3 · multi-attachment row + file pills ---------- */
+.act-multi .act-row{cursor:default}
+.ss-contents{display:contents;cursor:pointer}
+.act-files{grid-column:3/-1;grid-row:2;display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.ss-pill{
+  display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:980px;cursor:pointer;
+  font-family:var(--ui);font-size:11.5px;font-weight:500;line-height:1;letter-spacing:-.006em;white-space:nowrap;
+  color:#6e6e73;background:#f5f5f7;border:1px solid rgba(0,0,0,.09);
+  transition:color .15s ease,background .15s ease,border-color .15s ease;
+}
+.ss-pill:hover{border-color:rgba(0,0,0,.18)}
+.ss-pill:focus-visible{outline:2px solid rgba(0,113,227,.45);outline-offset:2px}
+.ss-pill[aria-pressed="true"]{color:#0071e3;background:rgba(0,113,227,.07);border-color:#0071e3}
+.ss-pill-ck{display:none;width:5px;height:8px;margin:-2px 1px 0 0;border:solid currentColor;border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+.ss-pill[aria-pressed="true"] .ss-pill-ck{display:inline-block}
+.ss-pill-more{font-weight:600;color:#6e6e73;background:#fff}
+
+/* ---------- ProofOfClose · per-step states ---------- */
+.ss-ok{font-style:normal;font-weight:700;color:#0071e3;margin-inline-start:1px}
+.act.st-verifying .act-row .act-box{background:#fff !important;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.1) !important}
+.act.st-verifying .act-row .act-box::after{left:2px;top:2px;width:14px;height:14px;border-radius:50%;border:2px solid transparent;border-top-color:#a1a1a6;border-right-color:#a1a1a6;transform:none;animation:actSpin .9s linear infinite}
+.act.st-verifying .act-out{color:#86868b}
+.act.st-failed .act-row .act-box{background:#f5f5f7 !important;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.16) !important}
+.act.st-failed .act-row .act-box::after{left:5px;top:8px;width:8px;height:0;border:0;border-top:2px solid #86868b;border-radius:1px;transform:none}
+.act.st-failed .act-glyph{color:#86868b}
+.ss-retry,.ss-undo{font-style:normal;font-weight:600;color:#0071e3;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.ss-undo{font-size:12px}
+.ss-proofed .act-row{border-style:solid;border-color:rgba(0,113,227,.24);background:#fff}
+.ss-proofed .act-text{color:#1d1d1f}
+.ss-seq{display:flex;flex-direction:column;gap:14px}
+.ss-seq .acts{margin:0}
+.ss-seq .approve-banner{margin:8px 0 0}
+.ss-seq-lbl{display:flex;align-items:center;gap:7px;margin:0 2px 7px;font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#6e6e73}
+.ss-seq-n{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;font-size:9px;letter-spacing:0;color:#6e6e73;background:#f5f5f7;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+/* settled = compact lines: the box already says verified, no extra ✓ */
+.stage-live[data-state="settled"] .ss-ok-auto{display:none}
+/* settled row with Undo at the end (F2) */
+.stage-live[data-state="settled"] .act-row:has(.ss-undo){grid-template-columns:16px 22px minmax(0,1fr) auto}
+/* disabled Approve (an explicit or user-added step failed) */
+.ss-approve-off{background:#f5f5f7 !important;border-color:rgba(0,0,0,.08) !important;box-shadow:none !important}
+.ss-approve-off .approve-title{color:#6e6e73}
+.ss-approve-off .approve-title::before{background:#a1a1a6 !important;box-shadow:0 0 0 3px rgba(0,0,0,.06) !important}
+.approve-btn[disabled]{background:#e8e8ed !important;color:#86868b !important;box-shadow:none !important;cursor:not-allowed;transform:none !important}
+/* receipt: manual step left */
+.ss-receipt-ic{flex:none;display:grid;place-items:center;width:12px;height:12px;color:#86868b}
+.ss-receipt-ic svg{width:11px;height:11px;display:block}
+
+/* ---------- F4 · cropped panel (list continues above) ---------- */
+.ss-crop-row{display:none !important}
+.ss-crop{padding-top:20px;border-top-left-radius:0;border-top-right-radius:0;border-top-color:transparent;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px);mask-image:linear-gradient(to bottom,transparent 0,#000 18px)}
+
+/* ---------- RTL (Hebrew) ---------- */
+[dir="rtl"].glance-surface{font-family:'Inter','Heebo','Noto Sans Hebrew','Arial Hebrew',system-ui,sans-serif}
+[dir="rtl"] .act-row,[dir="rtl"] .gs-head-meta,[dir="rtl"] .gs-intent{text-align:right}
+[dir="rtl"] .gs-intent,[dir="rtl"] .act-text,[dir="rtl"] .act-out,[dir="rtl"] .chip-txt{letter-spacing:0}
+[dir="rtl"] .acts-label,[dir="rtl"] .gs-intent-label{font-family:'Heebo','Inter',system-ui,sans-serif;letter-spacing:.02em;font-size:11px;text-transform:none}
+[dir="rtl"] .act-tag{letter-spacing:0;text-transform:none;font-size:10.5px;font-family:'Heebo','Inter',system-ui,sans-serif}
+[dir="rtl"] .ss-add-btn,[dir="rtl"] .chip-hold{font-family:'Heebo','Inter',system-ui,sans-serif;letter-spacing:0}
+[dir="rtl"] .ss-add-btn{font-size:13px}
+bdi{unicode-bidi:isolate}
+
+/* ---------- phones: every tag drops under its text (as v19 does for the close tag) ---------- */
+@media (max-width:560px){
+  .act-row > .act-tag{grid-column:3;justify-self:start;margin-top:5px;font-size:9px;padding:2px 7px}
+  [dir="rtl"] .act-row > .act-tag{font-size:10px}
+  .ss-add-row{grid-template-columns:18px 30px minmax(0,1fr) auto !important}
+  .stage-live[data-state="settled"] .act-row:has(.ss-undo){grid-template-columns:16px 22px minmax(0,1fr) auto}
+  .stage-live[data-state="settled"] .act-res{white-space:normal}
+}
+
+/* =================== Dark · Flow night =================== */
+html[data-theme="dark"] .ss-title h1{color:#f5f5f7}
+html[data-theme="dark"] .ss-title h1 span,
+html[data-theme="dark"] .ss-kicker{color:rgba(255,255,255,.5)}
+html[data-theme="dark"] .ss-lbl b{color:#9cc6f5;background:rgba(0,113,227,.18);border-color:rgba(0,113,227,.4)}
+html[data-theme="dark"] .ss-lbl span{color:rgba(235,240,250,.66)}
+html[data-theme="dark"] .ss-sub,
+html[data-theme="dark"] .ss-foot{color:rgba(255,255,255,.48)}
+html[data-theme="dark"] .chip-txt .chip-sugg{color:rgba(240,244,252,.52)}
+html[data-theme="dark"] .ss-chip-glyph{color:#59a3ed;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(0,113,227,.4)}
+html[data-theme="dark"] .act-suggested .act-row:has(.act-check:not(:checked)){background:rgba(255,255,255,.035);box-shadow:none}
+html[data-theme="dark"] .act-suggested .act-row:has(.act-check:not(:checked)) .act-text{color:#f5f5f7}
+html[data-theme="dark"] .act-suggested .act-row:has(.act-check:not(:checked)) .act-out{color:rgba(235,240,250,.86)}
+html[data-theme="dark"] .act-suggested .act-row:has(.act-check:not(:checked)) .act-app{color:#fff}
+html[data-theme="dark"] .ss-tag{color:rgba(255,255,255,.62);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+html[data-theme="dark"] .act-manual .act-row{background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.1);box-shadow:none}
+html[data-theme="dark"] .act-manual .act-glyph,
+html[data-theme="dark"] .act-manual .act-row:hover .act-glyph{color:rgba(255,255,255,.55);background:rgba(255,255,255,.06)}
+html[data-theme="dark"] .act-manual .act-text{color:rgba(255,255,255,.78)}
+html[data-theme="dark"] .ss-add-btn{color:rgba(255,255,255,.5)}
+html[data-theme="dark"] .ss-add-btn:hover{color:#59a3ed}
+html[data-theme="dark"] .ss-add-row{background:rgba(0,113,227,.08);border-color:rgba(0,113,227,.55);box-shadow:0 0 0 3px rgba(0,113,227,.14)}
+html[data-theme="dark"] .ss-add-row .act-glyph{color:#59a3ed;background:rgba(0,113,227,.16)}
+html[data-theme="dark"] .ss-add-input{color:#f5f5f7;caret-color:#59a3ed}
+html[data-theme="dark"] .ss-add-input::placeholder{color:rgba(255,255,255,.4)}
+html[data-theme="dark"] .ss-kbd{color:rgba(255,255,255,.55);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+html[data-theme="dark"] .ss-pill{color:rgba(235,240,250,.66);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+html[data-theme="dark"] .ss-pill:hover{border-color:rgba(255,255,255,.24)}
+html[data-theme="dark"] .ss-pill[aria-pressed="true"]{color:#9cc6f5;background:rgba(0,113,227,.16);border-color:#3d8fe6}
+html[data-theme="dark"] .ss-pill-more{color:rgba(235,240,250,.72);background:transparent}
+html[data-theme="dark"] .ss-ok,
+html[data-theme="dark"] .ss-retry,
+html[data-theme="dark"] .ss-undo{color:#59a3ed}
+html[data-theme="dark"] .act.st-verifying .act-row .act-box{background:transparent !important;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14) !important}
+html[data-theme="dark"] .act.st-verifying .act-row .act-box::after{border-top-color:rgba(255,255,255,.5);border-right-color:rgba(255,255,255,.5)}
+html[data-theme="dark"] .act.st-verifying .act-out{color:rgba(235,240,250,.5)}
+html[data-theme="dark"] .act.st-failed .act-row .act-box{background:rgba(255,255,255,.05) !important;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.2) !important}
+html[data-theme="dark"] .act.st-failed .act-row .act-box::after{border-top-color:rgba(255,255,255,.55)}
+html[data-theme="dark"] .act.st-failed .act-glyph{color:rgba(255,255,255,.5)}
+html[data-theme="dark"] .ss-proofed .act-row{background:rgba(0,113,227,.06);border-color:rgba(0,113,227,.4)}
+html[data-theme="dark"] .ss-proofed .act-text{color:#f5f5f7}
+html[data-theme="dark"] .ss-seq-lbl{color:rgba(255,255,255,.55)}
+html[data-theme="dark"] .ss-seq-n{color:rgba(255,255,255,.7);background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+html[data-theme="dark"] .ss-approve-off{background:rgba(255,255,255,.04) !important;border-color:rgba(255,255,255,.1) !important}
+html[data-theme="dark"] .ss-approve-off .approve-title{color:rgba(255,255,255,.66)}
+html[data-theme="dark"] .ss-approve-off .approve-title::before{background:rgba(255,255,255,.4) !important;box-shadow:0 0 0 3px rgba(255,255,255,.06) !important}
+html[data-theme="dark"] .approve-btn[disabled]{background:rgba(255,255,255,.08) !important;color:rgba(255,255,255,.45) !important}
+html[data-theme="dark"] .ss-receipt-ic{color:rgba(255,255,255,.5)}

@@ -436,6 +436,37 @@
     return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
   }
 
+  // To and Cc as the open message shows them. A line that starts with To or
+  // Cc (or אל / עותק) is that list. The sender's address is not a recipient.
+  function audienceOf(messageNode) {
+    const to = [];
+    const cc = [];
+    let userName = '';
+    if (!messageNode || !messageNode.querySelectorAll) return { to: to, cc: cc, userName: userName };
+    const blocks = messageNode.querySelectorAll('div, p, li');
+    for (let i = 0; i < blocks.length; i++) {
+      const n = blocks[i];
+      const t = String(n.innerText || '').trim();
+      if (!t || t.length > 400) continue;
+      const bucket = /^(to|אל)\b/i.test(t) ? to : (/^(cc|עותק)\b/i.test(t) ? cc : null);
+      if (!bucket) continue;
+      const marked = n.querySelectorAll('[email]');
+      for (let j = 0; j < marked.length; j++) {
+        const email = String(marked[j].getAttribute('email') || '').trim().toLowerCase();
+        if (email && bucket.indexOf(email) < 0) bucket.push(email);
+      }
+      const found = t.toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
+      found.forEach((email) => { if (bucket.indexOf(email) < 0) bucket.push(email); });
+    }
+    const mine = messageNode.querySelectorAll('[email]');
+    for (let i = 0; i < mine.length; i++) {
+      if (String(mine[i].textContent || '').trim() !== 'me') continue;
+      const name = String(mine[i].getAttribute('name') || '').trim();
+      if (name && name.toLowerCase() !== 'me') userName = name;
+    }
+    return { to: to, cc: cc, userName: userName };
+  }
+
   // Every [email] on the message, sender first. Same order extractSender
   // uses for the first one. Passed to FlowGoogleCloses.messageToJudge.
   function addressesOn(messageNode) {
@@ -587,6 +618,16 @@
   async function personalCloseSaysSilence(intent, threadId, subject) {
     if (!intent || !intent.personalClose || typeof FlowCloseMemory === 'undefined') return false;
     try {
+      if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.get === 'function') {
+        const bag = await FlowStorage.get();
+        const log = (bag && bag.log) || [];
+        for (let i = 0; i < log.length; i++) {
+          const row = log[i];
+          if (!row || row.kind !== 'undone') continue;
+          if (threadId && (row.threadId === threadId || row.outlookConversationId === threadId || row.messageId === threadId)) return false;
+          if (subject && row.subject && String(row.subject).toLowerCase() === String(subject).toLowerCase()) return false;
+        }
+      }
       const recalled = await FlowCloseMemory.recall({
         personalClose: intent.personalClose,
         threadId: threadId,
@@ -880,6 +921,8 @@
       const last = Number(chainHost.getAttribute('data-checked-at') || 0);
       if (Date.now() - last < 60000) return;
       chainHost.remove();
+    } else if (message.querySelector('.flow-chip-host[data-glance-verifying]')) {
+      // The read-back is still open. A later pass offers Do It if it fails.
     } else if (message.querySelector('.flow-chip-host')) {
       void noteSuggestShown(currentContext && currentContext.messageId);
       return;
@@ -933,7 +976,27 @@
       }
       return;
     }
-    if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) return;
+    if (typeof FlowStorage.verifyGateFrom === 'function' && FlowStorage.verifyGateFrom(settled, messageId) === 'verifying') {
+      if (!message.querySelector('[data-glance-verifying]')) {
+        const host = document.createElement('div');
+        host.className = 'flow-chip-host';
+        host.setAttribute('data-glance-verifying', '1');
+        const label = document.createElement('span');
+        label.className = 'flow-chip-label';
+        label.textContent = 'Verifying…';
+        host.appendChild(label);
+        if (message.firstChild) message.insertBefore(host, message.firstChild);
+        else message.appendChild(host);
+      }
+      return;
+    }
+    if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) {
+      const verifying = message.querySelector('.flow-chip-host[data-glance-verifying]');
+      if (verifying) verifying.remove();
+      return;
+    }
+    const verifyingHost = message.querySelector('.flow-chip-host[data-glance-verifying]');
+    if (verifyingHost) verifyingHost.remove();
 
     // ownMessageText (not a bare .innerText) both guards against Gmail
     // detaching or replacing this exact node between the synchronous work
@@ -1000,6 +1063,7 @@
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
+    const audience = audienceOf(message);
     openSuggest = {
       messageId: messageId,
       text: text,
@@ -1021,7 +1085,12 @@
       calibrationByType: state.calibrationByType,
       attachmentCount: attachments.length,
       messageId: messageId,
-      debug: debug
+      debug: debug,
+      to: audience.to,
+      cc: audience.cc,
+      ownAddresses: ownEmail ? [ownEmail] : [],
+      userName: audience.userName || null,
+      inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
     });
     // Reply-with-facts. Only when Google is already connected, so the chip
     // appears after one Sheet cell or Doc paragraph actually matched.
@@ -1209,7 +1278,9 @@
       // time "Do It" is clicked the chip's own ctx has no live node
       // reference to this message, and Gmail may have long since rebuilt or
       // removed it anyway.
-      bodyText: text
+      bodyText: text,
+      executionMemory: executionMemory,
+      app: 'gmail'
     });
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
     // not a rare edge case — logging 'shown' again every time would fill the
@@ -1794,7 +1865,10 @@
     // The process name as its own small, quiet label — "this is one named
     // thing Glance is closing," stated before the sentence explains what
     // that means, not left for the user to infer from a pile of pills.
-    host.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
+    const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
+      ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || '' })
+      : { title: ctx.process.name, sentence: null, fileCard: false };
+    host.appendChild(el('span', 'flow-chip-process-name', face.title || ctx.process.name));
 
     // loop mark + gradient "Glance" + the rest of the sentence as its own
     // text node — three children in that DOM order, mark first, right
@@ -1804,7 +1878,8 @@
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
-    textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
+    const sentence = face.fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
+    if (sentence) textEl.appendChild(document.createTextNode(' ' + sentence));
     if (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang === 'he') textEl.setAttribute('dir', 'auto');
     host.appendChild(textEl);
 
@@ -1815,9 +1890,10 @@
     // which steps were kept vs. stripped off.
     const liveSteps = ctx.process.steps.slice();
     const multi = ctx.process.steps.length > 1;
+    const stepsReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined';
 
     let pillRow = null;
-    if (multi) {
+    if (!stepsReady && multi) {
       pillRow = el('div', 'flow-chip-actions-row');
       pillRow.setAttribute('dir', 'ltr');
       pillRow.inert = true; // collapsed and non-interactive until the toggle opens it
@@ -1857,7 +1933,7 @@
     const mainRow = el('div', 'flow-chip-main-row');
     mainRow.setAttribute('dir', 'ltr');
 
-    if (multi) {
+    if (multi && pillRow) {
       const stepCount = ctx.process.steps.length;
       const toggle = el('button', 'flow-chip-more-toggle', stepCount + ' steps');
       toggle.type = 'button';
@@ -1890,12 +1966,53 @@
 
     host.appendChild(mainRow);
     if (pillRow) host.appendChild(pillRow);
+    if (stepsReady && typeof FlowStepKit !== 'undefined') {
+      host.replaceChildren();
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
+      host.__glanceSteps = FlowStepListView.mount(host, rows, {
+        intent: face.title || ctx.process.name,
+        lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
+        surface: 'gmail',
+        onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
+        onDismiss: () => onDismiss(host, ctx),
+        onChange: (next) => {
+          const picked = FlowStepList.liveStepsFrom(next, 'gmail');
+          liveSteps.length = 0;
+          picked.forEach((step) => liveSteps.push(step));
+        },
+        onRetry: () => onDoIt(host, host.querySelector('button.flow-chip') || host.querySelector('.do-halo'), ctx, liveSteps)
+      });
+      const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
+      if (draft) host.appendChild(buildAttachChooser(draft, ctx));
+      mountGoogleDetail(host, ctx);
+      messageNode.insertBefore(host, messageNode.firstChild);
+      return;
+    }
+    if (stepsReady) {
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
+      const view = FlowStepListView.mount(host, rows, {
+        onChange: (next) => {
+          const picked = FlowStepList.liveStepsFrom(next, 'gmail');
+          liveSteps.length = 0;
+          picked.forEach((step) => liveSteps.push(step));
+        },
+        onRetry: () => onDoIt(host, chip, ctx, liveSteps)
+      });
+      host.__glanceSteps = view;
+      const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
+      if (draft) host.appendChild(buildAttachChooser(draft, ctx));
+    }
     mountGoogleDetail(host, ctx);
 
     messageNode.insertBefore(host, messageNode.firstChild);
   }
 
   function setChipState(chip, cls, text) {
+    if (chip && chip.classList && (chip.classList.contains('do-halo') || (chip.closest && chip.closest('.flow-step-card')))) {
+      chip.setAttribute('data-glance-chip-state', cls || '');
+      if (text) chip.setAttribute('data-glance-chip-label', text);
+      return;
+    }
     chip.className = 'flow-chip ' + cls;
     chip.replaceChildren(el('span', 'flow-chip-label', text));
   }
@@ -2774,6 +2891,7 @@
     }
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
+    if (host.__glanceSteps) host.__glanceSteps.setAll('preparing');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
@@ -2797,6 +2915,11 @@
     // user needs mid-flight, and the counter added nothing but arithmetic.
     const doneVerbs = [];
     function onStepDone(result) {
+      if (host.__glanceSteps && result && result.action) {
+        const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
+        const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
+        host.__glanceSteps.setRow(result.action.id, next);
+      }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
       }

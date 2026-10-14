@@ -197,13 +197,15 @@ chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 const SURFACES = {
   whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
+  slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
+  telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
   outlook: {
     label: 'Outlook on the web',
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
     extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
       'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
-    css: ['src/chip.css']
+    css: ['design/step-states-v1/scoped.css', 'src/chip.css']
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
@@ -231,22 +233,31 @@ async function registerSurfaceNow(id) {
   if (!granted) return { ok: false, reason: 'no-permission' };
   const css = (def.css && def.css.length) ? def.css : ['src/follow.css'];
   const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: css, runAt: 'document_idle', persistAcrossSessions: true };
+  const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || chrome.runtime.getManifest().version || '';
+  let remembered = {};
+  try { remembered = (await chrome.storage.local.get({ glanceSurfaceStamp: {} })).glanceSurfaceStamp || {}; } catch (e) { remembered = {}; }
   let current = null;
   try { current = ((await chrome.scripting.getRegisteredContentScripts({ ids: [script.id] })) || [])[0] || null; } catch (e) { current = null; }
-  const same = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
+  const listSame = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
     && JSON.stringify((current.matches || []).slice().sort()) === JSON.stringify(script.matches.slice().sort());
+  // The file list can stay the same across a package. The previous registration
+  // would keep injecting the old greeting path. A new stamp registers again.
+  const same = listSame && remembered[id] === stamp;
   if (!same) {
     if (current) { try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered */ } }
     await chrome.scripting.registerContentScripts([script]);
-    console.info('Glance: ' + id + ' surface registered', chrome.runtime.getManifest().version, script.js.length + ' files');
+    remembered[id] = stamp;
+    try { await chrome.storage.local.set({ glanceSurfaceStamp: remembered }); } catch (e) { /* the page still got this registration */ }
+    console.info('Glance: ' + id + ' surface registered', stamp, script.js.length + ' files');
   }
-  const injected = await injectSurfaceIntoOpenTabs(id, script);
+  const injected = await injectSurfaceIntoOpenTabs(id, script, stamp);
   return { ok: true, registered: !same, injected };
 }
 
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
-async function injectSurfaceIntoOpenTabs(id, script) {
+async function injectSurfaceIntoOpenTabs(id, script, stamp) {
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
+  const want = stamp || ((typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '');
   let tabs = [];
   try { tabs = await chrome.tabs.query({ url: script.matches }); } catch (e) { return 0; }
   let n = 0;
@@ -256,17 +267,25 @@ async function injectSurfaceIntoOpenTabs(id, script) {
       const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
         let alive = false;
         try { alive = Boolean(chrome.runtime && chrome.runtime.id); } catch (e) { alive = false; }
-        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive };
+        const pageStamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive, stamp: pageStamp };
       } });
       const seen = (probe && probe[0] && probe[0].result) || {};
+      if (seen.globals && want && seen.stamp && seen.stamp !== want && chrome.tabs.reload) {
+        // The open page is an older package. Rescan would keep its greeting path.
+        console.warn('Glance: reloading an open ' + id + ' tab still on ' + seen.stamp);
+        try { await chrome.tabs.reload(tab.id); } catch (e) { /* the next navigation picks up the new scripts */ }
+        continue;
+      }
       if (seen.globals && !seen.alive) {
         // A copy from before an update, cut off from the extension: its declarations block a second copy. Only a reload
         // of that tab clears it.
         console.warn('Glance: an open ' + id + ' tab runs an old copy; reload that tab once');
+        if (chrome.tabs.reload) { try { await chrome.tabs.reload(tab.id); } catch (e) { /* left for the person */ } }
         continue;
       }
       if (seen.globals) {
-        // A copy from this or an earlier load is there: ask it to look again rather than declaring everything twice.
+        // A copy from this package is there: ask it to look again rather than declaring everything twice.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } } });
         continue;
       }
@@ -4031,27 +4050,67 @@ async function outlookFileUndo(ref) {
 
 // The attachmentSave step's writer. The page does not call it in 0.9.38.
 // Bytes have to be on the file. A multi-file step does not fetch "the one file".
+async function outlookAttachmentBytes(messageId, attachmentId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !messageId || !attachmentId) return null;
+  const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(messageId, attachmentId);
+  outlookAssertNotSend(itemUrl);
+  const res = await outlookFetch(itemUrl, { method: 'GET' });
+  if (!res || !res.ok) return null;
+  const body = await outlookReadJson(res);
+  if (!body || !body.contentBytes) return null;
+  return { base64: body.contentBytes, name: body.name || '', contentType: body.contentType || 'application/octet-stream' };
+}
+
 async function attachmentSaveWrite(p) {
   const Save = globalThis.FlowSuggestSave;
   if (!Save || typeof Save.saveAttachments !== 'function') return { ok: false, reason: 'not-configured' };
   const params = (p && p.params) || {};
   const files = params.files || [];
   const target = params.target === 'drive' ? 'drive' : 'onedrive';
+  const messageId = (p && (p.messageId || p.outlookIncomingId)) || params.messageId || null;
+  // AQQK/AQQk is a conversation id. Attachment bytes are on the Graph message.
+  function graphBytesId(id) {
+    const s = String(id || '');
+    if (!s || /^A[AQ]Qk/i.test(s)) return '';
+    return s;
+  }
+  const bytesId = graphBytesId(p && p.graphMessageId) || graphBytesId(params.graphMessageId) || graphBytesId(messageId);
   const out = await Save.saveAttachments(files, target, {
     writeOne: async (file) => {
-      const b64 = file && (file.base64 || file.contentBytes);
+      let b64 = file && (file.base64 || file.contentBytes);
+      let name = file && file.name;
+      let contentType = file && file.contentType;
+      if (!b64 && target === 'onedrive' && bytesId && file && file.id) {
+        const got = await outlookAttachmentBytes(bytesId, file.id);
+        if (got) {
+          b64 = got.base64;
+          name = name || got.name;
+          contentType = contentType || got.contentType;
+        }
+      }
       if (!b64) return { ok: false, reason: 'no-bytes' };
       if (target !== 'onedrive') return { ok: false, reason: 'no-bytes' };
       const written = await outlookFileWrite({
-        fileName: file.name,
-        attachment: { filename: file.name, mimeType: file.contentType, base64: b64 }
+        fileName: name,
+        attachment: { filename: name, mimeType: contentType, base64: b64 }
       });
       const proof = written && written.proof && written.proof.fetchedBack === true ? written.proof : null;
       const ref = written && written.ref ? Object.assign({ created: written.ref.created !== false }, written.ref) : null;
       return { ok: !!proof, proof: proof, ref: ref, reason: (written && written.reason) || (proof ? null : 'verify_failed') };
     }
   });
-  return Object.assign({ ok: !!(out && out.handled), written: out && (out.line || (out.handled ? 'Saved.' : null)) }, out);
+  const oneName = files.length === 1 && files[0] && files[0].name;
+  const writtenLine = (out && out.handled && oneName)
+    ? ('Saved ' + oneName + ' to OneDrive')
+    : (out && (out.line || (out.handled ? 'Saved.' : null)));
+  const proof = out && out.handled && out.proofs && out.proofs[0] ? out.proofs[0] : null;
+  return Object.assign({
+    ok: !!(out && out.handled),
+    written: writtenLine,
+    proof: proof,
+    ref: out ? { undo: out.undo || [], created: true } : null
+  }, out);
 }
 
 async function attachmentSaveUndo(ref) {

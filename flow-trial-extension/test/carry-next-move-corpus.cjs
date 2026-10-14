@@ -133,5 +133,51 @@ check('a released loop gets no move', F.nextMove([relW], relW, NOW, ON({})) === 
 const { FlowPersonModel: PM } = require('../core/person-model.js');
 check('a released loop is not an answer for the person model', PM.observe([relW], 'p:gone', 'reply', NOW).events.length === 0);
 
+
+console.log('--- edge cases (finish run) ---');
+const lapsed = loop({ stage: 'promised', promisedIso: '2026-10-05' });
+check('a promised day that passed with no answer: a move again', (F.nextMove(chatHistory.concat([lapsed]), lapsed, NOW, ON(merged)) || {}).type === 'channel');
+const coming = loop({ stage: 'promised', promisedIso: '2026-10-11' });
+check('a promised day that is today: still wait', F.nextMove(chatHistory.concat([coming]), coming, NOW, ON(merged)) === null);
+const outlookHist = closed('outlook', 'p:dana', 'dana@acme.co.il', 0.5, 3);
+check('Gmail and Outlook are both mail: no "ask on Outlook" move', (F.nextMove(outlookHist.concat([w]), w, NOW, ON(merged)) || {}).type !== 'channel');
+const waLoop = loop({ channel: 'whatsapp', lang: 'he', subject: 'החוזה החתום', counterpart: { phone: '972500000000', name: 'דנה', email: 'dana@acme.co.il' } });
+const mo = F.nextMove(outlookHist.concat([waLoop]), waLoop, NOW, ON(Object.assign({ apps: ['outlook', 'whatsapp'] }, merged)));
+check('a WhatsApp loop, they answer you on Outlook: ask there (Hebrew)', mo && mo.type === 'channel' && mo.app === 'outlook' && /אאוטלוק/.test(mo.question) && /בוואטסאפ/.test(mo.draft), mo);
+const yossiKeyed = closed('gmail', 'person:yossi', 'yossi.l@acme.co.il', 1, 2);
+const keyOfY = { keyOf: (x) => (x.counterpart && /yossi/.test(x.counterpart.email || '') ? 'person:yossi' : x.personKey || (x.counterpart && x.counterpart.email)), threadPeople: [{ email: 'yossi@acme.co.il', name: 'Yossi' }] };
+check('a colleague known under another address of the same person (identity key) counts', (F.nextMove(yossiKeyed.concat([wc]), wc, NOW, ON(keyOfY)) || {}).type === 'colleague');
+const said = Object.assign({}, loop({ id: 'w0', personKey: null, status: 'resolved', closedAs: 'replied', resolvedAt: NOW - 5 * DAY }), { moves: [{ type: 'colleague', to: 'yossi@acme.co.il', at: NOW - 10 * DAY, dismissed: true }] });
+check('the person said no to asking Yossi about Dana on another loop: not proposed again', (F.nextMove(yossi.concat([said, wc]), wc, NOW, ON({ threadPeople: [{ email: 'yossi@acme.co.il' }] })) || {}).type !== 'colleague');
+const oldNo = Object.assign({}, said, { moves: [{ type: 'colleague', to: 'yossi@acme.co.il', at: NOW - 120 * DAY, dismissed: true }] });
+check('that no expires after 90 days', (F.nextMove(yossi.concat([oldNo, wc]), wc, NOW, ON({ threadPeople: [{ email: 'yossi@acme.co.il' }] })) || {}).type === 'colleague');
+const dColl = F.moveDismissPatch(wc, { type: 'colleague', to: { email: 'yossi@acme.co.il' } }, NOW);
+check('a dismissed colleague move remembers who', dColl.moves[0].to === 'yossi@acme.co.il' && dColl.moves[0].dismissed === true);
+const enMail = loop({ personKey: null, counterpart: { email: 'dana@acme.co.il' }, subject: '' });
+const mEn = F.nextMove([enMail], enMail, NOW, ON({}));
+check('no name and no subject: the question still reads (English)', mEn && /^No answer from Dana after 3 reminders/.test(mEn.question), mEn && mEn.question);
+
+console.log('--- real-user A/B layer (core/pmf-metrics.js, CARRY.abLive off) ---');
+const { FlowPmfMetrics: M } = require('../core/pmf-metrics.js');
+const id = 'a1b2c3d4-0000-4000-8000-1234567890ab';
+check('switch off: no arm, for every off form', [undefined, null, {}, { enabled: false }, { enabled: 'true' }].every((o) => M.assignVariant(id, 'carry-next-move', o) === null));
+const v1 = M.assignVariant(id, 'carry-next-move', { enabled: true });
+check('on: the same install always gets the same arm', v1 && v1 === M.assignVariant(id, 'carry-next-move', { enabled: true }) && ['A', 'B'].indexOf(v1) >= 0);
+check('no install id, a short one, or an unknown experiment: no arm', M.assignVariant('', 'carry-next-move', { enabled: true }) === null && M.assignVariant('abc', 'carry-next-move', { enabled: true }) === null && M.assignVariant(id, 'nope', { enabled: true }) === null);
+let nA = 0; for (let i = 0; i < 4000; i++) if (M.assignVariant('install-' + i + '-xxxxxxxx', 'carry-next-move', { enabled: true }) === 'A') nA++;
+check('arms are balanced (4,000 installs, 45%–55% in A)', nA > 1800 && nA < 2200, nA);
+let st = {};
+['loop_stuck', 'loop_stuck', 'move_release', 'move_accepted', 'released', 'reopened_after_release', 'move_channel', 'answered_after_move'].forEach((e) => { st = M.foldAbEvent(st, 'carry-next-move', 'B', e); });
+st = M.foldAbEvent(st, 'carry-next-move', 'A', 'loop_stuck');
+const before = JSON.stringify(st);
+const st2 = M.foldAbEvent(st, 'carry-next-move', 'B', 'Dana asked about the lease');
+const st3 = M.foldAbEvent(st, 'carry-next-move', 'C', 'loop_stuck');
+check('free text, an unknown event or an unknown arm is never stored', JSON.stringify(st2) === before && JSON.stringify(st3) === before && !/Dana|asked about/.test(JSON.stringify(st2)));
+check('the fold does not mutate its input', JSON.stringify(st) === before);
+const snap = M.abSnapshot(st, 'carry-next-move');
+check('snapshot: per-arm counts and rates with their n', snap.B.stuck === 2 && snap.B.released === 0.5 && snap.B.earlyRelease === 1 && snap.B.movesProposed === 2 && snap.B.moveAccepted === 0.5 && snap.A.stuck === 1, snap);
+check('a rate on zero is null, not 0', snap.A.released === 0 && snap.A.earlyRelease === null && snap.A.moveAccepted === null, snap.A);
+check('the stored state holds only numbers', JSON.stringify(st).replace(/"[a-z_\-AB]+":/g, '').replace(/[{}\d,]/g, '') === '', st);
+
 console.log(failures ? '\nTOTAL FAILURES: ' + failures : '\nTOTAL FAILURES: 0');
 process.exit(failures ? 1 : 0);
