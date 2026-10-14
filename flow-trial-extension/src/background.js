@@ -3603,23 +3603,27 @@ async function outlookObjectSnap(url, prefer) {
   return body ? outlookCreationSnap(body) : null;
 }
 
-// Read the object Glance created. A changed changeKey, time, or body means
-// the person edited it: Undo stops and does not write over that edit.
+// Read the object Glance created. Undo deletes only after this GET succeeds
+// and still matches the creation snapshot. 404 means it is already gone.
+// Any other failure (5xx, network, timeout, a body that will not parse)
+// refuses with the one line and does not delete.
 async function outlookRefuseIfEdited(url, snapshot, prefer) {
   if (!snapshot || typeof snapshot !== 'object') return null;
   const keys = Object.keys(snapshot);
   if (!keys.length) return null;
+  const refused = { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
   let got;
   try { got = await outlookUndoConfirm(url, prefer); }
-  catch (e) { return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() }; }
-  if (got && got.reason === 'verify-timeout') return got;
+  catch (e) { return refused; }
   if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
-  if (!got || got.status === 404) return null;
-  if (!(got.status === 200 || got.ok)) return null;
+  if (got && got.status === 404) return { ok: true, alreadyGone: true, fetchedBack: true };
+  const readable = got && (got.status === 200 || got.ok === true) && got.reason !== 'verify-timeout';
+  if (!readable) return refused;
   let body = null;
   try { body = await got.json(); } catch (e) { body = null; }
+  if (!body) return refused;
   const N = globalThis.FlowNativeEdit;
-  if (body && N && N.userEdited(snapshot, body)) {
+  if (N && N.userEdited(snapshot, body)) {
     return { ok: false, reason: 'user-edited', written: outlookUserEditedLine(), fetchedBack: true };
   }
   return null;
@@ -4026,6 +4030,10 @@ async function outlookDraftUndo(ref, hint) {
   const id = typeof ref === 'string' ? ref : (ref && (ref.draftId || ref.id));
   if (!id) return { ok: false };
   const snapshot = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
+  if (!snapshot || typeof snapshot !== 'object' || !Object.keys(snapshot).length) {
+    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  }
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,changeKey,lastModifiedDateTime,body';
   outlookAssertNotSend(getUrl);

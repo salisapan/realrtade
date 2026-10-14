@@ -76,7 +76,8 @@ function background(opts) {
     console, URLSearchParams, URL, TextEncoder, Uint8Array, crypto: webcrypto,
     btoa: (s) => Buffer.from(String(s), 'binary').toString('base64'),
     atob: (s) => Buffer.from(String(s), 'base64').toString('binary'),
-    setTimeout, clearTimeout,
+    setTimeout: opts.clock || setTimeout,
+    clearTimeout: opts.clearClock || clearTimeout,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
@@ -140,6 +141,49 @@ console.log('\n--- the page scan does not rewrite a draft ---\n');
     gmail.indexOf('FlowNativeEdit') > 0 && gmail.indexOf('fillOnce') > 0);
 }
 
+(async () => {
+console.log('\n--- a failed To Do read does not delete, and a draft with no snapshot stays ---\n');
+{
+  const snap = { changeKey: 'ck-created', title: 'File the amendment', lastModifiedDateTime: '2026-10-14T09:00:00.000Z' };
+  const taskRef = (id) => ({ taskListId: 'DEF', taskId: id, externalId: id, created: snap });
+  const line = N.userEditedLine();
+  const five = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASK500$/, reply: () => ({ ok: false, status: 500, json: async () => ({ error: 'server' }), text: async () => '' }) }
+  ] });
+  const refused500 = await five.fn('outlookTaskUndo')(taskRef('TASK500'));
+  check('a To Do edit-check 500 refuses in one line and does not delete',
+    refused500.ok === false && refused500.written === line &&
+    !five.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    refused500);
+  const down = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASKNET$/, reply: () => { throw new Error('network'); } }
+  ] });
+  const refusedNet = await down.fn('outlookTaskUndo')(taskRef('TASKNET'));
+  check('a To Do edit-check network error refuses in one line and does not delete',
+    refusedNet.ok === false && refusedNet.written === line &&
+    !down.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    refusedNet);
+  const hung = background({
+    clock: (fn, ms) => { if (ms >= 8000) { fn(); return 1; } return setTimeout(fn, ms); },
+    routes: [
+      { method: 'GET', test: /\/tasks\/TASKSLOW$/, reply: () => new Promise(() => {}) }
+    ]
+  });
+  const refusedSlow = await hung.fn('outlookTaskUndo')(taskRef('TASKSLOW'));
+  check('a To Do edit-check timeout refuses in one line and does not delete',
+    refusedSlow.ok === false && refusedSlow.written === line &&
+    !hung.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    refusedSlow);
+  const draft = background({ routes: [
+    { method: 'GET', test: /\/me\/messages\/odraft-nosnap/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'odraft-nosnap', isDraft: true, changeKey: 'ck', body: { content: 'Thanks' } }), text: async () => '' }) }
+  ] });
+  const noSnap = await draft.fn('outlookDraftUndo')('odraft-nosnap');
+  check('an Outlook draft Undo with no snapshot refuses in one line and does not delete',
+    noSnap.ok === false && noSnap.written === line &&
+    !draft.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    noSnap);
+}
+
 console.log('\n--- an edited calendar event is left alone ---\n');
 {
   const event = {
@@ -167,3 +211,7 @@ console.log('\n--- an edited calendar event is left alone ---\n');
     process.exit(1);
   });
 }
+})().catch((err) => {
+  console.log('FAIL: rule-9 undo threw', err && err.stack ? err.stack : err);
+  process.exit(1);
+});
