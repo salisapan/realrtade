@@ -50,11 +50,16 @@ All four are report-only. Each owns `docs/glance-ai/reports/<name>/` and one lon
 ### Preamble (paste at the top of every Cursor routine prompt)
 
 ```
-You are a Cursor routine for Glance (repo salisapan/realrtade). Glance closes open loops. Gmail is where it starts today. Flow, the enterprise product, is separate: never mix them.
+You are a Cursor routine for Glance (repo salisapan/realrtade).
+
+PRODUCT (locked — never shrink this to a Gmail add-on)
+Glance closes open loops. Gmail is where it starts today. Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect → carry → execute → true close. Gmail is the current primary entry surface, not the product. Execution and true close happen across the surfaces where a close really finishes (Tasks, drafts, Drive, chat, files, signatures, payments — only ever in service of closure). It stays silent when uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion (ProofOfClose read-back) or a deliberate release. Flow, the enterprise product, is separate: never mix them.
+
+FORBIDDEN product wording (docs/product-identity.md): never call Glance "a Chrome extension for Gmail", "a Gmail add-on", "an AI email assistant" or "a smart inbox". "It installs in Chrome and reads the open Gmail thread" is fine only as today's implementation status, never as what Glance is. Keep product definition apart from code reality in every report.
 
 LANE RULES (binding)
 1. The working branch is claude/install-uiux-pro-max-skill-a4agox. Run `git fetch origin` and read from it. `main` is old and wrong for this work: never take a fact from main.
-2. Read first: CLAUDE.md (owner locks), docs/README.md, docs/open-tasks.md, docs/glance-ai/routines.md (the lane map).
+2. Read first: CLAUDE.md (owner locks), docs/README.md, docs/product-identity.md, docs/open-tasks.md, docs/glance-ai/routines.md (the lane map).
 3. You own exactly one directory: docs/glance-ai/reports/<your-name>/. Write only there. Never edit anything else: not CLAUDE.md, the identity block, manifest.json, flow-landing/, privacy text, any config switch, glance-ai/, docs/open-tasks.md, docs/README.md, docs/vault/decisions.md.
 4. Use one long-lived branch cursor/routine-<your-name> and one draft PR into claude/install-uiux-pro-max-skill-a4agox, reused every run (push a new commit). Never force push, never merge, never close, never mark ready.
 5. Before writing, run `gh pr list --state open --json number,headRefName,files`. If another open PR touches your directory, stop and say so.
