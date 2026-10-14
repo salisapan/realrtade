@@ -1,0 +1,7 @@
+diff --git a/flow-trial-extension/src/background.js b/flow-trial-extension/src/background.js
+--- a/flow-trial-extension/src/background.js
++++ b/flow-trial-extension/src/background.js
+@@ -56,2 +56,3 @@
+ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
++import './lane-chat-worker.js';
+ import { LADDER } from '../config/ladder.public.js';

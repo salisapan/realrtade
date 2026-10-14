@@ -11,42 +11,80 @@ const FlowMessengerParse = (() => {
     return null;
   }
 
-  function normKind(value) {
-    return String(value || '').toLowerCase().replace(/[\s_]+/g, '-');
+  // TODO-LIVE-DOM: David, save a real messenger.com and facebook.com/messages
+  // header here: test/fixtures/chat/TODO-LIVE-DOM.html. One one-to-one thread
+  // and one group. These checks use signals observers have published. A title
+  // is not one of them. If none of the signals below are on the page, this
+  // returns false and no draft is written.
+  //
+  // Selectors, each with the page that shows it:
+  // - [aria-label="Conversation information"]
+  //   The conversation-info control (the ellipsis). Any tag: the published
+  //   selector does not name one. Matched case-insensitively because the
+  //   panel heading is title case.
+  //   Source: https://gist.github.com/ariankordi/bae839598cd20680a5b2f85cd565336e
+  //   Source: https://bugzilla.mozilla.org/show_bug.cgi?id=1620508
+  //   (`<h3>Conversation Information</h3>`). We never click this control.
+  //   The chat-name link `[role="main"] a[role="link"][tabindex="0"][aria-label]`
+  //   in that gist is the title, so it is not proof.
+  // - header img
+  //   How many avatars are already in the header. Exactly one, together with
+  //   the info control and no group wording, is the one-to-one proof. Two or
+  //   more is a group. Zero is not proof.
+  //   Source: bug 1620508 (senders are thumbnails, not only the h5). The exact
+  //   img-versus-background node is TODO-LIVE-DOM. A single composite group
+  //   image is not distinguished until that snapshot.
+  // - header text and aria-label: /\bmembers\b/i, /\bparticipants\b/i,
+  //   /\bgroup chat\b/i, /\bgroup conversation\b/i, and משתתפים
+  //   A group word on the header or on the info control is a group.
+  //   Source: the conversation-info panel is where Messenger lists the people
+  //   (same gist; the blacklist script reads "Conversation Information" as
+  //   that panel: https://greasyfork.org/en/scripts/384707-messenger-blacklist/code).
+  //   The exact live string ("members" versus another word) is TODO-LIVE-DOM.
+
+  const GROUP_WORD = /\bmembers\b|\bparticipants\b|\bgroup chat\b|\bgroup conversation\b|משתתפים/i;
+
+  function headerOf(root) {
+    return root.querySelector('header');
   }
 
-  function threadType(root) {
-    if (!root || typeof root.getAttribute !== 'function') return '';
-    const own = root.getAttribute('data-thread-type');
-    if (own) return normKind(own);
-    if (typeof root.querySelector !== 'function') return '';
-    const marked = root.querySelector('[data-thread-type]');
-    return marked ? normKind(marked.getAttribute('data-thread-type')) : '';
+  function infoControl(root) {
+    const nodes = Array.from(root.querySelectorAll('[aria-label]'));
+    return nodes.find((el) => /^conversation information$/i.test(String(el.getAttribute('aria-label') || '').trim())) || null;
   }
 
-  function participantCount(root) {
-    if (!root || typeof root.querySelectorAll !== 'function') return null;
-    const nodes = Array.from(root.querySelectorAll('[data-testid="participant-count"], [data-glance-participants], [data-members-count]'));
-    const labelled = Array.from(root.querySelectorAll('[aria-label]')).filter((el) => /participant|משתתפ/i.test(el.getAttribute('aria-label') || ''));
-    for (const el of nodes.concat(labelled)) {
-      const raw = el.getAttribute('data-glance-participants') || el.getAttribute('data-members-count') || el.getAttribute('aria-label') || el.textContent || '';
-      const m = String(raw).match(/(\d+)/);
-      if (m) return Number(m[1]);
+  function headerAvatars(header) {
+    if (!header) return [];
+    return Array.from(header.querySelectorAll('img'));
+  }
+
+  function groupWording(header, info) {
+    const nodes = [];
+    if (header) nodes.push(header);
+    if (info && (!header || !header.contains(info))) nodes.push(info);
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const own = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
+      if (GROUP_WORD.test(own) || GROUP_WORD.test(node.textContent || '')) return true;
+      const labelled = node.querySelectorAll ? Array.from(node.querySelectorAll('[aria-label]')) : [];
+      for (let j = 0; j < labelled.length; j++) {
+        if (GROUP_WORD.test(labelled[j].getAttribute('aria-label') || '')) return true;
+      }
     }
-    return null;
+    return false;
   }
 
-  // A direct chat is proven by the thread type, and only when the page does not
-  // also show a group. A title is never that proof. Missing proof is not a direct chat.
+  // One-to-one only when the live header proves it. A title does not. A
+  // missing signal does not. Fixture-only attributes are ignored.
   function isOneToOne(root) {
     if (!root || typeof root.querySelector !== 'function') return false;
-    const kind = threadType(root);
-    if (kind === 'group' || kind === 'community' || kind === 'broadcast') return false;
-    if (root.querySelector('[data-testid="group-avatar"], [data-glance-avatar="group"]')) return false;
-    if (root.querySelector('a[href*="members"], [data-testid="members-link"], a[data-glance-members="1"]')) return false;
-    const count = participantCount(root);
-    if (count != null && count !== 1) return false;
-    return kind === 'one-to-one' || kind === 'direct';
+    const header = headerOf(root);
+    const info = infoControl(root);
+    const avatars = headerAvatars(header);
+    if (avatars.length >= 2) return false;
+    if (groupWording(header, info)) return false;
+    if (!info || avatars.length !== 1) return false;
+    return true;
   }
 
   function authorOf(row) {
