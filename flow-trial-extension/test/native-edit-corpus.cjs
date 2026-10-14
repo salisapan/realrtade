@@ -146,13 +146,14 @@ console.log('\n--- a failed To Do read does not delete, and a draft with no snap
 {
   const snap = { changeKey: 'ck-created', title: 'File the amendment', lastModifiedDateTime: '2026-10-14T09:00:00.000Z' };
   const taskRef = (id) => ({ taskListId: 'DEF', taskId: id, externalId: id, created: snap });
-  const line = N.userEditedLine();
+  const confirmLine = "Couldn't confirm it's unchanged. Undo left it alone.";
+  const legacy = { taskListId: 'DEF', taskId: 'TASKLEGACY', externalId: 'TASKLEGACY' };
   const five = background({ routes: [
     { method: 'GET', test: /\/tasks\/TASK500$/, reply: () => ({ ok: false, status: 500, json: async () => ({ error: 'server' }), text: async () => '' }) }
   ] });
   const refused500 = await five.fn('outlookTaskUndo')(taskRef('TASK500'));
   check('a To Do edit-check 500 refuses in one line and does not delete',
-    refused500.ok === false && refused500.written === line &&
+    refused500.ok === false && refused500.written === confirmLine && refused500.reason === 'unconfirmed' &&
     !five.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
     refused500);
   const down = background({ routes: [
@@ -160,7 +161,7 @@ console.log('\n--- a failed To Do read does not delete, and a draft with no snap
   ] });
   const refusedNet = await down.fn('outlookTaskUndo')(taskRef('TASKNET'));
   check('a To Do edit-check network error refuses in one line and does not delete',
-    refusedNet.ok === false && refusedNet.written === line &&
+    refusedNet.ok === false && refusedNet.written === confirmLine && refusedNet.reason === 'unconfirmed' &&
     !down.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
     refusedNet);
   const hung = background({
@@ -171,7 +172,7 @@ console.log('\n--- a failed To Do read does not delete, and a draft with no snap
   });
   const refusedSlow = await hung.fn('outlookTaskUndo')(taskRef('TASKSLOW'));
   check('a To Do edit-check timeout refuses in one line and does not delete',
-    refusedSlow.ok === false && refusedSlow.written === line &&
+    refusedSlow.ok === false && refusedSlow.written === confirmLine && refusedSlow.reason === 'unconfirmed' &&
     !hung.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
     refusedSlow);
   const draft = background({ routes: [
@@ -179,9 +180,39 @@ console.log('\n--- a failed To Do read does not delete, and a draft with no snap
   ] });
   const noSnap = await draft.fn('outlookDraftUndo')('odraft-nosnap');
   check('an Outlook draft Undo with no snapshot refuses in one line and does not delete',
-    noSnap.ok === false && noSnap.written === line &&
+    noSnap.ok === false && noSnap.written === confirmLine && noSnap.reason === 'unconfirmed' &&
     !draft.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
     noSnap);
+  const bareTodo = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASKLEGACY$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASKLEGACY', title: 'File the amendment' }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/tasks\/TASKLEGACY$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const todoBare = await bareTodo.fn('outlookTaskUndo')(legacy);
+  check('a To Do Undo with no snapshot refuses and does not delete',
+    todoBare.ok === false && todoBare.written === confirmLine && todoBare.deleted !== true && !/Undone/.test(todoBare.written || '') &&
+    !bareTodo.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    todoBare);
+  const bareCal = background({ routes: [
+    { method: 'DELETE', test: /\/me\/events\/EVLEGACY/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const calBare = await bareCal.fn('outlookCalendarUndo')({ eventId: 'EVLEGACY' });
+  check('a Calendar Undo with no snapshot refuses and does not delete',
+    calBare.ok === false && calBare.written === confirmLine && !/Undone/.test(calBare.written || '') &&
+    !bareCal.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    calBare);
+  const activityEnv = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASKLEGACY$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASKLEGACY', title: 'File the amendment' }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/tasks\/TASKLEGACY$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const activity = await activityEnv.fn('outlookTaskUndo')(legacy, { type: 'flow:undo-action', connectorId: 'outlookTask', ref: legacy, created: undefined });
+  const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
+  const activityAt = popup.indexOf('created: e.created');
+  const activitySrc = popup.slice(activityAt, activityAt + 2800);
+  check('Activity Undo on a legacy log entry refuses with the unconfirmed line and does not delete',
+    activity.ok === false && activity.written === confirmLine && activity.deleted !== true &&
+    !activityEnv.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH') &&
+    activitySrc.indexOf("reason === 'unconfirmed'") > 0 && activitySrc.indexOf('r.ok') > 0,
+    activity);
 }
 
 console.log('\n--- an edited calendar event is left alone ---\n');

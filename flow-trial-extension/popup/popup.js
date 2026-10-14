@@ -2371,10 +2371,10 @@
       } catch (err) {
         r = { ok: false, error: String(err && err.message || err) };
       }
-      if (r && r.reason === 'user-edited') {
+      if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
         u.disabled = false;
         u.textContent = 'Undo';
-        note.textContent = r.written || 'You edited this. Undo left it alone.';
+        note.textContent = r.written || (r.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : 'You edited this. Undo left it alone.');
         note.hidden = false;
         return;
       }
@@ -3019,7 +3019,7 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited'))
+            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
               ? r.written
               : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = 'Undo';

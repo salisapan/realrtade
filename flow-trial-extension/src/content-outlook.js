@@ -910,7 +910,7 @@
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created, outlookImmutableId: ctx.outlookImmutableId === true });
-        if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+        if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
         }
@@ -1253,11 +1253,11 @@
       undo.disabled = true;
       readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref })).then(async (result) => {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
-        if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited')) {
+        if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited' || result.reason === 'unconfirmed')) {
           undo.textContent = 'Undo';
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = result.written || (result.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : "Couldn't verify, try again");
+          hint.textContent = result.written || (result.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : (result.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : "Couldn't verify, try again"));
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           return;
         }
@@ -1416,7 +1416,7 @@
       url: draft.url || draft.where,
       onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref, created: draft.created });
-        if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+        if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(draft.messageId, draft.ref);
         }
@@ -1946,7 +1946,7 @@
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created });
-        if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+        if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
           await FlowStorage.updateWatch(ctx.threadId, { status: 'stopped', resolvedBy: 'undo' });
         }
@@ -2830,7 +2830,7 @@
           url: entry.url || entry.where,
           onUndo: guardedUndo(host, async () => {
             const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: entry.ref, created: entry.created });
-            if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+            if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
             if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
               await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
             }

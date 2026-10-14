@@ -7,6 +7,10 @@ const FlowNativeEdit = (() => {
     return 'You edited this. Undo left it alone.';
   }
 
+  function unconfirmedLine() {
+    return "Couldn't confirm it's unchanged. Undo left it alone.";
+  }
+
   function textOf(value) {
     if (value == null) return '';
     if (typeof value === 'string') return value;
@@ -75,7 +79,7 @@ const FlowNativeEdit = (() => {
     return { wrote: true };
   }
 
-  return { userEditedLine, snapshotOf, userEdited, fillOnce, textOf };
+  return { userEditedLine, unconfirmedLine, snapshotOf, userEdited, fillOnce, textOf };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.FlowNativeEdit = FlowNativeEdit;

@@ -3589,6 +3589,19 @@ function outlookUserEditedLine() {
   return (N && N.userEditedLine) ? N.userEditedLine() : 'You edited this. Undo left it alone.';
 }
 
+function outlookUnconfirmedLine() {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.unconfirmedLine) ? N.unconfirmedLine() : "Couldn't confirm it's unchanged. Undo left it alone.";
+}
+
+function outlookHasSnap(snapshot) {
+  return Boolean(snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length);
+}
+
+function outlookUnconfirmed() {
+  return { ok: false, reason: 'unconfirmed', written: outlookUnconfirmedLine(), deleted: false };
+}
+
 function outlookCreationSnap(obj) {
   const N = globalThis.FlowNativeEdit;
   return (N && N.snapshotOf) ? N.snapshotOf(obj) : {};
@@ -3605,23 +3618,21 @@ async function outlookObjectSnap(url, prefer) {
 
 // Read the object Glance created. Undo deletes only after this GET succeeds
 // and still matches the creation snapshot. 404 means it is already gone.
-// Any other failure (5xx, network, timeout, a body that will not parse)
-// refuses with the one line and does not delete.
+// A 5xx, a network error, a timeout, or a body that will not parse refuses
+// with the unconfirmed line and does not delete. A field that changed is
+// an edit, and that is the only path that says the person edited it.
 async function outlookRefuseIfEdited(url, snapshot, prefer) {
-  if (!snapshot || typeof snapshot !== 'object') return null;
-  const keys = Object.keys(snapshot);
-  if (!keys.length) return null;
-  const refused = { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  if (!outlookHasSnap(snapshot)) return null;
   let got;
   try { got = await outlookUndoConfirm(url, prefer); }
-  catch (e) { return refused; }
+  catch (e) { return outlookUnconfirmed(); }
   if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
   if (got && got.status === 404) return { ok: true, alreadyGone: true, fetchedBack: true };
   const readable = got && (got.status === 200 || got.ok === true) && got.reason !== 'verify-timeout';
-  if (!readable) return refused;
+  if (!readable) return outlookUnconfirmed();
   let body = null;
   try { body = await got.json(); } catch (e) { body = null; }
-  if (!body) return refused;
+  if (!body) return outlookUnconfirmed();
   const N = globalThis.FlowNativeEdit;
   if (N && N.userEdited(snapshot, body)) {
     return { ok: false, reason: 'user-edited', written: outlookUserEditedLine(), fetchedBack: true };
@@ -3833,14 +3844,16 @@ async function outlookCalendarWrite(p) {
   };
 }
 
-async function outlookCalendarUndo(ref) {
+async function outlookCalendarUndo(ref, hint) {
   const Cal = globalThis.FlowOutlookCalendar;
   const id = ref && typeof ref === 'object' ? ref.eventId : ref;
   const req = Cal && Cal.undoRequest(id);
   if (!req || req.method !== 'DELETE' || !/^\/me\/events\/[^/]+$/.test(req.path)) return { ok: false };
   const url = OUTLOOK_GRAPH + req.path;
   outlookAssertNotSend(url);
-  const edited = await outlookRefuseIfEdited(url, ref && ref.created);
+  const calSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  if (!outlookHasSnap(calSnap)) return outlookUnconfirmed();
+  const edited = await outlookRefuseIfEdited(url, calSnap);
   if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del.notConnected) return { ok: false, reason: 'not-connected' };
@@ -3963,13 +3976,15 @@ async function outlookTaskFetchBack(taskListId, taskId) {
   return { ok: true, task: body };
 }
 
-async function outlookTaskUndo(ref) {
+async function outlookTaskUndo(ref, hint) {
   const taskId = ref && (ref.externalId || ref.taskId);
   const listId = ref && ref.taskListId;
   if (!taskId || !listId) return { ok: false };
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
-  const edited = await outlookRefuseIfEdited(url, ref && ref.created);
+  const taskSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  if (!outlookHasSnap(taskSnap)) return outlookUnconfirmed();
+  const edited = await outlookRefuseIfEdited(url, taskSnap);
   if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
@@ -4031,21 +4046,21 @@ async function outlookDraftUndo(ref, hint) {
   if (!id) return { ok: false };
   const snapshot = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
   // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
-  if (!snapshot || typeof snapshot !== 'object' || !Object.keys(snapshot).length) {
-    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
-  }
+  if (!outlookHasSnap(snapshot)) return outlookUnconfirmed();
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,changeKey,lastModifiedDateTime,body';
   outlookAssertNotSend(getUrl);
   let got;
   try { got = await outlookUndoConfirm(getUrl, prefer); }
-  catch (e) { return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() }; }
-  if (got && got.reason === 'verify-timeout') return got;
+  catch (e) { return outlookUnconfirmed(); }
+  if (got && got.reason === 'verify-timeout') return outlookUnconfirmed();
   if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
   if (got && got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
-  if (!got || !got.ok) return { ok: false, reason: 'http-' + ((got && got.status) || 0) };
-  const msg = await got.json();
-  if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  if (!got || !got.ok) return outlookUnconfirmed();
+  let msg = null;
+  try { msg = await got.json(); } catch (e) { msg = null; }
+  if (!msg) return outlookUnconfirmed();
+  if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
   const N = globalThis.FlowNativeEdit;
   if (snapshot && N && N.userEdited(snapshot, msg)) {
     return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };

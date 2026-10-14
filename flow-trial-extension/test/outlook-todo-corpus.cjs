@@ -147,7 +147,7 @@ console.log('\n--- judge: task-only is To Do, a draft stays a draft, a calendar 
 (async () => {
 console.log('\n--- write, read back, undo ---\n');
 {
-  const env = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const env = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted', changeKey: 'ck-created', title: 'File the amendment' }) });
   const out = await env.fn('outlookTaskWrite')(PAYLOAD);
   const post = env.calls.find((c) => c.method === 'POST');
   const gets = env.calls.filter((c) => c.method === 'GET' && /\/tasks\//.test(c.url));
@@ -231,11 +231,16 @@ console.log('\n--- write, read back, undo ---\n');
 
 console.log('\n--- Undo says Undone only after GET confirms the task is gone ---\n');
 {
+  let goneReads = 0;
   const gone = background({ routes: [
     { method: 'DELETE', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
-    { method: 'GET', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) }
+    { method: 'GET', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => {
+      goneReads += 1;
+      if (goneReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', changeKey: 'ck-created', title: 'File the amendment' }), text: async () => '' };
+      return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+    } }
   ] });
-  const undone = await gone.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  const undone = await gone.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
   const order = gone.calls.map((c) => c.method);
   check('DELETE then GET 404 is Undone, and the receipt names the To Do page cache',
     undone.ok === true && undone.fetchedBack === true && undone.deleted === true &&
@@ -246,13 +251,13 @@ console.log('\n--- Undo says Undone only after GET confirms the task is gone ---
     { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
     { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', status: 'notStarted' }), text: async () => '' }) }
   ] });
-  const still = await present.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  const still = await present.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
   check('a live task after DELETE is not Undone', still.ok === false && still.reason === 'still-present' && still.fetchedBack === true, still);
   const flagged = background({ routes: [
     { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
     { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', status: 'deleted', isDeleted: true, '@removed': { reason: 'deleted' } }), text: async () => '' }) }
   ] });
-  const marked = await flagged.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  const marked = await flagged.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
   check('a 200 with a deleted flag is not Undone',
     marked.ok === false && marked.reason === 'still-present' && marked.fetchedBack === true && marked.deleted !== true,
     marked);
@@ -272,17 +277,27 @@ console.log('\n--- Undo says Undone only after GET confirms the task is gone ---
 
 console.log('\n--- a read-back that does not answer is not Undone ---\n');
 {
+  let slowWaits = 0;
+  let slowReads = 0;
   const hung = background({
     clock: (fn, ms) => {
-      if (ms >= 8000) { fn(); return 1; }
+      if (ms >= 8000) {
+        slowWaits += 1;
+        if (slowWaits > 1) { fn(); return slowWaits; }
+        return slowWaits;
+      }
       return setTimeout(fn, ms);
     },
     routes: [
       { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
-      { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => new Promise(() => {}) }
+      { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => {
+        slowReads += 1;
+        if (slowReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', changeKey: 'ck-created', title: 'File the amendment' }), text: async () => '' };
+        return new Promise(() => {});
+      } }
     ]
   });
-  const slow = await hung.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  const slow = await hung.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
   check('an 8s read-back timeout says try again and is not Undone',
     slow.ok === false && slow.reason === 'verify-timeout' && slow.fetchedBack !== true &&
     slow.written === "Couldn't verify, try again",
