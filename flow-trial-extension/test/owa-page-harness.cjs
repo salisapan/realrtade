@@ -3,13 +3,17 @@
 // world, on a Hebrew outlook.live.com reading pane whose ad slot changes every 200 ms, with the Graph mailbox behind the
 // worker faked. It must mount the Glance card in the open message and log each stage in debug mode.
 //
-// Needs jsdom (not a dependency of this repo): `npm i --no-save jsdom` or NODE_PATH pointing at one. Without it, SKIPPED.
+// Needs jsdom, a devDependency of this package. Missing jsdom is a failed run.
 // Run: node test/owa-page-harness.cjs
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 let JSDOM;
-try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('SKIPPED: jsdom not available'); process.exit(0); }
+try { ({ JSDOM } = require('jsdom')); }
+catch (e) {
+  console.error('FAIL: jsdom is not installed. The Outlook page harness cannot run.');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..');
 let failures = 0;

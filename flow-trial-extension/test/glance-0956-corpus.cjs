@@ -75,5 +75,29 @@ console.log('\n--- sender is not a recipient ---\n');
   }
 }
 
+console.log('\n--- a missing jsdom fails the regression ---\n');
+{
+  const { spawnSync } = require('child_process');
+  [
+    'test/mail-switch-race-corpus.cjs',
+    'test/cc-only-recipients-corpus.cjs',
+    'test/owa-page-harness.cjs'
+  ].forEach((file) => {
+    const r = spawnSync(process.execPath, ['-e', [
+      'const Module = require("module");',
+      'const orig = Module.prototype.require;',
+      'Module.prototype.require = function (id) {',
+      '  if (id === "jsdom") { const err = new Error("Cannot find module \'jsdom\'"); err.code = "MODULE_NOT_FOUND"; throw err; }',
+      '  return orig.apply(this, arguments);',
+      '};',
+      'require("./' + file + '");'
+    ].join('\n')], { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 20000 });
+    const out = String(r.stdout || '') + String(r.stderr || '');
+    check(file + ' exits 1 when jsdom is missing',
+      r.status === 1 && /jsdom is not installed/.test(out) && !/SKIPPED: jsdom/.test(out),
+      { status: r.status, out: out.slice(0, 400) });
+  });
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

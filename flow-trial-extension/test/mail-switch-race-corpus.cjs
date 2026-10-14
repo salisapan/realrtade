@@ -1,14 +1,17 @@
 // Gate 0.9.55. A scan that already read mail A must not paint A's card after
 // the open mail is B, and a click on a card bound to A must not run on B.
 // Run: node test/mail-switch-race-corpus.cjs
-// Needs jsdom (not a dependency of this repo): npm i --no-save jsdom
+// Needs jsdom, a devDependency of this package. Missing jsdom is a failed run.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }
-catch (e) { console.log('SKIPPED: jsdom not available'); process.exit(0); }
+catch (e) {
+  console.error('FAIL: jsdom is not installed. The mail-switch regression cannot run.');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..');
 const ME = 'glance.salisapan@outlook.com';
@@ -147,6 +150,12 @@ async function boot(opts) {
       if (/\/me\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
       return { ok: false, status: 404, body: '{}' };
     }
+    if (msg.type === 'flow:drive-find-one') {
+      return { ok: true, match: 'one', file: { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' } };
+    }
+    if (msg.type === 'flow:execute-action' && msg.payload && msg.payload.connectorId === 'outlookCalendar') {
+      return { ok: true, ref: { eventId: 'ev-1' }, written: 'On your calendar, with the file.', url: 'https://outlook.live.com/calendar/item/ev-1' };
+    }
     if (msg.type === 'flow:execute-action') return { ok: true, ref: 'draft-1', where: 'drafts', url: 'https://outlook.live.com/mail/0/drafts' };
     if (msg.type === 'flow:undo-action') return { ok: true, written: 'Undone' };
     return { ok: true };
@@ -281,6 +290,157 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   check('20 fast switches never show another mail\'s card', !foreign, { foreign: foreign, text: chipText(rapid.doc) });
   check('mail 20\'s card is up within 2 seconds', Boolean(host20) && (Date.now() - started) <= 2000, { ms: Date.now() - started, text: chipText(rapid.doc) });
   rapid.w.close();
+
+  async function cardFor(page, id) {
+    const until = Date.now() + 5000;
+    while (Date.now() < until) {
+      const host = page.doc.querySelector('.flow-chip-host');
+      if (host && boundTo(host, id) && host.getAttribute('data-glance-open')) return host;
+      await sleep(30);
+    }
+    return null;
+  }
+
+  const subject = await boot({ holdAfterRead: false });
+  const hostSub = await cardFor(subject, ID_A);
+  const tokenBefore = hostSub && hostSub.getAttribute('data-glance-open');
+  const clearedBefore = subject.logs.filter((line) => line.indexOf('stale card cleared') >= 0).length;
+  const heading = subject.doc.querySelector('#ReadingPaneContainerId [role="heading"] span');
+  if (heading) heading.textContent = 'Q3 summary — subject edited in place';
+  await sleep(60);
+  const hostAfter = subject.doc.querySelector('#ReadingPaneContainerId .flow-chip-host');
+  const clearedAfter = subject.logs.filter((line) => line.indexOf('stale card cleared') >= 0).length;
+  check('a subject edit with the same message id is not a mail switch',
+    tokenBefore === 'msg|' + ID_A && hostAfter === hostSub && clearedAfter === clearedBefore &&
+    subject.w.__glanceOutlookPage.openMailToken() === tokenBefore,
+    { tokenBefore: tokenBefore, tokenNow: subject.w.__glanceOutlookPage.openMailToken(), cleared: clearedAfter - clearedBefore, text: chipText(subject.doc) });
+  const liveDo = hostSub && (hostSub.querySelector('.do-halo') || hostSub.querySelector('button.flow-chip'));
+  const actsBefore = subject.sent.filter((m) => m.type === 'flow:execute-action').length;
+  if (liveDo) liveDo.click();
+  await sleep(300);
+  check('Do It still runs after a subject-only edit',
+    subject.sent.filter((m) => m.type === 'flow:execute-action').length === actsBefore + 1,
+    { acts: subject.sent.filter((m) => m.type === 'flow:execute-action').length });
+  subject.w.close();
+
+  const actions = await boot({ holdAfterRead: false });
+  const hostAct = await cardFor(actions, ID_A);
+  const holdBtn = hostAct && hostAct.querySelector('.chip-hold');
+  if (holdBtn) holdBtn.click();
+  check('Hold It on the open mail marks the card', Boolean(hostAct && hostAct.querySelector('[data-glance-held="1"]')));
+  const held = hostAct && hostAct.querySelector('[data-glance-held="1"]');
+  if (held) held.removeAttribute('data-glance-held');
+  const actParent = hostAct && hostAct.parentNode;
+  showMail(actions.doc, actions.w, MAIL_B);
+  await sleep(50);
+  if (hostAct && actParent && !hostAct.isConnected) actParent.insertBefore(hostAct, actParent.firstChild);
+  const staleHold = hostAct && hostAct.querySelector('.chip-hold');
+  if (staleHold) staleHold.click();
+  const dismiss = hostAct && (hostAct.querySelector('.chip-x') || hostAct.querySelector('.flow-chip-dismiss'));
+  if (dismiss) dismiss.click();
+  const dismissLeftTheCard = hostAct.isConnected;
+  await sleep(250);
+  const dismissed = ((actions.store && actions.store.log) || []).some((e) => e && e.kind === 'dismissed');
+  check('Hold It on another mail\'s card does nothing',
+    Boolean(staleHold) && !hostAct.querySelector('[data-glance-held="1"]') &&
+    actions.logs.some((line) => line.indexOf('stale card click ignored') >= 0));
+  check('Dismiss on another mail\'s card does not record a dismiss',
+    Boolean(dismiss) && !dismissed && dismissLeftTheCard,
+    { dismissed: dismissed, connected: dismissLeftTheCard });
+  hostAct.removeAttribute('data-glance-open');
+  const bareDo = hostAct.querySelector('.do-halo') || hostAct.querySelector('button.flow-chip');
+  const bareBefore = actions.sent.filter((m) => m.type === 'flow:execute-action').length;
+  if (bareDo) bareDo.click();
+  await sleep(250);
+  check('a card with no open-mail token never executes',
+    Boolean(bareDo) && actions.sent.filter((m) => m.type === 'flow:execute-action').length === bareBefore &&
+    actions.logs.some((line) => line.indexOf('card with no open-mail token ignored') >= 0),
+    { acts: actions.sent.filter((m) => m.type === 'flow:execute-action').length });
+  actions.w.close();
+
+  const undoPage = await boot({ holdAfterRead: false });
+  const hostUndo = await cardFor(undoPage, ID_A);
+  const doUndo = hostUndo && (hostUndo.querySelector('.do-halo') || hostUndo.querySelector('button.flow-chip'));
+  if (doUndo) doUndo.click();
+  let undoBtn = null;
+  const undoUntil = Date.now() + 2000;
+  while (Date.now() < undoUntil && !undoBtn) {
+    undoBtn = hostUndo && hostUndo.querySelector('.flow-chip-undo');
+    if (!undoBtn) await sleep(30);
+  }
+  const undoParent = hostUndo && hostUndo.parentNode;
+  showMail(undoPage.doc, undoPage.w, MAIL_B);
+  await sleep(50);
+  if (hostUndo && undoParent && !hostUndo.isConnected) undoParent.insertBefore(hostUndo, undoParent.firstChild);
+  const undosBefore = undoPage.sent.filter((m) => m.type === 'flow:undo-action').length;
+  if (undoBtn) undoBtn.click();
+  await sleep(250);
+  check('Undo on another mail\'s card does not undo',
+    Boolean(undoBtn) && undoPage.sent.filter((m) => m.type === 'flow:undo-action').length === undosBefore &&
+    undoPage.logs.some((line) => line.indexOf('stale card click ignored') >= 0),
+    { undos: undoPage.sent.filter((m) => m.type === 'flow:undo-action').length });
+  undoPage.w.close();
+
+  const layout = await boot({ holdAfterRead: false });
+  const hostLayout = await cardFor(layout, ID_A);
+  const paneEl = layout.doc.getElementById('ReadingPaneContainerId');
+  if (paneEl) paneEl.removeAttribute('id');
+  const origQuery = layout.doc.querySelector.bind(layout.doc);
+  layout.doc.querySelector = function (sel) {
+    if (sel === '#ReadingPaneContainerId') throw new Error('selector missing');
+    return origQuery(sel);
+  };
+  const urlToken = layout.w.__glanceOutlookPage.openMailToken();
+  layout.doc.querySelector = origQuery;
+  check('the open mail is the URL message id when ReadingPaneContainerId throws',
+    Boolean(hostLayout) && urlToken === 'msg|' + ID_A, { urlToken: urlToken });
+  layout.w.history.pushState({}, '', 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent('AQQkCONV-LAYOUT'));
+  await sleep(40);
+  const convBefore = layout.w.__glanceOutlookPage.openMailToken();
+  const convHead = layout.doc.querySelector('[role="main"] [role="heading"]');
+  if (convHead) convHead.textContent = 'Another mail in the same conversation';
+  await sleep(40);
+  const convAfter = layout.w.__glanceOutlookPage.openMailToken();
+  check('without a message id, a heading under role=main is a mail switch',
+    convBefore.indexOf('AQQkCONV-LAYOUT') >= 0 && convBefore !== convAfter && convAfter.indexOf('Another mail') >= 0 &&
+    !layout.doc.getElementById('ReadingPaneContainerId'),
+    { convBefore: convBefore, convAfter: convAfter });
+  layout.w.close();
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const when = 'tomorrow (' + months[tomorrow.getMonth()] + ' ' + tomorrow.getDate() + ', ' + tomorrow.getFullYear() + ')';
+  const cal = await boot({ holdAfterRead: false });
+  cal.store.outlookAuth.token.grantedScopes = ['Mail.Read', 'Calendars.ReadWrite'];
+  showMail(cal.doc, cal.w, {
+    id: 'MSG-CAL-HOLD',
+    subject: 'Put the file on the calendar',
+    toHtml: 'אל: <span>' + ME + '</span>',
+    ccHtml: '',
+    bodyHtml: lines('Put the glance-pricing-q4.pdf file on my calendar ' + when + ' at 10:00.')
+  });
+  let calHost = null;
+  const calUntil = Date.now() + 4000;
+  while (Date.now() < calUntil && !calHost) {
+    const host = cal.doc.querySelector('.flow-chip-host[data-glance-chain="calendar-hold"]');
+    if (host && host.getAttribute('data-glance-open') === 'msg|MSG-CAL-HOLD') calHost = host;
+    else await sleep(40);
+  }
+  const calParent = calHost && calHost.parentNode;
+  if (calHost) showMail(cal.doc, cal.w, MAIL_B);
+  await sleep(50);
+  if (calHost && calParent && !calHost.isConnected) calParent.insertBefore(calHost, calParent.firstChild);
+  const calDo = calHost && (calHost.querySelector('.do-halo') || calHost.querySelector('button.flow-chip'));
+  const calBefore = cal.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar').length;
+  if (calDo) calDo.click();
+  await sleep(250);
+  const calAfter = cal.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar').length;
+  check('a calendar Do It on another mail\'s card does nothing',
+    Boolean(calHost) && Boolean(calDo) && calAfter === calBefore &&
+    cal.logs.some((line) => line.indexOf('stale card click ignored') >= 0),
+    { host: Boolean(calHost), acts: calAfter, text: calHost ? String(calHost.textContent || '').slice(0, 180) : chipText(cal.doc) });
+  cal.w.close();
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

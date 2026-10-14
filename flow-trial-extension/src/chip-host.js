@@ -62,6 +62,10 @@ const FlowChipHost = (() => {
           if (handlers && handlers.onDismiss) handlers.onDismiss(host, ctx);
           else host.remove();
         },
+        onHold: function () {
+          if (handlers && handlers.onHold) return handlers.onHold(host, ctx);
+          return true;
+        },
         onChange: function (next) {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;
@@ -127,6 +131,10 @@ const FlowChipHost = (() => {
         },
         onRetry: () => {
           if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
+        },
+        onHold: function () {
+          if (handlers && handlers.onHold) return handlers.onHold(host, ctx);
+          return true;
         }
       });
       host.__glanceSteps = view;
