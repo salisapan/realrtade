@@ -199,6 +199,21 @@ const FlowGoogleDocs = (() => {
     const id = docId(ref && (ref.documentId || ref.externalId));
     if (!id) return { ok: false, reason: 'unclear' };
     if (ref.created === true) {
+      const inserted = ref.inserted ? String(ref.inserted) : '';
+      const mark = ref.rangeName ? String(ref.rangeName) : '';
+      if (inserted && mark) {
+        const got = await call(http, { method: 'GET', url: DOCS + encodeURIComponent(id) });
+        if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+        if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+        const span = namedSpan(got.json, mark);
+        const covered = span ? textInRange(got.json, span.startIndex, span.endIndex) : null;
+        if (!span || covered == null) {
+          return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
+        }
+        if (covered !== inserted) {
+          return { ok: false, reason: 'range-edited', error: 'Undo stopped. That text was edited, so nothing was deleted.' };
+        }
+      }
       const del = await call(http, {
         method: 'PATCH',
         url: FILES + '/' + encodeURIComponent(id),

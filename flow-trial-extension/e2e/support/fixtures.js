@@ -28,6 +28,13 @@ function gmailHtml(opts) {
     const url = (f && f.url) || ('https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(name));
     return '<span download_url="' + esc(mime + ':' + name + ':' + url) + '">' + esc(name) + '</span>';
   }).join('');
+  const file = o.downloadUrl
+    ? ('<span download_url="' + esc(o.downloadUrl) + '"></span>')
+    : '';
+  const compose = o.compose
+    ? ('<form><textarea name="to"></textarea><input name="subjectbox" value="">' +
+      '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></form>')
+    : '';
   return '<!doctype html><html><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
     '<div role="main">' +
     '<h2 class="hP">' + esc(subject) + '</h2>' +
@@ -36,7 +43,8 @@ function gmailHtml(opts) {
     '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
     toLine + ccLine + chips +
     '<div class="a3s">' + esc(body) + '</div>' +
-    '</div></div></body></html>';
+    file +
+    '</div>' + compose + '</div></body></html>';
 }
 
 function outlookHtml(opts) {

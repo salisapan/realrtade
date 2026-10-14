@@ -76,7 +76,14 @@ const FlowGoogleDrive = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed');
+    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,contentHash');
+  }
+
+  function hashBytes(bytes) {
+    let h = 5381;
+    const arr = bytes || [];
+    for (let i = 0; i < arr.length; i++) h = ((h * 33) ^ arr[i]) >>> 0;
+    return h.toString(16);
   }
 
   async function call(http, req) {
@@ -115,13 +122,31 @@ const FlowGoogleDrive = (() => {
     const link = 'https://drive.google.com/file/d/' + encodeURIComponent(file.id) + '/view';
     base.url = link;
     const proof = C && C.proofOf(SYSTEM, file.id, link, C.clockIso(clock));
-    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: { fileId: file.id, externalId: file.id, created: true }, proof: null }, base);
-    return Object.assign({ ok: true, ref: { fileId: file.id, externalId: file.id, created: true }, proof: proof }, base);
+    const remoteHash = got.json && got.json.contentHash ? String(got.json.contentHash) : hashBytes(ready.bytes);
+    const ref = {
+      fileId: file.id,
+      externalId: file.id,
+      created: true,
+      name: (got.json && got.json.name) || ready.name,
+      contentHash: remoteHash
+    };
+    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
   async function undo(ref, http) {
     const id = ref && (ref.externalId || ref.fileId);
     if (!id || ref.created !== true) return { ok: false, reason: 'unclear' };
+    const got = await call(http, { method: 'GET', url: fileUrl(id) });
+    if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+    if (got.status === 404) return { ok: true, written: 'Drive file removed.' };
+    if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
+    if (ref.name && got.json.name && got.json.name !== ref.name) {
+      return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the file, so it was left as you left it.' };
+    }
+    if (ref.contentHash && got.json.contentHash && String(got.json.contentHash) !== String(ref.contentHash)) {
+      return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the file, so it was left as you left it.' };
+    }
     const del = await call(http, {
       method: 'PATCH',
       url: FILES + encodeURIComponent(id),

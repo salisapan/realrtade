@@ -703,7 +703,10 @@
   function driveFindOne(term) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: 'flow:drive-find-one', term: term }, (res) => {
-        resolve(res && res.match ? res.match : 'unknown');
+        resolve({
+          match: res && res.match ? res.match : 'unknown',
+          file: res && res.file ? res.file : null
+        });
       });
     });
   }
@@ -721,8 +724,10 @@
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
-      const match = await driveFindOne(intent.googleWait.fileTerm);
-      intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match }));
+      const found = await driveFindOne(intent.googleWait.fileTerm);
+      const match = found && typeof found === 'object' ? found.match : found;
+      intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
+      if (intent && found && found.file) intent.laneFile = found.file;
     }
     return intent || { type: null };
   }
@@ -2048,6 +2053,9 @@
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
+    if (response.reason === 'user-edited') return response.error || 'You changed this. Glance did not rewrite it.';
+    if (response.reason === 'range-edited') return response.error || 'Undo stopped. That text was edited, so nothing was deleted.';
+    if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
     if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
@@ -2160,6 +2168,11 @@
     if (action.kind === 'calendar') {
       const params = Object.assign({}, action.params);
       if (params.shareLink && priorUrl) params.shareUrl = priorUrl;
+      const file = ctx.intent && ctx.intent.laneFile;
+      if (file && file.url && /^https:\/\//.test(String(file.url))) {
+        if (!params.fileUrl) params.fileUrl = file.url;
+        if (!params.fileName) params.fileName = file.name || params.fileTerm || '';
+      }
       return Object.assign(base, { params: params });
     }
 
@@ -2332,6 +2345,13 @@
     return sendRuntime({ type: 'flow:google-write', connectorId: lane, input: payload });
   }
 
+  function composeReadBack(page) {
+    if (!page || page.ok !== true) return null;
+    const back = page.seen || page.fields;
+    if (!back || !back.to || !back.subject || !back.body) return null;
+    return back;
+  }
+
   async function sendGmailCompose(payload) {
     const email = (payload && payload.senderEmail) || '';
     if (email) await sendRuntime({ type: 'flow:google-contacts', email: email, query: email });
@@ -2345,22 +2365,41 @@
       useDraft: true,
       draft: payload
     };
+    // The service-worker message stays so the lane hears the fill. Its
+    // in-memory object is not the compose window and is not the receipt.
+    const swPromise = sendRuntime({ type: 'flow:gmail-compose', connectorId: 'gmailCompose', input: input, payload: input });
     let page = null;
     if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.fill === 'function') {
-      try { page = FlowGoogleComposePage.fill(input); } catch (e) { page = null; }
+      try { page = FlowGoogleComposePage.fill(input); } catch (e) {
+        page = { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
+      }
+    } else {
+      page = { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: 'Open Reply first. Glance does not press Send.' };
     }
-    const sw = await sendRuntime({ type: 'flow:gmail-compose', connectorId: 'gmailCompose', input: input, payload: input });
-    if (page && (page.ok || page.reason === 'compose-closed')) return page;
-    return sw || page || { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false };
+    await swPromise;
+    if (page && page.ok) {
+      if (!composeReadBack(page)) {
+        return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
+      }
+      return page;
+    }
+    return page || { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
   }
 
   function sendLaneUndo(kind, ref) {
     const lane = laneConnectorId(kind);
     if (!lane) return sendRuntime({ type: 'flow:undo-action', connectorId: kind, ref: ref });
-    if (lane === 'gmailCompose' && typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.undo === 'function') {
+    if (lane === 'gmailCompose') {
       let page = null;
-      try { page = FlowGoogleComposePage.undo(ref); } catch (e) { page = null; }
-      return sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref }).then((sw) => (page && page.ok) ? page : (sw || page));
+      if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.undo === 'function') {
+        try { page = FlowGoogleComposePage.undo(ref); } catch (e) {
+          page = { ok: false, reason: 'unavailable', error: 'Undo stopped. The compose was not cleared.' };
+        }
+      } else {
+        page = { ok: false, reason: 'compose-closed', error: 'Open Reply first. Glance does not press Send.' };
+      }
+      void sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
+      return Promise.resolve(page);
     }
     return sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
   }
@@ -2459,7 +2498,14 @@
     for (const r of reverseOrder) {
       const result = await sendLaneUndo(r.action.kind, r.response.ref);
       if (!result || !result.ok) {
-        return { ok: false, undoneIds, failedAt: r.action, keptWhere: (r.response && r.response.where) || null };
+        return {
+          ok: false,
+          undoneIds,
+          failedAt: r.action,
+          keptWhere: (r.response && r.response.where) || null,
+          reason: result && result.reason,
+          error: result && (result.error || result.written)
+        };
       }
       undoneIds.push(r.action.id);
     }
@@ -2658,10 +2704,27 @@
 
   // A filled compose is a preview. The person sends it. The receipt says
   // what was filled and offers Undo. It does not say Handled.
-  function showPreviewReceipt(chip, result) {
+  // The Do It control is redrawn while the step runs, so the clicked button
+  // is no longer in the page. The receipt replaces the card host, the same
+  // place a proved write leaves its line.
+  function placeReceipt(host, chip, done) {
+    if (host && typeof host.replaceChildren === 'function') {
+      host.classList.add('flow-chip-settled');
+      host.replaceChildren(done);
+      return;
+    }
+    if (chip && typeof chip.replaceWith === 'function') chip.replaceWith(done);
+  }
+
+  function showPreviewReceipt(host, chip, result) {
     const response = result.response || {};
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('role', 'status');
+    if (!composeReadBack(response)) {
+      done.appendChild(el('span', 'flow-chip-label', reasonMessage(response, null)));
+      placeReceipt(host, chip, done);
+      return;
+    }
     done.appendChild(el('span', 'flow-chip-written', response.written || 'Compose filled. You send it.'));
     const undo = el('button', 'flow-chip-undo', 'Undo');
     undo.type = 'button';
@@ -2673,21 +2736,26 @@
           done.replaceChildren(el('span', 'flow-chip-label', undone.written || 'Undone. Nothing was sent.'));
           return;
         }
-        undo.disabled = false;
-        undo.textContent = 'Undo';
+        const line = (undone && (undone.error || undone.written)) || 'Undo stopped. The compose was not cleared.';
+        done.replaceChildren(el('span', 'flow-chip-label', line));
       });
     });
     done.appendChild(undo);
-    if (chip && typeof chip.replaceWith === 'function') chip.replaceWith(done);
+    placeReceipt(host, chip, done);
   }
 
   async function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter(stepHandled);
 
     if (!succeeded.length) {
-      const preview = results.find((r) => r.response && r.response.ok && r.response.preview === true);
+      const preview = results.find((r) => r.response && composeReadBack(r.response));
       if (preview) {
-        showPreviewReceipt(chip, preview);
+        showPreviewReceipt(host, chip, preview);
+        return;
+      }
+      const composeTry = results.find((r) => r.action && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
+      if (composeTry) {
+        showPreviewReceipt(host, chip, composeTry);
         return;
       }
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
@@ -2830,10 +2898,11 @@
             remaining: succeeded.length - result.undoneIds.length,
             keptWhere: result.keptWhere
           });
-          undo.textContent = glanceShow(copy.undoLabel);
-          undo.disabled = false;
+          const refused = result.reason === 'user-edited' || result.reason === 'range-edited' || result.reason === 'range-missing';
+          undo.textContent = glanceShow(refused ? 'Undo' : copy.undoLabel);
+          undo.disabled = refused;
           hint.hidden = false;
-          hint.textContent = glanceShow(note);
+          hint.textContent = glanceShow((refused && result.error) ? result.error : note);
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         }
       });

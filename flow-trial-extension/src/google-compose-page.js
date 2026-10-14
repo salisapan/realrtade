@@ -1,7 +1,12 @@
 // Fills the Gmail compose window that is already open. The person presses
 // Send. This file does not look up a Send control and does not activate one.
 // Open Reply first when the message body is not on the page.
+// Rule 9: after the person types, this file does not refill or rewrite.
+// There is no observer that puts Glance's text back. Undo refuses when the
+// content hash no longer matches the fill.
 const FlowGoogleComposePage = (() => {
+  let lastHash = '';
+  let lastStamp = null;
   function findTo(root) {
     return root.querySelector('textarea[name="to"], input[name="to"]');
   }
@@ -47,6 +52,17 @@ const FlowGoogleComposePage = (() => {
     };
   }
 
+  function edited() {
+    return {
+      ok: false,
+      reason: 'user-edited',
+      preview: true,
+      closes: false,
+      sent: false,
+      error: 'You changed the compose. Glance did not rewrite it.'
+    };
+  }
+
   function composeApi() {
     return typeof FlowGoogleCompose !== 'undefined' ? FlowGoogleCompose : null;
   }
@@ -65,6 +81,12 @@ const FlowGoogleComposePage = (() => {
       body: readValue(bodyEl),
       sendClicks: 0
     };
+    const currentHash = typeof Compose.contentHash === 'function'
+      ? Compose.contentHash(state.to, state.subject, state.body)
+      : '';
+    const dirty = !!(state.to || state.subject || state.body);
+    if (lastHash && currentHash === lastHash && lastStamp) return lastStamp;
+    if (dirty && currentHash !== lastHash) return edited();
     const planned = Compose.plan(payload || {});
     if (!planned.ok) return planned;
     const applied = Compose.apply(state, planned);
@@ -81,9 +103,13 @@ const FlowGoogleComposePage = (() => {
       if (toEl) writeValue(toEl, applied.before.to);
       if (subEl) writeValue(subEl, applied.before.subject);
       writeValue(bodyEl, applied.before.body);
-      return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, proof: null };
+      return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, error: 'The compose window is still empty.', proof: null };
     }
-    return Compose.stamp(planned, applied.before);
+    const stamped = Compose.stamp(planned, applied.before);
+    stamped.seen = { to: seen.to, subject: seen.subject, body: seen.body };
+    lastHash = typeof Compose.contentHash === 'function' ? Compose.contentHash(seen.to, seen.subject, seen.body) : '';
+    lastStamp = stamped;
+    return stamped;
   }
 
   function undo(ref, root) {
@@ -105,6 +131,8 @@ const FlowGoogleComposePage = (() => {
     if (toEl) writeValue(toEl, state.to);
     if (subEl) writeValue(subEl, state.subject);
     writeValue(bodyEl, state.body);
+    lastHash = '';
+    lastStamp = null;
     return result;
   }
 

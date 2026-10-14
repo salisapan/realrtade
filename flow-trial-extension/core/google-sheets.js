@@ -147,6 +147,14 @@ const FlowGoogleSheets = (() => {
   async function undo(ref, http) {
     const id = sheetId(ref && (ref.spreadsheetId || ''));
     if (!id) return { ok: false, reason: 'unclear' };
+    if (ref.row && rangeOk(ref.updatedRange)) {
+      const got = await call(http, { method: 'GET', url: valuesUrl(id, ref.updatedRange) });
+      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+      if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+      if (!sameRow(got.json, ref.row)) {
+        return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the row, so the sheet was left as you left it.' };
+      }
+    }
     if (ref.created === true) {
       const del = await call(http, {
         method: 'PATCH',

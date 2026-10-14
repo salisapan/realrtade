@@ -6,13 +6,13 @@ This lane is the Google execution path: a calendar hold, a task, one Drive file,
 
 ## What Chrome loads today
 
-Chrome loads `manifest.json`. That file is open on another change (0.9.56) and this lane does not edit it. The full flavor lives in `manifest.full.json`:
+Chrome loads `manifest.json`. The full flavor lives in `manifest.full.json`. The live manifest now loads the compose filler on `mail.google.com` (`core/draft-reply.js`, `core/google-config.js`, `core/google-compose.js`, and `src/google-compose-page.js` before `src/content-gmail.js`). Those four files are Gmail-only, so Outlook does not load them a second time. The receipt says the compose was filled only after to, subject, and body are read back from the page. If that read-back is missing, the line is that the window is still empty. A changed compose is not rewritten, and Undo refuses. OAuth, the extension key, and the service-worker entry stay on the full flavor:
 
 - `key` is the Chrome Web Store public key, so an unpacked load gets the extension id `lbihckfmoffgjjlnneoeaehbhoonfenh`.
 - `oauth2.client_id` is `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com`.
 - Scopes are `openid`, `email`, `profile`, `drive.file`, `calendar.events`, `tasks`, and `contacts.readonly`. Docs and Sheets run on a file Glance created or the person picked. There is no `gmail.*` scope, no `drive.readonly`, and no documents or spreadsheets scope.
-- The service worker entry is `src/google-lane-sw.js`, which imports the current worker and then the lane. `background.js` is not edited here.
-- Compose is filled from `src/google-compose-page.js` on the Gmail page. The Gmail API is not used to draft or send.
+- The service worker entry is `src/google-lane-sw.js`, which imports the current worker and then the lane. The live worker imports `src/google-lane-host.js` once so the cards can reach the lane. The corpus loader drops that import before it evaluates the worker as a classic script.
+- Compose is filled in the Gmail page DOM. The person edits it and presses Send. The Gmail API is not used to draft or send. Glance does not refill the window after the person types, and it does not watch the DOM to put its text back.
 
 Copying `manifest.full.json` over `manifest.json` waits until that other change has landed. Until then the unpacked id, the client, and the scope list in `manifest.json` stay as they are.
 

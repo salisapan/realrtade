@@ -93,7 +93,20 @@ console.log('\n--- allowlist, key, full-flavor manifest ---\n');
   const sw = fs.readFileSync(path.join(EXT, 'src', 'google-lane-sw.js'), 'utf8');
   check('the wrapper imports the current worker and the lane', sw.indexOf("import './background.js'") >= 0 && sw.indexOf("import './google-lane.js'") >= 0);
   const pageSrc = fs.readFileSync(path.join(EXT, 'src', 'google-compose-page.js'), 'utf8');
-  check('the compose page never activates a control', pageSrc.indexOf('.click(') < 0);
+  check('the compose page never activates a control', pageSrc.indexOf('.click(') < 0 && pageSrc.indexOf('MutationObserver') < 0);
+  const gmailScripts = live.content_scripts[0].js;
+  check('the live Gmail page loads the compose filler before the card',
+    gmailScripts.indexOf('core/google-compose.js') >= 0 &&
+    gmailScripts.indexOf('src/google-compose-page.js') > gmailScripts.indexOf('core/google-compose.js') &&
+    gmailScripts.indexOf('src/google-compose-page.js') < gmailScripts.indexOf('src/content-gmail.js'));
+  const gmailSrc = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
+  const composeSlice = gmailSrc.slice(gmailSrc.indexOf('async function sendGmailCompose'), gmailSrc.indexOf('function sendLaneUndo'));
+  check('a filled receipt is the compose DOM, not the in-memory fill',
+    composeSlice.indexOf('composeReadBack') >= 0 && composeSlice.indexOf('return sw') < 0 && composeSlice.indexOf("type: 'flow:gmail-compose'") >= 0);
+  const receiptSlice = gmailSrc.slice(gmailSrc.indexOf('function placeReceipt'), gmailSrc.indexOf('async function showMultiActionReceipt'));
+  check('the compose receipt replaces the card and says filled only after read-back',
+    receiptSlice.indexOf('composeReadBack') >= 0 && receiptSlice.indexOf('host.replaceChildren') >= 0 &&
+    receiptSlice.indexOf('Compose filled') > receiptSlice.indexOf('composeReadBack'));
   const worker = fs.readFileSync(path.join(EXT, 'src', 'background.js'), 'utf8');
   check('background.js does not gain the lane dispatcher', worker.indexOf('FlowGoogleLane') < 0);
 }
@@ -116,9 +129,15 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('calendar write is proved from the GET', proved(wrote) && wrote.proof.system === 'google/calendar' && held.calls.length === 2 && held.calls[1].method === 'GET', wrote);
   check('calendar create does not notify guests', held.calls[0].method === 'POST' && held.calls[0].url.indexOf('sendUpdates=none') >= 0);
   check('calendar calls stay off gmail', noGmail(held.calls));
-  const undone = scripted([{ status: 204, ok: true, json: null }]);
+  const undone = scripted([
+    { status: 200, ok: true, json: { id: 'ev1', status: 'confirmed' } },
+    { status: 204, ok: true, json: null }
+  ]);
   const undo = await Cal.undo(wrote.ref, undone.http);
-  check('calendar undo deletes that event', undo.ok === true && undone.calls[0].method === 'DELETE' && undone.calls[0].url.indexOf('ev1') >= 0 && undone.calls[0].url.indexOf('sendUpdates=none') >= 0, undo);
+  check('calendar undo reads the event, then deletes it', undo.ok === true && undone.calls[0].method === 'GET' && undone.calls[1].method === 'DELETE' && undone.calls[1].url.indexOf('ev1') >= 0 && undone.calls[1].url.indexOf('sendUpdates=none') >= 0, undo);
+  const editedCal = scripted([{ status: 200, ok: true, json: { id: 'ev1', summary: 'Changed', status: 'confirmed' } }]);
+  const refusedCal = await Cal.undo(wrote.ref, editedCal.http);
+  check('calendar undo refuses a changed event and does not delete it', refusedCal.ok === false && refusedCal.reason === 'user-edited' && editedCal.calls.length === 1 && editedCal.calls[0].method === 'GET', refusedCal);
   const blocked = scripted([]);
   const denied = await Cal.write({ scopes: ['https://www.googleapis.com/auth/gmail.compose'], dateIso: '2026-10-08', hour: 10, minute: 0, fileName: 'a.pdf', fileUrl: FILE_URL }, blocked.http, CLOCK);
   check('a gmail scope does not create an event', denied.ok === false && denied.reason === 'gmail-scope' && blocked.calls.length === 0, denied);
@@ -131,9 +150,15 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const task = await Tasks.write({ scopes: Cfg.SCOPES, taskListId: 'list1', title: 'Send the file' }, tasked.http, CLOCK);
   check('task write is proved from the GET', proved(task) && task.proof.system === 'google/tasks' && tasked.calls[0].method === 'POST' && tasked.calls[1].method === 'GET', task);
   check('task calls stay off gmail', noGmail(tasked.calls));
-  const taskUndo = scripted([{ status: 204, ok: true, json: null }]);
+  const taskUndo = scripted([
+    { status: 200, ok: true, json: { id: 't1', title: 'Send the file' } },
+    { status: 204, ok: true, json: null }
+  ]);
   const taskGone = await Tasks.undo(task.ref, taskUndo.http);
-  check('task undo deletes that task', taskGone.ok === true && taskUndo.calls[0].method === 'DELETE' && taskUndo.calls[0].url.indexOf('/lists/list1/tasks/t1') >= 0, taskGone);
+  check('task undo reads the task, then deletes it', taskGone.ok === true && taskUndo.calls[0].method === 'GET' && taskUndo.calls[1].method === 'DELETE' && taskUndo.calls[1].url.indexOf('/lists/list1/tasks/t1') >= 0, taskGone);
+  const taskEdited = scripted([{ status: 200, ok: true, json: { id: 't1', title: 'Changed by you' } }]);
+  const taskRefused = await Tasks.undo(task.ref, taskEdited.http);
+  check('task undo refuses a changed task and does not delete it', taskRefused.ok === false && taskRefused.reason === 'user-edited' && taskEdited.calls.length === 1 && taskEdited.calls[0].method === 'GET', taskRefused);
 
   console.log('\n--- one Drive file is read back, then undo trashes it ---\n');
   const saved = scripted([
@@ -143,9 +168,15 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const drive = await Drive.write({ scopes: Cfg.SCOPES, fileName: 'note.txt', base64: Buffer.from('hi').toString('base64'), mimeType: 'text/plain' }, saved.http, CLOCK);
   check('drive write is proved from the GET', proved(drive) && drive.proof.system === 'google/drive' && drive.ref.created === true && saved.calls[1].method === 'GET', drive);
   check('drive calls stay off gmail', noGmail(saved.calls));
-  const trashed = scripted([{ status: 200, ok: true, json: { id: 'file1', trashed: true } }]);
+  const trashed = scripted([
+    { status: 200, ok: true, json: { id: 'file1', name: 'note.txt', trashed: false } },
+    { status: 200, ok: true, json: { id: 'file1', trashed: true } }
+  ]);
   const driveUndo = await Drive.undo(drive.ref, trashed.http);
-  check('drive undo trashes that file', driveUndo.ok === true && trashed.calls[0].method === 'PATCH', driveUndo);
+  check('drive undo reads the file, then trashes it', driveUndo.ok === true && trashed.calls[0].method === 'GET' && trashed.calls[1].method === 'PATCH', driveUndo);
+  const driveEdited = scripted([{ status: 200, ok: true, json: { id: 'file1', name: 'note-edited.txt', trashed: false } }]);
+  const driveRefused = await Drive.undo(drive.ref, driveEdited.http);
+  check('drive undo refuses a renamed file and does not trash it', driveRefused.ok === false && driveRefused.reason === 'user-edited' && driveEdited.calls.length === 1 && driveEdited.calls[0].method === 'GET', driveRefused);
 
   function markedDoc(name, parts, rangeText, revisionId) {
     let cursor = 1;
@@ -190,9 +221,16 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     createdBatch.requests[0].insertText.text === docText &&
     createdBatch.requests[1].createNamedRange.name === createdMark);
   check('doc calls stay off gmail and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('/auth/documents') < 0));
-  const docTrash = scripted([{ status: 200, ok: true, json: { trashed: true } }]);
+  const docTrash = scripted([
+    { status: 200, ok: true, json: markedDoc(createdMark, [docText], docText, 'rev-c') },
+    { status: 200, ok: true, json: { trashed: true } }
+  ]);
   const docUndo = await Docs.undo(doc.ref, docTrash.http);
-  check('undo of a created doc trashes it', docUndo.ok === true && docTrash.calls[0].method === 'PATCH', docUndo);
+  check('undo of a created doc reads the range, then trashes it', docUndo.ok === true && docTrash.calls[0].method === 'GET' && docTrash.calls[1].method === 'PATCH', docUndo);
+  const docEditedText = 'Please find the receipt!!';
+  const docEdited = scripted([{ status: 200, ok: true, json: markedDoc(createdMark, [docEditedText], docEditedText, 'rev-e') }]);
+  const docRefused = await Docs.undo(doc.ref, docEdited.http);
+  check('undo of a created doc refuses an edited range and does not trash it', docRefused.ok === false && docRefused.reason === 'range-edited' && docEdited.calls.length === 1 && docEdited.calls[0].method === 'GET', docRefused);
   const added = 'Added line';
   const editMark = Docs.rangeName('doc9', added, CLOCK);
   const edited = scripted([
@@ -278,18 +316,27 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('sheet create append is proved', proved(appended) && appended.proof.system === 'google/sheets' && appended.ref.created === true && sheet.calls[3].method === 'GET', appended);
   check('sheet calls stay off gmail', noGmail(sheet.calls));
   check('a nested row is refused', Sheets.rowOf({ row: [['a']] }) === null && Sheets.rowOf({ row: ['only'] }) && Sheets.rowOf({ row: ['only'] }).length === 1);
-  const sheetTrash = scripted([{ status: 200, ok: true, json: { trashed: true } }]);
+  const sheetTrash = scripted([
+    { status: 200, ok: true, json: { values: [row] } },
+    { status: 200, ok: true, json: { trashed: true } }
+  ]);
   const sheetUndo = await Sheets.undo(appended.ref, sheetTrash.http);
-  check('undo of a created sheet trashes it', sheetUndo.ok === true && sheetTrash.calls[0].method === 'PATCH', sheetUndo);
+  check('undo of a created sheet reads the row, then trashes it', sheetUndo.ok === true && sheetTrash.calls[0].method === 'GET' && sheetTrash.calls[1].method === 'PATCH', sheetUndo);
+  const sheetEdited = scripted([{ status: 200, ok: true, json: { values: [['Ada', '999']] } }]);
+  const sheetRefused = await Sheets.undo(appended.ref, sheetEdited.http);
+  check('sheet undo refuses a changed row and does not trash it', sheetRefused.ok === false && sheetRefused.reason === 'user-edited' && sheetEdited.calls.length === 1 && sheetEdited.calls[0].method === 'GET', sheetRefused);
   const picked = scripted([
     { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A2:B2', updatedRows: 1 } } },
     { status: 200, ok: true, json: { values: [['Bea', '200']] } }
   ]);
   const pickedRow = await Sheets.write({ scopes: Cfg.SCOPES, spreadsheetId: 'sheet9', origin: 'picked', row: ['Bea', '200'] }, picked.http, CLOCK);
   check('a picked sheet append is proved', proved(pickedRow) && pickedRow.ref.created === false, pickedRow);
-  const cleared = scripted([{ status: 200, ok: true, json: {} }]);
+  const cleared = scripted([
+    { status: 200, ok: true, json: { values: [['Bea', '200']] } },
+    { status: 200, ok: true, json: {} }
+  ]);
   const clear = await Sheets.undo(pickedRow.ref, cleared.http);
-  check('undo of an append clears that range', clear.ok === true && cleared.calls[0].method === 'POST' && cleared.calls[0].url.indexOf(':clear') >= 0, clear);
+  check('undo of an append reads the row, then clears that range', clear.ok === true && cleared.calls[0].method === 'GET' && cleared.calls[1].method === 'POST' && cleared.calls[1].url.indexOf(':clear') >= 0, clear);
 
   console.log('\n--- contacts lookup is a GET and nothing else ---\n');
   const people = scripted([{
@@ -317,8 +364,14 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('a send flag is refused and Send stays unpressed', sendAttempt.ok === false && sendAttempt.reason === 'never-sends' && state.sendClicks === 0, sendAttempt);
   const click = Compose.clickSend(state);
   check('clickSend does not press Send', click.ok === false && click.reason === 'never-sends' && state.sendClicks === 0, click);
+  check('the fill stores a content hash', typeof filled.ref.contentHash === 'string' && filled.ref.contentHash.length > 0, filled.ref);
   const restored = Compose.undo(filled.ref, state);
   check('undo restores the compose window', restored.ok === true && restored.written === 'Undone. Nothing was sent.' && state.body === '' && state.to === '', restored);
+  const fresh = { to: '', subject: '', body: '', sendClicks: 0 };
+  const again = Compose.fill({ to: 'ada@example.com', subject: 'Receipt', body: 'Attached.' }, fresh, CLOCK);
+  fresh.body = 'Edited by you';
+  const refusedCompose = Compose.undo(again.ref, fresh);
+  check('compose undo refuses a changed hash and leaves the text', refusedCompose.ok === false && refusedCompose.reason === 'user-edited' && fresh.body === 'Edited by you', refusedCompose);
   state.sendClicks = 1;
   const late = Compose.undo(filled.ref, state);
   check('undo after Send does not claim the message was cleared', late.ok === false && late.reason === 'already-sent', late);
@@ -352,6 +405,12 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('the page undo clears the body', pageUndo.ok === true && pageUndo.written === 'Undone. Nothing was sent.' && dom.body.textContent === '', pageUndo);
   const noBody = Page.fill({ to: 'ada@example.com', body: 'Hi' }, { querySelector() { return null; } });
   check('a closed compose asks the person to open Reply', noBody.ok === false && noBody.reason === 'compose-closed' && /does not press Send/.test(noBody.error), noBody);
+  const pageAgain = Page.fill({ to: 'ada@example.com', subject: 'Receipt', body: 'Attached.' }, root);
+  dom.body.textContent = 'Edited by you';
+  const pageRewrite = Page.fill({ to: 'ada@example.com', subject: 'Other', body: 'Nope.' }, root);
+  check('a second fill does not rewrite text the person typed', pageRewrite.ok === false && pageRewrite.reason === 'user-edited' && dom.body.textContent === 'Edited by you' && dom.to.value === 'ada@example.com', pageRewrite);
+  const pageRefused = Page.undo(pageAgain.ref, root);
+  check('page undo refuses a changed hash and leaves the text', pageRefused.ok === false && pageRefused.reason === 'user-edited' && dom.body.textContent === 'Edited by you', pageRefused);
 
   console.log('\n--- lane proof: a preview is not a trusted close ---\n');
   const holdStep = { action: { kind: 'googleHold' }, response: wrote };

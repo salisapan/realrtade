@@ -103,6 +103,20 @@ const FlowGoogleCalendar = (() => {
     return { method: 'DELETE', url: url };
   }
 
+  function hash(text) {
+    let h = 5381;
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  function contentHash(ev) {
+    const summary = ev && ev.summary ? String(ev.summary) : '';
+    const description = ev && ev.description ? String(ev.description) : '';
+    const start = ev && ev.start ? String(ev.start.dateTime || ev.start.date || '') : '';
+    return hash(summary + '\n' + description + '\n' + start);
+  }
+
   function namesCalendar(text) {
     return /(?:\b(?:calendar|invite|event|hold)\b|ביומן|ליומן|בזימון)/i.test(String(text || ''));
   }
@@ -194,14 +208,24 @@ const FlowGoogleCalendar = (() => {
     const link = event.htmlLink && String(event.htmlLink).slice(0, 8) === 'https://' ? event.htmlLink : null;
     if (link) base.url = link;
     const proof = C && C.proofOf(SYSTEM, event.id, link, C.clockIso(clock));
-    if (!proof) return Object.assign({ ok: false, reason: pending, ref: { eventId: event.id, externalId: event.id }, proof: null }, base);
-    return Object.assign({ ok: true, ref: { eventId: event.id, externalId: event.id }, proof: proof }, base);
+    const ref = { eventId: event.id, externalId: event.id, contentHash: contentHash(got.json) };
+    if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
   async function undo(ref, http) {
     const id = ref && typeof ref === 'object' ? (ref.externalId || ref.eventId) : ref;
     const req = undoRequest(id);
     if (!req) return { ok: false };
+    if (ref && typeof ref === 'object' && ref.contentHash) {
+      const got = await call(http, { method: 'GET', url: eventUrl(id) });
+      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+      if (got.status === 404 || got.status === 410) return { ok: true, written: 'Calendar event removed.' };
+      if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
+      if (contentHash(got.json) !== ref.contentHash) {
+        return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the event, so it was left as you left it.' };
+      }
+    }
     const del = await call(http, req);
     if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
     if (del.ok || del.status === 204 || del.status === 404 || del.status === 410) {
@@ -216,6 +240,7 @@ const FlowGoogleCalendar = (() => {
     DURATION_MIN: DURATION_MIN,
     hasWriteScope: hasWriteScope,
     eventBody: eventBody,
+    contentHash: contentHash,
     whenLabel: whenLabel,
     createRequest: createRequest,
     undoRequest: undoRequest,

@@ -211,7 +211,7 @@ const SURFACES = {
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
-const GMAIL_ONLY_SCRIPTS = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
+const GMAIL_ONLY_SCRIPTS = ['core/draft-reply.js', 'core/google-config.js', 'core/google-compose.js', 'src/google-compose-page.js', 'src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
 
 function surfaceScripts(id) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
@@ -1211,6 +1211,21 @@ function glanceE2eGoogleAuth(interactive) {
   return e2e.googleAuthToken(Boolean(interactive));
 }
 
+// Headless regression only. A local mock server sets httpOrigin. Production
+// never sets __glanceE2e, so the URL below is unchanged.
+function glanceE2eRewrite(url) {
+  const e2e = globalThis.__glanceE2e;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
+}
+
 function getGoogleAuthToken(interactive) {
   const hooked = glanceE2eGoogleAuth(interactive);
   if (hooked && typeof hooked.then === 'function') return hooked;
@@ -1437,7 +1452,7 @@ async function googleAuthedFetch(baseUrl, path, options) {
   } catch (e) {
     return googleAuthUnavailableResponse();
   }
-  const doFetch = (t) => fetch(baseUrl + path, Object.assign({}, options, {
+  const doFetch = (t) => fetch(glanceE2eRewrite(baseUrl + path), Object.assign({}, options, {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
   const res = await doFetch(cred.token);

@@ -42,6 +42,10 @@ const FlowGoogleCompose = (() => {
     return h.toString(16);
   }
 
+  function contentHash(to, subject, body) {
+    return hash(String(to || '') + '\n' + String(subject || '') + '\n' + String(body || ''));
+  }
+
   function plan(input) {
     const i = input || {};
     if (i.send === true || i.pressSend === true) {
@@ -71,7 +75,7 @@ const FlowGoogleCompose = (() => {
 
   function stamp(planned, before, clock) {
     const C = cfg();
-    const id = 'compose:' + hash(planned.to + '\n' + planned.subject + '\n' + planned.body);
+    const id = 'compose:' + contentHash(planned.to, planned.subject, planned.body);
     const proof = C && C.proofOf(SYSTEM, id, null, C.clockIso(clock));
     const base = {
       where: 'Gmail',
@@ -83,7 +87,14 @@ const FlowGoogleCompose = (() => {
       sent: false,
       url: null
     };
-    const ref = { before: before, externalId: id, to: planned.to, subject: planned.subject, body: planned.body };
+    const ref = {
+      before: before,
+      externalId: id,
+      to: planned.to,
+      subject: planned.subject,
+      body: planned.body,
+      contentHash: contentHash(planned.to, planned.subject, planned.body)
+    };
     if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
     return Object.assign({ ok: true, ref: ref, proof: proof, fields: planned }, base);
   }
@@ -106,6 +117,15 @@ const FlowGoogleCompose = (() => {
     }
     const before = ref && ref.before;
     if (!before) return { ok: false, reason: 'unclear', closes: false };
+    if (ref.contentHash && contentHash(current.to, current.subject, current.body) !== ref.contentHash) {
+      return {
+        ok: false,
+        reason: 'user-edited',
+        closes: false,
+        sent: false,
+        error: 'Undo stopped. You changed the compose, so nothing was rewritten.'
+      };
+    }
     current.to = before.to || '';
     current.subject = before.subject || '';
     current.body = before.body || '';
@@ -121,6 +141,7 @@ const FlowGoogleCompose = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     plan: plan,
+    contentHash: contentHash,
     apply: apply,
     readBack: readBack,
     stamp: stamp,

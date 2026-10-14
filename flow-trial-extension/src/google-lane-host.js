@@ -30,6 +30,19 @@ function laneToken() {
   });
 }
 
+function laneUrl(url) {
+  const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
+}
+
 function laneHttp(req) {
   const request = req || {};
   return Promise.resolve()
@@ -39,7 +52,7 @@ function laneHttp(req) {
       const headers = Object.assign({}, request.headers || {}, { Authorization: 'Bearer ' + token });
       const init = { method: request.method || 'GET', headers: headers };
       if (request.body != null) init.body = request.body;
-      return fetch(request.url, init).then((res) => res.text().then((text) => {
+      return fetch(laneUrl(request.url), init).then((res) => res.text().then((text) => {
         let json = null;
         if (text) {
           try { json = JSON.parse(text); } catch (e) { json = null; }

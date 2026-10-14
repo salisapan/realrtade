@@ -47,6 +47,20 @@ const FlowGoogleTasks = (() => {
     return { method: 'DELETE', url: taskUrl(listId, taskId) };
   }
 
+  function hash(text) {
+    let h = 5381;
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  function contentHash(task) {
+    const title = task && task.title ? String(task.title) : '';
+    const notes = task && task.notes ? String(task.notes) : '';
+    const due = task && task.due ? String(task.due) : '';
+    return hash(title + '\n' + notes + '\n' + due);
+  }
+
   async function call(http, req) {
     try {
       const res = await http(req);
@@ -80,8 +94,9 @@ const FlowGoogleTasks = (() => {
     const link = 'https://tasks.google.com/embed/list/' + encodeURIComponent(listId) + '?pli=1';
     base.url = link;
     const proof = C && C.proofOf(SYSTEM, task.id, link, C.clockIso(clock));
-    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: { taskListId: listId, taskId: task.id, externalId: task.id }, proof: null }, base);
-    return Object.assign({ ok: true, ref: { taskListId: listId, taskId: task.id, externalId: task.id }, proof: proof }, base);
+    const ref = { taskListId: listId, taskId: task.id, externalId: task.id, contentHash: contentHash(got.json) };
+    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
   async function undo(ref, http) {
@@ -89,6 +104,15 @@ const FlowGoogleTasks = (() => {
     const listId = ref && (ref.taskListId || ref.listId);
     const req = undoRequest(listId, taskId);
     if (!req) return { ok: false };
+    if (ref && ref.contentHash) {
+      const got = await call(http, { method: 'GET', url: taskUrl(listId, taskId) });
+      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+      if (got.status === 404) return { ok: true, written: 'Google Task removed.' };
+      if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
+      if (contentHash(got.json) !== ref.contentHash) {
+        return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the task, so it was left as you left it.' };
+      }
+    }
     const del = await call(http, req);
     if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
     if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Google Task removed.' };
@@ -100,6 +124,7 @@ const FlowGoogleTasks = (() => {
     CONNECTOR: CONNECTOR,
     hasWriteScope: hasWriteScope,
     taskBody: taskBody,
+    contentHash: contentHash,
     createRequest: createRequest,
     undoRequest: undoRequest,
     write: write,

@@ -26,7 +26,9 @@ function copyExtension() {
     'https://outlook.office.com/*',
     'https://outlook.office365.com/*',
     'https://graph.microsoft.com/*',
-    'https://login.microsoftonline.com/*'
+    'https://login.microsoftonline.com/*',
+    'http://127.0.0.1/*',
+    'http://localhost/*'
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
@@ -538,6 +540,7 @@ async function boot() {
       e.driveItems = {};
       e.driveByName = {};
       e.seq = 1;
+      delete e.httpOrigin;
     });
   };
 

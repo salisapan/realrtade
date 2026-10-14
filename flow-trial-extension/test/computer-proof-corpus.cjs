@@ -333,7 +333,8 @@ console.log('\n--- wiring stays a scaffold ---\n');
   const block = start > 0 && send > start ? gmail.slice(start, send) : '';
   check('the thread Undo rewrites the computer Activity row and does not call a writer first',
     block.indexOf('markComputerUndone') > 0 && block.indexOf('Mail.Send') === -1, { start: start, send: send });
-  check('Google Task undo is still the task path', gmail.indexOf('markGoogleTaskUndone') > send);
+  const taskUndo = gmail.indexOf('sendLaneUndo(copy.connectorId, copy.ref)', start);
+  check('Google Task undo is still the task path', taskUndo > start && gmail.indexOf('markGoogleTaskUndone', taskUndo) > taskUndo);
   check('Activity Undo rewrites a computer row',
     storage.indexOf('markComputerUndone') > 0 && popup.indexOf('markComputerUndone') > 0);
   check('the computer close is not registered as an API writer',
