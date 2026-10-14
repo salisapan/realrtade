@@ -147,7 +147,7 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const driveUndo = await Drive.undo(drive.ref, trashed.http);
   check('drive undo trashes that file', driveUndo.ok === true && trashed.calls[0].method === 'PATCH', driveUndo);
 
-  function markedDoc(name, parts, rangeText) {
+  function markedDoc(name, parts, rangeText, revisionId) {
     let cursor = 1;
     const elements = [];
     let range = null;
@@ -160,6 +160,7 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
       cursor = end;
     }
     const body = { body: { content: [{ paragraph: { elements: elements } }] }, namedRanges: {} };
+    if (revisionId) body.revisionId = revisionId;
     if (range && name) {
       body.namedRanges[name] = {
         name: name,
@@ -167,6 +168,10 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
       };
     }
     return body;
+  }
+
+  function undoBody(call) {
+    return JSON.parse(call.body);
   }
 
   console.log('\n--- a Doc is created and edited, then undo removes it ---\n');
@@ -201,15 +206,54 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const preface = 'Opened earlier. ';
   const shiftedStart = 1 + preface.length;
   const shifted = scripted([
-    { status: 200, ok: true, json: markedDoc(editMark, [preface, added], added) },
+    { status: 200, ok: true, json: markedDoc(editMark, [preface, added], added, 'rev-open') },
     { status: 200, ok: true, json: {} }
   ]);
   const editGone = await Docs.undo(edit.ref, shifted.http);
-  const deleted = JSON.parse(shifted.calls[1].body).requests[0].deleteContentRange.range;
+  const shiftedBatch = undoBody(shifted.calls[1]);
+  const deleted = shiftedBatch.requests[0].deleteContentRange.range;
   check('undo after a new opening deletes only the marked text',
     editGone.ok === true && shifted.calls[0].method === 'GET' && shifted.calls[1].method === 'POST' &&
     deleted.startIndex === shiftedStart && deleted.endIndex === shiftedStart + added.length && deleted.startIndex !== 1, deleted);
+  check('undo locks the delete to the read-back revision and removes the named range',
+    shiftedBatch.writeControl.requiredRevisionId === 'rev-open' &&
+    shiftedBatch.requests.length === 2 &&
+    shiftedBatch.requests[1].deleteNamedRange.namedRangeId === 'kix.' + editMark, shiftedBatch);
+  const stale = scripted([
+    { status: 200, ok: true, json: markedDoc(editMark, [added], added, 'rev-1') },
+    { status: 400, ok: false, json: { error: { message: 'The required revision ID does not match the latest revision.' } } },
+    { status: 200, ok: true, json: markedDoc(editMark, [preface, added], added, 'rev-2') },
+    { status: 200, ok: true, json: {} }
+  ]);
+  const retried = await Docs.undo(edit.ref, stale.http);
+  const firstDelete = undoBody(stale.calls[1]);
+  const secondDelete = undoBody(stale.calls[3]);
+  check('a changed revision is read again before the delete',
+    retried.ok === true &&
+    stale.calls.map((c) => c.method).join(',') === 'GET,POST,GET,POST' &&
+    firstDelete.writeControl.requiredRevisionId === 'rev-1' &&
+    firstDelete.requests[0].deleteContentRange.range.startIndex === 1 &&
+    secondDelete.writeControl.requiredRevisionId === 'rev-2' &&
+    secondDelete.requests[0].deleteContentRange.range.startIndex === shiftedStart &&
+    secondDelete.requests[1].deleteNamedRange.namedRangeId === 'kix.' + editMark, secondDelete);
   const changed = 'Added line!!';
+  const movedThenEdited = scripted([
+    { status: 200, ok: true, json: markedDoc(editMark, [added], added, 'rev-1') },
+    { status: 400, ok: false, json: { error: { message: 'required revision ID is stale' } } },
+    { status: 200, ok: true, json: {
+      revisionId: 'rev-2',
+      body: { content: [{ paragraph: { elements: [{ startIndex: shiftedStart, endIndex: shiftedStart + changed.length, textRun: { content: changed } }] } }] },
+      namedRanges: { [editMark]: { name: editMark, namedRanges: [{ namedRangeId: 'kix.' + editMark, name: editMark, ranges: [{ startIndex: shiftedStart, endIndex: shiftedStart + changed.length }] }] } }
+    } }
+  ]);
+  const refusedRetry = await Docs.undo(edit.ref, movedThenEdited.http);
+  check('a revision change that edited the range does not delete',
+    refusedRetry.ok === false && refusedRetry.reason === 'range-edited' &&
+    movedThenEdited.calls.map((c) => c.method).join(',') === 'GET,POST,GET', refusedRetry);
+  const noRevision = scripted([{ status: 200, ok: true, json: markedDoc(editMark, [added], added) }]);
+  const refusedRevision = await Docs.undo(edit.ref, noRevision.http);
+  check('undo without a revision does not delete',
+    refusedRevision.ok === false && refusedRevision.reason === 'revision-missing' && noRevision.calls.length === 1, refusedRevision);
   const editedRange = scripted([{
     status: 200, ok: true, json: {
       body: { content: [{ paragraph: { elements: [{ startIndex: 1, endIndex: 1 + changed.length, textRun: { content: changed } }] } }] },

@@ -1,8 +1,9 @@
 // One Google Doc, created or edited only when Glance made the file or the
 // person picked it. Drive files.create uses drive.file. The Docs API edits
 // that id. There is no documents OAuth scope. Undo trashes a file this
-// lane created. An edit is wrapped in a named range, and Undo deletes that
-// range only when the text inside it is still the text Glance inserted.
+// lane created. An edit is wrapped in a named range. Undo reads that range
+// back, locks the delete to that revision, and removes the text and the
+// named range. A changed revision is read again before any second delete.
 // A missing or edited range is refused. Handled waits for a read-back.
 // Portable: no chrome.*, no DOM, no network.
 const FlowGoogleDocs = (() => {
@@ -69,7 +70,9 @@ const FlowGoogleDocs = (() => {
     const span = ranges[0];
     if (!Number.isInteger(span.startIndex) || !Number.isInteger(span.endIndex) || span.endIndex <= span.startIndex) return null;
     if (span.segmentId) return null;
-    return { startIndex: span.startIndex, endIndex: span.endIndex };
+    const namedRangeId = String(list[0].namedRangeId || '').trim();
+    if (!namedRangeId || /[\/\\\s]/.test(namedRangeId)) return null;
+    return { startIndex: span.startIndex, endIndex: span.endIndex, namedRangeId: namedRangeId };
   }
 
   // null: the document does not prove which characters the range covers.
@@ -111,6 +114,19 @@ const FlowGoogleDocs = (() => {
   function authFail(status) {
     if (status === 401 || status === 403) return { ok: false, reason: 'not-connected' };
     return null;
+  }
+
+  function revisionIdOf(doc) {
+    const id = doc && typeof doc.revisionId === 'string' ? doc.revisionId.trim() : '';
+    if (!id || id.length > 200) return '';
+    return id;
+  }
+
+  // A 400 whose body names the revision is the writeControl miss. Anything
+  // else stays a failure. The next step is another read, not another delete.
+  function revisionChanged(res) {
+    if (!res || res.ok || res.status !== 400) return false;
+    return /revision/i.test(JSON.stringify(res.json || ''));
   }
 
   async function insertAndRead(id, text, http, clock, created, name) {
@@ -198,29 +214,46 @@ const FlowGoogleDocs = (() => {
     if (!inserted || !mark) {
       return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
     }
-    const got = await call(http, { method: 'GET', url: DOCS + encodeURIComponent(id) });
-    if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
-    if (!got.ok) return { ok: false, reason: 'http-' + got.status };
-    const span = namedSpan(got.json, mark);
-    if (!span) {
-      return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
+    const url = DOCS + encodeURIComponent(id);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const got = await call(http, { method: 'GET', url: url });
+      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+      if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+      const span = namedSpan(got.json, mark);
+      if (!span) {
+        return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
+      }
+      const covered = textInRange(got.json, span.startIndex, span.endIndex);
+      if (covered == null) {
+        return { ok: false, reason: 'range-unsafe', error: 'Undo stopped. The doc did not show which text the mark covers.' };
+      }
+      if (covered !== inserted) {
+        return { ok: false, reason: 'range-edited', error: 'Undo stopped. That text was edited, so nothing was deleted.' };
+      }
+      const revisionId = revisionIdOf(got.json);
+      if (!revisionId) {
+        return { ok: false, reason: 'revision-missing', error: 'Undo stopped. The doc did not show a revision to lock the delete to.' };
+      }
+      const del = await call(http, {
+        method: 'POST',
+        url: url + ':batchUpdate',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [
+            { deleteContentRange: { range: { startIndex: span.startIndex, endIndex: span.endIndex } } },
+            { deleteNamedRange: { namedRangeId: span.namedRangeId } }
+          ],
+          writeControl: { requiredRevisionId: revisionId }
+        })
+      });
+      if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
+      if (del.ok) return { ok: true, written: 'Doc edit removed.' };
+      if (attempt === 0 && revisionChanged(del)) continue;
+      if (revisionChanged(del)) {
+        return { ok: false, reason: 'revision-changed', error: 'Undo stopped. The doc changed again before the delete.' };
+      }
+      return { ok: false, reason: 'http-' + del.status };
     }
-    const covered = textInRange(got.json, span.startIndex, span.endIndex);
-    if (covered == null) {
-      return { ok: false, reason: 'range-unsafe', error: 'Undo stopped. The doc did not show which text the mark covers.' };
-    }
-    if (covered !== inserted) {
-      return { ok: false, reason: 'range-edited', error: 'Undo stopped. That text was edited, so nothing was deleted.' };
-    }
-    const del = await call(http, {
-      method: 'POST',
-      url: DOCS + encodeURIComponent(id) + ':batchUpdate',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requests: [{ deleteContentRange: { range: { startIndex: span.startIndex, endIndex: span.endIndex } } }] })
-    });
-    if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
-    if (del.ok) return { ok: true, written: 'Doc edit removed.' };
-    return { ok: false, reason: 'http-' + del.status };
   }
 
   return {
