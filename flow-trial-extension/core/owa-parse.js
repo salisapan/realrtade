@@ -237,9 +237,33 @@ const FlowOwaParse = (() => {
     return long.endsWith(short) || long.startsWith(short);
   }
 
+  function labelForms(bytes) {
+    return shownSizeLabels(bytes).map((s) => norm(s).replace(/\s+/g, ''));
+  }
+
+  function labelMatchesSize(label, bytes) {
+    if (!label || bytes == null) return false;
+    return labelForms(bytes).indexOf(label) >= 0;
+  }
+
+  // attachmentsOf stores Math.round(3 * 1024) beside the chip text "3 KB".
+  // Graph's byte count for that same chip is rarely 3072. The label is the
+  // size the person saw. A rounded byte count is not a second measurement.
+  function roundedFromLabel(row) {
+    if (!row || row.size == null || !row.label) return false;
+    const m = String(row.label).match(/^(\d+(?:[.,]\d+)?)(b|kb|mb|gb)$/i);
+    if (!m) return false;
+    const amount = Number(String(m[1]).replace(',', '.'));
+    const unit = m[2].toLowerCase();
+    const mul = unit === 'kb' ? 1024 : unit === 'mb' ? 1024 * 1024 : unit === 'gb' ? 1024 * 1024 * 1024 : 1;
+    return isFinite(amount) && Math.round(amount * mul) === row.size;
+  }
+
   // 'yes' names and sizes agree, including a KB label and a truncated name.
   // 'no' they disagree. 'unknown' the pane did not show a file.
   // A missing size is not a disagreement: the chip could not be read.
+  // A label that displays the Graph size agrees even when the chip also
+  // stored the rounded byte count of that label.
   function fileRelation(paneList, graphList) {
     const pane = fileRows(paneList);
     const graph = fileRows(graphList);
@@ -247,14 +271,15 @@ const FlowOwaParse = (() => {
     if (!graph.length || pane.length !== graph.length) return 'no';
     for (let i = 0; i < pane.length; i++) {
       if (!namesAgree(pane[i].name, graph[i].name)) return 'no';
-      if (pane[i].size != null) {
+      if (pane[i].label && labelMatchesSize(pane[i].label, graph[i].size)) continue;
+      if (pane[i].size != null && !roundedFromLabel(pane[i])) {
         if (pane[i].size !== graph[i].size) return 'no';
         continue;
       }
+      if (pane[i].size != null && pane[i].size === graph[i].size) continue;
+      if (roundedFromLabel(pane[i])) return 'no';
       if (!pane[i].label) continue;
-      if (graph[i].size == null) return 'no';
-      const forms = shownSizeLabels(graph[i].size).map((s) => norm(s).replace(/\s+/g, ''));
-      if (forms.indexOf(pane[i].label) < 0) return 'no';
+      return 'no';
     }
     return 'yes';
   }

@@ -935,7 +935,7 @@ async function run() {
       }, Object.assign({}, base, {
         messageId: 'still-park',
         subject: 'Parking permit - please renew by Sunday',
-        text: 'Please renew the parking permit by Sunday, October 11.',
+        text: 'Please renew the parking permit by Sunday.',
         intent: Object.assign({}, base.intent, { label: 'Renew the parking permit by Oct 11', personalClose: 'follow-up-ask', type: 'request', noReplyDraft: true }),
         process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit by Oct 11' } }] }
       })]

@@ -406,6 +406,41 @@ const confirmedConflict = FlowOwaParse.uniqueGraphMessage(
 check('a confirmed conversation conflict beats a matching filename',
   !confirmedConflict.message && /conflict-conversation/.test(confirmedConflict.detail || ''), confirmedConflict);
 
+const roundedNorth = FlowOwaParse.uniqueGraphMessage(
+  {
+    subject: 'Northwind agreement - signed PDF',
+    senderEmail: 'flow@x.com',
+    conversationId: 'AQQkNw',
+    attachments: [{ name: 'northwind-agreement-signed.pdf', size: 3072, sizeLabel: '3 KB' }]
+  },
+  [msg('m-nw', 'AQQkNw', '', [file('northwind-agreement-signed.pdf', 3000)], 'Northwind agreement - signed PDF')]
+);
+check('a 3 KB chip links the same-conversation file that displays as 3 KB',
+  roundedNorth.message && roundedNorth.message.id === 'm-nw' && !/file-disagree/.test(roundedNorth.detail || ''), roundedNorth);
+const roundedAlpha = FlowOwaParse.uniqueGraphMessage(
+  {
+    subject: 'Q3 fund statement',
+    conversationId: 'AQQkQ3',
+    receivedDateTime: alphaWhen,
+    attachments: [{ name: '…t-q3-alpha.pdf', size: 3072, sizeLabel: '3 KB' }]
+  },
+  [msg('m-alpha', 'AQQkQ3', alphaWhen, [file('statement-q3-alpha.pdf', 2841)], 'Q3 fund statement'),
+    msg('m-beta', 'AQQkQ3', betaWhen, [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement')]
+);
+check('a rounded alpha chip still links statement-q3-alpha.pdf',
+  roundedAlpha.message && roundedAlpha.message.id === 'm-alpha' && !/file-disagree/.test(roundedAlpha.detail || ''), roundedAlpha);
+const wrongFile = FlowOwaParse.uniqueGraphMessage(
+  {
+    subject: 'Northwind agreement - signed PDF',
+    senderEmail: 'flow@x.com',
+    conversationId: 'AQQkNw',
+    attachments: [{ name: 'northwind-agreement-signed.pdf', size: 3072, sizeLabel: '3 KB' }]
+  },
+  [msg('m-nw', 'AQQkNw', '', [file('northwind-agreement-signed.pdf', 12288)], 'Northwind agreement - signed PDF')]
+);
+check('a 3 KB chip does not link a 12 KB file in the same conversation',
+  !wrongFile.message && /file-disagree|file-miss/.test(wrongFile.detail || ''), wrongFile);
+
 const receiptLeak = FlowOwaParse.matchEntryHow(
   { subject: 'Q3 fund statement', senderEmail: 'dana@acme.com' },
   [{ messageId: 'alpha', subject: 'Q3 fund statement', sender: { email: 'dana@acme.com' }, outlookReceipt: true, connectorId: 'onedriveFile' }]

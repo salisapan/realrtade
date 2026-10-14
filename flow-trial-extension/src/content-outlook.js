@@ -141,7 +141,8 @@
     if (!t || t === '|||') return true;
     const parts = t.split('|');
     if (parts[0] === 'msg') return !parts[1];
-    if (parts[0] === 'conv' || parts[0] === 'pane') return !parts[1] && !parts[2];
+    if (parts[0] === 'conv') return !parts[1];
+    if (parts[0] === 'pane') return !parts[1] && !parts[2];
     return false;
   }
 
@@ -1010,22 +1011,35 @@
     return heading ? String(heading.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180) : '';
   }
 
+  // The message body, not the subject heading. Editing the subject is not
+  // a different mail. A different body in the same conversation is.
+  function openMailBodyMark(root) {
+    if (!root || !root.querySelector) return '';
+    let body = null;
+    try { body = root.querySelector('div[role="document"]') || root.querySelector('[role="document"]'); } catch (e) { body = null; }
+    if (!body) return '';
+    let text = String(body.textContent || '');
+    const heading = headingSubject(root);
+    if (heading) text = text.split(heading).join(' ');
+    text = text.replace(/\s+/g, ' ').trim().slice(0, 240);
+    return text ? hashText(text) : '';
+  }
+
   // A message id in the address is the open mail. The subject heading is
-  // not part of that token: editing the subject is not a mail switch.
-  // A conversation address has no message id, so the heading still
-  // distinguishes one mail in that conversation from the next.
+  // not part of that token: editing the subject is not a mail switch, on a
+  // message address, a conversation address, or a pane with no id.
   function openMailTokenNow() {
     let href = '';
     try { href = location.href; } catch (e) { href = ''; }
     const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? (FlowOwaParse.urlIds(href) || {}) : {};
     if (ids.kind === 'message' && ids.itemId) return 'msg|' + String(ids.itemId);
     const root = openMailRoot();
-    const subject = headingSubject(root);
+    const mark = openMailBodyMark(root);
     if (ids.kind === 'conversation' && (ids.conversationId || ids.raw)) {
-      return 'conv|' + String(ids.conversationId || ids.raw) + '|' + subject;
+      return 'conv|' + String(ids.conversationId || ids.raw) + (mark ? '|' + mark : '');
     }
-    if (!root && !subject && !ids.raw) return '';
-    return 'pane|' + String(ids.raw || '') + '|' + subject;
+    if (!root && !mark && !ids.raw) return '';
+    return 'pane|' + String(ids.raw || '') + (mark ? '|' + mark : '');
   }
 
   function clearOpenCards() {
@@ -1733,6 +1747,20 @@
     const conv = pane && FlowOwaParse.canonId(pane.conversationId);
     if (!conv) return null;
     return diags.find((d) => d && FlowOwaParse.canonId(d.conversationId) === conv) || null;
+  }
+
+  // The URL conversation is not copied onto the pane until the open mail
+  // shows that id. The mailbox check still filed its silence under that URL.
+  // Own-sender and note-to-self are that row. A URL that names a different
+  // mail (url-stale) is not this row, and this row is not a file link.
+  function unconfirmedSyncRow(bag, pane) {
+    if (!pane || pane.idSource !== 'url-unconfirmed') return null;
+    const raw = pane.rawUrlId || pane.pathId;
+    if (!raw || typeof FlowOwaParse === 'undefined' || typeof FlowOwaParse.canonId !== 'function') return null;
+    const urlConv = FlowOwaParse.canonId(raw);
+    if (!urlConv) return null;
+    const diags = (bag && bag.outlookSync && bag.outlookSync.diagnostics) || [];
+    return diags.find((d) => d && FlowOwaParse.canonId(d.conversationId) === urlConv) || null;
   }
 
   function ownSender(email, own) {
@@ -2553,8 +2581,9 @@
     let decided = null;
     const bag = await FlowStorage.get();
     const planned = plannedRow(bag, pane);
+    const selfPlanned = planned || unconfirmedSyncRow(bag, pane);
     const receiptOnly = Boolean(entry && entry.outlookReceipt && entry.ref && !entry.process);
-    const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || personaOwnSender(own) || (planned && (planned.reason === 'note-to-self' || planned.reason === 'own-sender')));
+    const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || personaOwnSender(own) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
       if (selfMail) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);

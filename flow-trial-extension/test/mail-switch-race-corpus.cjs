@@ -433,10 +433,28 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   if (convHead) convHead.textContent = 'Another mail in the same conversation';
   await sleep(40);
   const convAfter = layout.w.__glanceOutlookPage.openMailToken();
-  check('without a message id, a heading under role=main is a mail switch',
-    convBefore.indexOf('AQQkCONV-LAYOUT') >= 0 && convBefore !== convAfter && convAfter.indexOf('Another mail') >= 0 &&
+  check('a subject edit on a conversation address is not a mail switch',
+    convBefore.indexOf('conv|AQQkCONV-LAYOUT') === 0 && convBefore === convAfter && convAfter.indexOf('Another mail') < 0 &&
     !layout.doc.getElementById('ReadingPaneContainerId'),
     { convBefore: convBefore, convAfter: convAfter });
+  const convBody = layout.doc.querySelector('[role="main"] [role="document"]') || layout.doc.querySelector('[role="document"]');
+  if (convBody) convBody.textContent = 'A different message body in the same conversation.';
+  const convMoved = layout.w.__glanceOutlookPage.openMailToken();
+  check('a different message on a conversation address is a mail switch',
+    convMoved !== convBefore && convMoved.indexOf('conv|AQQkCONV-LAYOUT') === 0 && convMoved.indexOf('Another mail') < 0,
+    { convBefore: convBefore, convMoved: convMoved });
+  layout.w.history.pushState({}, '', 'https://outlook.live.com/mail/0/inbox/');
+  const paneBefore = layout.w.__glanceOutlookPage.openMailToken();
+  if (convHead) convHead.textContent = 'Subject edited on a pane with no id';
+  const paneAfter = layout.w.__glanceOutlookPage.openMailToken();
+  check('a subject edit on a pane address is not a mail switch',
+    paneBefore.indexOf('pane|') === 0 && paneBefore === paneAfter && paneAfter.indexOf('Subject edited') < 0,
+    { paneBefore: paneBefore, paneAfter: paneAfter });
+  if (convBody) convBody.textContent = 'The pane now shows a different message.';
+  const paneMoved = layout.w.__glanceOutlookPage.openMailToken();
+  check('a different message on a pane address is a mail switch',
+    paneMoved !== paneBefore && paneMoved.indexOf('pane|') === 0,
+    { paneBefore: paneBefore, paneMoved: paneMoved });
   layout.w.close();
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

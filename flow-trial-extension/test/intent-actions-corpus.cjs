@@ -1453,7 +1453,7 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   check('a parking subject above a receiving-this footer stays quiet',
     subjectFooter && subjectFooter.quiet === 'noise' && subjectFooter.type == null, subjectFooter);
 
-  const PARK_BODY = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  const PARK_BODY = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
   const parkCtx = {
     now: new Date('2026-10-08T13:34:00Z'),
     senderEmail: 'ai.local.flow@gmail.com',

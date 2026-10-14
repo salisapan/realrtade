@@ -220,6 +220,42 @@ function panel(store) {
     { row: selfRow && selfRow.reason, panel: panel(self.store).map((d) => d.reason) });
   self.w.close();
 
+  const unconfirmed = await boot({
+    url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV),
+    diagnostics: [{ reason: 'own-sender', conversationId: CONV, subject: 'Pilot proposal' }],
+    graph: (url) => {
+      if (/\/me\?/.test(url)) return { mail: ME, displayName: 'Glance' };
+      if (/messages/.test(url)) {
+        return { value: [{
+          id: 'MSG-OWN-1',
+          conversationId: CONV,
+          subject: 'Pilot proposal',
+          isDraft: false,
+          from: { emailAddress: { name: 'Glance', address: ME } },
+          toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+          receivedDateTime: new Date().toISOString(),
+          body: { contentType: 'text', content: "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" }
+        }] };
+      }
+      return { value: [] };
+    }
+  });
+  showMail(unconfirmed.doc, unconfirmed.w, {
+    id: CONV,
+    url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV),
+    subject: 'Pilot proposal',
+    toHtml: 'אל: <span>' + ME + '</span>',
+    ccHtml: '',
+    bodyHtml: lines("Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?"),
+    fromTitle: 'flow <' + FLOW + '>'
+  });
+  await settle(unconfirmed);
+  const unconfirmedWhy = records(unconfirmed.store).map((d) => d.reason);
+  check('an unconfirmed conversation URL still records note-to-self, not page:no-message-id',
+    unconfirmedWhy.indexOf('note-to-self') >= 0 && unconfirmedWhy.indexOf('page:no-message-id') < 0 && !unconfirmed.doc.querySelector('.flow-chip-host'),
+    { page: unconfirmedWhy, sync: ((unconfirmed.store.outlookSync && unconfirmed.store.outlookSync.diagnostics) || []).map((d) => d.reason) });
+  unconfirmed.w.close();
+
   const file = await boot({
     url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV),
     diagnostics: [{ reason: 'drive-not-granted', conversationId: CONV, subject: 'File' }]
@@ -396,6 +432,14 @@ function panel(store) {
     none && none.hydrateHow === 'none' && (!none.to || none.to.length === 0) && (!none.cc || none.cc.length === 0) && none.itemId !== 'MSG-A' && none.itemId !== 'MSG-B',
     { how: none && none.hydrateHow, to: none && none.to, item: none && none.itemId });
   hyd.w.close();
+
+  const spec = fs.readFileSync(path.join(ROOT, '..', 'docs/glance-ai/card-whynotshown-single-source-spec.md'), 'utf8');
+  const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
+  check('the card and Why not shown share commitDecision',
+    outlookSrc.indexOf('async function commitDecision') > 0 &&
+    outlookSrc.indexOf('function whyNotShownRows') < 0 &&
+    spec.indexOf('Nothing in this commit wires the decision record') < 0 &&
+    spec.indexOf('commitDecision') > 0);
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

@@ -31,6 +31,16 @@ function upcomingWeekday(weekday, minDelta) {
   return d;
 }
 const SUNDAY = upcomingWeekday(0, 3);
+function weekdayAhead(weekday) {
+  const d = new Date(RUN_NOW);
+  let delta = (weekday - d.getDay() + 7) % 7;
+  if (delta === 0) delta = 7;
+  d.setDate(d.getDate() + delta);
+  return d;
+}
+const PARK_DAY = weekdayAhead(0);
+const PARK_ISO = dayStamp(PARK_DAY);
+const PARK_LABEL = humanDay(PARK_DAY);
 const WEDNESDAY = upcomingWeekday(3, 1);
 const SUNDAY_ISO = dayStamp(SUNDAY);
 const SUNDAY_LABEL = humanDay(SUNDAY);
@@ -459,7 +469,7 @@ function lum(rgb) {
   check('an own address on From is not To',
     fromOnly && fromOnly.to.indexOf(ME) < 0, { to: fromOnly && fromOnly.to, raw: fromOnly && fromOnly.rawToLine });
 
-  const parkBody = String(park.body).replace(/Sunday, October 11/g, SUNDAY_LONG);
+  const parkBody = String(park.body);
   const parkJudged = await page.evaluate((input) => window.__eng.judge.judge(input), {
     text: parkBody,
     subject: park.subject,
@@ -475,9 +485,9 @@ function lum(rgb) {
   const parkTask = ((parkJudged && parkJudged.process && parkJudged.process.steps) || []).find((s) => s.kind === 'outlookTask');
   check('gate049 parking is a To Do and not a draft',
     parkJudged && parkJudged.show === true && parkJudged.intent && parkJudged.intent.noReplyDraft === true &&
-    parkJudged.intent.label === 'Renew the parking permit by ' + SUNDAY_LABEL &&
-    parkJudged.intent.entities && parkJudged.intent.entities.dateIso === SUNDAY_ISO &&
-    parkTask && parkTask.params.title === 'Renew the parking permit by ' + SUNDAY_LABEL &&
+    parkJudged.intent.label === 'Renew the parking permit by ' + PARK_LABEL &&
+    parkJudged.intent.entities && parkJudged.intent.entities.dateIso === PARK_ISO &&
+    parkTask && parkTask.params.title === 'Renew the parking permit by ' + PARK_LABEL &&
     parkKinds.indexOf('outlookTask') >= 0 && parkKinds.indexOf('outlookDraft') < 0 &&
     !/Drafting your reply/.test(String(parkJudged.process && parkJudged.process.closingLine || '')) &&
     String(parkJudged.reason || '') !== 'quiet:noise',

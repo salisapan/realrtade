@@ -2328,7 +2328,7 @@
     function loopsHeading(which) {
       const row = el('div', 'loops-section act-section');
       row.setAttribute('data-glance-section', which);
-      const title = which === 'added' ? 'Added' : (which === 'expired' ? 'Expired' : 'Suggested');
+      const title = which === 'expired' ? 'Expired' : (which === 'added' ? 'Added' : 'Suggested');
       row.appendChild(el('span', 'acts-label', title));
       return row;
     }
