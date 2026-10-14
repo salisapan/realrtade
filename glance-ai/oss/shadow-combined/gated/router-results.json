@@ -1,0 +1,140 @@
+{
+ "sets": {
+  "OSS 275": {
+   "n": 275,
+   "sil": 167,
+   "wdi": 0,
+   "show": 108,
+   "miss": 13,
+   "he": [
+    10,
+    50
+   ],
+   "en": [
+    3,
+    58
+   ],
+   "dated": 8,
+   "wrongDate": 0,
+   "t2": 67,
+   "masked": 0,
+   "all": 275,
+   "wdiIds": [],
+   "wrongDateIds": []
+  },
+  "v2 held-out 400": {
+   "n": 400,
+   "sil": 218,
+   "wdi": 0,
+   "show": 182,
+   "miss": 20,
+   "he": [
+    10,
+    90
+   ],
+   "en": [
+    10,
+    92
+   ],
+   "dated": 0,
+   "wrongDate": 0,
+   "t2": 69,
+   "masked": 0,
+   "all": 400,
+   "wdiIds": [],
+   "wrongDateIds": []
+  },
+  "adversarial 72": {
+   "n": 72,
+   "sil": 50,
+   "wdi": 0,
+   "show": 22,
+   "miss": 2,
+   "he": [
+    1,
+    9
+   ],
+   "en": [
+    1,
+    13
+   ],
+   "dated": 0,
+   "wrongDate": 0,
+   "t2": 6,
+   "masked": 0,
+   "all": 74,
+   "wdiIds": [],
+   "wrongDateIds": []
+  },
+  "injection 39": {
+   "n": 39,
+   "sil": 29,
+   "wdi": 0,
+   "show": 10,
+   "miss": 2,
+   "he": [
+    0,
+    4
+   ],
+   "en": [
+    2,
+    6
+   ],
+   "dated": 0,
+   "wrongDate": 0,
+   "t2": 8,
+   "masked": 0,
+   "all": 47,
+   "wdiIds": [],
+   "wrongDateIds": []
+  },
+  "ALL pooled 786": {
+   "n": 786,
+   "sil": 464,
+   "wdi": 0,
+   "show": 322,
+   "miss": 37,
+   "he": [
+    21,
+    153
+   ],
+   "en": [
+    16,
+    169
+   ],
+   "dated": 8,
+   "wrongDate": 0,
+   "t2": 150,
+   "masked": 0,
+   "all": 796,
+   "wdiIds": [],
+   "wrongDateIds": []
+  }
+ },
+ "tier2SilentReasons": {
+  "model:no-actionable-intention": 117,
+  "gate:save-suggest:attachments-unread": 15,
+  "model:promise-without-date": 4,
+  "gate:unsupported-kind:attach-to-invite": 1,
+  "model:meeting-without-date": 1,
+  "model:ask-without-date": 2,
+  "gate:money-offer-acceptance": 1
+ },
+ "plan": {
+  "shown": 9,
+  "planned": 9,
+  "fileSave": 0,
+  "rejected": {},
+  "anchorRight": 8,
+  "dated": 8,
+  "dateRight": 8,
+  "sendSteps": 0,
+  "doneWhen": 9,
+  "rows": 9,
+  "byProcess": {
+   "schedule": 3,
+   "log-it": 4,
+   "reply-track": 2
+  }
+ }
+}

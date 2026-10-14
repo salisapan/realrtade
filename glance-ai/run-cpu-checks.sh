@@ -63,4 +63,10 @@ echo "== shadow package (logging, feature parity, JS dense parity, Python decisi
 bash model/shadow-pkg/run-tests.sh
 echo "== gated OSS score from cached predictions"
 node oss/shadow-combined/gated/score-gated.cjs qwen3.5-4b
+echo "== Understanding validator (M1) on cached predictions"
+node oss/shadow-combined/gated/score-understanding.cjs > /dev/null && echo "understanding: PASS"
+echo "== Router v2 (M2) end to end, real device mask, cached predictions"
+node oss/shadow-combined/gated/score-router.cjs > /dev/null && echo "router: PASS"
+echo "== Router v2 through the Glance cloud server path (M3, mock provider = cached predictions)"
+node oss/shadow-combined/gated/score-router.cjs --via-server > /dev/null && echo "router via server: PASS"
 echo "== cpu checks done"
