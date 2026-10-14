@@ -290,6 +290,21 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const reused = await o.createReplyDraft('a1', 'Thanks, will confirm.');
     const postsReuse = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
     check('a second Do It reuses the draft still in Drafts', reused.ok && reused.reused === true && reused.reason === 'draft-already' && reused.ref === draft.ref && postsReuse.length === 1, reused);
+
+    const page = world({ inbox: [ask], sent: [] });
+    const pageRunner = O.create(Object.assign({}, page.deps(), {
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent },
+      actions: FlowActions
+    }));
+    await pageRunner.connect();
+    page.drafts = { 'page-draft': { id: 'page-draft', isDraft: true, webLink: 'https://outlook.office.com/mail/draft/page-draft', body: { content: 'From the page.' }, attachments: {} } };
+    page.store.outlookSync = Object.assign({}, page.store.outlookSync, { glanceDraftByMessage: { a1: 'page-draft' } });
+    const postsBeforePage = page.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url)).length;
+    const fromPage = await pageRunner.createReplyDraft('a1', 'Thanks, will confirm.');
+    const postsAfterPage = page.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url)).length;
+    check('Loops Do It reuses the draft the page already stored for that mail',
+      fromPage.ok && fromPage.reused === true && fromPage.reason === 'draft-already' && fromPage.ref === 'page-draft' && postsAfterPage === postsBeforePage,
+      { fromPage, postsBeforePage, postsAfterPage });
     check('Mail.Send never in requested scopes', CFG.SCOPES.indexOf('Mail.Send') === -1);
     const forbidden = w.calls.filter((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(c.url) && c.method !== 'GET');
     check('no /send /reply /replyAll /forward /sendMail ever happens', forbidden.length === 0, forbidden);

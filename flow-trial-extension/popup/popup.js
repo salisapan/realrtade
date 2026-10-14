@@ -892,6 +892,29 @@
     return item;
   }
 
+  // A passed deadline is not an open card and not a close. Loops keeps the
+  // row and names it expired. Do It stays off: the due day already passed.
+  function expiredRow(entry) {
+    const item = el('div', 'log-item');
+    item.setAttribute('data-glance-status', 'expired');
+    const top = el('div', 'log-top');
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '';
+    top.appendChild(el('span', 'log-label', why));
+    top.appendChild(el('span', 'log-kind', 'expired'));
+    item.appendChild(top);
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', 'From Outlook'));
+    const subtitle = pendingRowSubtitle(entry);
+    if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
+    if (entry.threadUrl || entry.url) {
+      const view = el('a', 'ghost sm', 'View');
+      view.href = entry.url || entry.threadUrl;
+      view.target = '_blank';
+      view.rel = 'noopener';
+      item.appendChild(view);
+    }
+    return item;
+  }
+
 
   // ---- Open loops: what others owe you ---------------------------------------
   // A loop is something you asked for and have not had back. Free follows three
@@ -2268,7 +2291,10 @@
     const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
       ? await FlowStorage.getActiveOutlookReceipts()
       : [];
-    if (typeof FlowStillOpen.panelLoops === 'function') return FlowStillOpen.panelLoops(pending, receipts);
+    const expired = (typeof FlowStorage.getExpiredLoops === 'function')
+      ? await FlowStorage.getExpiredLoops()
+      : [];
+    if (typeof FlowStillOpen.panelLoops === 'function') return FlowStillOpen.panelLoops(pending, receipts, expired);
     const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
     const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
     return { openOnly: openOnly, receipts: receipts };
@@ -2283,8 +2309,11 @@
     loops = await visibleLoops();
     const openOnly = loops.openOnly;
     const receipts = loops.receipts;
-    const total = openOnly.length + receipts.length;
-    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: total });
+    const expired = Array.isArray(loops.expired) ? loops.expired : [];
+    // The badge counts work that is still open. An expired deadline stays
+    // in the list as a record, and it does not ask for another Do It.
+    const openCount = openOnly.length + receipts.length;
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: openCount });
     for (const item of openOnly) {
       FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: item.messageId })
         .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
@@ -2293,13 +2322,14 @@
     const host = document.getElementById('open-list');
     const empty = document.getElementById('open-empty');
     host.replaceChildren();
-    empty.hidden = total > 0;
+    empty.hidden = (openCount + expired.length) > 0;
     // Suggested and Added are list headings, including a single Do It and a
     // Handled row that has no step list. The chip alone is not the heading.
     function loopsHeading(which) {
       const row = el('div', 'loops-section act-section');
       row.setAttribute('data-glance-section', which);
-      row.appendChild(el('span', 'acts-label', which === 'added' ? 'Added' : 'Suggested'));
+      const title = which === 'added' ? 'Added' : (which === 'expired' ? 'Expired' : 'Suggested');
+      row.appendChild(el('span', 'acts-label', title));
       return row;
     }
     function hasAdded(entry) {
@@ -2331,6 +2361,10 @@
     if (added.length) {
       if (!ownsHeading(added[0], 'added')) host.appendChild(loopsHeading('added'));
       added.forEach((node) => host.appendChild(node));
+    }
+    if (expired.length) {
+      host.appendChild(loopsHeading('expired'));
+      expired.forEach((entry) => host.appendChild(expiredRow(entry)));
     }
     } finally { endRender(); }
   }

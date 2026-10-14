@@ -165,7 +165,12 @@ async function boot(opts) {
       id: 'ext', lastError: null, getURL: (s) => 'chrome-extension://x/' + s,
       getManifest: () => ({ version: 'test' }),
       onMessage: { addListener() {} },
-      sendMessage: (msg, cb) => { const r = reply(msg); setTimeout(() => cb && cb(r), 5); }
+      sendMessage: (msg, cb) => {
+        const r = reply(msg);
+        const slow = msg && msg.type === 'flow:outlook-fetch' && o.slowFetches > 0;
+        if (slow) o.slowFetches -= 1;
+        setTimeout(() => cb && cb(r), slow ? (o.fetchDelayMs || 3000) : 5);
+      }
     },
     storage: {
       local: {
@@ -220,9 +225,11 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
     const host = race.doc.querySelector('#ReadingPaneContainerId .flow-chip-host');
     const heading = race.doc.querySelector('#ReadingPaneContainerId [role="heading"]');
     const onB = heading && String(heading.textContent || '').indexOf('Office move') >= 0;
-    if (onB && host && (boundTo(host, ID_A) || /Reply/.test(host.textContent || ''))) {
+    const boundA = host && boundTo(host, ID_A);
+    const boundB = host && boundTo(host, ID_B);
+    if (onB && host && (boundA || (!boundB && /Reply/.test(host.textContent || '')))) {
       sawAonB = true;
-      sample = chipText(race.doc);
+      sample = chipText(race.doc) + ' bound=' + (host.getAttribute('data-glance-message') || '');
       break;
     }
     await sleep(15);
@@ -290,6 +297,31 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   check('20 fast switches never show another mail\'s card', !foreign, { foreign: foreign, text: chipText(rapid.doc) });
   check('mail 20\'s card is up within 2 seconds', Boolean(host20) && (Date.now() - started) <= 2000, { ms: Date.now() - started, text: chipText(rapid.doc) });
   rapid.w.close();
+
+  const timed = await boot({ slowFetches: 1, fetchDelayMs: 3000 });
+  await sleep(120);
+  const switches = [];
+  for (let i = 1; i <= 20; i++) {
+    const id = 'MSG-TIME-' + String(i).padStart(2, '0');
+    const t0 = Date.now();
+    showMail(timed.doc, timed.w, {
+      id: id,
+      subject: 'Q3 return ' + i,
+      toHtml: 'אל: <span>' + ME + '</span>',
+      ccHtml: '',
+      bodyHtml: lines('Hi,\nCan you reply and confirm whether the Q3 summary for switch ' + i + ' is ready?\nThanks,\nFlow')
+    });
+    let host = null;
+    while (Date.now() - t0 < 2000) {
+      const found = timed.doc.querySelector('#ReadingPaneContainerId .flow-chip-host');
+      if (found && boundTo(found, id)) { host = found; break; }
+      await sleep(20);
+    }
+    switches.push({ i: i, ms: Date.now() - t0, up: Boolean(host) });
+  }
+  const slow = switches.filter((row) => !row.up || row.ms > 2000);
+  check('the Q3 card is back within 2 seconds on all 20 switches', slow.length === 0 && switches.length === 20, slow);
+  timed.w.close();
 
   async function cardFor(page, id) {
     const until = Date.now() + 5000;

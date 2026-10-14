@@ -580,6 +580,53 @@ console.log('\n--- 0.9.56: another conversation is not this mail, and a receipt 
   check('a receipt covers the open copies of that promise',
     panel.receipts.length === 1 && panel.openOnly.length === 1 && panel.openOnly[0].messageId === 'passport-other',
     { open: panel.openOnly.map((r) => r.messageId), receipts: panel.receipts.length });
+  check('a panel with no passed deadline has an empty expired list',
+    Array.isArray(panel.expired) && panel.expired.length === 0, panel.expired);
+}
+
+console.log('\n--- 0.9.56: a passed deadline leaves the card and stays in Loops as expired ---\n');
+{
+  const text = 'Please send the car insurance certificate by October 12.';
+  const dueMorning = new Date(2026, 9, 12, 8, 0, 0);
+  const after = new Date(2026, 9, 14, 8, 0, 0);
+  const intent = FlowIntent.classify(text, { now: dueMorning });
+  const process = intent && intent.type
+    ? FlowActions.planFor(intent, { threadUrl: 'https://outlook.office.com/mail/insurance', hasThreadAttachment: false })
+    : null;
+  const row = {
+    messageId: 'car-insurance',
+    threadId: 't-car-insurance',
+    threadUrl: 'https://outlook.office.com/mail/insurance',
+    sender: { name: 'Dana', email: 'dana@example.com' },
+    subject: 'Car insurance certificate',
+    text: text,
+    ts: dueMorning.getTime(),
+    app: 'outlook',
+    intent: intent,
+    process: process
+  };
+  const iso = intent && intent.facts && intent.facts.date && intent.facts.date.iso;
+  check('October 12 on the due morning is that calendar day, not a later year', iso === '2026-10-12', iso);
+  check('the car-insurance card is on the list the morning it is due',
+    FlowStillOpen.select([row], dueMorning.getTime()).length === 1 &&
+    FlowStillOpen.deadlinePassed(row, dueMorning.getTime()) === false,
+    { type: intent && intent.type, iso: iso });
+  const gone = FlowStillOpen.select([row], after.getTime());
+  const expired = FlowStillOpen.expiredOf([row], after.getTime(), []);
+  check('two days later the card is gone because the deadline passed',
+    gone.length === 0 && FlowStillOpen.deadlinePassed(row, after.getTime()) === true, ids(gone));
+  check('Loops records that row as expired, and it is not a close',
+    expired.length === 1 && expired[0].status === 'expired' && expired[0].messageId === 'car-insurance',
+    expired.map((r) => ({ id: r.messageId, status: r.status })));
+  const listed = FlowStillOpen.panelLoops([], [], expired);
+  check('the expired row is the Loops list for that mail',
+    listed.openOnly.length === 0 && listed.expired.length === 1 && listed.expired[0].status === 'expired' && listed.expired[0].messageId === 'car-insurance');
+  const proof = {
+    kind: 'written', undone: false, connectorId: 'outlookTask', fetchedBack: true,
+    messageId: 'car-insurance', text: text, intent: intent, sender: row.sender
+  };
+  check('a proved close is not also recorded as expired',
+    FlowStillOpen.expiredOf([row], after.getTime(), [proof]).length === 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -71,6 +71,7 @@ function background() {
         const named = body && body.name === 'noid.pdf';
         return json(201, named ? { name: body.name } : { id: 'att-1', name: body && body.name });
       }
+      if (/\/me\/messages\/odraft_1(\?|$)/.test(u) && method === 'GET') return json(200, { id: 'odraft_1', isDraft: true, webLink: 'https://outlook.live.com/mail/drafts/odraft_1' });
       if (/\/me\/messages\/odraft_1$/.test(u) && method === 'DELETE') return { ok: true, status: 204, json: async () => null, text: async () => '' };
       if (/\/drive\/v3\/files\/f1\?fields=/.test(u)) return json(200, { name: 'Invoice 204.pdf', mimeType: 'application/pdf', size: '11' });
       if (/\/drive\/v3\/files\/f1\?alt=media/.test(u)) {
@@ -93,7 +94,7 @@ function background() {
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
-  return { calls, fn: (n) => vm.runInContext(n, sandbox) };
+  return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
 }
 function mimeBody(raw) {
   const mime = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
@@ -328,6 +329,22 @@ const CASES = [
     const noIdBg = background();
     const noIdWrite = await noIdBg.fn('outlookDraftWrite')({ connectorId: 'outlookDraft', outlookIncomingId: 'msg1', messageId: 'msg1', attachment: { filename: 'noid.pdf', mimeType: 'application/pdf', base64: Buffer.from('x').toString('base64') }, body: 'No file.' });
     check('no attachment id deletes the draft and does not claim attached', noIdWrite.ok === false && noIdWrite.reason === 'outlook-file-found-no-attach' && !(noIdWrite.written && /attach/i.test(noIdWrite.written)) && noIdBg.calls.some((c) => c.method === 'DELETE' && /\/me\/messages\/odraft_1$/.test(c.url)), noIdWrite);
+  }
+
+  console.log('\n--- one ask, the page and Loops, one draft ---\n');
+  {
+    const gate = background();
+    const op = { connectorId: 'outlookDraft', outlookIncomingId: 'msg-gate', messageId: 'msg-gate', body: 'The certificate is on this draft.' };
+    const first = await gate.fn('outlookDraftWrite')(op);
+    const second = await gate.fn('outlookDraftWrite')(op);
+    const posts = gate.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+    const map = gate.stored.outlookSync && gate.stored.outlookSync.glanceDraftByMessage;
+    check('a second page Do It reuses the draft and does not create another',
+      first.ok && first.ref === 'odraft_1' && second.ok && second.reused === true && second.reason === 'draft-already' && second.ref === 'odraft_1' && posts.length === 1,
+      { first, second, posts: posts.length });
+    check('that draft is the one Loops reads for the same mail',
+      map && map['msg-gate'] === 'odraft_1', map);
+    check('neither write sent the mail', !gate.calls.some((c) => /\/(send|sendMail)(\b|$)/.test(c.url)));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

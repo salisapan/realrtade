@@ -771,6 +771,12 @@ const FlowStorage = (() => {
     return FlowStillOpen.select(candidatesFromState(state, now), now || Date.now(), state.log);
   }
 
+  async function getExpiredLoops(now) {
+    if (typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.expiredOf !== 'function') return [];
+    const state = await get();
+    return FlowStillOpen.expiredOf(candidatesFromState(state, now), now || Date.now(), state.log);
+  }
+
   // Weekly summary's "still open" count. Hosts that have not loaded
   // still-open.js keep the older unresolved-shown count so a test sandbox
   // can exercise the trigger without the morning filter. The extension
@@ -1840,7 +1846,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, getExpiredLoops, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

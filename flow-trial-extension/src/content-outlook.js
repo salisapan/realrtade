@@ -253,6 +253,9 @@
 
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
   async function pageReason(reason, pane, extra) {
+    if (!paneCurrent(pane)) return;
+    const epoch = paneEpoch(pane);
+    if (epoch != null && epoch !== mailEpoch) return;
     if (!renderLive()) return;
     lastOutcome = 'reason';
     lastLoggedReason = reason;
@@ -280,7 +283,7 @@
       : String((pane && pane.subject) || '').slice(0, 120);
     await commitDecision({
       id: decisionIdFrom(pane) || String((pane && pane.subject) || location.pathname || 'open'),
-      epoch: renderEpoch,
+      epoch: epoch != null ? epoch : renderEpoch,
       source: 'page',
       verdict: 'quiet',
       reason: reason,
@@ -318,6 +321,8 @@
   // check's earlier quiet line for this message, so Why not shown does not
   // list a mail that has a card.
   async function clearReason(pane, reason) {
+    if (!paneCurrent(pane)) return;
+    const epoch = paneEpoch(pane);
     lastReasonKey = '';
     const id = openDecisionId || decisionIdFrom(pane);
     if (!id) return;
@@ -327,7 +332,7 @@
       : String((pane && pane.subject) || '').slice(0, 120);
     await commitDecision({
       id: id,
-      epoch: renderEpoch,
+      epoch: epoch != null ? epoch : renderEpoch,
       source: 'page',
       verdict: 'show',
       reason: reason || (existing && existing.reason) || 'shown',
@@ -406,13 +411,18 @@
   }
 
   // One check from this page, at most once a minute (the runner also refuses more often than that).
+  let syncEpoch = -1;
   async function pageSync(reason) {
+    // The previous mail's check is still in flight. This mail is judged
+    // from the page. Waiting on that check is how a card came back in 3–4s.
+    if (syncing && syncEpoch !== mailEpoch) return { ok: true, skipped: true };
     if (syncing) return syncing;
     const now = Date.now();
     if (now - lastPageSyncAt < PAGE_SYNC_MIN_MS) return { ok: true, skipped: true };
     const o = runner();
     if (!o) return { ok: false, error: 'no-runner' };
     lastPageSyncAt = now;
+    syncEpoch = mailEpoch;
     syncing = o.sync({ minIntervalMs: PAGE_SYNC_MIN_MS, reason: reason || 'page' })
       .catch((e) => ({ ok: false, error: String(e && e.message || e) }))
       .finally(() => { syncing = null; });
@@ -686,6 +696,21 @@
     return (graphTrace.attempts || []).slice(0, 12);
   }
 
+  function paneEpoch(pane) {
+    return pane && typeof pane.__epoch === 'number' ? pane.__epoch : null;
+  }
+
+  function paneCurrent(pane) {
+    const epoch = paneEpoch(pane);
+    return epoch == null || epoch === mailEpoch;
+  }
+
+  function stampEpoch(ctx, pane) {
+    const epoch = paneEpoch(pane);
+    if (ctx && epoch != null) ctx.__epoch = epoch;
+    return ctx;
+  }
+
   function buildCtx(entry, pane, decided) {
     const intent = (decided && decided.intent) || entry.intent;
     let process = (decided && decided.process) || entry.process;
@@ -723,7 +748,8 @@
       process: process,
       key: entry.key,
       hydrateHow: (pane && pane.hydrateHow) || null,
-      priorConversationId: (pane && pane.priorConversationId) || null
+      priorConversationId: (pane && pane.priorConversationId) || null,
+      __epoch: paneEpoch(pane)
     };
   }
 
@@ -1111,6 +1137,7 @@
 
   function injectCard(mount, ctx, handlers) {
     noteOpenMail();
+    if (ctx && typeof ctx.__epoch === 'number' && ctx.__epoch !== mailEpoch) return null;
     if (!renderLive()) return null;
     const src = handlers || {};
     const host = FlowChipHost.inject(mount, ctx, {
@@ -1339,6 +1366,7 @@
   async function keepActiveDraftReceipt(pane) {
     if (!pane || typeof FlowStorage.getActiveOutlookReceipts !== 'function') return false;
     const receipts = await FlowStorage.getActiveOutlookReceipts();
+    if (!paneCurrent(pane)) return false;
     const draft = (receipts || []).filter((r) => draftMatchesPane(r, pane)).pop();
     if (!draft) return false;
     const mount = mountPoint();
@@ -1350,11 +1378,11 @@
     }
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = injectCard(mount, {
+    const host = injectCard(mount, stampEpoch({
       process: { name: 'Reply', steps: [] },
       intent: { label: draft.label || 'Reply draft ready' },
       messageId: draft.messageId
-    }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
+    }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
     if (!host) return false;
     lastOutcome = 'card';
     FlowChipHost.showDraftReceipt(host, {
@@ -1728,7 +1756,8 @@
 
   // A silence replaces whatever card was already floating. The schedule card
   // from an older judgment used to stay up after the check had moved on.
-  function dropStuckCard() {
+  function dropStuckCard(pane) {
+    if (!paneCurrent(pane)) return;
     const mount = mountPoint();
     const old = mount && mount.querySelector('.flow-chip-host');
     if (old) old.remove();
@@ -1856,6 +1885,7 @@
   // outlook:file-found-no-attach and removed the card. The id is resolved when
   // it can be, and Do It resolves it again before the draft. Nothing is sent.
   async function showFilePrepare(pane, chain, messageId, messageIdFrom, immutable) {
+    if (!paneCurrent(pane)) return { shown: false, why: 'stale' };
     const file = chain && chain.hit && chain.hit.file;
     if (!file || !file.id) return { shown: false, why: 'no-file' };
     if (chain.hit.source !== 'drive') return { shown: false, why: 'not-drive' };
@@ -1901,9 +1931,10 @@
         }]
       }
     };
+    if (!paneCurrent(pane)) return { shown: false, why: 'stale' };
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = injectCard(mount, ctx, {
+    const host = injectCard(mount, stampEpoch(ctx, pane), {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -1920,6 +1951,7 @@
   }
 
   async function showHoldingChain(pane, chain, messageId) {
+    if (!paneCurrent(pane)) return false;
     if (!chain || chain.move !== 'needs-you' || chain.sends !== false || chain.close !== false) return false;
     if (!chain.holding || !chain.holding.text || chain.holding.claimsFile) return false;
     const mount = mountPoint();
@@ -1947,9 +1979,10 @@
       hydrateHow: pane && pane.hydrateHow,
       priorConversationId: pane && pane.priorConversationId
     };
+    if (!paneCurrent(pane)) return false;
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = injectCard(mount, ctx, {
+    const host = injectCard(mount, stampEpoch(ctx, pane), {
       onDoIt: (h, chip, c) => { onHoldingDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -2134,7 +2167,7 @@
   async function settleCalendarHold(pane, probe, st) {
     if (!probe || probe.move === 'ignore') return false;
     if (probe.move === 'silent') {
-      dropStuckCard();
+      dropStuckCard(pane);
       await pageReason('outlook-calendar-silent', pane);
       return true;
     }
@@ -2167,7 +2200,7 @@
     const match = found && found.match;
     const file = found && found.file;
     if (match !== 'one' || !file || !file.url) {
-      dropStuckCard();
+      dropStuckCard(pane);
       await pageReason(match === 'unknown' ? 'drive-search-failed' : 'outlook-calendar-no-file', pane);
       return true;
     }
@@ -2182,12 +2215,12 @@
       })
       : null;
     if (!hold || hold.move !== 'hold') {
-      dropStuckCard();
+      dropStuckCard(pane);
       await pageReason('outlook-calendar-silent', pane);
       return true;
     }
     if (typeof FlowOutlookCalendar === 'undefined' || !FlowOutlookCalendar.hasWriteScope(calendarScopes(st))) {
-      dropStuckCard();
+      dropStuckCard(pane);
       await pageReason('outlook-calendar-write-not-granted', pane);
       return true;
     }
@@ -2355,6 +2388,7 @@
     if (!renderLive()) return;
     const own = ownAddressesOf(st);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
+    if (pane) pane.__epoch = mailEpoch;
     const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
     const fileSig = pane && Array.isArray(pane.attachments)
@@ -2408,7 +2442,7 @@
     }
     dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, idSource: pane.idSource, chars: (pane.text || '').length });
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
-    if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(); await pageReason('page:not-connected', pane); return; }
+    if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(pane); await pageReason('page:not-connected', pane); return; }
     try {
       const filled = await hydratePane(pane);
       if (filled) {
@@ -2522,7 +2556,7 @@
     const receiptOnly = Boolean(entry && entry.outlookReceipt && entry.ref && !entry.process);
     const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || personaOwnSender(own) || (planned && (planned.reason === 'note-to-self' || planned.reason === 'own-sender')));
       if (selfMail) {
-      dropStuckCard();
+      dropStuckCard(pane);
       await pageReason('note-to-self', pane);
       return;
     }
@@ -2530,7 +2564,7 @@
       pane.userName = userNameOf(st);
       decided = await decideFromText(pane, own, entry);
       if (decided && decided.reason === 'third-party') {
-        dropStuckCard();
+        dropStuckCard(pane);
         await pageReason('page:third-party', pane);
         return;
       }
@@ -2564,7 +2598,7 @@
             if (chain && chain.move === 'needs-you') {
               const shown = await showHoldingChain(pane, chain, msgId);
               finalReason = shown ? 'needs-you' : 'page:no-message-id';
-              if (!shown) { dropStuckCard(); await pageReason(finalReason, pane); }
+              if (!shown) { dropStuckCard(pane); await pageReason(finalReason, pane); }
               return;
             }
             if (chain && chain.move === 'prepare') {
@@ -2578,12 +2612,12 @@
                 prepareWhy = !file || !file.id ? 'no-file' : 'not-drive';
                 finalReason = 'page:' + prepareWhy;
               }
-              dropStuckCard();
+              dropStuckCard(pane);
               await pageReason(finalReason, pane);
               return;
             }
             finalReason = namedSilence((ran && ran.quiet) || (chain && chain.reason) || 'file-chain-not-run');
-            dropStuckCard();
+            dropStuckCard(pane);
             await pageReason(finalReason, pane);
           } finally {
             if (tracing) {
@@ -2623,7 +2657,7 @@
           const keepFile = typeof FlowOutlookSync !== 'undefined' && typeof FlowOutlookSync.keepMailboxFileCard === 'function'
             && FlowOutlookSync.keepMailboxFileCard(decided, entry);
           if (!keepFile) {
-            dropStuckCard();
+            dropStuckCard(pane);
             const named = (decided && decided.reason) || 'intent-null';
             const quiet = /:/.test(String(named)) ? String(named) : ('page:' + named);
             await pageReason(quiet, pane);
@@ -2638,7 +2672,7 @@
           const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
           if (found && found.unread) {
             dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: found.from || null });
-            dropStuckCard();
+            dropStuckCard(pane);
             await pageReason(found.reason, pane);
             return;
           }
@@ -2673,7 +2707,8 @@
         await clearReason(pane, 'page:receipt-mounted');
         return;
       }
-      const host = injectCard(mount, {
+      if (!paneCurrent(pane)) return;
+      const host = injectCard(mount, stampEpoch({
         process: { name: 'Reply', id: 'reply', steps: [{ kind: 'outlookDraft', id: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
         messageId: entry.messageId,
@@ -2682,7 +2717,7 @@
         hydrateHow: pane.hydrateHow,
         priorConversationId: pane.priorConversationId,
         decisionReason: 'page:receipt-mounted'
-      }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
+      }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
       if (host) {
         lastOutcome = 'card';
         dbg('rendered', { receipt: true, messageId: entry.messageId });
@@ -2707,7 +2742,7 @@
     }
 
     if (!receiptOnly && await promiseOwnedElsewhere(pane, decided && decided.intent, [entry && entry.messageId, entry && entry.outlookIncomingId])) {
-      dropStuckCard();
+      dropStuckCard(pane);
       await pageReason('page:same-promise', pane);
       return;
     }
@@ -2778,6 +2813,7 @@
       lastKey = '';
     }
     if (mount.querySelector('.flow-chip-host') && key === lastKey) { lastOutcome = 'card'; return; }
+    if (!paneCurrent(pane)) return;
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
     lastKey = key;
@@ -2827,7 +2863,10 @@
   // there, which is how 0.9.14 stayed silent: so this is a throttle. One scan at a time; a change during a scan runs one more.
   function schedule() {
     const switched = noteOpenMail();
-    if (switched) {
+    // A switch that arrived while a scan was already reading the previous
+    // mail has already stored the token. That follow-up is still the fast
+    // path. Waiting out the 0.8s throttle is how a card came back in 3–4s.
+    if (switched || switchPending) {
       if (timer) { clearTimeout(timer); timer = null; }
       timer = setTimeout(runScan, 40);
       return;
@@ -3606,6 +3645,7 @@
   }
 
   async function showOpenLoopCard(pane, loop) {
+    if (!paneCurrent(pane)) return false;
     const mount = mountPoint();
     if (!mount || !loop || !loop.process) return false;
     const existing = mount.querySelector('.flow-chip-host');
@@ -3654,24 +3694,34 @@
     paintUndoneStatus(mount, pane, banner.line);
   }
 
+  let scanForEpoch = null;
   async function runScan() {
     timer = null;
-    if (scanning) { again = true; return; }
+    // Same mail: one scan. A new mail does not wait for the previous
+    // scan's Graph read. That scan drops its own writes once the epoch moved.
+    if (scanning && scanForEpoch === mailEpoch) { again = true; return; }
+    const epoch = mailEpoch;
     scanning = true;
+    scanForEpoch = epoch;
     try { await scan(); }
     catch (e) {
       try { console.error('Glance: outlook scan error', e && e.message ? e.message : e); } catch (x) { /* console gone */ }
       try {
-        const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? FlowOwaParse.urlIds(location.href) : {};
-        await pageReason('page:scan-error', { subject: (ids && (ids.raw || ids.itemId || ids.conversationId)) || '' });
+        if (scanForEpoch === epoch) {
+          const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? FlowOwaParse.urlIds(location.href) : {};
+          await pageReason('page:scan-error', { subject: (ids && (ids.raw || ids.itemId || ids.conversationId)) || '' });
+        }
       } catch (x2) { /* storage gone with the page */ }
     }
     finally {
+      if (scanForEpoch !== epoch) return;
       try { await recordSuggestNote(); } catch (e) { /* the note is not the card */ }
+      if (scanForEpoch !== epoch) return;
       try { await paintStoredUndoneIfQuiet(); } catch (e) { /* the banner is not the card */ }
+      if (scanForEpoch !== epoch) return;
       scanning = false;
       if (renderLive()) switchPending = false;
-      if (again || switchPending) { again = false; schedule(); }
+      if (again || switchPending || mailEpoch !== epoch) { again = false; schedule(); }
     }
   }
 

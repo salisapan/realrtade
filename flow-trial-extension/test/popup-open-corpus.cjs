@@ -269,6 +269,47 @@ async function run() {
     check('the empty state is shown', document.getElementById('open-empty').hidden === false);
   }
 
+  console.log('\n--- popup.js: a passed deadline is a Loops row named expired, with no Do It ---\n');
+  {
+    const proc = { id: 'reply-track', name: 'Reply & Track', steps: [{ id: 'draft' }] };
+    const stored = {
+      log: [{
+        ts: Date.now(),
+        kind: 'shown',
+        messageId: 'car-insurance',
+        threadId: 't-car',
+        process: proc,
+        sender: { name: 'Dana' },
+        subject: 'Car insurance certificate',
+        text: 'Please send the car insurance certificate by October 12.',
+        app: 'outlook',
+        threadUrl: 'https://outlook.office.com/mail/insurance',
+        intent: {
+          type: 'request',
+          label: 'Send the car insurance certificate',
+          confidence: 'high',
+          personalClose: 'follow-up-ask',
+          facts: { date: { iso: '2020-01-02' } },
+          entities: { what: 'the car insurance certificate', requestWhat: 'Please send the car insurance certificate by October 12.' }
+        }
+      }]
+    };
+    const { document } = (() => {
+      const l = load(stored);
+      vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), l.sandbox, { filename: 'popup.js' });
+      return l;
+    })();
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('open-list');
+    const rows = find(host, 'log-item');
+    const kinds = find(host, 'log-kind').map((n) => n.textContent);
+    const marked = rows.filter((n) => n.getAttribute('data-glance-status') === 'expired');
+    check('the car-insurance loop is listed once, as expired', rows.length === 1 && marked.length === 1 && kinds.indexOf('expired') !== -1, { rows: rows.length, kinds });
+    check('an expired loop has no Do It', find(host, 'primary').length === 0, find(host, 'primary').length);
+    check('the empty state stays hidden while the expired row is there', document.getElementById('open-empty').hidden === true);
+  }
+
   console.log('\n--- popup.js: Dismiss closes the process for good, DOM-independent ---\n');
   {
     const proc = { id: 'log-it', name: 'Log it', steps: [{ id: 'task' }] };
