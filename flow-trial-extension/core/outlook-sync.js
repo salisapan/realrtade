@@ -311,7 +311,27 @@ const FlowOutlookSync = (() => {
     return steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
   }
 
-  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan, keepMailboxFileCard };
+  // A Drafts-folder message Glance already created for a loop is not a
+  // new silence line. A draft with no known conversation and no stored ref
+  // is the unexplained one.
+  function explainDrafts(drafts, ctx) {
+    const conversations = {};
+    const refs = {};
+    ((ctx && ctx.conversations) || []).forEach((id) => { if (id) conversations[String(id)] = 1; });
+    ((ctx && ctx.refs) || []).forEach((id) => { if (id) refs[String(id)] = 1; });
+    return (drafts || []).filter(Boolean).map((d) => {
+      const id = String((d && d.id) || '');
+      const conv = String((d && d.conversationId) || '');
+      const known = (id && refs[id]) || (conv && conversations[conv]);
+      return {
+        id: id,
+        conversationId: conv || null,
+        reason: known ? 'draft-for-loop' : 'draft-unexplained'
+      };
+    });
+  }
+
+  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan, keepMailboxFileCard, explainDrafts };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookSync };

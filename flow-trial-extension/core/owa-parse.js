@@ -449,6 +449,30 @@ const FlowOwaParse = (() => {
     return pack(null, 'ambiguous');
   }
 
+  // Subject search is the last resort. A row from another conversation, or
+  // a row whose clock is a different minute, is not the open mail. No clock
+  // on the page means nothing here is confirmed.
+  function subjectFallbackRows(pane, rows) {
+    const list = (rows || []).filter(Boolean);
+    if (!pane) return [];
+    const confirmed = canonId(pane.conversationId);
+    let pool = list;
+    if (confirmed) {
+      pool = list.filter((m) => {
+        const got = canonId(m && m.conversationId);
+        return Boolean(got) && got === confirmed;
+      });
+    }
+    const minute = minuteKey(pane.receivedDateTime || pane.date) || '';
+    const alt = minuteKey(pane.clockAlt) || '';
+    if (!minute && !alt) return [];
+    return pool.filter((m) => {
+      const got = minuteKey(m && m.receivedDateTime);
+      if (!got) return false;
+      return got === minute || (alt && got === alt);
+    });
+  }
+
   function matchEntry(pane, entries) {
     const r = matchEntryHow(pane, entries);
     return r ? r.entry : null;
@@ -564,14 +588,44 @@ const FlowOwaParse = (() => {
     return (d && d.querySelector && d.querySelector('[role="main"]')) || null;
   }
 
+  // The recipient well and a To/Cc line are not the sender. A header that
+  // merely contains those lines is still searched.
+  function recipientLineEl(el) {
+    if (!el || !el.getAttribute) return false;
+    if (String(el.getAttribute('data-testid') || '') === 'RecipientWell') return true;
+    const id = String(el.getAttribute('id') || '');
+    if (/_(?:TO|CC)$/i.test(id)) return true;
+    const aria = plainLine(el.getAttribute('aria-label') || el.getAttribute('title') || '');
+    if (/^(?:to|cc|אל|עותק)\b/i.test(aria)) return true;
+    if (!el.children || el.children.length === 0) {
+      const own = plainLine(textOf(el)).slice(0, 40);
+      if (/^(?:to|cc|אל|עותק)\s*:/i.test(own)) return true;
+    }
+    return false;
+  }
+
+  function inRecipientBlock(n) {
+    if (!n) return false;
+    if (n.closest && n.closest('[data-testid="RecipientWell"]')) return true;
+    let p = n;
+    for (let i = 0; p && i < 10; i++) {
+      if (recipientLineEl(p)) return true;
+      p = p.parentElement;
+    }
+    return false;
+  }
+
   // Sender of the open message: a mailto link, an element whose title/aria-label carries an address, or "Name <address>"
   // text in the message header, above the body, that is not one of the person's own addresses.
+  // Graph `from` is the address when the page only shows a name. This walk
+  // skips the recipient well so a To/Cc address is not stored as the sender.
   function senderOf(container, bodyRoot, own) {
     const mine = new Set((own || []).map((a) => String(a || '').toLowerCase()));
     const ok = (e) => e && !mine.has(e);
     if (!container || !container.querySelectorAll) return { email: '', name: '' };
     const nodes = container.querySelectorAll('a[href^="mailto:"], [title*="@"], [aria-label*="@"], span, button');
     for (const n of nodes) {
+      if (inRecipientBlock(n)) continue;
       if (bodyRoot && (n === bodyRoot || (bodyRoot.contains && bodyRoot.contains(n)) || !before(n, bodyRoot))) continue;
       let email = '';
       let name = '';
@@ -1309,12 +1363,16 @@ const FlowOwaParse = (() => {
       const key = norm(name) + '|' + norm(label).replace(/\s+/g, '');
       if (seen[key]) continue;
       seen[key] = 1;
-      out.push({ name: name, sizeLabel: label });
+      const unit = sizeM[2].toUpperCase();
+      const amount = Number(sizeM[1].replace(',', '.'));
+      const mul = unit === 'KB' ? 1024 : unit === 'MB' ? 1024 * 1024 : unit === 'GB' ? 1024 * 1024 * 1024 : 1;
+      const size = isFinite(amount) ? Math.round(amount * mul) : null;
+      out.push(size == null ? { name: name, sizeLabel: label } : { name: name, size: size, sizeLabel: label });
     }
     return out;
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, subjectFallbackRows, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

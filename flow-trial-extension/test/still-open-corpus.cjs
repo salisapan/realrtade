@@ -550,5 +550,37 @@ console.log('\n--- still open: one Do It after Undo, and a no-reply ask keeps it
     }) === false);
 }
 
+console.log('\n--- 0.9.56: another conversation is not this mail, and a receipt covers its open copy ---\n');
+{
+  const row = candidate('I will send you the signed contract by Friday, September 18.', 'conv-row');
+  row.subject = 'Signed contract';
+  row.outlookConversationId = 'conv-a';
+  check('same subject and promise in another conversation do not match',
+    FlowStillOpen.sameSubjectPromise(row, {
+      text: row.text, subject: row.subject, sender: row.sender, outlookConversationId: 'conv-b'
+    }) === false);
+  check('the same conversation still matches',
+    FlowStillOpen.sameSubjectPromise(row, {
+      text: row.text, subject: row.subject, sender: row.sender, outlookConversationId: 'conv-a'
+    }) === true);
+  const twin = Object.assign({}, row, { messageId: 'conv-row-scan' });
+  const other = candidate('I will send the passport scan by Monday, September 21.', 'passport-other');
+  other.subject = row.subject;
+  other.outlookConversationId = 'conv-b';
+  const receipt = {
+    messageId: 'receipt-1',
+    outlookConversationId: 'conv-a',
+    subject: row.subject,
+    text: row.text,
+    intent: row.intent,
+    sender: row.sender,
+    process: row.process
+  };
+  const panel = FlowStillOpen.panelLoops([row, twin, other], [receipt]);
+  check('a receipt covers the open copies of that promise',
+    panel.receipts.length === 1 && panel.openOnly.length === 1 && panel.openOnly[0].messageId === 'passport-other',
+    { open: panel.openOnly.map((r) => r.messageId), receipts: panel.receipts.length });
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

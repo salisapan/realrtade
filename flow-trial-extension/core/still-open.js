@@ -470,7 +470,56 @@ const FlowStillOpen = (() => {
     const whoA = senderKeyOf(row);
     const whoB = senderKeyOf(pane);
     if (whoA && whoB && whoA !== whoB) return false;
+    const convA = conversationOf(row);
+    const convB = conversationOf(pane);
+    if (convA && convB && convA !== convB) return false;
     return true;
+  }
+
+  function conversationOf(row) {
+    if (!row) return '';
+    if (row.outlookConversationId) return String(row.outlookConversationId);
+    if (row.conversationId) return String(row.conversationId);
+    const t = String(row.threadId || '');
+    return t.indexOf('ol:') === 0 ? t.slice(3) : '';
+  }
+
+  function loopIds(row) {
+    return [row && row.messageId, row && row.itemId, row && row.pathId, row && row.outlookIncomingId].filter(Boolean).map(String);
+  }
+
+  // A receipt and a still-open row are one loop when they name the same
+  // message, the same promise, or the same conversation and promise.
+  // Two different promises stay two rows.
+  function sameLoopRow(a, b) {
+    if (!a || !b) return false;
+    const left = loopIds(a);
+    const right = loopIds(b);
+    if (left.some((id) => right.indexOf(id) >= 0)) return true;
+    const keyA = commitmentDedupeKey(a);
+    const keyB = commitmentDedupeKey(b);
+    if (keyA && keyB && keyA === keyB) return true;
+    const convA = conversationOf(a);
+    const convB = conversationOf(b);
+    if (convA && convB && convA === convB && sameSubjectPromise(a, b)) return true;
+    return false;
+  }
+
+  // Loops shows one row per loop. A receipt wins over the open copy.
+  function panelLoops(openRows, receipts) {
+    const opens = Array.isArray(openRows) ? openRows.filter(Boolean) : [];
+    const recs = Array.isArray(receipts) ? receipts.filter(Boolean) : [];
+    const keptReceipts = [];
+    recs.forEach((r) => {
+      if (!keptReceipts.some((k) => sameLoopRow(k, r))) keptReceipts.push(r);
+    });
+    const openOnly = [];
+    opens.forEach((row) => {
+      if (keptReceipts.some((r) => sameLoopRow(r, row))) return;
+      if (openOnly.some((k) => sameLoopRow(k, row))) return;
+      openOnly.push(row);
+    });
+    return { openOnly: openOnly, receipts: keptReceipts };
   }
 
   function humanDate(iso, now) {
@@ -667,6 +716,7 @@ const FlowStillOpen = (() => {
     select: select,
     promiseKey: commitmentDedupeKey,
     sameSubjectPromise: sameSubjectPromise,
+    panelLoops: panelLoops,
     activeProofFor: activeProofFor,
     whyLine: whyLine,
     notificationText: notificationText,

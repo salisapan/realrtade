@@ -287,6 +287,9 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('Do It createReply once on the incoming message id', draft.ok && draft.ref && draft.written.indexOf('Not sent') !== -1, draft);
     const posts = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
     check('exactly one createReply POST', posts.length === 1 && /\/messages\/a1\/createReply/.test(posts[0].url), posts.map((c) => c.url));
+    const reused = await o.createReplyDraft('a1', 'Thanks, will confirm.');
+    const postsReuse = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
+    check('a second Do It reuses the draft still in Drafts', reused.ok && reused.reused === true && reused.reason === 'draft-already' && reused.ref === draft.ref && postsReuse.length === 1, reused);
     check('Mail.Send never in requested scopes', CFG.SCOPES.indexOf('Mail.Send') === -1);
     const forbidden = w.calls.filter((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(c.url) && c.method !== 'GET');
     check('no /send /reply /replyAll /forward /sendMail ever happens', forbidden.length === 0, forbidden);

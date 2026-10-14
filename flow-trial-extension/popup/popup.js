@@ -2266,6 +2266,7 @@
     const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
       ? await FlowStorage.getActiveOutlookReceipts()
       : [];
+    if (typeof FlowStillOpen.panelLoops === 'function') return FlowStillOpen.panelLoops(pending, receipts);
     const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
     const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
     return { openOnly: openOnly, receipts: receipts };

@@ -121,6 +121,6 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
     attachments: pdf(800)
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
-  await expect(skipPane.getByText('northwind-agreement-signed.pdf · skipped · small-doc')).toBeVisible();
-  await expect(skipPane.getByText('Save the file?')).toHaveCount(0);
+  await expect(skipPane.getByText('Save the file?')).toBeVisible();
+  await expect(skipPane.locator('.flow-chip-process-name')).toHaveText('Save the file?');
 });

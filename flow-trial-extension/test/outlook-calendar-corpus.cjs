@@ -15,7 +15,10 @@ for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 
 const Cal = vm.runInContext('FlowOutlookCalendar', sandbox);
 const Cfg = vm.runInContext('FlowOutlookConfig', sandbox);
 
-const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0);
+// A number, not an outer Date: classify runs in a vm, and instanceof Date
+// fails across that boundary. After 2026-10-08 a live Date.now() would mark
+// the gate day as past and drop dateIso.
+const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0).getTime();
 const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
 const HE = 'שים את glance-pricing-q4.pdf ביומן מחר (8 באוקטובר 2026) בשעה 10:00.';
 const FILE = { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' };
