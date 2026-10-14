@@ -186,6 +186,20 @@ function installE2EHooks() {
         const item = e2e.driveByName[driveRoot[1]];
         return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
       }
+      const driveVersions = path.match(/\/me\/drive\/items\/([^/]+)\/versions$/);
+      if (driveVersions && method === 'GET') {
+        const item = e2e.driveItems[driveVersions[1]];
+        if (!item) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
+        return Promise.resolve(json(200, { value: [{ id: item.versionId || 'ver-prev' }] }));
+      }
+      const driveRestore = path.match(/\/me\/drive\/items\/([^/]+)\/versions\/([^/]+)\/restoreVersion$/);
+      if (driveRestore && method === 'POST') return Promise.resolve(empty(204));
+      const driveItemContent = path.match(/\/me\/drive\/items\/([^/]+)\/content$/);
+      if (driveItemContent && method === 'PUT') {
+        const item = e2e.driveItems[driveItemContent[1]];
+        if (!item) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
+        return Promise.resolve(json(200, item));
+      }
       const driveItem = path.match(/\/me\/drive\/items\/([^/]+)$/);
       if (driveItem) {
         const id = driveItem[1];

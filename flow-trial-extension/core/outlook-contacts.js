@@ -136,9 +136,12 @@ const FlowOutlookContacts = (() => {
 // this file is the extension worker (no document, chrome-extension URL).
 const LANE_PAGE_FILES = [
   'core/outlook-contacts.js',
+  'core/outlook-word.js',
   'src/lane-ms-page.js'
 ];
-const LANE_WORKER_FILES = [];
+const LANE_WORKER_FILES = [
+  'core/outlook-word.js'
+];
 const LANE_IDS = {
   outlookContacts: 'FlowOutlookContacts',
   outlookWord: 'FlowOutlookWord',
