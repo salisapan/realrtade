@@ -92,6 +92,7 @@ it, not touching the module.
 | `local-lm-audit.js` | The fixed sentences an on-device language model must pass on THIS device before core/local-lm.js lets it propose anything. |
 | `local-lm-server.js` | A language model the person runs ON THEIR OWN COMPUTER (Ollama, LM Studio, or anything that speaks the same two HTTP dialects), as another source for the session core/local-lm.js already knows how to use. |
 | `local-lm.js` | A language model that runs on THIS device, as the third recognition tier. |
+| `loop-bridge.js` | The contract for showing a coding agent which loops are open, over MCP, and taking back claims of evidence. Minimal by default (no names, sentences or amounts), an allowlist rebuild of every outgoing loop, and a claim is only a claim: the agent can never close, release or send, and a loop closes only on Glance's own read-back. Dormant: nothing in the extension calls it. `docs/glance-ai/loops-mcp.md`. |
 | `mask-ids.js` | Masks identifiers that core/privacyShield.js does not (national ID numbers, policy / case / account / claim numbers, IBANs, passport numbers) and composes it with the shield into the one masking pass that runs before ANY text may leave the device. |
 | `meeting-debrief.js` | After a meeting: what came out of it — portable, no chrome.*, no DOM, no network, no model. |
 | `model-store.js` | Fetches, verifies and keeps an on-device model's files, quietly and politely. |
