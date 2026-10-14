@@ -2351,16 +2351,35 @@
     }
     receipts.forEach((entry) => place(entry, outlookReceiptRow(entry)));
     openOnly.forEach((entry) => place(entry, openRow(entry)));
-    // A row that carries a step list already starts with its own Suggested or Added heading (src/step-kit.js). The Loops heading is
-    // for lists that have none (one Do It, one Handled row), so the same heading never shows twice.
-    const ownsHeading = (node, which) => Boolean(node && node.querySelector && node.querySelector('[data-glance-section="' + which + '"]'));
+    // The list owns Suggested and Added. A step list inside a card used to
+    // repeat that word (src/step-kit.js). The card keeps its steps. The
+    // heading stays once, above the cards.
+    function dropRepeatedHeading(node, which) {
+      if (!node || !node.children) return;
+      const kids = Array.prototype.slice.call(node.children);
+      for (let i = 0; i < kids.length; i++) {
+        const child = kids[i];
+        const section = child.getAttribute && child.getAttribute('data-glance-section');
+        if (section === which) {
+          if (node.removeChild) node.removeChild(child);
+          continue;
+        }
+        dropRepeatedHeading(child, which);
+      }
+    }
     if (suggested.length) {
-      if (!ownsHeading(suggested[0], 'suggested')) host.appendChild(loopsHeading('suggested'));
-      suggested.forEach((node) => host.appendChild(node));
+      host.appendChild(loopsHeading('suggested'));
+      suggested.forEach((node) => {
+        dropRepeatedHeading(node, 'suggested');
+        host.appendChild(node);
+      });
     }
     if (added.length) {
-      if (!ownsHeading(added[0], 'added')) host.appendChild(loopsHeading('added'));
-      added.forEach((node) => host.appendChild(node));
+      host.appendChild(loopsHeading('added'));
+      added.forEach((node) => {
+        dropRepeatedHeading(node, 'added');
+        host.appendChild(node);
+      });
     }
     if (expired.length) {
       host.appendChild(loopsHeading('expired'));

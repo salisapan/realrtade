@@ -949,6 +949,84 @@ async function run() {
     const doIts = find(handled.document.getElementById('open-list'), 'primary');
     check('that open parking row is one Do It', doIts.length === 1, doIts.length);
 
+    const headingIso = isoDaysFromNow(1);
+    const heading = load({
+      log: [
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'sug-mail', threadId: 'ol:sug',
+          subject: 'Please renew the parking permit by Sunday.',
+          text: 'Please renew the parking permit by Sunday.',
+          intent: datedIntent(headingIso),
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit' } }] }
+        },
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'add-mail', threadId: 'ol:add',
+          subject: 'Gate 0.9.35 To Do title',
+          text: 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate',
+          intent: {
+            type: 'decision',
+            label: 'Log commitment for Oct 9',
+            confidence: 'high',
+            personalClose: 'dated-commitment',
+            facts: { date: { iso: isoDaysFromNow(3) } },
+            entities: { what: 'renew the passport application' },
+            signals: { score: 80 }
+          },
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'added-task', added: true, params: { title: 'Call Noa' } }] }
+        }
+      ]
+    }, {});
+    heading.sandbox.FlowStepKit = {};
+    heading.sandbox.FlowStepList = {
+      rowsFor(process) {
+        const steps = (process && process.steps) || [];
+        if (steps.some((s) => s && s.added === true)) return [{ id: 'a', added: true }];
+        return [{ id: 's', suggested: true }];
+      },
+      liveStepsFrom() { return []; }
+    };
+    heading.sandbox.FlowStepListView = {
+      mount(host, rows) {
+        const added = (rows || []).some((r) => r && r.added);
+        const sec = heading.document.createElement('li');
+        sec.className = 'act-section';
+        sec.setAttribute('data-glance-section', added ? 'added' : 'suggested');
+        const label = heading.document.createElement('span');
+        label.className = 'acts-label';
+        label.textContent = added ? 'Added' : 'Suggested';
+        sec.appendChild(label);
+        host.appendChild(sec);
+        return {};
+      }
+    };
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), heading.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const headingList = heading.document.getElementById('open-list');
+    function sectionNodes(node, out) {
+      out = out || [];
+      if (node && node.getAttribute && node.getAttribute('data-glance-section')) out.push(node);
+      for (const c of (node && node.children) || []) sectionNodes(c, out);
+      return out;
+    }
+    const topHeads = (headingList.children || []).filter((n) => String(n.className || '').split(/\s+/).includes('loops-section'));
+    const topSuggested = topHeads.filter((n) => n.getAttribute('data-glance-section') === 'suggested');
+    const topAdded = topHeads.filter((n) => n.getAttribute('data-glance-section') === 'added');
+    const suggestedLabel = topSuggested[0] && (topSuggested[0].children || []).map((c) => c.textContent).join('');
+    const addedLabel = topAdded[0] && (topAdded[0].children || []).map((c) => c.textContent).join('');
+    const cards = find(headingList, 'log-item');
+    const repeated = [];
+    cards.forEach((card) => {
+      sectionNodes(card).forEach((n) => {
+        const section = n.getAttribute('data-glance-section');
+        if (section === 'suggested' || section === 'added') repeated.push(section);
+      });
+    });
+    check('Loops keeps one top-level Suggested heading and one top-level Added heading',
+      topSuggested.length === 1 && suggestedLabel === 'Suggested' && topAdded.length === 1 && addedLabel === 'Added',
+      { suggested: topSuggested.length, suggestedLabel, added: topAdded.length, addedLabel, cards: cards.length,
+        sections: sectionNodes(headingList).map((n) => n.getAttribute('data-glance-section') + ':' + String(n.className || '')) });
+    check('no Loops card repeats Suggested or Added', repeated.length === 0, repeated);
+
     check('a reply ask still does not write Microsoft To Do',
       !(draftOpts.executes || []).some((p) => p && (p.connectorId === 'outlookTask' || p.connectorId === 'onedriveFile')),
       draftOpts.executes);
