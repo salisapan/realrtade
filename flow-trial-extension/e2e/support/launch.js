@@ -75,6 +75,7 @@ function installE2EHooks() {
   e2e.drafts = e2e.drafts || {};
   e2e.driveItems = e2e.driveItems || {};
   e2e.driveByName = e2e.driveByName || {};
+  e2e.workbooks = e2e.workbooks || {};
   e2e.seq = e2e.seq || 1;
   globalThis.__glanceE2e = e2e;
 
@@ -143,6 +144,88 @@ function installE2EHooks() {
     }
 
     if (host === 'graph.microsoft.com') {
+      (scenario.driveSeed || []).forEach((item) => {
+        if (item && item.id && !e2e.driveItems[item.id]) {
+          e2e.driveItems[item.id] = item;
+          if (item.name) e2e.driveByName[item.name] = item;
+        }
+      });
+      e2e.workbooks = e2e.workbooks || {};
+      (scenario.workbookSeed || []).forEach((book) => {
+        if (!book || !book.itemId || e2e.workbooks[book.itemId]) return;
+        e2e.workbooks[book.itemId] = {
+          tables: (book.tables || []).map((table) => ({
+            id: table.id,
+            name: table.name || 'Table1',
+            rows: (table.rows || []).map((row) => row.slice())
+          }))
+        };
+      });
+      const workbook = path.match(/\/me\/drive\/items\/([^/]+)\/workbook(?:\/(.*))?$/);
+      if (workbook) {
+        const itemId = workbook[1];
+        const rest = workbook[2] || '';
+        if (!e2e.driveItems[itemId]) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
+        const wb = e2e.workbooks[itemId] || (e2e.workbooks[itemId] = { tables: [] });
+        let posted = {};
+        try { posted = init && init.body ? JSON.parse(init.body) : {}; } catch (err) { posted = {}; }
+        if (rest === 'createSession' && method === 'POST') {
+          wb.session = 'sess-' + itemId;
+          return Promise.resolve(json(201, { id: wb.session }));
+        }
+        if (rest === 'closeSession' && method === 'POST') {
+          wb.session = null;
+          return Promise.resolve(empty(204));
+        }
+        if (rest.indexOf('range') >= 0 && method === 'PATCH') {
+          wb.range = posted.values || [];
+          return Promise.resolve(json(200, { values: wb.range }));
+        }
+        if (rest.indexOf('range') >= 0 && method === 'GET') {
+          return Promise.resolve(json(200, { values: wb.range || [] }));
+        }
+        if (rest === 'tables/add' && method === 'POST') {
+          const id = 'e2e-table-' + (e2e.seq++);
+          const rows = (wb.range || []).map((row) => row.slice());
+          wb.tables.push({ id: id, name: 'Table1', rows: rows });
+          return Promise.resolve(json(201, { id: id, name: 'Table1' }));
+        }
+        if (rest === 'tables' && method === 'GET') {
+          return Promise.resolve(json(200, { value: wb.tables.map((table) => ({ id: table.id, name: table.name })) }));
+        }
+        const rowAdd = rest.match(/^tables\/([^/]+)\/rows\/add$/);
+        if (rowAdd && method === 'POST') {
+          const table = wb.tables.find((item) => item.id === rowAdd[1] || item.name === rowAdd[1]);
+          if (!table) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
+          const row = (posted.values && posted.values[0]) || [];
+          table.rows.push(row.slice());
+          return Promise.resolve(json(201, { index: table.rows.length - 1, values: [row] }));
+        }
+        const rowList = rest.match(/^tables\/([^/]+)\/rows$/);
+        if (rowList && method === 'GET') {
+          const table = wb.tables.find((item) => item.id === rowList[1] || item.name === rowList[1]);
+          if (!table) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
+          return Promise.resolve(json(200, {
+            value: table.rows.map((values, index) => ({ index: index, values: [values] }))
+          }));
+        }
+        const rowDelete = rest.match(/^tables\/([^/]+)\/rows\/itemAt\(index=(\d+)\)\/delete$/);
+        if (rowDelete && method === 'POST') {
+          const table = wb.tables.find((item) => item.id === rowDelete[1]);
+          if (table) table.rows.splice(Number(rowDelete[2]), 1);
+          return Promise.resolve(empty(204));
+        }
+        const tableOne = rest.match(/^tables\/([^/]+)$/);
+        if (tableOne && method === 'DELETE') {
+          wb.tables = wb.tables.filter((item) => item.id !== tableOne[1]);
+          return Promise.resolve(empty(204));
+        }
+        if (tableOne && method === 'GET') {
+          const table = wb.tables.find((item) => item.id === tableOne[1]);
+          return Promise.resolve(table ? json(200, { id: table.id, name: table.name }) : json(404, {}));
+        }
+        return Promise.resolve(json(404, { error: { message: 'e2e-unmocked', path: path } }));
+      }
       const attItem = path.match(/\/me\/messages\/([^/]+)\/attachments\/([^/]+)$/);
       if (attItem) {
         const messageId = attItem[1];
@@ -561,6 +644,7 @@ async function boot() {
       e.drafts = {};
       e.driveItems = {};
       e.driveByName = {};
+      e.workbooks = {};
       e.seq = 1;
     });
   };

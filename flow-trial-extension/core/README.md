@@ -103,6 +103,7 @@ it, not touching the module.
 | `outlook-config.js` | The application (client) ID of the registered "Glance Outlook" Microsoft Entra app. Public; a placeholder until the owner registers it (open-tasks). |
 | `outlook-contacts.js` | Read-only recipient resolve by name through `/me/contacts` and `/me/people`. `Contacts.Read` from `outlook-config.js`. An unclear or split match stays quiet. No network in the portable helpers. The one background import binds the service worker only when the page is an extension worker. |
 | `outlook-word.js` | One `.docx` on the person's OneDrive. Read-back of the item id is the close. Undo deletes a file this write created or restores the previous version. `Files.ReadWrite`. Never sends. No network in this file. |
+| `outlook-excel.js` | Append one row or create one table through the Graph workbook API. Handled only after that row or table is read back. Undo deletes that row, that table, or the workbook this write created. `Files.ReadWrite`. Never sends. No network in this file. |
 | `outlook-sync.js` | What to do with the last couple of weeks of an Outlook mailbox. |
 | `outlook-state-migrate.js` | One-shot upgrade: merge leftover HANDLED+UNDONE Outlook draft rows and scrub false-close counts for prepared-draft undos. |
 | `draft-reply.js` | Shared reply-draft body for Gmail and Outlook (never sent): rich ack of concrete asks (facts when known; placeholders only when needed), same shape on both surfaces. |
