@@ -1,5 +1,6 @@
 // One .docx on the person's OneDrive. Read-back of the item id is the close.
-// Undo deletes a file this write created, or restores the previous version.
+// Undo deletes a file this write created, unless eTag or lastModifiedDateTime
+// changed after that write, or restores the previous version.
 // Files.ReadWrite. Never sends. No network here: pass call().
 const FlowOutlookWord = (() => {
   const CONNECTOR = 'outlookWord';
@@ -213,7 +214,15 @@ const FlowOutlookWord = (() => {
     }
     const proof = prove(itemId, deps);
     if (!proof) return { ok: false, reason: 'verify_failed', proof: null };
-    const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created, previousVersionId: previousVersionId };
+    const ref = {
+      fileId: itemId,
+      itemId: itemId,
+      externalId: itemId,
+      created: created,
+      previousVersionId: previousVersionId,
+      eTag: back.body.eTag ? String(back.body.eTag) : '',
+      lastModifiedDateTime: back.body.lastModifiedDateTime ? String(back.body.lastModifiedDateTime) : ''
+    };
     return {
       ok: true,
       connectorId: CONNECTOR,
@@ -230,6 +239,14 @@ const FlowOutlookWord = (() => {
     const itemId = ref && (ref.itemId || ref.fileId);
     if (!itemId || typeof call !== 'function') return { ok: false, reason: 'unclear' };
     if (ref.created) {
+      if (ref.eTag || ref.lastModifiedDateTime) {
+        const fresh = await call({ method: 'GET', path: '/me/drive/items/' + encodeURIComponent(itemId) });
+        const body = fresh && fresh.body;
+        if (!fresh || fresh.ok !== true || !body) return { ok: false, reason: 'undo-failed' };
+        const etagChanged = ref.eTag && String(body.eTag || '') !== String(ref.eTag);
+        const timeChanged = ref.lastModifiedDateTime && String(body.lastModifiedDateTime || '') !== String(ref.lastModifiedDateTime);
+        if (etagChanged || timeChanged) return { ok: false, reason: 'file-changed' };
+      }
       const del = await call({ method: 'DELETE', path: '/me/drive/items/' + encodeURIComponent(itemId) });
       if (!del || del.ok !== true) return { ok: false, reason: 'undo-failed' };
       return {

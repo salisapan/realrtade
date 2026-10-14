@@ -147,7 +147,9 @@
       'files-not-granted': 'OneDrive is not on for this sign-in.',
       'chat-not-granted': 'Teams chat is not on for this sign-in.',
       unclear: '',
-      verify_failed: 'Could not confirm.'
+      verify_failed: 'Could not confirm.',
+      'row-changed': 'That row changed, so it was left as it is.',
+      'file-changed': 'The file changed, so it was left as it is.'
     };
     status.textContent = Object.prototype.hasOwnProperty.call(quiet, res.reason) ? quiet[res.reason] : (res.written || 'Could not finish that.');
   }

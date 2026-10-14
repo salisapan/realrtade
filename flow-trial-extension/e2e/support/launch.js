@@ -209,6 +209,14 @@ function installE2EHooks() {
             value: table.rows.map((values, index) => ({ index: index, values: [values] }))
           }));
         }
+        const rowAt = rest.match(/^tables\/([^/]+)\/rows\/itemAt\(index=(\d+)\)$/);
+        if (rowAt && method === 'GET') {
+          const table = wb.tables.find((item) => item.id === rowAt[1] || item.name === rowAt[1]);
+          const index = Number(rowAt[2]);
+          const values = table && table.rows[index];
+          if (!values) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
+          return Promise.resolve(json(200, { index: index, values: [values] }));
+        }
         const rowDelete = rest.match(/^tables\/([^/]+)\/rows\/itemAt\(index=(\d+)\)\/delete$/);
         if (rowDelete && method === 'POST') {
           const table = wb.tables.find((item) => item.id === rowDelete[1]);
@@ -259,7 +267,13 @@ function installE2EHooks() {
       if (driveContent && method === 'PUT') {
         const name = driveContent[1];
         const id = 'e2e-file-' + (e2e.seq++);
-        const item = { id: id, name: name, webUrl: 'https://onedrive.live.com/file/' + id };
+        const item = {
+          id: id,
+          name: name,
+          webUrl: 'https://onedrive.live.com/file/' + id,
+          eTag: 'etag-' + id,
+          lastModifiedDateTime: '2026-10-14T12:00:00.000Z'
+        };
         e2e.driveItems[id] = item;
         e2e.driveByName[name] = item;
         return Promise.resolve(json(201, item));

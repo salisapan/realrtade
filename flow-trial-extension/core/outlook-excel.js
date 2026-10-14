@@ -1,6 +1,8 @@
 // Append one row or create one table through the Graph workbook API.
-// Handled only after the row or table is read back. Undo deletes that row,
-// that table, or the workbook this write created. Files.ReadWrite. Never sends.
+// Undo of an append deletes that row only after a read-back still matches it.
+// Handled only after the row or table is read back. Undo of an append deletes
+// that row only after a read-back still matches it, and never the workbook.
+// Undo deletes the workbook only when this write created it. Files.ReadWrite. Never sends.
 // No network in this file: pass call().
 const FlowOutlookExcel = (() => {
   const CONNECTOR = 'outlookExcel';
@@ -267,7 +269,7 @@ const FlowOutlookExcel = (() => {
               : null;
             const hit = rowList(rows && rows.body).find((row) => sameRow(rowCells(row), values));
             if (!hit) outcome = { ok: false, reason: 'verify_failed', proof: null };
-            else outcome = finish(input, deps, itemId, tableId, hit.index, { createdFile: false, createdTable: false });
+            else outcome = finish(input, deps, itemId, tableId, hit.index, { createdFile: false, createdTable: false, values: values });
           }
         }
       }
@@ -295,7 +297,8 @@ const FlowOutlookExcel = (() => {
       rowIndex: rowIndex,
       externalId: externalId,
       createdFile: flags.createdFile === true,
-      createdTable: flags.createdTable === true
+      createdTable: flags.createdTable === true,
+      values: Array.isArray(flags.values) ? flags.values.map((cell) => String(cell)) : []
     };
     return {
       ok: true,
@@ -322,7 +325,7 @@ const FlowOutlookExcel = (() => {
     const call = deps && deps.call;
     if (!ref || !ref.itemId || typeof call !== 'function') return { ok: false, reason: 'unclear' };
     const base = '/me/drive/items/' + encodeURIComponent(ref.itemId);
-    if (ref.createdFile) {
+    if (ref.createdFile === true) {
       const del = await call({ method: 'DELETE', path: base });
       if (!del || del.ok !== true) return { ok: false, reason: 'undo-failed' };
       return { ok: true, written: 'Undone. The new workbook was deleted.', log: undone(ref) };
@@ -330,23 +333,29 @@ const FlowOutlookExcel = (() => {
     const sess = await call({ method: 'POST', path: base + '/workbook/createSession', body: { persistChanges: true } });
     if (!sess || !sess.body || !sess.body.id) return { ok: false, reason: 'undo-failed' };
     const headers = { 'workbook-session-id': String(sess.body.id) };
-    let ok = false;
+    let outcome = { ok: false, reason: 'undo-failed' };
     try {
       if (ref.createdTable) {
         const del = await call({ method: 'DELETE', path: base + '/workbook/tables/' + encodeURIComponent(ref.tableId), headers: headers });
-        ok = !!(del && del.ok === true);
+        outcome = del && del.ok === true ? { ok: true } : { ok: false, reason: 'undo-failed' };
       } else {
-        const del = await call({
-          method: 'POST',
-          path: base + '/workbook/tables/' + encodeURIComponent(ref.tableId) + '/rows/itemAt(index=' + Number(ref.rowIndex) + ')/delete',
-          headers: headers
-        });
-        ok = !!(del && del.ok === true);
+        const wanted = Array.isArray(ref.values) ? ref.values.map((cell) => String(cell)) : [];
+        const index = Number(ref.rowIndex);
+        const rowPath = base + '/workbook/tables/' + encodeURIComponent(ref.tableId) + '/rows/itemAt(index=' + index + ')';
+        const seen = wanted.length
+          ? await call({ method: 'GET', path: rowPath, headers: headers })
+          : null;
+        if (!wanted.length || !seen || seen.ok !== true || !sameRow(rowCells(seen.body), wanted)) {
+          outcome = { ok: false, reason: 'row-changed' };
+        } else {
+          const del = await call({ method: 'POST', path: rowPath + '/delete', headers: headers });
+          outcome = del && del.ok === true ? { ok: true } : { ok: false, reason: 'undo-failed' };
+        }
       }
     } finally {
       try { await call({ method: 'POST', path: base + '/workbook/closeSession', headers: headers }); } catch (e) { /* undo result stands */ }
     }
-    if (!ok) return { ok: false, reason: 'undo-failed' };
+    if (!outcome.ok) return outcome;
     return {
       ok: true,
       written: ref.createdTable ? 'Undone. The new table was deleted.' : 'Undone. That row was deleted.',

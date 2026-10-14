@@ -55,6 +55,25 @@ const depsOf = (call) => ({ call: call, grantedScopes: ['Files.ReadWrite'], now:
   const undone = await W.undo(made.ref, depsOf(removed.call));
   check('undo of a new file deletes it', undone.ok === true && removed.calls[0].method === 'DELETE' && /deleted/.test(undone.written), undone);
 
+  const stamped = fake([
+    { method: 'GET', test: /\/me\/drive\/root:\//, reply: () => ({ ok: false, status: 404, body: {} }) },
+    { method: 'PUT', test: /\/content$/, reply: () => ({ ok: true, status: 201, body: { id: 'file-3', name: 'notes.docx' } }) },
+    { method: 'GET', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-3', eTag: 'e1', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }) }
+  ]);
+  const stampedFile = await W.run({ params: offer.params, messageId: 'm3' }, depsOf(stamped.call));
+  const changed = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-3', eTag: 'e2', lastModifiedDateTime: '2026-10-14T13:00:00Z' } }) },
+    { method: 'DELETE', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 204, body: null }) }
+  ]);
+  const refused = await W.undo(stampedFile.ref, depsOf(changed.call));
+  check('undo refuses a file edited after creation', stampedFile.ref.eTag === 'e1' && refused.ok === false && refused.reason === 'file-changed' && changed.calls.every((c) => c.method !== 'DELETE'), refused);
+  const moved = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-3', eTag: 'e1', lastModifiedDateTime: '2026-10-14T13:00:00Z' } }) },
+    { method: 'DELETE', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 204, body: null }) }
+  ]);
+  const refusedTime = await W.undo(stampedFile.ref, depsOf(moved.call));
+  check('undo refuses a file whose lastModified changed', refusedTime.reason === 'file-changed' && moved.calls.every((c) => c.method !== 'DELETE'), refusedTime);
+
   const edited = fake([
     { method: 'GET', test: /\/me\/drive\/root:\//, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', name: 'notes.docx' } }) },
     { method: 'GET', test: /\/versions/, reply: () => ({ ok: true, status: 200, body: { value: [{ id: 'ver-prev' }] } }) },

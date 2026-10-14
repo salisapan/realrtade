@@ -91,12 +91,28 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
   check('undo of a new workbook deletes the file', gone.ok === true && removed.calls[0].method === 'DELETE' && /workbook was deleted/.test(gone.written), gone);
 
   const rowUndo = fake((req) => {
-    if (/createSession|closeSession|\/delete/.test(req.path)) return { ok: true, status: 204, body: req.path.indexOf('createSession') >= 0 ? { id: 'sess' } : null };
-    if (/createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'GET' && /itemAt\(index=1\)$/.test(req.path)) return { ok: true, status: 200, body: { index: 1, values: [['12', 'Dana', 'paid']] } };
+    if (req.method === 'POST' && /itemAt\(index=1\)\/delete/.test(req.path)) return { ok: true, status: 204, body: null };
+    if (req.method === 'POST' && /closeSession/.test(req.path)) return { ok: true, status: 204, body: null };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
     return { ok: false, status: 404, body: {} };
   });
-  const dropped = await X.undo({ itemId: 'wb-1', tableId: 't1', rowIndex: 1, createdFile: false, createdTable: false }, deps(rowUndo.call));
-  check('undo of a row deletes that row', dropped.ok === true && rowUndo.calls.some((c) => c.path.indexOf('itemAt(index=1)/delete') > 0), rowUndo.calls.map((c) => c.path));
+  const dropped = await X.undo(added.ref, deps(rowUndo.call));
+  const rowGets = rowUndo.calls.filter((c) => c.method === 'GET' && /itemAt\(index=1\)$/.test(c.path));
+  const rowDeletes = rowUndo.calls.filter((c) => /itemAt\(index=1\)\/delete/.test(c.path));
+  check('undo of an append deletes only the row that was read back', dropped.ok === true && added.ref.createdFile === false && rowGets.length === 1 && rowDeletes.length === 1 && rowUndo.calls.every((c) => c.method !== 'DELETE'), rowUndo.calls.map((c) => c.method + ' ' + c.path));
+
+  const changedRow = fake((req) => {
+    if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'GET' && /itemAt\(index=1\)$/.test(req.path)) return { ok: true, status: 200, body: { index: 1, values: [['other']] } };
+    if (req.method === 'POST' && /closeSession/.test(req.path)) return { ok: true, status: 204, body: null };
+    if (req.method === 'POST' && /\/delete/.test(req.path)) return { ok: true, status: 204, body: null };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const left = await X.undo(added.ref, deps(changedRow.call));
+  check('undo of an append refuses a different row and does not delete the workbook', left.ok === false && left.reason === 'row-changed' && changedRow.calls.every((c) => c.method !== 'DELETE' && c.path.indexOf('/delete') < 0), changedRow.calls.map((c) => c.method + ' ' + c.path));
 
   const denied = fake(() => ({ ok: true, status: 200, body: {} }));
   const no = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['1'] } }, deps(denied.call, ['Files.Read']));

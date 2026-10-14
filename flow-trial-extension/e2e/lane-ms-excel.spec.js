@@ -45,4 +45,8 @@ test('append adds a row only when the workbook already exists', async ({ glance 
   expect(calls.some((c) => c.method === 'PUT')).toBe(false);
   await card.locator('button.flow-lane-undo').click();
   await expect(card.locator('.flow-lane-status')).toHaveText('Undone.');
+  const after = await glance.apiCalls();
+  expect(after.some((c) => c.method === 'GET' && /itemAt\(index=\d+\)$/.test(c.url))).toBe(true);
+  expect(after.some((c) => c.method === 'POST' && c.url.indexOf('/delete') >= 0)).toBe(true);
+  expect(after.some((c) => c.method === 'DELETE')).toBe(false);
 });
