@@ -56,7 +56,7 @@ function scripted(steps) {
   const calls = [];
   let i = 0;
   async function http(req) {
-    calls.push({ method: req.method, url: req.url });
+    calls.push({ method: req.method, url: req.url, body: req.body });
     const step = steps[i++] || { status: 500, ok: false, json: null };
     return step;
   }
@@ -147,31 +147,80 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const driveUndo = await Drive.undo(drive.ref, trashed.http);
   check('drive undo trashes that file', driveUndo.ok === true && trashed.calls[0].method === 'PATCH', driveUndo);
 
+  function markedDoc(name, parts, rangeText) {
+    let cursor = 1;
+    const elements = [];
+    let range = null;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const start = cursor;
+      const end = cursor + part.length;
+      elements.push({ startIndex: start, endIndex: end, textRun: { content: part } });
+      if (part === rangeText && !range) range = { startIndex: start, endIndex: end };
+      cursor = end;
+    }
+    const body = { body: { content: [{ paragraph: { elements: elements } }] }, namedRanges: {} };
+    if (range && name) {
+      body.namedRanges[name] = {
+        name: name,
+        namedRanges: [{ namedRangeId: 'kix.' + name, name: name, ranges: [range] }]
+      };
+    }
+    return body;
+  }
+
   console.log('\n--- a Doc is created and edited, then undo removes it ---\n');
   const docText = 'Please find the receipt.';
+  const createdMark = Docs.rangeName('doc1', docText, CLOCK);
   const created = scripted([
     { status: 200, ok: true, json: { id: 'doc1', name: 'Receipt', mimeType: 'application/vnd.google-apps.document', trashed: false } },
     { status: 200, ok: true, json: { id: 'doc1', trashed: false } },
     { status: 200, ok: true, json: {} },
-    { status: 200, ok: true, json: { body: { content: [{ paragraph: { elements: [{ textRun: { content: docText + '\n' } }] } }] } } }
+    { status: 200, ok: true, json: markedDoc(createdMark, [docText], docText) }
   ]);
   const doc = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', text: docText }, created.http, CLOCK);
-  check('doc create is proved from the document text', proved(doc) && doc.proof.system === 'google/docs' && doc.ref.created === true && created.calls.length === 4 && created.calls[3].method === 'GET', doc);
+  check('doc create is proved from the named range', proved(doc) && doc.proof.system === 'google/docs' && doc.ref.created === true && doc.ref.rangeName === createdMark && created.calls.length === 4 && created.calls[3].method === 'GET', doc);
+  const createdBatch = JSON.parse(created.calls[2].body);
+  check('the insert is stored in a named range',
+    createdBatch.requests[0].insertText.text === docText &&
+    createdBatch.requests[1].createNamedRange.name === createdMark);
   check('doc calls stay off gmail and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('/auth/documents') < 0));
   const docTrash = scripted([{ status: 200, ok: true, json: { trashed: true } }]);
   const docUndo = await Docs.undo(doc.ref, docTrash.http);
   check('undo of a created doc trashes it', docUndo.ok === true && docTrash.calls[0].method === 'PATCH', docUndo);
+  const added = 'Added line';
+  const editMark = Docs.rangeName('doc9', added, CLOCK);
   const edited = scripted([
     { status: 200, ok: true, json: {} },
-    { status: 200, ok: true, json: { body: { content: [{ paragraph: { elements: [{ textRun: { content: 'Added line\n' } }] } }] } } }
+    { status: 200, ok: true, json: markedDoc(editMark, [added], added) }
   ]);
-  const edit = await Docs.write({ scopes: Cfg.SCOPES, documentId: 'doc9', origin: 'picked', text: 'Added line' }, edited.http, CLOCK);
-  check('a picked doc edit is proved', proved(edit) && edit.ref.created === false, edit);
-  const notOurs = await Docs.write({ scopes: Cfg.SCOPES, documentId: 'doc9', text: 'Added line' }, scripted([]).http, CLOCK);
+  const edit = await Docs.write({ scopes: Cfg.SCOPES, documentId: 'doc9', origin: 'picked', text: added }, edited.http, CLOCK);
+  check('a picked doc edit is proved', proved(edit) && edit.ref.created === false && edit.ref.rangeName === editMark, edit);
+  const notOurs = await Docs.write({ scopes: Cfg.SCOPES, documentId: 'doc9', text: added }, scripted([]).http, CLOCK);
   check('a doc Glance did not create or pick is refused', notOurs.ok === false && notOurs.reason === 'not-ours', notOurs);
-  const editUndo = scripted([{ status: 200, ok: true, json: {} }]);
-  const editGone = await Docs.undo(edit.ref, editUndo.http);
-  check('undo of an edit deletes the inserted range', editGone.ok === true && editUndo.calls[0].method === 'POST' && editUndo.calls[0].url.indexOf(':batchUpdate') >= 0, editGone);
+  const preface = 'Opened earlier. ';
+  const shiftedStart = 1 + preface.length;
+  const shifted = scripted([
+    { status: 200, ok: true, json: markedDoc(editMark, [preface, added], added) },
+    { status: 200, ok: true, json: {} }
+  ]);
+  const editGone = await Docs.undo(edit.ref, shifted.http);
+  const deleted = JSON.parse(shifted.calls[1].body).requests[0].deleteContentRange.range;
+  check('undo after a new opening deletes only the marked text',
+    editGone.ok === true && shifted.calls[0].method === 'GET' && shifted.calls[1].method === 'POST' &&
+    deleted.startIndex === shiftedStart && deleted.endIndex === shiftedStart + added.length && deleted.startIndex !== 1, deleted);
+  const changed = 'Added line!!';
+  const editedRange = scripted([{
+    status: 200, ok: true, json: {
+      body: { content: [{ paragraph: { elements: [{ startIndex: 1, endIndex: 1 + changed.length, textRun: { content: changed } }] } }] },
+      namedRanges: { [editMark]: { name: editMark, namedRanges: [{ namedRangeId: 'kix.edit', name: editMark, ranges: [{ startIndex: 1, endIndex: 1 + changed.length }] }] } }
+    }
+  }]);
+  const refusedEdit = await Docs.undo(edit.ref, editedRange.http);
+  check('an edited range is not deleted', refusedEdit.ok === false && refusedEdit.reason === 'range-edited' && editedRange.calls.length === 1 && editedRange.calls[0].method === 'GET', refusedEdit);
+  const missing = scripted([{ status: 200, ok: true, json: markedDoc('', [preface, added], added) }]);
+  const refusedMissing = await Docs.undo(edit.ref, missing.http);
+  check('a missing range is not deleted', refusedMissing.ok === false && refusedMissing.reason === 'range-missing' && missing.calls.length === 1, refusedMissing);
 
   console.log('\n--- one sheet row is read back, then undo clears or trashes it ---\n');
   const row = ['Ada', '100'];

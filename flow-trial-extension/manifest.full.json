@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Glance",
   "short_name": "Glance",
-  "version": "0.9.55",
+  "version": "0.9.56",
   "description": "Glance stays on what you are waiting on until it is closed, and closes what is asked of you in one click. Judgment on your device.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+ELt+EA0szCQf1G5EpVyxlTUlnltXkBR9oBkGSlxQVEgotuV9X3dqEav2DBUQ/aHJmLkkRqNTpMOWhPu03hwhzXDBy2WyD/reExrdnA3Zpn+/ANhIOHWFKxpyZHn/joyRpzDc27BkS2S51HDFtymJt0pbFlWRbxZy8veVdcKRpt+hKCrj094cs1BsWreXC2emEX1NRAkTKTwS0ORPe5qbcfxkkSuHhnxlfixIf7QgYYNRKVveSNCNXUMjDRRi9KjrpWeV5CflZnm2wmlvosbLJ+cIgjHUxPOvXkxczKB/Z1r/sCIM4XJXO+HTfzyL0BwDZd73/4U+UPdVn87ShtLRwIDAQAB",
   "icons": {

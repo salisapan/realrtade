@@ -1,7 +1,9 @@
 // One Google Doc, created or edited only when Glance made the file or the
 // person picked it. Drive files.create uses drive.file. The Docs API edits
 // that id. There is no documents OAuth scope. Undo trashes a file this
-// lane created, or deletes the inserted range. Handled waits for a read-back.
+// lane created. An edit is wrapped in a named range, and Undo deletes that
+// range only when the text inside it is still the text Glance inserted.
+// A missing or edited range is refused. Handled waits for a read-back.
 // Portable: no chrome.*, no DOM, no network.
 const FlowGoogleDocs = (() => {
   const SYSTEM = 'google/docs';
@@ -45,17 +47,54 @@ const FlowGoogleDocs = (() => {
     return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed');
   }
 
-  function docText(doc) {
+  function hash(text) {
+    let h = 5381;
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  // Stable for one insert. Undo looks up this name; it does not reuse the
+  // index the text had when it was written.
+  function rangeName(documentId, text, when) {
+    return 'glance-' + hash(String(documentId) + '\n' + String(text) + '\n' + String(when || ''));
+  }
+
+  function namedSpan(doc, name) {
+    const entry = doc && doc.namedRanges && doc.namedRanges[name];
+    const list = entry && entry.namedRanges;
+    if (!Array.isArray(list) || list.length !== 1) return null;
+    const ranges = list[0].ranges;
+    if (!Array.isArray(ranges) || ranges.length !== 1) return null;
+    const span = ranges[0];
+    if (!Number.isInteger(span.startIndex) || !Number.isInteger(span.endIndex) || span.endIndex <= span.startIndex) return null;
+    if (span.segmentId) return null;
+    return { startIndex: span.startIndex, endIndex: span.endIndex };
+  }
+
+  // null: the document does not prove which characters the range covers.
+  function textInRange(doc, start, end) {
     const content = doc && doc.body && doc.body.content;
-    if (!Array.isArray(content)) return '';
+    if (!Array.isArray(content)) return null;
     let out = '';
+    let covered = 0;
     for (let i = 0; i < content.length; i++) {
       const els = content[i].paragraph && content[i].paragraph.elements;
       if (!els) continue;
       for (let j = 0; j < els.length; j++) {
-        if (els[j].textRun && els[j].textRun.content) out += els[j].textRun.content;
+        const el = els[j];
+        if (!el.textRun || typeof el.textRun.content !== 'string') continue;
+        if (!Number.isInteger(el.startIndex) || !Number.isInteger(el.endIndex)) return null;
+        if (el.textRun.content.length !== el.endIndex - el.startIndex) return null;
+        const from = Math.max(el.startIndex, start);
+        const to = Math.min(el.endIndex, end);
+        if (to > from) {
+          out += el.textRun.content.slice(from - el.startIndex, to - el.startIndex);
+          covered += to - from;
+        }
       }
     }
+    if (covered !== end - start) return null;
     return out;
   }
 
@@ -76,19 +115,28 @@ const FlowGoogleDocs = (() => {
 
   async function insertAndRead(id, text, http, clock, created, name) {
     const C = cfg();
+    const when = C ? C.clockIso(clock) : '';
+    const mark = rangeName(id, text, when);
     const posted = await call(http, {
       method: 'POST',
       url: DOCS + encodeURIComponent(id) + ':batchUpdate',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requests: [{ insertText: { location: { index: 1 }, text: text } }] })
+      body: JSON.stringify({
+        requests: [
+          { insertText: { location: { index: 1 }, text: text } },
+          { createNamedRange: { name: mark, range: { startIndex: 1, endIndex: 1 + text.length } } }
+        ]
+      })
     });
     const denied = authFail(posted.status);
     if (denied) return denied;
-    const ref = { documentId: id, externalId: id, created: created === true, inserted: text };
+    const ref = { documentId: id, externalId: id, created: created === true, inserted: text, rangeName: mark };
     const base = { where: 'Google Docs', target: name || id, written: 'Doc · ' + (name || id), url: null };
     if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: created ? ref : null, proof: null }, base);
     const got = await call(http, { method: 'GET', url: DOCS + encodeURIComponent(id) });
-    if (!got.ok || docText(got.json).indexOf(text) < 0) {
+    const span = got.ok ? namedSpan(got.json, mark) : null;
+    const covered = span ? textInRange(got.json, span.startIndex, span.endIndex) : null;
+    if (!span || covered !== text) {
       return Object.assign({ ok: false, reason: 'verify_failed', ref: ref, proof: null }, base);
     }
     const link = 'https://docs.google.com/document/d/' + encodeURIComponent(id) + '/edit';
@@ -146,12 +194,29 @@ const FlowGoogleDocs = (() => {
       return { ok: false, reason: 'http-' + del.status };
     }
     const inserted = ref.inserted ? String(ref.inserted) : '';
-    if (!inserted) return { ok: false, reason: 'unclear' };
+    const mark = ref.rangeName ? String(ref.rangeName) : '';
+    if (!inserted || !mark) {
+      return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
+    }
+    const got = await call(http, { method: 'GET', url: DOCS + encodeURIComponent(id) });
+    if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+    if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+    const span = namedSpan(got.json, mark);
+    if (!span) {
+      return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
+    }
+    const covered = textInRange(got.json, span.startIndex, span.endIndex);
+    if (covered == null) {
+      return { ok: false, reason: 'range-unsafe', error: 'Undo stopped. The doc did not show which text the mark covers.' };
+    }
+    if (covered !== inserted) {
+      return { ok: false, reason: 'range-edited', error: 'Undo stopped. That text was edited, so nothing was deleted.' };
+    }
     const del = await call(http, {
       method: 'POST',
       url: DOCS + encodeURIComponent(id) + ':batchUpdate',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requests: [{ deleteContentRange: { range: { startIndex: 1, endIndex: 1 + inserted.length } } }] })
+      body: JSON.stringify({ requests: [{ deleteContentRange: { range: { startIndex: span.startIndex, endIndex: span.endIndex } } }] })
     });
     if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
     if (del.ok) return { ok: true, written: 'Doc edit removed.' };
@@ -162,7 +227,9 @@ const FlowGoogleDocs = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     safeName: safeName,
-    docText: docText,
+    rangeName: rangeName,
+    namedSpan: namedSpan,
+    textInRange: textInRange,
     write: write,
     undo: undo
   };
