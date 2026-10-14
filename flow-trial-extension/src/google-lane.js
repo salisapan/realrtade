@@ -85,8 +85,6 @@ const FlowGoogleLane = (() => {
     });
   }
 
-  install();
-
   return {
     WRITERS: WRITERS,
     setHttp: setHttp,

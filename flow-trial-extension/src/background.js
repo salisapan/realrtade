@@ -56,6 +56,7 @@ import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import { LADDER } from '../config/ladder.public.js';
+import './google-lane-host.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 

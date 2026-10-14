@@ -2047,6 +2047,7 @@
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
+    if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
     if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
     if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
@@ -2290,8 +2291,78 @@
     });
   }
 
+  // Card kinds on this page. The service worker's older writers stay for
+  // every other caller. Hold It, Task, Save file, Doc insert and Sheet row
+  // go through flow:google-write. Draft reply fills compose and looks up
+  // the contact. Undo of those cards is flow:google-undo.
+  const LANE_BY_KIND = {
+    calendar: 'googleHold',
+    googleTask: 'googleLaneTask',
+    googleTasks: 'googleLaneTask',
+    driveFile: 'googleDriveSave',
+    attachmentSave: 'googleDriveSave',
+    driveDoc: 'googleDoc',
+    driveSheet: 'googleSheetAppend',
+    gmailDraft: 'gmailCompose'
+  };
+
+  function laneConnectorId(kind) {
+    if (LANE_BY_KIND[kind]) return LANE_BY_KIND[kind];
+    if (kind === 'googleHold' || kind === 'googleLaneTask' || kind === 'googleDriveSave' || kind === 'googleDoc' || kind === 'googleSheetAppend' || kind === 'gmailCompose') return kind;
+    return '';
+  }
+
+  function sendRuntime(msg) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(msg, (res) => {
+          if (chrome.runtime && chrome.runtime.lastError && !res) resolve({ ok: false, reason: 'unavailable' });
+          else resolve(res);
+        });
+      } catch (e) {
+        resolve({ ok: false, reason: 'unavailable' });
+      }
+    });
+  }
+
   function sendExecuteAction(payload) {
-    return new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:execute-action', payload }, resolve));
+    const lane = laneConnectorId(payload && payload.connectorId);
+    if (!lane) return sendRuntime({ type: 'flow:execute-action', payload: payload });
+    if (lane === 'gmailCompose') return sendGmailCompose(payload);
+    return sendRuntime({ type: 'flow:google-write', connectorId: lane, input: payload });
+  }
+
+  async function sendGmailCompose(payload) {
+    const email = (payload && payload.senderEmail) || '';
+    if (email) await sendRuntime({ type: 'flow:google-contacts', email: email, query: email });
+    const input = {
+      to: email,
+      subject: payload && payload.subject,
+      senderName: payload && payload.senderName,
+      senderEmail: email,
+      quote: payload && payload.params && (payload.params.what || payload.params.quote),
+      body: payload && payload.params && payload.params.body,
+      useDraft: true,
+      draft: payload
+    };
+    let page = null;
+    if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.fill === 'function') {
+      try { page = FlowGoogleComposePage.fill(input); } catch (e) { page = null; }
+    }
+    const sw = await sendRuntime({ type: 'flow:gmail-compose', connectorId: 'gmailCompose', input: input, payload: input });
+    if (page && (page.ok || page.reason === 'compose-closed')) return page;
+    return sw || page || { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false };
+  }
+
+  function sendLaneUndo(kind, ref) {
+    const lane = laneConnectorId(kind);
+    if (!lane) return sendRuntime({ type: 'flow:undo-action', connectorId: kind, ref: ref });
+    if (lane === 'gmailCompose' && typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.undo === 'function') {
+      let page = null;
+      try { page = FlowGoogleComposePage.undo(ref); } catch (e) { page = null; }
+      return sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref }).then((sw) => (page && page.ok) ? page : (sw || page));
+    }
+    return sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
   }
 
   // Drive export stays in the service worker. The match stays here, in
@@ -2386,9 +2457,7 @@
     const reverseOrder = succeeded.slice().reverse();
     const undoneIds = [];
     for (const r of reverseOrder) {
-      const result = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: r.action.kind, ref: r.response.ref }, resolve);
-      });
+      const result = await sendLaneUndo(r.action.kind, r.response.ref);
       if (!result || !result.ok) {
         return { ok: false, undoneIds, failedAt: r.action, keptWhere: (r.response && r.response.where) || null };
       }
@@ -2455,6 +2524,7 @@
   // slice are unchanged. If the proof module is missing, a task does not
   // count as closed.
   function stepHandled(r) {
+    if (r && r.response && (r.response.preview === true || r.response.closes === false)) return false;
     if (typeof FlowProofOfClose !== 'undefined') return FlowProofOfClose.stepCountsAsHandled(r);
     if (taskKind(r)) return false;
     return !!(r && r.response && r.response.ok && !r.response.skipped);
@@ -2543,9 +2613,7 @@
       }
       undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
-      new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }, resolve);
-      }).then((result) => {
+      sendLaneUndo(copy.connectorId, copy.ref).then((result) => {
         if (!(result && result.ok)) {
           undo.textContent = copy.undoHint;
           undo.disabled = false;
@@ -2588,10 +2656,40 @@
     messageNode.insertBefore(host, messageNode.firstChild);
   }
 
+  // A filled compose is a preview. The person sends it. The receipt says
+  // what was filled and offers Undo. It does not say Handled.
+  function showPreviewReceipt(chip, result) {
+    const response = result.response || {};
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('role', 'status');
+    done.appendChild(el('span', 'flow-chip-written', response.written || 'Compose filled. You send it.'));
+    const undo = el('button', 'flow-chip-undo', 'Undo');
+    undo.type = 'button';
+    undo.addEventListener('click', () => {
+      undo.disabled = true;
+      undo.textContent = 'Undoing…';
+      sendLaneUndo('gmailCompose', response.ref).then((undone) => {
+        if (undone && undone.ok) {
+          done.replaceChildren(el('span', 'flow-chip-label', undone.written || 'Undone. Nothing was sent.'));
+          return;
+        }
+        undo.disabled = false;
+        undo.textContent = 'Undo';
+      });
+    });
+    done.appendChild(undo);
+    if (chip && typeof chip.replaceWith === 'function') chip.replaceWith(done);
+  }
+
   async function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter(stepHandled);
 
     if (!succeeded.length) {
+      const preview = results.find((r) => r.response && r.response.ok && r.response.preview === true);
+      if (preview) {
+        showPreviewReceipt(chip, preview);
+        return;
+      }
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
       setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
       return;
@@ -2821,9 +2919,10 @@
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
     // storage key with close-quality metrics.
+    const closeResults = results.filter((r) => !(r && r.response && (r.response.preview === true || r.response.closes === false)));
     const trustedClose = typeof FlowProofOfClose !== 'undefined'
-      ? FlowProofOfClose.shouldRecordTrustedClose(results)
-      : results.length > 0 && !results.some(taskKind) && results.every((r) => r && r.response && r.response.ok === true && !r.response.skipped);
+      ? FlowProofOfClose.shouldRecordTrustedClose(closeResults)
+      : closeResults.length > 0 && !closeResults.some(taskKind) && closeResults.every((r) => r && r.response && r.response.ok === true && !r.response.skipped);
     if (typeof FlowCloseMemory !== 'undefined' && ctx.intent && ctx.intent.personalClose && FlowCloseMemory.fullWriteOf(results) && trustedClose) {
       bookkeeping.push(
         FlowCloseMemory.recordClose({

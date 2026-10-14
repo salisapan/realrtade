@@ -258,6 +258,30 @@
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
   }
 
+  // Activity Undo for a lane write. Card kinds map onto the lane connector.
+  // Outlook and the other writers stay on flow:undo-action.
+  function laneUndoMessage(connectorId, ref, created) {
+    const map = {
+      calendar: 'googleHold',
+      googleTask: 'googleLaneTask',
+      googleTasks: 'googleLaneTask',
+      driveFile: 'googleDriveSave',
+      attachmentSave: 'googleDriveSave',
+      driveDoc: 'googleDoc',
+      driveSheet: 'googleSheetAppend',
+      gmailDraft: 'gmailCompose',
+      googleHold: 'googleHold',
+      googleLaneTask: 'googleLaneTask',
+      googleDriveSave: 'googleDriveSave',
+      googleDoc: 'googleDoc',
+      googleSheetAppend: 'googleSheetAppend',
+      gmailCompose: 'gmailCompose'
+    };
+    const lane = map[connectorId];
+    if (!lane) return null;
+    return { type: 'flow:google-undo', connectorId: lane, ref: ref, created: created };
+  }
+
   // The popup loads this package's stamp. The worker answers with the stamp
   // of the registration that is actually running. They differ when that
   // registration is still the previous build.
@@ -3313,7 +3337,10 @@
           }
           u.textContent = Lw.undoing;
           u.disabled = true;
-          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
+          // Keep both: a computer-use row returns above via markComputerUndone.
+          // A Google lane row uses flow:google-undo. Every other writer stays
+          // on flow:undo-action, including the creation snapshot #144 reads.
+          const r = await readBackOrTimeout(send(laneUndoMessage(e.connectorId, e.ref, e.created) || { type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
           const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
           if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
