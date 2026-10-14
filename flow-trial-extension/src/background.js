@@ -55,6 +55,7 @@ import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same 
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
+import '../core/outlook-contacts.js'; // lane-ms: one hook, loads the Microsoft Graph lane
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);

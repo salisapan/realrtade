@@ -38,6 +38,9 @@ function outlookAuth(opts) {
   const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'];
   if (o.tasks !== false) scopes.push('Tasks.ReadWrite');
   if (o.files !== false) scopes.push('Files.ReadWrite');
+  if (o.contacts) scopes.push('Contacts.Read');
+  if (o.teams) scopes.push('Chat.Read');
+  if (o.mailSend) scopes.push('Mail.Send');
   const now = Date.now();
   return {
     token: {
@@ -309,6 +312,13 @@ function installE2EHooks() {
         const row = scenario.messages && Object.prototype.hasOwnProperty.call(scenario.messages, id) ? scenario.messages[id] : null;
         if (row && row.id) return Promise.resolve(json(200, row));
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
+      }
+      if (path.indexOf('/me/contacts') >= 0 && method === 'GET') {
+        return Promise.resolve(json(200, { value: scenario.contacts || [] }));
+      }
+      if (path.indexOf('/me/people') >= 0 && method === 'GET') {
+        if (scenario.peopleForbidden) return Promise.resolve(json(403, { error: { code: 'ErrorAccessDenied' } }));
+        return Promise.resolve(json(200, { value: scenario.people || [] }));
       }
       if (path === '/v1.0/me' || path.endsWith('/me')) {
         if (scenario.meFail) return Promise.resolve(json(500, { error: { message: 'me-failed' } }));
