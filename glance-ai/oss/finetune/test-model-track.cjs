@@ -28,7 +28,7 @@ const partial = w('partial.jsonl', [{ id: 'a', pred: act('reply') }, { id: 'c', 
 const r1 = G.run({ base, cand: better, cases });
 check('a candidate that closes more and never acts wrongly is better, but not promoted without 200 owner labels', !r1.promote && /BETTER ON SPEC LABELS/.test(r1.verdict) && r1.cand.all.missed === 0 && r1.base.all.missed === 2, r1);
 check('ANY / AMBIGUOUS gold rows are left out', r1.base.all.n === 4);
-const owner = w('owner.jsonl', Array.from({ length: 200 }, (_, i) => ({ id: 'o' + i, step: 'SILENT', ownerVerified: true })));
+const owner = w('owner.jsonl', Array.from({ length: 200 }, (_, i) => ({ id: 'o' + i, step: 'SILENT', ownerVerified: true, labeledBy: 'sali' })));
 const r2 = G.run({ base, cand: better, cases, labels: owner });
 check('with 200 owner-verified labels the same candidate is promoted', r2.promote && r2.basis === 'owner-verified' && /^PROMOTE \(basis: 200 owner-verified/.test(r2.verdict), r2.verdict);
 // Two-pass agreement (owner's decision 2026-10-11: he does not label by hand). Never counts as owner-verified; the verdict says so.
@@ -48,7 +48,24 @@ const both = G.run({ base, cand: better, cases, labels: agreed + ',' + owner });
 check('several label files are read; with both kinds present the owner basis wins', both.promote && both.basis === 'owner-verified', both.basis);
 const agreedAsOwner = w('forged.jsonl', agreedRows(200, { ownerVerified: true, agreed: false, passes: 0 }));
 const rF = G.run({ base, cand: better, cases, labels: agreedAsOwner });
-check('an owner-verified flag still counts as owner-verified (the labeling tools refuse it unless labeledBy is sali)', rF.basis === 'owner-verified');
+check('an ownerVerified flag with no owner labeledBy does not count', rF.ownerVerified === 0 && rF.basis !== 'owner-verified', rF);
+const agentNames = ['claude', 'cursor', 'cos:david', 'cto', 'agreement:a+b', 'agent', 'gpt', 'grok'];
+check('Claude and other agents never count as owner-verified, even with the flag set', agentNames.every((by, i) => G.run({ base, cand: better, cases, labels: w('agent' + i + '.jsonl', Array.from({ length: 200 }, (_, n) => ({ id: 'a' + n, step: 'SILENT', ownerVerified: true, labeledBy: by }))) }).ownerVerified === 0));
+// Own-use labels (owner decision 2026-10-13, path A): his approve / edit / undo on his own accounts, with the connector's read-back proof.
+const proof = (extra) => Object.assign({ system: 'google/tasks', externalId: 'T1', fetchedBack: true, verifiedAt: '2026-10-13T10:00:00Z' }, extra);
+const useRows = (n, extra) => Array.from({ length: n }, (_, i) => Object.assign({ id: 'u' + i, step: 'SILENT', ownerVerified: true, labeledBy: 'sali:action', source: 'own-use', decision: 'approved', proof: proof() }, extra));
+const own200 = w('own200.jsonl', useRows(200));
+const rU = G.run({ base, cand: better, cases, labels: own200 });
+check('200 own-use labels with read-back proof count as owner-verified and promote a better candidate', rU.promote && rU.basis === 'owner-verified' && rU.ownerVerified === 200, rU);
+check('an approval whose close was NOT read back does not count', G.run({ base, cand: better, cases, labels: w('own-nofetch.jsonl', useRows(200, { proof: proof({ fetchedBack: false }) })) }).ownerVerified === 0);
+check('an undo counts by itself (the person took it back)', G.run({ base, cand: better, cases, labels: w('own-undo.jsonl', useRows(200, { decision: 'undone', proof: proof({ fetchedBack: false }) })) }).ownerVerified === 200);
+check('Handled counts only when the close was read back', G.run({ base, cand: better, cases, labels: w('own-handled.jsonl', useRows(200, { decision: 'handled' })) }).ownerVerified === 200);
+check('Handled without fetchedBack does not count', G.run({ base, cand: better, cases, labels: w('own-handled-miss.jsonl', useRows(200, { decision: 'handled', proof: proof({ fetchedBack: false }) })) }).ownerVerified === 0);
+check('MIN_OWNER stays 200', G.MIN_OWNER === 200);
+check('the string "sali:action" alone is not enough: wrong source, no decision, or no proof does not count', [{ source: 'claude' }, { decision: undefined }, { proof: undefined }, { proof: proof({ externalId: '' }) }, { decision: 'ignored' }].every((x, i) => G.run({ base, cand: better, cases, labels: w('own-forged' + i + '.jsonl', useRows(200, x)) }).ownerVerified === 0));
+check('a two-pass agreement row can never become owner-verified by carrying the flag and the string', G.run({ base, cand: better, cases, labels: w('own-agree.jsonl', agreedRows(200, { ownerVerified: true, labeledBy: 'sali:action', source: 'own-use' })) }).ownerVerified === 0);
+const useMixed = w('own-mixed.jsonl', useRows(150).concat(Array.from({ length: 50 }, (_, i) => ({ id: 'h' + i, step: 'SILENT', ownerVerified: true, labeledBy: 'sali' }))));
+check('his hand labels and his own-use labels add up to the 200', G.run({ base, cand: better, cases, labels: useMixed }).promote);
 const r3 = G.run({ base, cand: louder, cases, labels: owner });
 check('one more wrong Do It holds it, even though it closes more', !r3.promote && r3.verdict === 'HOLD' && r3.reasons.some((x) => /more wrong Do Its \(all: 0 -> 1\)/.test(x)), r3.reasons);
 check('the wrong Do It is reported in Hebrew too', r3.reasons.some((x) => /he: 0 -> 1/.test(x)));

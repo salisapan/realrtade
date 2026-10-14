@@ -19,6 +19,7 @@ trap cleanup EXIT
 
 echo "== owner-label ingest and score"
 node labeling/test-ingest.cjs
+node labeling/test-own-use.cjs
 node labeling/test-score.cjs
 node labeling/test-silence-prototype.cjs
 echo "== user-context profile (contrast pairs, empty-profile flips)"

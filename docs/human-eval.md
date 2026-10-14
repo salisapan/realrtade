@@ -178,3 +178,11 @@ The owner connected his personal Gmail and asked for the model tests to run on i
 Eight real replies in four threads (a service removal request, a university course request, a parcel enquiry, a share that got "cannot open") were labelled by hand: open or closed. `classifyReply` before the fix: **4 of 8 right**. The three wrong ones were all **false closes**, the worst error: a reply that hands the asker a task ("please attach a photo of the licence", "submit both by 26/7"), a reply that says no ("no need, and not possible, to approve"), and "it arrived, check back in a few days". After the fix (a reply that asks you for something, with nothing delivered, stays with you; "no need and not possible" is a no; "check back in a few days" waits): **8 of 8**, with every existing corpus unchanged (`outlook-calendar` is red on a date, unrelated).
 
 Caveats, stated plainly: n is 8, the same person labelled and fixed (so 8 of 8 is a regression guard, not a measure); one language mix (Hebrew and English); no number for Do It on mail written to the owner, since too few real asks arrived in the sampled threads. More history or a forwarded sample would be needed for that.
+
+## 10. Own-use labels toward the 200 (2026-10-14, aggregates only)
+
+Glance closes open loops. Gmail is where it starts today. Path A turns the owner's own approve, edit, undo, and Handled decisions into owner-verified labels (`docs/glance-ai/learning-from-use.md`). The labelled sentences stay in `flow-trial-extension/test/fixtures/private/` and are gitignored. This section is the count only, from `glance-ai/labeling/own-use-aggregates.json`.
+
+The lab machine had no local export on 2026-10-14. Events read: 0. Qualifying owner-verified own-use rows: **0 of 200**. Hebrew 0, English 0. Nothing was sent. The promotion bar was not lowered.
+
+Loop types with no qualifying row: dated-commitment, confirmed-amount, follow-up-ask, calendar-hold, calendar-cancel, calendar-move, create-missing, drive-file, file-on-hold, file-on-task. That is every personal loop type the product already names.
