@@ -176,6 +176,13 @@ const FlowChipHost = (() => {
             done.replaceChildren(el('span', 'flow-chip-label', r.written || 'Reply draft removed. Not sent.'));
           } else {
             undo.disabled = false; undo.textContent = 'Undo';
+            if (r && r.written) {
+              let hint = done.querySelector('.flow-chip-undo-hint');
+              if (!hint) {
+                hint = el('span', 'flow-chip-undo-hint flow-chip-undo-failed', r.written);
+                done.appendChild(hint);
+              } else hint.textContent = r.written;
+            }
           }
         });
       });

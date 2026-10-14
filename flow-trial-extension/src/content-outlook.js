@@ -890,6 +890,7 @@
       app: 'outlook',
       connectorId: 'outlookDraft',
       ref: r.ref,
+      created: r.created || null,
       where: r.where,
       url: r.url || r.where,
       outlookIncomingId: ctx.outlookIncomingId,
@@ -908,8 +909,9 @@
       written: written,
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
-        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, outlookImmutableId: ctx.outlookImmutableId === true });
-        if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created, outlookImmutableId: ctx.outlookImmutableId === true });
+        if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+        if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
         }
         if (u && u.ok) {
@@ -921,7 +923,8 @@
         lastSig = '';
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
-        return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
+        if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
+        return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
       })
     });
     } finally {
@@ -1250,11 +1253,11 @@
       undo.disabled = true;
       readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref })).then(async (result) => {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
-        if (result && result.reason === 'verify-timeout') {
+        if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited')) {
           undo.textContent = 'Undo';
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = (result.written) || "Couldn't verify, try again";
+          hint.textContent = result.written || (result.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : "Couldn't verify, try again");
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           return;
         }
@@ -1412,16 +1415,18 @@
       written: draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.',
       url: draft.url || draft.where,
       onUndo: guardedUndo(host, async () => {
-        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref });
-        if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref, created: draft.created });
+        if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+        if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(draft.messageId, draft.ref);
         }
-        await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: draft.messageId, draftOnly: true });
+        if (u && u.ok) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: draft.messageId, draftOnly: true });
+        if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
         lastKey = '';
         lastSig = '';
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
-        return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
+        return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
       })
     });
     return true;
@@ -1940,15 +1945,17 @@
       written: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
-        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
+        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created });
+        if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
         if (u && u.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
           await FlowStorage.updateWatch(ctx.threadId, { status: 'stopped', resolvedBy: 'undo' });
         }
+        if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
         lastKey = '';
         lastSig = '';
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
-        return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
+        return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
       })
     });
   }
@@ -2822,15 +2829,17 @@
           written: entry.label || 'Reply draft ready in Outlook Drafts. Not sent.',
           url: entry.url || entry.where,
           onUndo: guardedUndo(host, async () => {
-            const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: entry.ref });
-            if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+            const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: entry.ref, created: entry.created });
+            if (u && u.reason === 'user-edited') return { ok: false, reason: 'user-edited', written: u.written };
+            if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
               await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
             }
-            await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
+            if (u && u.ok) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
+            if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
             lastKey = '';
             try { host.remove(); } catch (e) { /* already gone */ }
             schedule();
-            return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
+            return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
           })
         });
       }

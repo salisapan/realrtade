@@ -103,6 +103,7 @@
         "src/step-kit.js",
         "src/step-list-view.js",
         "src/receipt-copy.js",
+        "src/native-edit.js",
         "src/follow.js",
         "src/content-gmail.js"
       ],

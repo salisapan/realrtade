@@ -825,6 +825,7 @@ const FlowOutlook = (() => {
       }
       if (!draft || !draft.id) return { ok: false, error: 'no-draft' };
       const draftUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
+      // The body is written once. The From patch below does not send it again.
       if (replyText && draft.isDraft !== false) {
         try {
           await graphWrite(token, 'PATCH', draftUrl, { body: { contentType: 'Text', content: replyText } });
@@ -886,9 +887,15 @@ const FlowOutlook = (() => {
         attachmentId = attached.id;
       }
       await rememberDraft(incomingId, draft.id);
+      let created = null;
+      try {
+        const settled = await graphGet(token, draftUrl + '?$select=id,changeKey,lastModifiedDateTime,body');
+        if (globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf) created = FlowNativeEdit.snapshotOf(settled);
+      } catch (e) { created = null; }
       return {
         ok: true,
         ref: draft.id,
+        created: created,
         where: draft.webLink || null,
         attachmentId: attachmentId,
         written: attachmentId
@@ -958,14 +965,16 @@ const FlowOutlook = (() => {
       } catch (e) { /* already gone */ }
     }
 
-    async function undoReplyDraft(draftId) {
+    async function undoReplyDraft(ref) {
+      const draftId = typeof ref === 'string' ? ref : (ref && (ref.id || ref.draftId));
+      const created = ref && typeof ref === 'object' ? (ref.created || null) : null;
       if (!draftId) return { ok: false, error: 'no-ref' };
       const auth = await read(AUTH_KEY, null);
       if (!auth || !auth.token) return { ok: false, error: 'not-connected' };
       const sess = await ensureSession({});
       if (!sess.ok) return { ok: false, error: sess.error };
       const token = holderFor(sess.token);
-      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft';
+      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,changeKey,lastModifiedDateTime,body';
       let msg;
       try { msg = await graphGet(token, getUrl); }
       catch (e) {
@@ -977,6 +986,9 @@ const FlowOutlook = (() => {
       }
       if (!msg) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
       if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+      if (created && globalThis.FlowNativeEdit && FlowNativeEdit.userEdited(created, msg)) {
+        return { ok: false, reason: 'user-edited', written: FlowNativeEdit.userEditedLine() };
+      }
       await graphWrite(token, 'DELETE', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId), null);
       await forgetDraftMap(null, draftId);
       return { ok: true, written: 'Draft removed from Outlook Drafts.' };

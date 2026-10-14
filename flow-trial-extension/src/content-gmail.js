@@ -3292,16 +3292,27 @@
       FlowSidebar.renderDraft('error', { message: 'Open Reply in Gmail first, then Insert into Reply.', onDraft: handleDraftIt });
       return;
     }
-    box.focus();
-    // execCommand is deprecated but still the one reliable way to make
-    // Gmail's own editor notice the change — a raw textContent assignment
-    // bypasses the input events its autosave and character counter are
-    // listening for, so it's kept as a fallback rather than the first try.
-    const inserted = document.execCommand && document.execCommand('insertText', false, text);
-    if (!inserted) {
-      box.textContent = text;
-      box.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    const Edit = globalThis.FlowNativeEdit;
+    const write = (node, value) => {
+      node.focus();
+      // execCommand is deprecated but still the one reliable way to make
+      // Gmail's own editor notice the change — a raw textContent assignment
+      // bypasses the input events its autosave and character counter are
+      // listening for, so it's kept as a fallback rather than the first try.
+      const inserted = document.execCommand && document.execCommand('insertText', false, value);
+      if (!inserted) {
+        node.textContent = value;
+        node.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+    };
+    if (Edit && Edit.fillOnce) {
+      const filled = Edit.fillOnce(box, text, { write: write });
+      if (!filled.wrote) {
+        FlowSidebar.renderDraft('error', { message: Edit.userEditedLine(), onDraft: handleDraftIt });
+      }
+      return;
     }
+    write(box, text);
   }
 
   /* ------------------------------------------------- Feature 3: attachment X-ray */

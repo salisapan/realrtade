@@ -256,6 +256,18 @@ console.log('\n--- Undo says Undone only after GET confirms the task is gone ---
   check('a 200 with a deleted flag is not Undone',
     marked.ok === false && marked.reason === 'still-present' && marked.fetchedBack === true && marked.deleted !== true,
     marked);
+  const edited = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'I changed the title', changeKey: 'ck-user', lastModifiedDateTime: '2026-10-14T12:00:00.000Z' }), text: async () => '' }) }
+  ] });
+  const kept = await edited.fn('outlookTaskUndo')({
+    taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9',
+    created: { changeKey: 'ck-created', title: 'File the amendment', lastModifiedDateTime: '2026-10-14T09:00:00.000Z' }
+  });
+  check('a task the person edited is not deleted',
+    kept.ok === false && kept.reason === 'user-edited' &&
+    kept.written === 'You edited this. Undo left it alone.' &&
+    !edited.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    kept);
 }
 
 console.log('\n--- a read-back that does not answer is not Undone ---\n');

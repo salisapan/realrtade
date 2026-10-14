@@ -54,6 +54,7 @@ import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitment
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
+import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -3583,6 +3584,47 @@ async function outlookDraftMap() {
 async function outlookSaveDraftMap(st, map) {
   await chrome.storage.local.set({ [OUTLOOK_STATE_KEY]: Object.assign({}, st, { glanceDraftByMessage: map }) });
 }
+function outlookUserEditedLine() {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.userEditedLine) ? N.userEditedLine() : 'You edited this. Undo left it alone.';
+}
+
+function outlookCreationSnap(obj) {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.snapshotOf) ? N.snapshotOf(obj) : {};
+}
+
+async function outlookObjectSnap(url, prefer) {
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET', headers: prefer || {} }); }
+  catch (e) { return null; }
+  if (!res || !res.ok) return null;
+  const body = await outlookReadJson(res);
+  return body ? outlookCreationSnap(body) : null;
+}
+
+// Read the object Glance created. A changed changeKey, time, or body means
+// the person edited it: Undo stops and does not write over that edit.
+async function outlookRefuseIfEdited(url, snapshot, prefer) {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  const keys = Object.keys(snapshot);
+  if (!keys.length) return null;
+  let got;
+  try { got = await outlookUndoConfirm(url, prefer); }
+  catch (e) { return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() }; }
+  if (got && got.reason === 'verify-timeout') return got;
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!got || got.status === 404) return null;
+  if (!(got.status === 200 || got.ok)) return null;
+  let body = null;
+  try { body = await got.json(); } catch (e) { body = null; }
+  const N = globalThis.FlowNativeEdit;
+  if (body && N && N.userEdited(snapshot, body)) {
+    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine(), fetchedBack: true };
+  }
+  return null;
+}
+
 async function outlookDraftWrite(p) {
   const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   if (!incomingId) return { ok: false, reason: 'no-message' };
@@ -3637,6 +3679,7 @@ async function outlookDraftWrite(p) {
   outlookAssertNotSend(patchUrl);
   const patchBody = { body: { contentType: 'Text', content: comment } };
   let fromSet = false;
+  let bodyWritten = false;
   if (wantFrom && draft.isDraft !== false && !outlookIsOpaqueMailbox(wantFrom)) {
     patchBody.from = { emailAddress: { address: wantFrom } };
     patchBody.sender = { emailAddress: { address: wantFrom } };
@@ -3644,10 +3687,12 @@ async function outlookDraftWrite(p) {
   if (draft.isDraft !== false) {
     try {
       const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
+      if (pr && pr.ok) bodyWritten = true;
       fromSet = Boolean(pr && pr.ok && patchBody.from);
-      if (pr && !pr.ok && patchBody.from) {
-        // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
-        await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+      // One body write. A refused From does not send the body again.
+      if (!bodyWritten && comment) {
+        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+        bodyWritten = Boolean(bodyOnly && bodyOnly.ok);
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
@@ -3683,9 +3728,11 @@ async function outlookDraftWrite(p) {
   const keys = Object.keys(saved.map);
   if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
   await outlookSaveDraftMap(saved.st, saved.map);
+  const created = await outlookObjectSnap(patchUrl + '?$select=id,changeKey,lastModifiedDateTime,body', prefer);
   return {
     ok: true,
     ref: draft.id,
+    created: created,
     where: draft.webLink || null,
     url: draft.webLink || null,
     attachmentId: attachmentId,
@@ -3767,12 +3814,17 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
+  const eventSnap = outlookCreationSnap(event);
+  if (!eventSnap.changeKey && !eventSnap.lastModifiedDateTime) {
+    const settled = await outlookObjectSnap(OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id) + '?$select=id,changeKey,lastModifiedDateTime,subject,body');
+    if (settled) Object.assign(eventSnap, settled);
+  }
   return {
     ok: true,
     where: 'Outlook Calendar',
     target: 'your calendar',
     written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
-    ref: { eventId: event.id },
+    ref: { eventId: event.id, created: eventSnap },
     url: event.webLink || null
   };
 }
@@ -3784,6 +3836,8 @@ async function outlookCalendarUndo(ref) {
   if (!req || req.method !== 'DELETE' || !/^\/me\/events\/[^/]+$/.test(req.path)) return { ok: false };
   const url = OUTLOOK_GRAPH + req.path;
   outlookAssertNotSend(url);
+  const edited = await outlookRefuseIfEdited(url, ref && ref.created);
+  if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del.notConnected) return { ok: false, reason: 'not-connected' };
   if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Calendar event removed.' };
@@ -3868,8 +3922,9 @@ async function outlookTaskWrite(p) {
   if (!task || typeof task.id !== 'string' || !task.id) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
-  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: outlookCreationSnap(task) };
   const fetched = await outlookTaskFetchBack(taskListId, task.id);
+  if (fetched && fetched.task) ref.created = outlookCreationSnap(fetched.task);
   if (!fetched.ok) {
     return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
   }
@@ -3910,6 +3965,8 @@ async function outlookTaskUndo(ref) {
   if (!taskId || !listId) return { ok: false };
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
+  const edited = await outlookRefuseIfEdited(url, ref && ref.created);
+  if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
   if (!(del && (del.ok || del.status === 204 || del.status === 404))) {
@@ -3944,14 +4001,14 @@ function outlookVerifyTimeoutLine() {
 
 // The confirming GET is the read-back. If it does not answer, Undo stops.
 // A late 200 must not become Undone after this wait.
-function outlookUndoConfirm(url) {
+function outlookUndoConfirm(url, prefer) {
   const waitMs = 8000;
   let timer = null;
   const timed = new Promise((resolve) => {
     timer = setTimeout(() => resolve({ verifyTimeout: true }), waitMs);
   });
   return Promise.race([
-    outlookFetch(url, { method: 'GET' }).catch(() => ({ status: 0, ok: false })),
+    outlookFetch(url, { method: 'GET', headers: prefer || {} }).catch(() => ({ status: 0, ok: false })),
     timed
   ]).then((got) => {
     if (timer != null) clearTimeout(timer);
@@ -3966,17 +4023,26 @@ function outlookUndoConfirm(url) {
 }
 
 async function outlookDraftUndo(ref, hint) {
-  if (!ref) return { ok: false };
+  const id = typeof ref === 'string' ? ref : (ref && (ref.draftId || ref.id));
+  if (!id) return { ok: false };
+  const snapshot = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,changeKey,lastModifiedDateTime,body';
   outlookAssertNotSend(getUrl);
-  const got = await outlookFetch(getUrl, { headers: prefer });
-  if (got.notConnected) return { ok: false, reason: 'not-connected' };
-  if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
-  if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+  let got;
+  try { got = await outlookUndoConfirm(getUrl, prefer); }
+  catch (e) { return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() }; }
+  if (got && got.reason === 'verify-timeout') return got;
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (got && got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+  if (!got || !got.ok) return { ok: false, reason: 'http-' + ((got && got.status) || 0) };
   const msg = await got.json();
   if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
-  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
+  const N = globalThis.FlowNativeEdit;
+  if (snapshot && N && N.userEdited(snapshot, msg)) {
+    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  }
+  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id);
   outlookAssertNotSend(delUrl);
   const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });
   if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
@@ -4094,6 +4160,7 @@ async function outlookFileWrite(p) {
   const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
   if (previousVersionId) ref.previousVersionId = previousVersionId;
   const fetched = await outlookFileFetchBack(itemId);
+  if (fetched && fetched.item) ref.editSnap = outlookCreationSnap(fetched.item);
   if (!fetched.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
   const link = fetched.item && fetched.item.webUrl && String(fetched.item.webUrl).slice(0, 8) === 'https://' ? fetched.item.webUrl : null;
   if (link) base.url = link;
@@ -4125,6 +4192,10 @@ async function outlookFileUndo(ref) {
   const Files = globalThis.FlowOnedriveFile;
   const itemId = ref && (ref.externalId || ref.fileId || ref.itemId);
   if (!Files || !itemId) return { ok: false };
+  const itemUrl = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(itemUrl);
+  const edited = await outlookRefuseIfEdited(itemUrl, ref && ref.editSnap);
+  if (edited) return edited;
   if (ref.created === false && ref.previousVersionId) {
     const url = OUTLOOK_GRAPH + Files.restorePath(itemId, ref.previousVersionId);
     outlookAssertNotSend(url);

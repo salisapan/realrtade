@@ -2361,15 +2361,22 @@
       let r = { ok: false };
       try {
         if (proof) {
-          r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref }));
+          r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref, created: entry.created }));
         } else {
           const o = outlook();
-          if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
+          if (o && entry.ref) r = await o.undoReplyDraft(entry.created ? { id: entry.ref, created: entry.created } : entry.ref);
           else if (!entry.ref) r = { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
           else r = { ok: false, error: 'not-connected' };
         }
       } catch (err) {
         r = { ok: false, error: String(err && err.message || err) };
+      }
+      if (r && r.reason === 'user-edited') {
+        u.disabled = false;
+        u.textContent = 'Undo';
+        note.textContent = r.written || 'You edited this. Undo left it alone.';
+        note.hidden = false;
+        return;
       }
       const todoUndo = proof && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.system === 'microsoft/todo');
       if (todoUndo && !(r && r.ok && r.fetchedBack === true)) {
@@ -2978,7 +2985,7 @@
           }
           u.textContent = 'Undoing…';
           u.disabled = true;
-          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref }));
+          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
           const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
           if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
@@ -3012,7 +3019,7 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = (r && r.reason === 'verify-timeout' && r.written)
+            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited'))
               ? r.written
               : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = 'Undo';

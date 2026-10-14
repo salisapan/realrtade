@@ -1,6 +1,7 @@
 // The Outlook runner against a fake Microsoft: read-only, bounded, honest about failure, and it never creates a loop without a tap.
 // Run: node test/outlook-runner-corpus.cjs
 const crypto = require('crypto');
+const { FlowNativeEdit } = require('../src/native-edit.js');
 const { FlowOutlook: O } = require('../src/outlook.js');
 const { FlowOutlookAuth: A } = require('../core/outlook-auth.js');
 const { FlowOutlookConfig: C } = require('../core/outlook-config.js');
@@ -49,7 +50,7 @@ function world(over) {
       w.drafts = w.drafts || {};
       const id = 'draft-' + Object.keys(w.drafts).length + 1;
       const body = init.body ? JSON.parse(init.body) : {};
-      w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
+      w.drafts[id] = { id, isDraft: true, changeKey: 'ck-created', lastModifiedDateTime: '2026-10-14T09:00:00.000Z', webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
       return { ok: true, status: 201, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
     }
     const listAtt = u.match(/\/me\/messages\/([^/?]+)\/attachments(?:\?|$)/i);
@@ -81,7 +82,10 @@ function world(over) {
       const method = (init.method || 'GET').toUpperCase();
       w.drafts = w.drafts || {};
       if (method === 'GET') {
-        if (w.drafts[id]) return { ok: true, status: 200, json: async () => ({ id, isDraft: w.drafts[id].isDraft !== false }) };
+        if (w.drafts[id]) {
+          const d = w.drafts[id];
+          return { ok: true, status: 200, json: async () => ({ id, isDraft: d.isDraft !== false, changeKey: d.changeKey || null, lastModifiedDateTime: d.lastModifiedDateTime || null, body: d.body || { content: '' } }) };
+        }
         return { ok: false, status: 404, json: async () => ({}) };
       }
       if (method === 'DELETE') {
@@ -340,6 +344,19 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const draftsBefore = Object.keys(w.drafts).length;
     const noId = await o.createReplyDraft('a1', 'Should not claim a file.', { file: file });
     check('no attachment id deletes the draft and does not claim attached', noId.ok === false && noId.reason === 'outlook-file-found-no-attach' && !(noId.written && /attach/i.test(noId.written)) && Object.keys(w.drafts).length === draftsBefore, noId);
+
+    const typed = await o.createReplyDraft('a-edited', 'Thanks, will confirm.');
+    w.drafts[typed.ref].changeKey = 'ck-user';
+    w.drafts[typed.ref].body = { content: 'I typed this myself.' };
+    const patchesBefore = w.calls.filter((c) => c.method === 'PATCH').length;
+    const leftAlone = await o.undoReplyDraft({ id: typed.ref, created: typed.created });
+    const patchesAfter = w.calls.filter((c) => c.method === 'PATCH').length;
+    check('a draft the person edited is left alone and is not rewritten',
+      leftAlone.ok === false && leftAlone.reason === 'user-edited' &&
+      leftAlone.written === FlowNativeEdit.userEditedLine() &&
+      w.drafts[typed.ref] && w.drafts[typed.ref].body.content === 'I typed this myself.' &&
+      patchesAfter === patchesBefore,
+      { leftAlone, patchesBefore, patchesAfter });
 
     // Silent reauth after 20h
     const w3 = world({ sent: [], inbox: [] });
