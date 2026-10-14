@@ -142,12 +142,6 @@ const LANE_PAGE_FILES = [
   'core/outlook-send.js',
   'src/lane-ms-page.js'
 ];
-const LANE_WORKER_FILES = [
-  'core/outlook-word.js',
-  'core/outlook-excel.js',
-  'core/teams-chat.js',
-  'core/outlook-send.js'
-];
 const LANE_IDS = {
   outlookContacts: 'FlowOutlookContacts',
   outlookWord: 'FlowOutlookWord',
@@ -171,8 +165,6 @@ function laneBindHost() {
   if (globalThis.__glanceLaneMsBound) return;
   globalThis.__glanceLaneMsBound = true;
   globalThis.__glanceLaneDebug = { manifest: false, register: false };
-
-  const ready = Promise.all(LANE_WORKER_FILES.map((file) => import(runtime.getURL(file)).catch(() => null)));
 
   function withLaneFiles(js) {
     const next = js.filter((file) => LANE_PAGE_FILES.indexOf(file) < 0);
@@ -298,7 +290,6 @@ function laneBindHost() {
   }
 
   async function dispatch(msg) {
-    try { await ready; } catch (e) { /* a sibling file failed to load */ }
     const id = laneId(msg);
     const mod = laneModule(id);
     if (!mod) return { ok: false, reason: 'connector-not-live' };

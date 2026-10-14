@@ -95,8 +95,8 @@ function dana() {
   check('a read is not a receipt', C.receiptFromLog([{ kind: 'written', connectorId: 'outlookContacts', fetchedBack: true }], { itemId: 'x' }) === null);
 
   const bg = fs.readFileSync(path.join(__dirname, '../src/background.js'), 'utf8');
-  const hooks = bg.split('\n').filter((line) => line.indexOf('outlook-contacts.js') >= 0);
-  check('background.js has one lane hook', hooks.length === 1, hooks);
+  const hooks = bg.split('\n').filter((line) => line.indexOf('lane-ms-host.js') >= 0);
+  check('background.js has one lane hook', hooks.length === 1 && bg.indexOf('outlook-contacts.js') < 0, hooks);
   const page = fs.readFileSync(path.join(__dirname, '../src/content-outlook.js'), 'utf8');
   check('content-outlook.js is not edited for this lane', page.indexOf('FlowLaneMs') < 0 && page.indexOf('lane-ms') < 0);
 
