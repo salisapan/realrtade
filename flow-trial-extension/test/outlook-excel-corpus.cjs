@@ -50,8 +50,10 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
       state.rows.push(req.body.values[0]);
       return { ok: true, status: 201, body: { index: state.rows.length - 1 } };
     }
-    if (req.method === 'GET' && /itemAt\(index=1\)$/.test(req.path)) {
-      return { ok: true, status: 200, body: { index: 1, values: [['not', 'the', 'cells']] } };
+    if (req.method === 'GET' && /itemAt\(index=(\d+)\)$/.test(req.path)) {
+      const index = Number(req.path.match(/itemAt\(index=(\d+)\)$/)[1]);
+      const row = state.rows[index];
+      return { ok: true, status: 200, body: { index: index, values: [row] } };
     }
     if (req.method === 'GET' && /\/rows$/.test(req.path)) {
       return { ok: true, status: 200, body: { value: state.rows.map((values, index) => ({ index: index, values: [values] })) } };
@@ -60,8 +62,8 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
     return { ok: false, status: 404, body: {} };
   });
   const added = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['12', 'Dana', 'paid'] }, messageId: 'm-x' }, deps(append.call));
-  check('append is Handled when the returned index is read back at that address', added.ok === true && added.proof.externalId === 'wb-1/t1/1' && added.ref.createdFile === false && append.calls.some((c) => /itemAt\(index=1\)$/.test(c.path)) && !append.calls.some((c) => /\/rows$/.test(c.path)), added);
-  check('the session is closed', append.calls.some((c) => c.path.indexOf('closeSession') > 0));
+  check('append is Handled when the returned index is read back with the same cells', added.ok === true && added.proof.externalId === 'wb-1/t1/1' && added.ref.createdFile === false && append.calls.some((c) => /itemAt\(index=1\)$/.test(c.path)) && !append.calls.some((c) => /\/rows$/.test(c.path)), added);
+  check('the session is closed', append.calls.filter((c) => c.path.indexOf('closeSession') > 0).length === 1 && append.calls[append.calls.length - 1].path.indexOf('closeSession') > 0);
 
   const mismatch = fake((req) => {
     if (req.method === 'GET' && /root:/.test(req.path)) return { ok: true, status: 200, body: { id: 'wb-1' } };
@@ -75,6 +77,20 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
   });
   const bad = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['12', 'Dana'] } }, deps(mismatch.call));
   check('a content match at another index is not Handled', bad.reason === 'verify_failed' && !bad.proof && mismatch.calls.some((c) => /itemAt\(index=1\)$/.test(c.path)) && mismatch.calls.some((c) => c.path.indexOf('closeSession') > 0), bad);
+
+  const differentRow = fake((req) => {
+    if (req.method === 'GET' && /root:/.test(req.path)) return { ok: true, status: 200, body: { id: 'wb-1' } };
+    if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'GET' && /\/tables$/.test(req.path)) return { ok: true, status: 200, body: { value: [{ id: 't1' }] } };
+    if (req.method === 'POST' && /rows\/add/.test(req.path)) return { ok: true, status: 201, body: { index: 1 } };
+    if (req.method === 'GET' && /itemAt\(index=1\)$/.test(req.path)) return { ok: true, status: 200, body: { index: 1, values: [['other', 'row']] } };
+    if (req.method === 'POST' && /closeSession/.test(req.path)) return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const differed = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['12', 'Dana'] } }, deps(differentRow.call));
+  check('a different row at the same index is not Handled', differed.ok !== true && differed.reason === 'cells-differ' && !differed.proof && differentRow.calls.some((c) => c.path.indexOf('closeSession') > 0), differed);
+  const pageSrc = require('fs').readFileSync(require('path').join(__dirname, '../src/lane-ms-page.js'), 'utf8');
+  check('a cell mismatch shows an honest line', pageSrc.indexOf("'cells-differ': 'The row that came back does not match what was written.'") > 0);
 
   const table = fake((req) => {
     if (req.method === 'GET' && /root:/.test(req.path)) return { ok: false, status: 404, body: {} };

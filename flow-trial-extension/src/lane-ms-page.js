@@ -174,6 +174,7 @@
       'chat-not-granted': 'Teams chat is not on for this sign-in.',
       unclear: '',
       verify_failed: 'Could not confirm.',
+      'cells-differ': 'The row that came back does not match what was written.',
       'row-changed': 'That row changed, so it was left as it is.',
       'file-changed': 'The file changed, so it was left as it is.'
     };

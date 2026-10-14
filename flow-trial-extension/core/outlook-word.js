@@ -1,10 +1,11 @@
 // One .docx on the person's OneDrive. A new file is Handled when its item id
 // is read back. An existing file is Handled only when the inserted text is in
-// the file content. Undo deletes a file this write created, or restores the
-// previous version, only when both eTag and lastModifiedDateTime are present
-// and unchanged since that write. A missing or changed stamp is file-changed
-// and nothing is deleted or restored. Files.ReadWrite. Never sends.
-// No network here: pass call().
+// the file content. After that write, Glance does not write again and holds
+// no lock or session. The file stays editable in Office. Undo deletes a file
+// this write created, or restores the previous version, only when both eTag
+// and lastModifiedDateTime are present and unchanged since that write. A
+// missing or changed stamp is file-changed and nothing is deleted or restored.
+// Files.ReadWrite. Never sends. No network here: pass call().
 const FlowOutlookWord = (() => {
   const CONNECTOR = 'outlookWord';
   const SYSTEM = 'microsoft/word';

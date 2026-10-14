@@ -27,6 +27,28 @@ test('a new Excel table is Handled after read-back, and Undo deletes the workboo
   });
 });
 
+test('Undo refuses when the Excel workbook was edited', async ({ glance }) => {
+  await glance.seedOutlook();
+  await lane.run(glance, { scenario: {} }, {
+    id: FIX.CREATE_ID,
+    subject: 'Excel',
+    senderEmail: S.SENDER,
+    body: FIX.CREATE_BODY
+  }, async (page) => {
+    await page.waitForSelector('html[data-glance-lane-ms="on"]', { timeout: 20000 });
+    const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
+    await expect(card).toBeVisible();
+    await card.locator('button.flow-lane-do').click();
+    await expect(card.locator('.flow-lane-status')).toHaveText('Handled.');
+    const edited = await lane.editFile(glance, 'budget.xlsx');
+    expect(edited && edited.ok).toBe(true);
+    await card.locator('button.flow-lane-undo').click();
+    await expect(card.locator('.flow-lane-status')).toHaveText('The file changed, so it was left as it is.');
+    const after = await glance.apiCalls();
+    expect(after.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+});
+
 test('append adds a row only when the workbook already exists', async ({ glance }) => {
   await glance.seedOutlook();
   await lane.run(glance, { scenario: FIX.APPEND_SCENARIO }, {

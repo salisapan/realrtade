@@ -1,18 +1,7 @@
-// Graph mock and Outlook-card injection for the Microsoft Graph lane.
-// launch.js stays the 0.9.56 copy. This file wraps the worker fetch that
-// launch.js already installed, and injects the lane content scripts into the
-// open Outlook tab after the Glance card is on the page.
+// Graph mock for the Microsoft Graph lane. launch.js stays the 0.9.56 copy.
+// The lane page and the Outlook caller load from the extension manifest.
+// This file does not inject scripts.
 const { SHOW } = require('./sentences');
-
-const LANE_FILES = [
-  'core/outlook-contacts.js',
-  'core/outlook-word.js',
-  'core/outlook-excel.js',
-  'core/teams-chat.js',
-  'core/outlook-send.js',
-  'src/lane-ms-page.js',
-  'src/content-outlook-lane-ms.js'
-];
 
 function installLaneMock(cfg) {
   const e2e = globalThis.__glanceE2e;
@@ -265,26 +254,6 @@ async function prepare(glance, opts) {
   });
 }
 
-async function inject(glance) {
-  const page = glance.page;
-  const chip = page.locator('#ReadingPaneContainerId .flow-chip-host');
-  try {
-    await chip.waitFor({ state: 'attached', timeout: 20000 });
-  } catch (err) {
-    const url = page.url();
-    const text = await page.locator('body').innerText().catch(() => '');
-    const html = await page.content().catch(() => '');
-    throw new Error('NO_OUTLOOK_CARD url=' + url + ' text=' + JSON.stringify(text.slice(0, 400)) + ' html=' + html.slice(0, 500));
-  }
-  return glance.evaluateWorker(async (files) => {
-    const tabs = await chrome.tabs.query({});
-    const tab = (tabs || []).filter((item) => item.url && item.url.indexOf('outlook.live.com') >= 0).pop();
-    if (!tab) return { ok: false, reason: 'no-tab' };
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: files, world: 'ISOLATED' });
-    return { ok: true, tabId: tab.id };
-  }, LANE_FILES);
-}
-
 function mailWithCard(mail) {
   const o = Object.assign({}, mail || {});
   const body = String(o.body || '');
@@ -293,10 +262,19 @@ function mailWithCard(mail) {
 }
 
 async function openOutlook(glance, mail) {
-  const page = await glance.openOutlook(mailWithCard(mail));
-  const injected = await inject(glance);
-  if (!injected || injected.ok !== true) throw new Error('LANE_INJECT_FAILED:' + JSON.stringify(injected));
-  return page;
+  return glance.openOutlook(mailWithCard(mail));
+}
+
+async function editFile(glance, name) {
+  return glance.evaluateWorker((fileName) => {
+    const lane = globalThis.__glanceE2e && globalThis.__glanceE2e.lane;
+    if (!lane) return { ok: false, reason: 'no-lane' };
+    const item = lane.driveByName[fileName] || lane.driveItems[fileName];
+    if (!item) return { ok: false, reason: 'missing' };
+    item.eTag = String(item.eTag || 'e') + '-edited';
+    item.lastModifiedDateTime = '2026-10-14T18:30:00Z';
+    return { ok: true, eTag: item.eTag };
+  }, name);
 }
 
 async function release(glance) {
@@ -316,4 +294,4 @@ async function run(glance, opts, mail, fn) {
   }
 }
 
-module.exports = { prepare, openOutlook, release, run, installLaneMock, LANE_FILES };
+module.exports = { prepare, openOutlook, release, run, editFile, installLaneMock };

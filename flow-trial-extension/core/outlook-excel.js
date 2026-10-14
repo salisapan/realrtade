@@ -1,11 +1,14 @@
 // Append one row or create one table through the Graph workbook API.
 // An append is Handled only when the row read back at the index returned by
-// the append is that same index. Undo of an append deletes that row only after
-// a read-back still matches its cells, and never the workbook. Undo deletes a
-// workbook this write created only when both eTag and lastModifiedDateTime are
-// present and unchanged since that write. A missing or changed stamp is
-// file-changed and the workbook stays. Files.ReadWrite. Never sends.
-// No network in this file: pass call().
+// the append is that same index and those cells are the cells that were
+// written. A different row at that index is not Handled. The workbook session
+// is closed before this returns, so the file stays editable in Office and no
+// lock is left open. Glance does not write to that file again. Undo of an
+// append deletes that row only after a read-back still matches its cells, and
+// never the workbook. Undo deletes a workbook this write created only when
+// both eTag and lastModifiedDateTime are present and unchanged since that
+// write. A missing or changed stamp is file-changed and the workbook stays.
+// Files.ReadWrite. Never sends. No network in this file: pass call().
 const FlowOutlookExcel = (() => {
   const CONNECTOR = 'outlookExcel';
   const SYSTEM = 'microsoft/excel';
@@ -292,6 +295,7 @@ const FlowOutlookExcel = (() => {
               : null;
             const seenIndex = seen && seen.body ? Number(seen.body.index) : NaN;
             if (!seen || seen.ok !== true || seenIndex !== addedIndex) outcome = { ok: false, reason: 'verify_failed', proof: null };
+            else if (!sameRow(rowCells(seen.body), values)) outcome = { ok: false, reason: 'cells-differ', proof: null };
             else outcome = finish(input, deps, itemId, tableId, addedIndex, { createdFile: false, createdTable: false, values: values });
           }
         }
