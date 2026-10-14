@@ -928,8 +928,8 @@ const FlowFollowUp = (() => {
   const CARRY_APPS = ['gmail', 'outlook', 'whatsapp'];
   const MAIL_APPS = ['gmail', 'outlook'];
   const COLLEAGUE_NO_DAYS = 90;         // "don't ask Yossi" about this person is remembered this long, across loops
-  const APP_NAME = { gmail: 'Gmail', outlook: 'Outlook', whatsapp: 'WhatsApp', teams: 'Teams' };
-  const APP_NAME_HE = { gmail: 'ג׳ימייל', outlook: 'אאוטלוק', whatsapp: 'וואטסאפ', teams: 'טימס' };
+  const APP_NAME = { gmail: 'Gmail', outlook: 'Outlook', whatsapp: 'WhatsApp', slack: 'Slack', telegram: 'Telegram', teams: 'Teams' };
+  const APP_NAME_HE = { gmail: 'ג׳ימייל', outlook: 'אאוטלוק', whatsapp: 'וואטסאפ', slack: 'סלאק', telegram: 'טלגרם', teams: 'טימס' };
 
   function carryKey(w, opts) {
     const keyOf = opts && typeof opts.keyOf === 'function' ? opts.keyOf : null;
