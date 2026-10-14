@@ -327,6 +327,48 @@
     return (token && token.grantedScopes) || [];
   }
 
+  function missingScopeSentence(scope, service) {
+    if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) return FlowReceipt.missingScopeLine(scope, service);
+    return scope + ' is not on this sign-in. In Setup, Connect Microsoft and check ' + service + '.';
+  }
+
+  function appendMissingScopeLine(copy, svc) {
+    const label = (svc && (svc.label || svc.id)) || '';
+    ((svc && svc.scopes) || []).forEach((scope) => {
+      if (!scope || !label) return;
+      const line = document.createElement('small');
+      line.className = 'ms-scope';
+      line.setAttribute('data-glance-scope-line', scope);
+      line.textContent = missingScopeSentence(scope, label);
+      copy.appendChild(line);
+    });
+  }
+
+  function readBackOrTimeout(promise) {
+    const line = (typeof FlowReceipt !== 'undefined' && FlowReceipt.verifyTimeoutLine)
+      ? FlowReceipt.verifyTimeoutLine()
+      : "Couldn't verify, try again";
+    return new Promise((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: false, reason: 'verify-timeout', written: line });
+      }, 8000);
+      Promise.resolve(promise).then((result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      }, () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ ok: false, reason: 'verify-timeout', written: line });
+      });
+    });
+  }
+
   function microsoftConnectCard() {
     const o = outlook();
     const card = el('div', 'conn');
@@ -364,6 +406,7 @@
         small.textContent = svc.detail;
         copy.appendChild(small);
       }
+      if (!required && !box.checked) appendMissingScopeLine(copy, svc);
       lab.appendChild(box);
       lab.appendChild(copy);
       screen.appendChild(lab);
@@ -1363,6 +1406,7 @@
           small.textContent = svc.detail;
           copy.appendChild(small);
         }
+        if (!required && !box.checked) appendMissingScopeLine(copy, svc);
         lab.appendChild(box);
         lab.appendChild(copy);
         screen.appendChild(lab);
@@ -2317,7 +2361,7 @@
       let r = { ok: false };
       try {
         if (proof) {
-          r = await send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref });
+          r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref }));
         } else {
           const o = outlook();
           if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
@@ -2934,7 +2978,7 @@
           }
           u.textContent = 'Undoing…';
           u.disabled = true;
-          const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
+          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref }));
           const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
           if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
@@ -2968,7 +3012,9 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
+            const line = (r && r.reason === 'verify-timeout' && r.written)
+              ? r.written
+              : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = 'Undo';
             u.disabled = false;
             u.setAttribute('aria-label', line);

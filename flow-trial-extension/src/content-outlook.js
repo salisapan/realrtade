@@ -1248,8 +1248,16 @@
       if (ignoreStaleClick(host)) return;
       undo.textContent = 'Undoing…';
       undo.disabled = true;
-      send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }).then(async (result) => {
+      readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref })).then(async (result) => {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
+        if (result && result.reason === 'verify-timeout') {
+          undo.textContent = 'Undo';
+          undo.disabled = false;
+          hint.hidden = false;
+          hint.textContent = (result.written) || "Couldn't verify, try again";
+          hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+          return;
+        }
         if (!(result && result.ok) || (todoUndo && result.fetchedBack !== true)) {
           undo.textContent = copy.undoHint;
           undo.disabled = false;
@@ -1515,6 +1523,42 @@
     return FlowStillOpen.activeProofFor((bag && bag.log) || [], item);
   }
 
+  function readBackOrTimeout(promise) {
+    const line = (typeof FlowReceipt !== 'undefined' && FlowReceipt.verifyTimeoutLine)
+      ? FlowReceipt.verifyTimeoutLine()
+      : "Couldn't verify, try again";
+    return new Promise((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: false, reason: 'verify-timeout', written: line });
+      }, 8000);
+      Promise.resolve(promise).then((result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      }, () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ ok: false, reason: 'verify-timeout', written: line });
+      });
+    });
+  }
+
+  function todoWriteFailureLine(r) {
+    if (r && r.reason === 'tasks-not-granted') {
+      if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) {
+        return FlowReceipt.missingScopeLine('Tasks.ReadWrite', 'To Do');
+      }
+      return 'Tasks.ReadWrite is not on this sign-in. In Setup, Connect Microsoft and check To Do.';
+    }
+    if (r && (r.reason === 'token-expired' || r.needsSignIn)) return 'Reconnect Outlook';
+    return (r && (r.error || r.reason)) || 'Could not confirm the task';
+  }
+
   async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
     const params = (taskStep && taskStep.params) || {};
     const he = ctx.intent && ctx.intent.lang === 'he';
@@ -1540,14 +1584,13 @@
         entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
       }
     });
+    if (ignoreStaleClick(host)) return;
     const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
-      const why = (r && r.reason === 'tasks-not-granted')
-        ? 'Reconnect Outlook to allow To Do'
-        : ((r && (r.error || r.reason)) || 'Could not confirm the task');
+      const why = todoWriteFailureLine(r);
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
       return;
     }

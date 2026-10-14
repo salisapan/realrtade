@@ -123,6 +123,19 @@ const FlowReceipt = (() => {
     return 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.';
   }
 
+  // One sentence for a service the sign-in does not include yet. Setup shows
+  // it beside an unchecked box. A failed write shows the same sentence.
+  function missingScopeLine(scope, service) {
+    const name = String(scope || '').trim();
+    const box = String(service || '').trim();
+    if (!name || !box) return '';
+    return name + ' is not on this sign-in. In Setup, Connect Microsoft and check ' + box + '.';
+  }
+
+  function verifyTimeoutLine() {
+    return "Couldn't verify, try again";
+  }
+
   function undoneLine(wheres) {
     const nouns = nounsFor(wheres);
     if (!nouns || !nouns.length) return 'Undone — nothing was kept.';
@@ -150,7 +163,7 @@ const FlowReceipt = (() => {
   }
 
   return {
-    confirmation, undoHint, undoneLine, reverseNote, todoUiCacheLine,
+    confirmation, undoHint, undoneLine, reverseNote, todoUiCacheLine, missingScopeLine, verifyTimeoutLine,
     EARLY_CLOSE_LIMIT, EARLY_LINE, STATUS_HANDLED, STATUS_HANDLED_HE, STATUS_PARTIAL
   };
 })();

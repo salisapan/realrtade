@@ -37,6 +37,10 @@ function background(opts) {
   const routes = opts.routes || [];
   const sandbox = {
     console, URLSearchParams, URL, TextEncoder, Uint8Array, crypto: webcrypto,
+    btoa: (s) => Buffer.from(String(s), 'binary').toString('base64'),
+    atob: (s) => Buffer.from(String(s), 'base64').toString('binary'),
+    setTimeout: opts.clock || setTimeout,
+    clearTimeout: opts.clearClock || clearTimeout,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
@@ -244,17 +248,65 @@ console.log('\n--- Undo says Undone only after GET confirms the task is gone ---
   ] });
   const still = await present.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
   check('a live task after DELETE is not Undone', still.ok === false && still.reason === 'still-present' && still.fetchedBack === true, still);
+  const flagged = background({ routes: [
+    { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', status: 'deleted', isDeleted: true, '@removed': { reason: 'deleted' } }), text: async () => '' }) }
+  ] });
+  const marked = await flagged.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  check('a 200 with a deleted flag is not Undone',
+    marked.ok === false && marked.reason === 'still-present' && marked.fetchedBack === true && marked.deleted !== true,
+    marked);
+}
+
+console.log('\n--- a read-back that does not answer is not Undone ---\n');
+{
+  const hung = background({
+    clock: (fn, ms) => {
+      if (ms >= 8000) { fn(); return 1; }
+      return setTimeout(fn, ms);
+    },
+    routes: [
+      { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+      { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => new Promise(() => {}) }
+    ]
+  });
+  const slow = await hung.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  check('an 8s read-back timeout says try again and is not Undone',
+    slow.ok === false && slow.reason === 'verify-timeout' && slow.fetchedBack !== true &&
+    slow.written === "Couldn't verify, try again",
+    slow);
 }
 
 console.log('\n--- To Do Do It rechecks the open mail after the proof read ---\n');
 {
   const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
   const fn = page.slice(page.indexOf('async function onOutlookTodoDoIt'), page.indexOf('async function onOnedriveDoIt'));
+  const failFn = page.slice(page.indexOf('function todoWriteFailureLine'), page.indexOf('async function onOutlookTodoDoIt'));
   const proofAt = fn.indexOf('await livePromiseProof');
   const recheckAt = fn.indexOf('ignoreStaleClick(host)', proofAt);
   const writeAt = fn.indexOf("type: 'flow:execute-action'", proofAt);
+  const afterWrite = fn.indexOf('ignoreStaleClick(host)', writeAt);
+  const logAt = fn.indexOf('FlowStorage.appendLog', writeAt);
   check('the stale check sits after the proof await and before the write',
     proofAt >= 0 && recheckAt > proofAt && writeAt > recheckAt, { proofAt, recheckAt, writeAt });
+  check('the stale check sits again after the write and before the receipt',
+    afterWrite > writeAt && logAt > afterWrite, { writeAt, afterWrite, logAt });
+  const scopeAt = failFn.indexOf("r.reason === 'tasks-not-granted'");
+  const reconnectAt = failFn.indexOf('Reconnect Outlook');
+  check('a missing To Do scope uses the Setup line, and Reconnect is the expired-token line',
+    fn.indexOf('todoWriteFailureLine') > 0 && scopeAt >= 0 &&
+    failFn.indexOf('Tasks.ReadWrite') > scopeAt &&
+    failFn.indexOf('token-expired') > 0 && reconnectAt > failFn.indexOf('token-expired') &&
+    page.indexOf('Reconnect Outlook to allow To Do') < 0,
+    { scopeAt, reconnectAt });
+  const undoClick = page.slice(page.indexOf("undo.textContent = 'Undoing…'"), page.indexOf('async function livePromiseProof'));
+  const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
+  check('an undo that does not answer shows try again instead of staying on Undoing',
+    undoClick.indexOf('readBackOrTimeout') > 0 &&
+    undoClick.indexOf("reason === 'verify-timeout'") > 0 &&
+    undoClick.indexOf("Couldn't verify, try again") > 0 &&
+    popup.indexOf('readBackOrTimeout') > 0 &&
+    popup.indexOf("r.reason === 'verify-timeout'") > 0);
 }
 
 console.log('\n--- a verify miss is not Handled ---\n');
@@ -281,6 +333,12 @@ console.log('\n--- no Tasks.ReadWrite means no write and no Handled ---\n');
   const out = await denied.fn('outlookTaskWrite')(PAYLOAD);
   check('a token without Tasks.ReadWrite does not create a task',
     out.ok === false && out.reason === 'tasks-not-granted' && denied.calls.length === 0, { out, calls: denied.calls });
+  const expired = background({ routes: [
+    { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: false, status: 401, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const expiredOut = await expired.fn('outlookTaskWrite')(PAYLOAD);
+  check('a 401 after the scope is present is an expired token, not a missing scope',
+    expiredOut.ok === false && expiredOut.reason === 'token-expired', expiredOut);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

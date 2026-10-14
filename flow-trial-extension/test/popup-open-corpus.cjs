@@ -1138,9 +1138,20 @@ async function run() {
       if (n && n.getAttribute && n.getAttribute('data-glance-service')) services.push(n.getAttribute('data-glance-service'));
       (n.children || []).forEach(walk);
     })(list);
+    const scopeLines = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-scope-line')) scopeLines.push(n.textContent);
+      (n.children || []).forEach(walk);
+    })(list);
     check('Outlook Setup says Connect Microsoft and offers Calendar',
       words.indexOf('Connect Microsoft') >= 0 && services.indexOf('calendar') >= 0 && words.indexOf('Connect Google') < 0,
       { words, services });
+    check('each unchecked service names its scope and how to connect',
+      scopeLines.some((t) => t.indexOf('Tasks.ReadWrite') >= 0 && t.indexOf('Connect Microsoft') >= 0 && t.indexOf('To Do') >= 0) &&
+      scopeLines.some((t) => t.indexOf('Calendars.ReadWrite') >= 0 && t.indexOf('Calendar') >= 0) &&
+      scopeLines.some((t) => t.indexOf('Files.ReadWrite') >= 0) &&
+      !scopeLines.some((t) => t.indexOf('Mail.Read') === 0),
+      scopeLines);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

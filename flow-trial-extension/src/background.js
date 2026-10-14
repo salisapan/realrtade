@@ -3815,7 +3815,12 @@ function outlookTodoListIdFrom(body) {
 
 async function outlookTaskWrite(p) {
   const session = await outlookSession({});
-  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  if (!session || !session.ok || !session.token) {
+    if (session && (session.needsSignIn || session.error === 'expired' || session.error === 'login_required')) {
+      return { ok: false, reason: 'token-expired' };
+    }
+    return { ok: false, reason: 'not-connected' };
+  }
   const scope = outlookHasTasksScope(session.token);
   if (scope === false) return { ok: false, reason: 'tasks-not-granted' };
 
@@ -3823,7 +3828,8 @@ async function outlookTaskWrite(p) {
   outlookAssertNotSend(listUrl);
   const listed = await outlookFetch(listUrl, { method: 'GET' });
   if (listed && listed.notConnected) return { ok: false, reason: 'not-connected' };
-  if (listed && (listed.status === 401 || listed.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (listed && listed.status === 401) return { ok: false, reason: 'token-expired' };
+  if (listed && listed.status === 403) return { ok: false, reason: 'tasks-not-granted' };
   if (!listed || !listed.ok) return { ok: false, reason: 'http-' + ((listed && listed.status) || 0) };
   let lists = null;
   try { lists = await listed.json(); } catch (e) { lists = null; }
@@ -3849,7 +3855,8 @@ async function outlookTaskWrite(p) {
     body: JSON.stringify(body)
   });
   if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
-  if (res && (res.status === 401 || res.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (res && res.status === 401) return { ok: false, reason: 'token-expired' };
+  if (res && res.status === 403) return { ok: false, reason: 'tasks-not-granted' };
   if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
   let task = null;
   try { task = await res.json(); } catch (e) { task = null; }
@@ -3908,7 +3915,13 @@ async function outlookTaskUndo(ref) {
   if (!(del && (del.ok || del.status === 204 || del.status === 404))) {
     return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
   }
-  const got = await outlookFetch(url, { method: 'GET' });
+  let got;
+  try {
+    got = await outlookUndoConfirm(url);
+  } catch (e) {
+    return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() };
+  }
+  if (got && got.reason === 'verify-timeout') return got;
   if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
   const cache = (globalThis.FlowReceipt && FlowReceipt.todoUiCacheLine)
     ? FlowReceipt.todoUiCacheLine()
@@ -3916,14 +3929,40 @@ async function outlookTaskUndo(ref) {
   if (got && got.status === 404) {
     return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. ' + cache };
   }
-  if (got && got.ok) {
-    let body = null;
-    try { body = await got.json(); } catch (e) { body = null; }
-    const gone = body && (body['@removed'] || body.status === 'deleted' || body.isDeleted === true);
-    if (gone) return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. ' + cache };
+  // A 200 means the task is still there. A deleted flag on that body is not a delete.
+  if (got && (got.status === 200 || got.ok)) {
     return { ok: false, reason: 'still-present', fetchedBack: true, written: 'Still there — the To Do task was not removed.' };
   }
   return { ok: false, reason: 'http-' + ((got && got.status) || 0) };
+}
+
+function outlookVerifyTimeoutLine() {
+  return (globalThis.FlowReceipt && FlowReceipt.verifyTimeoutLine)
+    ? FlowReceipt.verifyTimeoutLine()
+    : "Couldn't verify, try again";
+}
+
+// The confirming GET is the read-back. If it does not answer, Undo stops.
+// A late 200 must not become Undone after this wait.
+function outlookUndoConfirm(url) {
+  const waitMs = 8000;
+  let timer = null;
+  const timed = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ verifyTimeout: true }), waitMs);
+  });
+  return Promise.race([
+    outlookFetch(url, { method: 'GET' }).catch(() => ({ status: 0, ok: false })),
+    timed
+  ]).then((got) => {
+    if (timer != null) clearTimeout(timer);
+    if (got && got.verifyTimeout) {
+      return { ok: false, reason: 'verify-timeout', fetchedBack: false, written: outlookVerifyTimeoutLine() };
+    }
+    return got;
+  }, (e) => {
+    if (timer != null) clearTimeout(timer);
+    throw e;
+  });
 }
 
 async function outlookDraftUndo(ref, hint) {
