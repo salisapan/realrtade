@@ -83,8 +83,8 @@ d. Two lanes building the same loop type or connector in different open PRs (doc
 e. A lane open-tasks calls "in progress" that has produced no commit or PR in 10 days.
 
 ACTIONS (do these, in order, for every finding):
-1. On each involved open PR, post ONE review comment with `gh pr comment <n> --body "..."` that names: the finding type (a–e), the other PR numbers, the conflicting files or row numbers, and the next move (e.g. "retarget base to claude/install-uiux-pro-max-skill-a4agox", "wait for #138 to merge before touching docs/README.md", "rebase after #139", "stalled 10+ days — close as draft or resume with a commit"). Do not @-mention people. Do not approve, request changes as a formal review, merge, close, or mark ready.
-2. If a PR's base is main and gh allows, leave the retarget instruction in the comment (you do not change the base yourself unless the PR is yours under cursor/routine-*).
+1. On each involved open PR, post ONE top-level PR comment (not a review verdict). Prefer the built-in **Comment on Pull Request** tool. If that tool is unavailable, fall back to shell: `gh pr comment <n> --body "..."`. The body must name: the finding type (a–e), the other PR numbers, the conflicting files or row numbers, and the next move (e.g. "retarget base to claude/install-uiux-pro-max-skill-a4agox", "wait for #138 to merge before touching docs/README.md", "rebase after #139", "stalled 10+ days — resume with a commit or ask the owner whether to drop it"). Do not @-mention people. Do not approve, request changes as a formal review, merge, close, or mark ready.
+2. If a PR's base is main, put the retarget instruction in that comment (you do not change the base yourself unless the PR is yours under cursor/routine-*).
 3. Write the short receipt only if you posted at least one comment.
 
 No findings: write nothing and end. Never edit product code. Never edit shared index files.
@@ -223,7 +223,7 @@ Create each at cursor.com/automations. Repository: `salisapan/realrtade`. Branch
 
 | Automation | Cron (Israel time) | Tools it needs | Prompt |
 |---|---|---|---|
-| referee | `10 7 * * *` | shell + `gh` (can comment on PRs) | preamble + referee |
+| referee | `10 7 * * *` | **Comment on Pull Request** (add via + Add Tool; needs GitHub connected) + shell/`gh` | preamble + referee |
 | listener | `0 8 * * 0` | X tools, web search, shell | preamble + listener |
 | conductor | `0 9 * * 0` | shell + `gh` | preamble + conductor |
 | mcp-watch | `0 8 * * 1` | web fetch, shell | preamble + mcp-watch |
