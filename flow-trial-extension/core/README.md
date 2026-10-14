@@ -34,6 +34,8 @@ it, not touching the module.
 | Module | What it owns |
 |---|---|
 | `domains.js` | Per-field vocabulary and phrasing (sales, legal, finance, ops, support, hr). Data, not rules. |
+| `connector-outcome.js` | The learning hook every connector emits: one event per decision with ids and enums only (never a title, address or text), and the pure conclusions drawn from them (which destination to offer first, how readily to offer a close type, a vendor whose read-back keeps failing). Portable: no chrome.*, no DOM, no network. |
+| `consent-catalog.js` | The data behind the one sweeping consent screen: one entry per service with its honest line, group, state (built, experimental, coming) and permission steps; `stepsFor(ids)` returns exactly the steps for what was ticked, and Select all never includes a `coming` service. Portable: no chrome.*, no DOM, no network, no UI. |
 | `connectors.js` | The catalog of destinations Glance can write to and how each authenticates. Data, not a rule engine. |
 | `extract.js` | Pulls the amount, date, and decisive sentence out of plain text. No network, no state. |
 | `judgment.js` | The scorer and the adaptive threshold — **this is where precision-vs-harm tracking actually lives**: `thresholdFrom()` takes a plain `{clicks, dismissals, ts}` triple and returns a number, with zero opinion about where that triple came from or how it's persisted. |
@@ -95,6 +97,7 @@ it, not touching the module.
 | `mask-ids.js` | Masks identifiers that core/privacyShield.js does not (national ID numbers, policy / case / account / claim numbers, IBANs, passport numbers) and composes it with the shield into the one masking pass that runs before ANY text may leave the device. |
 | `meeting-debrief.js` | After a meeting: what came out of it — portable, no chrome.*, no DOM, no network, no model. |
 | `model-store.js` | Fetches, verifies and keeps an on-device model's files, quietly and politely. |
+| `notion-close.js` | One row in the person's chosen Notion database as the close, read back as the proof: write, GET back, Handled only when it matches, one page per loop, Undo archives and reads the archive back. The network, token store and ledger are injected. Portable: no chrome.*, no DOM. |
 | `onedrive-file.js` | One OneDrive file for a save-the-attachment close. Names, paths, the `Files.ReadWrite` check, and the bytes to upload. The service worker writes and reads the item back. A mail does not search OneDrive. No network in this file. |
 | `outcome-labels.js` | Labels the product earns for free from what happens next — portable, no chrome.*, no DOM, no network. |
 | `outlook-auth.js` | Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the session alive: `session()` refreshes inside the 24-hour single-page-application window, renews silently (prompt=none) from hour 16, and treats a failed attempt as transient unless Microsoft says a person must sign in. |

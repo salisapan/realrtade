@@ -17,6 +17,7 @@ const IMPORT_LINE = /^import \{ OAUTH_PUBLIC, publicClientId(?:, WEB_OAUTH_CLIEN
 const WEB_AUTH_IMPORT = /^import \{[^}]+\} from '\.\/google-web-auth\.js';\r?\n/m;
 const LADDER_IMPORT = /^import \{ LADDER \} from '\.\.\/config\/ladder\.public\.js';\r?\n/m;
 const CLASSIC_IMPORT = /^import '(\.\.\/core\/[\w-]+\.js)';[^\n]*\r?\n/gm;
+const CONNECTORS_IMPORT = /^import \{ CONNECTORS \} from '\.\.\/config\/connectors\.public\.js';\r?\n/m;
 const HYBRID_IMPORTS = /^import \{ HYBRID \} from '\.\.\/config\/hybrid\.public\.js';\r?\nimport '\.\/hybrid-sw\.js';[^\n]*\r?\n/m;
 
 function backgroundScript() {
@@ -25,11 +26,12 @@ function backgroundScript() {
   const webAuth = stripModuleSyntax(fs.readFileSync(path.join(root, 'src', 'google-web-auth.js'), 'utf8'));
   const hybridCfg = fs.readFileSync(path.join(root, 'config', 'hybrid.public.js'), 'utf8').replace(/^export const /m, 'const ');
   const ladderCfg = fs.readFileSync(path.join(root, 'config', 'ladder.public.js'), 'utf8').replace(/^export const /m, 'const ');
+  const connectorsCfg = fs.readFileSync(path.join(root, 'config', 'connectors.public.js'), 'utf8').replace(/^export const /m, 'const ');
   const hybridSw = fs.readFileSync(path.join(root, 'src', 'hybrid-sw.js'), 'utf8');
   // Classic scripts imported for their side effect (they set a global): inline them, with their CommonJS export line
   // turned into the same global assignment they make in the service worker.
   const classic = [];
-  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '');
+  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(CONNECTORS_IMPORT, '');
   bg = bg.replace(CLASSIC_IMPORT, (line, rel) => {
     const file = path.join(root, 'src', rel);
     const src = fs.readFileSync(file, 'utf8');
@@ -41,7 +43,7 @@ function backgroundScript() {
     throw new Error('background.js has an import the corpus harness does not load');
   }
   // hybrid-sw.js is a classic script that sets globalThis.FlowHybridSW when it is not run under Node's module system.
-  return oauth + '\n' + webAuth + '\n' + hybridCfg + '\n' + ladderCfg + '\n' + hybridSw.replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowHybridSW = FlowHybridSW;\n') + '\n' +
+  return oauth + '\n' + webAuth + '\n' + hybridCfg + '\n' + ladderCfg + '\n' + connectorsCfg + '\n' + hybridSw.replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowHybridSW = FlowHybridSW;\n') + '\n' +
     classic.map((c) => '{\n' + c + '\n}').join('\n') + '\n' + bg;
 }
 
