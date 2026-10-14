@@ -270,16 +270,13 @@ background/framing), not something to upload as-is.
 
 ## Manifest notes confirmed correct (no action needed)
 
-- **`manifest.json`'s pinned `key` field is intentional and correct** — it
-  keeps the extension ID (`dnjhplgmnkabbjogfpbhofjedlkehkai`) stable across
-  reloads and across the eventual Store listing. That exact ID is what
-  Google's own OAuth Client ID (the live connector — see `README.md`'s "Set
-  up Google" section, step 4's "Item ID") is registered against, and it's
-  also baked into the four non-Google connectors' OAuth redirect URLs even
-  though they're out of scope for this listing today. **Do not remove this
-  key before submitting** — removing it would let Chrome Web Store assign a
-  different ID and break Google sign-in along with every other connector's
-  redirect.
+- **`manifest.json`'s pinned `key` field stays in the source tree.** It
+  keeps an unpacked reload on `dnjhplgmnkabbjogfpbhofjedlkehkai`. The store
+  package is a different file: `scripts/build-prod.py` omits `key`, because
+  Unlisted item `lbihckfmoffgjjlnneoeaehbhoonfenh` already has its id.
+  Putting `key` into that zip fails `scripts/check-prod.py`. See `RELEASE.md`.
+  The Chrome-extension OAuth client has to be bound to that store item id,
+  not only to the unpacked id.
 - `chrome.tabs.create()` in `background.js` does not require the `"tabs"`
   permission (only reading cross-tab data would) — no permission gap there.
 - Icons (16/48/128) are present and correctly sized.
