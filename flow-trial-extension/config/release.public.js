@@ -7,3 +7,6 @@ export const PRIVACY_URL = 'https://theflow-ai.com/privacy';
 export const REPORT_EMAIL = 'ai.local.flow@gmail.com';
 
 export const BUILD_SHA = 'dev';
+
+// Rewritten in the store zip. "dev" is an unpacked load.
+export const BUILD_FLAVOR = 'dev';

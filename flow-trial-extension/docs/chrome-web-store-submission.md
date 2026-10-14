@@ -24,6 +24,13 @@ The four non-Google public client IDs live in `config/oauth.public.js` as
 `REPLACE_WITH_*` placeholders (see `docs/SETUP.md`). They are not part of
 this listing. Client secrets stay in Netlify. Do not invent IDs.
 
+The first friends upload is not this Google listing. It is the outlook
+flavor in `docs/RELEASE.md`: `python3 scripts/build-prod.py` writes
+`dist/glance-<version>-<sha7>-outlook-prod.zip`. That zip's required hosts
+are Outlook on the web, Microsoft Graph, Microsoft login, and
+`theflow-ai.com`. It has no Google host and no `oauth2` block. The
+permission table below is the full flavor (`--flavor full`).
+
 ## Store listing text
 
 ### Extension name

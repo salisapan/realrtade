@@ -3,7 +3,10 @@
 
 The unpacked tree keeps its dev key and its debug hooks. This module copies
 the install set, strips the store-forbidden pieces from that copy, and writes
-dist/glance-<version>-<sha7>-prod.zip. Source files are not modified.
+a zip. The default flavor is outlook (the first friends build):
+dist/glance-<version>-<sha7>-outlook-prod.zip. --flavor full keeps today's
+Google package as dist/glance-<version>-<sha7>-prod.zip. Source files are
+not modified.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ DIST_DIR = REPO_ROOT / "dist"
 CWS_ITEM_ID = "lbihckfmoffgjjlnneoeaehbhoonfenh"
 DESCRIPTION_MAX = 132
 
-# Permissions the store package is allowed to declare. Adding one means a
+# Permissions a store package is allowed to declare. Adding one means a
 # justification in flow-trial-extension/docs/RELEASE.md in the same change.
 ALLOWED_PERMISSIONS = (
     "storage",
@@ -36,7 +39,8 @@ ALLOWED_PERMISSIONS = (
     "scripting",
     "contextMenus",
 )
-ALLOWED_HOSTS = (
+# --flavor full. Today's package: Gmail is a host, Outlook is optional.
+FULL_HOSTS = (
     "https://mail.google.com/*",
     "https://tasks.googleapis.com/*",
     "https://www.googleapis.com/calendar/*",
@@ -46,7 +50,7 @@ ALLOWED_HOSTS = (
     "https://gmail.googleapis.com/*",
     "https://theflow-ai.com/*",
 )
-ALLOWED_OPTIONAL_HOSTS = (
+FULL_OPTIONAL_HOSTS = (
     "https://web.whatsapp.com/*",
     "https://app.slack.com/*",
     "https://web.telegram.org/*",
@@ -58,13 +62,47 @@ ALLOWED_OPTIONAL_HOSTS = (
     "https://outlook.office.com/*",
     "https://outlook.office365.com/*",
 )
-ALLOWED_SCOPES = (
+FULL_SCOPES = (
     "https://www.googleapis.com/auth/tasks",
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/drive.file",
 )
+# Default friends build. Outlook web, Graph, and Microsoft login are required.
+# theflow-ai.com is Glance's own host, not a Google host. WhatsApp, Slack, and
+# Telegram stay optional. Loopback stays optional for a model on this computer.
+OUTLOOK_HOSTS = (
+    "https://outlook.live.com/*",
+    "https://outlook.office.com/*",
+    "https://outlook.office365.com/*",
+    "https://graph.microsoft.com/*",
+    "https://login.microsoftonline.com/*",
+    "https://theflow-ai.com/*",
+)
+OUTLOOK_OPTIONAL_HOSTS = (
+    "https://web.whatsapp.com/*",
+    "https://app.slack.com/*",
+    "https://web.telegram.org/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+)
+FLAVORS = ("outlook", "full")
+DEFAULT_FLAVOR = "outlook"
+FLAVOR_RULES = {
+    "outlook": {
+        "hosts": OUTLOOK_HOSTS,
+        "optional_hosts": OUTLOOK_OPTIONAL_HOSTS,
+        "scopes": (),
+        "oauth2": False,
+    },
+    "full": {
+        "hosts": FULL_HOSTS,
+        "optional_hosts": FULL_OPTIONAL_HOSTS,
+        "scopes": FULL_SCOPES,
+        "oauth2": True,
+    },
+}
 
 # Dropped from the store manifest. Hybrid execution is off, and the lite
 # package does not ship the offscreen page, so the permission has no caller
@@ -111,6 +149,46 @@ FORBIDDEN = (
     "SALESFORCE_AUTH_BASE",
     "REPLACE_WITH_HUBSPOT_CLIENT_ID",
     "REPLACE_WITH_SALESFORCE_CLIENT_ID",
+)
+
+# Outlook flavor only. Slack and Monday OAuth placeholders, and the Notion
+# token writer. Outlook sign-in is FlowOutlookAuth, not runOAuthFlow.
+# app.slack.com stays: that host is the optional read-only Slack surface.
+OUTLOOK_FORBIDDEN = FORBIDDEN + (
+    "slackClientId",
+    "mondayClientId",
+    "REPLACE_WITH_SLACK_CLIENT_ID",
+    "REPLACE_WITH_MONDAY_CLIENT_ID",
+    "SLACK_CLIENT_ID",
+    "SLACK_API",
+    "MONDAY_CLIENT_ID",
+    "MONDAY_API",
+    "NOTION_API",
+    "api.notion.com",
+    "slack.com/oauth",
+    "slack.com/api",
+    "auth.monday.com",
+    "api.monday.com",
+    "getSlackAuth",
+    "connectSlack",
+    "slackWrite",
+    "slackUndo",
+    "getMondayAuth",
+    "connectMonday",
+    "mondayWrite",
+    "mondayUndo",
+    "getNotionAuth",
+    "connectNotion",
+    "notionWrite",
+    "notionUndo",
+    "runOAuthFlow",
+)
+
+GMAIL_ONLY_SCRIPTS = (
+    "src/content-gmail.js",
+    "src/sidebar.js",
+    "src/brief.js",
+    "src/weekly.js",
 )
 
 TEXT_SUFFIXES = {".js", ".json", ".html", ".css", ".md", ".svg", ".txt"}
@@ -193,7 +271,44 @@ def worktree_dirty() -> bool:
     return bool(out.strip())
 
 
-def transform_manifest(raw: str) -> str:
+def parse_flavor(argv: list[str]) -> str:
+    if not argv:
+        return DEFAULT_FLAVOR
+    if len(argv) == 2 and argv[0] == "--flavor" and argv[1] in FLAVORS:
+        return argv[1]
+    if len(argv) == 1 and argv[0].startswith("--flavor="):
+        flavor = argv[0].split("=", 1)[1]
+        if flavor in FLAVORS:
+            return flavor
+    die("build-prod.py accepts no arguments, or --flavor outlook (default), or --flavor full")
+    return DEFAULT_FLAVOR
+
+
+def flavor_from_name(name: str) -> str | None:
+    if re.fullmatch(r"glance-\d+\.\d+\.\d+-[0-9a-f]{7}-outlook-prod\.zip", name):
+        return "outlook"
+    if re.fullmatch(r"glance-\d+\.\d+\.\d+-[0-9a-f]{7}-prod\.zip", name):
+        return "full"
+    return None
+
+
+def google_match(match: str) -> bool:
+    text = match.lower()
+    return "google" in text or "gmail" in text
+
+
+def outlook_engine_scripts() -> list[str]:
+    """Shared engine files the Gmail content script lists, without the Gmail page."""
+    manifest = json.loads((EXTENSION_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    scripts = manifest.get("content_scripts") or []
+    js = (scripts[0].get("js") if scripts else None) or []
+    kept = [name for name in js if name not in GMAIL_ONLY_SCRIPTS]
+    if not kept:
+        die("outlook engine script list is empty")
+    return kept
+
+
+def transform_manifest(raw: str, flavor: str) -> str:
     try:
         manifest = json.loads(raw)
     except json.JSONDecodeError as err:
@@ -201,6 +316,16 @@ def transform_manifest(raw: str) -> str:
     manifest.pop("key", None)
     permissions = [p for p in (manifest.get("permissions") or []) if p not in DROPPED_PERMISSIONS]
     manifest["permissions"] = permissions
+    if flavor == "outlook":
+        rules = FLAVOR_RULES["outlook"]
+        manifest["host_permissions"] = list(rules["hosts"])
+        manifest["optional_host_permissions"] = list(rules["optional_hosts"])
+        manifest.pop("oauth2", None)
+        # A content_scripts match is a host grant. The friends build does not
+        # inject on Gmail. Outlook registers from background.js SURFACES.
+        manifest.pop("content_scripts", None)
+        for entry in manifest.get("web_accessible_resources") or []:
+            entry["matches"] = [m for m in (entry.get("matches") or []) if not google_match(m)]
     description = manifest.get("description") or ""
     if len(description) > DESCRIPTION_MAX:
         die(f"description is {len(description)} characters; the store limit is {DESCRIPTION_MAX}")
@@ -209,7 +334,7 @@ def transform_manifest(raw: str) -> str:
     return json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
 
 
-def transform_oauth(raw: str) -> str:
+def transform_oauth(raw: str, flavor: str) -> str:
     raw = replace_once(
         raw,
         "  hubspotClientId: 'REPLACE_WITH_HUBSPOT_CLIENT_ID',\n",
@@ -222,10 +347,23 @@ def transform_oauth(raw: str) -> str:
         "",
         "oauth salesforce client id",
     )
+    if flavor == "outlook":
+        raw = replace_once(
+            raw,
+            "  slackClientId: 'REPLACE_WITH_SLACK_CLIENT_ID',\n",
+            "",
+            "oauth slack client id",
+        )
+        raw = replace_once(
+            raw,
+            "  mondayClientId: 'REPLACE_WITH_MONDAY_CLIENT_ID'\n",
+            "",
+            "oauth monday client id",
+        )
     return raw
 
 
-def transform_background(raw: str) -> str:
+def transform_background(raw: str, flavor: str) -> str:
     raw = cut_until(raw, "const HUBSPOT_CLIENT_ID", "const SLACK_CLIENT_ID", "hubspot and salesforce constants")
     raw = cut_until(
         raw,
@@ -351,6 +489,150 @@ function getGoogleAuthToken(interactive) {
 """,
         "connect handlers",
     )
+    if flavor == "outlook":
+        raw = strip_outlook_dead_connectors(raw)
+    return raw
+
+
+def strip_outlook_dead_connectors(raw: str) -> str:
+    """Slack, Monday, and Notion writers. Outlook auth does not call them.
+
+    runOAuthFlow is only those handshakes once HubSpot and Salesforce are gone.
+    randomOAuthState stays: the Google web-flow fallback still calls it, and
+    this flavor does not delete the Google writers.
+    """
+    raw = cut_until(
+        raw,
+        "const SLACK_CLIENT_ID",
+        "// TODO(owner): create an OAuth Client ID",
+        "slack and monday constants",
+    )
+    raw = cut_until(
+        raw,
+        "/* ------------------------------------------------------------------- Slack */\n",
+        "/* ------------------------------------------------------------ Google Tasks */\n",
+        "slack and monday functions",
+    )
+    raw = cut_until(
+        raw,
+        "/* ------------------------------------------------------------------ Notion */\n",
+        "/* ------------------------------------------------------------- glance-assist */\n",
+        "notion writer",
+    )
+    raw = replace_once(
+        raw,
+        "const NOTION_API = 'https://api.notion.com/v1';\nconst NOTION_VERSION = '2022-06-28';\n\n",
+        "",
+        "notion constants",
+    )
+    raw = replace_once(
+        raw,
+        """async function runOAuthFlow(authUrlBase, providerName) {
+  const state = randomOAuthState();
+  const resultUrl = await chrome.identity.launchWebAuthFlow({
+    url: authUrlBase + '&state=' + encodeURIComponent(state),
+    interactive: true
+  });
+  const params = new URL(resultUrl).searchParams;
+  if (params.get('state') !== state) {
+    throw new Error(providerName + ' authorization could not be verified. Please try connecting again.');
+  }
+  const code = params.get('code');
+  if (!code) throw new Error(providerName + ' did not return an authorization code.');
+  return code;
+}
+
+""",
+        "",
+        "shared oauth handshake",
+    )
+    raw = replace_once(
+        raw,
+        "    notion: 'notionAuth', slack: 'slackAuth', monday: 'mondayAuth',\n",
+        "",
+        "outlook disconnect storage keys",
+    )
+    raw = replace_once(
+        raw,
+        """async function connectorStatus() {
+  const nt = await getNotionAuth();
+  const sl = await getSlackAuth();
+  const md = await getMondayAuth();
+  const gt = await getGoogleTasksAuth();
+  return {
+    googleTasks: {
+      connected: Boolean(gt),
+      configured: googleTasksConfigured(),
+      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
+    },
+    notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null },
+    slack: {
+      connected: Boolean(sl),
+      configured: Boolean(SLACK_CLIENT_ID),
+      detail: sl ? '#' + sl.channelId : null
+    },
+    monday: {
+      connected: Boolean(md),
+      configured: Boolean(MONDAY_CLIENT_ID),
+      detail: md ? 'Board ' + md.boardId : null
+    }
+  };
+}
+""",
+        """async function connectorStatus() {
+  const gt = await getGoogleTasksAuth();
+  return {
+    googleTasks: {
+      connected: Boolean(gt),
+      configured: googleTasksConfigured(),
+      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
+    }
+  };
+}
+""",
+        "outlook connector status",
+    )
+    raw = replace_once(
+        raw,
+        "  notion: notionWrite, slack: slackWrite, monday: mondayWrite,\n",
+        "",
+        "outlook writers",
+    )
+    raw = replace_once(
+        raw,
+        "  notion: notionUndo, slack: slackUndo, monday: mondayUndo,\n",
+        "",
+        "outlook undoers",
+    )
+    raw = replace_once(
+        raw,
+        """    if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'slack') return reply(sendResponse, connectSlack(msg.channel).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'monday') return reply(sendResponse, connectMonday(msg.board).then(() => ({ ok: true })));
+""",
+        "",
+        "outlook connect handlers",
+    )
+    baked = ",\n    ".join(json.dumps(name) for name in outlook_engine_scripts())
+    raw = replace_once(
+        raw,
+        """function surfaceScripts(id) {
+  const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
+  return base.concat(SURFACES[id].extra);
+}
+""",
+        f"""function surfaceScripts(id) {{
+  const declared = chrome.runtime.getManifest().content_scripts;
+  const fromManifest = declared && declared[0] && declared[0].js;
+  const baked = [
+    {baked}
+  ];
+  const base = (fromManifest || baked).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
+  return base.concat(SURFACES[id].extra);
+}}
+""",
+        "outlook surface script list",
+    )
     return raw
 
 
@@ -412,6 +694,62 @@ def transform_outlook(raw: str) -> str:
         "",
         "outlook debug listener",
     )
+    # The page must not read or write the silence log. The panel and the worker
+    # still can. __glanceOutlookPage stays: that is the rescan handshake.
+    raw = replace_once(raw, "  const PAGE_DIAG_KEY = 'outlookPageDiag';\n", "", "page diag key")
+    raw = replace_once(
+        raw,
+        """    try {
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
+      const list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => d && d.key !== key);
+      list.unshift(Object.assign({
+        key, reason, at: Date.now(), source: 'page',
+        subject: (typeof FlowDisplay !== 'undefined' && FlowDisplay.sanitizeStoredSubject)
+          ? FlowDisplay.sanitizeStoredSubject(pane && pane.subject)
+          : String((pane && pane.subject) || '').slice(0, 120),
+        counterpart: (pane && pane.senderEmail) || null,
+        conversationId: (pane && pane.conversationId) || null,
+        messageId: (pane && (pane.itemId || pane.pathId)) || null
+      }, extra || {}));
+      await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 40) }, resolve));
+      lastReasonKey = key;
+      lastReasonStored = true;
+    } catch (e) {
+      lastReasonStored = false;
+      try { console.error('Glance: page reason not stored', reason); } catch (x) { /* console gone */ }
+    }
+""",
+        """    lastReasonKey = key;
+    lastReasonStored = true;
+""",
+        "page diag write",
+    )
+    raw = replace_once(
+        raw,
+        """    try {
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
+      const ids = messageIdsOf(pane);
+      const id = pane && (pane.conversationId || pane.itemId || pane.subject);
+      const list = (bag[PAGE_DIAG_KEY] || []).filter((d) => {
+        if (!d) return false;
+        if (id && String(d.key || '').endsWith('|' + id)) return false;
+        if (idListed(d.conversationId, ids) || idListed(d.messageId, ids)) return false;
+        return true;
+      });
+      const sync = bag.outlookSync || {};
+      const patch = {};
+      if (list.length !== (bag[PAGE_DIAG_KEY] || []).length) patch[PAGE_DIAG_KEY] = list;
+      if (Array.isArray(sync.diagnostics)) {
+""",
+        """    try {
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ outlookSync: {} }, resolve));
+      const ids = messageIdsOf(pane);
+      const sync = bag.outlookSync || {};
+      const patch = {};
+      if (Array.isArray(sync.diagnostics)) {
+""",
+        "page diag clear",
+    )
     return raw
 
 
@@ -435,23 +773,45 @@ def transform_gmail(raw: str) -> str:
     )
 
 
-def transform_release(raw: str, sha: str) -> str:
-    return replace_once(
+def transform_release(raw: str, sha: str, flavor: str) -> str:
+    raw = replace_once(
         raw,
         "export const BUILD_SHA = 'dev';",
         f"export const BUILD_SHA = '{sha}';",
         "build sha",
     )
+    return replace_once(
+        raw,
+        "export const BUILD_FLAVOR = 'dev';",
+        f"export const BUILD_FLAVOR = '{flavor}';",
+        "build flavor",
+    )
 
 
-TRANSFORMS = {
-    "manifest.json": lambda raw, sha: transform_manifest(raw),
-    "config/oauth.public.js": lambda raw, sha: transform_oauth(raw),
-    "src/background.js": lambda raw, sha: transform_background(raw),
-    "src/content-outlook.js": lambda raw, sha: transform_outlook(raw),
-    "src/content-gmail.js": lambda raw, sha: transform_gmail(raw),
-    "config/release.public.js": lambda raw, sha: transform_release(raw, sha),
+TRANSFORM_FILES = {
+    "manifest.json",
+    "config/oauth.public.js",
+    "src/background.js",
+    "src/content-outlook.js",
+    "src/content-gmail.js",
+    "config/release.public.js",
 }
+
+
+def transform_file(rel: str, text: str, sha: str, flavor: str) -> str:
+    if rel == "manifest.json":
+        return transform_manifest(text, flavor)
+    if rel == "config/oauth.public.js":
+        return transform_oauth(text, flavor)
+    if rel == "src/background.js":
+        return transform_background(text, flavor)
+    if rel == "src/content-outlook.js":
+        return transform_outlook(text)
+    if rel == "src/content-gmail.js":
+        return transform_gmail(text)
+    if rel == "config/release.public.js":
+        return transform_release(text, sha, flavor)
+    return text
 
 
 def syntax_check(rel: str, data: bytes) -> None:
@@ -471,7 +831,7 @@ def syntax_check(rel: str, data: bytes) -> None:
         die(f"{rel} is not valid JavaScript after the store transform:\n{result.stderr}")
 
 
-def build_bytes(sha: str) -> dict[str, bytes]:
+def build_bytes(sha: str, flavor: str) -> dict[str, bytes]:
     if trial.hybrid_enabled():
         die(
             "config/hybrid.public.js has enabled: true. The store zip drops the "
@@ -484,8 +844,8 @@ def build_bytes(sha: str) -> dict[str, bytes]:
     out: dict[str, bytes] = {}
     for rel in sorted(files):
         raw = files[rel].read_bytes()
-        if rel in TRANSFORMS:
-            text = TRANSFORMS[rel](raw.decode("utf-8"), sha)
+        if rel in TRANSFORM_FILES:
+            text = transform_file(rel, raw.decode("utf-8"), sha, flavor)
             raw = text.encode("utf-8")
         if rel.endswith(".js"):
             syntax_check(rel, raw)
@@ -513,8 +873,13 @@ def write_zip(files: dict[str, bytes], out: Path) -> int:
     return out.stat().st_size
 
 
-def zip_name(version: str, sha: str) -> str:
-    return f"glance-{version}-{sha}-prod.zip"
+def zip_name(version: str, sha: str, flavor: str) -> str:
+    if flavor == "outlook":
+        return f"glance-{version}-{sha}-outlook-prod.zip"
+    if flavor == "full":
+        return f"glance-{version}-{sha}-prod.zip"
+    die(f"unknown flavor {flavor!r}")
+    return ""
 
 
 def read_zip(path: Path) -> dict[str, bytes]:
@@ -533,6 +898,20 @@ def read_zip(path: Path) -> dict[str, bytes]:
     return files
 
 
+def resolve_flavor(files: dict[str, bytes], zip_path: Path | None, failures: list[str]) -> str:
+    release = files.get("config/release.public.js", b"").decode("utf-8", errors="replace")
+    stamped = re.search(r"export const BUILD_FLAVOR = '(outlook|full)';", release)
+    flavor = stamped.group(1) if stamped else ""
+    named = flavor_from_name(zip_path.name) if zip_path is not None else None
+    if zip_path is not None and named is None:
+        failures.append(f"zip name {zip_path.name} is not glance-<version>-<sha7>-prod.zip or glance-<version>-<sha7>-outlook-prod.zip")
+    if not flavor:
+        failures.append("config/release.public.js has no BUILD_FLAVOR of outlook or full")
+    if flavor and named and flavor != named:
+        failures.append(f"BUILD_FLAVOR is {flavor} but the zip name is the {named} package")
+    return flavor or named or ""
+
+
 def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
     if "manifest.json" not in files:
         die("the zip has no manifest.json")
@@ -541,6 +920,8 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
     except json.JSONDecodeError as err:
         die(f"packaged manifest.json is not valid JSON: {err}")
     failures: list[str] = []
+    flavor = resolve_flavor(files, zip_path, failures)
+    rules = FLAVOR_RULES.get(flavor)
     if "key" in manifest:
         failures.append("manifest.json still has a key field")
     description = manifest.get("description") or ""
@@ -559,23 +940,49 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
             missing = [x for x in allowed if x not in got_list]
             failures.append(f"{label} mismatch; extra={extra or '-'} missing={missing or '-'}")
 
-    same("permissions", manifest.get("permissions"), ALLOWED_PERMISSIONS)
-    same("host_permissions", manifest.get("host_permissions"), ALLOWED_HOSTS)
-    same("optional_host_permissions", manifest.get("optional_host_permissions"), ALLOWED_OPTIONAL_HOSTS)
-    scopes = ((manifest.get("oauth2") or {}).get("scopes")) or []
-    same("oauth2.scopes", scopes, ALLOWED_SCOPES)
+    if rules:
+        same("permissions", manifest.get("permissions"), ALLOWED_PERMISSIONS)
+        same("host_permissions", manifest.get("host_permissions"), rules["hosts"])
+        same("optional_host_permissions", manifest.get("optional_host_permissions"), rules["optional_hosts"])
+        if rules["oauth2"]:
+            scopes = ((manifest.get("oauth2") or {}).get("scopes")) or []
+            same("oauth2.scopes", scopes, rules["scopes"])
+        else:
+            scopes = []
+            if "oauth2" in manifest:
+                failures.append("outlook flavor still has an oauth2 block")
+            for host in list(manifest.get("host_permissions") or []) + list(manifest.get("optional_host_permissions") or []):
+                if google_match(host):
+                    failures.append(f"outlook flavor still grants a Google host: {host}")
+            for script in manifest.get("content_scripts") or []:
+                for match in script.get("matches") or []:
+                    if google_match(match):
+                        failures.append(f"outlook flavor content script still matches {match}")
+            for entry in manifest.get("web_accessible_resources") or []:
+                for match in entry.get("matches") or []:
+                    if google_match(match):
+                        failures.append(f"outlook flavor exposes a resource to {match}")
+    else:
+        scopes = ((manifest.get("oauth2") or {}).get("scopes")) or []
 
+    needles = OUTLOOK_FORBIDDEN if flavor == "outlook" else FORBIDDEN
     hits: list[str] = []
     for rel, data in sorted(files.items()):
         suffix = Path(rel).suffix.lower()
         if suffix and suffix not in TEXT_SUFFIXES:
             continue
         text = data.decode("utf-8", errors="replace")
-        for needle in FORBIDDEN:
+        for needle in needles:
             if needle in text:
                 hits.append(f"{rel}: {needle}")
     if hits:
         failures.append("forbidden strings in the zip:\n  " + "\n  ".join(hits))
+
+    page = files.get("src/content-outlook.js", b"").decode("utf-8", errors="replace")
+    if "outlookPageDiag" in page or "PAGE_DIAG_KEY" in page:
+        failures.append("outlookPageDiag is reachable from the Outlook page script")
+    if "__glanceOutlookPage" not in page:
+        failures.append("the Outlook page is missing __glanceOutlookPage")
 
     release = files.get("config/release.public.js", b"").decode("utf-8", errors="replace")
     sha_match = re.search(r"export const BUILD_SHA = '([0-9a-f]{7})';", release)
@@ -594,8 +1001,8 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
     if "reportMailto" not in report:
         failures.append("report-problem.js has no reportMailto")
 
-    if zip_path is not None:
-        expected = zip_name(version, sha) if version and sha else ""
+    if zip_path is not None and flavor in FLAVOR_RULES:
+        expected = zip_name(version, sha, flavor) if version and sha else ""
         if expected and zip_path.name != expected:
             failures.append(f"zip name is {zip_path.name}; expected {expected}")
 
@@ -603,6 +1010,7 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
         die("store check failed:\n- " + "\n- ".join(failures))
 
     return {
+        "flavor": flavor,
         "version": version,
         "sha": sha,
         "description_chars": len(description),
@@ -610,22 +1018,21 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
         "host_permissions": list(manifest.get("host_permissions") or []),
         "optional_host_permissions": list(manifest.get("optional_host_permissions") or []),
         "scopes": list(scopes),
+        "oauth2": "oauth2" in manifest,
         "files": len(files),
     }
 
 
-def find_prod_zip(explicit: Path | None) -> Path:
-    if explicit is not None:
-        return explicit
-    matches = sorted(DIST_DIR.glob("glance-*-prod.zip"))
-    if len(matches) != 1:
-        die(f"expected one dist/glance-*-prod.zip, found {len(matches)}")
-    return matches[0]
+def prod_zips() -> list[Path]:
+    found = []
+    for path in sorted(DIST_DIR.glob("glance-*-prod.zip")):
+        if flavor_from_name(path.name):
+            found.append(path)
+    return found
 
 
 def main_build(argv: list[str]) -> None:
-    if argv:
-        die("build-prod.py takes no arguments; the version and sha come from the tree")
+    flavor = parse_flavor(argv)
     sha = git_sha7()
     if worktree_dirty():
         print(
@@ -633,13 +1040,13 @@ def main_build(argv: list[str]) -> None:
             "and does not cover those edits.",
             file=sys.stderr,
         )
-    files = build_bytes(sha)
+    files = build_bytes(sha, flavor)
     manifest = json.loads(files["manifest.json"].decode("utf-8"))
     version = manifest["version"]
-    out = DIST_DIR / zip_name(version, sha)
+    out = DIST_DIR / zip_name(version, sha, flavor)
     size = write_zip(files, out)
-    for old in DIST_DIR.glob("glance-*-prod.zip"):
-        if old.resolve() != out.resolve():
+    for old in prod_zips():
+        if flavor_from_name(old.name) == flavor and old.resolve() != out.resolve():
             old.unlink()
     report = check_files(files, out)
     shown = out.relative_to(REPO_ROOT) if out.is_relative_to(REPO_ROOT) else out
@@ -653,15 +1060,19 @@ def main_check(argv: list[str]) -> None:
         return
     if len(argv) > 1:
         die("check-prod.py takes one zip path, or none to read dist/glance-*-prod.zip")
-    path = find_prod_zip(Path(argv[0]).resolve() if argv else None)
-    files = read_zip(path)
-    report = check_files(files, path)
-    shown = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
-    print(f"PASS {shown}")
-    print_report(shown, report)
+    paths = [Path(argv[0]).resolve()] if argv else prod_zips()
+    if not paths:
+        die("expected at least one dist/glance-*-prod.zip, found 0")
+    for path in paths:
+        files = read_zip(path)
+        report = check_files(files, path)
+        shown = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
+        print(f"PASS {shown}")
+        print_report(shown, report)
 
 
 def print_report(shown, report: dict) -> None:
+    print(f"flavor {report.get('flavor', '')}")
     print(f"version {report['version']}")
     print(f"sha {report['sha']}")
     print(f"description {report['description_chars']} chars (limit {DESCRIPTION_MAX})")
@@ -674,16 +1085,33 @@ def print_report(shown, report: dict) -> None:
     print("optional_host_permissions:")
     for name in report["optional_host_permissions"]:
         print(f"  {name}")
-    print("oauth2.scopes:")
-    for name in report["scopes"]:
-        print(f"  {name}")
+    if report.get("oauth2"):
+        print("oauth2.scopes:")
+        for name in report["scopes"]:
+            print(f"  {name}")
+    else:
+        print("oauth2: absent")
     print(f"store item {CWS_ITEM_ID}")
 
 
+def _expect_fail(files: dict[str, bytes], name: str, label: str) -> None:
+    try:
+        check_files(files, Path(name))
+    except SystemExit as err:
+        if err.code in (None, 0):
+            die(f"self-test: {label} was accepted")
+    else:
+        die(f"self-test: {label} did not fail")
+
+
+def _manifest_bytes(manifest: dict) -> bytes:
+    return json.dumps(manifest).encode()
+
+
 def self_test() -> None:
-    """A zip that breaks the rules must fail. A clean minimal zip must pass the string gate."""
+    """A zip that breaks a flavor's rules must fail."""
     bad = {
-        "manifest.json": json.dumps({
+        "manifest.json": _manifest_bytes({
             "manifest_version": 3,
             "name": "Glance",
             "version": "0.0.1",
@@ -693,16 +1121,47 @@ def self_test() -> None:
             "host_permissions": ["https://mail.google.com/*", "https://app.hubspot.com/*"],
             "optional_host_permissions": [],
             "oauth2": {"client_id": "x", "scopes": ["https://www.googleapis.com/auth/tasks"]},
-        }).encode(),
+        }),
         "src/content-outlook.js": b"globalThis.__flowDiag = {};\n",
-        "config/release.public.js": b"export const BUILD_SHA = 'dev';\nexport const PRIVACY_URL = 'http://insecure.example/';\n",
+        "config/release.public.js": b"export const BUILD_SHA = 'dev';\nexport const BUILD_FLAVOR = 'full';\nexport const PRIVACY_URL = 'http://insecure.example/';\n",
         "popup/report-problem.js": b"const href = 'mailto:someone@example.com?body=the%20mail';\n",
     }
-    try:
-        check_files(bad, Path("glance-0.0.1-0000000-prod.zip"))
-    except SystemExit as err:
-        if err.code in (None, 0):
-            die("self-test: a broken zip was accepted")
-    else:
-        die("self-test: a broken zip did not fail")
+    _expect_fail(bad, "glance-0.0.1-0000000-prod.zip", "a broken full zip")
+
+    # Today's full allow-list, named as the friends zip. Outlook must reject it.
+    full_shaped = {
+        "manifest.json": _manifest_bytes({
+            "manifest_version": 3,
+            "name": "Glance",
+            "version": "0.0.1",
+            "description": "Glance stays on what you are waiting on.",
+            "permissions": list(ALLOWED_PERMISSIONS),
+            "host_permissions": list(FULL_HOSTS),
+            "optional_host_permissions": list(FULL_OPTIONAL_HOSTS),
+            "oauth2": {"client_id": "x", "scopes": list(FULL_SCOPES)},
+            "content_scripts": [{"matches": ["https://mail.google.com/*"], "js": ["src/content-gmail.js"]}],
+        }),
+        "src/content-outlook.js": b"globalThis.__glanceOutlookPage = {};\nconst PAGE_DIAG_KEY = 'outlookPageDiag';\n",
+        "src/background.js": b"const SLACK_CLIENT_ID = '';\nasync function runOAuthFlow() {}\nconst NOTION_API = 'https://api.notion.com/v1';\n",
+        "config/oauth.public.js": b"export const OAUTH_PUBLIC = { slackClientId: 'REPLACE_WITH_SLACK_CLIENT_ID' };\n",
+        "config/release.public.js": b"export const BUILD_SHA = 'abcdef0';\nexport const BUILD_FLAVOR = 'outlook';\nexport const PRIVACY_URL = 'https://theflow-ai.com/privacy';\n",
+        "popup/report-problem.js": b"export const REPORT_EMAIL = 'ai.local.flow@gmail.com';\nexport function reportMailto() { return 'mailto:' + REPORT_EMAIL + '?subject=Glance'; }\n",
+    }
+    _expect_fail(full_shaped, "glance-0.0.1-abcdef0-outlook-prod.zip", "a full package labeled as the outlook friends zip")
+
+    outlook_shaped = {
+        "manifest.json": _manifest_bytes({
+            "manifest_version": 3,
+            "name": "Glance",
+            "version": "0.0.1",
+            "description": "Glance stays on what you are waiting on.",
+            "permissions": list(ALLOWED_PERMISSIONS),
+            "host_permissions": list(OUTLOOK_HOSTS),
+            "optional_host_permissions": list(OUTLOOK_OPTIONAL_HOSTS),
+        }),
+        "src/content-outlook.js": b"globalThis.__glanceOutlookPage = { rescan() {} };\n",
+        "config/release.public.js": b"export const BUILD_SHA = 'abcdef0';\nexport const BUILD_FLAVOR = 'outlook';\nexport const PRIVACY_URL = 'https://theflow-ai.com/privacy';\n",
+        "popup/report-problem.js": full_shaped["popup/report-problem.js"],
+    }
+    _expect_fail(outlook_shaped, "glance-0.0.1-abcdef0-prod.zip", "an outlook package labeled as the full zip")
     print("PASS self-test: a broken zip is rejected")

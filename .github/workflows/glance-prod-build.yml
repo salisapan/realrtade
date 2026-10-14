@@ -12,9 +12,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Build the Chrome Web Store zip
+      - name: Build the Outlook friends zip
         run: python3 scripts/build-prod.py
-      - name: Fail the job if the store rules are broken
+      - name: Build the full zip
+        run: python3 scripts/build-prod.py --flavor full
+      - name: Fail the job if either flavor breaks its store rules
         run: python3 scripts/check-prod.py
       - uses: actions/upload-artifact@v4
         with:

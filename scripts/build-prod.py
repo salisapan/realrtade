@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Write dist/glance-<version>-<sha7>-prod.zip and fail if the store rules break.
+"""Write the Chrome Web Store zip and fail if that flavor's rules break.
 
+Default flavor is outlook: dist/glance-<version>-<sha7>-outlook-prod.zip.
+`--flavor full` keeps today's package: dist/glance-<version>-<sha7>-prod.zip.
 Version comes from flow-trial-extension/manifest.json. The sha is the first
 7 characters of HEAD. See flow-trial-extension/docs/RELEASE.md.
 """
