@@ -198,8 +198,13 @@
       chrome.runtime.sendMessage({ type: 'flow:lane-undo', connectorId: connectorId, ref: ref }, (res) => {
         if (location.href !== href) return;
         const err = chrome.runtime.lastError;
-        if (err || !res || res.ok !== true) {
+        if (err || !res) {
           statusNode(card).textContent = 'Undo unavailable.';
+          undo.disabled = false;
+          return;
+        }
+        if (res.ok !== true) {
+          paintResult(card, res);
           undo.disabled = false;
           return;
         }
