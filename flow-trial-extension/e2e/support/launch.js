@@ -410,6 +410,20 @@ function installE2EHooks() {
         if (row && row.id) return Promise.resolve(json(200, row));
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
       }
+      if (path.indexOf('/me/sendMail') >= 0 && method === 'POST') {
+        let posted = {};
+        try { posted = init && init.body ? JSON.parse(init.body) : {}; } catch (err) { posted = {}; }
+        const message = posted.message || {};
+        const id = 'e2e-sent-' + (e2e.seq++);
+        scenario.sent = scenario.sent || [];
+        scenario.sent.unshift({
+          id: id,
+          subject: message.subject || '',
+          toRecipients: message.toRecipients || [],
+          sentDateTime: new Date().toISOString()
+        });
+        return Promise.resolve(empty(202));
+      }
       if (path.indexOf('/me/chats') >= 0) {
         if (method !== 'GET') return Promise.resolve(json(403, { error: { code: 'never-post' } }));
         return Promise.resolve(json(200, { value: scenario.chats || [] }));
