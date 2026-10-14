@@ -111,8 +111,7 @@ Rules of thumb:
 1. **ASK + wrongDoIt=false** — clear ask of the owner (issue invoice, pay, get file from third party, confirm, schedule, reply with substance). `expectedAction` names the **true-close outcome** (or the single next step toward it) — e.g. `issue+verify invoice`, not «prepare invoice draft» as done; draft/file/calendar remain intermediate on the path to Handled. Labeling still judges *surface*; execution stays behind approval later.
 2. **SILENT + wrongDoIt=true** — traps: marketing, OOO/auto-reply, ask addressed to someone else, owner's own descriptive text, quoted own ask in a forward, soft conditionals (“only if…”), prohibitions (“don’t forward”).
 3. **SILENT + wrongDoIt=false** — rare: clearly no action and no plausible false Do It (e.g. pure FYI with no imperative). Still SILENT.
-4. **A confirmed amount or approved budget with no ask of the owner is SILENT** (owner «מאשר», 2026-10-14, rule 3b): «אישרנו 4,200», "the budget was approved". It overrides the older `confirmed-amount|task` reading in `lib.cjs` for labels. The engine still offers that task today; aligning it is a separate product change.
-5. Never mark ASK just because the mail is “important.” If unsure → **SILENT** and set `wrongDoIt: true` when a card would mislead.
+4. Never mark ASK just because the mail is “important.” If unsure → **SILENT** and set `wrongDoIt: true` when a card would mislead.
 
 Map from the older intent pipeline (ASK / PROMISE / HOLD / CLOSE / SILENT) only in `notes` / `importedFrom`. M0 `ownerLabel` stays binary ASK|SILENT for the Do It decision. **Silence beats a wrong Do It.**
 
