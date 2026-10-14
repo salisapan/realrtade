@@ -45,24 +45,36 @@ function isOwner(labeledBy) {
 // "sali:action" and source "own-use". It never makes a Claude or two-pass-agreement label owner-verified, and a row that says
 // "sali:action" without this exact shape does not qualify (so nobody can mint one by writing the string).
 const OWN_USE = 'sali:action';
-const OWN_USE_DECISIONS = ['approved', 'edited', 'undone'];
+// approved / edited need fetchedBack. undone is the person taking it back. handled counts only when the close was read back.
+// ignored is a weak negative and is not in this list, so it never qualifies.
+const OWN_USE_DECISIONS = ['approved', 'edited', 'undone', 'handled'];
+// Claude, Cursor, a chief of staff, the CTO, an agreement pass, or another agent. None of these may set ownerVerified.
+const AGENT_LABELED_BY = /^(claude|cursor|cos|cto|agreement|agent|gpt|openai|anthropic|grok|automation|synthetic|model)(\b|:|\/|$)/i;
+function isAgentLabeler(labeledBy) {
+  return AGENT_LABELED_BY.test(String(labeledBy || '').trim());
+}
 function isOwnUse(row) {
   const r = row || {};
+  if (isAgentLabeler(r.labeledBy)) return false;
   if (String(r.labeledBy || '').trim() !== OWN_USE || r.source !== 'own-use') return false;
   if (OWN_USE_DECISIONS.indexOf(r.decision) < 0) return false;
   const p = r.proof;
   if (!p || typeof p.system !== 'string' || !p.system || typeof p.externalId !== 'string' || !p.externalId) return false;
   if (typeof p.verifiedAt !== 'string' || !p.verifiedAt) return false;
-  // an approval or an edit is a label only when the close was read back; an undo is a label by itself (the person took it back)
+  // an approval, an edit, or Handled is a label only when the close was read back; an undo is a label by itself
   if (r.decision !== 'undone' && p.fetchedBack !== true) return false;
   return true;
 }
-// One rule for "this row counts as owner-verified": the owner's hand label, or a qualifying own-use row.
+// One rule for "this row counts as owner-verified": the owner's hand label (labeledBy sali), or a qualifying own-use row.
+// A flag on any other labeledBy, including every agent, does not count. The gate enforces this itself.
 function isOwnerVerified(row) {
   const r = row || {};
   if (r.ownerVerified !== true) return false;
-  if (String(r.labeledBy || '').trim().indexOf(OWN_USE) === 0) return isOwnUse(r);
-  return true;   // unchanged: the flag is set only by the validated ingest path (validateRow, ingest-answers)
+  const by = String(r.labeledBy || '').trim();
+  if (isAgentLabeler(by)) return false;
+  if (by === OWNER) return true;
+  if (by === OWN_USE) return isOwnUse(r);
+  return false;
 }
 
 function normMark(mark) {
@@ -223,6 +235,6 @@ function parseSheet(md) {
 }
 
 module.exports = {
-  OWNER, OWN_USE, isOwnUse, isOwnerVerified, HERE, SCHEMA_PATH, ACTION_CLOSE,
+  OWNER, OWN_USE, OWN_USE_DECISIONS, isAgentLabeler, isOwnUse, isOwnerVerified, HERE, SCHEMA_PATH, ACTION_CLOSE,
   isOwner, normMark, readJson, readJsonl, writeJsonl, loadBatch, loadBatches, rate, stepOf, metricsOf, validateRow, parseSheet
 };

@@ -1,0 +1,56 @@
+{
+  "asOf": "2026-10-14",
+  "exportFound": false,
+  "events": 0,
+  "skippedHandLabels": 0,
+  "qualifying": 0,
+  "minOwner": 200,
+  "remaining": 200,
+  "byDecision": {
+    "approved": 0,
+    "edited": 0,
+    "undone": 0,
+    "handled": 0,
+    "ignored": 0,
+    "other": 0
+  },
+  "qualifyingByDecision": {
+    "approved": 0,
+    "edited": 0,
+    "undone": 0,
+    "handled": 0,
+    "ignored": 0,
+    "other": 0
+  },
+  "byLang": {
+    "he": 0,
+    "en": 0,
+    "unknown": 0
+  },
+  "byLoopType": {
+    "dated-commitment": 0,
+    "confirmed-amount": 0,
+    "follow-up-ask": 0,
+    "calendar-hold": 0,
+    "calendar-cancel": 0,
+    "calendar-move": 0,
+    "create-missing": 0,
+    "drive-file": 0,
+    "file-on-hold": 0,
+    "file-on-task": 0
+  },
+  "lackingLoopTypes": [
+    "dated-commitment",
+    "confirmed-amount",
+    "follow-up-ask",
+    "calendar-hold",
+    "calendar-cancel",
+    "calendar-move",
+    "create-missing",
+    "drive-file",
+    "file-on-hold",
+    "file-on-task"
+  ],
+  "heldOutFromTraining": 0,
+  "privateTextCommitted": false
+}

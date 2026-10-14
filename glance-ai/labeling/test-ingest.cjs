@@ -246,5 +246,14 @@ assert.strictEqual(L.isOwnerVerified(Object.assign({ ownerVerified: true }, okUs
 assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'sali:action' }), false, 'the string alone never counts');
 assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'sali' }), true);
 assert.strictEqual(L.isOwnerVerified({ ownerVerified: false, labeledBy: 'sali' }), false);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'claude' }), false);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'cursor' }), false);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'cos:david' }), false);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'cto' }), false);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'agreement:a+b' }), false);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true }), false, 'a bare flag is not the owner');
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { decision: 'handled' })), true);
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { decision: 'handled', proof: Object.assign({}, okUse.proof, { fetchedBack: false }) })), false);
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { decision: 'ignored' })), false);
 
 console.log('ingest tests passed');

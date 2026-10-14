@@ -20,7 +20,8 @@
 // usage: node promote_gate.cjs --base <pred.jsonl> --cand <pred.jsonl> [--cases <cases.jsonl>] [--labels <id,step jsonl>]
 //                              [--understanding <understanding.js>] [--strict]
 //   --cases   default glance-ai/eval-data/shadow-combined-cases.jsonl (gold.step; AMBIGUOUS / ANY rows are left out)
-//   --labels  rows { id, step, ownerVerified } that override the case gold; ownerVerified rows count toward MIN_OWNER
+//   --labels  rows { id, step, ownerVerified, labeledBy } that override the case gold; a row counts toward MIN_OWNER only
+//             through labeling/lib.cjs isOwnerVerified (labeledBy sali, or qualifying sali:action). An agent flag does not.
 //   --strict  exit 1 unless promote is true (for CI)
 // No model is run; nothing leaves the machine.
 const fs = require('fs'), path = require('path');
