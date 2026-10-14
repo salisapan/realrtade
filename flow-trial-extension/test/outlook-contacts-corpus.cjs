@@ -99,6 +99,8 @@ function dana() {
   check('background.js has one lane hook', hooks.length === 1 && bg.indexOf('outlook-contacts.js') < 0, hooks);
   const page = fs.readFileSync(path.join(__dirname, '../src/content-outlook.js'), 'utf8');
   check('content-outlook.js is not edited for this lane', page.indexOf('FlowLaneMs') < 0 && page.indexOf('lane-ms') < 0);
+  const contactsSrc = fs.readFileSync(path.join(__dirname, '../core/outlook-contacts.js'), 'utf8');
+  check('contacts has no startup side effects', contactsSrc.indexOf('getManifest') < 0 && contactsSrc.indexOf('registerContentScripts') < 0 && contactsSrc.indexOf('addListener') < 0 && contactsSrc.indexOf('laneBindHost') < 0);
 
   if (failures) process.exit(1);
   console.log('outlook-contacts-corpus: all passed');

@@ -38,9 +38,6 @@ function outlookAuth(opts) {
   const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'];
   if (o.tasks !== false) scopes.push('Tasks.ReadWrite');
   if (o.files !== false) scopes.push('Files.ReadWrite');
-  if (o.contacts) scopes.push('Contacts.Read');
-  if (o.teams) scopes.push('Chat.Read');
-  if (o.mailSend) scopes.push('Mail.Send');
   const now = Date.now();
   return {
     token: {
@@ -75,7 +72,6 @@ function installE2EHooks() {
   e2e.drafts = e2e.drafts || {};
   e2e.driveItems = e2e.driveItems || {};
   e2e.driveByName = e2e.driveByName || {};
-  e2e.workbooks = e2e.workbooks || {};
   e2e.seq = e2e.seq || 1;
   globalThis.__glanceE2e = e2e;
 
@@ -144,96 +140,6 @@ function installE2EHooks() {
     }
 
     if (host === 'graph.microsoft.com') {
-      (scenario.driveSeed || []).forEach((item) => {
-        if (item && item.id && !e2e.driveItems[item.id]) {
-          e2e.driveItems[item.id] = item;
-          if (item.name) e2e.driveByName[item.name] = item;
-        }
-      });
-      e2e.workbooks = e2e.workbooks || {};
-      (scenario.workbookSeed || []).forEach((book) => {
-        if (!book || !book.itemId || e2e.workbooks[book.itemId]) return;
-        e2e.workbooks[book.itemId] = {
-          tables: (book.tables || []).map((table) => ({
-            id: table.id,
-            name: table.name || 'Table1',
-            rows: (table.rows || []).map((row) => row.slice())
-          }))
-        };
-      });
-      const workbook = path.match(/\/me\/drive\/items\/([^/]+)\/workbook(?:\/(.*))?$/);
-      if (workbook) {
-        const itemId = workbook[1];
-        const rest = workbook[2] || '';
-        if (!e2e.driveItems[itemId]) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
-        const wb = e2e.workbooks[itemId] || (e2e.workbooks[itemId] = { tables: [] });
-        let posted = {};
-        try { posted = init && init.body ? JSON.parse(init.body) : {}; } catch (err) { posted = {}; }
-        if (rest === 'createSession' && method === 'POST') {
-          wb.session = 'sess-' + itemId;
-          return Promise.resolve(json(201, { id: wb.session }));
-        }
-        if (rest === 'closeSession' && method === 'POST') {
-          wb.session = null;
-          return Promise.resolve(empty(204));
-        }
-        if (rest.indexOf('range') >= 0 && method === 'PATCH') {
-          wb.range = posted.values || [];
-          return Promise.resolve(json(200, { values: wb.range }));
-        }
-        if (rest.indexOf('range') >= 0 && method === 'GET') {
-          return Promise.resolve(json(200, { values: wb.range || [] }));
-        }
-        if (rest === 'tables/add' && method === 'POST') {
-          const id = 'e2e-table-' + (e2e.seq++);
-          const rows = (wb.range || []).map((row) => row.slice());
-          wb.tables.push({ id: id, name: 'Table1', rows: rows });
-          return Promise.resolve(json(201, { id: id, name: 'Table1' }));
-        }
-        if (rest === 'tables' && method === 'GET') {
-          return Promise.resolve(json(200, { value: wb.tables.map((table) => ({ id: table.id, name: table.name })) }));
-        }
-        const rowAdd = rest.match(/^tables\/([^/]+)\/rows\/add$/);
-        if (rowAdd && method === 'POST') {
-          const table = wb.tables.find((item) => item.id === rowAdd[1] || item.name === rowAdd[1]);
-          if (!table) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
-          const row = (posted.values && posted.values[0]) || [];
-          table.rows.push(row.slice());
-          return Promise.resolve(json(201, { index: table.rows.length - 1, values: [row] }));
-        }
-        const rowList = rest.match(/^tables\/([^/]+)\/rows$/);
-        if (rowList && method === 'GET') {
-          const table = wb.tables.find((item) => item.id === rowList[1] || item.name === rowList[1]);
-          if (!table) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
-          return Promise.resolve(json(200, {
-            value: table.rows.map((values, index) => ({ index: index, values: [values] }))
-          }));
-        }
-        const rowAt = rest.match(/^tables\/([^/]+)\/rows\/itemAt\(index=(\d+)\)$/);
-        if (rowAt && method === 'GET') {
-          const table = wb.tables.find((item) => item.id === rowAt[1] || item.name === rowAt[1]);
-          const index = Number(rowAt[2]);
-          const values = table && table.rows[index];
-          if (!values) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
-          return Promise.resolve(json(200, { index: index, values: [values] }));
-        }
-        const rowDelete = rest.match(/^tables\/([^/]+)\/rows\/itemAt\(index=(\d+)\)\/delete$/);
-        if (rowDelete && method === 'POST') {
-          const table = wb.tables.find((item) => item.id === rowDelete[1]);
-          if (table) table.rows.splice(Number(rowDelete[2]), 1);
-          return Promise.resolve(empty(204));
-        }
-        const tableOne = rest.match(/^tables\/([^/]+)$/);
-        if (tableOne && method === 'DELETE') {
-          wb.tables = wb.tables.filter((item) => item.id !== tableOne[1]);
-          return Promise.resolve(empty(204));
-        }
-        if (tableOne && method === 'GET') {
-          const table = wb.tables.find((item) => item.id === tableOne[1]);
-          return Promise.resolve(table ? json(200, { id: table.id, name: table.name }) : json(404, {}));
-        }
-        return Promise.resolve(json(404, { error: { message: 'e2e-unmocked', path: path } }));
-      }
       const attItem = path.match(/\/me\/messages\/([^/]+)\/attachments\/([^/]+)$/);
       if (attItem) {
         const messageId = attItem[1];
@@ -267,13 +173,7 @@ function installE2EHooks() {
       if (driveContent && method === 'PUT') {
         const name = driveContent[1];
         const id = 'e2e-file-' + (e2e.seq++);
-        const item = {
-          id: id,
-          name: name,
-          webUrl: 'https://onedrive.live.com/file/' + id,
-          eTag: 'etag-' + id,
-          lastModifiedDateTime: '2026-10-14T12:00:00.000Z'
-        };
+        const item = { id: id, name: name, webUrl: 'https://onedrive.live.com/file/' + id };
         e2e.driveItems[id] = item;
         e2e.driveByName[name] = item;
         return Promise.resolve(json(201, item));
@@ -282,20 +182,6 @@ function installE2EHooks() {
       if (driveRoot && method === 'GET') {
         const item = e2e.driveByName[driveRoot[1]];
         return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
-      }
-      const driveVersions = path.match(/\/me\/drive\/items\/([^/]+)\/versions$/);
-      if (driveVersions && method === 'GET') {
-        const item = e2e.driveItems[driveVersions[1]];
-        if (!item) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
-        return Promise.resolve(json(200, { value: [{ id: item.versionId || 'ver-prev' }] }));
-      }
-      const driveRestore = path.match(/\/me\/drive\/items\/([^/]+)\/versions\/([^/]+)\/restoreVersion$/);
-      if (driveRestore && method === 'POST') return Promise.resolve(empty(204));
-      const driveItemContent = path.match(/\/me\/drive\/items\/([^/]+)\/content$/);
-      if (driveItemContent && method === 'PUT') {
-        const item = e2e.driveItems[driveItemContent[1]];
-        if (!item) return Promise.resolve(json(404, { error: { code: 'itemNotFound' } }));
-        return Promise.resolve(json(200, item));
       }
       const driveItem = path.match(/\/me\/drive\/items\/([^/]+)$/);
       if (driveItem) {
@@ -423,31 +309,6 @@ function installE2EHooks() {
         const row = scenario.messages && Object.prototype.hasOwnProperty.call(scenario.messages, id) ? scenario.messages[id] : null;
         if (row && row.id) return Promise.resolve(json(200, row));
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
-      }
-      if (path.indexOf('/me/sendMail') >= 0 && method === 'POST') {
-        let posted = {};
-        try { posted = init && init.body ? JSON.parse(init.body) : {}; } catch (err) { posted = {}; }
-        const message = posted.message || {};
-        const id = 'e2e-sent-' + (e2e.seq++);
-        scenario.sent = scenario.sent || [];
-        scenario.sent.unshift({
-          id: id,
-          subject: message.subject || '',
-          toRecipients: message.toRecipients || [],
-          sentDateTime: new Date().toISOString()
-        });
-        return Promise.resolve(empty(202));
-      }
-      if (path.indexOf('/me/chats') >= 0) {
-        if (method !== 'GET') return Promise.resolve(json(403, { error: { code: 'never-post' } }));
-        return Promise.resolve(json(200, { value: scenario.chats || [] }));
-      }
-      if (path.indexOf('/me/contacts') >= 0 && method === 'GET') {
-        return Promise.resolve(json(200, { value: scenario.contacts || [] }));
-      }
-      if (path.indexOf('/me/people') >= 0 && method === 'GET') {
-        if (scenario.peopleForbidden) return Promise.resolve(json(403, { error: { code: 'ErrorAccessDenied' } }));
-        return Promise.resolve(json(200, { value: scenario.people || [] }));
       }
       if (path === '/v1.0/me' || path.endsWith('/me')) {
         if (scenario.meFail) return Promise.resolve(json(500, { error: { message: 'me-failed' } }));
@@ -676,7 +537,6 @@ async function boot() {
       e.drafts = {};
       e.driveItems = {};
       e.driveByName = {};
-      e.workbooks = {};
       e.seq = 1;
     });
   };

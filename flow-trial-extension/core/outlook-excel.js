@@ -1,8 +1,10 @@
 // Append one row or create one table through the Graph workbook API.
-// Undo of an append deletes that row only after a read-back still matches it.
-// Handled only after the row or table is read back. Undo of an append deletes
-// that row only after a read-back still matches it, and never the workbook.
-// Undo deletes the workbook only when this write created it. Files.ReadWrite. Never sends.
+// An append is Handled only when the row read back at the index returned by
+// the append is that same index. Undo of an append deletes that row only after
+// a read-back still matches its cells, and never the workbook. Undo deletes a
+// workbook this write created only when both eTag and lastModifiedDateTime are
+// present and unchanged since that write. A missing or changed stamp is
+// file-changed and the workbook stays. Files.ReadWrite. Never sends.
 // No network in this file: pass call().
 const FlowOutlookExcel = (() => {
   const CONNECTOR = 'outlookExcel';
@@ -214,6 +216,17 @@ const FlowOutlookExcel = (() => {
       return { ok: false, reason: 'unclear' };
     }
     const base = '/me/drive/items/' + encodeURIComponent(itemId);
+    let stamp = { eTag: '', lastModifiedDateTime: '' };
+    if (createdFile) {
+      const meta = await call({ method: 'GET', path: base });
+      const metaBody = meta && meta.body;
+      if (meta && meta.ok === true && metaBody) {
+        stamp = {
+          eTag: metaBody.eTag ? String(metaBody.eTag) : '',
+          lastModifiedDateTime: metaBody.lastModifiedDateTime ? String(metaBody.lastModifiedDateTime) : ''
+        };
+      }
+    }
     let sessionId = '';
     let outcome = { ok: false, reason: 'unclear' };
     try {
@@ -248,7 +261,12 @@ const FlowOutlookExcel = (() => {
               : null;
             const hit = rowList(rows && rows.body).find((row) => sameRow(rowCells(row), columns));
             if (!tableId || !hit) outcome = { ok: false, reason: 'verify_failed', proof: null };
-            else outcome = finish(input, deps, itemId, tableId, hit.index, { createdFile: createdFile, createdTable: true });
+            else outcome = finish(input, deps, itemId, tableId, hit.index, {
+              createdFile: createdFile,
+              createdTable: true,
+              eTag: stamp.eTag,
+              lastModifiedDateTime: stamp.lastModifiedDateTime
+            });
           }
         } else {
           const values = cellsOf(params.values);
@@ -264,12 +282,17 @@ const FlowOutlookExcel = (() => {
               headers: headers,
               body: { values: [values] }
             });
-            const rows = added && added.ok === true
-              ? await call({ method: 'GET', path: base + '/workbook/tables/' + encodeURIComponent(tableId) + '/rows', headers: headers })
+            const addedIndex = added && added.body ? Number(added.body.index) : NaN;
+            const seen = added && added.ok === true && Number.isInteger(addedIndex) && addedIndex >= 0
+              ? await call({
+                method: 'GET',
+                path: base + '/workbook/tables/' + encodeURIComponent(tableId) + '/rows/itemAt(index=' + addedIndex + ')',
+                headers: headers
+              })
               : null;
-            const hit = rowList(rows && rows.body).find((row) => sameRow(rowCells(row), values));
-            if (!hit) outcome = { ok: false, reason: 'verify_failed', proof: null };
-            else outcome = finish(input, deps, itemId, tableId, hit.index, { createdFile: false, createdTable: false, values: values });
+            const seenIndex = seen && seen.body ? Number(seen.body.index) : NaN;
+            if (!seen || seen.ok !== true || seenIndex !== addedIndex) outcome = { ok: false, reason: 'verify_failed', proof: null };
+            else outcome = finish(input, deps, itemId, tableId, addedIndex, { createdFile: false, createdTable: false, values: values });
           }
         }
       }
@@ -298,6 +321,8 @@ const FlowOutlookExcel = (() => {
       externalId: externalId,
       createdFile: flags.createdFile === true,
       createdTable: flags.createdTable === true,
+      eTag: flags.eTag ? String(flags.eTag) : '',
+      lastModifiedDateTime: flags.lastModifiedDateTime ? String(flags.lastModifiedDateTime) : '',
       values: Array.isArray(flags.values) ? flags.values.map((cell) => String(cell)) : []
     };
     return {
@@ -326,6 +351,14 @@ const FlowOutlookExcel = (() => {
     if (!ref || !ref.itemId || typeof call !== 'function') return { ok: false, reason: 'unclear' };
     const base = '/me/drive/items/' + encodeURIComponent(ref.itemId);
     if (ref.createdFile === true) {
+      if (!ref.eTag || !ref.lastModifiedDateTime) return { ok: false, reason: 'file-changed' };
+      const fresh = await call({ method: 'GET', path: base });
+      const body = fresh && fresh.body;
+      if (!fresh || fresh.ok !== true || !body) return { ok: false, reason: 'undo-failed' };
+      if (!body.eTag || !body.lastModifiedDateTime) return { ok: false, reason: 'file-changed' };
+      if (String(body.eTag) !== String(ref.eTag) || String(body.lastModifiedDateTime) !== String(ref.lastModifiedDateTime)) {
+        return { ok: false, reason: 'file-changed' };
+      }
       const del = await call({ method: 'DELETE', path: base });
       if (!del || del.ok !== true) return { ok: false, reason: 'undo-failed' };
       return { ok: true, written: 'Undone. The new workbook was deleted.', log: undone(ref) };

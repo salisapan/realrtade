@@ -1,7 +1,10 @@
-// One .docx on the person's OneDrive. Read-back of the item id is the close.
-// Undo deletes a file this write created, unless eTag or lastModifiedDateTime
-// changed after that write, or restores the previous version.
-// Files.ReadWrite. Never sends. No network here: pass call().
+// One .docx on the person's OneDrive. A new file is Handled when its item id
+// is read back. An existing file is Handled only when the inserted text is in
+// the file content. Undo deletes a file this write created, or restores the
+// previous version, only when both eTag and lastModifiedDateTime are present
+// and unchanged since that write. A missing or changed stamp is file-changed
+// and nothing is deleted or restored. Files.ReadWrite. Never sends.
+// No network here: pass call().
 const FlowOutlookWord = (() => {
   const CONNECTOR = 'outlookWord';
   const SYSTEM = 'microsoft/word';
@@ -118,6 +121,21 @@ const FlowOutlookWord = (() => {
     return m ? m[1].trim() : '';
   }
 
+  function payloadText(body) {
+    if (typeof body === 'string') return body;
+    if (body && typeof body.text === 'string') return body.text;
+    if (body && typeof body.length === 'number' && typeof body.byteLength === 'number') {
+      try { return new TextDecoder().decode(body); } catch (e) { return ''; }
+    }
+    return '';
+  }
+
+  function inserted(payload, content) {
+    if (!payload) return false;
+    if (content) return payload.indexOf(xml(content)) >= 0 || payload.indexOf(content) >= 0;
+    return payload.indexOf('word/document.xml') >= 0;
+  }
+
   function offer(ctx) {
     const text = String((ctx && (ctx.text || ctx.body)) || '');
     if (!/\b(?:create|write|edit|update|prepare)\b[\s\S]{0,80}\b(?:word document|\.docx)\b/i.test(text)) return { show: false };
@@ -212,6 +230,12 @@ const FlowOutlookWord = (() => {
     if (!back || back.ok !== true || !back.body || String(back.body.id) !== itemId) {
       return { ok: false, reason: 'verify_failed', proof: null };
     }
+    if (!created) {
+      const file = await call({ method: 'GET', path: '/me/drive/items/' + encodeURIComponent(itemId) + '/content' });
+      if (!file || file.ok !== true || !inserted(payloadText(file.body), content)) {
+        return { ok: false, reason: 'verify_failed', proof: null };
+      }
+    }
     const proof = prove(itemId, deps);
     if (!proof) return { ok: false, reason: 'verify_failed', proof: null };
     const ref = {
@@ -234,19 +258,24 @@ const FlowOutlookWord = (() => {
     };
   }
 
+  async function stampGate(ref, call, itemId) {
+    if (!ref.eTag || !ref.lastModifiedDateTime) return 'file-changed';
+    const fresh = await call({ method: 'GET', path: '/me/drive/items/' + encodeURIComponent(itemId) });
+    const body = fresh && fresh.body;
+    if (!fresh || fresh.ok !== true || !body) return 'undo-failed';
+    if (!body.eTag || !body.lastModifiedDateTime) return 'file-changed';
+    if (String(body.eTag) !== String(ref.eTag)) return 'file-changed';
+    if (String(body.lastModifiedDateTime) !== String(ref.lastModifiedDateTime)) return 'file-changed';
+    return '';
+  }
+
   async function undo(ref, deps) {
     const call = deps && deps.call;
     const itemId = ref && (ref.itemId || ref.fileId);
     if (!itemId || typeof call !== 'function') return { ok: false, reason: 'unclear' };
+    const gate = await stampGate(ref, call, itemId);
+    if (gate) return { ok: false, reason: gate };
     if (ref.created) {
-      if (ref.eTag || ref.lastModifiedDateTime) {
-        const fresh = await call({ method: 'GET', path: '/me/drive/items/' + encodeURIComponent(itemId) });
-        const body = fresh && fresh.body;
-        if (!fresh || fresh.ok !== true || !body) return { ok: false, reason: 'undo-failed' };
-        const etagChanged = ref.eTag && String(body.eTag || '') !== String(ref.eTag);
-        const timeChanged = ref.lastModifiedDateTime && String(body.lastModifiedDateTime || '') !== String(ref.lastModifiedDateTime);
-        if (etagChanged || timeChanged) return { ok: false, reason: 'file-changed' };
-      }
       const del = await call({ method: 'DELETE', path: '/me/drive/items/' + encodeURIComponent(itemId) });
       if (!del || del.ok !== true) return { ok: false, reason: 'undo-failed' };
       return {

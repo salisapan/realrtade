@@ -49,11 +49,14 @@ const depsOf = (call) => ({ call: call, grantedScopes: ['Files.ReadWrite'], now:
   const made = await W.run({ params: offer.params, messageId: 'm1' }, depsOf(created.call));
   check('create is Handled only after the item is read back', made.ok === true && made.proof && made.proof.fetchedBack === true && made.proof.system === 'microsoft/word' && made.proof.externalId === 'file-1' && made.ref.created === true, made);
   check('create does not send', created.calls.every((c) => c.path.indexOf('sendMail') < 0) && created.calls.some((c) => c.method === 'PUT' && c.raw && c.raw[0] === 0x50));
-  const removed = fake([
+  const bareUndo = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-1$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-1' } }) },
     { method: 'DELETE', test: /\/me\/drive\/items\/file-1$/, reply: () => ({ ok: true, status: 204, body: null }) }
   ]);
-  const undone = await W.undo(made.ref, depsOf(removed.call));
-  check('undo of a new file deletes it', undone.ok === true && removed.calls[0].method === 'DELETE' && /deleted/.test(undone.written), undone);
+  const missingStamp = await W.undo(made.ref, depsOf(bareUndo.call));
+  check('a missing eTag refuses and does not delete', !made.ref.eTag && missingStamp.ok === false && missingStamp.reason === 'file-changed' && bareUndo.calls.length === 0, missingStamp);
+  const missingDate = await W.undo(Object.assign({}, made.ref, { eTag: 'e1', lastModifiedDateTime: '' }), depsOf(bareUndo.call));
+  check('a missing lastModified refuses and does not delete', missingDate.reason === 'file-changed' && bareUndo.calls.length === 0, missingDate);
 
   const stamped = fake([
     { method: 'GET', test: /\/me\/drive\/root:\//, reply: () => ({ ok: false, status: 404, body: {} }) },
@@ -73,20 +76,57 @@ const depsOf = (call) => ({ call: call, grantedScopes: ['Files.ReadWrite'], now:
   ]);
   const refusedTime = await W.undo(stampedFile.ref, depsOf(moved.call));
   check('undo refuses a file whose lastModified changed', refusedTime.reason === 'file-changed' && moved.calls.every((c) => c.method !== 'DELETE'), refusedTime);
+  const same = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-3', eTag: 'e1', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }) },
+    { method: 'DELETE', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 204, body: null }) }
+  ]);
+  const deleted = await W.undo(stampedFile.ref, depsOf(same.call));
+  check('undo of a new file deletes it only when both stamps match', deleted.ok === true && same.calls[0].method === 'GET' && same.calls[1].method === 'DELETE' && /deleted/.test(deleted.written), deleted);
+  const liveBare = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-3' } }) },
+    { method: 'DELETE', test: /\/me\/drive\/items\/file-3$/, reply: () => ({ ok: true, status: 204, body: null }) }
+  ]);
+  const refusedLive = await W.undo(stampedFile.ref, depsOf(liveBare.call));
+  check('a live file with no stamp is not deleted', refusedLive.reason === 'file-changed' && liveBare.calls.every((c) => c.method !== 'DELETE'), refusedLive);
 
   const edited = fake([
     { method: 'GET', test: /\/me\/drive\/root:\//, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', name: 'notes.docx' } }) },
     { method: 'GET', test: /\/versions/, reply: () => ({ ok: true, status: 200, body: { value: [{ id: 'ver-prev' }] } }) },
     { method: 'PUT', test: /\/items\/file-9\/content$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9' } }) },
-    { method: 'GET', test: /\/me\/drive\/items\/file-9$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9' } }) }
+    { method: 'GET', test: /\/items\/file-9\/content$/, reply: () => ({ ok: true, status: 200, body: 'word/document.xml revised' }) },
+    { method: 'GET', test: /\/me\/drive\/items\/file-9$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', eTag: 'e9', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }) }
   ]);
   const updated = await W.run({ fileName: 'notes.docx', content: 'revised' }, depsOf(edited.call));
-  check('edit keeps the previous version', updated.ok === true && updated.ref.created === false && updated.ref.previousVersionId === 'ver-prev', updated);
+  check('edit keeps the previous version and the inserted text', updated.ok === true && updated.ref.created === false && updated.ref.previousVersionId === 'ver-prev' && edited.calls.some((c) => c.method === 'GET' && /\/content$/.test(c.path)), updated);
+  const wrongFile = fake([
+    { method: 'GET', test: /\/me\/drive\/root:\//, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', name: 'notes.docx' } }) },
+    { method: 'GET', test: /\/versions/, reply: () => ({ ok: true, status: 200, body: { value: [{ id: 'ver-prev' }] } }) },
+    { method: 'PUT', test: /\/items\/file-9\/content$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9' } }) },
+    { method: 'GET', test: /\/items\/file-9\/content$/, reply: () => ({ ok: true, status: 200, body: 'unrelated' }) },
+    { method: 'GET', test: /\/me\/drive\/items\/file-9$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', eTag: 'e9', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }) }
+  ]);
+  const wrong = await W.run({ fileName: 'notes.docx', content: 'revised' }, depsOf(wrongFile.call));
+  check('an existing file whose content is not the inserted text is not Handled', wrong.reason === 'verify_failed' && !wrong.proof, wrong);
   const restored = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-9$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', eTag: 'e9', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }) },
     { method: 'POST', test: /\/restoreVersion$/, reply: () => ({ ok: true, status: 204, body: null }) }
   ]);
   const back = await W.undo(updated.ref, depsOf(restored.call));
-  check('undo restores that version', back.ok === true && restored.calls[0].path.indexOf('/versions/ver-prev/restoreVersion') > 0, back);
+  check('undo restores that version only when both stamps match', back.ok === true && restored.calls[0].method === 'GET' && restored.calls[1].path.indexOf('/versions/ver-prev/restoreVersion') > 0, back);
+  const drifted = fake([
+    { method: 'GET', test: /\/me\/drive\/items\/file-9$/, reply: () => ({ ok: true, status: 200, body: { id: 'file-9', eTag: 'e10', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }) },
+    { method: 'POST', test: /\/restoreVersion$/, reply: () => ({ ok: true, status: 204, body: null }) },
+    { method: 'DELETE', test: /\/me\/drive\/items\/file-9$/, reply: () => ({ ok: true, status: 204, body: null }) }
+  ]);
+  const noRestore = await W.undo(updated.ref, depsOf(drifted.call));
+  check('a changed stamp does not restore the previous version', noRestore.reason === 'file-changed' && drifted.calls.every((c) => c.method !== 'POST' && c.method !== 'DELETE'), noRestore);
+  const unstampedEdit = fake([
+    { method: 'GET', test: /.*/, reply: () => ({ ok: true, status: 200, body: {} }) },
+    { method: 'POST', test: /\/restoreVersion$/, reply: () => ({ ok: true, status: 204, body: null }) },
+    { method: 'DELETE', test: /.*/, reply: () => ({ ok: true, status: 204, body: null }) }
+  ]);
+  const noStampRestore = await W.undo(Object.assign({}, updated.ref, { eTag: '', lastModifiedDateTime: '' }), depsOf(unstampedEdit.call));
+  check('a restore without stamps is refused', noStampRestore.reason === 'file-changed' && unstampedEdit.calls.length === 0, noStampRestore);
 
   const bare = fake([
     { method: 'GET', test: /\/me\/drive\/root:\//, reply: () => ({ ok: true, status: 200, body: { id: 'file-2' } }) },

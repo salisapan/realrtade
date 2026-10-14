@@ -50,6 +50,9 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
       state.rows.push(req.body.values[0]);
       return { ok: true, status: 201, body: { index: state.rows.length - 1 } };
     }
+    if (req.method === 'GET' && /itemAt\(index=1\)$/.test(req.path)) {
+      return { ok: true, status: 200, body: { index: 1, values: [['not', 'the', 'cells']] } };
+    }
     if (req.method === 'GET' && /\/rows$/.test(req.path)) {
       return { ok: true, status: 200, body: { value: state.rows.map((values, index) => ({ index: index, values: [values] })) } };
     }
@@ -57,7 +60,7 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
     return { ok: false, status: 404, body: {} };
   });
   const added = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['12', 'Dana', 'paid'] }, messageId: 'm-x' }, deps(append.call));
-  check('append is Handled when the row is read back', added.ok === true && added.proof.externalId === 'wb-1/t1/1' && added.ref.createdFile === false, added);
+  check('append is Handled when the returned index is read back at that address', added.ok === true && added.proof.externalId === 'wb-1/t1/1' && added.ref.createdFile === false && append.calls.some((c) => /itemAt\(index=1\)$/.test(c.path)) && !append.calls.some((c) => /\/rows$/.test(c.path)), added);
   check('the session is closed', append.calls.some((c) => c.path.indexOf('closeSession') > 0));
 
   const mismatch = fake((req) => {
@@ -65,16 +68,18 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
     if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
     if (req.method === 'GET' && /\/tables$/.test(req.path)) return { ok: true, status: 200, body: { value: [{ id: 't1' }] } };
     if (req.method === 'POST' && /rows\/add/.test(req.path)) return { ok: true, status: 201, body: { index: 1 } };
-    if (req.method === 'GET' && /\/rows$/.test(req.path)) return { ok: true, status: 200, body: { value: [{ index: 1, values: [['nope']] }] } };
+    if (req.method === 'GET' && /\/rows$/.test(req.path)) return { ok: true, status: 200, body: { value: [{ index: 4, values: [['12', 'Dana']] }] } };
+    if (req.method === 'GET' && /itemAt\(index=1\)$/.test(req.path)) return { ok: true, status: 200, body: { index: 4, values: [['12', 'Dana']] } };
     if (req.method === 'POST' && /closeSession/.test(req.path)) return { ok: true, status: 204, body: null };
     return { ok: false, status: 404, body: {} };
   });
   const bad = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['12', 'Dana'] } }, deps(mismatch.call));
-  check('a mismatched row is not Handled', bad.reason === 'verify_failed' && !bad.proof && mismatch.calls.some((c) => c.path.indexOf('closeSession') > 0), bad);
+  check('a content match at another index is not Handled', bad.reason === 'verify_failed' && !bad.proof && mismatch.calls.some((c) => /itemAt\(index=1\)$/.test(c.path)) && mismatch.calls.some((c) => c.path.indexOf('closeSession') > 0), bad);
 
   const table = fake((req) => {
     if (req.method === 'GET' && /root:/.test(req.path)) return { ok: false, status: 404, body: {} };
     if (req.method === 'PUT') return { ok: true, status: 201, body: { id: 'wb-new' } };
+    if (req.method === 'GET' && /\/items\/wb-new$/.test(req.path)) return { ok: true, status: 200, body: { id: 'wb-new', eTag: 'wb-e', lastModifiedDateTime: '2026-10-14T12:00:00Z' } };
     if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
     if (req.method === 'PATCH') return { ok: true, status: 200, body: req.body };
     if (req.method === 'POST' && /tables\/add/.test(req.path)) return { ok: true, status: 201, body: { id: 't-new', name: 'Table1' } };
@@ -86,9 +91,33 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
   check('a new table is Handled after its row is read back', made.ok === true && made.ref.createdFile === true && made.ref.createdTable === true && made.proof.system === 'microsoft/excel', made);
   check('the new workbook is a zip upload', table.calls.some((c) => c.method === 'PUT' && c.raw && c.raw[0] === 0x50));
 
-  const removed = fake((req) => (req.method === 'DELETE' ? { ok: true, status: 204, body: null } : { ok: false, status: 404, body: {} }));
+  const removed = fake((req) => {
+    if (req.method === 'GET' && /\/items\/wb-new$/.test(req.path)) return { ok: true, status: 200, body: { id: 'wb-new', eTag: 'wb-e', lastModifiedDateTime: '2026-10-14T12:00:00Z' } };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
   const gone = await X.undo(made.ref, deps(removed.call));
-  check('undo of a new workbook deletes the file', gone.ok === true && removed.calls[0].method === 'DELETE' && /workbook was deleted/.test(gone.written), gone);
+  check('undo of a new workbook deletes the file only when both stamps match', made.ref.eTag === 'wb-e' && gone.ok === true && removed.calls[0].method === 'GET' && removed.calls[1].method === 'DELETE' && /workbook was deleted/.test(gone.written), gone);
+  const noEtag = fake((req) => (req.method === 'DELETE' ? { ok: true, status: 204, body: null } : { ok: true, status: 200, body: { id: 'wb-new', eTag: 'wb-e', lastModifiedDateTime: '2026-10-14T12:00:00Z' } }));
+  const refusedEtag = await X.undo(Object.assign({}, made.ref, { eTag: '' }), deps(noEtag.call));
+  check('a created workbook with no eTag is not deleted', refusedEtag.reason === 'file-changed' && noEtag.calls.length === 0, refusedEtag);
+  const noDate = fake((req) => (req.method === 'DELETE' ? { ok: true, status: 204, body: null } : { ok: true, status: 200, body: {} }));
+  const refusedDate = await X.undo(Object.assign({}, made.ref, { lastModifiedDateTime: '' }), deps(noDate.call));
+  check('a created workbook with no lastModified is not deleted', refusedDate.reason === 'file-changed' && noDate.calls.length === 0, refusedDate);
+  const changedBook = fake((req) => {
+    if (req.method === 'GET') return { ok: true, status: 200, body: { id: 'wb-new', eTag: 'wb-other', lastModifiedDateTime: '2026-10-14T12:00:00Z' } };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const refusedBook = await X.undo(made.ref, deps(changedBook.call));
+  check('a created workbook whose stamp changed is not deleted', refusedBook.reason === 'file-changed' && changedBook.calls.every((c) => c.method !== 'DELETE'), refusedBook);
+  const liveBareBook = fake((req) => {
+    if (req.method === 'GET') return { ok: true, status: 200, body: { id: 'wb-new' } };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const refusedLiveBook = await X.undo(made.ref, deps(liveBareBook.call));
+  check('a live workbook with no stamp is not deleted', refusedLiveBook.reason === 'file-changed' && liveBareBook.calls.every((c) => c.method !== 'DELETE'), refusedLiveBook);
 
   const rowUndo = fake((req) => {
     if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
