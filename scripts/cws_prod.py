@@ -638,6 +638,9 @@ def main_build(argv: list[str]) -> None:
     version = manifest["version"]
     out = DIST_DIR / zip_name(version, sha)
     size = write_zip(files, out)
+    for old in DIST_DIR.glob("glance-*-prod.zip"):
+        if old.resolve() != out.resolve():
+            old.unlink()
     report = check_files(files, out)
     shown = out.relative_to(REPO_ROOT) if out.is_relative_to(REPO_ROOT) else out
     print(f"Wrote {shown} ({size} bytes, {report['files']} files)")
