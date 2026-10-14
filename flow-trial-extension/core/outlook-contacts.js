@@ -170,8 +170,20 @@ function laneBindHost() {
   if (root.indexOf('chrome-extension://') !== 0) return;
   if (globalThis.__glanceLaneMsBound) return;
   globalThis.__glanceLaneMsBound = true;
+  globalThis.__glanceLaneDebug = { manifest: false, register: false };
 
   const ready = Promise.all(LANE_WORKER_FILES.map((file) => import(runtime.getURL(file)).catch(() => null)));
+
+  function withLaneFiles(js) {
+    const next = js.filter((file) => LANE_PAGE_FILES.indexOf(file) < 0);
+    let at = next.lastIndexOf('src/content-outlook.js');
+    if (at < 0) at = next.length;
+    LANE_PAGE_FILES.forEach((file) => {
+      next.splice(at, 0, file);
+      at += 1;
+    });
+    return next;
+  }
 
   try {
     const origManifest = runtime.getManifest.bind(runtime);
@@ -180,17 +192,32 @@ function laneBindHost() {
       try {
         const copy = JSON.parse(JSON.stringify(raw));
         const js = copy.content_scripts && copy.content_scripts[0] && copy.content_scripts[0].js;
-        if (Array.isArray(js)) {
-          LANE_PAGE_FILES.forEach((file) => {
-            if (js.indexOf(file) < 0) js.push(file);
-          });
-        }
+        if (Array.isArray(js)) copy.content_scripts[0].js = withLaneFiles(js);
+        globalThis.__glanceLaneDebug.manifest = true;
         return copy;
       } catch (e) {
         return raw;
       }
     };
   } catch (e) { /* manifest stays the package copy */ }
+
+  try {
+    const scripting = globalThis.chrome.scripting;
+    if (scripting && typeof scripting.registerContentScripts === 'function') {
+      const origRegister = scripting.registerContentScripts.bind(scripting);
+      scripting.registerContentScripts = function laneRegister(scripts) {
+        globalThis.__glanceLaneDebug.register = true;
+        const next = (scripts || []).map((script) => {
+          if (!script || script.id !== 'flow-outlook' || !Array.isArray(script.js)) return script;
+          const copy = {};
+          Object.keys(script).forEach((key) => { copy[key] = script[key]; });
+          copy.js = withLaneFiles(script.js);
+          return copy;
+        });
+        return origRegister(next);
+      };
+    }
+  } catch (e) { /* registration stays on the package list */ }
 
   function forbiddenSend(path) {
     return /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(path);

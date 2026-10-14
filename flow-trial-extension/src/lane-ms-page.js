@@ -5,13 +5,25 @@
   if (globalThis.__glanceLaneMsPage) return;
   globalThis.__glanceLaneMsPage = true;
 
+  // Content scripts share one lexical scope. FlowStorage is a top-level const
+  // in storage.js and is never copied onto globalThis. A missing later binding
+  // is still in the temporal dead zone, so the read is wrapped.
+  function binding(read) {
+    try {
+      const value = read();
+      return typeof value === 'undefined' ? null : value;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function modules() {
     return [
-      globalThis.FlowOutlookContacts,
-      globalThis.FlowOutlookWord,
-      globalThis.FlowOutlookExcel,
-      globalThis.FlowTeamsChat,
-      globalThis.FlowOutlookSend
+      binding(() => FlowOutlookContacts),
+      binding(() => FlowOutlookWord),
+      binding(() => FlowOutlookExcel),
+      binding(() => FlowTeamsChat),
+      binding(() => FlowOutlookSend)
     ].filter((mod) => mod && typeof mod.offer === 'function');
   }
 
@@ -63,7 +75,7 @@
   }
 
   function remember(entry) {
-    const store = globalThis.FlowStorage;
+    const store = binding(() => FlowStorage);
     if (!entry || !store || typeof store.appendLog !== 'function') return;
     Promise.resolve(store.appendLog(entry)).catch(() => {});
   }
@@ -239,7 +251,7 @@
   }
 
   function readPane() {
-    const parse = globalThis.FlowOwaParse;
+    const parse = binding(() => FlowOwaParse);
     if (!parse || typeof parse.readPane !== 'function') return null;
     try { return parse.readPane(document, location.href, {}) || null; } catch (e) { return null; }
   }
@@ -260,7 +272,7 @@
       const text = (pane.subject ? pane.subject + '\n' : '') + (pane.text || '');
       const ctx = { text: text, subject: pane.subject || '' };
       let state = null;
-      const store = globalThis.FlowStorage;
+      const store = binding(() => FlowStorage);
       if (store && typeof store.get === 'function') {
         try { state = await store.get(); } catch (e) { state = null; }
       }
@@ -306,7 +318,7 @@
   }
 
   function boot() {
-    if (typeof globalThis.FlowOwaParse === 'undefined' || typeof globalThis.FlowStorage === 'undefined') {
+    if (!binding(() => FlowOwaParse) || !binding(() => FlowStorage)) {
       setTimeout(boot, 50);
       return;
     }
