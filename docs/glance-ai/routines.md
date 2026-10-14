@@ -63,7 +63,7 @@ LANE RULES (binding)
 3. You own exactly one directory: docs/glance-ai/reports/<your-name>/. Write only there. Never edit anything else: not CLAUDE.md, the identity block, manifest.json, flow-landing/, privacy text, any config switch, glance-ai/, docs/open-tasks.md, docs/README.md, docs/vault/decisions.md.
 4. Use one long-lived branch cursor/routine-<your-name> and one draft PR into claude/install-uiux-pro-max-skill-a4agox, reused every run (push a new commit). Never force push, never merge, never close, never mark ready.
 5. Before writing, run `gh pr list --state open --json number,headRefName,files`. If another open PR touches your directory, stop and say so.
-6. Do not post to Slack, ClickUp or PR #77. Do not send mail. Do not deploy. Do not turn a switch on.
+6. Do not post to any chat, task tracker, or the Claude↔CoS bridge (draft PR #77). Do not send messages. Do not deploy. Do not turn a switch on. Never request or connect chat/mail/tracker tools for this routine.
 7. Be honest: state status as code reality, apart from the product definition. Never invent usage, revenue, accuracy or install numbers: write "not measured". If nothing changed since your last report, write nothing and end.
 8. Anything only Sali can do goes under "Needs Sali" at the top of the report, one line each.
 ```
