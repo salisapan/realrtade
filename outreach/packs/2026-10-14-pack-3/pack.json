@@ -1,0 +1,450 @@
+[
+  {
+    "n": 1,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "מיתר",
+    "domain": "meitar.com",
+    "size_floor": "≥120",
+    "size_estimate": "537 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025. מצבת עורכי דין מעל 120 גוררת מצבת עובדים מעל 120.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "אמיר אנגלנדר (Amir Englender)",
+        "role": "CFO",
+        "email": "amire@meitar.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://meitar.com/people/englender-amir/",
+        "email_snippet": "Englender, Amir. בעמוד הפרופיל התפקיד CFO והמייל amire@meitar.com. ל-CIO גולן עטיה אין מייל בעמוד.",
+        "mx_result": "1 meitar-com.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי הדין הגדול בישראל לפי Dun's 100 ל-2025, 537 עורכי דין. אמיר אנגלנדר הוא ה-CFO, והמייל האישי בעמוד הפרופיל באתר המשרד.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום אמיר,",
+      "אני פונה בנוגע למיתר, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 2,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "הרצוג, פוקס, נאמן",
+    "domain": "herzoglaw.co.il",
+    "size_floor": "≥120",
+    "size_estimate": "512 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "עופר בן שחר (Ofer Ben Shahar)",
+        "role": "CFO",
+        "email": "ben-shaharo@herzoglaw.co.il",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://herzoglaw.co.il/en/our-team/ofer-ben-shahar/",
+        "email_snippet": "כותרת העמוד: Ofer Ben Shahar - CFO. המייל ben-shaharo@herzoglaw.co.il מפוענח מענן Cloudflare. באותו קישור יש cc ל-contact@herzoglaw.co.il, תיבה כללית שלא נכללה.",
+        "mx_result": "5 mx1.hc977-34.eu.iphmx.com.; 5 mx2.hc977-34.eu.iphmx.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 512 עורכי דין. עופר בן שחר הוא ה-CFO, והמייל האישי בעמוד הפרופיל. לא נשלח ל-contact@.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום עופר,",
+      "אני פונה בנוגע להרצוג, פוקס, נאמן, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 3,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "גולדפרב גרוס זליגמן",
+    "domain": "goldfarb.com",
+    "size_floor": "≥120",
+    "size_estimate": "490 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "חיים משקל (Haim Mishkal)",
+        "role": "סמנכ\"ל כספים (CFO)",
+        "email": "haim.mishkal@goldfarb.com",
+        "email_type": "published",
+        "confidence": "medium",
+        "email_source_url": "https://web.archive.org/web/20231129130628/https://www.goldfarb.com/he/attorneys/",
+        "email_snippet": "בצילום הארכיון מ-29 בנובמבר 2023 של מדריך עורכי הדין באתר המשרד: חיים משקל סמנכ\"ל כספים, mailto:haim.mishkal@goldfarb.com. האתר החי החזיר 403 באוקטובר 2026, ולכן הרשומה בינונית ולא גבוהה.",
+        "mx_result": "0 goldfarb-com.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 490 עורכי דין. חיים משקל רשום כסמנכ\"ל הכספים במדריך האתר. האתר החי חסום; המקור הוא צילום ארכיון מנובמבר 2023 של אותו מדריך.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום חיים,",
+      "אני פונה בנוגע לגולדפרב גרוס זליגמן, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 4,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "פישר (FBC)",
+    "domain": "fbclawyers.com",
+    "size_floor": "≥120",
+    "size_estimate": "365 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "גלעד וינקלר (Gilad Winkler)",
+        "role": "Managing Partner",
+        "email": "gwinkler@fbclawyers.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.fbclawyers.com/lawyer/gilad-winkler/",
+        "email_snippet": "Gilad Winkler Managing Partner, והמייל gwinkler@fbclawyers.com בעמוד הפרופיל. ל-CIO עידן סיון יש טלפון ואין מייל.",
+        "mx_result": "10 fbclawyers-com.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 365 עורכי דין. גלעד וינקלר הוא שותף מנהל, והמייל האישי בעמוד הפרופיל.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום גלעד,",
+      "אני פונה בנוגע לפישר (FBC), שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 5,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "ארנון, תדמור-לוי",
+    "domain": "arnontl.com",
+    "size_floor": "≥120",
+    "size_estimate": "358 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "ג'ייקוב גופט (Jacob Goft)",
+        "role": "COO",
+        "email": "Jacob.G@ArnonTL.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://arnontl.com/people/",
+        "email_snippet": "בכרטיס Jacob Goft בעמוד האנשים: התפקיד COO, ו-mailto:Jacob.G@ArnonTL.com.",
+        "mx_result": "0 arnontl-com.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 358 עורכי דין. ג'ייקוב גופט הוא ה-COO, והמייל האישי בכרטיס שלו במדריך האנשים.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום ג'ייקוב,",
+      "אני פונה בנוגע לארנון, תדמור-לוי, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 6,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "גורניצקי",
+    "domain": "gornitzky.com",
+    "size_floor": "≥120",
+    "size_estimate": "300 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "גלי עמית (Gali Amit)",
+        "role": "COO",
+        "email": "galia@gornitzky.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.gornitzky.com/attorneys/gali-amit/",
+        "email_snippet": "בפרופיל: התפקיד COO, והטקסט Gali Amit is Chief Operating Officer. המייל galia@gornitzky.com מפוענח מענן Cloudflare.",
+        "mx_result": "0 gornitzky-com.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 300 עורכי דין. גלי עמית היא ה-COO, והמייל האישי בעמוד הפרופיל.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום גלי,",
+      "אני פונה בנוגע לגורניצקי, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 7,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "נשיץ ברנדס אמיר",
+    "domain": "nblaw.com",
+    "size_floor": "≥120",
+    "size_estimate": "270 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "דלית בן-ישראל (Dalit Ben-Israel)",
+        "role": "Partner, Head of IT",
+        "email": "dbenisrael@nblaw.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.nblaw.com/lawyers",
+        "email_snippet": "בכרטיס: Dalit Ben-Israel Partner Head of IT Privacy & Data Protection, co-Head of AI, dbenisrael@nblaw.com.",
+        "mx_result": "10 relay.nblaw.com.; 60 omx1.cyfox.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 270 עורכי דין. דלית בן-ישראל היא שותפה וראש מערכות המידע, והמייל האישי במדריך עורכי הדין.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום דלית,",
+      "אני פונה בנוגע לנשיץ ברנדס אמיר, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 8,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "פרל כהן",
+    "domain": "pearlcohen.com",
+    "size_floor": "≥120",
+    "size_estimate": "266 עובדים (2025) בתיבת המידע של ויקיפדיה העברית, בציטוט לדירוג Dun's 100 למשרדי עורכי דין.",
+    "size_evidence_url": "https://he.wikipedia.org/wiki/%D7%A4%D7%A8%D7%9C_%D7%9B%D7%94%D7%9F_%D7%A6%D7%93%D7%A7_%D7%9C%D7%A6%D7%A8_%D7%91%D7%A8%D7%A5",
+    "recipients": [
+      {
+        "name": "זאב פרל (Zeev Pearl)",
+        "role": "מייסד ושותף מנהל",
+        "email": "ZPearl@PearlCohen.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.pearlcohen.co.il/team-member/%D7%96%D7%90%D7%91-%D7%A4%D7%A8%D7%9C/",
+        "email_snippet": "כותרת העמוד: זאב פרל. התפקיד: מייסד ושותף מנהל, יו\"ר קבוצת STEM. המייל ZPearl@PearlCohen.com. תיבות Marketing@ ו-Mzolberg@ מופיעות כתיבות אתר ולא נכללו.",
+        "mx_result": "0 pearlcohen-com.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד משפט וקניין רוחני, 266 עובדים ב-2025 לפי ויקיפדיה. זאב פרל הוא מייסד ושותף מנהל, והמייל האישי בעמוד הפרופיל.",
+    "subject": "ביצוע על מסמכי תיק קניין רוחני, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום זאב,",
+      "אני פונה בנוגע לפרל כהן, שמטפל במשפט מסחרי ובקניין רוחני. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק פטנט או לסימן מסחר. במקום תיוק ידני בין המייל, תיק הקניין הרוחני ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 9,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "ש. הורוביץ",
+    "domain": "s-horowitz.com",
+    "size_floor": "≥120",
+    "size_estimate": "238 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "עדי בן ינאי (Adi Ben Yanay)",
+        "role": "Head of IT Department",
+        "email": "adiab@s-horowitz.com",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://s-horowitz.com/administrative-management/",
+        "email_snippet": "Adi Ben Yanay Head of IT Department +972-3-5670727 adiab@s-horowitz.com.",
+        "mx_result": "10 cluster1.eu.messagelabs.com.; 20 cluster1a.eu.messagelabs.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 238 עורכי דין. עדי בן ינאי עומד בראש מחלקת ה-IT, והמייל האישי בעמוד ההנהלה האדמיניסטרטיבית.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום עדי,",
+      "אני פונה בנוגע לש. הורוביץ, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 10,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "קבוצת ריינהולד כהן",
+    "domain": "rcip.co.il",
+    "size_floor": "≥120",
+    "size_estimate": "כ-220 עובדים, מתוכם כ-70 עורכי פטנטים ועורכי דין, לפי ויקיפדיה העברית. המספר בערך ולא מתוארך.",
+    "size_evidence_url": "https://he.wikipedia.org/wiki/%D7%A7%D7%91%D7%95%D7%A6%D7%AA_%D7%A8%D7%99%D7%99%D7%A0%D7%94%D7%95%D7%9C%D7%93_%D7%9B%D7%94%D7%9F",
+    "recipients": [
+      {
+        "name": "גדעון זונדלביץ' (Gidon Zundelevich)",
+        "role": "Head of Information Systems Department",
+        "email": "gizundelevich@rcip.co.il",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://rcip.co.il/team/gidon-zundelevich/",
+        "email_snippet": "Gidon Zundelevich, Head of Information Systems Department, gizundelevich@rcip.co.il. תיבת info@rcip.co.il באותו אתר לא נכללה.",
+        "mx_result": "10 esa1.rcip.c3s2.iphmx.com.; 20 esa2.rcip.c3s2.iphmx.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "קבוצת קניין רוחני, כ-220 עובדים לפי ויקיפדיה. גדעון זונדלביץ' עומד בראש מערכות המידע, והמייל האישי בעמוד שלו.",
+    "subject": "ביצוע על מסמכי תיק קניין רוחני, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום גדעון,",
+      "אני פונה בנוגע לקבוצת ריינהולד כהן, שמטפלת בפטנטים, בסימני מסחר ובליטיגציה של קניין רוחני. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק פטנט או לסימן מסחר. במקום תיוק ידני בין המייל, תיק הקניין הרוחני ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 11,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "אגמון עם טולצ'ינסקי",
+    "domain": "agmon-law.co.il",
+    "size_floor": "≥120",
+    "size_estimate": "201 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "מורן אומן (Moran Aumann)",
+        "role": "Managing Partner",
+        "email": "moran@agmon-law.co.il",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.agmon-law.co.il/en/team-member/moran-aumann/",
+        "email_snippet": "Managing Partner Moran Aumann, והמייל moran@agmon-law.co.il בעמוד הפרופיל.",
+        "mx_result": "0 agmonlaw-co-il01c.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 201 עורכי דין. מורן אומן היא שותפה מנהלת, והמייל האישי בעמוד הפרופיל.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום מורן,",
+      "אני פונה בנוגע לאגמון עם טולצ'ינסקי, שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 12,
+    "pool": "core_icp",
+    "vertical": "law",
+    "org": "ארדינסט, בן נתן, טולידאנו (EBN)",
+    "domain": "ebnlaw.co.il",
+    "size_floor": "≥120",
+    "size_estimate": "160 עורכי דין נכון ל-31 בדצמבר 2024, בדירוג Dun's 100 שפורסם בגלובס ב-12 במרץ 2025.",
+    "size_evidence_url": "https://en.globes.co.il/en/article-meitar-reclaims-title-of-israels-biggest-law-firm-1001504365",
+    "recipients": [
+      {
+        "name": "יואב שמיר (Yoav Shamir)",
+        "role": "CIO",
+        "email": "yoavs@ebnlaw.co.il",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.ebnlaw.co.il/headquarters-management/",
+        "email_snippet": "Yoav Shamir, CIO - Chief Information Officer, +972 3 7770320, yoavs@ebnlaw.co.il. תיבת office@ebnlaw.co.il לא נכללה.",
+        "mx_result": "0 ebnlaw-co-il.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "משרד עורכי דין, 160 עורכי דין. יואב שמיר הוא ה-CIO, והמייל האישי בעמוד הנהלת המטה.",
+    "subject": "ביצוע על מסמכי תיק לקוח, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום יואב,",
+      "אני פונה בנוגע לארדינסט, בן נתן, טולידאנו (EBN), שמטפל בתיקי לקוחות במחלקות המשרד. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לתיק לקוח או ייפוי כוח. במקום תיוק ידני בין המייל, תיק הלקוח ומערכת המשרד, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 13,
+    "pool": "adjacent",
+    "vertical": "income_producing_real_estate",
+    "org": "ביג מרכזי קניות",
+    "domain": "BigCenters.co.il",
+    "size_floor": "≥100",
+    "size_estimate": "109 עובדים נכון למועד הדוח התקופתי לשנת 2025, ו-109 עובדים ליום 31 בדצמבר 2025 (105 בסוף 2024).",
+    "size_evidence_url": "https://www.bigcenters.co.il/wp-content/uploads/2026/03/P1728295-00-merged.pdf",
+    "recipients": [
+      {
+        "name": "ארז אריאב (Erez Ariav)",
+        "role": "סמנכ\"ל מערכות מידע (CIO)",
+        "email": "ereza@BigCenters.co.il",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://www.bigcenters.co.il/management/",
+        "email_snippet": "ארז אריאב סמנכ\"ל מערכות מידע, טלפון 054-5660158, אימייל ereza@BigCenters.co.il. בגרסה האנגלית: Erez Ariav - CIO, ereza@Big.global. נבחרה הכתובת על BigCenters.co.il.",
+        "mx_result": "5 bigcenters-co-il.mail.protection.outlook.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "חברת נדל\"ן מניב, 109 עובדים בדוח 2025, מעל רצפת 100. ארז אריאב הוא סמנכ\"ל מערכות המידע, והמייל האישי בעמוד ההנהלה.",
+    "subject": "ביצוע על מסמכי שכירות ותיק נכס, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום ארז,",
+      "אני פונה בנוגע לביג מרכזי קניות, שמחזיקה ומפעילה מרכזי מסחר מניבים. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל מסמך לחוזה שכירות או לתיק נכס. במקום תיוק ידני בין המייל, תיק הנכס ומערכת הניהול, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  },
+  {
+    "n": 14,
+    "pool": "adjacent",
+    "vertical": "leasing_and_fleet",
+    "org": "קבוצת שלמה",
+    "domain": "shlomo.co.il",
+    "size_floor": "≥100",
+    "size_estimate": "כ-5,000 עובדים, בעמוד הקריירה של קבוצת שלמה.",
+    "size_evidence_url": "https://www.shlomo.co.il/careers",
+    "recipients": [
+      {
+        "name": "אייל גור (Eyal Gur)",
+        "role": "CEO, Shlomo Holdings",
+        "email": "eyalg@shlomo.co.il",
+        "email_type": "published",
+        "confidence": "high",
+        "email_source_url": "https://en.shlomo.co.il/about-shlomo-group-leaders/about-eyal-gur",
+        "email_snippet": "Eyal Gur, CEO, Shlomo Holdings, eyalg@shlomo.co.il. תיבות SIXT הכלליות באותו אתר לא נכללו.",
+        "mx_result": "10 esa1.hc1923-79.eu.iphmx.com.; 10 esa2.hc1923-79.eu.iphmx.com.",
+        "smtp_result": "port 25 unreachable from research host (connection to meitar-com.mail.protection.outlook.com:25 timed out); RCPT not run"
+      }
+    ],
+    "why_this_org": "קבוצה שמפעילה ליסינג, השכרת רכב וצי, כ-5,000 עובדים. אייל גור הוא מנכ\"ל שלמה החזקות, והמייל האישי בעמוד שלו.",
+    "subject": "ביצוע על חוזי ליסינג ותיק רכב, בלי לקפוץ בין חלונות",
+    "paras": [
+      "שלום אייל,",
+      "אני פונה בנוגע לקבוצת שלמה, שמפעילה ליסינג, השכרת רכב וצי רכב. Flow היא שכבת ביצוע לארגון כולו: לא צ׳אט ולא כלי נפרד, אלא שכבה שרצה בכל המחלקות והמערכות, מזהה כוונה ברגע החיכוך, ומציגה פעולה אחת שסוגרת שרשרת בין המערכות שכבר אצלכם.",
+      "למשל: מגיע במייל חוזה ליסינג או מסמך לתיק רכב. במקום תיוק ידני בין המייל, תיק הרכב ומערכת הליסינג, Flow מזהה את התיק ומציע פעולה אחת שמתייקת את המסמך, מעדכנת את הסטטוס ומכינה את ההמשך, ואתם מאשרים בלחיצה אחת על [Do It]. זו רק דוגמה אחת. אותה שכבה סוגרת עבודה גם בתפעול, בשירות ובמטה.",
+      "הבינה המלאכותית משמשת לזיהוי הקשר בלבד. הביצוע עצמו מבוקר, עם אישור אנושי לפעולות רגישות. אפשר להריץ את Flow על השרתים שלכם (Flow Edge) או בענן ממוסך. שתי האפשרויות זמינות היום, והארגון בוחר.",
+      "נשמח לתאם פגישה ולהציג הדגמה חיה, בזום או אצלכם."
+    ]
+  }
+]
