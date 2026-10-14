@@ -3038,27 +3038,24 @@
     }
     let hydrateHow = item ? 'item' : (rows.length ? 'conversation' : 'none');
     let subjectFallback = false;
-    if (!rows.length && pane.subject) {
+    const openConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
+      ? FlowOwaParse.canonId(pane.conversationId) : '';
+    const identityConfirmed = pane.idSource !== 'url-unconfirmed' && pane.idSource !== 'url-stale' && openConv;
+    // The open conversation is not in this result. A subject row is the open
+    // message only when it is that conversation at the page's minute.
+    // Another message, and an unconfirmed id, stay off this pane.
+    if (!rows.length && pane.subject && identityConfirmed) {
       const bySubject = await graphJson('/me/messages?$filter=' + encodeURIComponent(subjectFilter(pane.subject)) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate-subject', null);
       const raw = bySubject && Array.isArray(bySubject.value) ? bySubject.value : [];
       const narrowed = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.subjectFallbackRows === 'function')
         ? FlowOwaParse.subjectFallbackRows(pane, raw)
         : [];
-      const pool = narrowed.length ? narrowed : raw;
       subjectFallback = true;
-      if (pool.length === 1) {
-        rows = pool;
+      if (narrowed.length === 1) {
+        rows = narrowed;
         hydrateHow = 'subject-fallback';
       } else {
-        const want = String(pane.subject).trim().toLowerCase();
-        const named = pool.filter((r) => String(r.subject || '').trim().toLowerCase() === want);
-        if (named.length === 1) {
-          rows = named;
-          hydrateHow = 'subject-unique';
-        } else {
-          rows = [];
-          hydrateHow = 'none';
-        }
+        hydrateHow = 'none';
       }
     }
     if (!rows.length) {
@@ -3089,9 +3086,10 @@
       if (!pane.senderName && name) patch.senderName = String(name).slice(0, 80);
     }
     if (picked) {
-      if ((hydrateHow === 'subject-fallback' || hydrateHow === 'subject-unique') && picked.id && !isConversationId(picked.id)) {
-        patch.itemId = String(picked.id);
-        if (picked.conversationId) patch.conversationId = String(picked.conversationId);
+      if (hydrateHow === 'subject-fallback' && picked.id && !isConversationId(picked.id)) {
+        const pickedConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
+          ? FlowOwaParse.canonId(picked.conversationId) : '';
+        if (pickedConv && openConv && pickedConv === openConv) patch.itemId = String(picked.id);
       }
       if (!pane.subject && picked.subject) patch.subject = String(picked.subject);
       if (needAudience) {
@@ -3179,7 +3177,13 @@
   // Each miss names the stage: no id, Graph status, no candidate, unresolved, empty list.
   async function suggestFiles(pane) {
     if (pane && pane.idSource === 'url-stale') return suggestFail('suggest:pane-stale');
-    const id = pane.itemId || null;
+    if (pane && pane.idSource === 'url-unconfirmed') return suggestFail('suggest:unresolved', 'unconfirmed');
+    // Subject fallback must not hand this save the other message's id.
+    const priorConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane && pane.priorConversationId) : '';
+    const nowConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane && pane.conversationId) : '';
+    const crossed = pane && (pane.hydrateHow === 'subject-fallback' || pane.hydrateHow === 'subject-unique')
+      && priorConv && nowConv && priorConv !== nowConv;
+    const id = crossed ? null : (pane.itemId || null);
     const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.conversationId) : '';
     const wantNet = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.internetMessageId) : '';
     if (!id && !wantConv && !wantNet && !(pane && pane.subject)) return suggestFail('suggest:no-message-id');

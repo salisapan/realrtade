@@ -264,10 +264,10 @@ function lum(rgb) {
       alphaDetail: alpha && alpha.detail
     };
   }, { nw: GRAPH_NW, twin: GRAPH_TWIN, beta: GRAPH_BETA, old: GRAPH_OLD });
-  check('Chromium links the Northwind chip when the conversation id is another mail',
-    linked && linked.northId === 'm-nw', linked);
-  check('Chromium links statement-q3-alpha.pdf when an older id is on the open mail',
-    linked && linked.alphaId === 'm-alpha' && /time-file/.test(linked.alphaDetail || ''), linked);
+  check('Chromium stays quiet when the Northwind conversation id is another mail',
+    linked && !linked.northId && /unconfirmed/.test(linked.northDetail || ''), linked);
+  check('Chromium stays quiet when an older id would link statement-q3-alpha.pdf on another message',
+    linked && !linked.alphaId && /unconfirmed|file-miss/.test(linked.alphaDetail || ''), linked);
 
   const convId = 'AQQkAAAAAAFNPyybyE5TKbM3tgp2Qjp';
   await page.setContent('<!doctype html><html lang="he" dir="rtl"><body><div role="main"><div id="ReadingPaneContainerId">' +

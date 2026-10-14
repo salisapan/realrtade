@@ -352,16 +352,16 @@ const falseSearch = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: 'AQQkSearchNotGraph', receivedDateTime: betaWhen, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
   [alpha, beta]
 );
-check('a search id that matches no Graph row still links the unique beta file',
-  falseSearch.message && falseSearch.message.id === 'm-beta' && !/id-conflict/.test(falseSearch.detail || ''), falseSearch);
+check('a search id that matches no Graph row does not link another message by file size',
+  !falseSearch.message && /file-miss|unconfirmed|id-conflict/.test(falseSearch.detail || ''), falseSearch);
 const alphaOther = msg('m-alpha', 'AQQkAlpha', alphaWhen, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement');
 const betaOther = msg('m-beta', 'AQQkBeta', betaWhen, [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement');
 const realBeat = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: betaWhen, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
   [alphaOther, betaOther]
 );
-check('the beta chip still links when the conversation id is the alpha row',
-  realBeat.message && realBeat.message.id === 'm-beta' && /time-file/.test(realBeat.detail || ''), realBeat);
+check('an unconfirmed conversation does not link the beta chip on another message',
+  !realBeat.message && /unconfirmed|file-miss/.test(realBeat.detail || ''), realBeat);
 const noChip = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: betaWhen },
   [alphaOther, betaOther]
@@ -373,8 +373,8 @@ const northSave = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', conversationId: 'AQQkStale', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: nwWhen, attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
   [msg('m-nw', 'AQQkNw', nwWhen, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
 );
-check('Northwind links the chip when the conversation id is another mail',
-  northSave.message && northSave.message.id === 'm-nw', northSave);
+check('an unconfirmed conversation does not link the Northwind file on another mail',
+  !northSave.message && /unconfirmed/.test(northSave.detail || ''), northSave);
 
 const twinAt = '2026-10-08T11:37:50.000Z';
 const twinBt = '2026-10-08T11:37:59.000Z';
@@ -384,21 +384,21 @@ const gateBeta = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: null, idSource: 'url-unconfirmed', idKind: 'conversation', receivedDateTime: twinBt, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
   [twinAlpha, twinBeta]
 );
-check('gate049 beta at the same minute links statement-q3-beta.pdf',
-  gateBeta.message && gateBeta.message.id === 'm-beta' && /time-file/.test(gateBeta.detail || ''), gateBeta);
+check('an unconfirmed minute does not link statement-q3-beta.pdf by size',
+  !gateBeta.message && /unconfirmed|file-miss/.test(gateBeta.detail || ''), gateBeta);
 const staleAlpha = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idSource: 'url-unconfirmed', idKind: 'conversation', receivedDateTime: twinBt, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
   [twinAlpha, twinBeta]
 );
-check('a stale url conversation id is not a conflict against beta.pdf',
-  staleAlpha.message && staleAlpha.message.id === 'm-beta' && !/id-conflict/.test(staleAlpha.detail || ''), staleAlpha);
+check('a stale url conversation id does not link beta.pdf by size',
+  !staleAlpha.message && /unconfirmed|file-miss/.test(staleAlpha.detail || ''), staleAlpha);
 const oldQ3 = msg('m-old', 'AQQkOld', '2026-10-01T14:37:00.000Z', [file('statement-q3-old.pdf', 1000)], 'Q3 fund statement');
 const alphaSave = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: 'AQQkOld', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: twinAt, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
   [oldQ3, twinAlpha, twinBeta]
 );
-check('alpha links statement-q3-alpha.pdf when an older id is on the open mail',
-  alphaSave.message && alphaSave.message.id === 'm-alpha' && /time-file/.test(alphaSave.detail || ''), alphaSave);
+check('an older unconfirmed id does not link statement-q3-alpha.pdf on another message',
+  !alphaSave.message && /unconfirmed|file-miss/.test(alphaSave.detail || ''), alphaSave);
 const confirmedConflict = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Signed agreement', conversationId: 'AQQkDana', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: nwWhen, attachments: [{ name: 'agreement-signed.pdf', sizeLabel: '12 KB' }] },
   [msg('m-bob', 'AQQkBob', nwWhen, [file('agreement-signed.pdf', 12288)], 'Signed agreement')]
@@ -440,6 +440,42 @@ const wrongFile = FlowOwaParse.uniqueGraphMessage(
 );
 check('a 3 KB chip does not link a 12 KB file in the same conversation',
   !wrongFile.message && /file-disagree|file-miss/.test(wrongFile.detail || ''), wrongFile);
+
+// Box bar wrong-file-guard-e2e. Graph has not indexed the open mail. The only
+// subject hit is another message (id ending B9WFY02AAAA=) with the same
+// filename and the same displayed kilobyte size, at the same minute.
+// 0.9.55 stays quiet. A size match must not become that save.
+const signedAt = '2026-10-08T12:20:00.000Z';
+const openSigned = 'AQQkADAwATM0MDAAq3rD0aGn5Ks';
+const otherSigned = 'AQMkADAwATM0MDAAB9WFY02AAAA=';
+const bobSigned = msg(otherSigned, 'AQQkBobHartConv', signedAt, [file('agreement-signed.pdf', 3000)], 'Signed agreement');
+const lagPane = {
+  subject: 'Signed agreement',
+  senderEmail: '',
+  senderName: 'Dana',
+  conversationId: openSigned,
+  idKind: 'conversation',
+  idSource: 'open-mail',
+  receivedDateTime: signedAt,
+  attachments: [{ name: 'agreement-signed.pdf', size: 3072, sizeLabel: '3 KB' }]
+};
+const graphLag = FlowOwaParse.uniqueGraphMessage(lagPane, [bobSigned]);
+check('Graph lag does not link agreement-signed.pdf on the other message',
+  !graphLag.message && /conflict-conversation/.test(graphLag.detail || '') && String(otherSigned).slice(-12) === 'B9WFY02AAAA=',
+  graphLag);
+const graphLagQuiet = FlowOwaParse.uniqueGraphMessage(
+  Object.assign({}, lagPane, { idSource: 'url-unconfirmed' }),
+  [bobSigned]
+);
+check('an unconfirmed open mail stays quiet instead of saving the other agreement',
+  !graphLagQuiet.message && /unconfirmed/.test(graphLagQuiet.detail || ''), graphLagQuiet);
+const sameConvSave = FlowOwaParse.uniqueGraphMessage(
+  Object.assign({}, lagPane, { conversationId: 'AQQkDanaSigned' }),
+  [msg('m-dana', 'AQQkDanaSigned', signedAt, [file('agreement-signed.pdf', 3000)], 'Signed agreement')]
+);
+check('the same conversation still links agreement-signed.pdf when the chip says 3 KB',
+  sameConvSave.message && sameConvSave.message.id === 'm-dana' && !/file-disagree|unconfirmed/.test(sameConvSave.detail || ''),
+  sameConvSave);
 
 const receiptLeak = FlowOwaParse.matchEntryHow(
   { subject: 'Q3 fund statement', senderEmail: 'dana@acme.com' },

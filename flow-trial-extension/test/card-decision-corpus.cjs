@@ -383,17 +383,43 @@ function panel(store) {
     hdr.appendChild(mark);
   }
   await settle(fallback);
-  const pickedRow = records(fallback.store).find((d) => d.verdict === 'show' || d.hydrateHow);
-  check('subject fallback records the picked message id and the prior conversation',
-    pickedRow && pickedRow.id === PICKED && pickedRow.hydrateHow === 'subject-fallback' && pickedRow.priorConversationId === CONV
-      && !panel(fallback.store).some((d) => d.reason === 'intent-null'),
-    pickedRow && { id: pickedRow.id, how: pickedRow.hydrateHow, prior: pickedRow.priorConversationId, verdict: pickedRow.verdict, panel: panel(fallback.store).map((d) => d.reason) });
+  const adopted = records(fallback.store).filter((d) => d && (d.id === PICKED || d.messageId === PICKED || d.hydrateHow === 'subject-fallback'));
+  check('Graph lag does not adopt another message as this open mail',
+    adopted.length === 0,
+    { adopted: adopted.map((d) => ({ id: d.id, how: d.hydrateHow, prior: d.priorConversationId, verdict: d.verdict })),
+      panel: panel(fallback.store).map((d) => d.reason) });
   fallback.w.close();
 
   let generation = 'one';
   const hyd = await boot({
     id: 'MSG-HYDRATE-1',
     graph: (url) => {
+      if (generation === 'wrong-file' || generation === 'same-conv') {
+        if (/\$filter=conversationId/i.test(url)) return { value: [] };
+        if (/\$filter=subject/i.test(url) || /startswith\(subject/i.test(url)) {
+          if (generation === 'wrong-file') {
+            return { value: [{
+              id: 'AQMkADAwATM0MDAAB9WFY02AAAA=',
+              subject: 'Signed agreement',
+              conversationId: 'AQQkBobHartConv',
+              from: { emailAddress: { address: 'bob.hart@contoso.example', name: 'Bob Hart' } },
+              toRecipients: [{ emailAddress: { address: ME } }],
+              ccRecipients: [],
+              receivedDateTime: '2026-10-08T12:20:00.000Z'
+            }] };
+          }
+          return { value: [{
+            id: 'm-nw',
+            subject: 'Northwind agreement - signed PDF',
+            conversationId: 'AQQkNw',
+            from: { emailAddress: { address: FLOW, name: 'flow' } },
+            toRecipients: [{ emailAddress: { address: ME } }],
+            ccRecipients: [],
+            receivedDateTime: '2026-10-08T14:01:00.000Z'
+          }] };
+        }
+        return { value: [] };
+      }
       if (generation === 'two-same') {
         if (/\$filter=subject/i.test(url) || /startswith\(subject/i.test(url)) {
           return { value: [
@@ -431,15 +457,55 @@ function panel(store) {
   check('two subject rows are not picked and their recipients are not copied',
     none && none.hydrateHow === 'none' && (!none.to || none.to.length === 0) && (!none.cc || none.cc.length === 0) && none.itemId !== 'MSG-A' && none.itemId !== 'MSG-B',
     { how: none && none.hydrateHow, to: none && none.to, item: none && none.itemId });
+
+  generation = 'wrong-file';
+  await vm.runInContext('__glanceOutlookPage.bumpMailEpoch("wrong-file")', hyd.ctx);
+  const lag = await vm.runInContext('__glanceOutlookPage.hydratePane(' + JSON.stringify({
+    conversationId: 'AQQkADAwATM0MDAAq3rD0aGn5Ks',
+    idKind: 'conversation',
+    idSource: 'open-mail',
+    subject: 'Signed agreement',
+    receivedDateTime: '2026-10-08T12:20:00.000Z',
+    to: [ME],
+    cc: [],
+    text: 'Hi, The signed agreement is attached. Best, Dana',
+    attachments: [{ name: 'agreement-signed.pdf', size: 3072, sizeLabel: '3 KB' }]
+  }) + ')', hyd.ctx);
+  check('Graph lag does not put agreement-signed.pdf from the other message on this pane',
+    lag && lag.itemId !== 'AQMkADAwATM0MDAAB9WFY02AAAA=' && lag.conversationId === 'AQQkADAwATM0MDAAq3rD0aGn5Ks' && lag.hydrateHow === 'none',
+    { item: lag && lag.itemId, conv: lag && lag.conversationId, how: lag && lag.hydrateHow });
+
+  generation = 'same-conv';
+  await vm.runInContext('__glanceOutlookPage.bumpMailEpoch("same-conv")', hyd.ctx);
+  const kept = await vm.runInContext('__glanceOutlookPage.hydratePane(' + JSON.stringify({
+    conversationId: 'AQQkNw',
+    idKind: 'conversation',
+    idSource: 'open-mail',
+    subject: 'Northwind agreement - signed PDF',
+    receivedDateTime: '2026-10-08T14:01:00.000Z',
+    to: [],
+    cc: [],
+    text: 'Please find the signed Northwind agreement attached.'
+  }) + ')', hyd.ctx);
+  check('subject fallback still names the open conversation when that message is the subject hit',
+    kept && kept.itemId === 'm-nw' && kept.conversationId === 'AQQkNw' && kept.hydrateHow === 'subject-fallback',
+    { item: kept && kept.itemId, conv: kept && kept.conversationId, how: kept && kept.hydrateHow });
   hyd.w.close();
 
-  const spec = fs.readFileSync(path.join(ROOT, '..', 'docs/glance-ai/card-whynotshown-single-source-spec.md'), 'utf8');
   const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
-  check('the card and Why not shown share commitDecision',
-    outlookSrc.indexOf('async function commitDecision') > 0 &&
-    outlookSrc.indexOf('function whyNotShownRows') < 0 &&
-    spec.indexOf('Nothing in this commit wires the decision record') < 0 &&
-    spec.indexOf('commitDecision') > 0);
+  const specPath = path.join(ROOT, '..', 'docs/glance-ai/card-whynotshown-single-source-spec.md');
+  check('the page writes the card decision with commitDecision',
+    outlookSrc.indexOf('async function commitDecision') > 0 && outlookSrc.indexOf('function whyNotShownRows') < 0);
+  if (!fs.existsSync(specPath)) {
+    console.log('SKIP: card-whynotshown spec is not beside this extension (' + specPath + ')');
+  } else {
+    const spec = fs.readFileSync(specPath, 'utf8');
+    check('the card and Why not shown share commitDecision',
+      spec.indexOf('Nothing in this commit wires the decision record') < 0 &&
+      spec.indexOf('commitDecision') > 0 &&
+      /another conversation is not adopted/.test(spec) &&
+      /does not cross messages/.test(spec));
+  }
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

@@ -319,12 +319,36 @@ const FlowOwaParse = (() => {
     return Boolean(convOk || netOk);
   }
 
+  // A file links to the open message. A known conversation, message id, or
+  // internet id that differs is another message: a kilobyte label does not
+  // cross it. An id the page has not confirmed stays unresolved. No
+  // conversation on the pane is not a conflict; the filename may still
+  // name the one matching row.
+  function fileMayLink(pane, m) {
+    if (!pane || !m) return false;
+    if (pane.idSource === 'url-unconfirmed' || pane.idSource === 'url-stale') return false;
+    const paneItem = canonId(pane.itemId);
+    const msgId = canonId(m.id);
+    if (paneItem && msgId && paneItem !== msgId) return false;
+    if (paneItem && msgId && paneItem === msgId) return true;
+    const paneNet = canonId(pane.internetMessageId);
+    const msgNet = canonId(m.internetMessageId);
+    if (paneNet && msgNet && paneNet !== msgNet) return false;
+    if (paneNet && msgNet && paneNet === msgNet) return true;
+    const paneConv = canonId(pane.conversationId);
+    const msgConv = canonId(m.conversationId);
+    if (paneConv && msgConv && paneConv !== msgConv) return false;
+    if (paneConv && !msgConv) return false;
+    return true;
+  }
+
   // One subject and sender is not enough. That mail links only when the
-  // query already covered the mailbox and one confirming signal holds: the
-  // open conversation or internet id, or a filename visible on the page that
-  // is on that message. A filename corroborates only when nothing conflicts.
-  // A conversation id, an internet message id, or a parsed clock that does
-  // not match the candidate stays unresolved, even when the filename matches.
+  // query already covered the mailbox and the row is the open message: a
+  // confirmed message id, or the same conversation. A filename and a
+  // kilobyte label corroborate that row. They never select a different
+  // message. An unconfirmed id stays unresolved. A conversation id, an
+  // internet message id, or a parsed clock that does not match the
+  // candidate stays unresolved, even when the filename matches.
   // An empty chip with no id stays unresolved. A failed attachment read is
   // unknown, not an empty list. Several mails are split by the minute and
   // the attachment, after an unmarked 1–12 hour is settled. A file that
@@ -411,6 +435,7 @@ const FlowOwaParse = (() => {
       const conflict = idConflict(pane, one) || clockConflict(pane, one, minute);
       if (conflict) return pack(null, (why || 'subject-unique') + ' conflict-' + conflict);
       if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
+      if (!fileMayLink(pane, one)) return pack(null, (why || 'subject-unique') + ' unconfirmed');
       if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
       return pack(null, (why || 'subject-unique') + ' unconfirmed');
     }
@@ -465,7 +490,7 @@ const FlowOwaParse = (() => {
     }
     pool = agreedId;
     if (fileRows(pane && pane.attachments).length) {
-      const agreed = pool.filter((m) => fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
+      const agreed = pool.filter((m) => fileMayLink(pane, m) && fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
       if (agreed.length === 1) return pack(agreed[0], 'time-file');
       if (!agreed.length) return pack(null, 'file-miss');
       return pack(null, 'file-ambiguous');
