@@ -901,7 +901,15 @@ const FlowCloseFamilies = (() => {
   function askBlocked(text) {
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     text = stripQuotedAsks(text);
-    if (NOISE_EN.test(text) || NOISE_HE.test(text)) return true;
+    if (NOISE_HE.test(text)) return true;
+    if (NOISE_EN.test(text)) {
+      // "Everyone else, no action needed" stands other people down. It is
+      // not a whole-mail noise line when another sentence still asks.
+      const parts = splitSentences(text);
+      const kept = parts.filter((s) => !/^(?:everyone else|all others|everybody else|the rest(?: of you)?)[,:]?\s+no action (?:needed|required|necessary)\b/i.test(String(s || '').trim()));
+      if (kept.length === parts.length || NOISE_EN.test(kept.join('\n'))) return true;
+      text = kept.join('\n');
+    }
     const cue = /\b(?:can you|could you|would you|please|kindly|send|forward|chase|nudge)\b/i;
     let saw = false;
     let open = false;

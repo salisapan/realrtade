@@ -88,6 +88,8 @@
   let syncing = null;
   let lastReasonKey = '';
   let lastReasonStored = false;
+  let openDecisionId = '';
+  const decisionMemory = Object.create(null);
   let lastLoggedReason = '';
   let lastHref = location.href;
   // What the last finished scan looked at, and how it ended ('card' or 'reason'). Same open message, same text, and the
@@ -134,11 +136,119 @@
     try { console.info('Glance: ' + stage, data === undefined ? '' : (typeof data === 'string' ? data : JSON.stringify(data))); } catch (e) { /* console gone */ }
   }
 
+  function tokenMissing(token) {
+    const t = String(token || '');
+    if (!t || t === '|||') return true;
+    const parts = t.split('|');
+    if (parts[0] === 'msg') return !parts[1];
+    if (parts[0] === 'conv' || parts[0] === 'pane') return !parts[1] && !parts[2];
+    return false;
+  }
+
+  function decisionIdFrom(src) {
+    const s = src || {};
+    const item = s.itemId && !isConversationId(s.itemId) ? String(s.itemId) : '';
+    if (item) return item;
+    return String(s.messageId || s.conversationId || s.pathId || s.id || '');
+  }
+
+  function cardCanonical(ctx) {
+    const messageId = String((ctx && (ctx.messageId || ctx.itemId)) || '');
+    const label = String((ctx && ctx.intent && ctx.intent.label) || '');
+    const processId = String((ctx && ctx.process && ctx.process.id) || '');
+    const steps = (ctx && ctx.process && ctx.process.steps) || [];
+    const stepPart = steps.map((s) => String((s && s.kind) || '') + ':' + String((s && s.id) || '')).join(',');
+    const chain = String((ctx && ctx.glanceChain) || '');
+    return messageId + ' | ' + label + ' | ' + processId + ' | ' + stepPart + ' | ' + chain;
+  }
+
+  function decisionFor(id) {
+    return id ? decisionMemory[String(id)] || null : null;
+  }
+
+  function rememberDecision(record) {
+    if (!record || !record.id) return;
+    decisionMemory[String(record.id)] = record;
+    openDecisionId = String(record.id);
+  }
+
+  function recordIds(record) {
+    return [record && record.id, record && record.priorConversationId, record && record.conversationId, record && record.messageId]
+      .filter(Boolean).map(String);
+  }
+
+  function sameRecordId(value, ids) {
+    return idListed(value, ids);
+  }
+
+  // One record for the open mail. A quiet commit upserts it. A show commit
+  // upserts it and drops any quiet record, and the sync line, for this id
+  // or the conversation hydrate replaced. A commit after the epoch moved
+  // is dropped.
+  async function commitDecision(record) {
+    if (!record || !record.id) return;
+    if (typeof record.epoch === 'number' && record.epoch !== mailEpoch) return;
+    const stored = {
+      id: String(record.id),
+      epoch: record.epoch,
+      source: record.source || 'page',
+      verdict: record.verdict === 'show' ? 'show' : 'quiet',
+      reason: record.reason,
+      cardHash: record.verdict === 'show' ? (record.cardHash || null) : null,
+      hydrateHow: record.hydrateHow || null,
+      priorConversationId: record.priorConversationId || null,
+      key: String(record.reason || '') + '|' + String(record.id),
+      at: Date.now(),
+      subject: record.subject || '',
+      counterpart: record.counterpart || null,
+      conversationId: record.conversationId || null,
+      messageId: record.messageId || null
+    };
+    if (record.extra) Object.assign(stored, record.extra);
+    rememberDecision(stored);
+    try {
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
+      if (stored.epoch !== mailEpoch) return;
+      const ids = recordIds(stored);
+      let list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => {
+        if (!d) return false;
+        if (sameRecordId(d.id, ids) || sameRecordId(d.messageId, ids) || sameRecordId(d.conversationId, ids)) return false;
+        if (stored.verdict === 'show' && d.verdict === 'quiet' && sameRecordId(d.priorConversationId, ids)) return false;
+        return true;
+      });
+      list.unshift(stored);
+      const patch = { [PAGE_DIAG_KEY]: list.slice(0, 40) };
+      const sync = bag.outlookSync || {};
+      if (Array.isArray(sync.diagnostics)) {
+        const diagnostics = sync.diagnostics.filter((d) => {
+          if (!d) return false;
+          if (sameRecordId(d.conversationId, ids) || sameRecordId(d.messageId, ids) || sameRecordId(d.id, ids)) return false;
+          return true;
+        });
+        if (diagnostics.length !== sync.diagnostics.length) patch.outlookSync = Object.assign({}, sync, { diagnostics: diagnostics });
+      }
+      await new Promise((resolve) => chrome.storage.local.set(patch, resolve));
+      lastReasonKey = stored.key;
+      lastReasonStored = true;
+    } catch (e) {
+      lastReasonStored = false;
+    }
+  }
+
   function quietReason(reason) {
     const r = String(reason || '');
     if (r === 'third-party' || r === 'page:third-party') return 'third-party';
     if (r === 'outlook:file-found-no-attach' || r === 'outlook-file-found-no-attach') return 'outlook-file-found-no-attach';
     return null;
+  }
+
+  // The scan already committed this open mail for this epoch. The suggest
+  // note runs after that and must not replace the reason the card or the
+  // quiet line is showing.
+  function pageAlreadyDecided(pane) {
+    const id = decisionIdFrom(pane) || openDecisionId;
+    const existing = decisionFor(id);
+    return Boolean(existing && existing.epoch === renderEpoch);
   }
 
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
@@ -165,25 +275,24 @@
     if (quiet && quietId && typeof FlowStorage !== 'undefined' && typeof FlowStorage.recordSilence === 'function') {
       FlowStorage.recordSilence({ messageId: String(quietId), reason: quiet }).catch(() => {});
     }
-    try {
-      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
-      const list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => d && d.key !== key);
-      list.unshift(Object.assign({
-        key, reason, at: Date.now(), source: 'page',
-        subject: (typeof FlowDisplay !== 'undefined' && FlowDisplay.sanitizeStoredSubject)
-          ? FlowDisplay.sanitizeStoredSubject(pane && pane.subject)
-          : String((pane && pane.subject) || '').slice(0, 120),
-        counterpart: (pane && pane.senderEmail) || null,
-        conversationId: (pane && pane.conversationId) || null,
-        messageId: (pane && (pane.itemId || pane.pathId)) || null
-      }, extra || {}));
-      await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 40) }, resolve));
-      lastReasonKey = key;
-      lastReasonStored = true;
-    } catch (e) {
-      lastReasonStored = false;
-      try { console.error('Glance: page reason not stored', reason); } catch (x) { /* console gone */ }
-    }
+    const subject = (typeof FlowDisplay !== 'undefined' && FlowDisplay.sanitizeStoredSubject)
+      ? FlowDisplay.sanitizeStoredSubject(pane && pane.subject)
+      : String((pane && pane.subject) || '').slice(0, 120);
+    await commitDecision({
+      id: decisionIdFrom(pane) || String((pane && pane.subject) || location.pathname || 'open'),
+      epoch: renderEpoch,
+      source: 'page',
+      verdict: 'quiet',
+      reason: reason,
+      cardHash: null,
+      hydrateHow: (pane && pane.hydrateHow) || 'none',
+      priorConversationId: (pane && pane.priorConversationId) || null,
+      subject: subject,
+      counterpart: (pane && pane.senderEmail) || null,
+      conversationId: (pane && pane.conversationId) || null,
+      messageId: (pane && (pane.itemId || pane.pathId)) || null,
+      extra: extra || null
+    });
   }
 
   function messageIdsOf(pane) {
@@ -208,31 +317,28 @@
   // A visible card is the outcome. Drop the page reason and the mailbox
   // check's earlier quiet line for this message, so Why not shown does not
   // list a mail that has a card.
-  async function clearReason(pane) {
+  async function clearReason(pane, reason) {
     lastReasonKey = '';
-    try {
-      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
-      const ids = messageIdsOf(pane);
-      const id = pane && (pane.conversationId || pane.itemId || pane.subject);
-      const list = (bag[PAGE_DIAG_KEY] || []).filter((d) => {
-        if (!d) return false;
-        if (id && String(d.key || '').endsWith('|' + id)) return false;
-        if (idListed(d.conversationId, ids) || idListed(d.messageId, ids)) return false;
-        return true;
-      });
-      const sync = bag.outlookSync || {};
-      const patch = {};
-      if (list.length !== (bag[PAGE_DIAG_KEY] || []).length) patch[PAGE_DIAG_KEY] = list;
-      if (Array.isArray(sync.diagnostics)) {
-        const diagnostics = sync.diagnostics.filter((d) => {
-          if (!d) return false;
-          if (idListed(d.conversationId, ids) || idListed(d.messageId, ids)) return false;
-          return true;
-        });
-        if (diagnostics.length !== sync.diagnostics.length) patch.outlookSync = Object.assign({}, sync, { diagnostics: diagnostics });
-      }
-      if (Object.keys(patch).length) await new Promise((resolve) => chrome.storage.local.set(patch, resolve));
-    } catch (e) { /* ignore */ }
+    const id = openDecisionId || decisionIdFrom(pane);
+    if (!id) return;
+    const existing = decisionFor(id);
+    const subject = (typeof FlowDisplay !== 'undefined' && FlowDisplay.sanitizeStoredSubject)
+      ? FlowDisplay.sanitizeStoredSubject(pane && pane.subject)
+      : String((pane && pane.subject) || '').slice(0, 120);
+    await commitDecision({
+      id: id,
+      epoch: renderEpoch,
+      source: 'page',
+      verdict: 'show',
+      reason: reason || (existing && existing.reason) || 'shown',
+      cardHash: existing && existing.cardHash,
+      hydrateHow: (pane && pane.hydrateHow) || (existing && existing.hydrateHow) || null,
+      priorConversationId: (pane && pane.priorConversationId) || (existing && existing.priorConversationId) || null,
+      subject: subject,
+      counterpart: (pane && pane.senderEmail) || null,
+      conversationId: (pane && pane.conversationId) || null,
+      messageId: (pane && (pane.itemId || pane.pathId)) || (existing && existing.messageId) || null
+    });
   }
 
   function send(msg) {
@@ -615,7 +721,9 @@
       sender: sender,
       intent: intent,
       process: process,
-      key: entry.key
+      key: entry.key,
+      hydrateHow: (pane && pane.hydrateHow) || null,
+      priorConversationId: (pane && pane.priorConversationId) || null
     };
   }
 
@@ -663,6 +771,7 @@
     try {
       if (!(ctx && (ctx.outlookIncomingId || ctx.messageId))) graphTrace = { attempts: [] };
       resolvedId = await ensureOutlookMessageId(ctx);
+      if (ignoreStaleClick(host)) return;
       if (traceArmed || localFileTrace()) {
         logFileTrace({
           phase: 'do-it',
@@ -726,6 +835,7 @@
       payload.driveMimeType = file.mimeType || null;
     }
     payload.connectorId = 'outlookDraft';
+    if (ignoreStaleClick(host)) return;
     const r = await send({ type: 'flow:execute-action', payload: payload });
     // A file is attached only when Graph returned an attachment id. A success
     // without that id is not a draft we keep, and the receipt never says attached.
@@ -949,11 +1059,47 @@
   function ignoreStaleClick(host) {
     const bound = host && host.getAttribute && host.getAttribute('data-glance-open');
     const now = openMailTokenNow();
-    if (bound && now && bound === now) return false;
+    const tokenOk = Boolean(bound) && !tokenMissing(now) && bound === now;
+    const epoch = host && host.getAttribute && host.getAttribute('data-glance-epoch');
+    const epochOk = epoch != null && String(epoch) === String(mailEpoch);
+    const hash = host && host.getAttribute && host.getAttribute('data-glance-card');
+    const id = host && host.getAttribute && host.getAttribute('data-glance-decision');
+    const record = decisionFor(id);
+    const hashOk = Boolean(record) && record.verdict === 'show' && record.cardHash != null && hash === record.cardHash;
+    if (tokenOk && epochOk && hashOk) return false;
     try {
       console.info(bound ? 'Glance: stale card click ignored' : 'Glance: card with no open-mail token ignored', bound || '');
     } catch (e) { /* console gone */ }
     return true;
+  }
+
+  function stampCard(host, ctx, reason) {
+    if (!host) return null;
+    const chain = String((ctx && ctx.glanceChain) || (host.getAttribute && host.getAttribute('data-glance-chain')) || '');
+    if (chain) host.setAttribute('data-glance-chain', chain);
+    const id = decisionIdFrom(ctx);
+    if (!id) return null;
+    const cardHash = hashText(cardCanonical(Object.assign({}, ctx, { glanceChain: chain })));
+    const token = openMailTokenNow();
+    if (token && !tokenMissing(token)) host.setAttribute('data-glance-open', token);
+    host.setAttribute('data-glance-epoch', String(mailEpoch));
+    host.setAttribute('data-glance-decision', id);
+    host.setAttribute('data-glance-card', cardHash);
+    const record = {
+      id: id,
+      epoch: mailEpoch,
+      source: 'page',
+      verdict: 'show',
+      reason: reason || (ctx && ctx.decisionReason) || 'shown',
+      cardHash: cardHash,
+      hydrateHow: (ctx && ctx.hydrateHow) || null,
+      priorConversationId: (ctx && ctx.priorConversationId) || null,
+      subject: (ctx && ctx.subject) || '',
+      conversationId: (ctx && ctx.conversationId) || null,
+      messageId: (ctx && (ctx.itemId || ctx.messageId)) || null
+    };
+    rememberDecision(record);
+    return record;
   }
 
   function guardedUndo(host, fn) {
@@ -972,8 +1118,7 @@
       onDismiss: src.onDismiss,
       onHold: function (held) { return !ignoreStaleClick(held); }
     });
-    const token = openMailTokenNow();
-    if (host && token) host.setAttribute('data-glance-open', token);
+    if (host) stampCard(host, ctx, (ctx && ctx.decisionReason) || 'shown');
     return host;
   }
 
@@ -1048,8 +1193,16 @@
       view.rel = 'noopener';
       actionsRow.appendChild(view);
     }
-    const openToken = openMailTokenNow();
-    if (openToken) host.setAttribute('data-glance-open', openToken);
+    stampCard(host, {
+      messageId: row.messageId || '',
+      itemId: row.itemId || row.messageId || '',
+      conversationId: row.outlookConversationId || row.threadId || '',
+      subject: row.subject || '',
+      intent: { label: (copy && copy.status) || 'Handled' },
+      process: { id: 'task-proof', steps: [] },
+      glanceChain: 'task-proof',
+      decisionReason: 'page:receipt-mounted'
+    }, 'page:receipt-mounted');
     undo.addEventListener('click', () => {
       if (ignoreStaleClick(host)) return;
       undo.textContent = 'Undoing…';
@@ -1154,6 +1307,18 @@
     if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
     else mount.appendChild(host);
     stripDuplicateUndoHosts(mount);
+    stampCard(host, {
+      messageId: (pane && (pane.itemId || pane.conversationId)) || '',
+      itemId: pane && pane.itemId,
+      conversationId: pane && pane.conversationId,
+      subject: pane && pane.subject,
+      hydrateHow: pane && pane.hydrateHow,
+      priorConversationId: pane && pane.priorConversationId,
+      intent: { label: line || 'Undone' },
+      process: { id: 'task-proof', steps: [] },
+      glanceChain: 'task-proof',
+      decisionReason: 'page:still-open'
+    }, 'page:still-open');
     lastOutcome = 'card';
     return host;
   }
@@ -1547,6 +1712,20 @@
     return Boolean(e && (own || []).indexOf(e) >= 0);
   }
 
+  // senderOf leaves the person's own address off the pane so it is never the
+  // counterpart. The persona title still names that address on a note to self.
+  function personaOwnSender(own) {
+    let node = null;
+    try { node = document.querySelector('#ReadingPaneContainerId .persona'); } catch (e) { node = null; }
+    if (!node) return false;
+    const bits = [];
+    if (node.getAttribute) bits.push(node.getAttribute('title') || '', node.getAttribute('aria-label') || '');
+    const spans = node.querySelectorAll ? node.querySelectorAll('[title], [aria-label]') : [];
+    for (let i = 0; i < spans.length; i++) bits.push(spans[i].getAttribute('title') || '', spans[i].getAttribute('aria-label') || '');
+    const found = bits.join(' ').match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/ig) || [];
+    return found.some((email) => ownSender(email, own));
+  }
+
   // A silence replaces whatever card was already floating. The schedule card
   // from an older judgment used to stay up after the check had moved on.
   function dropStuckCard() {
@@ -1621,6 +1800,7 @@
       const st = await FlowStorage.get();
       fromAddress = preferHumanFrom(st && st.outlookAuth);
     } catch (e) { /* From resolved again in background */ }
+    if (ignoreStaleClick(host)) return;
     const r = await send({
       type: 'flow:execute-action',
       payload: {
@@ -1698,6 +1878,10 @@
       bodyText: (pane && pane.text) || '',
       sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
       attachFile: { id: file.id, name: file.name || null, mimeType: file.mimeType || null },
+      glanceChain: 'prepare',
+      decisionReason: 'prepare',
+      hydrateHow: pane && pane.hydrateHow,
+      priorConversationId: pane && pane.priorConversationId,
       intent: { type: 'request', label: line },
       process: {
         id: 'reply-track',
@@ -1730,7 +1914,7 @@
     lastKey = (messageId || (pane && pane.conversationId) || 'open') + '|prepare';
     dbg('decision', { shown: true, chain: 'prepare', fileId: file.id, messageId: messageId || null });
     dbg('rendered', { messageId: messageId || null, chain: 'prepare' });
-    await clearReason(pane);
+    await clearReason(pane, 'prepare');
     await forgetFileSilence(pane);
     return { shown: true, why: messageId ? 'shown' : 'shown-without-message-id' };
   }
@@ -1757,7 +1941,11 @@
         closingLine: line,
         steps: [{ kind: 'outlookDraft', id: 'outlookDraft', params: {} }]
       },
-      chain: chain
+      chain: chain,
+      glanceChain: 'needs-you',
+      decisionReason: 'needs-you',
+      hydrateHow: pane && pane.hydrateHow,
+      priorConversationId: pane && pane.priorConversationId
     };
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
@@ -1771,7 +1959,7 @@
     lastKey = messageId + '|needs-you';
     dbg('decision', { shown: true, chain: 'needs-you', label: ctx.doLabel });
     dbg('rendered', { messageId: messageId, chain: 'needs-you' });
-    await clearReason(pane);
+    await clearReason(pane, 'needs-you');
     await forgetFileSilence(pane);
     return true;
   }
@@ -1780,6 +1968,7 @@
     if (ignoreStaleClick(host)) return;
     host.remove();
     if (!ctx || !ctx.messageId) return;
+    if (ignoreStaleClick(host)) return;
     await FlowStorage.appendLog({
       kind: 'dismissed',
       label: (ctx.intent && ctx.intent.label) || 'Dismissed',
@@ -1913,8 +2102,14 @@
       app: 'outlook',
       doLabel: 'Do It',
       messageId: messageId,
-      process: { name: 'File on hold', steps: [{ kind: 'calendar' }] },
-      intent: { label: row.label || 'On your calendar' }
+      itemId: pane && pane.itemId,
+      conversationId: pane && pane.conversationId,
+      hydrateHow: pane && pane.hydrateHow,
+      priorConversationId: pane && pane.priorConversationId,
+      process: { name: 'File on hold', steps: [{ kind: 'calendar', id: 'calendar' }] },
+      intent: { label: row.label || 'On your calendar' },
+      glanceChain: 'calendar-hold',
+      decisionReason: 'calendar-hold'
     }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
     if (!host) return;
     host.setAttribute('data-glance-chain', 'calendar-hold');
@@ -1928,7 +2123,7 @@
       linkLabel: 'Open event',
       onUndo: calendarUndoHandler(host, messageId, row.ref)
     });
-    await clearReason(pane);
+    await clearReason(pane, 'calendar-hold');
   }
 
   // Family B on the open page: one named file, one clock, one Outlook event.
@@ -2042,7 +2237,11 @@
       sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
       intent: hold.intent,
       process: process,
-      calendarHold: { params: params }
+      calendarHold: { params: params },
+      glanceChain: 'calendar-hold',
+      decisionReason: 'calendar-hold',
+      hydrateHow: pane && pane.hydrateHow,
+      priorConversationId: pane && pane.priorConversationId
     };
     if (doItInFlight) return;
     const old = mount.querySelector('.flow-chip-host');
@@ -2062,7 +2261,7 @@
     lastKey = (messageId || 'open') + '|calendar-hold';
     dbg('decision', { shown: true, chain: 'calendar-hold', file: file.name || null });
     dbg('rendered', { messageId: messageId || null, chain: 'calendar-hold' });
-    await clearReason(pane);
+    await clearReason(pane, 'calendar-hold');
     await forgetFileSilence(pane);
     let lateWrite = null;
     try { lateWrite = await findWrittenCalendar(pane, ctx.calendarHoldKey); }
@@ -2091,6 +2290,7 @@
     let wrote = null;
     try {
       const hold = (ctx && ctx.calendarHold) || {};
+      if (ignoreStaleClick(host)) return;
       const r = await send({
         type: 'flow:execute-action',
         payload: { connectorId: 'outlookCalendar', params: hold.params || {}, messageId: ctx.messageId }
@@ -2222,6 +2422,7 @@
     try {
       if (await remountProvedTodoReceipt(pane)) {
         dbg('decision', { shown: true, reason: 'page:receipt-mounted', subject: pane.subject });
+        await clearReason(pane, 'page:receipt-mounted');
         return;
       }
       const earlyProof = await livePromiseProof({
@@ -2237,6 +2438,7 @@
         const earlyMount = mountPoint();
         if (earlyMount && paintOutlookTodoReceipt(earlyMount, earlyProof)) {
           dbg('decision', { shown: true, reason: 'page:promise-proof', subject: pane.subject });
+          await clearReason(pane, 'page:promise-proof');
           return;
         }
       }
@@ -2252,6 +2454,7 @@
     try {
       if (await keepActiveDraftReceipt(pane)) {
         dbg('decision', { shown: true, reason: 'page:draft-receipt', subject: pane.subject });
+        await clearReason(pane, 'page:draft-receipt');
         return;
       }
     } catch (e) {
@@ -2317,10 +2520,10 @@
     const bag = await FlowStorage.get();
     const planned = plannedRow(bag, pane);
     const receiptOnly = Boolean(entry && entry.outlookReceipt && entry.ref && !entry.process);
-    const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || (planned && (planned.reason === 'note-to-self' || planned.reason === 'own-sender')));
-    if (selfMail) {
+    const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || personaOwnSender(own) || (planned && (planned.reason === 'note-to-self' || planned.reason === 'own-sender')));
+      if (selfMail) {
       dropStuckCard();
-      await pageReason((planned && planned.reason) || 'note-to-self', pane);
+      await pageReason('note-to-self', pane);
       return;
     }
     if (!receiptOnly) {
@@ -2380,7 +2583,6 @@
               return;
             }
             finalReason = namedSilence((ran && ran.quiet) || (chain && chain.reason) || 'file-chain-not-run');
-            if ((!ran || ran.ran !== true) && planned && fileSilenceReason(planned.reason)) finalReason = planned.reason;
             dropStuckCard();
             await pageReason(finalReason, pane);
           } finally {
@@ -2423,9 +2625,7 @@
           if (!keepFile) {
             dropStuckCard();
             const named = (decided && decided.reason) || 'intent-null';
-            const quiet = (planned && planned.reason && !fileSilenceReason(planned.reason))
-              ? planned.reason
-              : (String(named).indexOf('page:') === 0 ? named : ('page:' + named));
+            const quiet = /:/.test(String(named)) ? String(named) : ('page:' + named);
             await pageReason(quiet, pane);
             return;
           }
@@ -2468,11 +2668,20 @@
     if (entry.outlookReceipt && entry.ref && !entry.process && entry.connectorId === 'outlookDraft') {
       const mount = mountPoint();
       if (!mount) { await pageReason('page:no-mount', pane); return; }
-      if (mount.querySelector('.flow-chip-host')) { lastOutcome = 'card'; return; }
+      if (mount.querySelector('.flow-chip-host')) {
+        lastOutcome = 'card';
+        await clearReason(pane, 'page:receipt-mounted');
+        return;
+      }
       const host = injectCard(mount, {
-        process: { name: 'Reply', steps: [{ kind: 'outlookDraft' }] },
+        process: { name: 'Reply', id: 'reply', steps: [{ kind: 'outlookDraft', id: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
-        messageId: entry.messageId
+        messageId: entry.messageId,
+        itemId: pane.itemId,
+        conversationId: pane.conversationId,
+        hydrateHow: pane.hydrateHow,
+        priorConversationId: pane.priorConversationId,
+        decisionReason: 'page:receipt-mounted'
       }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
       if (host) {
         lastOutcome = 'card';
@@ -2493,6 +2702,7 @@
           })
         });
       }
+      await clearReason(pane, 'page:receipt-mounted');
       return;
     }
 
@@ -2523,6 +2733,21 @@
           else verifyMount.appendChild(host);
         }
         lastOutcome = 'card';
+        const held = verifyMount && verifyMount.querySelector('[data-glance-verifying]');
+        if (held) {
+          stampCard(held, {
+            messageId: ctx.messageId,
+            itemId: pane.itemId,
+            conversationId: pane.conversationId,
+            subject: pane.subject,
+            hydrateHow: pane.hydrateHow,
+            priorConversationId: pane.priorConversationId,
+            intent: { label: 'Verifying' },
+            process: { id: 'verify', steps: [] },
+            decisionReason: 'shown'
+          }, 'shown');
+        }
+        await clearReason(pane, 'shown');
         return;
       }
       const verifying = verifyMount && verifyMount.querySelector('.flow-chip-host[data-glance-verifying]');
@@ -2535,6 +2760,7 @@
     if (livePromise) {
       if (mountPoint() && paintOutlookTodoReceipt(mountPoint(), livePromise)) {
         dbg('decision', { shown: true, reason: 'page:promise-proof', subject: pane.subject });
+        await clearReason(pane, 'page:promise-proof');
         return;
       }
       await pageReason('page:same-promise', pane);
@@ -2566,7 +2792,7 @@
     lastOutcome = 'card';
     dbg('decision', { shown: true, label: ctx.intent && ctx.intent.label });
     dbg('rendered', { messageId: ctx.messageId, label: ctx.intent && ctx.intent.label });
-    await clearReason(pane);
+    await clearReason(pane, 'shown');
 
     await FlowStorage.appendLog({
       kind: 'shown',
@@ -2726,10 +2952,11 @@
       Object.keys(hydrateCache).forEach((k) => { delete hydrateCache[k]; });
     }
     hydratePane.mailKey = mailKey;
+    const priorConversationId = pane.priorConversationId || pane.conversationId || null;
     const conv = String(pane.conversationId || '').trim();
     const item = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId) : '';
     if (!conv && !item) return pane;
-    const key = item + '|' + conv + '|' + (pane.receivedDateTime || '') + '|' + (pane.subject || '');
+    const key = String(mailEpoch) + '|' + item + '|' + conv + '|' + (pane.receivedDateTime || '') + '|' + (pane.subject || '');
     if (hydrateCache[key]) return Object.assign(pane, hydrateCache[key]);
     const select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,conversationId';
     let rows = [];
@@ -2741,20 +2968,40 @@
       const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate', null);
       rows = body && Array.isArray(body.value) ? body.value : [];
     }
+    let hydrateHow = item ? 'item' : (rows.length ? 'conversation' : 'none');
     let subjectFallback = false;
     if (!rows.length && pane.subject) {
       const bySubject = await graphJson('/me/messages?$filter=' + encodeURIComponent(subjectFilter(pane.subject)) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate-subject', null);
       const raw = bySubject && Array.isArray(bySubject.value) ? bySubject.value : [];
-      rows = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.subjectFallbackRows === 'function')
+      const narrowed = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.subjectFallbackRows === 'function')
         ? FlowOwaParse.subjectFallbackRows(pane, raw)
         : [];
+      const pool = narrowed.length ? narrowed : raw;
       subjectFallback = true;
+      if (pool.length === 1) {
+        rows = pool;
+        hydrateHow = 'subject-fallback';
+      } else {
+        const want = String(pane.subject).trim().toLowerCase();
+        const named = pool.filter((r) => String(r.subject || '').trim().toLowerCase() === want);
+        if (named.length === 1) {
+          rows = named;
+          hydrateHow = 'subject-unique';
+        } else {
+          rows = [];
+          hydrateHow = 'none';
+        }
+      }
     }
-    if (!rows.length) return pane;
+    if (!rows.length) {
+      const empty = { hydrateHow: hydrateHow, priorConversationId: priorConversationId };
+      hydrateCache[key] = empty;
+      return Object.assign(pane, empty);
+    }
     const minute = minuteOf(pane.receivedDateTime);
     const alt = minuteOf(pane.clockAlt);
     let picked = rows.length === 1 ? rows[0] : null;
-    if (!picked && minute) {
+    if (!picked && minute && !subjectFallback) {
       const timed = rows.filter((r) => {
         const k = minuteOf(r.receivedDateTime);
         return k && (k === minute || (alt && k === alt));
@@ -2766,7 +3013,7 @@
       const named = rows.filter((r) => String(r.subject || '').trim().toLowerCase() === want);
       if (named.length === 1) picked = named[0];
     }
-    const patch = {};
+    const patch = { hydrateHow: hydrateHow, priorConversationId: priorConversationId };
     const froms = rows.map((r) => graphAddress(r.from)).filter(Boolean);
     if (!subjectFallback && needSender && froms.length && froms.every((e) => e === froms[0])) {
       patch.senderEmail = froms[0];
@@ -2774,6 +3021,10 @@
       if (!pane.senderName && name) patch.senderName = String(name).slice(0, 80);
     }
     if (picked) {
+      if ((hydrateHow === 'subject-fallback' || hydrateHow === 'subject-unique') && picked.id && !isConversationId(picked.id)) {
+        patch.itemId = String(picked.id);
+        if (picked.conversationId) patch.conversationId = String(picked.conversationId);
+      }
       if (!pane.subject && picked.subject) patch.subject = String(picked.subject);
       if (needAudience) {
         const gto = (picked.toRecipients || []).map(graphAddress).filter(Boolean);
@@ -3018,10 +3269,11 @@
       onDoIt: (host, chip, c) => onSuggestDoIt(host, chip, c),
       onDismiss: async (host) => {
         if (ignoreStaleClick(host)) return;
-        try { host.remove(); } catch (e) { /* already gone */ }
         const id = ctx.messageId;
         if (!id || typeof FlowStorage === 'undefined') return;
         const bag = await FlowStorage.get();
+        if (ignoreStaleClick(host)) return;
+        try { host.remove(); } catch (e) { /* already gone */ }
         const map = Object.assign({}, bag.suggestDismissals || {});
         map[id] = { at: Date.now() };
         await FlowStorage.set({ suggestDismissals: map });
@@ -3047,6 +3299,7 @@
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
       const step = (ctx.process.steps || [])[0] || {};
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
+      if (ignoreStaleClick(host)) return;
       const r = await send({
         type: 'flow:execute-action',
         payload: {
@@ -3199,7 +3452,7 @@
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
       await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
-      await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
+      if (!pageAlreadyDecided(pane)) await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
       return;
     }
     let bag = {};
@@ -3271,7 +3524,7 @@
       await clearReason(pane);
       return;
     }
-    await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
+    if (!pageAlreadyDecided(pane)) await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
   }
 
   function paintSkippedOnly(pane, skipped) {
@@ -3369,7 +3622,7 @@
     if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
     lastOutcome = 'card';
     lastKey = ctx.messageId + '|' + ((ctx.intent && ctx.intent.label) || '');
-    await clearReason(pane);
+    await clearReason(pane, 'page:still-open');
     return true;
   }
 
@@ -3448,7 +3701,9 @@
   } catch (e) { /* history is sealed */ }
   globalThis.__glanceOutlookPage = {
     rescan: () => { lastKey = ''; lastSig = ''; schedule(); },
-    openMailToken: () => openMailTokenNow()
+    openMailToken: () => openMailTokenNow(),
+    hydratePane: (pane) => hydratePane(pane),
+    bumpMailEpoch: (why) => bumpMailEpoch(why)
   };
   // A check from the panel (or another Outlook tab) lands here at once.
   try {

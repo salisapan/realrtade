@@ -1350,6 +1350,38 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     const intent = classify(text, extra);
     check('reply draft stays silent: ' + label, !intent.type && intent.quiet === 'hedge', { type: intent.type, quiet: intent.quiet });
   });
+  const heWhen = new Date('2026-10-14T09:00:00.000Z');
+  const heBody = 'שלום אבי,\nתוכל בבקשה להשיב ולאשר אם מעבר המשרד עדיין נקבע ל-20 באוקטובר?\nתודה,\nנועה';
+  const heCc = classify(heBody, {
+    to: ['avi.mizrahi@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Hebrew Cc-only reply addressed to Avi stays quiet:hedge', !heCc.type && heCc.quiet === 'hedge', { type: heCc.type, quiet: heCc.quiet });
+  check('שלום אבי names אבי', FlowIntent.openingAddressee(heBody) === 'אבי');
+  const heSend = classify('תוכל לשלוח לי את החוזה עד יום חמישי?', {
+    to: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Hebrew send-ask is not treated as a reply ask', heSend.type === FlowIntent.TYPES.REQUEST && heSend.quiet !== 'hedge', { type: heSend.type, quiet: heSend.quiet });
+  const namedCc = classify('Hi all,\nDana, can you reply and confirm whether your section of the board pack is final by October 20?\nEveryone else, no action needed.\nNoa', {
+    to: ['finance@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Dana named on Cc with a reply ask still offers', namedCc.type === FlowIntent.TYPES.REQUEST && namedCc.quiet !== 'noise' && namedCc.quiet !== 'hedge', { type: namedCc.type, quiet: namedCc.quiet });
 }
 
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');

@@ -160,6 +160,29 @@ const FlowDisplay = (() => {
     return !!(row && row.reason === 'page:already-handled');
   }
 
+  // Why not shown lists quiet decisions only. A page record for a mail
+  // removes the mailbox-sync line for that same id. A sync line is kept
+  // only for mail the page has not decided.
+  function whyNotShownRows(pageDiagnostics, diagnostics) {
+    const page = Array.isArray(pageDiagnostics) ? pageDiagnostics : [];
+    const claimed = Object.create(null);
+    page.forEach((d) => {
+      if (!d) return;
+      [d.id, d.priorConversationId, d.conversationId, d.messageId].forEach((id) => {
+        if (id) claimed[String(id)] = true;
+      });
+    });
+    const quiet = page.filter((d) => d && d.reason && d.verdict !== 'show');
+    const sync = [];
+    (Array.isArray(diagnostics) ? diagnostics : []).forEach((d) => {
+      if (!d || !d.reason) return;
+      const ids = [d.id, d.conversationId, d.messageId].filter(Boolean).map(String);
+      if (ids.some((id) => claimed[id])) return;
+      sync.push(Object.assign({ source: 'sync', verdict: 'quiet' }, d));
+    });
+    return quiet.concat(sync);
+  }
+
   return {
     SAVE_TITLE: SAVE_TITLE,
     genericLabel: genericLabel,
@@ -172,7 +195,8 @@ const FlowDisplay = (() => {
     commitmentTitle: commitmentTitle,
     isPanelReceipt: isPanelReceipt,
     dropOutlookLoopRow: dropOutlookLoopRow,
-    dropAlreadyHandledDiag: dropAlreadyHandledDiag
+    dropAlreadyHandledDiag: dropAlreadyHandledDiag,
+    whyNotShownRows: whyNotShownRows
   };
 })();
 
