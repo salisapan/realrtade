@@ -1,0 +1,25 @@
+name: Glance production build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  prod-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build the Outlook friends zip
+        run: python3 scripts/build-prod.py
+      - name: Build the full zip
+        run: python3 scripts/build-prod.py --flavor full
+      - name: Fail the job if either flavor breaks its store rules
+        run: python3 scripts/check-prod.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glance-prod-zip
+          path: dist/glance-*-prod.zip
+          if-no-files-found: error

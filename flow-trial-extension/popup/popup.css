@@ -316,6 +316,9 @@ main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anc
 .log-acts .primary.sm{margin-top:0}
 
 .ftr{padding:var(--space-4) var(--space-5); border-top:1px solid var(--line); font-size:.68rem; color:var(--ink-3); text-align:center; line-height:1.6}
+.ftr-links{margin:8px 0 0; display:flex; justify-content:center; gap:14px}
+.ftr-links a{color:var(--ink-2); text-decoration:underline; text-underline-offset:2px}
+.ftr-links a:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
 /* ---- Glance Pro card ---- */
 .pro-block{position:relative}

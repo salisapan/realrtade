@@ -597,7 +597,7 @@ core/ (the other ~60 modules)  one line each in `core/README.md`; a test keeps t
 core/ai-ladder.js       the second reading's policy: who may be asked about what, the Free/Pro allowance, the checks an answer passes
 core/resolution.js      multi-step resolution: receipts and the documents the person sends; closes only on a real delivery
 core/follow-up.js       Waiting on, promises, what a reply did to a loop, the true-close rules
-config/                 public switches: oauth.public.js, hybrid.public.js (off), ladder.public.js (on; the server decides)
+config/                 public switches: oauth.public.js, hybrid.public.js (off), ladder.public.js (on; the server decides), release.public.js (PRIVACY_URL, the report address, the store sha, BUILD_FLAVOR)
 
 src/storage.js          chrome.storage wrapper; log, calibration, weekly/badge counters — Glance's own persistence choices, not core logic
 src/chrome-storage-adapter.js  wires core/execution-memory.js's storage seam to chrome.storage.local

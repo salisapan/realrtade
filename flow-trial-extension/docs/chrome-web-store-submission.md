@@ -24,6 +24,13 @@ The four non-Google public client IDs live in `config/oauth.public.js` as
 `REPLACE_WITH_*` placeholders (see `docs/SETUP.md`). They are not part of
 this listing. Client secrets stay in Netlify. Do not invent IDs.
 
+The first friends upload is not this Google listing. It is the outlook
+flavor in `docs/RELEASE.md`: `python3 scripts/build-prod.py` writes
+`dist/glance-<version>-<sha7>-outlook-prod.zip`. That zip's required hosts
+are Outlook on the web, Microsoft Graph, Microsoft login, and
+`theflow-ai.com`. It has no Google host and no `oauth2` block. The
+permission table below is the full flavor (`--flavor full`).
+
 ## Store listing text
 
 ### Extension name
@@ -270,16 +277,13 @@ background/framing), not something to upload as-is.
 
 ## Manifest notes confirmed correct (no action needed)
 
-- **`manifest.json`'s pinned `key` field is intentional and correct** — it
-  keeps the extension ID (`dnjhplgmnkabbjogfpbhofjedlkehkai`) stable across
-  reloads and across the eventual Store listing. That exact ID is what
-  Google's own OAuth Client ID (the live connector — see `README.md`'s "Set
-  up Google" section, step 4's "Item ID") is registered against, and it's
-  also baked into the four non-Google connectors' OAuth redirect URLs even
-  though they're out of scope for this listing today. **Do not remove this
-  key before submitting** — removing it would let Chrome Web Store assign a
-  different ID and break Google sign-in along with every other connector's
-  redirect.
+- **`manifest.json`'s pinned `key` field stays in the source tree.** It
+  keeps an unpacked reload on `dnjhplgmnkabbjogfpbhofjedlkehkai`. The store
+  package is a different file: `scripts/build-prod.py` omits `key`, because
+  Unlisted item `lbihckfmoffgjjlnneoeaehbhoonfenh` already has its id.
+  Putting `key` into that zip fails `scripts/check-prod.py`. See `RELEASE.md`.
+  The Chrome-extension OAuth client has to be bound to that store item id,
+  not only to the unpacked id.
 - `chrome.tabs.create()` in `background.js` does not require the `"tabs"`
   permission (only reading cross-tab data would) — no permission gap there.
 - Icons (16/48/128) are present and correctly sized.
