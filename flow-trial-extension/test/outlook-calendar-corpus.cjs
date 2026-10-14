@@ -16,11 +16,23 @@ const Cal = vm.runInContext('FlowOutlookCalendar', sandbox);
 const Cfg = vm.runInContext('FlowOutlookConfig', sandbox);
 
 // A number, not an outer Date: classify runs in a vm, and instanceof Date
-// fails across that boundary. After 2026-10-08 a live Date.now() would mark
-// the gate day as past and drop dateIso.
-const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0).getTime();
-const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
-const HE = 'שים את glance-pricing-q4.pdf ביומן מחר (8 באוקטובר 2026) בשעה 10:00.';
+// fails across that boundary. The day is tomorrow on the run clock, so a
+// later calendar day cannot mark the gate as past.
+const noon = new Date();
+noon.setHours(12, 0, 0, 0);
+const GATE_NOW = noon.getTime();
+const tomorrow = new Date(noon.getTime());
+tomorrow.setDate(tomorrow.getDate() + 1);
+function isoDay(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const TOMORROW = isoDay(tomorrow);
+const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const HE_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+const EN_WHEN = EN_MONTHS[tomorrow.getMonth()] + ' ' + tomorrow.getDate() + ', ' + tomorrow.getFullYear();
+const HE_WHEN = tomorrow.getDate() + ' ב' + HE_MONTHS[tomorrow.getMonth()] + ' ' + tomorrow.getFullYear();
+const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (' + EN_WHEN + ') at 10:00.';
+const HE = 'שים את glance-pricing-q4.pdf ביומן מחר (' + HE_WHEN + ') בשעה 10:00.';
 const FILE = { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' };
 
 let failures = 0;
@@ -41,16 +53,17 @@ console.log('\n--- the gate sentence is a calendar hold, or silence ---\n');
   check('one Drive file is a file-on-hold calendar step',
     hold.move === 'hold' && hold.process && hold.process.id === 'file-on-hold' &&
     hold.process.steps.length === 1 && hold.process.steps[0].kind === 'calendar' &&
-    hold.params.dateIso === '2026-10-08' && hold.params.hour === 10 && hold.params.minute === 0 &&
+    hold.params.dateIso === TOMORROW && hold.params.hour === 10 && hold.params.minute === 0 &&
     hold.params.fileTerm === 'glance-pricing-q4.pdf' && hold.params.requireTime === true,
     hold);
   const he = decide(HE, { fileMatch: 'one' });
-  check('Hebrew ביומן is the same hold', he.move === 'hold' && he.fileTerm === 'glance-pricing-q4.pdf', he);
-  check('a hedge stays silent', decide('Maybe put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.', { fileMatch: 'one' }).move === 'silent');
+  check('Hebrew ביומן is the same hold', he.move === 'hold' && he.fileTerm === 'glance-pricing-q4.pdf' && he.params && he.params.dateIso === TOMORROW, he);
+  check('a hedge stays silent', decide('Maybe put the glance-pricing-q4.pdf file on my calendar tomorrow (' + EN_WHEN + ') at 10:00.', { fileMatch: 'one' }).move === 'silent');
   check('zero files stay silent', decide(EN, { fileMatch: 'none' }).move === 'silent');
   check('two files stay silent', decide(EN, { fileMatch: 'many' }).move === 'silent');
-  check('a generic file stays silent', decide('Put the file on my calendar tomorrow (Oct 8, 2026) at 10:00.', { fileMatch: 'one' }).move !== 'hold');
-  check('no clock stays silent', decide('Put the glance-pricing-q4.pdf file on my calendar on October 8, 2026.', { fileMatch: 'one' }).move === 'silent');
+  check('a generic file stays silent', decide('Put the file on my calendar tomorrow (' + EN_WHEN + ') at 10:00.', { fileMatch: 'one' }).move !== 'hold');
+  const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  check('no clock stays silent', decide('Put the glance-pricing-q4.pdf file on my calendar on ' + FULL_MONTHS[tomorrow.getMonth()] + ' ' + tomorrow.getDate() + ', ' + tomorrow.getFullYear() + '.', { fileMatch: 'one' }).move === 'silent');
   check('a meeting with no file is not this close', decide('Can we meet tomorrow at 10:00 to go over the rollout?').move === 'ignore');
   check('a file asked before a meeting is not this close', decide("Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?").move === 'ignore');
 }
@@ -58,13 +71,13 @@ console.log('\n--- the gate sentence is a calendar hold, or silence ---\n');
 console.log('\n--- the event body carries the file link and invites nobody ---\n');
 {
   const body = Cal.eventBody({
-    dateIso: '2026-10-08', hour: 10, minute: 0, timeZone: 'UTC',
+    dateIso: TOMORROW, hour: 10, minute: 0, timeZone: 'UTC',
     fileName: FILE.name, fileUrl: FILE.url, quote: EN
   });
   check('subject is the file, start is 10:00, end is 30 minutes later',
     body && body.subject === 'glance-pricing-q4.pdf' &&
-    body.start.dateTime === '2026-10-08T10:00:00' && body.start.timeZone === 'UTC' &&
-    body.end.dateTime === '2026-10-08T10:30:00', body);
+    body.start.dateTime === TOMORROW + 'T10:00:00' && body.start.timeZone === 'UTC' &&
+    body.end.dateTime === TOMORROW + 'T10:30:00', body);
   check('the description has the sentence and the file link',
     body && body.body.contentType === 'Text' && body.body.content.indexOf(EN) === 0 &&
     body.body.content.indexOf('File: glance-pricing-q4.pdf') > 0 &&
@@ -73,9 +86,9 @@ console.log('\n--- the event body carries the file link and invites nobody ---\n
     body && body.body.content.indexOf('https://drive.google.com/file/d/f1/view') > 0 &&
     Array.isArray(body.attendees) && body.attendees.length === 0 &&
     body.isOnlineMeeting !== true, body && { attendees: body.attendees, online: body.isOnlineMeeting });
-  check('a missing link is not an event', Cal.eventBody({ dateIso: '2026-10-08', hour: 10, minute: 0, fileName: FILE.name }) === null);
-  check('an http link is not an event', Cal.eventBody({ dateIso: '2026-10-08', hour: 10, minute: 0, fileName: FILE.name, fileUrl: 'http://drive.google.com/file/d/f1/view' }) === null);
-  check('a missing clock is not an event', Cal.eventBody({ dateIso: '2026-10-08', fileName: FILE.name, fileUrl: FILE.url }) === null);
+  check('a missing link is not an event', Cal.eventBody({ dateIso: TOMORROW, hour: 10, minute: 0, fileName: FILE.name }) === null);
+  check('an http link is not an event', Cal.eventBody({ dateIso: TOMORROW, hour: 10, minute: 0, fileName: FILE.name, fileUrl: 'http://drive.google.com/file/d/f1/view' }) === null);
+  check('a missing clock is not an event', Cal.eventBody({ dateIso: TOMORROW, fileName: FILE.name, fileUrl: FILE.url }) === null);
   const undo = Cal.undoRequest('AAMkAG-ev1');
   check('undo deletes that one event', undo && undo.method === 'DELETE' && undo.path === '/me/events/AAMkAG-ev1', undo);
   check('undo refuses a path', Cal.undoRequest('ev/1') === null && Cal.undoRequest('') === null);

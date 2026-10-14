@@ -291,6 +291,7 @@ const FlowStepListView = (() => {
       if (hold) {
         hold.addEventListener('click', function (e) {
           e.preventDefault();
+          if (o.onHold && o.onHold() === false) return;
           root.setAttribute('data-glance-held', '1');
         });
       }

@@ -770,7 +770,7 @@
     FlowChipHost.showDraftReceipt(host, {
       written: written,
       url: r.url || r.where,
-      onUndo: async () => {
+      onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, outlookImmutableId: ctx.outlookImmutableId === true });
         if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
@@ -785,7 +785,7 @@
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
-      }
+      })
     });
     } finally {
       doItInFlight = false;
@@ -819,7 +819,7 @@
   }
 
   function readingScope(mount) {
-    return document.querySelector('#ReadingPaneContainerId') || mount || document;
+    return openMailRoot() || mount || document;
   }
 
   // One Handled receipt for this message. A second copy, in the header or
@@ -838,17 +838,58 @@
     return kept;
   }
 
-  // URL id plus the subject heading. The body can change before a scan
-  // finishes; the previous card has to leave in that same turn.
+  // The open mail, on the layouts OWA actually ships. #ReadingPaneContainerId
+  // is one of them. A missing or throwing selector is not "no mail open".
+  function openMailRoot() {
+    const sels = [
+      '#ReadingPaneContainerId',
+      '[data-testid="ReadingPane"]',
+      '[data-app-section="ReadingPane"]',
+      '[data-app-section="ConversationContainer"]',
+      '.ReadingPaneContents',
+      '[role="main"]'
+    ];
+    for (let i = 0; i < sels.length; i++) {
+      try {
+        const n = document.querySelector(sels[i]);
+        if (n) return n;
+      } catch (e) { /* this layout does not have that selector */ }
+    }
+    try {
+      if (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.readingPaneRoots === 'function') {
+        const roots = FlowOwaParse.readingPaneRoots(document) || [];
+        const body = roots[0];
+        if (!body) return null;
+        const up = body.closest && (body.closest('[role="main"]') || body.closest('[data-app-section="ReadingPane"]'));
+        return up || body;
+      }
+    } catch (e) { /* roots unavailable */ }
+    return null;
+  }
+
+  function headingSubject(root) {
+    if (!root || !root.querySelector) return '';
+    let heading = null;
+    try { heading = root.querySelector('[role="heading"]'); } catch (e) { heading = null; }
+    return heading ? String(heading.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180) : '';
+  }
+
+  // A message id in the address is the open mail. The subject heading is
+  // not part of that token: editing the subject is not a mail switch.
+  // A conversation address has no message id, so the heading still
+  // distinguishes one mail in that conversation from the next.
   function openMailTokenNow() {
     let href = '';
-    let root = null;
     try { href = location.href; } catch (e) { href = ''; }
-    try { root = document.querySelector('#ReadingPaneContainerId'); } catch (e) { return ''; }
     const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? (FlowOwaParse.urlIds(href) || {}) : {};
-    const heading = root && root.querySelector('[role="heading"]');
-    const subject = heading ? String(heading.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180) : '';
-    return [ids.itemId || '', ids.conversationId || '', ids.raw || '', subject].join('|');
+    if (ids.kind === 'message' && ids.itemId) return 'msg|' + String(ids.itemId);
+    const root = openMailRoot();
+    const subject = headingSubject(root);
+    if (ids.kind === 'conversation' && (ids.conversationId || ids.raw)) {
+      return 'conv|' + String(ids.conversationId || ids.raw) + '|' + subject;
+    }
+    if (!root && !subject && !ids.raw) return '';
+    return 'pane|' + String(ids.raw || '') + '|' + subject;
   }
 
   function clearOpenCards() {
@@ -902,24 +943,37 @@
     return true;
   }
 
-  // The card records the open mail it was painted for. A Graph message id
-  // and the conversation id are the same mail, so the click compares that
-  // token, not the two spellings. A card with no token still runs.
+  // The card records the open mail it was painted for. No token on the
+  // card, or no open mail now, never executes. A different token is a
+  // click meant for a mail that is no longer open.
   function ignoreStaleClick(host) {
     const bound = host && host.getAttribute && host.getAttribute('data-glance-open');
-    if (!bound) return false;
     const now = openMailTokenNow();
-    if (!now || now === '|||' || bound === now) return false;
-    try { console.info('Glance: stale card click ignored', bound); } catch (e) { /* console gone */ }
+    if (bound && now && bound === now) return false;
+    try {
+      console.info(bound ? 'Glance: stale card click ignored' : 'Glance: card with no open-mail token ignored', bound || '');
+    } catch (e) { /* console gone */ }
     return true;
+  }
+
+  function guardedUndo(host, fn) {
+    return async function () {
+      if (ignoreStaleClick(host)) return { ok: false };
+      return fn();
+    };
   }
 
   function injectCard(mount, ctx, handlers) {
     noteOpenMail();
     if (!renderLive()) return null;
-    const host = FlowChipHost.inject(mount, ctx, handlers);
+    const src = handlers || {};
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: src.onDoIt,
+      onDismiss: src.onDismiss,
+      onHold: function (held) { return !ignoreStaleClick(held); }
+    });
     const token = openMailTokenNow();
-    if (host && token && token !== '|||') host.setAttribute('data-glance-open', token);
+    if (host && token) host.setAttribute('data-glance-open', token);
     return host;
   }
 
@@ -994,7 +1048,10 @@
       view.rel = 'noopener';
       actionsRow.appendChild(view);
     }
+    const openToken = openMailTokenNow();
+    if (openToken) host.setAttribute('data-glance-open', openToken);
     undo.addEventListener('click', () => {
+      if (ignoreStaleClick(host)) return;
       undo.textContent = 'Undoing…';
       undo.disabled = true;
       send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }).then(async (result) => {
@@ -1132,13 +1189,13 @@
       process: { name: 'Reply', steps: [] },
       intent: { label: draft.label || 'Reply draft ready' },
       messageId: draft.messageId
-    }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
+    }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
     if (!host) return false;
     lastOutcome = 'card';
     FlowChipHost.showDraftReceipt(host, {
       written: draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.',
       url: draft.url || draft.where,
-      onUndo: async () => {
+      onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref });
         if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(draft.messageId, draft.ref);
@@ -1149,7 +1206,7 @@
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
-      }
+      })
     });
     return true;
   }
@@ -1551,6 +1608,7 @@
   }
 
   async function onHoldingDoIt(host, chip, ctx) {
+    if (ignoreStaleClick(host)) return;
     const chain = ctx.chain || {};
     const holding = chain.holding && chain.holding.text;
     if (!holding || !ctx.sender || !ctx.sender.email) {
@@ -1599,7 +1657,7 @@
       status: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
       written: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
       url: r.url || r.where,
-      onUndo: async () => {
+      onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
         if (u && u.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
           await FlowStorage.updateWatch(ctx.threadId, { status: 'stopped', resolvedBy: 'undo' });
@@ -1609,7 +1667,7 @@
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
-      }
+      })
     });
   }
 
@@ -1719,6 +1777,7 @@
   }
 
   async function onDismiss(host, ctx) {
+    if (ignoreStaleClick(host)) return;
     host.remove();
     if (!ctx || !ctx.messageId) return;
     await FlowStorage.appendLog({
@@ -1804,7 +1863,7 @@
   }
 
   function calendarUndoHandler(host, messageId, ref) {
-    return async () => {
+    return guardedUndo(host, async () => {
       const u = await send({ type: 'flow:undo-action', connectorId: 'outlookCalendar', ref: ref });
       if (!(u && u.ok)) return { ok: false };
       if (typeof FlowStorage.markOutlookCalendarUndone === 'function') {
@@ -1825,7 +1884,7 @@
       try { host.remove(); } catch (e) { /* already gone */ }
       schedule();
       return { ok: true, written: (u && u.written) || 'Calendar event removed.', reopen: true };
-    };
+    });
   }
 
   // Handled stays on the open message. A settled card from this click is left
@@ -1856,7 +1915,7 @@
       messageId: messageId,
       process: { name: 'File on hold', steps: [{ kind: 'calendar' }] },
       intent: { label: row.label || 'On your calendar' }
-    }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
+    }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
     if (!host) return;
     host.setAttribute('data-glance-chain', 'calendar-hold');
     host.setAttribute('data-glance-message', messageId || '');
@@ -2026,6 +2085,7 @@
   }
 
   async function onCalendarDoIt(host, chip, ctx) {
+    if (ignoreStaleClick(host)) return;
     doItInFlight = true;
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     let wrote = null;
@@ -2413,14 +2473,14 @@
         process: { name: 'Reply', steps: [{ kind: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
         messageId: entry.messageId
-      }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
+      }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
       if (host) {
         lastOutcome = 'card';
         dbg('rendered', { receipt: true, messageId: entry.messageId });
         FlowChipHost.showDraftReceipt(host, {
           written: entry.label || 'Reply draft ready in Outlook Drafts. Not sent.',
           url: entry.url || entry.where,
-          onUndo: async () => {
+          onUndo: guardedUndo(host, async () => {
             const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: entry.ref });
             if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
               await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
@@ -2430,7 +2490,7 @@
             try { host.remove(); } catch (e) { /* already gone */ }
             schedule();
             return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
-          }
+          })
         });
       }
       return;
@@ -2957,6 +3017,7 @@
     return injectCard(mount, ctx, {
       onDoIt: (host, chip, c) => onSuggestDoIt(host, chip, c),
       onDismiss: async (host) => {
+        if (ignoreStaleClick(host)) return;
         try { host.remove(); } catch (e) { /* already gone */ }
         const id = ctx.messageId;
         if (!id || typeof FlowStorage === 'undefined') return;
@@ -3385,7 +3446,10 @@
       };
     }
   } catch (e) { /* history is sealed */ }
-  globalThis.__glanceOutlookPage = { rescan: () => { lastKey = ''; lastSig = ''; schedule(); } };
+  globalThis.__glanceOutlookPage = {
+    rescan: () => { lastKey = ''; lastSig = ''; schedule(); },
+    openMailToken: () => openMailTokenNow()
+  };
   // A check from the panel (or another Outlook tab) lands here at once.
   try {
     chrome.runtime.onMessage.addListener((msg) => {

@@ -2,14 +2,17 @@
 // Harvesting that parent put the Cc address in pane.to, so the draft card
 // offered while Graph recipients (Why not shown) stayed quiet:hedge.
 // Run: node test/cc-only-recipients-corpus.cjs
-// Needs jsdom (not a dependency of this repo): npm i --no-save jsdom
+// Needs jsdom, a devDependency of this package. Missing jsdom is a failed run.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }
-catch (e) { console.log('SKIPPED: jsdom not available'); process.exit(0); }
+catch (e) {
+  console.error('FAIL: jsdom is not installed. The Cc-only regression cannot run.');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..');
 const { FlowOwaParse } = require(path.join(ROOT, 'core', 'owa-parse.js'));
