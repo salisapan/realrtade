@@ -129,6 +129,16 @@ ADDENDUM 2026-10-14. Each run also times setup-to-first-close on a fresh profile
 ADDENDUM 2026-10-14. Tie-breaker: when two rows are in the same state, prefer the one that the latest docs/glance-ai/reports/listener/ report names most, if that report exists. Never edit docs/glance-ai/loops-mcp.md, core/loop-bridge.js or scripts/glance-loops-mcp.cjs. A new connector's closes feed the loops bridge only after the owner approves wiring it.
 ```
 
+**Connector builder, MCP pilot (row 73). Append, in addition to the tie-breaker above:**
+
+```
+ADDENDUM 2026-10-14 (open-tasks row 73, the owner said "okay" to the direction). Glance as a CLIENT of a vendor's own remote MCP server, as one generic adapter. Steps, one per run, after the foundation row of the queue:
+1. Write docs/glance-ai/connectors/mcp-client.md: the design. Verify from the vendors' and the MCP specification's official pages (cite each): remote transport, OAuth with PKCE, dynamic client registration and whether the extension's redirect URI (https://<id>.chromiumapp.org) is accepted, tool annotations. Never from memory.
+2. Then a portable, dormant core/mcp-client.js (no chrome.*, no DOM, no network; the worker would inject the transport) with a corpus test: a fixed allowlist of tools per close type chosen by Glance's own code and never by a model; tool names, descriptions and results are untrusted text and never become instructions; the tool schema is pinned and any drift means silence; a close is a ProofOfClose with fetchedBack true only after a read through the vendor's read tool; no read tool means "prepared", never "closed"; the learning hook event carries no text, address or title.
+3. Pilot on ONE row of connectors-queue.md (Linear, row 4), mocked vendor only.
+Never edit manifest.json, privacy text, flow-landing/ or turn anything on: those stay a draft PR for the owner's «מאשר». This is not Glance's own MCP server (row 71): never mix the two, never let an agent that reads Glance's loops be a path to a vendor write.
+```
+
 ## 5. Where each of the seven earlier ideas lives now
 
 | Idea | Where |
@@ -142,3 +152,16 @@ ADDENDUM 2026-10-14. Tie-breaker: when two rows are in the same state, prefer th
 | Weekly conductor | `conductor` |
 | The bold bet (loops as MCP) | Built dormant: `docs/glance-ai/loops-mcp.md`; watched by `mcp-watch` |
 | (new) Collision referee | `referee` |
+
+## 6. Setup sheet (what to enter in the dashboard)
+
+Create each at cursor.com/automations. Repository: `salisapan/realrtade`. Branch it starts from: `claude/install-uiux-pro-max-skill-a4agox`. Pick the Asia/Jerusalem time zone if the form offers it; otherwise use UTC (Israel is UTC+3 until 2026-10-25, then UTC+2, so the UTC hour moves by one).
+
+| Automation | Cron (Israel time) | Tools it needs | Prompt |
+|---|---|---|---|
+| referee | `10 7 * * *` | shell with `gh` (read only) | preamble + referee |
+| listener | `0 8 * * 0` | X tools, web search | preamble + listener |
+| conductor | `0 9 * * 0` | shell with `gh` (read only) | preamble + conductor |
+| mcp-watch | `0 8 * * 1` | web fetch | preamble + mcp-watch |
+
+The three addenda and the MCP pilot addendum are not new automations: open the existing Claude routine (Red team, Scenario rehearsal, Breadth builder, Connector builder) and append the text at its end. Start with `referee` alone for a week, then add the others.
