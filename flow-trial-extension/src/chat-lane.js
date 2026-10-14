@@ -1,0 +1,71 @@
+// Shared by the chat content scripts. Reads a decision from src/chat-draft.js,
+// asks the worker for sources the person already connected, and inserts one draft
+// through src/chat-compose.js. This file does not press Enter or click Send.
+// A fact ask uses the existing flow:fact-sources message. A place ask uses
+// flow:chat-evidence, which returns locations only.
+const FlowChatLane = (() => {
+  function ask(type, payload) {
+    return new Promise((resolve) => {
+      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+        resolve({ ok: false, reason: 'no-runtime' });
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage({ type: type, payload: payload }, (r) => {
+          if (chrome.runtime.lastError) { resolve({ ok: false, reason: 'runtime' }); return; }
+          resolve(r || { ok: false });
+        });
+      } catch (e) { resolve({ ok: false, reason: 'runtime' }); }
+    });
+  }
+
+  function bagFromFact(detected, reply) {
+    const fact = detected.fact || {};
+    const kind = fact.sourceKind === 'doc' ? 'docs' : 'sheets';
+    const connected = { sheets: kind === 'sheets', docs: kind === 'docs', calendar: false, drive: false, thread: true, gmail: false, outlook: false };
+    if (!reply || reply.ok === false || reply.truncated || reply.reason === 'not-connected') {
+      return { connected, facts: null, events: null };
+    }
+    let match = null;
+    if (typeof FlowFactReply !== 'undefined' && typeof FlowFactReply.resolve === 'function') {
+      match = FlowFactReply.resolve(fact, reply.sources || [], { truncated: false });
+    }
+    const facts = match && match.value != null
+      ? [{ value: String(match.value), source: kind, name: match.fileName || null, id: match.fileId || null }]
+      : [];
+    return { connected, facts, events: [] };
+  }
+
+  // box is the open chat's input. input.evidence skips the worker (tests).
+  // A missing box, a veto, or two answers leaves the page untouched.
+  async function draftInto(box, input) {
+    const i = input || {};
+    if (typeof FlowChatDraft === 'undefined' || typeof FlowChatCompose === 'undefined') {
+      return { ok: false, sends: false, reason: 'missing' };
+    }
+    const detected = FlowChatDraft.detect(i.text, i);
+    let evidence = Object.prototype.hasOwnProperty.call(i, 'evidence') ? i.evidence : null;
+    if (evidence == null && detected && detected.fetch) {
+      if (detected.kind === 'fact') {
+        const reply = await ask('flow:fact-sources', detected.fact || {});
+        evidence = bagFromFact(detected, reply);
+      } else {
+        const reply = await ask('flow:chat-evidence', detected.fetch);
+        evidence = (reply && reply.evidence) || { connected: { calendar: false }, events: null };
+      }
+    }
+    const judged = FlowChatDraft.judge(Object.assign({}, i, { evidence: evidence || {}, detected: detected }));
+    if (!judged || judged.sends !== false || !judged.show || !judged.draft) {
+      return { ok: false, sends: false, reason: (judged && judged.reason) || 'silence', judged: judged };
+    }
+    const wrote = FlowChatCompose.insertDraft(box, judged.draft);
+    wrote.sends = false;
+    wrote.judged = judged;
+    return wrote;
+  }
+
+  return { draftInto };
+})();
+
+if (typeof module !== 'undefined') module.exports = { FlowChatLane };
+else if (typeof globalThis !== 'undefined') globalThis.FlowChatLane = FlowChatLane;
