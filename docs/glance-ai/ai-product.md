@@ -88,9 +88,9 @@ Today the site promises judgment on the device, with one masked sentence for the
 | # | Decision | Why it blocks |
 |---|---|---|
 | 1 | ~~Approve this spec, and the identity wording in §8~~ **done 2026-10-09** | - |
-| 2 | Where Glance cloud model is served, and the monthly spend cap | Tier 2 cannot go live without a host |
-| 3 | 200 owner-verified labels (`glance-ai/labeling/`, row 60) | Promotion of any model and any fine-tune needs them |
-| 4 | The new privacy and consent copy (§6) | Nothing leaves the device under the new rule before it |
+| 2 | ~~Where Glance cloud model is served~~ **approved 2026-10-14**: a pay-per-use GPU host running our own copy of the model; the cap amount (below $50) still to be set; not rented yet | Tier 2 cannot go live without a host |
+| 3 | 200 owner-verified labels (`glance-ai/labeling/`, row 60): now from the owner's own use, path A of `learning-from-use.md` (2026-10-13) | Promotion of any model and any fine-tune needs them |
+| 4 | ~~The new privacy and consent copy (§6)~~ **approved 2026-10-14** (`docs/glance-ai/proposals/2026-10-12-owner-decisions.md` §2); it ships in the commit that wires the switch, off, and goes live only with a Netlify «מאשר» | Nothing leaves the device under the new rule before it |
 | 5 | Free/Pro allowance for model-first reading, after M6 numbers | Cost per user |
 
 ## 8. Identity change (approved and applied 2026-10-09)

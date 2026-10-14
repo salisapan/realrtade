@@ -1,6 +1,6 @@
 # Three owner decisions for Glance's own model, ready to approve
 
-- **Status:** waiting on Sali for 1 and 2. Decision 3 is withdrawn 2026-10-14: the owner does not label by hand (decision 2026-10-11), and owner-verified labels now come from his own use (path A, `docs/glance-ai/learning-from-use.md`, approved 2026-10-13). Prepared 2026-10-12 after «תעשה הכל». Nothing in this file is switched on, deployed, rented or published.
+- **Status:** approved by Sali 2026-10-14 («מאשר הכל»): 1 (host type; the cap amount, below $50, still to be set, and nothing rented yet), 2 (the copy ships with the switch wiring, off), 3b (silence). Auto-merge rule approved; the `CLAUDE.md` lock text still needs the owner or David to apply it (a routine may not edit its own instructions). Decision 3 is withdrawn 2026-10-14: the owner does not label by hand (decision 2026-10-11), and owner-verified labels now come from his own use (path A, `docs/glance-ai/learning-from-use.md`, approved 2026-10-13). Prepared 2026-10-12 after «תעשה הכל». Nothing in this file is switched on, deployed, rented or published.
 - **Blocks:** `docs/glance-ai/ai-product.md` §7 rows 2, 3 and 4; `docs/open-tasks.md` rows 60 and 63.
 - **Switches that stay off until each answer:** `aiPrimary`, `aiUnderstandingV1` (`flow-trial-extension/core/understanding-router.js`, `core/understanding.js`).
 
