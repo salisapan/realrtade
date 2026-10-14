@@ -149,6 +149,12 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
   - Bug found and fixed while building: the server read values it cannot read (the placeholders) and lowercased the quotes, so a date never reached the device. Now the server keeps the quote as written and the device reads it.
   - Tests: `glance-assist/understand.test.cjs` (switch, cap, masking, allowance, refunds, wire format, and one pass device mask → server → device router).
   - Lab: `score-router.cjs --via-server`: 0/464 wrong Do It, 37/322 missed, 0/8 wrong dates, the same as in-process. 150/150 cloud reads answered; $0.06 counted against the cap.
+- 2026-10-14: **M5 built** (same branch, PR #128): `core/model-plan.js`, switch `aiPlanV1` off.
+  - A grounded model proposal becomes the product's own process (`actions.js` `planFor`), drawn by the steps list (`step-list.js` `rowsFor`).
+  - The plan gate allows only calendar, draft and task writes (never a send or a page action), requires an anchor that matches the proposal, and accepts only dates the device read.
+  - Each plan carries `doneWhen` (a sent reply, an event read back, the promised item arriving; never the draft or the task itself) and `carry` (when Glance looks again).
+  - Lab (`score-router.cjs`, Plans section): the 9 closes only the model found reach the screen. Before, 0/9 had a plan the steps list could draw. Now 9/9 are planned (Schedule It 3, Log It 4, Reply & Track 2), with 0 plan-gate refusals, 8/8 dated steps on the gold day, 0 send steps and 9/9 with a done-when. Anchor equals the gold step on 8/9 (the one miss is the existing wrong-action case).
+  - The owner decision on labels (§7 row 3) is now met by path A of `docs/glance-ai/learning-from-use.md`. The batch-001 ask is withdrawn: the owner does not label by hand.
 - 2026-10-12 review, red on the working-branch tip without this change:
   - `outlook-calendar-corpus` is still red (the `instanceof Date` defect, see 10-11).
   - `glance-ai/profile/test-heldout.cjs:36` expects the learned profile scorer at 58.3% (35/60) and gets 60.0% (36/60). It is green on the first parent of `f8f57a6` and red from the #118 merge, so the 0.9.41–0.9.55 engine moved one pair. The number needs re-pinning by the lab owner. It also stops `run-cpu-checks.sh` before its later steps; both M1/M2 scorers were run directly and pass.

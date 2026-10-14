@@ -20,6 +20,11 @@ No model was run. Spec labels. Tier 1 absent. Confidence not measured.
 - model:meeting-without-date: 1
 - gate:money-offer-acceptance: 1
 
+## Plans (M5)
+
+Model proposals on screen: 9. Planned into the product's own process: 9 ({"schedule":3,"log-it":4,"reply-track":2}); file saves left to suggest-save: 0; refused by the plan gate: {}.
+Anchor step equals the gold step: 8/9. Every dated step on the gold due day: 8/8. Send steps: 0. A done-when condition: 9/9. Drawn by the steps list (one row per step): 9/9.
+
 ## Server path
 
 Tier 2 went through `glance-assist/understand.js` (cached answer as the mock provider). Server answers: {"200":150}. Counted against the spend cap: $0.0600 at the default $0.0004 a read.

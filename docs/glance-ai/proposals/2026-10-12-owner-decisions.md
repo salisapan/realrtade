@@ -1,6 +1,6 @@
 # Three owner decisions for Glance's own model, ready to approve
 
-- **Status:** waiting on Sali. Prepared 2026-10-12 after «תעשה הכל». Nothing in this file is switched on, deployed, rented or published.
+- **Status:** waiting on Sali for 1 and 2. Decision 3 is withdrawn 2026-10-14: the owner does not label by hand (decision 2026-10-11), and owner-verified labels now come from his own use (path A, `docs/glance-ai/learning-from-use.md`, approved 2026-10-13). Prepared 2026-10-12 after «תעשה הכל». Nothing in this file is switched on, deployed, rented or published.
 - **Blocks:** `docs/glance-ai/ai-product.md` §7 rows 2, 3 and 4; `docs/open-tasks.md` rows 60 and 63.
 - **Switches that stay off until each answer:** `aiPrimary`, `aiUnderstandingV1` (`flow-trial-extension/core/understanding-router.js`, `core/understanding.js`).
 
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 1 | איפה המודל רץ ותקרת הוצאה | שרת GPU לפי שימוש, עם עותק של המודל שלנו בחשבון שלנו. תקרה: 50 דולר לחודש | «מאשר 1» או שינוי |
 | 2 | נוסח פרטיות והסכמה | הטיוטה למטה. הענן לא שומר טקסט, וההסכמה כבויה עד שהמשתמש מדליק | «מאשר 2» או תיקונים |
-| 3 | תוויות batch-001 | 14 תשובות מוכנות בטבלה למטה, לפי מה שה-CTO סימן | «מאשר 3», או למשל «מאשר 3 חוץ מ-7: לשתוק» |
+| ~~3~~ | ~~תוויות batch-001~~ **בוטל 14/10: התוויות יגיעו מהשימוש שלך (מסלול A)** | 14 תשובות מוכנות בטבלה למטה, לפי מה שה-CTO סימן | «מאשר 3», או למשל «מאשר 3 חוץ מ-7: לשתוק» |
 | 3ב | כלל: אישור סכום או תקציב (למשל «אישרנו 4,200») | לשתוק, ולא ליצור משימה. אין כאן בקשה ממך | «מאשר 3ב» או «משימה» |
 
 ## 1. איפה המודל רץ, ובכמה
@@ -73,7 +73,9 @@
 
 **מה אני אעשה אחרי «מאשר 2»:** אכניס את הנוסח לכל הקבצים בקומיט אחד, יחד עם חיבור המתג, כמו שדורש §6 במפרט. זה יהיה PR טיוטה בלי פריסה. הפריסה ל-Netlify מחכה ל«מאשר» נפרד, כמו היום.
 
-## 3. תוויות batch-001
+## 3. תוויות batch-001 (בוטל 14/10)
+
+**לא צריך לענות על הסעיף הזה.** ב-11/10 החלטת שאת לא מתייגת ידנית, וב-13/10 אישרת את מסלול A: תוויות מאומתות נוצרות מהפעולות שלך על הכרטיסים (אישור, עריכה, ביטול). הטבלה נשארת כאן לעיון בלבד. שאלה 3ב, הכלל על אישור סכום, עדיין פתוחה.
 
 19 מיילים. 14 מהם עם תשובה ברורה, ו-5 מסומנים "תלוי הקשר", אז הם לא נספרים ואין צורך לענות עליהם. ההמלצה היא מה שה-CTO סימן ב-08/10. חשוב לדעת: לפי הכלל של המעבדה, תווית נחשבת "מאומתת ע״י הבעלים" רק אם את אישרת אותה. לכן אני לא יכול לסמן אותן בשמך.
 

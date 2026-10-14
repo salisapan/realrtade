@@ -68,6 +68,8 @@ The same file's no-gate propose-only row on the v2 held-out is 3.7% (8/218) wron
 
 2026-10-13: the same run with Tier 2 through the Glance cloud server path (`glance-assist/understand.js`, mock provider = cached answers, `score-router.cjs --via-server`) gives the same numbers. 150/150 reads answered; $0.06 counted against the spend cap.
 
+2026-10-14 (M5, `core/model-plan.js`): the 9 model proposals on screen now get a plan. Before 0/9, now 9/9: Schedule It 3, Log It 4, Reply & Track 2. Every dated step on the gold day 8/8, 0 send steps, done-when 9/9.
+
 The strict gate treats a save proposal as unread (`suggest:attachments-unread`) because the case file has counts and names only. The SENSITIVITY row models declared files as 240KB PDFs. That row is not a result.
 
 ## Blocked

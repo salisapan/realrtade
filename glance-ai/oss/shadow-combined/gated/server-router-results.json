@@ -120,6 +120,23 @@
   "model:ask-without-date": 2,
   "gate:money-offer-acceptance": 1
  },
+ "plan": {
+  "shown": 9,
+  "planned": 9,
+  "fileSave": 0,
+  "rejected": {},
+  "anchorRight": 8,
+  "dated": 8,
+  "dateRight": 8,
+  "sendSteps": 0,
+  "doneWhen": 9,
+  "rows": 9,
+  "byProcess": {
+   "schedule": 3,
+   "log-it": 4,
+   "reply-track": 2
+  }
+ },
  "server": {
   "codes": {
    "200": 150

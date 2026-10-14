@@ -115,6 +115,34 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
   for (const c of cases) { const r = res[c.id]; if (r.tier === 2 && r.step === 'SILENT') reasons[r.reason] = (reasons[r.reason] || 0) + 1; }
   R.tier2SilentReasons = reasons;
   md += '\n## Why a Tier 2 answer stayed silent\n\n' + Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, v]) => `- ${k}: ${v}`).join('\n') + '\n';
+  // M5: every model proposal that reached the screen becomes a plan (core/model-plan.js, loaded the way the extension shares one scope).
+  {
+    const vm = require('vm');
+    const sb = { module: undefined, console };
+    vm.createContext(sb);
+    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'step-list.js', 'json-enforce.js', 'understanding.js', 'model-plan.js'])
+      vm.runInContext(fs.readFileSync(path.join(ROOT, 'flow-trial-extension/core', f), 'utf8'), sb, { filename: f });
+    const MP = vm.runInContext('FlowModelPlan', sb);
+    const pm = { shown: 0, planned: 0, fileSave: 0, rejected: {}, anchorRight: 0, dated: 0, dateRight: 0, sendSteps: 0, doneWhen: 0, rows: 0, byProcess: {} };
+    for (const c of cases) {
+      const r = res[c.id];
+      if (r.tier !== 2 || r.step === 'SILENT') continue;
+      pm.shown++;
+      const g = goldOf(c);
+      const x = MP.plan({ aiPlanV1: true }, r.proposal, { today: c.today, lang: c.lang, surface: c.surface === 'outlook' ? 'outlook' : 'gmail' });
+      if (!x.plan) { if (x.reason === 'file-save-is-suggest-save') pm.fileSave++; else pm.rejected[x.reason] = (pm.rejected[x.reason] || 0) + 1; continue; }
+      pm.planned++; pm.byProcess[x.plan.processId] = (pm.byProcess[x.plan.processId] || 0) + 1;
+      if (x.rows.length === x.plan.steps.length) pm.rows++;
+      if (x.plan.doneWhen && x.plan.doneWhen.kind) pm.doneWhen++;
+      pm.sendSteps += x.plan.steps.filter((s) => /send/i.test(s.kind)).length;
+      const anchorStep = { calendar: 'calendar', outlookCalendar: 'calendar', gmailDraft: 'draft', outlookDraft: 'draft', googleTask: 'task', outlookTask: 'task' }[x.plan.anchor];
+      if (anchorStep === g) pm.anchorRight++;
+      const ds = x.plan.steps.map((s) => s.params && s.params.dateIso).filter(Boolean);
+      if (c.gold.due && ds.length) { pm.dated++; if (ds.every((d) => d === c.gold.due)) pm.dateRight++; }
+    }
+    R.plan = pm;
+    md += `\n## Plans (M5)\n\nModel proposals on screen: ${pm.shown}. Planned into the product's own process: ${pm.planned} (${JSON.stringify(pm.byProcess)}); file saves left to suggest-save: ${pm.fileSave}; refused by the plan gate: ${JSON.stringify(pm.rejected)}.\nAnchor step equals the gold step: ${pm.anchorRight}/${pm.planned}. Every dated step on the gold due day: ${pm.dateRight}/${pm.dated}. Send steps: ${pm.sendSteps}. A done-when condition: ${pm.doneWhen}/${pm.planned}. Drawn by the steps list (one row per step): ${pm.rows}/${pm.planned}.\n`;
+  }
   if (VIA_SERVER) {
     const spent = [...serverStore.rows.entries()].filter(([k]) => k.startsWith('u-spend')).reduce((a, [, v]) => a + v, 0);
     R.server = { codes: serverCodes, spentMicroUsd: spent };

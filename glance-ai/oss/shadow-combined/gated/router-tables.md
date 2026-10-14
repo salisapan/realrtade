@@ -19,3 +19,8 @@ No model was run. Spec labels. Tier 1 absent. Confidence not measured.
 - gate:unsupported-kind:attach-to-invite: 1
 - model:meeting-without-date: 1
 - gate:money-offer-acceptance: 1
+
+## Plans (M5)
+
+Model proposals on screen: 9. Planned into the product's own process: 9 ({"schedule":3,"log-it":4,"reply-track":2}); file saves left to suggest-save: 0; refused by the plan gate: {}.
+Anchor step equals the gold step: 8/9. Every dated step on the gold due day: 8/8. Send steps: 0. A done-when condition: 9/9. Drawn by the steps list (one row per step): 9/9.
