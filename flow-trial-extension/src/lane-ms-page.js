@@ -17,14 +17,25 @@
     }
   }
 
+  function named(key) {
+    const fromGlobal = globalThis[key];
+    if (fromGlobal) return fromGlobal;
+    return binding(() => {
+      if (key === 'FlowOutlookContacts') return FlowOutlookContacts;
+      if (key === 'FlowOutlookWord') return FlowOutlookWord;
+      if (key === 'FlowOutlookExcel') return FlowOutlookExcel;
+      if (key === 'FlowTeamsChat') return FlowTeamsChat;
+      if (key === 'FlowOutlookSend') return FlowOutlookSend;
+      if (key === 'FlowOwaParse') return FlowOwaParse;
+      if (key === 'FlowStorage') return FlowStorage;
+      return undefined;
+    });
+  }
+
   function modules() {
-    return [
-      binding(() => FlowOutlookContacts),
-      binding(() => FlowOutlookWord),
-      binding(() => FlowOutlookExcel),
-      binding(() => FlowTeamsChat),
-      binding(() => FlowOutlookSend)
-    ].filter((mod) => mod && typeof mod.offer === 'function');
+    return ['FlowOutlookContacts', 'FlowOutlookWord', 'FlowOutlookExcel', 'FlowTeamsChat', 'FlowOutlookSend']
+      .map(named)
+      .filter((mod) => mod && typeof mod.offer === 'function');
   }
 
   function ensureStyle() {
@@ -42,8 +53,23 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
+  let cardHost = null;
+
   function mount() {
+    const host = cardHost && cardHost.isConnected ? cardHost : null;
+    if (host && host.parentNode) return host.parentNode;
     return document.getElementById('ReadingPaneContainerId') || document.body;
+  }
+
+  function place(card) {
+    const parent = mount();
+    const host = cardHost && cardHost.isConnected && cardHost.parentNode === parent ? cardHost : null;
+    if (host) {
+      if (host.nextSibling) parent.insertBefore(card, host.nextSibling);
+      else parent.appendChild(card);
+      return;
+    }
+    parent.appendChild(card);
   }
 
   function clearCard() {
@@ -75,7 +101,7 @@
   }
 
   function remember(entry) {
-    const store = binding(() => FlowStorage);
+    const store = named('FlowStorage');
     if (!entry || !store || typeof store.appendLog !== 'function') return;
     Promise.resolve(store.appendLog(entry)).catch(() => {});
   }
@@ -168,7 +194,7 @@
     undo.onclick = () => {
       const href = location.href;
       undo.disabled = true;
-      chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: connectorId, ref: ref }, (res) => {
+      chrome.runtime.sendMessage({ type: 'flow:lane-undo', connectorId: connectorId, ref: ref }, (res) => {
         if (location.href !== href) return;
         const err = chrome.runtime.lastError;
         if (err || !res || res.ok !== true) {
@@ -189,7 +215,7 @@
     const href = location.href;
     const messageId = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
     chrome.runtime.sendMessage({
-      type: 'flow:execute-action',
+      type: 'flow:lane-execute',
       payload: {
         connectorId: payload.connectorId,
         params: payload.params || {},
@@ -232,7 +258,7 @@
       });
       card.appendChild(button);
     }
-    mount().appendChild(card);
+    place(card);
   }
 
   function paintReceipt(row) {
@@ -249,11 +275,11 @@
     written.textContent = row.where ? ('In ' + row.where + '.') : '';
     card.appendChild(written);
     showUndo(card, row.ref, row.connectorId);
-    mount().appendChild(card);
+    place(card);
   }
 
   function readPane() {
-    const parse = binding(() => FlowOwaParse);
+    const parse = named('FlowOwaParse');
     if (!parse || typeof parse.readPane !== 'function') return null;
     try { return parse.readPane(document, location.href, {}) || null; } catch (e) { return null; }
   }
@@ -274,7 +300,7 @@
       const text = (pane.subject ? pane.subject + '\n' : '') + (pane.text || '');
       const ctx = { text: text, subject: pane.subject || '' };
       let state = null;
-      const store = binding(() => FlowStorage);
+      const store = named('FlowStorage');
       if (store && typeof store.get === 'function') {
         try { state = await store.get(); } catch (e) { state = null; }
       }
@@ -319,14 +345,20 @@
     schedule();
   }
 
-  function boot() {
-    if (!binding(() => FlowOwaParse) || !binding(() => FlowStorage)) {
-      setTimeout(boot, 50);
-      return;
+  let watching = false;
+
+  function attach(host) {
+    if (host && host.nodeType === 1) cardHost = host;
+    if (!named('FlowOwaParse')) return false;
+    if (watching) {
+      paneKey = '';
+      schedule();
+      return true;
     }
+    watching = true;
     watch();
+    return true;
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  globalThis.FlowLaneMsPage = { attach: attach };
 })();

@@ -92,11 +92,13 @@ async function makeDeps() {
 
 function laneId(msg) {
   if (!msg) return '';
-  if (msg.type === 'flow:execute-action') {
+  if (msg.type === 'flow:lane-execute' || msg.type === 'flow:execute-action') {
     const id = msg.payload && msg.payload.connectorId;
     return LANE_IDS[id] ? id : '';
   }
-  if (msg.type === 'flow:undo-action') return LANE_IDS[msg.connectorId] ? msg.connectorId : '';
+  if (msg.type === 'flow:lane-undo' || msg.type === 'flow:undo-action') {
+    return LANE_IDS[msg.connectorId] ? msg.connectorId : '';
+  }
   return '';
 }
 
@@ -105,7 +107,7 @@ async function dispatch(msg) {
   const mod = laneModule(id);
   if (!mod) return { ok: false, reason: 'connector-not-live' };
   const deps = await makeDeps();
-  if (msg.type === 'flow:undo-action') {
+  if (msg.type === 'flow:lane-undo' || msg.type === 'flow:undo-action') {
     if (typeof mod.undo !== 'function') return { ok: false, reason: 'no-undo' };
     return mod.undo(msg.ref || {}, deps);
   }

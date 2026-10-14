@@ -157,8 +157,8 @@ function boot(stripHook) {
   const lane = withHook.listeners[0];
   const replies = [];
   const ignored = lane({ type: 'flow:execute-action', payload: { connectorId: 'googleTasks' } }, {}, (r) => replies.push(r));
-  const claimed = lane({ type: 'flow:execute-action', payload: { connectorId: 'outlookWord' } }, {}, (r) => replies.push(r));
-  const undoClaimed = lane({ type: 'flow:undo-action', connectorId: 'outlookExcel' }, {}, (r) => replies.push(r));
+  const claimed = lane({ type: 'flow:lane-execute', payload: { connectorId: 'outlookWord' } }, {}, (r) => replies.push(r));
+  const undoClaimed = lane({ type: 'flow:lane-undo', connectorId: 'outlookExcel' }, {}, (r) => replies.push(r));
   const foreign = lane({ type: 'flow:build-stamp' }, {}, (r) => replies.push(r));
   check('a listener for another connector is left alone', ignored === undefined && foreign === undefined && replies.length === 0, replies);
   check('the lane listener claims only its own message types', claimed === true && undoClaimed === true);

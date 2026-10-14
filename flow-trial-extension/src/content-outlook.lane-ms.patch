@@ -1,0 +1,10 @@
+--- a/flow-trial-extension/src/content-outlook.js
++++ b/flow-trial-extension/src/content-outlook.js
+@@ -1139,6 +1139,7 @@
+       messageId: (ctx && (ctx.itemId || ctx.messageId)) || null
+     };
+     rememberDecision(record);
++    try { host.dispatchEvent(new CustomEvent('glance:outlook-card', { bubbles: true })); } catch (e) { /* lane listens; no listener changes nothing */ }
+     return record;
+   }
+ 
