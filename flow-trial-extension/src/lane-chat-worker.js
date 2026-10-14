@@ -1,6 +1,8 @@
-// Calendar locations for a chat draft. The service worker entry imports this
-// after background.js, which other open pull requests own. This file does not
-// edit that listener. It answers only flow:chat-evidence.
+// Calendar locations for a chat draft. This file is not loaded by the service
+// worker yet. After #144 merges, add this one line to the service worker:
+// importScripts('src/lane-chat-worker.js');
+//
+// It answers only flow:chat-evidence.
 //
 // A place ask needs the location field. Titles, descriptions, and attendees
 // are not requested. The token is the one Google connect already stored.

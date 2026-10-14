@@ -61,11 +61,8 @@
     return null;
   }
 
-  function oneToOne(main, title) {
-    if (main.getAttribute('data-glance-chat') === 'group') return false;
-    if (main.getAttribute('data-glance-chat') === 'direct') return true;
-    if (P.isGroupTitle(title)) return false;
-    return Boolean(title);
+  function oneToOne(main) {
+    return P.isOneToOne(main) === true;
   }
 
   function report(ok, reason) {
@@ -108,7 +105,7 @@
     if (!list.length) { report(false, 'no-messages-recognised'); return; }
     const t = titleOf(main);
     if (!t) { report(false, 'chat-not-identified'); return; }
-    const direct = oneToOne(main, t);
+    const direct = oneToOne(main);
     if (!direct) { report(true); return; }
     if (list.some((n) => author(n) == null)) { report(false, 'sender-not-identified'); return; }
     report(true);

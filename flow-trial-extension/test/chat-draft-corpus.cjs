@@ -1,12 +1,12 @@
 // Chat drafts on WhatsApp, Messenger, and Instagram. The judge is portable.
 // The page test loads the manifest's own script list into a fixture and proves
 // the composer can gain a draft while Send is never clicked and Enter is never
-// pressed. Needs jsdom for the page half (`npm i --no-save jsdom`). The judge,
-// the insert function, and the static scan run without it.
+// pressed. jsdom is a devDependency, so the page half runs in this process.
 // Run: node test/chat-draft-corpus.cjs
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { JSDOM } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..');
 const NOW = new Date(2026, 9, 14, 12);
@@ -44,7 +44,6 @@ const LANE_FILES = [
   'src/content-messenger.js',
   'src/content-instagram.js',
   'src/lane-chat-worker.js',
-  'src/lane-chat-sw.js',
   'lane-chat/enable.js'
 ];
 
@@ -61,7 +60,7 @@ check('the calendar read does not open a consent window', !/interactive:\s*true/
 check('the calendar read does not ask for titles', /fields: 'items\(id,status,location,start\)'/.test(workerSrc) && !/summary/.test(workerSrc));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
-check('the version line stays 0.9.55', manifest.version === '0.9.55');
+check('the version line stays 0.9.56', manifest.version === '0.9.56');
 check('Gmail is still the first content script', manifest.content_scripts[0].js[manifest.content_scripts[0].js.length - 1] === 'src/content-gmail.js');
 const laneLists = manifest.content_scripts.slice(1);
 check('three chat script lists were added', laneLists.length === 3);
@@ -73,7 +72,11 @@ const optional = manifest.optional_host_permissions || [];
 const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
 check('chat hosts are optional, never required', !required.some((h) => chatHost.test(h)) && optional.some((h) => /messenger\.com/.test(h)) && optional.some((h) => /instagram\.com\/direct/.test(h)) && optional.some((h) => /web\.whatsapp\.com/.test(h)));
 check('the enable page is the options page', manifest.options_ui && manifest.options_ui.page === 'lane-chat/enable.html');
-check('the service worker entry imports the existing worker', manifest.background.service_worker === 'src/lane-chat-sw.js' && /import '\.\/background\.js';/.test(fs.readFileSync(path.join(ROOT, 'src/lane-chat-sw.js'), 'utf8')));
+check('the manifest service worker stays background.js', manifest.background.service_worker === 'src/background.js');
+const workerNote = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.js'), 'utf8');
+check('the chat worker waits for one importScripts line after #144', /importScripts\('src\/lane-chat-worker\.js'\)/.test(workerNote));
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
 check('content-whatsapp.js is not hooked by this lane', fs.readFileSync(path.join(ROOT, 'src/content-whatsapp.js'), 'utf8').indexOf('FlowChatLane') < 0);
 
 console.log('\n--- the judge ---\n');
@@ -137,7 +140,18 @@ check('one sheet cell drafts that value', fact.show === true && fact.sends === f
 
 check('Messenger is only the messages path', FlowMessengerParse.page('https://www.messenger.com/t/1') && FlowMessengerParse.page('https://www.facebook.com/messages/t/1') && !FlowMessengerParse.page('https://www.facebook.com/watch'));
 check('Instagram is only direct messages', FlowInstagramParse.page('https://www.instagram.com/direct/t/abc/') && !FlowInstagramParse.page('https://www.instagram.com/p/abc'));
-check('a group title is not a direct chat', FlowMessengerParse.isGroupTitle('3 participants') && FlowInstagramParse.isGroupTitle('Dana and Noa and Avi') && !FlowMessengerParse.isGroupTitle('Dana'));
+function chatEl(html) {
+  return new JSDOM('<body>' + html + '</body>').window.document.body.firstElementChild;
+}
+check('a title is not proof of a direct chat', ['Dana, Noa', 'Dana & Noa', 'Family 🏠'].every((title) => {
+  const html = '<div role="main"><h2>' + title + '</h2></div>';
+  return FlowMessengerParse.isOneToOne(chatEl(html)) === false && FlowInstagramParse.isOneToOne(chatEl(html)) === false;
+}));
+check('a one-to-one thread type is proof', FlowMessengerParse.isOneToOne(chatEl('<div role="main" data-thread-type="one-to-one"><h2>Dana</h2></div>')) === true);
+check('a participant count blocks the draft', FlowMessengerParse.isOneToOne(chatEl('<div role="main" data-thread-type="one-to-one"><span data-testid="participant-count">3 participants</span></div>')) === false);
+check('a group avatar blocks the draft', FlowInstagramParse.isOneToOne(chatEl('<div role="main" data-thread-type="direct"><img data-testid="group-avatar" alt=""></div>')) === false);
+check('a members link blocks the draft', FlowInstagramParse.isOneToOne(chatEl('<div role="main" data-thread-type="direct"><a data-testid="members-link" href="/direct/members/">Members</a></div>')) === false);
+check('a group thread type blocks the draft', FlowMessengerParse.isOneToOne(chatEl('<div role="main" data-thread-type="group"><h2>Dana</h2></div>')) === false);
 
 console.log('\n--- insert never sends ---\n');
 function box(text) {
@@ -215,14 +229,6 @@ console.log('\n--- calendar evidence ---\n');
   const factBox = box('');
   const viaLane = await FlowChatLane.draftInto(factBox, { text: factText, now: NOW.getTime(), oneToOne: true });
   check('the lane drafts the cell the existing fact judge resolved', viaLane.ok === true && viaLane.sends === false && factBox.textContent === '1840' && factBox.clicked === false, viaLane);
-
-  let JSDOM;
-  try { ({ JSDOM } = require('jsdom')); } catch (e) { JSDOM = null; }
-  if (!JSDOM) {
-    console.log('SKIPPED: jsdom not available for the page fixtures');
-    console.log('\nTOTAL FAILURES:', failures);
-    process.exit(failures ? 1 : 0);
-  }
 
   console.log('\n--- pages ---\n');
   const clicks = [];
@@ -303,7 +309,10 @@ console.log('\n--- calendar evidence ---\n');
     ['messenger-place.html', 'https://www.messenger.com/t/1', 'src/content-messenger.js', true],
     ['messenger-live.html', 'https://www.messenger.com/t/2', 'src/content-messenger.js', false],
     ['instagram-place.html', 'https://www.instagram.com/direct/t/abc/', 'src/content-instagram.js', true],
-    ['instagram-fact.html', 'https://www.instagram.com/direct/t/fact/', 'src/content-instagram.js', 'fact']
+    ['instagram-fact.html', 'https://www.instagram.com/direct/t/fact/', 'src/content-instagram.js', 'fact'],
+    ['messenger-dana-comma.html', 'https://www.messenger.com/t/comma', 'src/content-messenger.js', false],
+    ['messenger-dana-amp.html', 'https://www.messenger.com/t/amp', 'src/content-messenger.js', false],
+    ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false]
   ];
   for (const [name, url, surface, expect] of pages) {
     const page = await open(name, url, surface);

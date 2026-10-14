@@ -21,7 +21,7 @@
     "default_path": "popup/popup.html"
   },
   "background": {
-    "service_worker": "src/lane-chat-sw.js",
+    "service_worker": "src/background.js",
     "type": "module"
   },
   "content_scripts": [
