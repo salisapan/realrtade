@@ -8,12 +8,14 @@ const FlowMessengerParse = (() => {
     const host = u.hostname.replace(/^www\./, '');
     if (host === 'messenger.com') return { host: 'messenger' };
     if (host === 'facebook.com' && (u.pathname === '/messages' || u.pathname.indexOf('/messages/') === 0)) return { host: 'messenger' };
+    if (host === 'business.facebook.com' && (u.pathname === '/latest/inbox' || u.pathname.indexOf('/latest/inbox/') === 0)) return { host: 'messenger' };
     return null;
   }
 
-  // TODO-LIVE-DOM: David, save a real messenger.com and facebook.com/messages
-  // header in test/fixtures/chat/TODO-LIVE-DOM.html. The parsers do not read
-  // that file. Until it holds a snapshot, the open thread is classified from
+  // TODO-LIVE-DOM: a Messenger group and Instagram direct still need a snapshot
+  // in test/fixtures/chat/TODO-LIVE-DOM.html. The parsers do not read that file.
+  // The facebook.com/messages one-to-one header and the Business Suite inbox
+  // header are in test/fixtures/chat/live/. The open thread is classified from
   // the first region in this chain. A later region is not consulted.
   //
   // 1. aria-label. [aria-label="Conversation information"]
@@ -24,6 +26,12 @@ const FlowMessengerParse = (() => {
   //    (`<h3>Conversation Information</h3>`). We never click this control.
   //    The chat-name link `[role="main"] a[role="link"][tabindex="0"][aria-label]`
   //    in that gist is the title, so it is not this control.
+  //    Live facebook.com/messages/t/<id> (test/fixtures/chat/live/messenger-1to1.html):
+  //    the control is a sibling of the name. It contains no image and no name.
+  //    The region is the nearest ancestor that also contains h3 and a[role="link"].
+  //    The one image sits inside that link. The name is that h3's text.
+  //    When no such ancestor exists, the header or banner that holds the control
+  //    is the region, which is what the synthetic fixtures use.
   // 2. [role="banner"]
   //    The header landmark, used when the info control is absent.
   //    Source: https://www.w3.org/TR/wai-aria-1.2/#banner
@@ -32,6 +40,12 @@ const FlowMessengerParse = (() => {
   //    The chat-name heading, used when neither control nor banner is present.
   //    Source: bug 1620508 (`<h2>` is the chat name). A heading alone is not
   //    one-to-one proof.
+  // 4. [data-surface$="inbox:detail_view_header"]
+  //    Business Suite inbox, business.facebook.com/latest/inbox.
+  //    Fixture: test/fixtures/chat/live/messenger-page-inbox.html.
+  //    The name is the first text that is not inside [role="button"].
+  //    One img in that region is one-to-one. No img is unknown. A group word
+  //    is a group. Both refuse a draft.
   //
   // Inside the chosen region, img elements that are not inside a message row
   // are the avatars. Exactly one, and no group wording, is one-to-one. Two or
@@ -71,6 +85,46 @@ const FlowMessengerParse = (() => {
     return el;
   }
 
+  // The live Conversation information button is beside the name link, so the
+  // button itself is not the region. Climb to the header row that holds both.
+  function headerRow(info) {
+    let node = info && info.parentElement;
+    while (node) {
+      if (!inRow(node) && node.querySelector && node.querySelector('h3') && node.querySelector('a[role="link"]')) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function plainText(node) {
+    return String(node && node.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function looseName(region) {
+    function walk(node) {
+      if (!node) return '';
+      if (node.nodeType === 1 && node.getAttribute && node.getAttribute('role') === 'button') return '';
+      if (node.nodeType === 3) return plainText(node);
+      const kids = node.childNodes ? Array.from(node.childNodes) : [];
+      for (let i = 0; i < kids.length; i++) {
+        const found = walk(kids[i]);
+        if (found) return found;
+      }
+      return '';
+    }
+    return walk(region);
+  }
+
+  function nameIn(region, via) {
+    if (!region || typeof region.querySelector !== 'function') return '';
+    if (via === 'inbox') return looseName(region);
+    const h3 = region.querySelector('h3');
+    if (!h3 || inRow(h3)) return '';
+    const text = plainText(h3);
+    if (!text || SKIP_HEADING.test(text)) return '';
+    return text;
+  }
+
   function headingIn(root) {
     const main = root.getAttribute && root.getAttribute('role') === 'main' ? root : (root.querySelector('[role="main"]') || root);
     const list = Array.from(main.querySelectorAll('h1, h2, h3'));
@@ -106,22 +160,25 @@ const FlowMessengerParse = (() => {
 
   function decide(scope, via) {
     const avatars = imgsIn(scope);
-    if (avatars.length >= 2 || groupWording(scope)) return { kind: 'group', via: via };
-    if (avatars.length === 1) return { kind: 'one-to-one', via: via };
-    return { kind: 'unknown', via: via };
+    const name = nameIn(scope, via);
+    if (avatars.length >= 2 || groupWording(scope)) return { kind: 'group', via: via, name: name };
+    if (avatars.length === 1) return { kind: 'one-to-one', via: via, name: name };
+    return { kind: 'unknown', via: via, name: name };
   }
 
   // First matching region wins. No positive one-to-one or group signal there
   // is unknown, and the next region is not tried. A title is not proof.
   function classify(root) {
-    if (!root || typeof root.querySelector !== 'function') return { kind: 'unknown', via: null };
+    if (!root || typeof root.querySelector !== 'function') return { kind: 'unknown', via: null, name: '' };
     const info = infoControl(root);
-    if (info) return decide(scopeFor(info, root), 'aria');
+    if (info) return decide(headerRow(info) || scopeFor(info, root), 'aria');
     const banner = root.querySelector('[role="banner"]');
     if (banner && !inRow(banner)) return decide(banner, 'banner');
     const heading = headingIn(root);
     if (heading) return decide(heading.parentElement || heading, 'heading');
-    return { kind: 'unknown', via: null };
+    const inbox = root.querySelector('[data-surface$="inbox:detail_view_header"]');
+    if (inbox && !inRow(inbox)) return decide(inbox, 'inbox');
+    return { kind: 'unknown', via: null, name: '' };
   }
 
   function isOneToOne(root) {

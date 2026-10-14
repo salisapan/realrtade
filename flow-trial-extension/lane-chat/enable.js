@@ -11,7 +11,11 @@ const LANES = [
       'https://www.facebook.com/messages',
       'https://www.facebook.com/messages/*',
       'https://facebook.com/messages',
-      'https://facebook.com/messages/*'
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*'
     ]
   },
   {

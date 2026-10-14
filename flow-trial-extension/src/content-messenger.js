@@ -67,10 +67,6 @@
     return null;
   }
 
-  function oneToOne(main) {
-    return P.isOneToOne(main) === true;
-  }
-
   function report(ok, reason) {
     const key = ok ? 'ok' : 'bad:' + reason;
     if (key === lastReportedHealth) return;
@@ -109,9 +105,13 @@
     const main = root();
     const list = rows(main);
     if (!list.length) { report(false, 'no-messages-recognised'); return; }
-    const t = titleOf(main);
+    const thread = P.classify(main);
+    const t = String((thread && thread.name) || titleOf(main) || '').replace(/\s+/g, ' ').trim();
     if (!t) { report(false, 'chat-not-identified'); return; }
-    const direct = oneToOne(main);
+    const direct = thread && thread.kind === 'one-to-one';
+    globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
+    globalThis.__glanceChatSurfaces.messenger = globalThis.__glanceChatSurfaces.messenger || {};
+    globalThis.__glanceChatSurfaces.messenger.name = t;
     if (!direct) { report(true); return; }
     if (list.some((n) => author(n) == null)) { report(false, 'sender-not-identified'); return; }
     report(true);

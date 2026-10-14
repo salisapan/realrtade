@@ -71,6 +71,7 @@ const required = manifest.host_permissions || [];
 const optional = manifest.optional_host_permissions || [];
 const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
 check('chat hosts are optional, never required', !required.some((h) => chatHost.test(h)) && optional.some((h) => /messenger\.com/.test(h)) && optional.some((h) => /instagram\.com\/direct/.test(h)) && optional.some((h) => /web\.whatsapp\.com/.test(h)));
+check('Business Suite inbox is an optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
 check('the enable page is the options page', manifest.options_ui && manifest.options_ui.page === 'lane-chat/enable.html');
 check('the manifest service worker stays background.js', manifest.background.service_worker === 'src/background.js');
 const workerNote = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.js'), 'utf8');
@@ -144,7 +145,7 @@ const fact = decide(factText, {
 });
 check('one sheet cell drafts that value', fact.show === true && fact.sends === false && fact.draft === '1840', fact);
 
-check('Messenger is only the messages path', FlowMessengerParse.page('https://www.messenger.com/t/1') && FlowMessengerParse.page('https://www.facebook.com/messages/t/1') && !FlowMessengerParse.page('https://www.facebook.com/watch'));
+check('Messenger is only the messages path', FlowMessengerParse.page('https://www.messenger.com/t/1') && FlowMessengerParse.page('https://www.facebook.com/messages/t/1') && FlowMessengerParse.page('https://business.facebook.com/latest/inbox/') && !FlowMessengerParse.page('https://www.facebook.com/watch') && !FlowMessengerParse.page('https://business.facebook.com/'));
 check('Instagram is only direct messages', FlowInstagramParse.page('https://www.instagram.com/direct/t/abc/') && !FlowInstagramParse.page('https://www.instagram.com/p/abc'));
 function chatEl(html) {
   return new JSDOM('<body>' + html + '</body>').window.document.body.firstElementChild;
@@ -187,6 +188,18 @@ const fallbackKind = { direct: 'one-to-one', group: 'group', unknown: 'unknown' 
     });
   });
 });
+function liveRoot(file) {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/chat', file), 'utf8');
+  return new JSDOM(html).window.document.querySelector('[role="main"]');
+}
+const liveDirect = FlowMessengerParse.classify(liveRoot('live/messenger-1to1.html'));
+check('live messenger 1:1 is a direct chat named Flow AI', liveDirect.kind === 'one-to-one' && liveDirect.via === 'aria' && liveDirect.name === 'Flow AI' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html')) === true, liveDirect);
+const liveInbox = FlowMessengerParse.classify(liveRoot('live/messenger-page-inbox.html'));
+check('live Business Suite inbox is a direct chat named Sali Sapan', liveInbox.kind === 'one-to-one' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan', liveInbox);
+const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-unknown.html'));
+check('Business Suite inbox with no image is unknown', inboxUnknown.kind === 'unknown' && inboxUnknown.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html')) === false, inboxUnknown);
+const inboxGroup = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-group.html'));
+check('Business Suite inbox with a group word is a group', inboxGroup.kind === 'group' && inboxGroup.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-group.html')) === false, inboxGroup);
 
 console.log('\n--- insert never sends ---\n');
 function box(text) {
@@ -327,9 +340,12 @@ console.log('\n--- calendar evidence ---\n');
     const send = w.document.querySelector('[aria-label="Send"]');
     let sendClicks = 0;
     if (send) send.addEventListener('click', () => { sendClicks += 1; });
+    let partyName = '';
+    try { partyName = vm.runInContext('(globalThis.__glanceChatSurfaces && globalThis.__glanceChatSurfaces.messenger && globalThis.__glanceChatSurfaces.messenger.name) || ""', ctx); } catch (e) { partyName = ''; }
     return {
       text: composer ? (composer.textContent || '') : '',
       search: (w.document.getElementById('search') || {}).textContent || '',
+      name: partyName,
       sent: sent,
       sendClicks: sendClicks,
       close() { w.close(); }
@@ -349,7 +365,11 @@ console.log('\n--- calendar evidence ---\n');
     ['messenger-dana-amp.html', 'https://www.messenger.com/t/amp', 'src/content-messenger.js', false],
     ['messenger-members.html', 'https://www.messenger.com/t/members', 'src/content-messenger.js', false],
     ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false],
-    ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false]
+    ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false],
+    ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-flow'],
+    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', 'live-sali'],
+    ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', false],
+    ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false]
   ];
   ['messenger', 'instagram'].forEach((app) => {
     ['aria', 'banner', 'heading'].forEach((level) => {
@@ -367,9 +387,11 @@ console.log('\n--- calendar evidence ---\n');
     const page = await open(name, url, surface);
     const keyboard = keys.filter((e) => e.type === 'keydown' || e.type === 'keypress' || e.type === 'keyup' || e.key === 'Enter');
     check(name + ' never clicks and never presses Enter', clicks.length === 0 && keyboard.length === 0 && page.sendClicks === 0, { clicks: clicks.length, keyboard: keyboard });
-    if (expect === true) {
+    if (expect === true || expect === 'live-flow' || expect === 'live-sali') {
       check(name + ' drafts the maps link', page.text.indexOf('Taizu - ' + MAPS) === 0, page.text);
       check(name + ' leaves the search box alone', page.search === '');
+      if (expect === 'live-flow') check(name + ' names Flow AI', page.name === 'Flow AI', page.name);
+      if (expect === 'live-sali') check(name + ' names Sali Sapan', page.name === 'Sali Sapan', page.name);
     } else if (expect === 'fact') {
       check(name + ' drafts the one cell', page.text === '1840', page.text);
     } else if (name === 'whatsapp-filled.html') {
@@ -397,7 +419,7 @@ console.log('\n--- calendar evidence ---\n');
   check('the enable page offers one switch per app', buttons.length === 3);
   buttons[1].click();
   await new Promise((r) => setTimeout(r, 20));
-  check('Messenger is requested as an optional origin and nothing is sent', asked.length === 1 && asked[0].some((o) => /messenger\.com/.test(o)) && asked[0].every((o) => /messages|messenger/.test(o)));
+  check('Messenger is requested as an optional origin and nothing is sent', asked.length === 1 && asked[0].some((o) => /messenger\.com/.test(o)) && asked[0].some((o) => /business\.facebook\.com\/latest\/inbox/.test(o)) && asked[0].every((o) => /messages|messenger|business\.facebook\.com\/latest\/inbox/.test(o)));
   enable.window.close();
 
   console.log('\nTOTAL FAILURES:', failures);
