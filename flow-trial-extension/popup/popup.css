@@ -292,7 +292,10 @@ main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anc
 #open-list.log-list, #log-list.log-list{max-height:none; overflow:visible}
 /* Section headings are near-black in the light step card. This panel is always dark. */
 #open-list .loops-section{display:block; margin:10px 0 6px}
+.loops-expired{display:block; margin:10px 0 6px}
+.loops-expired > summary{cursor:pointer}
 #open-list .loops-section .acts-label,
+.loops-expired > summary,
 #open-list .flow-step-card .act-section .acts-label{color:var(--ink); display:block; font-size:11px; font-weight:650; letter-spacing:.14em; text-transform:uppercase}
 .log-item{
   background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--surface);

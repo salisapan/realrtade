@@ -94,7 +94,7 @@
   wireRecipe();
   wirePro();
   wireLoopView();
-  renderConnectors();
+  await renderConnectors();
   await renderStatusPill();
   await renderLog();
   await renderOpen();
@@ -247,7 +247,7 @@
   async function refresh() {
     status = await send({ type: 'flow:connector-status' });
     state = await FlowStorage.get();
-    renderConnectors();
+    await renderConnectors();
     await renderStatusPill();
     renderSetupDone();
   }
@@ -297,11 +297,107 @@
   function renderConnectors() {
     const host = document.getElementById('connector-list');
     host.replaceChildren();
-    // MVP surface is one connector, one decision: sign in, or don't. The rest
-    // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
-    // them wired) but showing four more cards here is exactly the setup
-    // friction the MVP is supposed to have zero of.
-    FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
+    return outlookHostOpen().then((onOutlook) => {
+      if (onOutlook) {
+        host.appendChild(microsoftConnectCard());
+        return;
+      }
+      // MVP surface is one connector, one decision: sign in, or don't. The rest
+      // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
+      // them wired) but showing four more cards here is exactly the setup
+      // friction the MVP is supposed to have zero of.
+      FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
+    });
+  }
+
+  // The panel opened on an Outlook tab. Setup offers one Microsoft consent,
+  // not the Google sign-in that covers Gmail.
+  async function outlookHostOpen() {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return false;
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const url = (tabs && tabs[0] && tabs[0].url) || '';
+      return /https:\/\/outlook\.(live|office|office365)\.com\//i.test(url);
+    } catch (e) { return false; }
+  }
+
+  function grantedOutlookScopes() {
+    const auth = state && state.outlookAuth;
+    const token = auth && auth.token;
+    return (token && token.grantedScopes) || [];
+  }
+
+  function microsoftConnectCard() {
+    const o = outlook();
+    const card = el('div', 'conn');
+    card.setAttribute('data-glance-connect', 'microsoft');
+    const head = el('div', 'conn-head');
+    const name = el('div', 'conn-name');
+    name.appendChild(el('b', null, 'Microsoft'));
+    name.appendChild(el('i', null, 'Mail, To Do & Calendar'));
+    head.appendChild(name);
+    head.appendChild(el('span', 'badge live', 'Works now'));
+    card.appendChild(head);
+    card.appendChild(el('p', 'conn-note', 'One Microsoft sign-in. Check Calendar to place a named file on the calendar. Glance never sends.'));
+    const screen = el('div', 'ms-connect');
+    const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
+      { id: 'mail', label: 'Mail', required: true },
+      { id: 'todo', label: 'To Do', scopes: ['Tasks.ReadWrite'] },
+      { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite'] }
+    ];
+    const granted = grantedOutlookScopes();
+    const boxes = {};
+    services.forEach((svc) => {
+      const lab = document.createElement('label');
+      lab.className = 'ms-svc';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.setAttribute('data-glance-service', svc.id);
+      const required = Boolean(svc.required || svc.id === 'mail');
+      const has = (svc.scopes || []).every((sc) => granted.indexOf(sc) >= 0);
+      if (required) { box.checked = true; box.disabled = true; }
+      else if (has && granted.length) box.checked = true;
+      boxes[svc.id] = box;
+      const copy = el('span', null, svc.label || svc.id);
+      if (svc.detail) {
+        const small = document.createElement('small');
+        small.textContent = svc.detail;
+        copy.appendChild(small);
+      }
+      lab.appendChild(box);
+      lab.appendChild(copy);
+      screen.appendChild(lab);
+    });
+    card.appendChild(screen);
+    const err = el('p', 'conn-err');
+    err.hidden = true;
+    const btn = el('button', 'primary sm');
+    btn.type = 'button';
+    btn.appendChild(el('span', 'shell'));
+    btn.appendChild(el('span', 'ring'));
+    btn.appendChild(el('span', 'shine'));
+    btn.appendChild(el('span', 'btn-label', 'Connect Microsoft'));
+    btn.addEventListener('click', async () => {
+      if (!o) return;
+      btn.disabled = true; setBtnLabel(btn, 'Connecting…'); err.hidden = true;
+      const ids = services.filter((svc) => {
+        const box = boxes[svc.id];
+        return box && (box.checked || box.disabled);
+      }).map((svc) => svc.id);
+      const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
+        ? FlowOutlookConfig.scopesFor(ids) : null;
+      const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();
+      if (!r || !r.ok) {
+        btn.disabled = false; setBtnLabel(btn, 'Connect Microsoft');
+        err.textContent = (r && (r.error || r.reason)) || 'Connection failed.';
+        err.hidden = false;
+        return;
+      }
+      await refresh();
+    });
+    card.appendChild(btn);
+    card.appendChild(err);
+    return card;
   }
 
   function connectorCard(c) {
@@ -2231,10 +2327,17 @@
       } catch (err) {
         r = { ok: false, error: String(err && err.message || err) };
       }
-      // Always drop the local receipt — stale cards after Graph delete are the bug.
+      const todoUndo = proof && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.system === 'microsoft/todo');
+      if (todoUndo && !(r && r.ok && r.fetchedBack === true)) {
+        u.disabled = false;
+        u.textContent = 'Undo';
+        note.textContent = (r && r.written) || 'Still there — the To Do task was not removed.';
+        note.hidden = false;
+        return;
+      }
       if (proof && (entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.system === 'microsoft/onedrive') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
         await FlowStorage.markOnedriveFileUndone(entry.messageId, entry.ref, entry.threadId);
-      } else if (proof && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+      } else if (todoUndo && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
         await FlowStorage.markMicrosoftTodoUndone(entry.messageId, entry.ref, entry.threadId);
         await reopenOutlookTask(entry);
       } else if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
@@ -2322,7 +2425,10 @@
     const host = document.getElementById('open-list');
     const empty = document.getElementById('open-empty');
     host.replaceChildren();
-    empty.hidden = (openCount + expired.length) > 0;
+    const priorExpired = document.querySelector && document.querySelector('#loops-expired');
+    if (priorExpired && priorExpired.parentNode && priorExpired.parentNode.removeChild) priorExpired.parentNode.removeChild(priorExpired);
+    // Expired rows are not open work. The empty line stays when nothing is still open.
+    empty.hidden = openCount > 0;
     // Suggested and Added are list headings, including a single Do It and a
     // Handled row that has no step list. The chip alone is not the heading.
     function loopsHeading(which) {
@@ -2382,8 +2488,21 @@
       });
     }
     if (expired.length) {
-      host.appendChild(loopsHeading('expired'));
-      expired.forEach((entry) => host.appendChild(expiredRow(entry)));
+      // Collapsed, and after Suggested and Added. It never replaces those headings.
+      const box = document.createElement('details');
+      box.id = 'loops-expired';
+      box.className = 'loops-section loops-expired';
+      box.setAttribute('data-glance-section', 'expired');
+      const sum = document.createElement('summary');
+      sum.className = 'acts-label';
+      sum.textContent = 'Expired';
+      box.appendChild(sum);
+      expired.forEach((entry) => box.appendChild(expiredRow(entry)));
+      const parent = empty && empty.parentNode;
+      if (parent && parent.appendChild) {
+        if (empty.nextSibling && parent.insertBefore) parent.insertBefore(box, empty.nextSibling);
+        else parent.appendChild(box);
+      } else host.appendChild(box);
     }
     } finally { endRender(); }
   }
@@ -2769,6 +2888,9 @@
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
+    if (e.kind === 'undone' && (e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowReceipt !== 'undefined' && FlowReceipt.todoUiCacheLine) {
+      item.appendChild(el('span', 'log-where', FlowReceipt.todoUiCacheLine()));
+    }
     item.appendChild(el('span', 'when', when(e.ts)));
 
     if (e.kind === 'written' && (e.url || e.ref)) {
@@ -2813,7 +2935,8 @@
           u.textContent = 'Undoing…';
           u.disabled = true;
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
-          if (r && r.ok) {
+          const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
+          if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
             const isOutlookCalendar = e.connectorId === 'outlookCalendar';
             if (isOutlookDraft && typeof FlowStorage.markOutlookDraftUndone === 'function') {

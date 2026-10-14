@@ -1372,6 +1372,28 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     now: heWhen
   });
   check('Hebrew send-ask is not treated as a reply ask', heSend.type === FlowIntent.TYPES.REQUEST && heSend.quiet !== 'hedge', { type: heSend.type, quiet: heSend.quiet });
+  const heReader = {
+    to: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  };
+  const heReply = classify('תוכלי בבקשה להשיב עד 20 באוקטובר?\nתודה,\nנועה', heReader);
+  check('Hebrew להשיב addressed to the reader is a reply ask', heReply.type === FlowIntent.TYPES.REQUEST && heReply.quiet !== 'hedge', { type: heReply.type, quiet: heReply.quiet });
+  const heConfirm = classify('תוכל להשיב ולאשר את המועד עד 20 באוקטובר.', heReader);
+  check('Hebrew להשיב ולאשר addressed to the reader is a reply ask', heConfirm.type === FlowIntent.TYPES.REQUEST && heConfirm.quiet !== 'hedge', { type: heConfirm.type, quiet: heConfirm.quiet });
+  const heCcReply = classify('תוכל להשיב אם המעבר עדיין ב-20 באוקטובר?\nתודה,\nנועה', {
+    to: ['avi.mizrahi@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Hebrew להשיב on Cc only stays quiet:hedge', !heCcReply.type && heCcReply.quiet === 'hedge', { type: heCcReply.type, quiet: heCcReply.quiet });
   const namedCc = classify('Hi all,\nDana, can you reply and confirm whether your section of the board pack is final by October 20?\nEveryone else, no action needed.\nNoa', {
     to: ['finance@northwind.example'],
     cc: ['dana.cohen@northwind.example'],

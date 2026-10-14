@@ -1249,7 +1249,8 @@
       undo.textContent = 'Undoing…';
       undo.disabled = true;
       send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }).then(async (result) => {
-        if (!(result && result.ok)) {
+        const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
+        if (!(result && result.ok) || (todoUndo && result.fetchedBack !== true)) {
           undo.textContent = copy.undoHint;
           undo.disabled = false;
           hint.hidden = false;
@@ -1518,6 +1519,7 @@
     const params = (taskStep && taskStep.params) || {};
     const he = ctx.intent && ctx.intent.lang === 'he';
     const live = await livePromiseProof(promiseItem(ctx));
+    if (ignoreStaleClick(host)) return;
     if (live) {
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
       return;
@@ -2248,12 +2250,35 @@
       return true;
     }
     if (typeof FlowOutlookCalendar === 'undefined' || !FlowOutlookCalendar.hasWriteScope(calendarScopes(st))) {
-      dropStuckCard(pane);
+      await showCalendarScopeCard(pane, messageId);
       await pageReason('outlook-calendar-write-not-granted', pane);
+      lastOutcome = 'card';
       return true;
     }
     await showCalendarHold(pane, hold, file, messageId);
     return true;
+  }
+
+  // Missing Calendars.ReadWrite is a card, not a silent drop. One line names
+  // the scope and the Setup checkbox. Do It does not write.
+  async function showCalendarScopeCard(pane, messageId) {
+    const mount = mountPoint();
+    if (!mount) return;
+    const old = mount.querySelector('.flow-chip-host');
+    if (old && old.getAttribute('data-glance-chain') === 'calendar-connect') {
+      lastOutcome = 'card';
+      lastKey = (messageId || 'open') + '|calendar-connect';
+      return;
+    }
+    if (old) old.remove();
+    const host = FlowChipHost.el('div', 'flow-chip-host');
+    host.setAttribute('dir', 'ltr');
+    host.setAttribute('data-glance-chain', 'calendar-connect');
+    host.setAttribute('data-glance-message', messageId || '');
+    host.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite. In Setup, Connect Microsoft and check Calendar.'));
+    mount.appendChild(host);
+    lastOutcome = 'card';
+    lastKey = (messageId || 'open') + '|calendar-connect';
   }
 
   async function showCalendarHold(pane, hold, file, messageId) {

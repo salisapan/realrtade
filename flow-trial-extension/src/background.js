@@ -3905,8 +3905,25 @@ async function outlookTaskUndo(ref) {
   outlookAssertNotSend(url);
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
-  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'To Do task removed.' };
-  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  if (!(del && (del.ok || del.status === 204 || del.status === 404))) {
+    return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  }
+  const got = await outlookFetch(url, { method: 'GET' });
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  const cache = (globalThis.FlowReceipt && FlowReceipt.todoUiCacheLine)
+    ? FlowReceipt.todoUiCacheLine()
+    : 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.';
+  if (got && got.status === 404) {
+    return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. ' + cache };
+  }
+  if (got && got.ok) {
+    let body = null;
+    try { body = await got.json(); } catch (e) { body = null; }
+    const gone = body && (body['@removed'] || body.status === 'deleted' || body.isDeleted === true);
+    if (gone) return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. ' + cache };
+    return { ok: false, reason: 'still-present', fetchedBack: true, written: 'Still there — the To Do task was not removed.' };
+  }
+  return { ok: false, reason: 'http-' + ((got && got.status) || 0) };
 }
 
 async function outlookDraftUndo(ref, hint) {

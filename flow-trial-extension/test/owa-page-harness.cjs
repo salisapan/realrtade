@@ -622,7 +622,9 @@ async function runPage(opts) {
       driveFind: { match: 'one', file: file }
     });
     const blockedWhy = (blocked.store.outlookPageDiag || []).map((d) => d.reason);
-    check('without Calendars.ReadWrite the note stays quiet and names the missing scope', !blocked.chip && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0, blockedWhy);
+    check('without Calendars.ReadWrite a calendar card names the scope and Connect Microsoft',
+      Boolean(blocked.chip) && /Calendars\.ReadWrite/.test(blocked.chip.textContent) && /Connect Microsoft/.test(blocked.chip.textContent) && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0,
+      { text: blocked.chip && blocked.chip.textContent, why: blockedWhy });
     check('that quiet path does not draft a reply', !blocked.sent.some((m) => m.type === 'flow:execute-action'), blocked.sent.map((m) => m.type));
 
     const shown = await runPage({

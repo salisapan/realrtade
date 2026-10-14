@@ -218,9 +218,43 @@ console.log('\n--- write, read back, undo ---\n');
 
   const undo = await env.fn('outlookTaskUndo')(out.ref);
   const del = env.calls.filter((c) => c.method === 'DELETE');
-  check('Undo DELETEs that external id',
-    undo.ok === true && del.length === 1 && /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/.test(del[0].url),
-    del.map((c) => c.url));
+  const afterDelete = env.calls.filter((c) => c.method === 'GET' && /\/tasks\/TASK9$/.test(c.url));
+  check('Undo does not say Undone while GET still returns the task',
+    undo.ok === false && undo.reason === 'still-present' && undo.fetchedBack === true &&
+    del.length === 1 && /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/.test(del[0].url) && afterDelete.length >= 2,
+    { undo, del: del.map((c) => c.url), gets: afterDelete.length });
+}
+
+console.log('\n--- Undo says Undone only after GET confirms the task is gone ---\n');
+{
+  const gone = background({ routes: [
+    { method: 'DELETE', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const undone = await gone.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  const order = gone.calls.map((c) => c.method);
+  check('DELETE then GET 404 is Undone, and the receipt names the To Do page cache',
+    undone.ok === true && undone.fetchedBack === true && undone.deleted === true &&
+    order.indexOf('DELETE') >= 0 && order.indexOf('DELETE') < order.lastIndexOf('GET') &&
+    /two minutes/.test(undone.written || ''),
+    { undone, order });
+  const present = background({ routes: [
+    { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', status: 'notStarted' }), text: async () => '' }) }
+  ] });
+  const still = await present.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9' });
+  check('a live task after DELETE is not Undone', still.ok === false && still.reason === 'still-present' && still.fetchedBack === true, still);
+}
+
+console.log('\n--- To Do Do It rechecks the open mail after the proof read ---\n');
+{
+  const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const fn = page.slice(page.indexOf('async function onOutlookTodoDoIt'), page.indexOf('async function onOnedriveDoIt'));
+  const proofAt = fn.indexOf('await livePromiseProof');
+  const recheckAt = fn.indexOf('ignoreStaleClick(host)', proofAt);
+  const writeAt = fn.indexOf("type: 'flow:execute-action'", proofAt);
+  check('the stale check sits after the proof await and before the write',
+    proofAt >= 0 && recheckAt > proofAt && writeAt > recheckAt, { proofAt, recheckAt, writeAt });
 }
 
 console.log('\n--- a verify miss is not Handled ---\n');

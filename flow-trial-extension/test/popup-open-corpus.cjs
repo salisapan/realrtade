@@ -99,6 +99,10 @@ function load(stored, opts) {
     },
     identity: { getRedirectURL: () => 'https://testextensionidtestextensionid12.chromiumapp.org/' },
     permissions: { contains: async () => false, request: async () => false, remove: async () => true },
+    tabs: {
+      query: async () => (opts.activeTabs || []),
+      sendMessage: async () => {}
+    },
     runtime: {
       sendMessage: (msg, cb) => {
         (opts.messages = opts.messages || []).push(msg && msg.type);
@@ -305,9 +309,16 @@ async function run() {
     const rows = find(host, 'log-item');
     const kinds = find(host, 'log-kind').map((n) => n.textContent);
     const marked = rows.filter((n) => n.getAttribute('data-glance-status') === 'expired');
-    check('the car-insurance loop is listed once, as expired', rows.length === 1 && marked.length === 1 && kinds.indexOf('expired') !== -1, { rows: rows.length, kinds });
+    const mainCards = (host.children || []).filter((n) => String(n.className || '').split(/\s+/).includes('log-item'));
+    const expiredBox = (host.children || []).filter((n) => n.getAttribute && n.getAttribute('data-glance-section') === 'expired');
+    const box = expiredBox[0];
+    check('the car-insurance loop is kept once, inside a collapsed Expired section',
+      rows.length === 1 && marked.length === 1 && kinds.indexOf('expired') !== -1 && mainCards.length === 0 &&
+      box && String(box.tagName).toLowerCase() === 'details' && box.open !== true &&
+      (box.children || []).some((c) => String(c.tagName).toLowerCase() === 'summary' && c.textContent === 'Expired'),
+      { rows: rows.length, kinds, main: mainCards.length, tag: box && box.tagName, open: box && box.open });
     check('an expired loop has no Do It', find(host, 'primary').length === 0, find(host, 'primary').length);
-    check('the empty state stays hidden while the expired row is there', document.getElementById('open-empty').hidden === true);
+    check('the main list is empty while the expired row stays collapsed', document.getElementById('open-empty').hidden === false);
   }
 
   console.log('\n--- popup.js: Dismiss closes the process for good, DOM-independent ---\n');
@@ -1030,6 +1041,106 @@ async function run() {
     check('a reply ask still does not write Microsoft To Do',
       !(draftOpts.executes || []).some((p) => p && (p.connectorId === 'outlookTask' || p.connectorId === 'onedriveFile')),
       draftOpts.executes);
+  }
+
+  console.log('\n--- popup.js: expired rows do not replace Suggested or Added ---\n');
+  {
+    const mixed = load({
+      log: [
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'sug-mail', threadId: 'ol:sug',
+          subject: 'Please renew the parking permit by Sunday.',
+          text: 'Please renew the parking permit by Sunday.',
+          intent: datedIntent(isoDaysFromNow(2)),
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit' } }] }
+        },
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'add-mail', threadId: 'ol:add',
+          subject: 'Gate 0.9.35 To Do title',
+          text: 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate',
+          intent: {
+            type: 'decision', label: 'Log commitment for Oct 9', confidence: 'high',
+            personalClose: 'dated-commitment',
+            facts: { date: { iso: isoDaysFromNow(3) } },
+            entities: { what: 'renew the passport application' },
+            signals: { score: 80 }
+          },
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'added-task', added: true, params: { title: 'Call Noa' } }] }
+        },
+        {
+          ts: Date.now(), kind: 'shown', messageId: 'car-insurance', threadId: 't-car',
+          process: { id: 'reply-track', name: 'Reply & Track', steps: [{ id: 'draft' }] },
+          sender: { name: 'Dana' }, subject: 'Car insurance certificate',
+          text: 'Please send the car insurance certificate by October 12.',
+          app: 'outlook', threadUrl: 'https://outlook.office.com/mail/insurance',
+          intent: {
+            type: 'request', label: 'Send the car insurance certificate', confidence: 'high',
+            personalClose: 'follow-up-ask',
+            facts: { date: { iso: '2020-01-02' } },
+            entities: { what: 'the car insurance certificate' }
+          }
+        }
+      ]
+    }, {});
+    mixed.sandbox.FlowStepKit = {};
+    mixed.sandbox.FlowStepList = {
+      rowsFor(process) {
+        const steps = (process && process.steps) || [];
+        if (steps.some((s) => s && s.added === true)) return [{ id: 'a', added: true }];
+        return [{ id: 's', suggested: true }];
+      },
+      liveStepsFrom() { return []; }
+    };
+    mixed.sandbox.FlowStepListView = {
+      mount(host, rows) {
+        const added = (rows || []).some((r) => r && r.added);
+        const sec = mixed.document.createElement('li');
+        sec.className = 'act-section';
+        sec.setAttribute('data-glance-section', added ? 'added' : 'suggested');
+        const label = mixed.document.createElement('span');
+        label.className = 'acts-label';
+        label.textContent = added ? 'Added' : 'Suggested';
+        sec.appendChild(label);
+        host.appendChild(sec);
+        return {};
+      }
+    };
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), mixed.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const list = mixed.document.getElementById('open-list');
+    const heads = (list.children || []).filter((n) => String(n.className || '').split(/\s+/).includes('loops-section'));
+    const names = heads.map((n) => n.getAttribute('data-glance-section'));
+    const expired = heads.filter((n) => n.getAttribute('data-glance-section') === 'expired')[0];
+    const mainExpired = (list.children || []).filter((n) => n.getAttribute && n.getAttribute('data-glance-status') === 'expired');
+    check('Suggested and Added stay when an expired loop is also stored',
+      names.indexOf('suggested') >= 0 && names.indexOf('added') >= 0 && names.indexOf('suggested') < names.indexOf('added'),
+      names);
+    check('Expired is a collapsed section after Suggested and Added, not the main list',
+      names[names.length - 1] === 'expired' && expired && String(expired.tagName).toLowerCase() === 'details' &&
+      expired.open !== true && mainExpired.length === 0 &&
+      (expired.children || []).some((c) => c.getAttribute && c.getAttribute('data-glance-status') === 'expired'),
+      { names, open: expired && expired.open, main: mainExpired.length });
+  }
+
+  console.log('\n--- popup.js: Setup on an Outlook tab says Connect Microsoft ---\n');
+  {
+    const panel = load({}, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const list = panel.document.getElementById('connector-list');
+    const words = [];
+    (function walk(n) {
+      if (n && n.textContent) words.push(n.textContent);
+      (n.children || []).forEach(walk);
+    })(list);
+    const services = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-service')) services.push(n.getAttribute('data-glance-service'));
+      (n.children || []).forEach(walk);
+    })(list);
+    check('Outlook Setup says Connect Microsoft and offers Calendar',
+      words.indexOf('Connect Microsoft') >= 0 && services.indexOf('calendar') >= 0 && words.indexOf('Connect Google') < 0,
+      { words, services });
   }
 
   console.log('\nTOTAL FAILURES:', failures);

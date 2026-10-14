@@ -118,6 +118,11 @@ const FlowReceipt = (() => {
     return 'Undo all removes ' + joinWithAnd(nouns.map((n) => 'the ' + n)) + '.';
   }
 
+  // Graph can confirm the delete while the To Do website still draws the row.
+  function todoUiCacheLine() {
+    return 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.';
+  }
+
   function undoneLine(wheres) {
     const nouns = nounsFor(wheres);
     if (!nouns || !nouns.length) return 'Undone — nothing was kept.';
@@ -145,7 +150,7 @@ const FlowReceipt = (() => {
   }
 
   return {
-    confirmation, undoHint, undoneLine, reverseNote,
+    confirmation, undoHint, undoneLine, reverseNote, todoUiCacheLine,
     EARLY_CLOSE_LIMIT, EARLY_LINE, STATUS_HANDLED, STATUS_HANDLED_HE, STATUS_PARTIAL
   };
 })();
