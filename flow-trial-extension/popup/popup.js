@@ -1134,7 +1134,9 @@
       row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
       // The mailbox check's reasons, then the Outlook-on-the-web card's own (newest first): every incoming message ends
       // in a card or in a line here.
-      const diags = (Array.isArray(st.pageDiagnostics) ? st.pageDiagnostics : []).concat(Array.isArray(st.diagnostics) ? st.diagnostics : []);
+      const diags = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownRows === 'function')
+        ? FlowDisplay.whyNotShownRows(st.pageDiagnostics, st.diagnostics)
+        : (Array.isArray(st.pageDiagnostics) ? st.pageDiagnostics : []).filter((d) => d && d.verdict !== 'show');
       if (diags.length) {
         const details = document.createElement('details');
         details.className = 'wait-note';
