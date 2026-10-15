@@ -1,6 +1,7 @@
 // Glance card host for Gmail on the web and in the Gmail apps on iOS and Android.
-// Card Service only. One Do it writes one Google Task, then reads it back.
-// Undo deletes that task only when it is unchanged. This file never sends mail.
+// Card Service only. Do it writes one task, one calendar hold, or a scheduled
+// event plus its reminder, then reads each write back.
+// Undo deletes only when that read still matches. This file never sends mail.
 
 var GLANCE_TASK_LIST = 'Glance';
 var UNDO_PREFIX = 'glanceUndo_';
@@ -66,12 +67,7 @@ function onDoIt(e) {
     }
     var decision = judgeOpen_(opened, e);
     if (!decision.speak) return update_(render_(Glance.cards.quiet(lang)));
-    return finishCreate_({
-      title: decision.title,
-      due: decision.due || null,
-      notes: notesFor_(opened),
-      listId: glanceTaskList_()
-    }, opened.messageId, lang);
+    return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
   } catch (err) {
     console.error(err && err.message ? err.message : err);
     return update_(render_(Glance.cards.unconfirmed(lang)));
@@ -84,12 +80,12 @@ function onUndo(e) {
     var id = undoId_(e);
     var record = id ? readUndo_(id) : null;
     if (!record || !record.snapshot) return update_(render_(Glance.cards.unconfirmed(lang)));
-    var result = Glance.execute.performUndo(record.snapshot, tasksApi_());
+    var result = undoRecord_(record.snapshot);
     if (result.action === 'deleted') {
       clearUndo_(id);
       return update_(render_(Glance.cards.undone(lang)));
     }
-    if (result.action === 'refuse') return update_(render_(Glance.cards.edited(lang)));
+    if (result.action === 'refuse') return update_(render_(Glance.cards.edited(lang, result.which)));
     return update_(render_(Glance.cards.unconfirmed(lang)));
   } catch (err) {
     console.error(err && err.message ? err.message : err);
@@ -126,6 +122,100 @@ function engineHit_(text, opened, now) {
       executionMemory: null
     })
   };
+}
+
+function finishDecision_(decision, opened, messageId, lang, timeZone) {
+  if (decision.kind === 'hold' || decision.kind === 'schedule') {
+    return finishCalendar_(decision, opened, messageId, lang, timeZone);
+  }
+  return finishCreate_({
+    title: decision.title,
+    due: decision.due || null,
+    notes: notesFor_(opened),
+    listId: glanceTaskList_()
+  }, messageId, lang);
+}
+
+function finishCalendar_(decision, opened, messageId, lang, timeZone) {
+  var eventResult = Glance.execute.performCreateEvent({
+    calendarId: 'primary',
+    title: decision.title,
+    dateIso: decision.dateIso,
+    hour: Number.isInteger(decision.hour) ? decision.hour : null,
+    minute: Number.isInteger(decision.minute) ? decision.minute : null,
+    timeZone: timeZone || 'Etc/UTC',
+    description: eventNotes_(opened, decision.quote)
+  }, calendarApi_());
+  if (!eventResult.confirmed || !eventResult.view) return update_(render_(Glance.cards.unconfirmed(lang)));
+  if (decision.kind === 'hold') {
+    var holdView = {
+      kind: 'hold',
+      id: eventResult.view.id,
+      title: eventResult.view.title,
+      when: eventResult.view.when
+    };
+    var holdSaved = saveUndo_(messageId, {
+      view: holdView,
+      snapshot: { kind: 'event', event: eventResult.snapshot }
+    });
+    return update_(render_(Glance.cards.proof(holdView, lang, {
+      messageId: messageId,
+      source: 'message',
+      undo: holdSaved
+    })));
+  }
+  var listId;
+  try { listId = glanceTaskList_(); } catch (err) {
+    Glance.execute.performUndoEvent(eventResult.snapshot, calendarApi_());
+    return update_(render_(Glance.cards.unconfirmed(lang)));
+  }
+  var taskResult = Glance.execute.performCreate({
+    title: decision.taskTitle,
+    due: decision.taskDue || null,
+    notes: notesFor_(opened),
+    listId: listId
+  }, tasksApi_());
+  if (!taskResult.confirmed || !taskResult.view) {
+    Glance.execute.performUndoEvent(eventResult.snapshot, calendarApi_());
+    return update_(render_(Glance.cards.unconfirmed(lang)));
+  }
+  var scheduleView = {
+    kind: 'schedule',
+    id: eventResult.view.id,
+    title: eventResult.view.title,
+    when: eventResult.view.when,
+    taskId: taskResult.view.id,
+    taskTitle: taskResult.view.title,
+    taskDue: taskResult.view.due
+  };
+  var scheduleSaved = saveUndo_(messageId, {
+    view: scheduleView,
+    snapshot: { kind: 'schedule', event: eventResult.snapshot, task: taskResult.snapshot }
+  });
+  return update_(render_(Glance.cards.proof(scheduleView, lang, {
+    messageId: messageId,
+    source: 'message',
+    undo: scheduleSaved
+  })));
+}
+
+function undoRecord_(snapshot) {
+  if (snapshot.kind === 'schedule') {
+    return Glance.execute.performUndoSchedule(snapshot, { calendar: calendarApi_(), tasks: tasksApi_() });
+  }
+  if (snapshot.kind === 'event') {
+    return Glance.execute.performUndoEvent(snapshot.event, calendarApi_());
+  }
+  return Glance.execute.performUndo(snapshot, tasksApi_());
+}
+
+function eventNotes_(opened, quote) {
+  var lines = [];
+  if (quote) lines.push(quote);
+  if (opened && opened.subject) lines.push('Subject: ' + Glance.intent.sanitizeTitle(opened.subject));
+  if (opened && opened.threadUrl) lines.push(opened.threadUrl);
+  lines.push('Logged by Glance');
+  return lines.join('\n').slice(0, 2000);
 }
 
 function finishCreate_(proposal, messageId, lang) {
@@ -179,6 +269,14 @@ function tasksApi_() {
     insert: function (listId, resource) { return Tasks.Tasks.insert(resource, listId); },
     get: function (listId, taskId) { return Tasks.Tasks.get(listId, taskId); },
     remove: function (listId, taskId) { Tasks.Tasks.remove(listId, taskId); }
+  };
+}
+
+function calendarApi_() {
+  return {
+    insert: function (calendarId, resource) { return Calendar.Events.insert(resource, calendarId); },
+    get: function (calendarId, eventId) { return Calendar.Events.get(calendarId, eventId); },
+    remove: function (calendarId, eventId) { Calendar.Events.remove(calendarId, eventId); }
   };
 }
 

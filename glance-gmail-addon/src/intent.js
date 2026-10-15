@@ -1,9 +1,11 @@
-// One task, or silence.
+// One close the host can write, or silence.
 //
 // Order: an explicit "please remember to" / "don't forget" / "תזכיר לי"
 // ask is a task even when the shared classifier would plan a meeting or a
-// draft. Otherwise the shared classifier is asked, and only a plan whose
-// single step is a Google Task is shown. Anything else stays quiet.
+// draft. Otherwise the shared classifier is asked.
+// One Google Task stays a task. A calendar hold (one timed event) stays a
+// hold. A schedule plan (one event plus one reminder task) stays that plan.
+// A draft, a file, or any other shape stays quiet.
 // This file does not write and does not send.
 
 var GlanceIntent = (function () {
@@ -151,7 +153,7 @@ var GlanceIntent = (function () {
     var pulled = pullDue(match[1], now, timeZone);
     var title = sanitizeTitle(pulled.text);
     if (!title || title.length < 2) return null;
-    return { speak: true, source: 'local', title: title, due: pulled.due, lang: lang };
+    return { speak: true, source: 'local', kind: 'task', title: title, due: pulled.due, lang: lang };
   }
 
   function isoOrNull(value, now, timeZone) {
@@ -159,25 +161,95 @@ var GlanceIntent = (function () {
     return notPast(value, now, timeZone);
   }
 
-  // A plan that is exactly one Google Task. A draft or a calendar step is
-  // not rewritten into a task: this host cannot do that close.
+  function clockOf(params) {
+    if (!params) return null;
+    var hour = params.hour;
+    var minute = params.minute;
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return { hour: hour, minute: minute };
+  }
+
+  function stepKind(step) {
+    return step && step.kind;
+  }
+
+  // A draft or a file step is not rewritten into a task or an event.
   function mapEngine(result, now, timeZone) {
     if (!result || !result.plan || !result.plan.steps) return null;
     var steps = result.plan.steps;
-    if (steps.length !== 1) return null;
-    var step = steps[0];
-    if (!step || step.kind !== 'googleTask') return null;
-    var params = step.params || {};
-    if (params.send === true) return null;
-    var title = sanitizeTitle(params.title || params.what || step.label || '');
-    if (!title) return null;
-    return {
-      speak: true,
-      source: 'engine',
-      title: title,
-      due: isoOrNull(params.dateIso, now, timeZone),
-      lang: null
-    };
+    if (!steps.length) return null;
+    for (var i = 0; i < steps.length; i++) {
+      var kind = stepKind(steps[i]);
+      var params = (steps[i] && steps[i].params) || {};
+      if (params.send === true) return null;
+      if (kind !== 'googleTask' && kind !== 'calendar') return null;
+      if (params.calendarOp === 'delete' || params.calendarOp === 'update') return null;
+    }
+    if (steps.length === 1 && steps[0].kind === 'googleTask') {
+      var taskParams = steps[0].params || {};
+      var title = sanitizeTitle(taskParams.title || taskParams.what || steps[0].label || '');
+      if (!title) return null;
+      return {
+        speak: true,
+        source: 'engine',
+        kind: 'task',
+        title: title,
+        due: isoOrNull(taskParams.dateIso, now, timeZone),
+        lang: null
+      };
+    }
+    if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
+      var holdParams = steps[0].params || {};
+      var holdClock = clockOf(holdParams);
+      var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
+      var holdTitle = sanitizeTitle(holdParams.title || '');
+      if (!holdClock || !holdDate || !holdTitle || holdParams.requireTime === false) return null;
+      return {
+        speak: true,
+        source: 'engine',
+        kind: 'hold',
+        title: holdTitle,
+        due: holdDate,
+        dateIso: holdDate,
+        hour: holdClock.hour,
+        minute: holdClock.minute,
+        quote: sanitizeTitle(holdParams.quote || ''),
+        lang: null
+      };
+    }
+    if (steps.length === 2 && result.plan.id === 'schedule') {
+      var calendarStep = null;
+      var taskStep = null;
+      for (var s = 0; s < steps.length; s++) {
+        if (steps[s].kind === 'calendar') calendarStep = steps[s];
+        if (steps[s].kind === 'googleTask') taskStep = steps[s];
+      }
+      if (!calendarStep || !taskStep) return null;
+      var calendarParams = calendarStep.params || {};
+      var reminderParams = taskStep.params || {};
+      var clock = clockOf(calendarParams);
+      if (calendarParams.requireTime && !clock) return null;
+      var dateIso = isoOrNull(calendarParams.dateIso, now, timeZone);
+      var calendarTitle = sanitizeTitle(calendarParams.title || '');
+      var taskTitle = sanitizeTitle(reminderParams.title || reminderParams.what || '');
+      if (!dateIso || !calendarTitle || !taskTitle) return null;
+      return {
+        speak: true,
+        source: 'engine',
+        kind: 'schedule',
+        title: calendarTitle,
+        due: dateIso,
+        dateIso: dateIso,
+        hour: clock ? clock.hour : null,
+        minute: clock ? clock.minute : null,
+        quote: sanitizeTitle(calendarParams.quote || ''),
+        taskTitle: taskTitle,
+        taskDue: isoOrNull(reminderParams.dateIso, now, timeZone),
+        lang: null
+      };
+    }
+    return null;
   }
 
   // glance-assist action "classify" shape. A request or an event is not a
@@ -196,6 +268,7 @@ var GlanceIntent = (function () {
     return {
       speak: true,
       source: 'classifier',
+      kind: 'task',
       title: title,
       due: isoOrNull(result.dateIso, now, timeZone),
       lang: null

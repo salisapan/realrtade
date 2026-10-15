@@ -6,6 +6,7 @@ updated: 2026-10-15
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-15 · Workspace card on the open mail matches the shared classifier for a task, a calendar hold, and a schedule (event plus reminder). Calendar scope is `calendar.events` only. Undo of an event requires the stored content hash; no hash means do not delete. Test deployment only. Not verified on web, iOS, or Android. Never sends. · Claude · `glance-gmail-addon/README.md`, [[open-tasks]] row 70
 - 2026-10-15 · Workspace card v1 inside Gmail: one Google Task, read it back before the card shows it, Undo only if that task is unchanged. Test deployment only. Not verified on web, iOS, or Android. Never sends. · Claude · `glance-gmail-addon/README.md`, [[open-tasks]] row 70
 - 2026-10-10 · Owner chose the first wedge: accountants and lawyers. Client requests engine, ledger and page built (not wired to Gmail yet; switch off). docs/glance-ai/client-requests.md, open-tasks row 68.
 - 2026-10-10 · Owner rejected the standalone "מה חסר ממי" page (not Glance). Removed; engine and ledger stay, unwired, switch off. No existing file or behavior changed.

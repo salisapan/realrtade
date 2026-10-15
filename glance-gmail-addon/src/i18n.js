@@ -15,7 +15,12 @@ var GlanceI18n = (function () {
       due: 'Due',
       inTasks: 'In Google Tasks.',
       undone: 'Undone.',
-      id: 'Id'
+      id: 'Id',
+      calendarHold: 'Calendar hold',
+      when: 'When',
+      onCalendar: 'On your calendar.',
+      schedule: 'Calendar and a reminder.',
+      editedEvent: "The event was edited, so I won't undo it"
     },
     he: {
       doIt: 'בצע',
@@ -28,7 +33,12 @@ var GlanceI18n = (function () {
       due: 'יעד',
       inTasks: 'ב-Google Tasks.',
       undone: 'בוטל.',
-      id: 'מזהה'
+      id: 'מזהה',
+      calendarHold: 'החזקה ביומן',
+      when: 'מתי',
+      onCalendar: 'ביומן.',
+      schedule: 'יומן ותזכורת.',
+      editedEvent: 'האירוע נערך, אז לא אבטל אותו'
     }
   };
 

@@ -8,11 +8,11 @@ Glance is a system for unfinished intentions: what you asked someone for, what y
 
 ## Current implementation status
 
-This folder is a Workspace card host for the open Gmail message, on the web and in the Gmail apps on iOS and Android. It is not the Chrome extension in `flow-trial-extension/`. v1 does one thing: when the open message is one clear task, the card shows the title, the due date if there is one, and one **Do it** button.
+This folder is a Workspace card host for the open Gmail message, on the web and in the Gmail apps on iOS and Android. It is not the Chrome extension in `flow-trial-extension/`. On the open message the card offers the same close the shared classifier plans, when this host can write it: one Google Task, one calendar hold, or a scheduled event plus its reminder. Each of those cards has one **Do it** button.
 
-Do it creates one Google Task, then reads that task back. The card shows the id, title, and due from that read. If the read does not match, the card says **Couldn't confirm** and does not say the task was created. Undo deletes the task only when its title, due, etag, and updated time are still the values from that read. If you edited it, Undo says **The task was edited, so I won't undo it** and leaves the task alone.
+Do it creates that task, that event, or both, then reads each write back. The card shows the read. If a read does not match, the card says **Couldn't confirm** and does not say the write succeeded. A calendar hold that was just created is removed again when the reminder task cannot be confirmed. Undo deletes only when the read still matches. A task must still have the same title, due, etag, and updated time. An event must still have the same content hash (title, time, description, location, guests). No stored hash means Undo will not delete the event. If you edited it, Undo says **The task was edited, so I won't undo it** or **The event was edited, so I won't undo it**, and leaves the edit. A scheduled event and its reminder are undone together, or not at all.
 
-Nothing in this host sends mail. There is no draft and no calendar write.
+Nothing in this host sends mail. There is no draft. The event has no guests.
 
 The card language follows the Gmail locale (`he` / `iw` → Hebrew, anything else → English). Hebrew lines carry right-to-left marks because Card Service has no direction setting.
 
@@ -21,9 +21,9 @@ The card language follows the Gmail locale (`he` / `iw` → Hebrew, anything els
 It speaks only for:
 
 - an explicit ask: `please remember to`, `don't forget`, `תזכיר לי`, or `אל תשכח` at the start of the message (a short greeting in front is fine)
-- or the shared classifier already in this repo (`flow-trial-extension/core/intent.js`, bundled into `CoreBundle.js`), and only when that plan is exactly one Google Task
+- or the shared classifier already in this repo (`flow-trial-extension/core/intent.js`, bundled into `CoreBundle.js`), when that plan is one Google Task, one calendar hold, or a schedule (one event plus one reminder task)
 
-A meeting, a reply, or a file ask stays quiet. This host will not turn those into a task.
+A reply or a file ask stays quiet. A calendar step is not rewritten into a task.
 
 The bundled classifier runs in Apps Script, in the Google account that installed the card. `src/remote.js` is the stub for the repo's `glance-assist` `classify` action. v1 does not call it: that endpoint expects masked text and a Pro licence, and this host does not mask or send the message there.
 
@@ -38,10 +38,11 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 - `https://www.googleapis.com/auth/gmail.addons.current.message.readonly`
 - `https://www.googleapis.com/auth/gmail.addons.execute`
 - `https://www.googleapis.com/auth/tasks`
+- `https://www.googleapis.com/auth/calendar.events`
 - `https://www.googleapis.com/auth/script.external_request` (only if a script property URL is set)
 - `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
 
-No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`.
+No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`.
 
 ## Tests
 
@@ -56,7 +57,7 @@ Re-run the bundle script after changing `src/` or the classifier. `CoreBundle.js
 
 Do not publish to the Workspace Marketplace. A test deployment can be installed by up to 100 test users of an unverified OAuth app. Those people see Google's unverified-app warning.
 
-1. In Google Cloud Console, use the GCP project this account already uses for Glance (the October host used `oceanic-spider-509610-c1`). Enable the Gmail API, the Google Tasks API, and the Apps Script API.
+1. In Google Cloud Console, use the GCP project this account already uses for Glance (the October host used `oceanic-spider-509610-c1`). Enable the Gmail API, the Google Tasks API, the Google Calendar API, and the Apps Script API.
 2. OAuth consent screen: **External**, and leave it in **Testing**. Do not submit it for verification in this pass. Add the Google accounts that will install the card, up to 100. Add only the scopes listed above.
 3. On the machine that will push, turn on the Apps Script API for that Google account at [script.google.com/home/usersettings](https://script.google.com/home/usersettings). Then `npm install -g @google/clasp` (or use `npx @google/clasp`) and `clasp login`.
 4. From this folder:
@@ -77,7 +78,7 @@ The unverified-app screen says Google has not verified the app. The test user ch
 
 ### Gmail on the web
 
-Open a message. Open the side panel and choose Glance. The card is either one Do it, or nothing to close. Leave the panel open: the next message runs the same card. Do it on `Please remember to send the contract by Friday.` Confirm the task in Google Tasks matches the id, title, and due on the card, then Undo and confirm it is gone. Edit a task in Google Tasks and Undo again: the card must refuse, and the edited task must still be there.
+Open a message. Open the side panel and choose Glance. The card is either one Do it, or nothing to close. Leave the panel open: the next message runs the same card. Do it on `Please remember to send the contract by Friday.` Confirm the task in Google Tasks matches the id, title, and due on the card, then Undo and confirm it is gone. Edit a task in Google Tasks and Undo again: the card must refuse, and the edited task must still be there. On a mail whose subject is `פגישה ביום חמישי 22/10`, the card offers the scheduled event and its reminder, not "Nothing to close." Do it creates the all-day event and the task, and both ids on the card match what Google stored. Edit the event and Undo: the card refuses, and both the event and the task remain. On `Could we meet Thursday at 3pm?` the card says Calendar hold. Do it creates one 30-minute event and no task.
 
 ### Gmail on iOS and Android
 
@@ -87,5 +88,5 @@ Same Google account. Open a message and tap the Glance icon under the message. T
 
 - Do not publish, and do not create a Marketplace listing.
 - Do not add a send call (`GmailApp.sendEmail`, `MailApp`, `Drafts.send`).
-- Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, or calendar scopes.
+- Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, or the full `calendar` scope. The only calendar scope is `calendar.events`.
 - Do not put a client secret in the repo. The card uses the person's Apps Script grant.

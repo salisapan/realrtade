@@ -5631,7 +5631,12 @@ var GlanceI18n = (function () {
       due: 'Due',
       inTasks: 'In Google Tasks.',
       undone: 'Undone.',
-      id: 'Id'
+      id: 'Id',
+      calendarHold: 'Calendar hold',
+      when: 'When',
+      onCalendar: 'On your calendar.',
+      schedule: 'Calendar and a reminder.',
+      editedEvent: "The event was edited, so I won't undo it"
     },
     he: {
       doIt: 'בצע',
@@ -5644,7 +5649,12 @@ var GlanceI18n = (function () {
       due: 'יעד',
       inTasks: 'ב-Google Tasks.',
       undone: 'בוטל.',
-      id: 'מזהה'
+      id: 'מזהה',
+      calendarHold: 'החזקה ביומן',
+      when: 'מתי',
+      onCalendar: 'ביומן.',
+      schedule: 'יומן ותזכורת.',
+      editedEvent: 'האירוע נערך, אז לא אבטל אותו'
     }
   };
 
@@ -5705,12 +5715,14 @@ var GlanceUrls = (function () {
 if (typeof module !== 'undefined') module.exports = GlanceUrls;
 
 // ----- glance-gmail-addon/src/intent.js -----
-// One task, or silence.
+// One close the host can write, or silence.
 //
 // Order: an explicit "please remember to" / "don't forget" / "תזכיר לי"
 // ask is a task even when the shared classifier would plan a meeting or a
-// draft. Otherwise the shared classifier is asked, and only a plan whose
-// single step is a Google Task is shown. Anything else stays quiet.
+// draft. Otherwise the shared classifier is asked.
+// One Google Task stays a task. A calendar hold (one timed event) stays a
+// hold. A schedule plan (one event plus one reminder task) stays that plan.
+// A draft, a file, or any other shape stays quiet.
 // This file does not write and does not send.
 
 var GlanceIntent = (function () {
@@ -5858,7 +5870,7 @@ var GlanceIntent = (function () {
     var pulled = pullDue(match[1], now, timeZone);
     var title = sanitizeTitle(pulled.text);
     if (!title || title.length < 2) return null;
-    return { speak: true, source: 'local', title: title, due: pulled.due, lang: lang };
+    return { speak: true, source: 'local', kind: 'task', title: title, due: pulled.due, lang: lang };
   }
 
   function isoOrNull(value, now, timeZone) {
@@ -5866,25 +5878,95 @@ var GlanceIntent = (function () {
     return notPast(value, now, timeZone);
   }
 
-  // A plan that is exactly one Google Task. A draft or a calendar step is
-  // not rewritten into a task: this host cannot do that close.
+  function clockOf(params) {
+    if (!params) return null;
+    var hour = params.hour;
+    var minute = params.minute;
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return { hour: hour, minute: minute };
+  }
+
+  function stepKind(step) {
+    return step && step.kind;
+  }
+
+  // A draft or a file step is not rewritten into a task or an event.
   function mapEngine(result, now, timeZone) {
     if (!result || !result.plan || !result.plan.steps) return null;
     var steps = result.plan.steps;
-    if (steps.length !== 1) return null;
-    var step = steps[0];
-    if (!step || step.kind !== 'googleTask') return null;
-    var params = step.params || {};
-    if (params.send === true) return null;
-    var title = sanitizeTitle(params.title || params.what || step.label || '');
-    if (!title) return null;
-    return {
-      speak: true,
-      source: 'engine',
-      title: title,
-      due: isoOrNull(params.dateIso, now, timeZone),
-      lang: null
-    };
+    if (!steps.length) return null;
+    for (var i = 0; i < steps.length; i++) {
+      var kind = stepKind(steps[i]);
+      var params = (steps[i] && steps[i].params) || {};
+      if (params.send === true) return null;
+      if (kind !== 'googleTask' && kind !== 'calendar') return null;
+      if (params.calendarOp === 'delete' || params.calendarOp === 'update') return null;
+    }
+    if (steps.length === 1 && steps[0].kind === 'googleTask') {
+      var taskParams = steps[0].params || {};
+      var title = sanitizeTitle(taskParams.title || taskParams.what || steps[0].label || '');
+      if (!title) return null;
+      return {
+        speak: true,
+        source: 'engine',
+        kind: 'task',
+        title: title,
+        due: isoOrNull(taskParams.dateIso, now, timeZone),
+        lang: null
+      };
+    }
+    if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
+      var holdParams = steps[0].params || {};
+      var holdClock = clockOf(holdParams);
+      var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
+      var holdTitle = sanitizeTitle(holdParams.title || '');
+      if (!holdClock || !holdDate || !holdTitle || holdParams.requireTime === false) return null;
+      return {
+        speak: true,
+        source: 'engine',
+        kind: 'hold',
+        title: holdTitle,
+        due: holdDate,
+        dateIso: holdDate,
+        hour: holdClock.hour,
+        minute: holdClock.minute,
+        quote: sanitizeTitle(holdParams.quote || ''),
+        lang: null
+      };
+    }
+    if (steps.length === 2 && result.plan.id === 'schedule') {
+      var calendarStep = null;
+      var taskStep = null;
+      for (var s = 0; s < steps.length; s++) {
+        if (steps[s].kind === 'calendar') calendarStep = steps[s];
+        if (steps[s].kind === 'googleTask') taskStep = steps[s];
+      }
+      if (!calendarStep || !taskStep) return null;
+      var calendarParams = calendarStep.params || {};
+      var reminderParams = taskStep.params || {};
+      var clock = clockOf(calendarParams);
+      if (calendarParams.requireTime && !clock) return null;
+      var dateIso = isoOrNull(calendarParams.dateIso, now, timeZone);
+      var calendarTitle = sanitizeTitle(calendarParams.title || '');
+      var taskTitle = sanitizeTitle(reminderParams.title || reminderParams.what || '');
+      if (!dateIso || !calendarTitle || !taskTitle) return null;
+      return {
+        speak: true,
+        source: 'engine',
+        kind: 'schedule',
+        title: calendarTitle,
+        due: dateIso,
+        dateIso: dateIso,
+        hour: clock ? clock.hour : null,
+        minute: clock ? clock.minute : null,
+        quote: sanitizeTitle(calendarParams.quote || ''),
+        taskTitle: taskTitle,
+        taskDue: isoOrNull(reminderParams.dateIso, now, timeZone),
+        lang: null
+      };
+    }
+    return null;
   }
 
   // glance-assist action "classify" shape. A request or an event is not a
@@ -5903,6 +5985,7 @@ var GlanceIntent = (function () {
     return {
       speak: true,
       source: 'classifier',
+      kind: 'task',
       title: title,
       due: isoOrNull(result.dateIso, now, timeZone),
       lang: null
@@ -6001,13 +6084,96 @@ var GlanceProof = (function () {
     return { action: 'delete' };
   }
 
+  // The fields a later edit would change. Formatting that Google adds
+  // around a dateTime (seconds, an offset) is not an edit.
+  function canonicalEvent(event) {
+    function when(point) {
+      if (!point) return '';
+      if (point.date) return 'd:' + String(point.date).slice(0, 10);
+      if (point.dateTime) return 't:' + String(point.dateTime).slice(0, 16);
+      return '';
+    }
+    var attendees = [];
+    var list = (event && event.attendees) || [];
+    for (var i = 0; i < list.length; i++) {
+      var email = list[i] && list[i].email ? String(list[i].email).toLowerCase() : '';
+      if (email) attendees.push(email);
+    }
+    attendees.sort();
+    return {
+      summary: normTitle(event && event.summary),
+      start: when(event && event.start),
+      end: when(event && event.end),
+      description: normTitle(event && event.description),
+      location: normTitle(event && event.location),
+      attendees: attendees.join(',')
+    };
+  }
+
+  function contentHash(event) {
+    var body = JSON.stringify(canonicalEvent(event));
+    var hash = 5381;
+    for (var i = 0; i < body.length; i++) {
+      hash = ((hash << 5) + hash + body.charCodeAt(i)) >>> 0;
+    }
+    return hash.toString(16);
+  }
+
+  function whenOf(event) {
+    var start = canonicalEvent(event).start;
+    if (start.indexOf('t:') === 0) return start.slice(2).replace('T', ' ');
+    if (start.indexOf('d:') === 0) return start.slice(2);
+    return '';
+  }
+
+  function compareEvent(created, fetched) {
+    if (!created || !fetched) return { ok: false, reason: 'mismatch' };
+    if (fetched.status === 'cancelled') return { ok: false, reason: 'mismatch' };
+    if (!created.id || String(fetched.id) !== String(created.id)) return { ok: false, reason: 'mismatch' };
+    var left = canonicalEvent(created);
+    var right = canonicalEvent(fetched);
+    if (left.summary !== right.summary) return { ok: false, reason: 'mismatch' };
+    if (left.start !== right.start || left.end !== right.end) return { ok: false, reason: 'mismatch' };
+    if (left.description !== right.description) return { ok: false, reason: 'mismatch' };
+    if (left.location !== right.location) return { ok: false, reason: 'mismatch' };
+    if (left.attendees !== right.attendees) return { ok: false, reason: 'mismatch' };
+    return { ok: true };
+  }
+
+  function eventSnapshot(event, calendarId) {
+    var canonical = canonicalEvent(event);
+    return {
+      calendarId: String(calendarId || 'primary'),
+      id: String(event.id),
+      contentHash: contentHash(event),
+      summary: canonical.summary,
+      start: canonical.start,
+      end: canonical.end
+    };
+  }
+
+  // No stored hash is not a license to delete. An edit is a different hash.
+  function eventUndoDecision(snapshot, current) {
+    if (!snapshot || !snapshot.contentHash) return { action: 'refuse', which: 'event' };
+    if (!current || current.status === 'cancelled') return { action: 'missing' };
+    if (String(current.id) !== String(snapshot.id)) return { action: 'refuse', which: 'event' };
+    if (contentHash(current) !== snapshot.contentHash) return { action: 'refuse', which: 'event' };
+    return { action: 'delete' };
+  }
+
   return {
     normTitle: normTitle,
     normalizeDue: normalizeDue,
     snapshotOf: snapshotOf,
     compareCreated: compareCreated,
     unchanged: unchanged,
-    undoDecision: undoDecision
+    undoDecision: undoDecision,
+    canonicalEvent: canonicalEvent,
+    contentHash: contentHash,
+    whenOf: whenOf,
+    compareEvent: compareEvent,
+    eventSnapshot: eventSnapshot,
+    eventUndoDecision: eventUndoDecision
   };
 })();
 
@@ -6057,15 +6223,115 @@ var GlanceExecute = (function () {
     return { action: 'deleted' };
   }
 
-  return { performCreate: performCreate, performUndo: performUndo };
+  function pad(n) {
+    n = Number(n);
+    return (n < 10 ? '0' : '') + n;
+  }
+
+  function wallClock(dateIso, hour, minute, addMinutes) {
+    var parts = dateIso.split('-');
+    var dt = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2], hour, minute + (addMinutes || 0), 0));
+    return dt.getUTCFullYear() + '-' + pad(dt.getUTCMonth() + 1) + '-' + pad(dt.getUTCDate()) +
+      'T' + pad(dt.getUTCHours()) + ':' + pad(dt.getUTCMinutes()) + ':00';
+  }
+
+  function nextDate(dateIso) {
+    var parts = dateIso.split('-');
+    var dt = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2] + 1));
+    return dt.getUTCFullYear() + '-' + pad(dt.getUTCMonth() + 1) + '-' + pad(dt.getUTCDate());
+  }
+
+  // Timed events last 30 minutes, the same default the extension writes.
+  // A schedule with no clock is an all-day event. No guests.
+  function eventBody(proposal) {
+    var summary = String(proposal.title || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!summary) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(proposal.dateIso || '')) return null;
+    var body = { summary: summary };
+    if (proposal.description) body.description = String(proposal.description).slice(0, 8000);
+    var timed = Number.isInteger(proposal.hour) && Number.isInteger(proposal.minute);
+    if (timed) {
+      var zone = proposal.timeZone || 'Etc/UTC';
+      body.start = { dateTime: wallClock(proposal.dateIso, proposal.hour, proposal.minute, 0), timeZone: zone };
+      body.end = { dateTime: wallClock(proposal.dateIso, proposal.hour, proposal.minute, 30), timeZone: zone };
+    } else {
+      body.start = { date: proposal.dateIso };
+      body.end = { date: nextDate(proposal.dateIso) };
+    }
+    return body;
+  }
+
+  function performCreateEvent(proposal, api) {
+    var Proof = proofLib();
+    var resource = eventBody(proposal);
+    if (!resource) return { confirmed: false, reason: 'write' };
+    var calendarId = proposal.calendarId || 'primary';
+    var inserted;
+    try { inserted = api.insert(calendarId, resource); } catch (err) { return { confirmed: false, reason: 'write' }; }
+    if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
+    var fetched;
+    try { fetched = api.get(calendarId, inserted.id); } catch (err) { return { confirmed: false, reason: 'fetch' }; }
+    var cmp = Proof.compareEvent(inserted, fetched);
+    if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
+    return {
+      confirmed: true,
+      snapshot: Proof.eventSnapshot(fetched, calendarId),
+      view: {
+        id: String(fetched.id),
+        title: Proof.normTitle(fetched.summary),
+        when: Proof.whenOf(fetched)
+      }
+    };
+  }
+
+  function performUndoEvent(snapshot, api) {
+    var Proof = proofLib();
+    if (!snapshot || !snapshot.contentHash) return { action: 'refuse', which: 'event' };
+    var current;
+    try { current = api.get(snapshot.calendarId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    var decision = Proof.eventUndoDecision(snapshot, current);
+    if (decision.action !== 'delete') return decision.action === 'refuse' ? decision : { action: 'unconfirmed' };
+    try { api.remove(snapshot.calendarId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    return { action: 'deleted' };
+  }
+
+  // Both reads must still match. One edit refuses both deletes.
+  function performUndoSchedule(snapshot, apis) {
+    var Proof = proofLib();
+    if (!snapshot || !snapshot.event || !snapshot.event.contentHash || !snapshot.task) {
+      return { action: 'refuse', which: 'event' };
+    }
+    var eventNow;
+    var taskNow;
+    try { eventNow = apis.calendar.get(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { taskNow = apis.tasks.get(snapshot.task.listId, snapshot.task.id); } catch (err) { return { action: 'unconfirmed' }; }
+    var eventDecision = Proof.eventUndoDecision(snapshot.event, eventNow);
+    var taskDecision = Proof.undoDecision(snapshot.task, taskNow);
+    if (eventDecision.action === 'refuse' || taskDecision.action === 'refuse') {
+      return { action: 'refuse', which: eventDecision.action === 'refuse' ? 'event' : 'task' };
+    }
+    if (eventDecision.action !== 'delete' || taskDecision.action !== 'delete') return { action: 'unconfirmed' };
+    try { apis.calendar.remove(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { apis.tasks.remove(snapshot.task.listId, snapshot.task.id); } catch (err) { return { action: 'unconfirmed' }; }
+    return { action: 'deleted' };
+  }
+
+  return {
+    performCreate: performCreate,
+    performUndo: performUndo,
+    eventBody: eventBody,
+    performCreateEvent: performCreateEvent,
+    performUndoEvent: performUndoEvent,
+    performUndoSchedule: performUndoSchedule
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = GlanceExecute;
 
 // ----- glance-gmail-addon/src/cards.js -----
 // Plain card models. Code.js turns these into Card Service widgets.
-// One Do it button on a proposal. A proof card shows the task that was
-// read back. A mismatch card does not say the task was created.
+// One Do it button on a proposal. A proof card shows what was read back.
+// A mismatch card does not say the write succeeded.
 
 var GlanceCards = (function () {
   function i18n() {
@@ -6093,6 +6359,11 @@ var GlanceCards = (function () {
     return text(lang, line);
   }
 
+  function whenLine(lang, when) {
+    var L = i18n();
+    return text(lang, L.t(lang, 'when') + ': ' + L.isolateLtr(when));
+  }
+
   function button(lang, key, action, params) {
     return {
       type: 'button',
@@ -6103,23 +6374,74 @@ var GlanceCards = (function () {
     };
   }
 
+  function doItButton(messageId, lang) {
+    return button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' });
+  }
+
   function proposal(decision, messageId, lang) {
+    var L = i18n();
+    if (decision.kind === 'hold') {
+      var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
+      return card(lang, [
+        text(lang, L.t(lang, 'calendarHold')),
+        text(lang, decision.title),
+        whenLine(lang, holdWhen),
+        doItButton(messageId, lang)
+      ]);
+    }
+    if (decision.kind === 'schedule') {
+      var when = decision.dateIso;
+      if (Number.isInteger(decision.hour) && Number.isInteger(decision.minute)) {
+        when = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
+      }
+      return card(lang, [
+        text(lang, decision.title),
+        whenLine(lang, when),
+        text(lang, L.t(lang, 'schedule')),
+        doItButton(messageId, lang)
+      ]);
+    }
     var widgets = [text(lang, decision.title)];
     if (decision.due) widgets.push(dueLine(lang, decision.due));
-    widgets.push(button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' }));
+    widgets.push(doItButton(messageId, lang));
     return card(lang, widgets);
+  }
+
+  function undoButton(lang, opts) {
+    if (!opts || opts.undo === false || !opts.messageId) return null;
+    return button(lang, 'undo', 'onUndo', { messageId: String(opts.messageId), source: opts.source || 'message' });
   }
 
   function proof(view, lang, opts) {
     opts = opts || {};
     var L = i18n();
-    var widgets = [text(lang, L.t(lang, 'inTasks'))];
-    widgets.push(text(lang, view.title));
-    if (view.due) widgets.push(dueLine(lang, view.due));
-    widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
-    if (opts.undo !== false && opts.messageId) {
-      widgets.push(button(lang, 'undo', 'onUndo', { messageId: String(opts.messageId), source: opts.source || 'message' }));
+    var widgets;
+    if (view && view.kind === 'hold') {
+      widgets = [
+        text(lang, L.t(lang, 'onCalendar')),
+        text(lang, view.title),
+        whenLine(lang, view.when),
+        text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id))
+      ];
+    } else if (view && view.kind === 'schedule') {
+      widgets = [
+        text(lang, L.t(lang, 'onCalendar')),
+        text(lang, view.title),
+        whenLine(lang, view.when),
+        text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)),
+        text(lang, L.t(lang, 'inTasks')),
+        text(lang, view.taskTitle)
+      ];
+      if (view.taskDue) widgets.push(dueLine(lang, view.taskDue));
+      widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.taskId)));
+    } else {
+      widgets = [text(lang, L.t(lang, 'inTasks'))];
+      widgets.push(text(lang, view.title));
+      if (view.due) widgets.push(dueLine(lang, view.due));
+      widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
     }
+    var undo = undoButton(lang, opts);
+    if (undo) widgets.push(undo);
     return card(lang, widgets);
   }
 
@@ -6127,8 +6449,9 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'couldntConfirm'))]);
   }
 
-  function edited(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'edited'))]);
+  function edited(lang, which) {
+    var key = which === 'event' ? 'editedEvent' : 'edited';
+    return card(lang, [text(lang, i18n().t(lang, key))]);
   }
 
   function undone(lang) {

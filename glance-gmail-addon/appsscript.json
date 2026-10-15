@@ -6,6 +6,11 @@
         "userSymbol": "Tasks",
         "version": "v1",
         "serviceId": "tasks"
+      },
+      {
+        "userSymbol": "Calendar",
+        "version": "v3",
+        "serviceId": "calendar"
       }
     ]
   },
@@ -15,6 +20,7 @@
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
     "https://www.googleapis.com/auth/gmail.addons.execute",
     "https://www.googleapis.com/auth/tasks",
+    "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/script.locale"
   ],

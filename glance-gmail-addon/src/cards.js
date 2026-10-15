@@ -1,6 +1,6 @@
 // Plain card models. Code.js turns these into Card Service widgets.
-// One Do it button on a proposal. A proof card shows the task that was
-// read back. A mismatch card does not say the task was created.
+// One Do it button on a proposal. A proof card shows what was read back.
+// A mismatch card does not say the write succeeded.
 
 var GlanceCards = (function () {
   function i18n() {
@@ -28,6 +28,11 @@ var GlanceCards = (function () {
     return text(lang, line);
   }
 
+  function whenLine(lang, when) {
+    var L = i18n();
+    return text(lang, L.t(lang, 'when') + ': ' + L.isolateLtr(when));
+  }
+
   function button(lang, key, action, params) {
     return {
       type: 'button',
@@ -38,23 +43,74 @@ var GlanceCards = (function () {
     };
   }
 
+  function doItButton(messageId, lang) {
+    return button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' });
+  }
+
   function proposal(decision, messageId, lang) {
+    var L = i18n();
+    if (decision.kind === 'hold') {
+      var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
+      return card(lang, [
+        text(lang, L.t(lang, 'calendarHold')),
+        text(lang, decision.title),
+        whenLine(lang, holdWhen),
+        doItButton(messageId, lang)
+      ]);
+    }
+    if (decision.kind === 'schedule') {
+      var when = decision.dateIso;
+      if (Number.isInteger(decision.hour) && Number.isInteger(decision.minute)) {
+        when = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
+      }
+      return card(lang, [
+        text(lang, decision.title),
+        whenLine(lang, when),
+        text(lang, L.t(lang, 'schedule')),
+        doItButton(messageId, lang)
+      ]);
+    }
     var widgets = [text(lang, decision.title)];
     if (decision.due) widgets.push(dueLine(lang, decision.due));
-    widgets.push(button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' }));
+    widgets.push(doItButton(messageId, lang));
     return card(lang, widgets);
+  }
+
+  function undoButton(lang, opts) {
+    if (!opts || opts.undo === false || !opts.messageId) return null;
+    return button(lang, 'undo', 'onUndo', { messageId: String(opts.messageId), source: opts.source || 'message' });
   }
 
   function proof(view, lang, opts) {
     opts = opts || {};
     var L = i18n();
-    var widgets = [text(lang, L.t(lang, 'inTasks'))];
-    widgets.push(text(lang, view.title));
-    if (view.due) widgets.push(dueLine(lang, view.due));
-    widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
-    if (opts.undo !== false && opts.messageId) {
-      widgets.push(button(lang, 'undo', 'onUndo', { messageId: String(opts.messageId), source: opts.source || 'message' }));
+    var widgets;
+    if (view && view.kind === 'hold') {
+      widgets = [
+        text(lang, L.t(lang, 'onCalendar')),
+        text(lang, view.title),
+        whenLine(lang, view.when),
+        text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id))
+      ];
+    } else if (view && view.kind === 'schedule') {
+      widgets = [
+        text(lang, L.t(lang, 'onCalendar')),
+        text(lang, view.title),
+        whenLine(lang, view.when),
+        text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)),
+        text(lang, L.t(lang, 'inTasks')),
+        text(lang, view.taskTitle)
+      ];
+      if (view.taskDue) widgets.push(dueLine(lang, view.taskDue));
+      widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.taskId)));
+    } else {
+      widgets = [text(lang, L.t(lang, 'inTasks'))];
+      widgets.push(text(lang, view.title));
+      if (view.due) widgets.push(dueLine(lang, view.due));
+      widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
     }
+    var undo = undoButton(lang, opts);
+    if (undo) widgets.push(undo);
     return card(lang, widgets);
   }
 
@@ -62,8 +118,9 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'couldntConfirm'))]);
   }
 
-  function edited(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'edited'))]);
+  function edited(lang, which) {
+    var key = which === 'event' ? 'editedEvent' : 'edited';
+    return card(lang, [text(lang, i18n().t(lang, key))]);
   }
 
   function undone(lang) {
