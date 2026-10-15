@@ -41,9 +41,9 @@ const FlowReceipt = (() => {
   // succeeded / total: how many steps in this Do It actually wrote.
   // priorCloses: writeStats.total from BEFORE those writes are logged.
   // requireProof: this Do It includes a writer that must be read back
-  // (Google Tasks in this slice). Handled only when every proof has
-  // fetchedBack true. Omit requireProof for writers that are not on
-  // this gate yet (Calendar, drafts, Drive).
+  // (Tasks, To Do, Calendar, Drive, OneDrive, or the allowlisted page).
+  // Handled only when every proof has fetchedBack true. A draft stays
+  // off this flag: preparing a draft is the write it already was.
   function confirmation(input) {
     input = input || {};
     const succeeded = count(input.succeeded);

@@ -100,9 +100,43 @@ console.log('\n--- POST + GET ok is Handled ---\n');
   check('that step is a trusted close', FlowProofOfClose.shouldRecordTrustedClose(results) === true);
   check('undo still addresses the external id', write.ref.externalId === built.externalId);
   const calendar = [{ action: { kind: 'calendar' }, response: { ok: true, ref: { eventId: 'ev_1' } } }];
-  check('a calendar write without this proof is unchanged', FlowProofOfClose.shouldRecordTrustedClose(calendar) === true && FlowProofOfClose.stepCountsAsHandled(calendar[0]) === true);
-  const mixed = calendar.concat(results);
+  check('a calendar write without fetchedBack is not a trusted close',
+    FlowProofOfClose.shouldRecordTrustedClose(calendar) === false && FlowProofOfClose.stepCountsAsHandled(calendar[0]) === false);
+  const calendarProof = FlowProofOfClose.buildProof({
+    system: FlowProofOfClose.SYSTEM_GOOGLE_CALENDAR,
+    externalId: 'ev_1',
+    fetchedBack: true,
+    verifiedAt: VERIFIED
+  });
+  const calendarProved = [{ action: { kind: 'calendar' }, response: { ok: true, ref: { eventId: 'ev_1', externalId: 'ev_1' }, proof: calendarProof } }];
+  check('a calendar read-back is a trusted close',
+    calendarProof && calendarProof.system === 'google/calendar' && calendarProof.fetchedBack === true &&
+    FlowProofOfClose.shouldRecordTrustedClose(calendarProved) === true && FlowProofOfClose.stepCountsAsHandled(calendarProved[0]) === true);
+  check('a calendar proof with fetchedBack false is not Handled',
+    FlowProofOfClose.stepCountsAsHandled({
+      action: { kind: 'calendar' },
+      response: { ok: true, proof: { system: 'google/calendar', externalId: 'ev_1', fetchedBack: false, verifiedAt: VERIFIED } }
+    }) === false);
+  const driveBare = ['driveDoc', 'driveSheet', 'driveFile'].map((kind) => ({
+    action: { kind: kind },
+    response: { ok: true, ref: { fileId: 'file_1' } }
+  }));
+  check('a Drive write without fetchedBack is not a trusted close',
+    driveBare.every((step) => FlowProofOfClose.stepCountsAsHandled(step) === false) &&
+    FlowProofOfClose.shouldRecordTrustedClose(driveBare) === false);
+  const driveProof = FlowProofOfClose.buildProof({
+    system: FlowProofOfClose.SYSTEM_GOOGLE_DRIVE,
+    externalId: 'file_1',
+    fetchedBack: true,
+    verifiedAt: VERIFIED
+  });
+  check('a Drive read-back is a trusted close',
+    driveProof && driveProof.system === 'google/drive' &&
+    FlowProofOfClose.stepCountsAsHandled({ action: { kind: 'driveFile' }, response: { ok: true, proof: driveProof } }) === true);
+  const mixed = calendarProved.concat(results);
   check('calendar plus a proved task is a trusted close', FlowProofOfClose.shouldRecordTrustedClose(mixed) === true);
+  check('an unproved calendar plus a proved task is not a trusted close',
+    FlowProofOfClose.shouldRecordTrustedClose(calendar.concat(results)) === false);
   const mixedMiss = calendar.concat([{ action: { kind: 'googleTask' }, response: { ok: false, reason: 'verify_failed' } }]);
   check('calendar plus a verify miss is not a trusted close', FlowProofOfClose.shouldRecordTrustedClose(mixedMiss) === false);
   const partial = FlowReceipt.confirmation({
@@ -146,6 +180,38 @@ console.log('\n--- Handled survives a thread reload ---\n');
     FlowProofOfClose.taskReceiptFromLog([writtenRow({ messageId: 'other' })], 'm1') === null);
   check('a calendar write is not this remount',
     FlowProofOfClose.taskReceiptFromLog([{ kind: 'written', messageId: 'm1', connectorId: 'calendar', ref: { eventId: 'ev' } }], 'm1') === null);
+  const provedCalendar = {
+    kind: 'written', messageId: 'm1', connectorId: 'calendar', system: 'google/calendar',
+    externalId: 'ev_1', verifiedAt: VERIFIED, fetchedBack: true,
+    writtenLine: 'Calendar · Kickoff · Sep 21 15:00', receiptStatus: 'Handled.',
+    url: 'https://calendar.google.com/event?eid=ev_1',
+    ref: { eventId: 'ev_1', externalId: 'ev_1' }
+  };
+  check('a calendar read-back remounts Handled',
+    FlowProofOfClose.taskReceiptFromLog([provedCalendar], 'm1') === provedCalendar);
+  const calendarCopy = FlowProofOfClose.remountCopy(provedCalendar);
+  check('the calendar remount names the event and keeps the event id for Undo',
+    calendarCopy && calendarCopy.status === 'Handled.' && calendarCopy.connectorId === 'calendar' &&
+    calendarCopy.externalId === 'ev_1' && calendarCopy.ref.eventId === 'ev_1' &&
+    calendarCopy.undoHint === 'Undo removes the Calendar event.',
+    calendarCopy);
+  check('a calendar row without fetchedBack does not remount',
+    FlowProofOfClose.remountCopy({ kind: 'written', messageId: 'm1', system: 'google/calendar', externalId: 'ev_1', verifiedAt: VERIFIED, connectorId: 'calendar' }) === null);
+  const provedDrive = {
+    kind: 'written', messageId: 'm1', connectorId: 'driveDoc', system: 'google/drive',
+    externalId: 'doc_1', verifiedAt: VERIFIED, fetchedBack: true,
+    writtenLine: 'Doc · Kickoff notes', receiptStatus: 'Handled.',
+    url: 'https://docs.google.com/document/d/doc_1/edit'
+  };
+  check('a Drive read-back remounts Handled',
+    FlowProofOfClose.taskReceiptFromLog([provedDrive], 'm1') === provedDrive);
+  const driveCopy = FlowProofOfClose.remountCopy(provedDrive);
+  check('the Drive remount keeps the file id for Undo',
+    driveCopy && driveCopy.connectorId === 'driveDoc' && driveCopy.ref.fileId === 'doc_1' &&
+    driveCopy.undoHint === 'Undo removes the Doc.',
+    driveCopy);
+  check('a trashed-shaped Drive row with fetchedBack false does not remount',
+    FlowProofOfClose.remountCopy({ kind: 'written', messageId: 'm1', system: 'google/drive', externalId: 'doc_1', verifiedAt: VERIFIED, fetchedBack: false, connectorId: 'driveFile' }) === null);
   check('fetchedBack false is not a receipt',
     FlowProofOfClose.taskReceiptFromLog([writtenRow({ fetchedBack: false })], 'm1') === null);
   check('a row with no external id is not a receipt',

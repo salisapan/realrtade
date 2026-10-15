@@ -1,8 +1,9 @@
 // Proof of close. A loop is Handled only after the system that received the
-// write is read back. A draft, an attachment, and a calendar hold are not
-// this proof. This slice speaks for Google Tasks, Microsoft To Do, and one
-// allowlisted page the floating extension already sees (`computer/<host>`),
-// and one OneDrive file (`microsoft/onedrive`).
+// write is read back. A draft is preparation, and this file does not treat
+// a draft id as a close. This slice speaks for Google Tasks, Microsoft To Do,
+// one Google Calendar event (`google/calendar`), one Google Drive file
+// (`google/drive`), one allowlisted page the floating extension already sees
+// (`computer/<host>`), and one OneDrive file (`microsoft/onedrive`).
 //
 // Shape (execution architecture, decision 5):
 //   { system, externalId, url?, number?, fetchedBack: true, verifiedAt }
@@ -18,11 +19,13 @@
 // This path does not ask Sali.
 //
 // Portable: no chrome.*, no DOM, no network. The service worker performs
-// the POST and the GET for Tasks, To Do, and one OneDrive file. A computer close takes an
+// the write and the GET for Tasks, To Do, Calendar, Drive, and one OneDrive file. A computer close takes an
 // injected reader (`query`) so this file never touches a page. The live
 // page driver is not wired.
 const FlowProofOfClose = (() => {
   const SYSTEM_GOOGLE_TASKS = 'google/tasks';
+  const SYSTEM_GOOGLE_CALENDAR = 'google/calendar';
+  const SYSTEM_GOOGLE_DRIVE = 'google/drive';
   const SYSTEM_MICROSOFT_TODO = 'microsoft/todo';
   const SYSTEM_MICROSOFT_ONEDRIVE = 'microsoft/onedrive';
   const SYSTEM_COMPUTER_PREFIX = 'computer/';
@@ -129,15 +132,23 @@ const FlowProofOfClose = (() => {
     return kind === 'onedriveFile';
   }
 
-  // Writers that must be read back before Handled. Calendar, drafts,
-  // and Google Drive are not in this list. One OneDrive file is.
-  // A computer close is on this list: Handled only when fetchedBack is true.
-  function isProofTaskKind(kind) {
-    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isOnedriveKind(kind) || isComputerKind(kind);
+  function isCalendarKind(kind) {
+    return kind === 'calendar';
   }
 
-  // One step of a Do It. A task counts only with a proof. Every other
-  // kind keeps the write it already had: this slice does not verify them.
+  function isDriveKind(kind) {
+    return kind === 'driveDoc' || kind === 'driveSheet' || kind === 'driveFile';
+  }
+
+  // Writers that must be read back before Handled. A draft is not a close
+  // and is not in this list: the chip still records the draft it prepared.
+  // A computer close is on this list: Handled only when fetchedBack is true.
+  function isProofTaskKind(kind) {
+    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isOnedriveKind(kind) || isComputerKind(kind) || isCalendarKind(kind) || isDriveKind(kind);
+  }
+
+  // One step of a Do It. A proof kind counts only with fetchedBack.
+  // A draft keeps the write it already had.
   function stepCountsAsHandled(result) {
     if (!result || !result.response || result.response.ok !== true || result.response.skipped) return false;
     const kind = result.action && result.action.kind;
@@ -240,6 +251,11 @@ const FlowProofOfClose = (() => {
       if (!clean(row.verifiedAt) || Number.isNaN(Date.parse(clean(row.verifiedAt)))) return false;
       if (!isComputerSystem(computerSystemName)) return false;
       return computerHostAllowlisted(computerSystemName.slice(SYSTEM_COMPUTER_PREFIX.length));
+    }
+    if (clean(row.system) === SYSTEM_GOOGLE_CALENDAR || clean(row.system) === SYSTEM_GOOGLE_DRIVE) {
+      if (row.fetchedBack !== true) return false;
+      if (!clean(row.verifiedAt) || Number.isNaN(Date.parse(clean(row.verifiedAt)))) return false;
+      return true;
     }
     if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
     return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row) || isOnedriveConnector(row);
@@ -420,6 +436,8 @@ const FlowProofOfClose = (() => {
     if (!isTaskReceiptRow(row)) return null;
     const externalId = externalIdOf(row);
     if (isComputerSystem(clean(row.system).toLowerCase())) return computerRemountCopy(row, externalId);
+    if (clean(row.system) === SYSTEM_GOOGLE_CALENDAR) return calendarRemountCopy(row, externalId);
+    if (clean(row.system) === SYSTEM_GOOGLE_DRIVE) return driveRemountCopy(row, externalId);
     if (isOnedriveRow(row)) return onedriveRemountCopy(row, externalId);
     const ref = { taskId: externalId, externalId: externalId };
     const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
@@ -441,6 +459,49 @@ const FlowProofOfClose = (() => {
       connectorId: connector,
       externalId: externalId,
       ref: ref
+    };
+  }
+
+  function calendarRemountCopy(row, externalId) {
+    const stored = row.ref && typeof row.ref === 'object' ? row.ref : {};
+    const ref = { eventId: externalId, externalId: externalId };
+    if (stored.restore) ref.restore = stored.restore;
+    if (stored.previousStart) ref.previousStart = stored.previousStart;
+    if (stored.previousEnd) ref.previousEnd = stored.previousEnd;
+    const url = clean(row.url);
+    return {
+      status: receiptStatusOf(row),
+      writtenLine: clip(row.writtenLine, 180) || 'Calendar',
+      processName: clip(row.processName, 80),
+      closedLine: clip(row.closedLine, 180),
+      undoHint: 'Undo removes the Calendar event.',
+      undoneLine: 'Undone — the Calendar event was removed.',
+      undoFailed: 'Still there — the Calendar event was not removed.',
+      url: url.slice(0, 8) === 'https://' ? url : '',
+      connectorId: 'calendar',
+      externalId: externalId,
+      ref: ref
+    };
+  }
+
+  function driveRemountCopy(row, externalId) {
+    const connector = row.connectorId === 'driveDoc' || row.connectorId === 'driveSheet' || row.connectorId === 'driveFile'
+      ? row.connectorId
+      : 'driveFile';
+    const noun = connector === 'driveDoc' ? 'Doc' : (connector === 'driveSheet' ? 'Sheet' : 'Drive file');
+    const url = clean(row.url);
+    return {
+      status: receiptStatusOf(row),
+      writtenLine: clip(row.writtenLine, 180) || noun,
+      processName: clip(row.processName, 80),
+      closedLine: clip(row.closedLine, 180),
+      undoHint: 'Undo removes the ' + noun + '.',
+      undoneLine: 'Undone — the ' + noun + ' was removed.',
+      undoFailed: 'Still there — the ' + noun + ' was not removed.',
+      url: url.slice(0, 8) === 'https://' ? url : '',
+      connectorId: connector,
+      externalId: externalId,
+      ref: { fileId: externalId, externalId: externalId }
     };
   }
 
@@ -829,6 +890,8 @@ const FlowProofOfClose = (() => {
 
   return {
     SYSTEM_GOOGLE_TASKS: SYSTEM_GOOGLE_TASKS,
+    SYSTEM_GOOGLE_CALENDAR: SYSTEM_GOOGLE_CALENDAR,
+    SYSTEM_GOOGLE_DRIVE: SYSTEM_GOOGLE_DRIVE,
     SYSTEM_MICROSOFT_TODO: SYSTEM_MICROSOFT_TODO,
     SYSTEM_MICROSOFT_ONEDRIVE: SYSTEM_MICROSOFT_ONEDRIVE,
     SYSTEM_COMPUTER_PREFIX: SYSTEM_COMPUTER_PREFIX,
@@ -846,6 +909,8 @@ const FlowProofOfClose = (() => {
     isMicrosoftTodoKind: isMicrosoftTodoKind,
     isComputerKind: isComputerKind,
     isOnedriveKind: isOnedriveKind,
+    isCalendarKind: isCalendarKind,
+    isDriveKind: isDriveKind,
     isComputerSystem: isComputerSystem,
     isProofTaskKind: isProofTaskKind,
     stepCountsAsHandled: stepCountsAsHandled,

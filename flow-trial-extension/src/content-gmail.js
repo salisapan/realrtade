@@ -2426,9 +2426,16 @@
     return kind === 'googleTask' || kind === 'googleTasks';
   }
 
-  // Google Tasks is Handled only after fetchedBack. Other writers in this
-  // slice are unchanged. If the proof module is missing, a task does not
-  // count as closed.
+  function proofStep(r) {
+    const kind = r && r.action && r.action.kind;
+    if (typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.isProofTaskKind === 'function') {
+      return FlowProofOfClose.isProofTaskKind(kind);
+    }
+    return taskKind(r);
+  }
+
+  // A proof kind is Handled only after fetchedBack. If the proof module is
+  // missing, a task does not count as closed.
   function stepHandled(r) {
     if (typeof FlowProofOfClose !== 'undefined') return FlowProofOfClose.stepCountsAsHandled(r);
     if (taskKind(r)) return false;
@@ -2588,7 +2595,7 @@
     const he = /[\u0590-\u05FF]/.test(
       ((ctx && ctx.subject) || '') + ((ctx && ctx.bodyText) || '') + ((ctx && ctx.intent && ctx.intent.label) || '')
     );
-    const taskSteps = results.filter(taskKind);
+    const taskSteps = results.filter(proofStep);
     const copy = FlowReceipt.confirmation({
       succeeded: succeeded.length,
       total: results.length,
@@ -2596,7 +2603,7 @@
       lang: he ? 'he' : 'en',
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
-        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        ? succeeded.filter(proofStep).map((r) => r.response && r.response.proof)
         : undefined,
       verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
