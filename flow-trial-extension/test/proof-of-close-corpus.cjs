@@ -454,6 +454,38 @@ console.log('\n--- Microsoft To Do ---\n');
   const followEnd = bg.indexOf('async function followTaskComplete');
   check('the waiting-on chase does not write Microsoft To Do',
     follow > 0 && followEnd > follow && bg.slice(follow, followEnd).indexOf('/me/todo/') === -1);
+
+  console.log('\n--- one proof record for the card and for Loops ---\n');
+  const proved = {
+    kind: 'written', messageId: 'graph-1', itemId: 'owa-1', pathId: 'path-1', threadId: 'conv-1',
+    outlookConversationId: 'conv-1', connectorId: 'outlookTask', system: 'microsoft/todo',
+    externalId: 'task-1', fetchedBack: true, writtenLine: 'To Do · Renew the parking permit',
+    receiptStatus: 'Handled.', label: 'Renew the parking permit',
+    ref: { taskId: 'task-1', taskListId: 'list-1', externalId: 'task-1', created: { title: 'Renew the parking permit', importance: 'normal' } },
+    url: 'https://to-do.office.com/tasks/task-1'
+  };
+  let proofs = FlowProofOfClose.rememberProof(null, proved);
+  const byItem = FlowProofOfClose.proofForIds(proofs, ['owa-1']);
+  const byConv = FlowProofOfClose.proofForIds(proofs, ['conv-1']);
+  check('the same proof record is found by the item id and by the conversation id',
+    byItem && byConv && byItem === byConv && byItem.messageId === 'graph-1', byItem && byItem.messageId);
+  const refused = FlowProofOfClose.noteUndoRefused(byItem, 'You edited this. Undo left it alone.');
+  check('a refused Undo stays on the record',
+    refused.undoRefused === 'user-edited' && refused.undoLine === 'You edited this. Undo left it alone.');
+  const gone = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 404 });
+  check('a 404 marks the record deleted in To Do',
+    gone.deleted === true && gone.deletedLine === 'Deleted in To Do' && gone.verifyNote == null, gone);
+  const goneFile = FlowProofOfClose.noteReconcile(Object.assign({}, byItem, { objectName: 'OneDrive' }), { ok: false, status: 410 });
+  check('a 410 uses the object name', goneFile.deletedLine === 'Deleted in OneDrive');
+  const missed = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 500 });
+  check('a Graph error keeps the record and says couldn\'t verify',
+    missed.deleted !== true && missed.verifyNote === "couldn't verify" && missed.externalId === 'task-1', missed);
+  const dropped = FlowProofOfClose.dropProof(proofs, 'graph-1');
+  check('Undo drops the proof so the card does not return to Handled',
+    FlowProofOfClose.proofForIds(dropped, ['owa-1']) == null);
+  check('the page reconciles from that record and persists a refused Undo',
+    outlook.indexOf("type: 'flow:reconcile-proof'") > 0 && outlook.indexOf('patchGlanceProof') > 0 &&
+    outlook.indexOf('proofForIds') > 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

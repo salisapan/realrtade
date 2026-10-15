@@ -3394,6 +3394,18 @@ const OUTLOOK_KEEPALIVE_MINUTES = 30;
 // minutes and, from hour 16 of the 24-hour single-page-application window, renews silently (prompt=none, no window) so a
 // new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
 // staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
+function outlookLaunchInteractive(url) {
+  return new Promise((resolve) => {
+    try {
+      chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => {
+        const err = chrome.runtime.lastError;
+        if (err || !r) resolve(null);
+        else resolve(r);
+      });
+    } catch (e) { resolve(null); }
+  });
+}
+
 function outlookLaunchSilent(url) {
   return new Promise((resolve) => {
     try {
@@ -3411,6 +3423,73 @@ function outlookPrimaryHint(auth) {
   const opaque = /^outlook_[0-9a-f]+@outlook\.com$/i;
   const list = [auth.account && auth.account.address, auth.account && auth.account.mail].concat(auth.ownAddresses || []).filter(Boolean).map((a) => String(a).toLowerCase());
   return list.find((a) => !opaque.test(a)) || list[0] || null;
+}
+
+// Hold asks for Calendars.ReadWrite only. Already granted scopes stay on the
+// request so Mail is not replaced. This does not call connect(), which clears
+// judgment. No new Chrome permission: launchWebAuthFlow is already the sign-in.
+async function outlookConsentScope(msg) {
+  const A = globalThis.FlowOutlookAuth;
+  const cfg = globalThis.FlowOutlookConfig;
+  if (!A || !cfg || typeof A.signIn !== 'function' || typeof cfg.incrementalConsentScopes !== 'function') {
+    return { ok: false, reason: 'not-configured' };
+  }
+  const scope = String((msg && msg.scope) || '');
+  const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = bag[OUTLOOK_AUTH_KEY];
+  if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
+  const scopes = cfg.incrementalConsentScopes(
+    [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []),
+    scope
+  );
+  if (!scopes) return { ok: false, reason: 'scope-refused' };
+  const r = await A.signIn({
+    fetch: (u, i) => fetch(u, i),
+    now: () => Date.now(),
+    random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+    sha256: (b) => crypto.subtle.digest('SHA-256', b),
+    launch: outlookLaunchInteractive
+  }, cfg, chrome.identity.getRedirectURL(), {
+    scopes: scopes,
+    prompt: 'consent',
+    loginHint: outlookPrimaryHint(auth)
+  });
+  if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
+  const granted = [];
+  [].concat(r.token.grantedScopes || [], scopes).forEach((s) => {
+    if (s && granted.indexOf(s) < 0) granted.push(s);
+  });
+  const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
+  await chrome.storage.local.set({
+    [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {
+      token: Object.assign({}, r.token, { grantedScopes: granted }),
+      requestedScopes: scopes
+    }),
+    glanceCalendarConsent: { mode: policy, scope: scope, revoked: false, at: Date.now() }
+  });
+  return { ok: true, policy: policy, scope: scope };
+}
+
+async function outlookReconcileProof(msg) {
+  const ref = (msg && msg.ref && typeof msg.ref === 'object') ? msg.ref : {};
+  const id = (msg && msg.externalId) || ref.externalId || ref.taskId || ref.fileId || ref.itemId || ref.eventId;
+  if (!id) return { ok: false, status: 0, reason: 'no-id' };
+  let url = '';
+  if ((msg && msg.connectorId) === 'outlookCalendar' || ref.eventId) {
+    url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(ref.eventId || id);
+  } else if ((msg && (msg.connectorId === 'onedriveFile' || msg.system === 'microsoft/onedrive')) || ref.fileId) {
+    url = OUTLOOK_GRAPH + '/me/drive/items/' + encodeURIComponent(ref.fileId || ref.itemId || id);
+  } else {
+    const listId = ref.taskListId;
+    if (!listId) return { ok: false, status: 0, reason: 'no-id' };
+    url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId || id);
+  }
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); }
+  catch (e) { return { ok: false, status: 0, reason: 'error' }; }
+  if (!res) return { ok: false, status: 0, reason: 'error' };
+  return { ok: res.ok === true, status: Number(res.status) || 0 };
 }
 
 let outlookSessionBusy = null;
@@ -4068,6 +4147,18 @@ async function outlookTaskWrite(p) {
   const body = { title: title };
   if (notes) body.body = { contentType: 'text', content: notes };
   if (close.dueIso) body.dueDateTime = { dateTime: close.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+  const reminder = p && p.params && p.params.reminder;
+  if (reminder) {
+    const remDay = calendarIsoDate(reminder.dateIso);
+    const remClock = calendarClock(reminder.hour, reminder.minute);
+    if (remDay && remClock && !remClock.invalid && !remClock.absent) {
+      body.isReminderOn = true;
+      body.reminderDateTime = {
+        dateTime: calendarDateTime(remDay, remClock.hour, remClock.minute),
+        timeZone: localTimeZone()
+      };
+    }
+  }
 
   const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
   outlookAssertNotSend(postUrl);
@@ -4638,6 +4729,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
   if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
+  if (msg.type === 'flow:outlook-consent-scope') return reply(sendResponse, outlookConsentScope(msg));
+  if (msg.type === 'flow:reconcile-proof') return reply(sendResponse, outlookReconcileProof(msg));
   if (msg.type === 'flow:outlook-keepalive') {
     if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
     return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());

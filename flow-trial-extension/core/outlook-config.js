@@ -68,5 +68,20 @@ FlowOutlookConfig.defaultConnectIds = function defaultConnectIds() {
   return ['mail'];
 };
 
+// Incremental consent for Hold. The only new scope is Calendars.ReadWrite.
+// Scopes already granted stay on the request so Mail is not dropped.
+// Mail.Send and any Shared scope are never added.
+FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(existing, scope) {
+  const add = String(scope || '');
+  if (add !== 'Calendars.ReadWrite') return null;
+  const out = [];
+  (Array.isArray(existing) ? existing : []).forEach((s) => {
+    if (!s || /Mail\.Send/i.test(s) || /Shared$/i.test(s)) return;
+    if (out.indexOf(s) < 0) out.push(s);
+  });
+  if (out.indexOf(add) < 0) out.push(add);
+  return out;
+};
+
 if (typeof module !== 'undefined') module.exports = { FlowOutlookConfig };
 else if (typeof globalThis !== 'undefined') globalThis.FlowOutlookConfig = FlowOutlookConfig;

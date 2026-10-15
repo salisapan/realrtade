@@ -453,6 +453,8 @@ const FlowStorage = (() => {
     }
 
     patch.log = trimLog([row, ...state.log], resolved);
+    const proofs = mergeGlanceProof(state, row);
+    if (proofs) patch.glanceProofs = proofs;
     await set(patch);
     return patch.log;
   });
@@ -1434,6 +1436,18 @@ const FlowStorage = (() => {
   // Outlook Loops receipts: a prepared draft is shown in place until Undo or dismiss.
   // Written rows are terminal for getPending; these helpers surface the active draft
   // receipt and can reopen the ask after a draft-only undo.
+  function proofApi() {
+    return typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+  }
+
+  function mergeGlanceProof(state, row) {
+    const P = proofApi();
+    if (!P || typeof P.rememberProof !== 'function' || !row || !row.messageId) return null;
+    const next = P.rememberProof(state && state.glanceProofs, row);
+    if (!next || !next.records || !next.records[row.messageId]) return null;
+    return next;
+  }
+
   function getActiveOutlookReceiptsFrom(state) {
     const log = (state && state.log) || [];
     // An older undone (e.g. migrated 0.9.3) must not hide a NEWER draft receipt
@@ -1459,6 +1473,30 @@ const FlowStorage = (() => {
       if (seen.has(e.messageId)) continue;
       seen.add(e.messageId);
       out.push(e);
+    }
+    const P = proofApi();
+    const store = state && state.glanceProofs;
+    if (P && typeof P.proofForIds === 'function' && store && store.records) {
+      for (let i = 0; i < out.length; i++) {
+        if (!out[i] || out[i].connectorId === 'outlookDraft') continue;
+        const rec = P.proofForIds(store, [out[i].messageId, out[i].itemId, out[i].pathId, out[i].threadId, out[i].outlookConversationId]);
+        if (!rec) continue;
+        if (rec.undone === true) {
+          out.splice(i, 1);
+          i -= 1;
+          continue;
+        }
+        const view = P.proofAsLogRow(rec);
+        if (view) out[i] = Object.assign({}, out[i], view);
+      }
+      Object.keys(store.records).forEach((mid) => {
+        const rec = store.records[mid];
+        if (!rec || rec.undone === true || seen.has(rec.messageId)) return;
+        const view = P.proofAsLogRow(rec);
+        if (!view || !panelReceipt(view)) return;
+        seen.add(view.messageId);
+        out.push(view);
+      });
     }
     return out;
   }
@@ -1659,8 +1697,34 @@ const FlowStorage = (() => {
       hit = true;
     }
     const resolved = (state.resolvedMessageIds || []).filter((id) => !messageId || id !== messageId);
-    await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
+    const patch = { log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved };
+    const P = proofApi();
+    if (P && typeof P.dropProof === 'function' && messageId) {
+      patch.glanceProofs = P.dropProof(state.glanceProofs, messageId);
+    }
+    await set(patch);
     return { ok: true, hit: hit };
+  });
+
+  const rememberGlanceProof = serialize(async function rememberGlanceProof(row) {
+    const state = await get();
+    const proofs = mergeGlanceProof(state, row);
+    if (!proofs) return { ok: false };
+    await set({ glanceProofs: proofs });
+    return { ok: true, record: proofs.records[row.messageId] };
+  });
+
+  const patchGlanceProof = serialize(async function patchGlanceProof(messageId, patch) {
+    if (!messageId || !patch || typeof patch !== 'object') return { ok: false };
+    const state = await get();
+    const store = state.glanceProofs || { records: {}, byId: {} };
+    const records = store.records || {};
+    const rec = records[messageId] || (proofApi() && proofApi().proofForIds(store, [messageId]));
+    const key = rec && rec.messageId;
+    if (!key || !records[key]) return { ok: false };
+    const next = Object.assign({}, records[key], patch);
+    await set({ glanceProofs: { records: Object.assign({}, records, { [key]: next }), byId: store.byId || {} } });
+    return { ok: true, record: next };
   });
 
   // Same in-place rewrite for the OneDrive file. A second HANDLED row is
@@ -1846,7 +1910,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, getExpiredLoops, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, getExpiredLoops, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, rememberGlanceProof, patchGlanceProof, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

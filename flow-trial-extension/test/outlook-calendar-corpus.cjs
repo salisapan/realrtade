@@ -131,6 +131,19 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
   const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
   check('a calendar undo flips that written row and does not invent a draft',
     /function markOutlookCalendarUndone/.test(storage) && /Calendar event removed\./.test(storage));
+  check('missing calendar scope asks, Once asks again, Always does not',
+    Cal.holdConsentAsk(false, null) === true &&
+    Cal.holdConsentAsk(true, { mode: 'once' }) === true &&
+    Cal.holdConsentAsk(true, { mode: 'always' }) === false &&
+    Cal.holdConsentAsk(true, { revoked: true }) === true &&
+    Cal.holdConsentAsk(true, null) === false);
+  const added = Cfg.incrementalConsentScopes(['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite'], 'Calendars.ReadWrite');
+  check('incremental consent adds only Calendars.ReadWrite to scopes already granted',
+    added.indexOf('Calendars.ReadWrite') >= 0 && added.indexOf('Tasks.ReadWrite') >= 0 &&
+    added.indexOf('Mail.Send') < 0 && Cfg.incrementalConsentScopes(added, 'Files.ReadWrite') == null, added);
+  check('Hold asks in one line with Once, Always, and Not now',
+    /Calendar needs Calendars\.ReadWrite\./.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8')) &&
+    /data-glance-consent-choice', pair\[1\]/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8')));
 }
 
 console.log('\nTOTAL FAILURES:', failures);

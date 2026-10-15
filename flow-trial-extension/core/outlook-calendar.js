@@ -16,6 +16,18 @@ const FlowOutlookCalendar = (() => {
     return String(scopes || '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
   }
 
+  // Missing calendar scope asks. Once asks again next time. Always does not,
+  // until Settings revokes it. A Connect checkbox that already granted the
+  // scope, with no card policy, does not ask.
+  function holdConsentAsk(granted, policy) {
+    const p = policy || {};
+    if (p.revoked === true) return true;
+    if (!granted) return true;
+    if (p.mode === 'once') return true;
+    if (p.mode === 'always') return false;
+    return false;
+  }
+
   // The exact delegated scope, or the Graph URL form of that same scope.
   // Calendars.Read and Calendars.ReadWrite.Shared are not this permission.
   function hasWriteScope(scopes) {
@@ -154,6 +166,7 @@ const FlowOutlookCalendar = (() => {
     WRITE_SCOPE: WRITE_SCOPE,
     DURATION_MIN: DURATION_MIN,
     hasWriteScope: hasWriteScope,
+    holdConsentAsk: holdConsentAsk,
     namesCalendar: namesCalendar,
     fileLink: fileLink,
     eventBody: eventBody,

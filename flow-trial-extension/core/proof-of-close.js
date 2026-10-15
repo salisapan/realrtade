@@ -505,6 +505,223 @@ const FlowProofOfClose = (() => {
     return contentSnapshot(row.created);
   }
 
+  // One proof record per message. The open mail and Loops both read this
+  // map. A page-only banner is not a second store.
+  function emptyProofStore() {
+    return { records: {}, byId: {} };
+  }
+
+  function sharedProofRow(row) {
+    return isMicrosoftTodoRow(row) || isOnedriveRow(row);
+  }
+
+  function proofIdList(row) {
+    const ids = [];
+    if (!row) return ids;
+    [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId, row.outlookIncomingId, row.graphMessageId, row.legacyMessageId].forEach((id) => {
+      const c = canonId(id);
+      if (c && ids.indexOf(c) < 0) ids.push(c);
+    });
+    return ids;
+  }
+
+  function objectNameOf(row) {
+    if (!row) return 'To Do';
+    if (row.objectName) return String(row.objectName);
+    if (isOnedriveRow(row)) return 'OneDrive';
+    return 'To Do';
+  }
+
+  function proofExternalId(row) {
+    return externalIdOf(row) || (row && row.ref && typeof row.ref === 'object' ? clean(row.ref.eventId) : '');
+  }
+
+  function proofRecordFromRow(row) {
+    if (!row || !row.messageId || !sharedProofRow(row)) return null;
+    if (row.kind && row.kind !== 'written') return null;
+    if (row.fetchedBack === false || row.undone === true) return null;
+    const externalId = proofExternalId(row);
+    if (!externalId) return null;
+    const ids = proofIdList(row);
+    return {
+      messageId: String(row.messageId),
+      ids: ids,
+      kind: 'written',
+      connectorId: row.connectorId || (isOnedriveRow(row) ? 'onedriveFile' : 'outlookTask'),
+      system: row.system || (isOnedriveRow(row) ? SYSTEM_MICROSOFT_ONEDRIVE : SYSTEM_MICROSOFT_TODO),
+      externalId: externalId,
+      ref: row.ref && typeof row.ref === 'object' ? row.ref : { externalId: externalId, taskId: externalId },
+      created: (row.ref && row.ref.created) || row.created || null,
+      url: row.url || null,
+      fetchedBack: true,
+      writtenLine: row.writtenLine || row.label || '',
+      receiptStatus: row.receiptStatus || STATUS_HANDLED,
+      label: row.label || row.actionTitle || row.writtenLine || '',
+      actionTitle: row.actionTitle || row.label || '',
+      subject: row.subject || '',
+      process: row.process || null,
+      intent: row.intent || null,
+      sender: row.sender || null,
+      text: row.text || row.bodyText || '',
+      threadId: row.threadId || null,
+      outlookConversationId: row.outlookConversationId || null,
+      itemId: row.itemId || null,
+      pathId: row.pathId || null,
+      app: row.app || 'outlook',
+      undoRefused: row.undoRefused || null,
+      undoLine: row.undoLine || null,
+      deleted: row.deleted === true,
+      deletedLine: row.deletedLine || null,
+      verifyNote: row.verifyNote || null,
+      objectName: objectNameOf(row),
+      ts: row.ts || null,
+      where: row.where || null
+    };
+  }
+
+  function rememberProof(store, row) {
+    const base = store && typeof store === 'object' ? store : emptyProofStore();
+    const records = Object.assign({}, base.records || {});
+    const byId = Object.assign({}, base.byId || {});
+    const next = proofRecordFromRow(row);
+    if (!next) return { records: records, byId: byId };
+    const prev = records[next.messageId];
+    if (prev && prev.undone !== true) {
+      if (!next.undoRefused && prev.undoRefused) {
+        next.undoRefused = prev.undoRefused;
+        next.undoLine = prev.undoLine;
+      }
+      if (prev.deleted === true && next.deleted !== true) {
+        next.deleted = true;
+        next.deletedLine = prev.deletedLine;
+      }
+      if (!next.verifyNote && prev.verifyNote) next.verifyNote = prev.verifyNote;
+      (prev.ids || []).forEach((id) => { if (next.ids.indexOf(id) < 0) next.ids.push(id); });
+    }
+    records[next.messageId] = next;
+    next.ids.forEach((id) => { byId[id] = next.messageId; });
+    const primary = canonId(next.messageId);
+    if (primary) byId[primary] = next.messageId;
+    return { records: records, byId: byId };
+  }
+
+  function proofLookupKeys(ids) {
+    const keys = [];
+    function add(id) {
+      const c = canonId(id);
+      if (c && keys.indexOf(c) < 0) keys.push(c);
+    }
+    if (Array.isArray(ids)) {
+      ids.forEach(add);
+      return keys;
+    }
+    if (ids && (ids.messageIds || ids.threadIds || ids.messageId || ids.threadId)) {
+      const q = queryIds(ids);
+      q.messageIds.forEach(add);
+      q.threadIds.forEach(add);
+      return keys;
+    }
+    add(ids);
+    return keys;
+  }
+
+  function proofForIds(store, ids) {
+    if (!store || !store.records) return null;
+    const keys = proofLookupKeys(ids);
+    const byId = store.byId || {};
+    for (let i = 0; i < keys.length; i++) {
+      const mid = byId[keys[i]];
+      const rec = mid && store.records[mid];
+      if (rec && rec.undone !== true && rec.kind !== 'undone') return rec;
+    }
+    return null;
+  }
+
+  function dropProof(store, messageId) {
+    const base = store && typeof store === 'object' ? store : emptyProofStore();
+    const records = Object.assign({}, base.records || {});
+    const byId = Object.assign({}, base.byId || {});
+    const key = records[messageId] ? messageId : (byId[canonId(messageId)] || null);
+    const rec = key && records[key];
+    if (!rec) return { records: records, byId: byId };
+    const next = Object.assign({}, rec, { undone: true, kind: 'undone' });
+    records[key] = next;
+    (rec.ids || []).concat([canonId(key)]).forEach((id) => {
+      if (id && byId[id] === key) delete byId[id];
+    });
+    return { records: records, byId: byId };
+  }
+
+  function noteUndoRefused(record, line) {
+    if (!record) return null;
+    return Object.assign({}, record, {
+      undoRefused: 'user-edited',
+      undoLine: line || 'You edited this. Undo left it alone.'
+    });
+  }
+
+  // 404 and 410 mean the item is gone. Any other miss keeps the record.
+  function noteReconcile(record, result) {
+    if (!record) return null;
+    const status = result && Number(result.status);
+    if (status === 404 || status === 410) {
+      const name = record.objectName || 'To Do';
+      return Object.assign({}, record, {
+        deleted: true,
+        deletedLine: 'Deleted in ' + name,
+        verifyNote: null
+      });
+    }
+    if (result && result.ok === true) {
+      return Object.assign({}, record, { verifyNote: null });
+    }
+    return Object.assign({}, record, {
+      verifyNote: "couldn't verify",
+      deleted: record.deleted === true,
+      deletedLine: record.deleted === true ? record.deletedLine : null
+    });
+  }
+
+  function proofAsLogRow(record) {
+    if (!record || record.undone === true || record.kind === 'undone') return null;
+    const deleted = record.deleted === true;
+    const line = deleted ? (record.deletedLine || ('Deleted in ' + (record.objectName || 'To Do'))) : (record.writtenLine || record.label || '');
+    return {
+      kind: 'written',
+      messageId: record.messageId,
+      itemId: record.itemId || null,
+      pathId: record.pathId || null,
+      threadId: record.threadId || null,
+      outlookConversationId: record.outlookConversationId || null,
+      connectorId: record.connectorId,
+      system: record.system,
+      externalId: record.externalId,
+      ref: record.ref,
+      created: record.created || (record.ref && record.ref.created) || null,
+      url: deleted ? null : (record.url || null),
+      where: record.where || null,
+      fetchedBack: true,
+      writtenLine: line,
+      label: deleted ? line : (record.label || line),
+      actionTitle: deleted ? line : (record.actionTitle || record.label || line),
+      receiptStatus: deleted ? line : (record.receiptStatus || STATUS_HANDLED),
+      subject: record.subject || '',
+      process: record.process || null,
+      intent: record.intent || null,
+      sender: record.sender || null,
+      text: record.text || '',
+      app: record.app || 'outlook',
+      ts: record.ts || null,
+      undoRefused: record.undoRefused || null,
+      undoLine: deleted ? null : (record.undoLine || null),
+      deleted: deleted,
+      glanceDeleted: deleted,
+      deletedLine: deleted ? line : null,
+      verifyNote: deleted ? null : (record.verifyNote || null),
+      objectName: record.objectName || 'To Do'
+    };
+  }
+
   // Shape only. The live Google Tasks path is the service worker writer,
   // which POSTs, GETs, and undoes by externalId. Later adapters can share
   // this capabilities list. This stub does not call a network.
@@ -902,7 +1119,14 @@ const FlowProofOfClose = (() => {
     verifyComputerDom: verifyComputerDom,
     computerClose: computerClose,
     localFileCloseShape: localFileCloseShape,
-    applyComputerUndo: applyComputerUndo
+    applyComputerUndo: applyComputerUndo,
+    emptyProofStore: emptyProofStore,
+    rememberProof: rememberProof,
+    proofForIds: proofForIds,
+    dropProof: dropProof,
+    noteUndoRefused: noteUndoRefused,
+    noteReconcile: noteReconcile,
+    proofAsLogRow: proofAsLogRow
   };
 })();
 

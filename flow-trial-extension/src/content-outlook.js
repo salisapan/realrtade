@@ -1207,13 +1207,27 @@
     if (!mount || !copy) return null;
     const keptSnap = (row.ref && typeof row.ref === 'object' && row.ref.created) || row.created || null;
     if (keptSnap && typeof keptSnap === 'object' && copy.ref) copy.ref.created = keptSnap;
+    const deleted = row.glanceDeleted === true || row.deleted === true;
+    const deletedLine = row.deletedLine || (deleted ? copy.status : '');
+    const undoLine = deleted ? '' : (row.undoLine || '');
+    const verifyNote = deleted ? '' : (row.verifyNote || '');
     const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
     const scope = (typeof readingScope === 'function' && readingScope(mount)) || mount;
     const hosts = scope.querySelectorAll ? Array.prototype.slice.call(scope.querySelectorAll('.flow-chip-host')) : [];
     let host = hosts.filter((h) => h.getAttribute('data-glance-undone') !== '1').pop() || null;
     if (host && host.classList.contains('flow-chip-settled') && host.getAttribute('data-glance-chain') === 'task-proof' && (!ids.length || hostMatches(host, ids))) {
-      hosts.forEach((other) => { if (other !== host) other.remove(); });
-      return host;
+      const shown = String(host.textContent || '');
+      const sameDeleted = deleted && deletedLine && shown.indexOf(deletedLine) >= 0 && !host.querySelector('.flow-chip-undo');
+      const sameRefusal = !deleted && undoLine && shown.indexOf(undoLine) >= 0;
+      const sameVerify = !verifyNote || shown.indexOf(verifyNote) >= 0;
+      if (!deleted && !undoLine && !verifyNote && shown.indexOf('You edited this') < 0 && shown.indexOf("couldn't verify") < 0 && shown.indexOf('Deleted in ') < 0) {
+        hosts.forEach((other) => { if (other !== host) other.remove(); });
+        return host;
+      }
+      if ((sameDeleted || sameRefusal) && sameVerify) {
+        hosts.forEach((other) => { if (other !== host) other.remove(); });
+        return host;
+      }
     }
     const el = FlowChipHost.el;
     if (!host) {
@@ -1235,8 +1249,9 @@
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', copy.status));
-    if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
+    done.appendChild(el('span', 'flow-chip-handled', deleted ? deletedLine : copy.status));
+    if (!deleted && copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
+    if (verifyNote) done.appendChild(el('span', 'flow-chip-label', verifyNote));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
       if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
@@ -1246,7 +1261,8 @@
     const undo = el('button', 'flow-chip-undo', copy.undoHint);
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
-    hint.hidden = true;
+    hint.hidden = !undoLine;
+    if (undoLine) hint.textContent = undoLine;
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
@@ -1283,6 +1299,12 @@
           hint.hidden = false;
           hint.textContent = result.written || (result.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : (result.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : "Couldn't verify, try again"));
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+          if (result.reason === 'user-edited' && row.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
+            const refused = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.noteUndoRefused)
+              ? FlowProofOfClose.noteUndoRefused({ messageId: row.messageId }, hint.textContent)
+              : { undoRefused: 'user-edited', undoLine: hint.textContent };
+            await FlowStorage.patchGlanceProof(row.messageId, { undoRefused: refused.undoRefused, undoLine: refused.undoLine });
+          }
           return;
         }
         if (!(result && result.ok) || (todoUndo && result.fetchedBack !== true)) {
@@ -1321,7 +1343,7 @@
         lastSig = '';
       });
     });
-    done.appendChild(actionsRow);
+    if (!deleted) done.appendChild(actionsRow);
     done.appendChild(hint);
     if (manuals) done.appendChild(el('span', 'flow-chip-label', manuals + (manuals === 1 ? ' manual step left for you' : ' manual steps left for you')));
     host.__glanceSteps = null;
@@ -1458,15 +1480,66 @@
     return true;
   }
 
+  function proofIdsForPane(pane, extra) {
+    const ids = [pane && pane.itemId, pane && pane.pathId, pane && pane.conversationId];
+    (extra || []).forEach((id) => ids.push(id));
+    return ids.filter(Boolean);
+  }
+
+  async function reconcileProofRecord(record) {
+    if (!record || record.deleted === true || record.undone === true) return record;
+    let result = null;
+    try {
+      result = await send({
+        type: 'flow:reconcile-proof',
+        system: record.system,
+        connectorId: record.connectorId,
+        externalId: record.externalId,
+        ref: record.ref,
+        objectName: record.objectName
+      });
+    } catch (e) {
+      result = { ok: false, status: 0 };
+    }
+    if (!result) result = { ok: false, status: 0 };
+    const next = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.noteReconcile)
+      ? FlowProofOfClose.noteReconcile(record, result)
+      : record;
+    if (next && record.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
+      const changed = next.deleted !== record.deleted || next.verifyNote !== record.verifyNote || next.deletedLine !== record.deletedLine;
+      if (changed) {
+        try { await FlowStorage.patchGlanceProof(record.messageId, next); } catch (e) { /* the card still shows this read */ }
+      }
+    }
+    return next || record;
+  }
+
+  async function paintSharedProof(mount, record) {
+    const live = await reconcileProofRecord(record);
+    const row = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.proofAsLogRow)
+      ? FlowProofOfClose.proofAsLogRow(live)
+      : live;
+    if (!row) return false;
+    return Boolean(paintOutlookTodoReceipt(mount, row));
+  }
+
   // Handled after a reload or a return to this thread. The match is the
   // Outlook item id, the path id, or the conversation id. A hash of the
-  // pane text is not an id.
+  // pane text is not an id. The record is the same one Loops reads.
   async function remountProvedTodoReceipt(pane) {
     if (!pane || typeof FlowProofOfClose === 'undefined' || typeof FlowProofOfClose.taskReceiptFromLog !== 'function') return false;
     const mount = mountPoint();
     if (!mount) return false;
     let bag = null;
     try { bag = await FlowStorage.get(); } catch (e) { return false; }
+    if (typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.proofForIds === 'function') {
+      const shared = FlowProofOfClose.proofForIds(bag && bag.glanceProofs, proofIdsForPane(pane));
+      if (shared && await paintSharedProof(mount, shared)) {
+        lastOutcome = 'card';
+        lastKey = (shared.messageId || 'open') + '|task-proof';
+        return true;
+      }
+    }
     const log = (bag && bag.log) || [];
     const todoLog = log.filter((e) => outlookProofRow(e));
     let fileNames = (pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean);
@@ -1492,11 +1565,24 @@
         }
       }
     } catch (e) { /* a miss stays on the ids the page already has */ }
-    const row = FlowProofOfClose.taskReceiptFromLog(todoLog, {
-      messageIds: [pane.itemId, pane.pathId, pane.conversationId].concat(graphId ? [graphId] : []),
+    const rowQuery = {
+      messageIds: [pane.itemId, pane.pathId, pane.conversationId],
       threadIds: [pane.conversationId],
       fileNames: fileNames
-    });
+    };
+    if (graphId) rowQuery.messageIds.push(graphId);
+    if (graphId && typeof FlowProofOfClose.proofForIds === 'function') {
+      const later = FlowProofOfClose.proofForIds(bag && bag.glanceProofs, proofIdsForPane(pane, [graphId]));
+      if (later && await paintSharedProof(mount, later)) {
+        lastOutcome = 'card';
+        lastKey = (later.messageId || 'open') + '|task-proof';
+        return true;
+      }
+    }
+    const row = FlowProofOfClose.taskReceiptFromLog(todoLog, rowQuery);
+    if (outlookProofRow(row) && typeof FlowStorage.rememberGlanceProof === 'function') {
+      try { await FlowStorage.rememberGlanceProof(row); } catch (e) { /* the log row still paints */ }
+    }
     const existing = stripDuplicateUndoHosts(mount);
     // An Undo line is not a close. data-glance-undone stays on the click,
     // then this scan drops it so exactly one Do It can return, including
@@ -1590,9 +1676,123 @@
     return (r && (r.error || r.reason)) || 'Could not confirm the task';
   }
 
+  async function commitProvedTodo(host, ctx, r, taskStep, proved) {
+    const params = (taskStep && taskStep.params) || {};
+    const he = ctx && ctx.intent && ctx.intent.lang === 'he';
+    if (!proved) {
+      const status = "Created, couldn't verify";
+      const messageId = (ctx && ctx.messageId) || null;
+      await FlowStorage.appendLog({
+        kind: 'written',
+        label: status,
+        messageId: messageId,
+        itemId: (ctx && ctx.itemId) || null,
+        pathId: (ctx && ctx.pathId) || null,
+        threadId: (ctx && (ctx.threadId || ctx.conversationId)) || null,
+        outlookConversationId: (ctx && ctx.conversationId) || null,
+        outlookIncomingId: (ctx && (ctx.outlookIncomingId || ctx.messageId)) || null,
+        app: 'outlook',
+        connectorId: 'outlookTask',
+        ref: r.ref,
+        created: (r.ref && r.ref.created) || null,
+        where: r.where || null,
+        url: r.url || null,
+        fetchedBack: false,
+        receiptStatus: status,
+        intent: ctx && ctx.intent,
+        process: ctx && ctx.process,
+        sender: ctx && ctx.sender,
+        subject: ctx && ctx.subject,
+        text: ctx && ctx.bodyText
+      });
+      FlowChipHost.showDraftReceipt(host, {
+        status: status,
+        written: status,
+        url: r.url || null,
+        linkLabel: 'View',
+        onUndo: () => send({
+          type: 'flow:undo-action',
+          connectorId: 'outlookTask',
+          ref: r.ref,
+          created: (r.ref && r.ref.created) || null
+        })
+      });
+      return;
+    }
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
+    const status = he ? 'טופל.' : 'Handled.';
+    const fields = FlowProofOfClose.receiptLogFields
+      ? FlowProofOfClose.receiptLogFields(r.proof, {
+        writtenLine: r.written,
+        processName: faceTitle(ctx),
+        closedLine: ctx && ctx.process && ctx.process.closedLine,
+        status: status,
+        created: (r.ref && r.ref.created) || null
+      })
+      : null;
+    const threadId = (ctx && (ctx.threadId || ctx.conversationId)) || null;
+    const taskTitle = actionTitle({
+      connectorId: 'outlookTask', process: ctx && ctx.process, intent: ctx && ctx.intent, text: ctx && ctx.bodyText,
+      writtenLine: r.written, subject: ctx && ctx.subject, params: params
+    });
+    await FlowStorage.appendLog(Object.assign({
+      kind: 'written',
+      label: taskTitle,
+      actionTitle: taskTitle,
+      messageId: ctx && ctx.messageId,
+      itemId: (ctx && ctx.itemId) || null,
+      pathId: (ctx && ctx.pathId) || null,
+      threadId: threadId,
+      outlookConversationId: (ctx && ctx.conversationId) || null,
+      outlookIncomingId: (ctx && (ctx.outlookIncomingId || ctx.messageId)) || null,
+      app: 'outlook',
+      connectorId: 'outlookTask',
+      ref: r.ref,
+      created: (r.ref && r.ref.created) || null,
+      where: r.where,
+      url: r.url || null,
+      intent: ctx && ctx.intent,
+      process: ctx && ctx.process,
+      sender: ctx && ctx.sender,
+      subject: ctx && ctx.subject,
+      text: ctx && ctx.bodyText
+    }, fields || {}));
+    if (ctx && ctx.messageId) {
+      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
+      await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
+    }
+    const mount = (host && host.parentElement) || mountPoint();
+    const row = Object.assign({
+      kind: 'written',
+      messageId: ctx && ctx.messageId,
+      itemId: (ctx && ctx.itemId) || null,
+      pathId: (ctx && ctx.pathId) || null,
+      threadId: threadId,
+      outlookConversationId: (ctx && ctx.conversationId) || null,
+      connectorId: 'outlookTask',
+      ref: r.ref,
+      created: (r.ref && r.ref.created) || null,
+      url: r.url || null,
+      system: 'microsoft/todo',
+      externalId: r.proof && r.proof.externalId,
+      verifiedAt: r.proof && r.proof.verifiedAt,
+      fetchedBack: true,
+      writtenLine: r.written,
+      processName: faceTitle(ctx),
+      closedLine: ctx && ctx.process && ctx.process.closedLine,
+      receiptStatus: status,
+      process: ctx && ctx.process,
+      intent: ctx && ctx.intent,
+      text: ctx && ctx.bodyText,
+      sender: ctx && ctx.sender,
+      subject: ctx && ctx.subject,
+      app: 'outlook'
+    }, fields || {});
+    if (mount) paintOutlookTodoReceipt(mount, row);
+  }
+
   async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
     const params = (taskStep && taskStep.params) || {};
-    const he = ctx.intent && ctx.intent.lang === 'he';
     const live = await livePromiseProof(promiseItem(ctx));
     if (ignoreStaleClick(host)) return;
     if (live) {
@@ -1621,43 +1821,7 @@
       : false;
     if (!proved) {
       if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
-        const status = "Created, couldn't verify";
-        const messageId = ctx.messageId || null;
-        await FlowStorage.appendLog({
-          kind: 'written',
-          label: status,
-          messageId: messageId,
-          itemId: ctx.itemId || null,
-          pathId: ctx.pathId || null,
-          threadId: ctx.threadId || ctx.conversationId || null,
-          outlookConversationId: ctx.conversationId || null,
-          outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
-          app: 'outlook',
-          connectorId: 'outlookTask',
-          ref: r.ref,
-          created: (r.ref && r.ref.created) || null,
-          where: r.where || null,
-          url: r.url || null,
-          fetchedBack: false,
-          receiptStatus: status,
-          intent: ctx.intent,
-          process: ctx.process,
-          sender: ctx.sender,
-          subject: ctx.subject,
-          text: ctx.bodyText
-        });
-        FlowChipHost.showDraftReceipt(host, {
-          status: status,
-          written: status,
-          url: r.url || null,
-          linkLabel: 'View',
-          onUndo: () => send({
-            type: 'flow:undo-action',
-            connectorId: 'outlookTask',
-            ref: r.ref,
-            created: (r.ref && r.ref.created) || null
-          })
-        });
+        await commitProvedTodo(host, ctx, r, taskStep, false);
         return;
       }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
@@ -1665,74 +1829,7 @@
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
       return;
     }
-    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
-    const status = he ? 'טופל.' : 'Handled.';
-    const fields = FlowProofOfClose.receiptLogFields
-      ? FlowProofOfClose.receiptLogFields(r.proof, {
-        writtenLine: r.written,
-        processName: faceTitle(ctx),
-        closedLine: ctx.process && ctx.process.closedLine,
-        status: status,
-        created: (r.ref && r.ref.created) || null
-      })
-      : null;
-    const threadId = ctx.threadId || ctx.conversationId || null;
-    const taskTitle = actionTitle({
-      connectorId: 'outlookTask', process: ctx.process, intent: ctx.intent, text: ctx.bodyText,
-      writtenLine: r.written, subject: ctx.subject, params: params
-    });
-    await FlowStorage.appendLog(Object.assign({
-      kind: 'written',
-      label: taskTitle,
-      actionTitle: taskTitle,
-      messageId: ctx.messageId,
-      itemId: ctx.itemId || null,
-      pathId: ctx.pathId || null,
-      threadId: threadId,
-      outlookConversationId: ctx.conversationId || null,
-      outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
-      app: 'outlook',
-      connectorId: 'outlookTask',
-      ref: r.ref,
-      created: (r.ref && r.ref.created) || null,
-      where: r.where,
-      url: r.url || null,
-      intent: ctx.intent,
-      process: ctx.process,
-      sender: ctx.sender,
-      subject: ctx.subject,
-      text: ctx.bodyText
-    }, fields || {}));
-    if (ctx.messageId) {
-      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
-      await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
-    }
-    const mount = host.parentElement || mountPoint();
-    const row = Object.assign({
-      kind: 'written',
-      messageId: ctx.messageId,
-      threadId: threadId,
-      outlookConversationId: ctx.conversationId || null,
-      connectorId: 'outlookTask',
-      ref: r.ref,
-      created: (r.ref && r.ref.created) || null,
-      url: r.url || null,
-      system: 'microsoft/todo',
-      externalId: r.proof && r.proof.externalId,
-      verifiedAt: r.proof && r.proof.verifiedAt,
-      fetchedBack: true,
-      writtenLine: r.written,
-      processName: faceTitle(ctx),
-      closedLine: ctx.process && ctx.process.closedLine,
-      receiptStatus: status,
-      process: ctx.process,
-      intent: ctx.intent,
-      text: ctx.bodyText,
-      sender: ctx.sender,
-      subject: ctx.subject,
-      app: 'outlook'
-    }, fields || {});
-    if (mount) paintOutlookTodoReceipt(mount, row);
+    await commitProvedTodo(host, ctx, r, taskStep, true);
   }
 
   async function onOnedriveDoIt(host, chip, ctx, fileStep) {
@@ -2303,15 +2400,135 @@
     return null;
   }
 
+  const CALENDAR_SCOPE = 'Calendars.ReadWrite';
+
+  function calendarAsk(st) {
+    const granted = typeof FlowOutlookCalendar !== 'undefined' && FlowOutlookCalendar.hasWriteScope
+      ? FlowOutlookCalendar.hasWriteScope(calendarScopes(st))
+      : false;
+    const policy = (st && st.glanceCalendarConsent) || null;
+    if (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.holdConsentAsk === 'function') {
+      return FlowOutlookCalendar.holdConsentAsk(granted, policy);
+    }
+    return !granted;
+  }
+
+  async function storeCalendarPolicy(choice) {
+    const st = await FlowStorage.get();
+    const auth = (st && st.outlookAuth) || {};
+    const token = Object.assign({}, auth.token || {});
+    const scopes = Array.isArray(token.grantedScopes) ? token.grantedScopes.slice() : [];
+    if (scopes.indexOf(CALENDAR_SCOPE) < 0) scopes.push(CALENDAR_SCOPE);
+    token.grantedScopes = scopes;
+    const mode = choice === 'always' ? 'always' : 'once';
+    await FlowStorage.set({
+      outlookAuth: Object.assign({}, auth, { token: token }),
+      glanceCalendarConsent: { mode: mode, scope: CALENDAR_SCOPE, revoked: false, at: Date.now() }
+    });
+    if (mode === 'always') {
+      await FlowStorage.appendLog({
+        kind: 'shown',
+        label: 'Calendar permission: Always',
+        app: 'outlook',
+        reason: 'calendar-consent-always',
+        messageId: 'calendar-consent'
+      });
+    }
+  }
+
+  function paintCalendarConsent(host, ctx) {
+    if (!host || host.querySelector('[data-glance-consent="calendar"]')) return;
+    const row = FlowChipHost.el('div', 'flow-chip-consent');
+    row.setAttribute('data-glance-consent', 'calendar');
+    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite.'));
+    const actions = FlowChipHost.el('span', 'flow-chip-actions');
+    [['Once', 'once'], ['Always', 'always'], ['Not now', 'not-now']].forEach((pair) => {
+      const button = FlowChipHost.el('button', 'flow-chip-consent-btn', pair[0]);
+      button.type = 'button';
+      button.setAttribute('data-glance-consent-choice', pair[1]);
+      button.addEventListener('click', () => { onCalendarConsent(host, ctx, pair[1]); });
+      actions.appendChild(button);
+    });
+    row.appendChild(actions);
+    host.appendChild(row);
+  }
+
+  async function onCalendarConsent(host, ctx, choice) {
+    if (!host || ignoreStaleClick(host)) return;
+    if (choice === 'not-now') {
+      await holdAsTodo(host, ctx);
+      return;
+    }
+    const granted = await send({ type: 'flow:outlook-consent-scope', scope: CALENDAR_SCOPE, policy: choice });
+    if (!granted || granted.ok !== true) {
+      if (!host.querySelector('.flow-chip-undo-hint')) {
+        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', (granted && (granted.error || granted.reason)) || 'Calendar permission was not granted.'));
+      }
+      return;
+    }
+    await storeCalendarPolicy(choice);
+    const ask = host.querySelector('[data-glance-consent="calendar"]');
+    if (ask) ask.remove();
+    await finishMeetingHold(host, ctx);
+  }
+
+  async function holdAsTodo(host, ctx) {
+    if (!host || ignoreStaleClick(host)) return;
+    const clock = meetingClock(ctx);
+    const title = (clock && clock.title) || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Hold';
+    const params = { title: title };
+    if (clock) params.reminder = { dateIso: clock.dateIso, hour: clock.hour, minute: clock.minute };
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookTask',
+        params: params,
+        label: title,
+        senderName: ctx && ctx.sender && ctx.sender.name,
+        senderEmail: ctx && ctx.sender && ctx.sender.email,
+        subject: (ctx && ctx.subject) || '',
+        text: (ctx && (ctx.bodyText || ctx.text)) || '',
+        threadUrl: (ctx && ctx.threadUrl) || null
+      }
+    });
+    if (ignoreStaleClick(host)) return;
+    const taskStep = { params: params };
+    if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
+      await commitProvedTodo(host, ctx, r, taskStep, false);
+      return;
+    }
+    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+      ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
+      : false;
+    if (!proved) {
+      const why = todoWriteFailureLine(r);
+      if (!host.querySelector('.flow-chip-undo-hint')) {
+        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
+      }
+      return;
+    }
+    await commitProvedTodo(host, ctx, r, taskStep, true);
+  }
+
   // Hold It on a meeting mail writes one calendar event and leaves the card
-  // on Handled, with Undo. A mail with no clock stays on the card and says so.
+  // on Handled, with Undo. Without calendar scope the card asks once, in one
+  // line. Not now holds the same loop as a To Do task.
   async function onMeetingHold(host, ctx) {
+    if (!host || ignoreStaleClick(host)) return;
+    let st = null;
+    try { st = await FlowStorage.get(); } catch (e) { st = null; }
+    if (calendarAsk(st)) {
+      paintCalendarConsent(host, ctx);
+      return;
+    }
+    await finishMeetingHold(host, ctx);
+  }
+
+  async function finishMeetingHold(host, ctx) {
     if (!host || ignoreStaleClick(host)) return;
     const params = meetingClock(ctx);
     if (!params) {
-      if (!host.querySelector('.flow-chip-undo-hint')) {
-        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', 'Needs a time on the calendar.'));
-      }
+      await holdAsTodo(host, ctx);
       return;
     }
     const r = await send({

@@ -440,6 +440,25 @@
     });
     card.appendChild(btn);
     card.appendChild(err);
+    const calendarPolicy = state && state.glanceCalendarConsent;
+    if (calendarPolicy && calendarPolicy.mode === 'always' && calendarPolicy.revoked !== true) {
+      card.appendChild(el('p', 'conn-note', 'Calendar permission: Always.'));
+      const revoke = el('button', 'ghost', 'Revoke calendar permission');
+      revoke.type = 'button';
+      revoke.setAttribute('data-glance-revoke-calendar', 'always');
+      revoke.addEventListener('click', async () => {
+        await FlowStorage.set({ glanceCalendarConsent: { mode: null, revoked: true, scope: 'Calendars.ReadWrite', at: Date.now() } });
+        await FlowStorage.appendLog({
+          kind: 'shown',
+          label: 'Calendar permission revoked',
+          app: 'outlook',
+          reason: 'calendar-consent-revoked',
+          messageId: 'calendar-consent'
+        });
+        await refresh();
+      });
+      card.appendChild(revoke);
+    }
     return card;
   }
 
@@ -2344,12 +2363,13 @@
       ? FlowDisplay.activityTitle(entry)
       : (entry.actionTitle || entry.label || (proof ? 'Handled.' : 'Reply draft ready in Outlook Drafts. Not sent.'));
     top.appendChild(el('span', 'log-label', proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.')));
-    top.appendChild(el('span', 'log-kind written', proof ? 'Handled' : 'Draft'));
+    const deleted = entry.glanceDeleted === true || entry.deleted === true;
+    top.appendChild(el('span', 'log-kind written', deleted ? (entry.deletedLine || 'Deleted in To Do') : (proof ? 'Handled' : 'Draft')));
     item.appendChild(top);
     item.appendChild(el('span', 'log-where', 'From Outlook'));
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
     const acts = el('div', 'log-acts');
-    if (entry.url || entry.where) {
+    if (!deleted && (entry.url || entry.where)) {
       const a = el('a', 'ghost sm', proof ? 'View' : 'Open draft');
       a.href = entry.url || entry.where; a.target = '_blank'; a.rel = 'noopener';
       acts.appendChild(a);
@@ -2379,6 +2399,9 @@
         u.textContent = 'Undo';
         note.textContent = r.written || (r.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : 'You edited this. Undo left it alone.');
         note.hidden = false;
+        if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
+          await FlowStorage.patchGlanceProof(entry.messageId, { undoRefused: 'user-edited', undoLine: note.textContent });
+        }
         return;
       }
       const todoUndo = proof && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.system === 'microsoft/todo');
@@ -2417,8 +2440,15 @@
       await renderLog();
       await notifyOutlookProof();
     });
-    acts.appendChild(u);
+    if (!deleted) acts.appendChild(u);
     item.appendChild(acts);
+    if (entry.undoLine) {
+      note.textContent = entry.undoLine;
+      note.hidden = false;
+    } else if (entry.verifyNote) {
+      note.textContent = entry.verifyNote;
+      note.hidden = false;
+    }
     item.appendChild(note);
     return item;
   }

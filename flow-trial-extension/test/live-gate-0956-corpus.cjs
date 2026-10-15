@@ -403,6 +403,190 @@ function listsRoute() {
     { text: chipText(meetPage.doc), cal: cal.map((m) => m.payload && m.payload.params) });
   meetPage.w.close();
 
+  console.log('\n--- the card and Loops read one proof record ---\n');
+  const parkStore = parkProofStore();
+  const park = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: parkStore
+  });
+  const parkUndo = await waitFor(park.doc, '.flow-chip-undo', 4000);
+  check('a reload shows Handled, the receipt, and Undo',
+    Boolean(parkUndo) && /Handled/i.test(chipText(park.doc)) && !park.doc.querySelector('.do-halo'),
+    { text: chipText(park.doc) });
+  const away = park.w.location.href.replace('MSG-PARK', 'MSG-OTHER');
+  park.w.history.pushState({}, '', away);
+  const left = await waitForGone(park.doc, 'Renew the parking permit', 4000);
+  check('switching mail leaves this receipt', left, { text: chipText(park.doc) });
+  park.w.history.pushState({}, '', park.w.location.href.replace('MSG-OTHER', 'MSG-PARK'));
+  const backUndo = await waitFor(park.doc, '.flow-chip-undo', 4000);
+  check('switching back restores Handled and Undo from the same record',
+    Boolean(backUndo) && /Handled/i.test(chipText(park.doc)) && !park.doc.querySelector('.do-halo'),
+    { text: chipText(park.doc) });
+  park.w.close();
+
+  const editedStore = parkProofStore();
+  const edited = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: editedStore,
+    undo: () => ({ ok: false, reason: 'user-edited', written: 'You edited this. Undo left it alone.' })
+  });
+  const editedBtn = await waitFor(edited.doc, '.flow-chip-undo', 4000);
+  if (editedBtn) editedBtn.click();
+  const editedLine = await waitForText(edited.doc, 'You edited this', 4000);
+  check('a refused Undo says You edited this', editedLine, { text: chipText(edited.doc) });
+  const editedAgain = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: JSON.parse(JSON.stringify(edited.store)),
+    undo: () => ({ ok: false, reason: 'user-edited', written: 'You edited this. Undo left it alone.' })
+  });
+  const editedKept = await waitForText(editedAgain.doc, 'You edited this', 4000);
+  check('a refused Undo is still shown after reopen',
+    editedKept && Boolean(editedAgain.doc.querySelector('.flow-chip-undo')),
+    { text: chipText(editedAgain.doc), record: editedAgain.store.glanceProofs && editedAgain.store.glanceProofs.records['MSG-PARK'] });
+  edited.w.close();
+  editedAgain.w.close();
+
+  const deleted = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: parkProofStore(),
+    reconcile: () => ({ ok: false, status: 404 })
+  });
+  const deletedLine = await waitForText(deleted.doc, 'Deleted in To Do', 4000);
+  check('a manual delete on reopen says Deleted in To Do and drops Undo',
+    deletedLine && !deleted.doc.querySelector('.flow-chip-undo'),
+    { text: chipText(deleted.doc) });
+  const deletedRec = deleted.store.glanceProofs && deleted.store.glanceProofs.records['MSG-PARK'];
+  check('the delete is stored on the proof record', Boolean(deletedRec && deletedRec.deleted === true), deletedRec);
+  deleted.w.close();
+
+  const shaky = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: parkProofStore(),
+    reconcile: () => ({ ok: false, status: 500 })
+  });
+  const shakyLine = await waitForText(shaky.doc, "couldn't verify", 4000);
+  const shakyRec = shaky.store.glanceProofs && shaky.store.glanceProofs.records['MSG-PARK'];
+  check('a Graph error keeps Handled and Undo and says couldn\'t verify',
+    shakyLine && /Handled/i.test(chipText(shaky.doc)) && Boolean(shaky.doc.querySelector('.flow-chip-undo')) &&
+    shakyRec && shakyRec.deleted !== true,
+    { text: chipText(shaky.doc), record: shakyRec });
+  shaky.w.close();
+
+  console.log('\n--- Hold without calendar scope asks, then finishes ---\n');
+  const noCal = mailOnlyStore();
+  const oncePage = await boot({
+    id: 'MSG-BUDGET-REVIEW',
+    subject: 'Budget review',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: noCal
+  });
+  const onceHost = await waitCard(oncePage);
+  const onceHold = onceHost && onceHost.querySelector('.chip-hold');
+  if (onceHold) onceHold.click();
+  const onceBtn = await waitFor(oncePage.doc, '[data-glance-consent-choice="once"]', 4000);
+  check('Hold without calendar asks Once, Always, and Not now',
+    Boolean(onceBtn) && Boolean(oncePage.doc.querySelector('[data-glance-consent-choice="always"]')) &&
+    Boolean(oncePage.doc.querySelector('[data-glance-consent-choice="not-now"]')) &&
+    /Calendar needs Calendars\.ReadWrite\./.test(chipText(oncePage.doc)),
+    { text: chipText(oncePage.doc) });
+  if (onceBtn) onceBtn.click();
+  const onceDone = await waitFor(oncePage.doc, '.flow-chip-undo', 4000);
+  const onceConsent = oncePage.sent.filter((m) => m.type === 'flow:outlook-consent-scope');
+  const onceCal = oncePage.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar');
+  check('Once consents only Calendars.ReadWrite and the hold finishes',
+    Boolean(onceDone) && onceConsent.length === 1 && onceConsent[0].scope === 'Calendars.ReadWrite' && onceConsent[0].policy === 'once' &&
+    onceCal.length === 1 && /Handled|Calendar/i.test(chipText(oncePage.doc)),
+    { text: chipText(oncePage.doc), consent: onceConsent, cal: onceCal.length });
+  const onceKept = {
+    outlookAuth: JSON.parse(JSON.stringify(oncePage.store.outlookAuth)),
+    glanceCalendarConsent: JSON.parse(JSON.stringify(oncePage.store.glanceCalendarConsent))
+  };
+  const onceAgain = await boot({
+    id: 'MSG-BUDGET-NEXT',
+    subject: 'Budget review next',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: onceKept
+  });
+  const onceHost2 = await waitCard(onceAgain);
+  const onceHold2 = onceHost2 && onceHost2.querySelector('.chip-hold');
+  if (onceHold2) onceHold2.click();
+  const onceAsked = await waitFor(onceAgain.doc, '[data-glance-consent-choice="once"]', 4000);
+  check('Once asks again the next time, even though the scope stays granted',
+    Boolean(onceAsked) && onceAgain.store.glanceCalendarConsent && onceAgain.store.glanceCalendarConsent.mode === 'once',
+    { text: chipText(onceAgain.doc), policy: onceAgain.store.glanceCalendarConsent });
+  oncePage.w.close();
+  onceAgain.w.close();
+
+  const alwaysPage = await boot({
+    id: 'MSG-BUDGET-REVIEW',
+    subject: 'Budget review',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: mailOnlyStore()
+  });
+  const alwaysHost = await waitCard(alwaysPage);
+  const alwaysHold = alwaysHost && alwaysHost.querySelector('.chip-hold');
+  if (alwaysHold) alwaysHold.click();
+  const alwaysBtn = await waitFor(alwaysPage.doc, '[data-glance-consent-choice="always"]', 4000);
+  if (alwaysBtn) alwaysBtn.click();
+  const alwaysDone = await waitFor(alwaysPage.doc, '.flow-chip-undo', 4000);
+  const alwaysLogged = (alwaysPage.store.log || []).some((e) => e && e.reason === 'calendar-consent-always');
+  check('Always is stored and logged, then the hold finishes',
+    Boolean(alwaysDone) && alwaysPage.store.glanceCalendarConsent && alwaysPage.store.glanceCalendarConsent.mode === 'always' && alwaysLogged,
+    { policy: alwaysPage.store.glanceCalendarConsent, text: chipText(alwaysPage.doc) });
+  const alwaysKept = {
+    outlookAuth: JSON.parse(JSON.stringify(alwaysPage.store.outlookAuth)),
+    glanceCalendarConsent: JSON.parse(JSON.stringify(alwaysPage.store.glanceCalendarConsent))
+  };
+  const alwaysNext = await boot({
+    id: 'MSG-BUDGET-NEXT',
+    subject: 'Budget review next',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: alwaysKept
+  });
+  const alwaysHost2 = await waitCard(alwaysNext);
+  const alwaysHold2 = alwaysHost2 && alwaysHost2.querySelector('.chip-hold');
+  if (alwaysHold2) alwaysHold2.click();
+  const alwaysQuiet = await waitFor(alwaysNext.doc, '.flow-chip-undo', 4000);
+  const alwaysCal = alwaysNext.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar');
+  check('Always does not ask the next time',
+    Boolean(alwaysHold2) && Boolean(alwaysQuiet) && alwaysCal.length === 1 &&
+    !alwaysNext.doc.querySelector('[data-glance-consent="calendar"]') &&
+    alwaysNext.sent.filter((m) => m.type === 'flow:outlook-consent-scope').length === 0,
+    { text: chipText(alwaysNext.doc) });
+  alwaysPage.w.close();
+  alwaysNext.w.close();
+
+  const laterPage = await boot({
+    id: 'MSG-BUDGET-REVIEW',
+    subject: 'Budget review',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: mailOnlyStore()
+  });
+  const laterHost = await waitCard(laterPage);
+  const laterHold = laterHost && laterHost.querySelector('.chip-hold');
+  if (laterHold) laterHold.click();
+  const laterBtn = await waitFor(laterPage.doc, '[data-glance-consent-choice="not-now"]', 4000);
+  if (laterBtn) laterBtn.click();
+  const laterDone = await waitFor(laterPage.doc, '.flow-chip-undo', 4000);
+  const laterTask = laterPage.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookTask');
+  const laterCal = laterPage.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar');
+  const reminder = laterTask[0] && laterTask[0].payload.params && laterTask[0].payload.params.reminder;
+  check('Not now holds a To Do task with a reminder, and does not write a calendar event',
+    Boolean(laterDone) && laterTask.length === 1 && laterCal.length === 0 && reminder && reminder.hour === 10 &&
+    /Handled|To Do/i.test(chipText(laterPage.doc)),
+    { text: chipText(laterPage.doc), reminder: reminder });
+  laterPage.w.close();
+
   console.log('\n--- a draft both reads missed is not Draft ready ---\n');
   const missPage = await boot({
     id: 'MSG-DRAFT-MISS',
@@ -460,7 +644,85 @@ function chipText(doc) {
   return host ? String(host.textContent || '').replace(/\s+/g, ' ').trim() : '';
 }
 
+function parkProofStore() {
+  return {
+    glanceProofs: {
+      records: {
+        'MSG-PARK': {
+          messageId: 'MSG-PARK',
+          ids: ['msg-park'],
+          kind: 'written',
+          connectorId: 'outlookTask',
+          system: 'microsoft/todo',
+          externalId: 'task-park',
+          ref: {
+            taskId: 'task-park',
+            taskListId: 'list-1',
+            externalId: 'task-park',
+            created: { title: 'Renew the parking permit', importance: 'normal' }
+          },
+          fetchedBack: true,
+          writtenLine: 'To Do · Renew the parking permit',
+          receiptStatus: 'Handled.',
+          label: 'Renew the parking permit',
+          url: 'https://to-do.office.com/tasks/task-park',
+          objectName: 'To Do',
+          app: 'outlook',
+          subject: 'Parking permit - please renew by Sunday'
+        }
+      },
+      byId: { 'msg-park': 'MSG-PARK' }
+    },
+    log: [{
+      ts: Date.now(),
+      kind: 'written',
+      messageId: 'MSG-PARK',
+      connectorId: 'outlookTask',
+      system: 'microsoft/todo',
+      externalId: 'task-park',
+      fetchedBack: true,
+      label: 'Renew the parking permit',
+      writtenLine: 'To Do · Renew the parking permit',
+      url: 'https://to-do.office.com/tasks/task-park'
+    }]
+  };
+}
+
+function mailOnlyStore() {
+  return {
+    outlookAuth: {
+      token: {
+        accessToken: 'AT',
+        refreshToken: 'RT',
+        expiresAt: Date.now() + 3600e3,
+        rtIssuedAt: Date.now(),
+        grantedScopes: ['Mail.ReadWrite', 'Tasks.ReadWrite']
+      },
+      account: { address: ME, name: 'Glance' },
+      ownAddresses: [ME]
+    }
+  };
+}
+
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function waitForText(doc, text, ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (chipText(doc).indexOf(text) >= 0) return true;
+    await sleep(30);
+  }
+  return false;
+}
+
+async function waitForGone(doc, text, ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (chipText(doc).indexOf(text) < 0) return true;
+    await sleep(30);
+  }
+  return false;
+}
 
 async function waitFor(doc, sel, ms) {
   const until = Date.now() + ms;
@@ -534,14 +796,32 @@ async function boot(opts) {
       return { ok: false, status: 404, body: '{}' };
     }
     if (msg.type === 'flow:execute-action' && typeof o.execute === 'function') return o.execute(msg);
+    if (msg.type === 'flow:reconcile-proof') {
+      if (typeof o.reconcile === 'function') return o.reconcile(msg);
+      return { ok: true, status: 200 };
+    }
+    if (msg.type === 'flow:outlook-consent-scope') {
+      return { ok: true, policy: msg.policy, scope: msg.scope };
+    }
     if (msg.type === 'flow:execute-action' && msg.payload && msg.payload.connectorId === 'outlookCalendar') {
       return {
         ok: true,
         fetchedBack: true,
-        ref: { eventId: 'EV-BUDGET', created: { subject: 'Budget review', start: '2026-10-16T10:00:00', body: 'Budget review' } },
+        ref: { eventId: 'EV-BUDGET', created: { subject: 'Budget review', start: '2026-10-16T10:00:00', body: 'Budget review', importance: 'normal' } },
         written: 'Calendar · Budget review · 10:00',
         url: 'https://outlook.live.com/calendar/item/EV-BUDGET',
         where: 'Outlook Calendar'
+      };
+    }
+    if (msg.type === 'flow:execute-action' && msg.payload && msg.payload.connectorId === 'outlookTask') {
+      return {
+        ok: true,
+        fetchedBack: true,
+        proof: { system: 'microsoft/todo', externalId: 'task-hold', fetchedBack: true, verifiedAt: '2026-10-15T06:00:00.000Z' },
+        ref: { taskId: 'task-hold', taskListId: 'list-1', externalId: 'task-hold', created: { title: 'Budget review', importance: 'normal' } },
+        written: 'To Do · Budget review',
+        url: 'https://to-do.office.com/tasks/task-hold',
+        where: 'Microsoft To Do'
       };
     }
     if (msg.type === 'flow:execute-action') {
@@ -554,7 +834,10 @@ async function boot(opts) {
         where: 'Outlook Drafts'
       };
     }
-    if (msg.type === 'flow:undo-action') return { ok: true, written: 'Draft removed from Outlook Drafts.' };
+    if (msg.type === 'flow:undo-action') {
+      if (typeof o.undo === 'function') return o.undo(msg);
+      return { ok: true, written: 'Draft removed from Outlook Drafts.' };
+    }
     return { ok: true };
   }
   w.chrome = {
