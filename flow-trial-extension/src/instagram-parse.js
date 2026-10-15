@@ -115,7 +115,8 @@ const FlowInstagramParse = (() => {
     if (/\s(?:&|and)\s/i.test(t)) return true;
     if (/\band\s+\d{1,4}\s+others\b/i.test(t)) return true;
     if (/ועוד\s*\d|\d\s*אחרים/.test(t)) return true;
-    if (/\sו[\u0590-\u05FF]/.test(t)) return true;
+    // A standalone ו between two names ("דנה ו נועה"). ו inside "דנה וייס" is not one.
+    if (/\S\s+ו\s+\S/.test(t)) return true;
     if (/🏠|👥/.test(t)) return true;
     if (GROUP_WORD.test(t)) return true;
     return false;
@@ -148,56 +149,91 @@ const FlowInstagramParse = (() => {
     return false;
   }
 
-  function normPerson(value) {
-    return String(value || '')
-      .normalize('NFKC')
-      .replace(/[\u200e\u200f\u202a-\u202e]/g, '')
-      .replace(/[🏠👥]/g, '')
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  function samePerson(a, b) {
-    if (!a || !b) return false;
-    if (a === b) return true;
-    return a.replace(/ /g, '') === b.replace(/ /g, '');
-  }
-
-  function slugName(href) {
-    const raw = String(href || '').trim();
-    if (!raw || raw.charAt(0) === '#') return '';
-    let u;
-    try { u = new URL(raw, 'https://example.com'); } catch (e) { return ''; }
-    const path = u.pathname.replace(/\/+$/, '') || '/';
-    if (path === '/profile.php') return '';
-    const seg = path.split('/').filter(Boolean).pop() || '';
-    if (!seg || /^\d+$/.test(seg)) return '';
-    if (RESERVED_PROFILE.test(seg)) return '';
-    return normPerson(seg);
-  }
-
-  function linkMatchesTitle(el, title) {
-    const text = normPerson(plainText(el));
-    const aria = normPerson(el.getAttribute('aria-label') || '');
-    const slug = slugName(el.getAttribute('href'));
-    if (text && !samePerson(text, title)) return false;
-    if (aria && !samePerson(aria, title)) return false;
-    if (slug && !samePerson(slug, title)) return false;
-    return samePerson(text, title) || samePerson(aria, title) || samePerson(slug, title);
-  }
-
   function plainText(node) {
     return String(node && node.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
+  // Lowercase, then drop digits, underscores, and dots. "danalevi_88" and
+  // "Dana Levi" share the token identity danalevi.
+  function identityTokens(value) {
+    const cleaned = String(value || '')
+      .normalize('NFKC')
+      .replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+      .replace(/[🏠👥]/g, '')
+      .toLowerCase()
+      .replace(/[0-9_.]/g, '')
+      .replace(/[^\p{L}]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned ? cleaned.split(' ') : [];
+  }
+
+  function sameIdentity(a, b) {
+    if (!a.length || !b.length) return false;
+    if (a.join('\n') === b.join('\n')) return true;
+    return a.join('') === b.join('');
+  }
+
+  function parsedProfile(href) {
+    const raw = String(href || '').trim();
+    if (!raw || raw.charAt(0) === '#') return null;
+    let u;
+    try { u = new URL(raw, 'https://example.com'); } catch (e) { return null; }
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/profile.php') {
+      const id = u.searchParams.get('id') || '';
+      return /^\d+$/.test(id) ? { id: id, slug: '' } : null;
+    }
+    const seg = path.split('/').filter(Boolean).pop() || '';
+    if (!seg || RESERVED_PROFILE.test(seg)) return null;
+    if (/^\d+$/.test(seg)) return { id: seg, slug: '' };
+    return { id: '', slug: seg };
+  }
+
+  function profileKey(href) {
+    const parsed = parsedProfile(href);
+    if (!parsed) return '';
+    if (parsed.id) return 'id:' + parsed.id;
+    const tokens = identityTokens(parsed.slug);
+    return tokens.length ? 'name:' + tokens.join('') : '';
+  }
+
+  function nameSignals(el) {
+    const signals = [];
+    const text = plainText(el);
+    const aria = el.getAttribute('aria-label') || '';
+    const parsed = parsedProfile(el.getAttribute('href'));
+    if (text) signals.push(identityTokens(text));
+    if (aria) signals.push(identityTokens(aria));
+    if (parsed && parsed.slug) signals.push(identityTokens(parsed.slug));
+    return signals.filter((tokens) => tokens.length);
+  }
+
+  function groupMatchesTitle(links, title) {
+    let saw = false;
+    for (let i = 0; i < links.length; i++) {
+      const signals = nameSignals(links[i]);
+      for (let j = 0; j < signals.length; j++) {
+        if (!sameIdentity(signals[j], title)) return false;
+        saw = true;
+      }
+    }
+    return saw;
+  }
+
   function matchingProfile(scope) {
-    const title = normPerson(regionTitle(scope));
-    if (!title) return false;
-    const links = profileLinks(scope);
-    if (links.length !== 1) return false;
-    return linkMatchesTitle(links[0], title);
+    const title = identityTokens(regionTitle(scope));
+    if (!title.length) return false;
+    const groups = new Map();
+    const order = [];
+    profileLinks(scope).forEach((el) => {
+      const key = profileKey(el.getAttribute('href'));
+      if (!key) return;
+      if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+      groups.get(key).push(el);
+    });
+    if (order.length !== 1) return false;
+    return groupMatchesTitle(groups.get(order[0]), title);
   }
 
   function profileHref(href) {
@@ -218,14 +254,27 @@ const FlowInstagramParse = (() => {
     return /^conversation information$/i.test(label) || /chat details/i.test(label);
   }
 
+  function isProfileAnchor(el) {
+    if (!el || !el.getAttribute) return false;
+    if (String(el.tagName || '').toUpperCase() !== 'A') return false;
+    if (inRow(el)) return false;
+    if (el.getAttribute('role') === 'button') return false;
+    if (infoAnchor(el)) return false;
+    return profileHref(el.getAttribute('href'));
+  }
+
+  // Descendants, plus the link itself when the title is nested inside it.
+  // Two anchors for one profile count once.
   function profileLinks(scope) {
-    if (!scope || typeof scope.querySelectorAll !== 'function') return [];
-    return Array.from(scope.querySelectorAll('a[href]')).filter((a) => {
-      if (inRow(a)) return false;
-      if (a.getAttribute('role') === 'button') return false;
-      if (infoAnchor(a)) return false;
-      return profileHref(a.getAttribute('href'));
-    });
+    const found = [];
+    function push(el) {
+      if (isProfileAnchor(el) && found.indexOf(el) < 0) found.push(el);
+    }
+    if (scope && typeof scope.querySelectorAll === 'function') {
+      Array.from(scope.querySelectorAll('a[href]')).forEach(push);
+    }
+    if (scope && scope.closest) push(scope.closest('a[href]'));
+    return found;
   }
 
   function headerMatches(node, re) {
@@ -257,6 +306,15 @@ const FlowInstagramParse = (() => {
 
   // First matching region wins. No positive one-to-one or group signal there
   // is unknown, and the next region is not tried. A title is not proof.
+  function regionAround(node) {
+    if (!node || !node.closest) return node;
+    const header = node.closest('header, [role="banner"]');
+    if (header && !inRow(header)) return header;
+    const link = node.closest('a[href]');
+    if (link && !inRow(link)) return link;
+    return node.parentElement || node;
+  }
+
   function classify(root) {
     if (!root || typeof root.querySelector !== 'function') return { kind: 'unknown', via: null };
     const info = infoControl(root);
@@ -264,7 +322,7 @@ const FlowInstagramParse = (() => {
     const banner = root.querySelector('[role="banner"]');
     if (banner && !inRow(banner)) return decide(banner, 'banner');
     const heading = headingIn(root);
-    if (heading) return decide(heading.parentElement || heading, 'heading');
+    if (heading) return decide(regionAround(heading), 'heading');
     return { kind: 'unknown', via: null };
   }
 

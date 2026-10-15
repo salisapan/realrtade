@@ -257,6 +257,14 @@ advFiles.forEach((name) => {
   const verdict = wantDraft ? 'drafts' : 'stays quiet';
   check('adv ' + name + ' ' + verdict, msDraft === wantDraft && igDraft === wantDraft && ms.active === wantActive && ig.active === wantActive, { messenger: ms, instagram: ig });
 });
+['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-duplicate.html', 'id-weiss.html'].forEach((name) => {
+  const root = liveRoot('identity/' + name);
+  const ms = FlowMessengerParse.classify(root);
+  const ig = FlowInstagramParse.classify(root);
+  check(name + ' drafts', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true, { messenger: ms, instagram: ig });
+});
+const standaloneVav = chatEl('<div role="main"><header><h2>דנה ו נועה</h2><a href="/100012345678/" role="link">דנה ו נועה</a><a aria-label="Conversation information">Conversation information</a></header></div>');
+check('a standalone vav between two names stays quiet', FlowMessengerParse.isOneToOne(standaloneVav) === false && FlowInstagramParse.isOneToOne(standaloneVav) === false);
 
 console.log('\n--- insert never sends ---\n');
 function box(text) {
@@ -439,6 +447,9 @@ console.log('\n--- calendar evidence ---\n');
   ];
   fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
     pages.push(['adv/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', name === 'd-link.html']);
+  });
+  ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-duplicate.html', 'id-weiss.html'].forEach((name) => {
+    pages.push(['identity/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', true]);
   });
   ['messenger', 'instagram'].forEach((app) => {
     ['aria', 'banner', 'heading'].forEach((level) => {
