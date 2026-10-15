@@ -56,6 +56,11 @@ import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+// The worker cannot call import(). These are the helpers imported at the top of this file.
+globalThis.__glanceGoogleAuth = {
+  GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
+  webTokenUsable: webTokenUsable
+};
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);

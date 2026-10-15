@@ -57,6 +57,8 @@ const compose = stripComments(fs.readFileSync(path.join(ROOT, 'src/chat-compose.
 check('the composer writes with insertText only', /execCommand\('insertText'/.test(compose) && /new InputEvent\('input'/.test(compose));
 const workerSrc = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.js'), 'utf8');
 check('the calendar read does not open a consent window', !/interactive:\s*true/.test(workerSrc) && !/launchWebAuthFlow/.test(workerSrc));
+check('the worker never calls import()', !/import\s*\(/.test(stripComments(workerSrc)));
+check('Graph calendarView times out at 8 seconds', /GRAPH_TIMEOUT_MS = 8000/.test(workerSrc) && /AbortController/.test(workerSrc));
 check('the calendar read does not ask for titles', /fields: 'items\(id,status,location,start\)'/.test(workerSrc) && !/summary/.test(workerSrc));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
@@ -79,6 +81,7 @@ const backgroundSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf
 const backgroundLines = backgroundSrc.split('\n');
 const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
+check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
@@ -135,6 +138,12 @@ check('a holding line is not a chat draft', decide("I'll send it by Friday.").dr
 ['hi', 'היי'].forEach((text) => {
   const r = decide(text);
   check('a greeting stays quiet: ' + text, r.show === false && r.draft == null && r.sends === false && r.reason === 'no-ask', r);
+});
+const weekMemory = decide('מהשבוע שעבר אני לא זוכר איפה היינו');
+check('מהשבוע שעבר stays quiet', weekMemory.show === false && weekMemory.draft == null && weekMemory.sends === false && weekMemory.reason === 'no-ask', weekMemory);
+['איפה המסעדה שהיינו בה שבוע שעבר?', 'איך קוראים למסעדה שהייתם בה שבוע שעבר?', 'שלח לי את המיקום של המסעדה שהיינו בה שבוע שעבר'].forEach((text) => {
+  const r = decide(text);
+  check('a real last-week place ask still drafts: ' + text.slice(0, 24), r.show === true && r.sends === false && r.draft.indexOf('Taizu - ' + MAPS) === 0, r);
 });
 
 const factText = "What's the Q3 total in the budget sheet?";
@@ -429,6 +438,127 @@ console.log('\n--- calendar evidence ---\n');
   const neither = await merged({});
   check('neither calendar connected stays quiet', neither.judged.show === false && neither.judged.draft == null && neither.judged.sends === false && neither.judged.reason === 'not-checked' && neither.urls.length === 0 && neither.evidence.evidence.events == null && neither.evidence.evidence.connected.calendar === false, neither.judged);
 
+  const savedChrome = global.chrome;
+  const savedAuth = globalThis.__glanceGoogleAuth;
+  globalThis.__glanceGoogleAuth = {
+    GOOGLE_WEB_AUTH_STORAGE_KEY: 'googleWebAuth',
+    webTokenUsable() { return false; }
+  };
+  global.chrome = {
+    runtime: { lastError: null },
+    storage: {
+      local: {
+        async get() { return { googleTasksAuth: { taskListId: 'glance-list' } }; }
+      }
+    },
+    identity: {
+      getAuthToken(details, cb) {
+        global.chrome.runtime.lastError = { message: 'unreadable' };
+        cb(undefined);
+      }
+    }
+  };
+  const unreadUrls = [];
+  const unread = await fetchPlace(placeWindow, {
+    outlookToken: async () => 'o-tok',
+    fetch: async (u) => {
+      unreadUrls.push(u);
+      return outlookItems(TAIZU);
+    }
+  });
+  const unreadDetected = FlowChatDraft.detect(ASK, { now: NOW, oneToOne: true, fromMe: false });
+  const unreadJudged = FlowChatDraft.judge({
+    text: ASK,
+    now: NOW.getTime(),
+    oneToOne: true,
+    fromMe: false,
+    evidence: unread.evidence,
+    detected: unreadDetected
+  });
+  check('Google connected but unreadable stays quiet', unreadJudged.show === false && unreadJudged.sends === false && unreadJudged.reason === 'not-checked' && unread.evidence.events == null && unread.evidence.connected.calendar === true && unreadUrls.every((u) => u.indexOf('googleapis.com') < 0), { judged: unreadJudged, urls: unreadUrls });
+  global.chrome.identity.getAuthToken = function () { throw new Error('identity is not the test seam'); };
+  globalThis.__glanceE2e = { googleAuthToken() { return Promise.resolve('ya29.e2e'); } };
+  let seamUrl = '';
+  const viaSeam = await fetchPlace(placeWindow, {
+    outlookToken: async () => null,
+    fetch: async (u) => {
+      seamUrl = u;
+      return googleItems(TAIZU);
+    }
+  });
+  check('the service-worker test seam reads Google', seamUrl.indexOf('calendar/v3') >= 0 && viaSeam.sends === false && viaSeam.evidence.events && viaSeam.evidence.events[0].location === TAIZU, { seamUrl: seamUrl, evidence: viaSeam.evidence });
+  delete globalThis.__glanceE2e;
+  global.chrome = savedChrome;
+  globalThis.__glanceGoogleAuth = savedAuth;
+
+  const hungAt = Date.now();
+  const hung = await fetchPlace(placeWindow, {
+    token: async () => null,
+    outlookToken: async () => 'o-tok',
+    graphTimeout: 40,
+    fetch: (u, init) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ ok: true, json: async () => ({ value: [] }) }), 5000);
+      const signal = init && init.signal;
+      if (signal) {
+        const abort = () => { clearTimeout(timer); reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); };
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort);
+      }
+    })
+  });
+  const hungDetected = FlowChatDraft.detect(ASK, { now: NOW, oneToOne: true, fromMe: false });
+  const hungJudged = FlowChatDraft.judge({
+    text: ASK,
+    now: NOW.getTime(),
+    oneToOne: true,
+    fromMe: false,
+    evidence: hung.evidence,
+    detected: hungDetected
+  });
+  check('a Graph calendarView timeout stays quiet', Date.now() - hungAt < 2000 && hungJudged.show === false && hungJudged.sends === false && hungJudged.reason === 'not-checked' && hung.evidence.events == null && hung.evidence.connected.calendar === true, hungJudged);
+
+  const named = await fetchPlace(placeWindow, {
+    token: async () => null,
+    outlookToken: async () => 'o-tok',
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        value: [{
+          id: 'o-name',
+          isCancelled: false,
+          location: { displayName: 'Taizu', address: { street: '23 Montefiore', city: 'Tel Aviv' } },
+          start: { dateTime: '2026-10-06T16:00:00.0000000', timeZone: 'UTC' }
+        }]
+      })
+    })
+  });
+  const namedDetected = FlowChatDraft.detect(ASK, { now: NOW, oneToOne: true, fromMe: false });
+  const namedJudged = FlowChatDraft.judge({
+    text: ASK,
+    now: NOW.getTime(),
+    oneToOne: true,
+    fromMe: false,
+    evidence: named.evidence,
+    detected: namedDetected
+  });
+  check('a name-only Outlook displayName uses street and city', namedJudged.show === true && namedJudged.sends === false && named.evidence.events[0].location === '23 Montefiore, Tel Aviv' && namedJudged.draft.indexOf('23 Montefiore - ' + MAPS) === 0 && namedJudged.draft.indexOf(encodeURIComponent('23 Montefiore, Tel Aviv')) > 0, namedJudged);
+  const namedFull = await fetchPlace(placeWindow, {
+    token: async () => null,
+    outlookToken: async () => 'o-tok',
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        value: [{
+          id: 'o-full',
+          isCancelled: false,
+          location: { displayName: TAIZU, address: { street: '1 Other', city: 'Haifa' } },
+          start: { dateTime: '2026-10-06T16:00:00.0000000', timeZone: 'UTC' }
+        }]
+      })
+    })
+  });
+  check('a displayName that is already an address stays', namedFull.evidence.events[0].location === TAIZU, namedFull.evidence.events[0]);
+
   global.FlowChatDraft = FlowChatDraft;
   global.FlowChatCompose = FlowChatCompose;
   global.FlowChatLane = FlowChatLane;
@@ -536,6 +666,7 @@ console.log('\n--- calendar evidence ---\n');
     ['messenger-place.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', true],
     ['messenger-greeting.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', false],
     ['messenger-greeting-he.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', false],
+    ['messenger-week-memory.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', false],
     ['messenger-live.html', 'https://www.messenger.com/t/2', 'src/content-messenger.js', false],
     ['instagram-place.html', 'https://www.instagram.com/direct/t/abc/', 'src/content-instagram.js', true],
     ['instagram-fact.html', 'https://www.instagram.com/direct/t/fact/', 'src/content-instagram.js', 'fact'],

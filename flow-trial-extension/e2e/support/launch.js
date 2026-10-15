@@ -114,7 +114,16 @@ function installE2EHooks() {
       return Promise.resolve(json(200, {}));
     }
     if (host === 'www.googleapis.com') {
-      if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0 || path.indexOf('/calendar/') >= 0) {
+      if (path.indexOf('/calendar/') >= 0) {
+        const loc = scenario.chatGoogleLocation || '';
+        const start = parsed.searchParams.get('timeMin');
+        if (!loc || !start || !Number.isFinite(Date.parse(start))) return Promise.resolve(json(200, { items: [] }));
+        const when = new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+        return Promise.resolve(json(200, {
+          items: [{ id: 'e2e-gcal-1', status: 'confirmed', location: loc, start: { dateTime: when } }]
+        }));
+      }
+      if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0) {
         return Promise.resolve(json(200, { files: [], items: [] }));
       }
       return Promise.resolve(json(200, {}));
@@ -535,7 +544,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }

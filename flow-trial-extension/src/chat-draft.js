@@ -65,7 +65,8 @@ const FlowChatDraft = (() => {
 
   function windowFor(body, now) {
     const clock = now instanceof Date ? now : new Date(typeof now === 'number' ? now : Date.now());
-    if (/last week|ב?שבוע שעבר/i.test(body)) return { window: lastWeek(clock), weak: false };
+    // שבוע שעבר only at a word edge. מהשבוע שעבר is one word and stays quiet.
+    if (/last week|(?:^|[^\p{L}\p{N}])ב?שבוע שעבר/iu.test(body)) return { window: lastWeek(clock), weak: false };
     if (/\byesterday\b|אתמול/i.test(body)) return { window: dayWindow(addDays(atMidnight(clock), -1)), weak: false };
     const en = body.match(/\bon (sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
     if (en) return { window: dayWindow(pastWeekday(clock, DAYS.indexOf(en[1].toLowerCase()))), weak: false };
