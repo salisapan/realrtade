@@ -26,6 +26,16 @@ const VENDORS = {
     bodyFormat: 'json',
     extraHeaders: { 'Notion-Version': '2022-06-28' },
     supportsRefresh: true
+  },
+  asana: {
+    tokenUrl: 'https://app.asana.com/-/oauth_token',
+    idEnv: 'ASANA_CLIENT_ID',
+    secretEnv: 'ASANA_CLIENT_SECRET',
+    // Asana takes client_id and client_secret in a form-encoded body; the PKCE code_verifier is forwarded as sent (verify against the vendor page before go-live).
+    clientAuth: 'body',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
   }
 };
 

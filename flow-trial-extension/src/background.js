@@ -57,6 +57,7 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import { LADDER } from '../config/ladder.public.js';
 import { CONNECTORS } from '../config/connectors.public.js';
 import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
+import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -1266,7 +1267,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1283,7 +1284,7 @@ async function disconnectConnector(connectorId) {
     return { ok: true };
   }
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : key);
   return { ok: true };
 }
 
@@ -3085,13 +3086,17 @@ async function notionRefreshToken(auth) {
 // The learning hook (core/connector-outcome.js): ids and enums only — never a title, address or text. Off with the switch.
 async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
-  if (!O || !CONNECTORS.notionReadBack) return;
-  const ev = O.buildEvent(Object.assign({ connector: 'notion', closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: 'notion/page' }, extra || {}), { enabled: CONNECTORS.notionReadBack });
+  const e = extra || {};
+  const connector = e.connector || 'notion';
+  const enabled = connector === 'asana' ? CONNECTORS.asanaReadBack : CONNECTORS.notionReadBack;
+  if (!O || !enabled) return;
+  const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: connector === 'asana' ? 'asana/task' : 'notion/page' }, e, { connector: connector });
+  const ev = O.buildEvent(input, { enabled: enabled });
   if (!ev) return;
   try {
     const cur = (await chrome.storage.local.get(NOTION_OUTCOME_KEY))[NOTION_OUTCOME_KEY];
     await chrome.storage.local.set({ [NOTION_OUTCOME_KEY]: O.append(cur, ev) });
-  } catch (e) { /* a learning note never blocks a close */ }
+  } catch (err) { /* a learning note never blocks a close */ }
 }
 
 function notionCloseEngine() {
@@ -3140,6 +3145,100 @@ async function notionReadBackWrite(p) {
 async function notionReadBackUndo(ref) {
   const r = await notionCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, {});
+  return r;
+}
+
+/* ----------------------------------------------------- Asana, with a proof */
+// docs/glance-ai/connectors/asana.md. Everything here is behind config/connectors.public.js (asanaReadBack, asanaOAuth), both off.
+
+const ASANA_API = 'https://app.asana.com/api/1.0';
+const ASANA_AUTH_BASE = 'https://app.asana.com/-/oauth_authorize';
+const ASANA_LEDGER_KEY = 'asanaLedger';
+
+async function getAsanaAuth() {
+  const { asanaAuth } = await chrome.storage.local.get('asanaAuth');
+  return asanaAuth || null;
+}
+
+// A project link is https://app.asana.com/0/<project>/list or .../project/<project>/...; a bare number also works.
+function parseAsanaProjectGid(input) {
+  const t = String(input || '').trim();
+  if (/^\d{6,30}$/.test(t)) return t;
+  const m = t.match(/\/project\/(\d{6,30})/) || t.match(/\/0\/(\d{6,30})/);
+  return m ? m[1] : null;
+}
+
+function base64Url(bytes) {
+  return btoa(String.fromCharCode.apply(null, Array.from(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// "Sign in with Asana" (OAuth with PKCE). The one-time code and the verifier go to the relay, which adds the secret.
+async function connectAsanaOAuth(projectInput) {
+  if (!CONNECTORS.asanaOAuth) throw new Error('Sign in with Asana is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.asanaClientId);
+  if (!clientId) throw new Error('Asana sign-in isn’t configured on this build yet.');
+  const projectGid = parseAsanaProjectGid(projectInput);
+  if (!projectGid) throw new Error('That doesn’t look like an Asana project link — open the project and copy the URL.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(ASANA_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&redirect_uri=' + encodeURIComponent(redirectUri) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Asana');
+  const got = await relayTokenRequest({ vendor: 'asana', grant: 'code', code: code, code_verifier: verifier, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Asana connection failed (' + got.error + ').');
+  const res = await fetch(ASANA_API + '/projects/' + projectGid + '?opt_fields=name', { headers: { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' } });
+  if (res.status === 403 || res.status === 404) throw new Error('Asana signed you in but cannot open that project — check the link and that you are a member.');
+  if (!res.ok) throw new Error('Asana returned ' + res.status + '.');
+  const body = await res.json();
+  const name = (body && body.data && body.data.name) || 'Asana project';
+  await chrome.storage.local.set({ asanaAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, projectGid: projectGid, projectName: name, via: 'oauth' } });
+  return { title: name };
+}
+
+async function asanaRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'asana', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function asanaCloseEngine() {
+  return globalThis.FlowAsanaClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getAsanaAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ asanaAuth: a }); },
+    refresh: asanaRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(ASANA_LEDGER_KEY))[ASANA_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(ASANA_LEDGER_KEY))[ASANA_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [ASANA_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function asanaReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await asanaCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'asana:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'asana', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'asana', lang: lang });
+    return { ok: true, where: 'Asana', target: 'your project', written: 'Added to Asana.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'asana', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Asana' };
+}
+
+async function asanaReadBackUndo(ref) {
+  const r = await asanaCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'asana' });
   return r;
 }
 
@@ -4254,6 +4353,7 @@ const WRITERS = {
   onedriveFile: outlookFileWrite,
   attachmentSave: attachmentSaveWrite
 };
+if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
 const UNDOERS = {
   hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
@@ -4264,6 +4364,7 @@ const UNDOERS = {
   onedriveFile: outlookFileUndo,
   attachmentSave: attachmentSaveUndo
 };
+if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
@@ -4328,6 +4429,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
     if (msg.connectorId === 'slack') return reply(sendResponse, connectSlack(msg.channel).then((r) => ({ ok: true, detail: r.title })));

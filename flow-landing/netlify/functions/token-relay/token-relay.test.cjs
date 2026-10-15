@@ -127,5 +127,22 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     assert.strictEqual((await run(ev(Object.assign({}, base, { grant: 'password' })), f)).statusCode, 400);
     assert.strictEqual(f.calls.length, 0);
   });
+  await t('asana: form body with client id and secret goes to the vendor only; verifier forwarded; secret never returned', async () => {
+    const f = mock(200, { access_token: 'a-tok', refresh_token: 'a-ref', expires_in: 3600 });
+    const env = Object.assign({}, ENV, { ASANA_CLIENT_ID: 'acid', ASANA_CLIENT_SECRET: 'ASANA-SECRET-1' });
+    const r = await relay(ev({ vendor: 'asana', grant: 'code', code: 'c1', code_verifier: 'ver-1234567890', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(JSON.parse(r.body).access_token, 'a-tok');
+    assert.strictEqual(f.calls[0].url, 'https://app.asana.com/-/oauth_token');
+    const sent = new URLSearchParams(f.calls[0].init.body);
+    assert.strictEqual(sent.get('grant_type'), 'authorization_code'); assert.strictEqual(sent.get('client_id'), 'acid'); assert.strictEqual(sent.get('client_secret'), 'ASANA-SECRET-1'); assert.strictEqual(sent.get('code_verifier'), 'ver-1234567890');
+    assert.strictEqual(f.calls[0].init.headers.Authorization, undefined);
+    assert.ok(r.body.indexOf('ASANA-SECRET-1') < 0);
+    const f2 = mock(200, { access_token: 'x', echo: 'ASANA-SECRET-1' });
+    assert.strictEqual((await relay(ev({ vendor: 'asana', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 502);
+  });
+  await t('asana is not configured when only notion vars are set', async () => {
+    const f = mock(200, {}); const r = await relay(ev(Object.assign({}, base, { vendor: 'asana' })), { env: ENV, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 503); assert.strictEqual(f.calls.length, 0);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

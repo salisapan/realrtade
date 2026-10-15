@@ -7,4 +7,9 @@
 //              connection the person already made. Off = the earlier Notion write, unchanged.
 // notionOAuth: "Sign in with Notion" through the token relay (flow-landing/netlify/functions/token-relay). Needs the relay deployed,
 //              NOTION_CLIENT_ID / NOTION_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.notionClientId set. Off = the pasted token only.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false };
+//
+// asanaReadBack: the Asana write goes through core/asana-close.js (one task in the chosen project, read back, Undo read back).
+//                Off = no Asana writer exists at all (nothing is registered under the id "asana").
+// asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
+//                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false };
