@@ -221,12 +221,18 @@ const msProfile = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana
 const igProfile = namedHeader('Dana', '<a href="/dana/" role="link">Dana</a>', igInfo);
 check('a one-to-one with a profile link still drafts', FlowMessengerParse.classify(msProfile).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(msProfile) === true);
 check('an Instagram one-to-one with a profile link still drafts', FlowInstagramParse.classify(igProfile).kind === 'one-to-one' && FlowInstagramParse.isOneToOne(igProfile) === true);
-['Active now', 'Active 5m ago'].forEach((status) => {
+['Active now', 'Active 5m ago', 'פעיל/ה עכשיו', 'פעיל עכשיו', 'פעילה עכשיו', 'פעיל/ה לפני 5 דק׳'].forEach((status) => {
   const ms = namedHeader('Dana', '<span>' + status + '</span>', msInfo);
   const ig = namedHeader('Dana', '<span>' + status + '</span>', igInfo);
-  check('a one-to-one with ' + status + ' still drafts', FlowMessengerParse.classify(ms).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(ms) === true);
-  check('an Instagram one-to-one with ' + status + ' still drafts', FlowInstagramParse.classify(ig).kind === 'one-to-one' && FlowInstagramParse.isOneToOne(ig) === true);
+  const msGot = FlowMessengerParse.classify(ms);
+  const igGot = FlowInstagramParse.classify(ig);
+  check(status + ' alone stays quiet on Messenger', msGot.kind !== 'one-to-one' && msGot.active === true && FlowMessengerParse.isOneToOne(ms) === false, msGot);
+  check(status + ' alone stays quiet on Instagram', igGot.kind !== 'one-to-one' && igGot.active === true && FlowInstagramParse.isOneToOne(ig) === false, igGot);
 });
+const linkedActive = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><span>פעיל/ה עכשיו</span>', msInfo);
+check('a matching profile link still drafts when Hebrew active status is present', FlowMessengerParse.classify(linkedActive).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(linkedActive) === true);
+const mismatched = namedHeader('Dana', '<a href="/booklovers.tlv/" role="link">Book club</a><span>Active now</span>', msInfo);
+check('active status does not repair a profile link that names someone else', FlowMessengerParse.isOneToOne(mismatched) === false && FlowInstagramParse.isOneToOne(mismatched) === false);
 const activeInRow = chatEl('<div role="main"><h2>Book club</h2><img alt="" src="data:,"><div role="row"><span>Active now</span></div></div>');
 check('Active status inside a message row is not a one-to-one signal', FlowMessengerParse.isOneToOne(activeInRow) === false && FlowInstagramParse.isOneToOne(activeInRow) === false);
 check('a participant count with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Dana</h2><span>4 people</span><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
@@ -237,6 +243,20 @@ const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-in
 check('Business Suite inbox with no image is unknown', inboxUnknown.kind === 'unknown' && inboxUnknown.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html')) === false, inboxUnknown);
 const inboxGroup = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-group.html'));
 check('Business Suite inbox with a group word is a group', inboxGroup.kind === 'group' && inboxGroup.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-group.html')) === false, inboxGroup);
+const advDir = path.join(__dirname, 'fixtures/chat/adv');
+const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html')).sort();
+check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
+advFiles.forEach((name) => {
+  const root = liveRoot('adv/' + name);
+  const wantDraft = name === 'd-link.html';
+  const wantActive = ['d-active.html', 'd-ago.html', 'd-he-active.html', 'g-book-active.html', 'g-he2-active.html'].indexOf(name) >= 0;
+  const ms = FlowMessengerParse.classify(root);
+  const ig = FlowInstagramParse.classify(root);
+  const msDraft = ms.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true;
+  const igDraft = ig.kind === 'one-to-one' && FlowInstagramParse.isOneToOne(root) === true;
+  const verdict = wantDraft ? 'drafts' : 'stays quiet';
+  check('adv ' + name + ' ' + verdict, msDraft === wantDraft && igDraft === wantDraft && ms.active === wantActive && ig.active === wantActive, { messenger: ms, instagram: ig });
+});
 
 console.log('\n--- insert never sends ---\n');
 function box(text) {
@@ -417,6 +437,9 @@ console.log('\n--- calendar evidence ---\n');
     ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
     ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
   ];
+  fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
+    pages.push(['adv/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', name === 'd-link.html']);
+  });
   ['messenger', 'instagram'].forEach((app) => {
     ['aria', 'banner', 'heading'].forEach((level) => {
       ['direct', 'group', 'unknown'].forEach((kind) => {
