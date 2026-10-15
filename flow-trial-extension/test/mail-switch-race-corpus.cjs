@@ -32,255 +32,9 @@ function check(name, cond, detail) {
   }
 }
 
-// Every card paint is a call inside paintIfCurrent, or a call inside the
-// body of a paint function that itself refuses to draw unless that gate
-// is open. A nested callback is not that body.
-function lintPaintGate(src) {
-  const ENTRY = {
-    paintOutlookTodoReceipt: 1, paintUndoneStatus: 1, paintCalendarConsent: 1,
-    paintSuggestCard: 1, paintSkippedOnly: 1, injectCard: 1, paintRemove: 1,
-    paintCalendarFailure: 1, paintHint: 1, stripDuplicateUndoHosts: 1
-  };
-  const TARGET = Object.assign({
-    'FlowChipHost.showDraftReceipt': 1,
-    'FlowChipHost.setChipState': 1,
-    'FlowChipHost.inject': 1
-  }, ENTRY);
-  const violations = [];
-  const n = src.length;
-  let i = 0;
-  let line = 1;
-  let brace = 0;
-  let paren = 0;
-  let bracket = 0;
-  let last = '';
-  const scopes = [];
-  let expectGate = 0;
-  let sawFunction = false;
-  let fnAwaitingBody = false;
-  let fnName = '';
-  let fnGated = false;
-  const CARD_DOM = /^(host|mount|verifyMount|earlyMount)\.(appendChild|insertBefore|replaceChildren)$/;
-
-  function cur() {
-    return scopes.length ? scopes[scopes.length - 1] : null;
-  }
-  function popTo() {
-    while (scopes.length) {
-      const sc = scopes[scopes.length - 1];
-      if (sc.expr) {
-        if (paren < sc.paren || brace < sc.brace || bracket < sc.bracket) scopes.pop();
-        else break;
-      } else if (brace < sc.brace) scopes.pop();
-      else break;
-    }
-  }
-  function startFn(gated, name, expr) {
-    const parent = cur();
-    const ownEntry = name && ENTRY[name] ? name : '';
-    scopes.push({
-      brace: brace,
-      paren: paren,
-      bracket: bracket,
-      gated: Boolean(gated) || Boolean(parent && parent.gated),
-      entry: ownEntry || (parent && parent.entry) || '',
-      expr: expr
-    });
-  }
-  function callHere(name) {
-    if (!TARGET[name]) return;
-    const sc = cur();
-    if (sc && (sc.gated || sc.entry)) return;
-    violations.push(line + ':' + name);
-  }
-  function skipLine() {
-    while (i < n && src[i] !== '\n') i++;
-  }
-  function skipBlock() {
-    i += 2;
-    while (i < n && !(src[i] === '*' && src[i + 1] === '/')) {
-      if (src[i] === '\n') line++;
-      i++;
-    }
-    i += 2;
-  }
-  function skipQuote(q) {
-    const fromBracket = last === '[';
-    const startLine = line;
-    i++;
-    let body = '';
-    while (i < n) {
-      if (src[i] === '\\') {
-        body += src[i + 1] || '';
-        i += 2;
-        continue;
-      }
-      if (src[i] === '\n') line++;
-      if (src[i] === q) { i++; break; }
-      body += src[i];
-      i++;
-    }
-    if (fromBracket && (TARGET[body] || /^paint[A-Z]/.test(body) || body.indexOf('FlowChipHost.') === 0)) {
-      violations.push(startLine + ':bracket ' + body);
-    }
-  }
-  function skipRegex() {
-    i++;
-    let cls = false;
-    while (i < n) {
-      if (src[i] === '\\') { i += 2; continue; }
-      if (src[i] === '\n') break;
-      if (src[i] === '[') cls = true;
-      else if (src[i] === ']') cls = false;
-      else if (src[i] === '/' && !cls) { i++; while (i < n && /[a-z]/i.test(src[i])) i++; return; }
-      i++;
-    }
-  }
-
-  while (i < n) {
-    const c = src[i];
-    if (c === '\n') { line++; i++; continue; }
-    if (c === ' ' || c === '\t' || c === '\r') { i++; continue; }
-    if (c === '/' && src[i + 1] === '/') { skipLine(); continue; }
-    if (c === '/' && src[i + 1] === '*') { skipBlock(); continue; }
-    if (c === "'" || c === '"' || c === '`') { skipQuote(c); last = 'str'; continue; }
-    if (c === '/' && last !== 'ident' && last !== 'num' && last !== ')' && last !== ']') { skipRegex(); last = 'regex'; continue; }
-    if (c === '{') {
-      brace++;
-      if (fnAwaitingBody) {
-        startFn(fnGated, fnName, false);
-        fnAwaitingBody = false;
-        fnName = '';
-        fnGated = false;
-      }
-      i++;
-      last = '{';
-      continue;
-    }
-    if (c === '}') {
-      brace--;
-      popTo();
-      i++;
-      last = '}';
-      continue;
-    }
-    if (c === '(') { paren++; i++; last = '('; if (sawFunction) sawFunction = false; continue; }
-    if (c === ')') {
-      paren--;
-      const expr = cur();
-      i++;
-      last = ')';
-      if (expr && expr.expr && paren < expr.paren) popTo();
-      continue;
-    }
-    if (c === '[') { bracket++; i++; last = '['; continue; }
-    if (c === ']') { bracket--; popTo(); i++; last = ']'; continue; }
-    if (c === ',' || c === ';') {
-      const expr = cur();
-      if (expr && expr.expr && paren === expr.paren && brace === expr.brace && bracket === expr.bracket) scopes.pop();
-      i++;
-      last = c;
-      continue;
-    }
-    if (c === '=' && src[i + 1] === '>') {
-      i += 2;
-      const gated = expectGate > 0;
-      if (gated) expectGate--;
-      while (i < n && (src[i] === ' ' || src[i] === '\t' || src[i] === '\n' || src[i] === '\r')) {
-        if (src[i] === '\n') line++;
-        i++;
-      }
-      if (src[i] === '{') {
-        brace++;
-        i++;
-        startFn(gated, '', false);
-        last = '{';
-      } else {
-        startFn(gated, '', true);
-        last = '=>';
-      }
-      continue;
-    }
-    if (c === '=' && src[i + 1] !== '>' && src[i + 1] !== '=' && last !== '=') {
-      i++;
-      last = 'assign';
-      continue;
-    }
-    if (/[A-Za-z_$]/.test(c)) {
-      const start = i;
-      const at = line;
-      i++;
-      while (i < n && /[A-Za-z0-9_$.]/.test(src[i])) i++;
-      const name = src.slice(start, i);
-      if (name === 'function') {
-        sawFunction = true;
-        fnAwaitingBody = true;
-        fnGated = expectGate > 0;
-        if (fnGated) expectGate--;
-        fnName = '';
-        last = 'function';
-        continue;
-      }
-      if (sawFunction) {
-        sawFunction = false;
-        fnName = name;
-        last = 'ident';
-        continue;
-      }
-      let j = i;
-      while (j < n && (src[j] === ' ' || src[j] === '\t' || src[j] === '\n' || src[j] === '\r')) j++;
-      const saved = line;
-      line = at;
-      if (last === 'assign' && src[j] !== '(' && (TARGET[name] || /^paint[A-Z]/.test(name))) violations.push(at + ':alias ' + name);
-      if (CARD_DOM.test(name) && src[j] === '(') {
-        const sc = cur();
-        if (!(sc && (sc.gated || sc.entry))) violations.push(at + ':' + name);
-      }
-      if (src[j] === '(') {
-        const invoked = name.match(/^(.*)\.(call|apply)$/);
-        if (name === 'paintIfCurrent') expectGate++;
-        else if (invoked && (TARGET[invoked[1]] || /^paint[A-Z]/.test(invoked[1]))) {
-          const sc = cur();
-          if (!(sc && (sc.gated || sc.entry))) violations.push(at + ':' + name);
-        } else callHere(name);
-      } else if (src[j] === '.' && TARGET[name]) {
-        let k = j + 1;
-        let method = '';
-        while (k < n && /[A-Za-z]/.test(src[k])) { method += src[k]; k++; }
-        while (k < n && (src[k] === ' ' || src[k] === '\t')) k++;
-        if ((method === 'call' || method === 'apply') && src[k] === '(') callHere(name + '.' + method);
-      }
-      line = saved;
-      last = 'ident';
-      continue;
-    }
-    if (/[0-9]/.test(c)) {
-      while (i < n && /[0-9]/.test(src[i])) i++;
-      last = 'num';
-      continue;
-    }
-    i++;
-    last = c;
-  }
-  const guardAt = src.indexOf('function paintIfCurrent');
-  if (guardAt >= 0) {
-    const open = src.indexOf('{', guardAt);
-    let depth = 0;
-    let end = open;
-    for (let p = open; p >= 0 && p < n; p++) {
-      if (src[p] === '{') depth++;
-      else if (src[p] === '}') {
-        depth--;
-        if (depth === 0) { end = p + 1; break; }
-      }
-    }
-    const body = open >= 0 ? src.slice(open, end) : '';
-    if (body.indexOf('mailTokenLive') < 0) {
-      violations.push((src.slice(0, guardAt).split('\n').length) + ':paintIfCurrent missing mailTokenLive guard');
-    }
-  }
-  return violations;
-}
+// Every card paint is a call inside paintIfCurrent, or a call inside an
+// entry painter that still refuses to draw unless paintDepth is open.
+const { lintPaintGate } = require('./paint-gate-lint.cjs');
 
 function registeredFiles() {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
@@ -548,22 +302,38 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
   const gateViolations = lintPaintGate(outlookSrc);
   check('every paint goes through paintIfCurrent', gateViolations.length === 0, gateViolations.slice(0, 12));
-  const planted = lintPaintGate('function sneak() { paintOutlookTodoReceipt(mount, row); FlowChipHost.inject(mount, ctx, {}); }\n');
-  check('the paint gate lint catches a direct paint', planted.length === 2, planted);
-  const allowed = lintPaintGate('function paintHint(host, text) {}\npaintIfCurrent(token, function () { paintOutlookTodoReceipt(mount, row); });\n');
+  function mustFail(name, src, needle) {
+    const hit = lintPaintGate(src);
+    check(name, hit.some((row) => String(row).indexOf(needle) >= 0), hit);
+  }
+  mustFail('the paint gate lint catches a dot call', 'function sneak() { FlowChipHost.inject(mount, ctx, {}); }\n', 'FlowChipHost');
+  mustFail('the paint gate lint catches a bracket call', "function sneak() { FlowChipHost['inject'](mount, ctx); }\n", 'FlowChipHost');
+  mustFail('the paint gate lint catches an alias', 'function sneak() { const p = FlowChipHost.showDraftReceipt; p(host, {}); }\n', 'FlowChipHost');
+  mustFail('the paint gate lint catches a destructure', 'function sneak() { const { setChipState } = FlowChipHost; setChipState(chip, "a", "b"); }\n', 'FlowChipHost');
+  mustFail('the paint gate lint catches call', 'function sneak() { FlowChipHost.inject.call(FlowChipHost, mount, ctx); }\n', 'FlowChipHost');
+  mustFail('the paint gate lint catches apply', 'function sneak() { FlowChipHost.inject.apply(FlowChipHost, [mount, ctx]); }\n', 'FlowChipHost');
+  mustFail('the paint gate lint catches bind', 'function sneak() { const run = FlowChipHost.inject.bind(FlowChipHost); run(mount, ctx); }\n', 'FlowChipHost');
+  mustFail('the paint gate lint catches appendChild', 'function sneak() { host.appendChild(node); }\n', 'appendChild');
+  mustFail('the paint gate lint catches a bracket appendChild', "function sneak() { host['appendChild'](node); }\n", 'appendChild');
+  mustFail('the paint gate lint catches insertBefore', 'function sneak() { mount.insertBefore(node, mount.firstChild); }\n', 'insertBefore');
+  mustFail('the paint gate lint catches replaceChildren', 'function sneak() { host.replaceChildren(node); }\n', 'replaceChildren');
+  mustFail('the paint gate lint catches append', 'function sneak() { pane.append(node); }\n', 'append');
+  mustFail('the paint gate lint catches prepend', 'function sneak() { pane.prepend(node); }\n', 'prepend');
+  mustFail('the paint gate lint catches innerHTML', 'function sneak() { pane.innerHTML = "<p></p>"; }\n', 'innerHTML');
+  mustFail('the paint gate lint catches outerHTML', 'function sneak() { host.outerHTML = "<div></div>"; }\n', 'outerHTML');
+  mustFail('the paint gate lint catches insertAdjacentHTML', 'function sneak() { mount.insertAdjacentHTML("beforeend", "<div></div>"); }\n', 'insertAdjacentHTML');
+  mustFail('the paint gate lint catches mountPoint()', 'function sneak() { mountPoint().appendChild(node); }\n', 'appendChild');
+  mustFail('the paint gate lint catches a mountPoint alias', 'function sneak() { const m = mountPoint(); m.prepend(node); }\n', 'prepend');
+  mustFail('the paint gate lint catches a pane alias', 'function sneak() { const card = pane; card.innerHTML = "x"; }\n', 'innerHTML');
+  mustFail('the paint gate lint catches a missing paintDepth guard', 'function paintHint(host, text) { return text; }\n', 'paintDepth');
+  mustFail('the paint gate lint catches a paintIfCurrent with no live-mail guard', 'function paintIfCurrent(token, fn) { paintDepth += 1; try { return fn(); } finally { paintDepth -= 1; } }\n', 'mailTokenLive');
+  const allowed = lintPaintGate([
+    'function paintHint(host, text) { if (paintDepth <= 0 || !host) return; host.appendChild(node); const el = FlowChipHost.el; el("span"); }',
+    'function paintSkippedOnly(pane, skipped) { if (paintDepth <= 0) return null; const mount = mountPoint(); skipped.forEach(function (file) { host.appendChild(file); }); mount.insertBefore(host, mount.firstChild); }',
+    'paintIfCurrent(token, function () { FlowChipHost.inject(mount, ctx, {}); mount.appendChild(host); });',
+    'function localOnly() { const host = document.createElement("div"); host.appendChild(node); }'
+  ].join('\n'));
   check('the paint gate lint allows a gated paint', allowed.length === 0, allowed);
-  const aliasHit = lintPaintGate('function sneak() { const p = paintOutlookTodoReceipt; p(mount, row); }\n');
-  check('the paint gate lint catches an alias', aliasHit.some((row) => row.indexOf('alias paintOutlookTodoReceipt') >= 0), aliasHit);
-  const bracketHit = lintPaintGate("function sneak() { obj['paintX'](); obj['paintOutlookTodoReceipt'](); }\n");
-  check('the paint gate lint catches bracket access', bracketHit.length >= 2, bracketHit);
-  const callHit = lintPaintGate('function sneak() { paintOutlookTodoReceipt.call(null, mount, row); paintOutlookTodoReceipt.apply(null, [mount, row]); }\n');
-  check('the paint gate lint catches call and apply', callHit.length >= 2, callHit);
-  const domHit = lintPaintGate('function sneak() { host.appendChild(node); mount.insertBefore(node, mount.firstChild); host.replaceChildren(node); }\n');
-  check('the paint gate lint catches a direct card mutation', domHit.length >= 3, domHit);
-  const unguarded = lintPaintGate('function paintIfCurrent(token, fn) { paintDepth += 1; try { return fn(); } finally { paintDepth -= 1; } }\n');
-  check('the paint gate lint catches a paintIfCurrent with no live-mail guard', unguarded.some((row) => row.indexOf('missing mailTokenLive guard') >= 0), unguarded);
-  const guardedDom = lintPaintGate('function paintHint(host, text) { host.appendChild(node); }\npaintIfCurrent(token, function () { mount.appendChild(host); });\n');
-  check('the paint gate lint allows a card mutation inside the gate', guardedDom.length === 0, guardedDom);
 
   const race = await boot({ holdAfterRead: true });
   const waitHold = Date.now() + 4000;

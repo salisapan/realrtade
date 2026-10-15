@@ -509,10 +509,11 @@ function listsRoute() {
   const onceDone = await waitFor(oncePage.doc, '.flow-chip-undo', 4000);
   const onceConsent = oncePage.sent.filter((m) => m.type === 'flow:outlook-consent-scope');
   const onceCal = oncePage.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar');
+  const onceLogged = (oncePage.store.log || []).some((e) => e && e.label === 'הרשאת יומן: פעם אחת');
   check('Once consents only Calendars.ReadWrite and the hold finishes',
     Boolean(onceDone) && onceConsent.length === 1 && onceConsent[0].scope === 'Calendars.ReadWrite' && onceConsent[0].policy === 'once' &&
-    onceCal.length === 1 && /Handled|Calendar/i.test(chipText(oncePage.doc)),
-    { text: chipText(oncePage.doc), consent: onceConsent, cal: onceCal.length });
+    onceCal.length === 1 && onceLogged && /Handled|Calendar/i.test(chipText(oncePage.doc)),
+    { text: chipText(oncePage.doc), consent: onceConsent, cal: onceCal.length, log: oncePage.store.log });
   const onceKept = {
     outlookAuth: JSON.parse(JSON.stringify(oncePage.store.outlookAuth)),
     glanceCalendarConsent: JSON.parse(JSON.stringify(oncePage.store.glanceCalendarConsent))
@@ -545,7 +546,7 @@ function listsRoute() {
   const alwaysBtn = await waitFor(alwaysPage.doc, '[data-glance-consent-choice="always"]', 4000);
   if (alwaysBtn) alwaysBtn.click();
   const alwaysDone = await waitFor(alwaysPage.doc, '.flow-chip-undo', 4000);
-  const alwaysLogged = (alwaysPage.store.log || []).some((e) => e && e.reason === 'calendar-consent-always');
+  const alwaysLogged = (alwaysPage.store.log || []).some((e) => e && e.reason === 'calendar-consent-always' && e.label === 'הרשאת יומן: תמיד');
   check('Always is stored and logged, then the hold finishes',
     Boolean(alwaysDone) && alwaysPage.store.glanceCalendarConsent && alwaysPage.store.glanceCalendarConsent.mode === 'always' && alwaysLogged,
     { policy: alwaysPage.store.glanceCalendarConsent, text: chipText(alwaysPage.doc) });
@@ -587,10 +588,11 @@ function listsRoute() {
   const laterTask = laterPage.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookTask');
   const laterCal = laterPage.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar');
   const reminder = laterTask[0] && laterTask[0].payload.params && laterTask[0].payload.params.reminder;
+  const laterLogged = (laterPage.store.log || []).some((e) => e && e.label === 'הרשאת יומן: לא עכשיו');
   check('Not now holds a To Do task with a reminder, and does not write a calendar event',
     Boolean(laterDone) && laterTask.length === 1 && laterCal.length === 0 && reminder && reminder.hour === 10 &&
-    /Handled|To Do/i.test(chipText(laterPage.doc)),
-    { text: chipText(laterPage.doc), reminder: reminder });
+    laterLogged && /Handled|To Do/i.test(chipText(laterPage.doc)),
+    { text: chipText(laterPage.doc), reminder: reminder, log: laterPage.store.log });
   laterPage.w.close();
 
   console.log('\n--- a real Microsoft token, and a real OWA mail open ---\n');

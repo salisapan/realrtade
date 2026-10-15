@@ -2557,15 +2557,29 @@
       outlookAuth: Object.assign({}, auth, { token: token }),
       glanceCalendarConsent: { mode: mode, scope: CALENDAR_SCOPE, revoked: false, at: Date.now() }
     });
-    if (mode === 'always') {
-      await FlowStorage.appendLog({
-        kind: 'shown',
-        label: 'Calendar permission: Always',
-        app: 'outlook',
-        reason: 'calendar-consent-always',
-        messageId: 'calendar-consent'
-      });
-    }
+    await logCalendarChoice(mode);
+  }
+
+  async function logCalendarChoice(choice) {
+    const labels = {
+      always: 'הרשאת יומן: תמיד',
+      once: 'הרשאת יומן: פעם אחת',
+      'not-now': 'הרשאת יומן: לא עכשיו'
+    };
+    const reasons = {
+      always: 'calendar-consent-always',
+      once: 'calendar-consent-once',
+      'not-now': 'calendar-consent-not-now'
+    };
+    const label = labels[choice];
+    if (!label) return;
+    await FlowStorage.appendLog({
+      kind: 'shown',
+      label: label,
+      app: 'outlook',
+      reason: reasons[choice],
+      messageId: 'calendar-consent'
+    });
   }
 
   function calendarReasonLine(result) {
@@ -2620,6 +2634,7 @@
   async function onCalendarConsent(host, ctx, choice) {
     if (!host || ignoreStaleClick(host)) return;
     if (choice === 'not-now') {
+      await logCalendarChoice('not-now');
       await holdAsTodo(host, ctx);
       return;
     }
