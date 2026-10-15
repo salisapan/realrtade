@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Corner v25 — Glance בעברית · לולאות פתוחות, סגורות · קליק אחד, אתם מאשרים</title>
+<link rel="stylesheet" href="/glance/assets/corner.css">
+<link rel="stylesheet" href="/glance/assets/corner-v19.css">
+<link rel="stylesheet" href="/glance/assets/corner-v20.css">
+<link rel="stylesheet" href="/glance/assets/step-states.css">
+<link rel="stylesheet" href="/glance/assets/corner-v21.css">
+<link rel="stylesheet" href="/glance/assets/corner-v22.css">
+<link rel="stylesheet" href="/glance/assets/corner-v23.css">
+<link rel="stylesheet" href="/glance/assets/corner-v24.css">
+<link rel="stylesheet" href="/glance/assets/corner-v25.css">
+<script>
+(function(){try{
+  var q=new URLSearchParams(location.search);
+  var t=q.get('theme');
+  if(t!=='dark'&&t!=='light') t=localStorage.getItem('glance.corner.theme')||localStorage.getItem('glance_theme');
+  if(t==='dark') document.documentElement.setAttribute('data-theme','dark');
+  else document.documentElement.removeAttribute('data-theme');
+  localStorage.setItem('flow_lang', document.documentElement.lang==='he'?'he':'en');
+}catch(e){}})();
+</script>
+</head>
+<body class="v21 he">
+
+<header class="nav">
+  <div class="wrap wide">
+    <a class="brand" href="#">
+      <img src="/glance/assets/logo-header.png" alt="Flow">
+      <span class="slash">/</span>
+      <span class="gname">Glance</span>
+    </a>
+    <nav class="links">
+      <a class="on" href="#">Glance</a>
+      <a href="#">Flow</a>
+      <a href="#">מחירים</a>
+      <span class="lang-toggle" role="group" aria-label="שפה"><a href="/glance/" lang="en">EN</a><a class="on" href="/glance/he.html" lang="he" aria-current="true">עב</a></span>
+      <button type="button" class="theme-toggle" id="btn-theme" aria-label="מעבר לתצוגה כהה" title="תצוגה">
+        <span class="theme-ico theme-ico-moon" aria-hidden="true">◐</span>
+        <span class="theme-label" id="theme-label">Dark</span>
+      </button>
+      <a class="btn sm btn-glow" href="#get-glance">להתקנה</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO · cinematic scroll story (pinned ~325vh) · Detect → Do It → Prepared → Approve → Closed -->
+<section class="h21" id="hero" aria-label="Glance">
+  <div class="h21-pin">
+    <div class="h21-bg" aria-hidden="true"><div class="h21-glow"></div><div class="h21-glow h21-glow-b"></div><div class="h21-stars"></div><div class="h21-floor"></div></div>
+
+    <div class="h21-copy">
+      <p class="h21-eye"><bdi>Glance</bdi></p>
+      <h1 class="h21-h1"><span class="h1-echo" aria-hidden="true">לולאות פתוחות.<br><em>סגורות.</em></span><span class="h1-main">לולאות פתוחות.<br><em>סגורות.</em></span></h1>
+      <p class="h21-sub"><bdi>Glance</bdi> מזהה את הבקשה, מכין כל צעד, ומחכה. קליק אחד. אתם מאשרים.</p>
+      <div class="h21-ctas">
+        <a class="btn btn-glow h21-cta" href="#get-glance">להתקנת Glance</a>
+        <button type="button" class="h21-link" id="btn-see-name">לראות עם השם שלי <span aria-hidden="true">‹</span></button>
+      </div>
+      <div class="capture-card" id="capture-card" hidden>
+        <div class="capture-card-inner">
+          <p class="capture-kicker">תצוגה מקדימה</p>
+          <h3 class="capture-title">לפתוח את <bdi>Glance</bdi> עם השם שלכם</h3>
+          <form class="capture-form" id="capture-form">
+            <label class="sr-only" for="capture-name">השם שלכם</label>
+            <input type="text" id="capture-name" name="name" placeholder="השם שלכם" maxlength="40" autocomplete="name" required>
+            <button type="submit" class="btn capture-go">תראו לי</button>
+          </form>
+          <button type="button" class="capture-cancel" id="btn-capture-cancel">ביטול</button>
+        </div>
+      </div>
+      <p class="capture-hint" id="capture-hint" hidden></p>
+    </div>
+
+    <div class="h21-end" aria-hidden="true">
+      <p class="h21-end-h">נסגר. <span>ב־5 כלים.</span> <em>קליק אחד.</em></p>
+    </div>
+
+    <div class="h21-scene">
+      <div class="h21-rig">
+        <div class="h21-win h21-mail">
+          <div class="gw-top">
+            <span class="gw-dots"><i></i><i></i><i></i></span>
+            <span class="gw-logo"><span class="brand-ico" data-brand="gmail"></span><b>Gmail</b></span>
+            <span class="gw-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg><span>חיפוש בדואר</span></span>
+            <span class="gw-av viewer-initials" title="סאלי ספן">סס</span>
+          </div>
+          <div class="gw-body">
+            <aside class="gw-side">
+              <span class="gw-nav on"><b>דואר נכנס</b></span>
+              <span class="gw-nav">מסומנים</span>
+              <span class="gw-nav">נשלח</span>
+              <span class="gw-nav">טיוטות</span>
+            </aside>
+            <div class="gw-main">
+              <div class="gw-mail">
+                <h4 class="gw-subj"><span data-bind="subj">Thursday for the Lumen review?</span></h4>
+                <div class="gw-msg">
+                  <span class="gw-mav" data-bind="av">JH</span>
+                  <div class="gw-mbody">
+                    <div class="gw-from"><b data-bind="fromName">Jordan Hale</b><span class="gw-addr" data-bind="fromAddr">jordan@lumen.studio</span><span class="gw-time" data-bind="fromTime">09:12</span></div>
+                    <div class="gw-to">אל <span class="viewer-first">אני</span></div>
+                    <p class="gw-p" data-bind="greet">Sali —</p>
+                    <p class="gw-p"><span class="h21-ask" data-bind="msgBody">Can we move the Lumen client review to Thursday at 3? Zoom, the Notion brief, the Jira epic, the Dropbox deck, and the HubSpot deal still say Tuesday.</span></p>
+                    <p class="gw-p gw-sign" data-bind="sign">Jordan</p>
+                    <div class="h21-ping" aria-hidden="true"><span class="h21-ping-r"></span><span class="h21-ping-r"></span><img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="18" height="18"><b>Glance</b><span class="h21-ping-t" data-bind="pingTxt">can close this · 5 steps</span></div>
+                  </div>
+                </div>
+                <div class="gw-artifact" id="gw-artifact" hidden>
+                  <div class="gw-art-top"><span class="gw-art-k" data-art-k>טיוטה</span><span class="gw-art-app">Gmail</span></div>
+                  <div class="gw-slack">
+                    <span class="gw-mav viewer-initials" title="סאלי ספן">סס</span>
+                    <div class="gw-slack-body">
+                      <div class="gw-from"><b class="viewer-name">סאלי ספן</b><span class="gw-addr">to</span> <span data-art-who>Jordan Hale</span></div>
+                      <p class="gw-art-body" data-art-body>יום חמישי ב־15:00 מתאים. Zoom, Notion, Jira, Dropbox ו־HubSpot עודכנו.</p>
+                      <div class="gw-notion"><span class="gw-notion-ic" data-brand="notion"></span><span data-art-notion>בריף Lumen</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="h21-sweep" aria-hidden="true"></div>
+          <div class="h21-dim" aria-hidden="true"></div>
+        </div>
+
+        <!-- floating tool tiles (execution) -->
+        <div class="h21-tiles" aria-hidden="true"></div>
+
+        <!-- Glance — the floating extension card (step card · step-states v1) -->
+        <div class="h21-card stage stage-live" id="product-moment" data-state="propose" data-case="launch">
+          <div class="glance-surface g19 h21-gs" id="live-glance">
+            <div class="gs-head">
+              <img class="living-ico" id="live-living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="26" height="26">
+              <div class="gs-head-meta">
+                <div class="gs-brand">Glance</div>
+                <div class="gs-intent-label">כוונה שזוהתה</div>
+              </div>
+              <span class="handled gs-badge">נסגר</span>
+            </div>
+            <p class="gs-intent" data-bind="intent">Jordan wants the Lumen review on Thursday at 3.</p>
+            <div class="acts-head">
+              <span class="acts-label">Glance יבצע</span>
+              <span class="acts-hint">אפשר לבטל סימון</span>
+            </div>
+            <ol class="acts" id="live-acts"></ol>
+            <div class="ss-add" data-open="true">
+              <button type="button" class="ss-add-btn" id="btn-add-open">+ להוסיף צעד</button>
+              <div class="ss-add-row act-row">
+                <span class="act-box act-none" aria-hidden="true"></span>
+                <span class="act-glyph" data-glyph="you"></span>
+                <input type="text" class="ss-add-input" id="custom-step-input" maxlength="80" placeholder="+ הוסף צעד…" aria-label="New step">
+                <kbd class="ss-kbd">↵</kbd>
+              </div>
+            </div>
+            <div class="approve-banner" id="live-approve" hidden>
+              <div class="approve-meta">
+                <div class="approve-title">Prepared · nothing sent</div>
+                <div class="approve-sub">מוכן ≠ סגור · עוד Do It אחד סוגר באמת</div>
+              </div>
+              <button type="button" class="do-halo approve-btn" id="btn-approve" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+            </div>
+            <div class="chip chip-invoice" id="live-chip">
+              <button type="button" class="chip-hold" id="btn-hold" aria-label="השהה">השהה</button>
+              <span class="chip-txt"><b class="gplus"><span class="gplus-name">Glance</span></b> יכול לסגור את זה ב־<b class="file">5 צעדים</b> · Zoom · Notion · Jira · Dropbox · HubSpot<span class="chip-sugg"> · +1 suggested</span></span>
+              <span class="chip-act">
+                <button type="button" class="chip-x" id="btn-dismiss" aria-label="סגירה">×</button>
+                <button type="button" class="do-halo h21-doit" id="btn-doit" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span><i class="doit-ripple" aria-hidden="true"></i></button>
+              </span>
+            </div>
+            <div class="parked-banner" id="parked-banner">
+              <span class="receipt-dot"></span>
+              <span><b>מושהה</b> · עדיין פתוח · שום דבר לא הוכן · <em class="js-unpark" id="btn-unpark">להחזיר</em></span>
+            </div>
+            <div class="receipt-stack" id="live-receipt"></div>
+          </div>
+        </div>
+      </div>
+      <svg class="h21-beams" aria-hidden="true"></svg>
+    </div>
+
+    <div class="h21-cap" aria-live="polite">
+      <ol class="h21-steps">
+        <li data-s="0">זיהוי</li><li data-s="1">Do It</li><li data-s="2">מוכן</li><li data-s="3">אישור</li><li data-s="4">נסגר</li>
+      </ol>
+      <p class="h21-cap-txt"><bdi>Glance</bdi> קורא את הבקשה. עוד לא קורה כלום.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Works where the loop lives — A · Orbiting Circles (upper overview · Magic UI · https://21st.dev/@dillionverma/components/orbiting-circles) -->
+<section class="ints o20sec" id="integrations" aria-label="עובד איפה שהלולאה נמצאת">
+  <div class="wrap wide">
+    <p class="ints-kicker mono-eye">עובד איפה שהלולאה נמצאת</p>
+    <h2 class="ints-h">הבקשה מגיעה מכל מקום. <em><bdi>Glance</bdi> סוגר אותה איפה שהיא נוחתת.</em></h2>
+    <p class="ints-sub o20-sub"><bdi>Glance</bdi> אחד מעל הכלים שכבר יש לכם.</p>
+    <div class="o20" data-orbit20>
+      <div class="o20-plate o20-plate-out" aria-hidden="true"></div>
+      <div class="o20-plate o20-plate-in" aria-hidden="true"></div>
+      <svg class="o20-tracks" aria-hidden="true"></svg>
+      <div class="o20-ring" data-ring="in" data-speed="7.5">
+        <button type="button" class="o20-orb" data-glyph="gmail" aria-label="Gmail"><span class="o20-tip">Gmail</span></button>
+        <button type="button" class="o20-orb" data-glyph="outlook" aria-label="Outlook"><span class="o20-tip">Outlook</span></button>
+        <button type="button" class="o20-orb" data-glyph="whatsapp" aria-label="WhatsApp"><span class="o20-tip">WhatsApp</span></button>
+        <button type="button" class="o20-orb" data-glyph="slack" aria-label="Slack"><span class="o20-tip">Slack</span></button>
+        <button type="button" class="o20-orb" data-glyph="teams" aria-label="Teams"><span class="o20-tip">Teams</span></button>
+      </div>
+      <div class="o20-ring" data-ring="out" data-speed="-4.8">
+        <button type="button" class="o20-orb" data-glyph="morning" aria-label="Morning"><span class="o20-tip">Morning</span></button>
+        <button type="button" class="o20-orb" data-glyph="calendar" aria-label="Calendar"><span class="o20-tip">Calendar</span></button>
+        <button type="button" class="o20-orb" data-glyph="drive" aria-label="Drive"><span class="o20-tip">Drive</span></button>
+        <button type="button" class="o20-orb" data-glyph="docs" aria-label="Docs"><span class="o20-tip">Docs</span></button>
+        <button type="button" class="o20-orb" data-glyph="sheets" aria-label="Sheets"><span class="o20-tip">Sheets</span></button>
+        <button type="button" class="o20-orb" data-glyph="todo" aria-label="Microsoft To Do"><span class="o20-tip">Microsoft To Do</span></button>
+        <button type="button" class="o20-orb" data-glyph="onedrive" aria-label="OneDrive"><span class="o20-tip">OneDrive</span></button>
+      </div>
+      <div class="o20-core">
+        <span class="o20-ripple" aria-hidden="true"></span><span class="o20-ripple" aria-hidden="true"></span><span class="o20-ripple" aria-hidden="true"></span>
+        <div class="o20-disc"><img class="living-ico o20-ring-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="46" height="46"></div>
+        <b class="o20-name">Glance</b>
+      </div>
+    </div>
+    <p class="o20-legend"><span><i></i>פנימי · איפה שהבקשה מגיעה</span><span><i class="o"></i>חיצוני · איפה שהסגירה נוחתת</span></p>
+  </div>
+</section>
+
+
+<!-- Same close · different surfaces — WhatsApp Web (RTL · Hebrew) -->
+<section class="surfaces band s21" id="surfaces" aria-label="אותה סגירה במקומות אחרים">
+  <div class="wrap wide">
+    <p class="surfaces-kicker mono-eye">אותה סגירה · מקומות אחרים</p>
+    <h2 class="s21-h">הבקשה מגיעה מכל מקום. <em><bdi>Glance</bdi> סוגר אותה איפה שהיא נוחתת.</em></h2>
+    <article class="surf-demo" id="demo-whatsapp-block">
+      <div class="surf-label">
+        <span class="surf-tag">WhatsApp Web</span>
+        <span class="surf-desc">דני לי כותבת לסאלי. כתבו כדני — Glance מסתגל. שום דבר לא נשלח עד שלוחצים על Do It.</span>
+      </div>
+      <div class="surf-rail surf-rail-rtl" dir="ltr">
+        <div class="surf-card featured">
+          <div class="story-tag accent">חי · כמה צעדים</div>
+          <div class="wa21-wrap stage stage-live stage-demo" id="demo-whatsapp" data-state="propose">
+            <div class="wa21" dir="rtl" lang="he">
+              <aside class="wa21-list">
+                <div class="wa21-lhead">
+                  <span class="wa21-av wa21-av-me" aria-hidden="true"></span>
+                  <span class="wa21-icons"><i data-wa="newchat"></i><i data-wa="dots"></i></span>
+                </div>
+                <div class="wa21-search"><i data-wa="search"></i><span>חיפוש</span></div>
+                <div class="wa21-filters"><span class="on">הכול</span><span>לא נקראו</span><span>מועדפים</span><span>קבוצות</span></div>
+                <ul class="wa21-chats">
+                  <li class="on"><span class="wa21-av" aria-hidden="true"></span><div><b>דני לי</b><span id="wa-list-preview">אפשר להזיז את הטעימה של חמישי ל־19:30?</span></div><div class="wa21-meta"><time class="unread">10:42</time><em>1</em></div></li>
+                  <li><span class="wa21-av wa21-av-grp" aria-hidden="true"></span><div><b>Riverview · צוות</b><span>כריס: מעולה, נדבר ביום ראשון</span></div><div class="wa21-meta"><time>10:15</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>אלכס ריברה</b><span><i class="wa21-ticks read" data-wa="dbl"></i>שלחתי לכם את הבריף</span></div><div class="wa21-meta"><time>09:58</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>אמא</b><span>מגיעים בשישי?</span></div><div class="wa21-meta"><time>אתמול</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>מייק מהמשרד</b><span>סגור, תודה!</span></div><div class="wa21-meta"><time>אתמול</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>ג׳נה · הנהלת חשבונות</b><span><i class="wa21-ticks read" data-wa="dbl"></i>מצרפת את הדוח של ספטמבר</span></div><div class="wa21-meta"><time>יום שלישי</time></div></li>
+                  <li><span class="wa21-av wa21-av-grp" aria-hidden="true"></span><div><b>בניין · השדרה החמישית</b><span>סאם: מחר מנקים את חדר המדרגות</span></div><div class="wa21-meta"><time>יום שני</time></div></li>
+                </ul>
+              </aside>
+              <div class="wa21-chat">
+                <div class="wa21-head">
+                  <span class="wa21-av" aria-hidden="true"></span>
+                  <div class="wa21-who"><b>דני לי</b><span>מחובר</span></div>
+                  <span class="wa21-icons"><i data-wa="video"></i><i data-wa="search"></i><i data-wa="dots"></i></span>
+                </div>
+                <div class="wa21-thread">
+                  <div class="wa21-date"><span>היום</span></div>
+                  <div class="wa21-msg bubble in tail" id="wa-pre-in"><p>היי סאלי, אני על הרצפה היום.</p><span class="wa21-time">10:38</span></div>
+                  <div class="wa21-msg bubble out tail" id="wa-pre-out"><p>אני כאן. מה צריך?</p><span class="wa21-time">10:40<i class="wa21-ticks read" data-wa="dbl"></i></span></div>
+                  <div class="wa21-msg bubble in tail wa21-ask"><p id="wa-ask-text">אפשר להזיז את הטעימה של חמישי ל־19:30?</p><span class="wa21-time">10:42</span></div>
+                  <div class="wa21-msg bubble out tail wa21-art wa21-art-draft">
+                    <p id="wa-draft-text">הטעימה של חמישי עכשיו ב־19:30. אעדכן את המטבח.</p>
+                    <div class="wa21-file" id="wa-draft-file" hidden><span class="wa21-pdf">PDF</span><span><b id="wa-draft-file-name">Seating.pdf</b><em>Not sent</em></span></div>
+                    <span class="wa21-time"><i class="wa21-draft-tag">טיוטה</i></span>
+                  </div>
+                  <div class="wa21-msg bubble out tail wa21-art wa21-art-sent">
+                    <p id="wa-sent-text">הטעימה של חמישי עכשיו ב־19:30. אעדכן את המטבח.</p>
+                    <div class="wa21-file" id="wa-sent-file" hidden><span class="wa21-pdf">PDF</span><span><b>Seating.pdf</b><em>Sent</em></span></div>
+                    <span class="wa21-time">10:44<i class="wa21-ticks read" data-wa="dbl"></i></span>
+                  </div>
+                  <div id="wa-live"></div>
+                </div>
+                <div class="wa21-suggests" id="wa-suggests">
+                  <button type="button" data-i="0">להזיז את הטעימה של חמישי ל־19:30</button>
+                  <button type="button" data-i="1">הפרחים צריכים את מספר המרכזים</button>
+                  <button type="button" data-i="2">לשלוח לדני את תרשים ההושבה</button>
+                </div>
+                <p class="wa21-as">כתבו כדני — Glance מסתגל</p>
+                <div class="wa21-compose">
+                  <i data-wa="emoji"></i><i data-wa="plus"></i>
+                  <input class="wa21-input" id="wa-compose" type="text" maxlength="160" placeholder="הקלד/י הודעה" aria-label="הודעה לדני לי">
+                  <button type="button" class="wa21-send" id="wa-send" aria-label="Send"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l-.2 6.8L15.2 12 3.2 13.8z"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Glance floats over WhatsApp Web (its own style · Hebrew · RTL) -->
+            <div class="glance-surface gs-demo g19 wa21-glance" id="wa-glance" dir="rtl" lang="he">
+              <div class="gs-head compact">
+                <img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="24" height="24">
+                <div class="gs-head-meta">
+                  <div class="gs-brand">Glance</div>
+                  <div class="gs-intent-label">כוונה שזוהתה</div>
+                </div>
+                <span class="wa-think act is-active" hidden><span class="act-box" aria-hidden="true"></span></span>
+                <span class="handled gs-badge">נסגר</span>
+              </div>
+              <p class="gs-intent" id="wa-intent">דני רוצה להזיז את הטעימה של חמישי ל־19:30.</p>
+              <div class="acts-head">
+                <span class="acts-label">Glance יבצע</span>
+                <span class="acts-hint">אפשר לבטל סימון</span>
+              </div>
+              <div class="acts-run" hidden>
+                <div class="run-meta"><div class="run-title">עובד…</div><div class="run-sub"></div></div>
+                <div class="run-count">1<span>/</span>2</div>
+                <div class="run-track" aria-hidden="true"><div class="run-fill"></div></div>
+              </div>
+              <ol class="acts"></ol>
+              <div class="ss-add" data-open="true">
+                <button type="button" class="ss-add-btn">+ Add a step</button>
+                <div class="ss-add-row act-row">
+                  <span class="act-box act-none" aria-hidden="true"></span>
+                  <span class="act-glyph" data-glyph="you"></span>
+                  <input type="text" class="ss-add-input" maxlength="80" placeholder="+ הוסף צעד…" aria-label="New step">
+                  <kbd class="ss-kbd">↵</kbd>
+                </div>
+              </div>
+              <div class="approve-banner demo-approve" hidden>
+                <div class="approve-meta">
+                  <div class="approve-title">Prepared · nothing sent</div>
+                  <div class="approve-sub">Prepared ≠ closed · Glance never sends for you</div>
+                </div>
+                <button type="button" class="do-halo approve-btn" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+              </div>
+              <div class="chip pulse demo-chip">
+                <button type="button" class="chip-hold" aria-label="השהה">השהה</button>
+                <span class="chip-txt"></span>
+                <span class="chip-act">
+                  <button type="button" class="chip-x" aria-label="סגירה">×</button>
+                  <button type="button" class="do-halo demo-doit" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+                </span>
+              </div>
+              <div class="parked-banner demo-parked">
+                <span class="receipt-dot"></span>
+                <span><b>מושהה</b> · עדיין פתוח · <em class="js-unpark">להחזיר</em></span>
+              </div>
+              <div class="receipt-stack demo-receipt"></div>
+            </div>
+          </div>
+          <p class="demo-hint">פתוח עד ש־Do It סוגר · ואז נסגר + ביטול</p>
+        </div>
+        </article>
+  </div>
+</section>
+
+<!-- One intent · four tools — Google Meet → Docs → Drive → Calendar → Gmail → back to Meet -->
+<section class="mj21" id="meet-journey" aria-label="כוונה אחת, ארבעה כלים">
+  <div class="wrap wide">
+    <p class="mono-eye mj-eye">כוונה אחת · בכלים שבהם אתם עובדים</p>
+    <h2 class="mj-h">נאמר בפגישה.<br><em>בוצע בכל מקום.</em></h2>
+    <p class="mj-sub">נועה מבקשת בשיחת <bdi>Meet</bdi>. <bdi>Glance</bdi> מכין את ההצעה ב־<bdi>Docs</bdi>, מפרסם ב־<bdi>Slack</bdi>, פותח הצעת מחיר ב־<bdi>Morning</bdi> ומכין טיוטה ב־<bdi>Outlook</bdi> — ומחכה לכם.</p>
+
+    <div class="mj" id="mj" data-step="meet" data-state="propose" data-phase="intro">
+      <div class="mj-railbar">
+        <ol class="mj-rail" aria-label="איפה Glance עובד">
+          <li class="mj-src" data-k="meet"><span class="mj-ic brand-ico" data-brand="meet"></span><b>Meet</b></li>
+          <li data-k="docs"><span class="mj-ic brand-ico" data-brand="docs"></span><b>Docs</b><i class="mj-ok" aria-hidden="true"></i></li>
+          <li data-k="slack"><span class="mj-ic brand-ico" data-brand="slack"></span><b>Slack</b><i class="mj-ok" aria-hidden="true"></i></li>
+          <li data-k="morning"><span class="mj-ic brand-ico" data-brand="morning"></span><b>Morning</b><i class="mj-ok" aria-hidden="true"></i></li>
+          <li data-k="outlook"><span class="mj-ic brand-ico" data-brand="outlook"></span><b>Outlook</b><i class="mj-ok" aria-hidden="true"></i></li>
+        </ol>
+        <button type="button" class="mj-replay" id="mj-replay" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>שוב</button>
+      </div>
+
+      <div class="mj-body">
+        <div class="mj-frame">
+          <div class="mj-chrome" aria-hidden="true">
+            <span class="mj-dots"><i></i><i></i><i></i></span>
+            <span class="mj-url"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9z"/></svg><span class="mj-url-t">meet.google.com/rvs-prop-sync</span></span>
+            <span class="mj-ext" title="Glance"><img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="16" height="16"></span>
+          </div>
+          <div class="mj-viewport">
+            <div class="mj-canvas">
+
+              <!-- MEET -->
+              <div class="mj-screen on" data-screen="meet">
+                <div class="mt">
+                  <div class="mt-grid">
+                    <div class="mt-tile speaking"><span class="mt-av mt-av-n">נ</span><span class="mt-name">נועה לוי</span><span class="mt-eq" aria-hidden="true"><i></i><i></i><i></i></span></div>
+                    <div class="mt-tile"><span class="mt-av mt-av-d">ד</span><span class="mt-name">דנה · <bdi>Riverview Studio</bdi></span><span class="mt-mute" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3 3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg></span></div>
+                  </div>
+                  <div class="mt-self"><span class="mt-av mt-av-s viewer-initials">סס</span><span class="mt-name viewer-name">סאלי ספן</span></div>
+                  <div class="mt-cc">
+                    <span class="mt-cc-av">נ</span>
+                    <div class="mt-cc-body"><b>נועה לוי</b><p class="mt-cc-txt"><span class="mt-w">סאלי,</span> <span class="mt-w">תוכלי</span> <mark class="mt-hl"><span class="mt-w">לשלוח</span> <span class="mt-w">לנו</span> <span class="mt-w">את</span> <span class="mt-w">ההצעה</span> <span class="mt-w">עד</span> <span class="mt-w">יום</span> <span class="mt-w">ראשון?</span></mark></p></div>
+                  </div>
+                  <div class="mt-bar">
+                    <span class="mt-meta"><b>17:32</b><i>|</i><bdi>Riverview</bdi> · סנכרון הצעה</span>
+                    <span class="mt-ctrls">
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></i>
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z"/></svg></i>
+                      <i class="mt-btn on"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1z"/></svg></i>
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 5.5v10.75A5.75 5.75 0 0 1 15.25 22h-1.5c-2.07 0-3.4-.9-4.84-2.6l-4.2-4.98a1.6 1.6 0 0 1 2.32-2.2L9 14V4.5a1.5 1.5 0 0 1 3 0V11h.5V2.5a1.5 1.5 0 0 1 3 0V11h.5V4a1.5 1.5 0 0 1 3 0v7h.5V5.5a1.5 1.5 0 0 1 1.5-1.5c.8 0 1.5.7 1.5 1.5z"/></svg></i>
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></i>
+                      <i class="mt-btn mt-end"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85a1 1 0 0 1-1.41-.01L.29 13.08A1 1 0 0 1 0 12.38c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71s-.11.53-.29.71l-2.48 2.48a1 1 0 0 1-1.41.01 11.3 11.3 0 0 0-2.67-1.85 1 1 0 0 1-.56-.9v-3.1A15.4 15.4 0 0 0 12 9z"/></svg></i>
+                    </span>
+                    <span class="mt-side"><i>ⓘ</i><i class="mt-ppl">3</i></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DOCS -->
+              <div class="mj-screen" data-screen="docs">
+                <div class="gd">
+                  <div class="gd-top">
+                    <span class="gd-ic brand-ico" data-brand="docs"></span>
+                    <div class="gd-title"><b>הצעת מחיר — <bdi>Riverview Studio</bdi></b><span class="gd-menu"><i>קובץ</i><i>עריכה</i><i>תצוגה</i><i>הוספה</i><i>עיצוב</i><i>כלים</i><i>תוספים</i><i>עזרה</i></span></div>
+                    <span class="gd-share">שיתוף</span><span class="gd-av viewer-initials">סס</span>
+                  </div>
+                  <div class="gd-tools"><i class="w2"></i><i></i><i></i><b>100%</b><b>טקסט רגיל</b><b>Arial</b><b>11</b><i class="bold">B</i><i class="it">I</i><i class="ul">U</i><i class="w2"></i><i></i></div>
+                  <div class="gd-canvas">
+                    <div class="gd-page">
+                      <span class="gd-tpl">מתבנית · הצעת מחיר ללקוח</span>
+                      <p class="gd-l gd-k" style="--i:0">הצעת מחיר</p>
+                      <h5 class="gd-l gd-h" style="--i:1"><bdi>Riverview Studio</bdi> — מיתוג ואתר</h5>
+                      <p class="gd-l gd-meta" style="--i:2">הוכן עבור נועה לוי · <bdi>Riverview Studio</bdi> · 8 באוקטובר 2026</p>
+                      <table class="gd-l gd-tbl" style="--i:3">
+                        <tr><th>פריט</th><th>סכום</th></tr>
+                        <tr class="gd-l" style="--i:4"><td>שפה מותגית</td><td>₪22,000</td></tr>
+                        <tr class="gd-l" style="--i:5"><td>עיצוב אתר · 8 עמודים</td><td>₪18,000</td></tr>
+                        <tr class="gd-l" style="--i:6"><td>ערכת תוכן להשקה</td><td>₪8,000</td></tr>
+                        <tr class="gd-l gd-total" style="--i:7"><td>סה״כ</td><td>₪48,000</td></tr>
+                      </table>
+                      <p class="gd-l gd-p" id="meet-summary" style="--i:8">Valid until Oct 31. Half is due on signature, and the walkthrough is Sunday at 10:00.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SLACK -->
+              <div class="mj-screen" data-screen="slack">
+                <div class="sk">
+                  <aside class="sk-side">
+                    <b class="sk-ws">Riverview</b>
+                    <span class="sk-ch on"># riverview</span>
+                    <span class="sk-ch"># design</span>
+                    <span class="sk-ch">Noa Levi</span>
+                    <span class="sk-ch">Dani Lee</span>
+                  </aside>
+                  <div class="sk-main">
+                    <header class="sk-head"><b># riverview</b><span>4 חברים</span></header>
+                    <div class="sk-thread">
+                      <div class="sk-msg"><i>N</i><div><b>Noa Levi</b><time>17:32</time><p>סאלי, תוכלי לשלוח לנו את ההצעה עד יום ראשון?</p></div></div>
+                      <div class="sk-msg sk-art sk-draft"><i class="me">S</i><div><b>Sali Sapan</b><em class="sk-tag">טיוטה</em><p>ההצעה מוכנה — <bdi>Riverview Studio</bdi>, ‏₪48,000. אעבור איתך עליה ביום ראשון ב־10:00.</p><span class="sk-file"><span class="brand-ico" data-brand="docs"></span><b>Riverview-proposal.pdf</b><em>184 KB</em></span></div></div>
+                      <div class="sk-msg sk-art sk-sent"><i class="me">S</i><div><b>Sali Sapan</b><time>17:36</time><p>ההצעה מוכנה — <bdi>Riverview Studio</bdi>, ‏₪48,000. אעבור איתך עליה ביום ראשון ב־10:00.</p><span class="sk-file"><span class="brand-ico" data-brand="docs"></span><b>Riverview-proposal.pdf</b><em>184 KB · נשלח</em></span></div></div>
+                    </div>
+                    <div class="sk-compose">הודעה ל־#riverview</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MORNING -->
+              <div class="mj-screen" data-screen="morning">
+                <div class="mn">
+                  <header class="mn-top"><span class="mn-logo"><span class="brand-ico" data-brand="morning"></span>Morning</span><span>הצעות מחיר</span><span class="mn-new">+ הצעה חדשה</span></header>
+                  <div class="mn-body">
+                    <aside class="mn-side"><span class="on">הצעות מחיר</span><span>חשבוניות</span><span>קבלות</span><span>לקוחות</span></aside>
+                    <article class="mn-doc">
+                      <div class="mn-kicker"><span class="mn-tag">טיוטה</span><span class="mn-tag mn-tag-sent">הופקה</span> הצעת מחיר · לא נשלח</div>
+                      <h4>Q-2208</h4>
+                      <p class="mn-for"><bdi>Riverview Studio</bdi> · נועה לוי</p>
+                      <table>
+                        <tr><td>הצעת מיתוג ואתר</td><td>₪48,000</td></tr>
+                        <tr><td>VAT</td><td>כלול בהצעה</td></tr>
+                        <tr class="mn-tot"><td>סה״כ</td><td>₪48,000</td></tr>
+                      </table>
+                      <p class="mn-note">בתוקף עד 31.10 · פולואפ ביום ראשון 10:00</p>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <!-- OUTLOOK -->
+              <div class="mj-screen" data-screen="outlook">
+                <div class="ol">
+                  <header class="ol-top"><span class="ol-logo"><span class="brand-ico" data-brand="outlook"></span>Outlook</span><span class="ol-search">חיפוש</span></header>
+                  <div class="ol-body">
+                    <aside class="ol-side"><span class="ol-new">דואר חדש</span><span class="on">טיוטות <em>1</em></span><span>דואר נכנס</span><span>נשלח</span></aside>
+                    <article class="ol-draft">
+                      <div class="ol-bar"><b>Riverview proposal</b><span class="ol-state">טיוטה · לא נשלח</span><span class="ol-state ol-state-sent">נשלח</span></div>
+                      <p><em>אל</em> נועה לוי</p>
+                      <p><em>נושא</em> הצעת Riverview</p>
+                      <div class="ol-txt"><p>היי נועה,</p><p>מצורפת ההצעה ל־<bdi>Riverview Studio</bdi> — ‏₪48,000. אשמח לעבור עליה ביום ראשון ב־10:00. ההצעה היא <bdi>Q-2208</bdi> ב־<bdi>Morning</bdi>, והשארתי הודעה ב־<bdi>#riverview</bdi>.</p><p>תודה,<br>סאלי</p></div>
+                      <span class="ol-file"><span class="brand-ico" data-brand="docs"></span>Riverview-proposal.pdf</span>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DRIVE (retired) -->
+              <div class="mj-screen" data-screen="drive" hidden>
+                <div class="dv">
+                  <div class="dv-top"><span class="dv-logo"><span class="brand-ico" data-brand="drive"></span>Drive</span><span class="dv-search">חיפוש ב־Drive</span><span class="gd-av viewer-initials">סס</span></div>
+                  <div class="dv-body">
+                    <aside class="dv-side"><span class="dv-new">+ חדש</span><span class="dv-nav">דף הבית</span><span class="dv-nav on">האחסון שלי</span><span class="dv-nav">שותפו איתי</span><span class="dv-nav">אחרונים</span><span class="dv-nav">מסומנים בכוכב</span><span class="dv-nav">אשפה</span></aside>
+                    <div class="dv-main">
+                      <div class="dv-crumb">האחסון שלי <i>‹</i> לקוחות <i>‹</i> <b>Riverview</b></div>
+                      <div class="dv-chips"><span>סוג ▾</span><span>אנשים ▾</span><span>שינוי אחרון ▾</span></div>
+                      <div class="dv-table">
+                        <div class="dv-row dv-hd"><span>שם</span><span>בעלים</span><span>שינוי אחרון</span><span>משותף</span></div>
+                        <div class="dv-row dv-new-file"><span class="dv-name"><span class="brand-ico" data-brand="docs"></span><b>הצעת Riverview</b></span><span>אני</span><span>עכשיו</span><span class="dv-share"><span class="dv-shav">נ</span><em>נועה · צפייה</em></span></div>
+                        <div class="dv-row"><span class="dv-name"><span class="dv-fi pdf">PDF</span>Brief — Riverview.pdf</span><span>נועה לוי</span><span>2 באוק׳</span><span>—</span></div>
+                        <div class="dv-row"><span class="dv-name"><span class="dv-fi img">IMG</span>Moodboard v3.png</span><span>דנה</span><span>5 באוק׳</span><span>—</span></div>
+                        <div class="dv-row"><span class="dv-name"><span class="dv-fi fold"></span>נכסים</span><span>אני</span><span>28 בספט׳</span><span>—</span></div>
+                      </div>
+                      <div class="dv-toast">שותף עם נועה לוי · צפייה</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CALENDAR -->
+              <div class="mj-screen" data-screen="calendar">
+                <div class="gc">
+                  <div class="gc-top"><span class="dv-logo"><span class="brand-ico" data-brand="calendar"></span>Calendar</span><span class="gc-today">היום</span><span class="gc-nav">› ‹</span><b class="gc-month">אוקטובר 2026</b><span class="gc-view">4 ימים ▾</span></div>
+                  <div class="gc-body">
+                    <aside class="gc-side"><span class="dv-new">+ יצירה</span>
+                      <div class="gc-mini"><b>אוקטובר 2026</b><div class="gc-mgrid"><i>א</i><i>ב</i><i>ג</i><i>ד</i><i>ה</i><i>ו</i><i>ש</i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i class="t">8</i><i>9</i><i>10</i><i class="f">11</i><i>12</i><i>13</i><i>14</i><i>15</i><i>16</i><i>17</i><i>18</i><i>19</i><i>20</i><i>21</i><i>22</i><i>23</i><i>24</i></div></div>
+                    </aside>
+                    <div class="gc-grid">
+                      <div class="gc-days"><span></span><span class="t"><em>יום ה׳</em><b>8</b></span><span><em>יום ו׳</em><b>9</b></span><span><em>שבת</em><b>10</b></span><span class="f"><em>יום א׳</em><b>11</b></span></div>
+                      <div class="gc-hours">
+                        <div class="gc-h"><i>08:00</i></div><div class="gc-h"><i>09:00</i></div><div class="gc-h"><i>10:00</i></div><div class="gc-h"><i>11:00</i></div><div class="gc-h"><i>12:00</i></div>
+                        <span class="gc-ev gc-ev-old" style="--c:1;--t:1;--d:.5">סטנדאפ</span>
+                        <span class="gc-ev gc-ev-old" style="--c:1;--t:2.5;--d:1">הכנה לקיקאוף <bdi>Riverview</bdi></span>
+                        <span class="gc-ev gc-ev-new" style="--c:4;--t:2;--d:.5"><b>פולואפ · הצעת <bdi>Riverview</bdi></b><em>10:00–10:30 · נועה לוי</em></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- GMAIL -->
+              <div class="mj-screen" data-screen="gmail">
+                <div class="gm21">
+                  <div class="gm21-top"><span class="gw-logo"><span class="brand-ico" data-brand="slack"></span><b>Slack</b></span><span class="dv-search">חיפוש בדואר</span><span class="gd-av viewer-initials">סס</span></div>
+                  <div class="gm21-body">
+                    <aside class="gm21-side"><span class="gw-compose">כתיבה</span><span class="gw-nav on"><b>דואר נכנס</b><em>24</em></span><span class="gw-nav">מסומנים בכוכב</span><span class="gw-nav">נשלחו</span><span class="gw-nav">טיוטות<em>2</em></span></aside>
+                    <div class="gm21-list"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="gm21-compose">
+                      <div class="gm21-ch"><b>הצעת Riverview</b><span>_ ⤢ ×</span></div>
+                      <div class="gm21-f"><em>אל</em><span class="gm21-to"><span class="dv-shav">נ</span>נועה לוי</span></div>
+                      <div class="gm21-f"><em>נושא</em>הצעת Riverview</div>
+                      <div class="gm21-txt"><p>היי נועה,</p><p>מצורפת ההצעה ל־<bdi>Riverview Studio</bdi> — ‏₪48,000, כמו שדיברנו. אשמח לעבור עליה יחד ביום ראשון ב־10:00.</p><p>תודה,<br><span class="viewer-first-name">סאלי</span></p></div>
+                      <span class="gm21-att"><span class="brand-ico" data-brand="docs"></span>הצעת Riverview</span>
+                      <div class="gm21-foot"><span class="gm21-send">שליחה</span><span class="gm21-draft">טיוטה · לא נשלח</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <div class="mj-close" aria-live="polite">
+              <div class="mj-close-card">
+                <img class="living-ico" src="/glance/assets/living/key-done-512.png" alt="" width="36" height="36">
+                <p class="mj-close-k">נסגר</p>
+                <ul class="mj-close-lines">
+                  <li><b>Docs</b> הצעת Riverview · ‏₪48,000 · נוצרה</li>
+                  <li><b>Slack</b> <bdi>#riverview</bdi> · ההצעה נשלחה</li>
+                  <li><b>Morning</b> הצעה <bdi>Q-2208</bdi> · הופקה</li>
+                  <li><b>Outlook</b> נשלח לנועה</li>
+                </ul>
+                <p class="mj-close-undo">ההצעה אצל נועה · <button type="button" class="linkish js-undo">ביטול</button></p>
+              </div>
+            </div>
+            <div class="mj-pill" aria-live="polite"><img class="living-ico" src="/glance/assets/living/thinking.webp" alt="" width="18" height="18"><span class="mj-pill-t">Docs · יוצר את ההצעה…</span></div>
+          </div>
+        </div>
+
+        <!-- Glance card (same row components as every demo) -->
+        <div class="mj-card stage stage-live stage-demo" id="demo-meet" data-state="propose">
+          <div class="glance-surface gs-demo g19" id="meet-glance">
+            <div class="gs-head compact">
+              <img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="24" height="24">
+              <div class="gs-head-meta"><div class="gs-brand">Glance</div><div class="gs-intent-label">כוונה שזוהתה · <bdi>Meet</bdi></div></div>
+              <span class="handled gs-badge">נסגר</span>
+            </div>
+            <p class="mj-side-closed"><b>נסגר</b> · 4 כלים · <button type="button" class="linkish js-undo">ביטול</button></p>
+            <p class="gs-intent">נועה צריכה את ההצעה ל־<bdi>Riverview</bdi> עד יום ראשון.</p>
+            <div class="acts-head"><span class="acts-label">Glance יבצע</span><span class="acts-hint">אפשר לבטל סימון</span></div>
+            <div class="acts-run" hidden>
+              <div class="run-meta"><div class="run-title">עובד…</div><div class="run-sub"></div></div>
+              <div class="run-count">1<span>/</span>4</div>
+              <div class="run-track" aria-hidden="true"><div class="run-fill"></div></div>
+            </div>
+            <ol class="acts"></ol>
+            <div class="approve-banner demo-approve" hidden>
+              <div class="approve-meta"><div class="approve-title">Prepared · nothing sent</div><div class="approve-sub">4 of 4 verified · nothing reaches Noa until you Approve</div></div>
+              <button type="button" class="do-halo approve-btn" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+            </div>
+            <div class="chip pulse demo-chip">
+              <button type="button" class="chip-hold" aria-label="השהה">השהה</button>
+              <span class="chip-txt"></span>
+              <span class="chip-act">
+                <button type="button" class="chip-x" aria-label="סגירה">×</button>
+                <button type="button" class="do-halo demo-doit" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+              </span>
+            </div>
+            <div class="parked-banner demo-parked"><span class="receipt-dot"></span><span><b>מושהה</b> · עדיין פתוח · <em class="js-unpark">להחזיר</em></span></div>
+            <div class="receipt-stack demo-receipt"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- One ask · many tools — B · Animated Beam (lower · Magic UI · https://21st.dev/@dillionverma/components/animated-beam) -->
+<section class="ints b20sec" id="one-ask" aria-label="בקשה אחת, הרבה כלים">
+  <div class="wrap wide">
+    <p class="ints-kicker mono-eye">בקשה אחת · הרבה כלים</p>
+    <h2 class="ints-h b20-h">בקשה אחת נכנסת. <em>כל הצעדים יוצאים.</em></h2>
+    <div class="b20" data-beam20>
+      <svg class="b20-svg" aria-hidden="true"></svg>
+      <div class="b20-col b20-src">
+        <span class="b20-cap">הבקשה מגיעה</span>
+        <div class="b20-tile" data-node="file"><span class="b20-ic" data-glyph="file"></span><span class="b20-txt"><b>Files</b><em class="b20-q">“The signed brief just landed.”</em></span></div>
+        <div class="b20-tile" data-node="whatsapp"><span class="b20-ic" data-glyph="whatsapp"></span><span class="b20-txt"><b>WhatsApp</b><em class="b20-q">“Move Thursday’s tasting?”</em></span></div>
+        <div class="b20-tile" data-node="outlook"><span class="b20-ic" data-glyph="outlook"></span><span class="b20-txt"><b>Outlook</b><em class="b20-q">״מאשרת חמישי 11:00?״</em></span></div>
+      </div>
+      <div class="b20-hub">
+        <div class="b20-core"><span class="b20-halo" aria-hidden="true"></span><img class="living-ico b20-ring-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="44" height="44"></div>
+        <b class="b20-name">Glance</b>
+        <span class="b20-hubsub">מאשרים פעם אחת</span>
+      </div>
+      <div class="b20-col b20-dst">
+        <span class="b20-cap">הסגירה נוחתת</span>
+        <div class="b20-tile" data-node="morning"><span class="b20-ic" data-glyph="morning"></span><span class="b20-txt"><b>Morning</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="gmail"><span class="b20-ic" data-glyph="gmail"></span><span class="b20-txt"><b>Gmail</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="calendar"><span class="b20-ic" data-glyph="calendar"></span><span class="b20-txt"><b>Calendar</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="drive"><span class="b20-ic" data-glyph="drive"></span><span class="b20-txt"><b>Drive</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="whatsapp"><span class="b20-ic" data-glyph="whatsapp"></span><span class="b20-txt"><b>WhatsApp</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="outlookcal"><span class="b20-ic" data-glyph="outlookcal"></span><span class="b20-txt"><b>Outlook Calendar</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="outlook"><span class="b20-ic" data-glyph="outlook"></span><span class="b20-txt"><b>Outlook</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+      </div>
+    </div>
+    <p class="b20-line" aria-live="polite"><b>Brief</b> from Files → Drive · Morning<i class="b20-dot"> · </i><span class="b20-n">2 steps, one click</span></p>
+    <div class="b20-pills" role="tablist" aria-label="בחירת מקרה">
+      <button type="button" class="b20-pill" role="tab" data-case="invoice">Brief</button>
+      <button type="button" class="b20-pill" role="tab" data-case="payment">Payment</button>
+      <button type="button" class="b20-pill" role="tab" data-case="calendar">Calendar</button>
+      <button type="button" class="b20-pill" role="tab" data-case="file">File</button>
+      <button type="button" class="b20-pill" role="tab" data-case="whatsapp">WhatsApp</button>
+      <button type="button" class="b20-pill" role="tab" data-case="outlook">Outlook</button>
+    </div>
+  </div>
+</section>
+
+
+<!-- A day with Glance — horizontal snap carousel -->
+<section class="day21" id="day" aria-label="יום עם Glance">
+  <div class="wrap wide">
+    <div class="day21-head">
+      <div>
+        <p class="mono-eye day21-eye">יום עם <bdi>Glance</bdi></p>
+        <h2 class="day21-h">בקשה אחת · <em>נסגרת בכלים.</em></h2>
+        <p class="day21-sub">המקור, העבודה, והסגירה. חמש בקשות, שורה אחת.</p>
+      </div>
+      <div class="day21-arrows">
+        <button type="button" class="day21-arrow" data-dir="-1" aria-label="הקודם"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></button>
+        <button type="button" class="day21-arrow" data-dir="1" aria-label="הבא"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.6 16.6 10 18l6-6-6-6-1.4 1.4 4.6 4.6z"/></svg></button>
+      </div>
+    </div>
+  </div>
+  <div class="day21-track" id="day-track" tabindex="0" aria-label="מקרים לאורך היום">
+    <article class="day21-card">
+      <header class="day24-top"><time>08:40</time><span class="day24-av" aria-hidden="true">NK</span><span class="day21-src"><span class="day24-mark" data-brand="gmail"></span>Gmail · נועה קליין</span></header>
+      <p class="day21-ask">״אפשר להוציא את החשבונית של אוקטובר? ‏₪12,400 + מע״מ.״</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="morning"></span><b>Morning</b><span class="day24-res">Invoice INV-4821</span></li><li><span class="day24-mark" data-brand="gmail"></span><b>Gmail</b><span class="day24-res">Reply drafted · PDF attached</span></li><li><span class="day24-mark" data-brand="calendar"></span><b>Calendar</b><span class="day24-res">Payment check · Oct 21</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · INV-4821 issued · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>11:15</time><span class="day24-av" aria-hidden="true">HC</span><span class="day21-src"><span class="day24-mark" data-brand="calendly"></span>Calendly · Harbor &amp; Co</span></header>
+      <p class="day21-ask">״אפשר אינטרו של 30 דקות ביום חמישי?״</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="calendly"></span><b>Calendly</b><span class="day24-res">Intro · Thu 11:00</span></li><li><span class="day24-mark" data-brand="notion"></span><b>Notion</b><span class="day24-res">Harbor page updated</span></li><li><span class="day24-mark" data-brand="gmail"></span><b>Gmail</b><span class="day24-res">Confirmation drafted</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · intro on Thursday · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>13:10</time><span class="day24-av" aria-hidden="true">DL</span><span class="day21-src"><span class="day24-mark" data-brand="whatsapp"></span>WhatsApp · Dani Lee</span></header>
+      <p class="day21-ask">“Can we move Thursday’s tasting to 7:30?”</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="outlook"></span><b>Outlook</b><span class="day24-res">טעימה ← חמישי 19:30</span></li><li><span class="day24-mark" data-brand="whatsapp"></span><b>WhatsApp</b><span class="day24-res">Reply drafted · not sent</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · Dani has 7:30 · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>15:20</time><span class="day24-av day24-file" data-brand="files" aria-hidden="true"></span><span class="day21-src"><span class="day24-mark" data-brand="files"></span>הורדות · <bdi>contract-signed.pdf</bdi></span></header>
+      <p class="day21-ask">החוזה החתום של <bdi>Riverview</bdi> נחת עכשיו בהורדות.</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="drive"></span><b>Drive</b><span class="day24-res">Filed to /Clients/Riverview</span></li><li><span class="day24-mark" data-brand="sheets"></span><b>Sheets</b><span class="day24-res">Pipeline row → Signed</span></li><li><span class="day24-mark" data-brand="gmail"></span><b>Gmail</b><span class="day24-res">Thank-you to Noa drafted</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · contract filed · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>17:30</time><span class="day24-av" aria-hidden="true">NL</span><span class="day21-src"><span class="day24-mark" data-brand="meet"></span>Meet · סנכרון <bdi>Riverview</bdi></span></header>
+      <p class="day21-ask">״סאלי, תוכלי לשלוח לנו את ההצעה עד יום ראשון?״</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="docs"></span><b>Docs</b><span class="day24-res">Proposal · ₪48,000</span></li><li><span class="day24-mark" data-brand="slack"></span><b>Slack</b><span class="day24-res">#riverview draft</span></li><li><span class="day24-mark" data-brand="morning"></span><b>Morning</b><span class="day24-res">Quote Q-2208</span></li><li><span class="day24-mark" data-brand="outlook"></span><b>Outlook</b><span class="day24-res">Draft to Noa</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · proposal with Noa · <em>Undo</em></p>
+    </article>
+    <span class="day21-end" aria-hidden="true"></span>
+  </div>
+  <div class="wrap wide"><div class="day21-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div></div>
+</section>
+
+<!-- Trust creed — one strong section · Quiet / Never sends / Undo -->
+<section class="creed-x band band-alt" id="trust-creed" aria-label="שקט כשלא בטוח · לא שולח בשמכם · תמיד אפשר לבטל">
+  <div class="creed-glow" aria-hidden="true"></div>
+  <div class="creed-stars" aria-hidden="true"></div>
+  <div class="wrap wide">
+    <p class="creed-eye mono-eye">DNA של אמון · בפועל, לא בהצהרות</p>
+    <h2 class="creed-h">שקט כשלא בטוח.<br>לא שולח בשמכם.<br><em>תמיד אפשר לבטל.</em></h2>
+    <p class="creed-sub">שכבה צפה מעל האפליקציות שכבר יש לכם — לא צ׳אט. <bdi>Glance</bdi> מכין את הסגירה; <b>אתם מאשרים</b>. מוכן ≠ סגור.</p>
+
+    <div class="creed-grid">
+      <article class="pillar pillar-quiet" tabindex="0">
+        <div class="pillar-bloom" aria-hidden="true"></div>
+        <div class="pillar-stage">
+          <div class="mini-mail">
+            <span class="mm-line w80"></span>
+            <span class="mm-line w64"></span>
+            <span class="mm-line w72 mm-vague">״אולי מתישהו בחודש הבא?״</span>
+          </div>
+          <div class="pillar-moment">
+            <img class="living-ico sm pillar-ring" src="/glance/assets/living/key-idle-512.png" alt="" width="22" height="22">
+            <span class="pm-txt"><b>לא בטוח</b> · לא מוצג צ׳יפ</span>
+          </div>
+        </div>
+        <span class="pillar-num mono-eye">01</span>
+        <h3>שקט כשלא בטוח</h3>
+        <p>אם הבקשה לא ברורה, <bdi>Glance</bdi> שותק. בלי ניחושים רועשים. בלי ביטחון מזויף.</p>
+      </article>
+
+      <article class="pillar pillar-never" tabindex="0">
+        <div class="pillar-bloom" aria-hidden="true"></div>
+        <div class="pillar-stage">
+          <div class="pillar-chip">
+            <span class="pc-txt"><b class="gplus"><img class="living-ico gplus-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="14" height="14"><span class="gplus-name">Glance</span></b> · 3 פעולות מוכנות</span>
+            <img class="chip-do pillar-doit" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark pillar" role="img" aria-label="Do It">[Do It]</span>
+          </div>
+          <div class="pillar-moment">
+            <span class="pm-dot"></span>
+            <span class="pm-txt"><b>מוכן</b> · לא נשלח · מחכה לאישור</span>
+          </div>
+        </div>
+        <span class="pillar-num mono-eye">02</span>
+        <h3>לא שולח בשמכם</h3>
+        <p>קליק אחד מכין את הסגירה. שום דבר לא יוצא מהחשבון שלכם עד שלוחצים על אישור.</p>
+      </article>
+
+      <article class="pillar pillar-undo" tabindex="0">
+        <div class="pillar-bloom" aria-hidden="true"></div>
+        <div class="pillar-stage">
+          <div class="pillar-receipt">
+            <span class="receipt-dot"></span>
+            <span class="pr-txt"><b>נסגר</b> · <bdi>INV-4821</bdi> · Morning</span>
+            <span class="pr-undo">ביטול</span>
+          </div>
+          <div class="pillar-moment">
+            <span class="pm-timer" aria-hidden="true"></span>
+            <span class="pm-txt"><b>נפתח מחדש בשקט</b> · חוזר לפתוח</span>
+          </div>
+        </div>
+        <span class="pillar-num mono-eye">03</span>
+        <h3>תמיד אפשר לבטל</h3>
+        <p>כל סגירה מגיעה עם אישור ועם ביטול. התחרטת? הלולאה פשוט נפתחת מחדש.</p>
+      </article>
+    </div>
+
+    <ul class="trust-strip" aria-label="ההבטחות של Glance">
+      <li>לא צ׳אט</li>
+      <li>צף מעל Gmail, Outlook ו־WhatsApp</li>
+      <li>מוכן ≠ סגור עד האישור</li>
+      <li>המילים שלכם · כפתור השליחה שלכם</li>
+      <li>ביטול על כל סגירה</li>
+    </ul>
+  </div>
+</section>
+
+
+
+<!-- Closing CTA · wherever the work already is -->
+<section class="cta21" id="get-glance" aria-label="לקבל את Glance">
+  <div class="wrap wide">
+    <p class="mono-eye cta21-eye">לקבל את <bdi>Glance</bdi></p>
+    <h2 class="cta21-h">לולאות פתוחות. <em>סגורות.</em></h2>
+    <p class="cta21-sub"><bdi>Glance</bdi> עובד איפה שהעבודה שלכם קורית. קליק אחד מכין את הסגירה, ואתם מאשרים.</p>
+    <form class="su" id="signup" data-signup action="#" novalidate>
+      <div class="su-row">
+        <label class="su-field" for="su-email">
+          <span class="sr-only">אימייל</span>
+          <input class="su-input" id="su-email" name="email" type="email" inputmode="email" autocomplete="email" dir="ltr" spellcheck="false" placeholder="you@company.com" required>
+        </label>
+        <button type="submit" class="su-go" data-submit>
+          <span class="su-go-label">קבלו את <bdi>Glance</bdi></span>
+        </button>
+      </div>
+      <p class="su-note su-invalid">הזינו אימייל תקין.</p>
+      <div class="su-checks">
+        <label class="su-check">
+          <input type="checkbox" id="su-terms" name="terms" required>
+          <span class="su-box" aria-hidden="true"></span>
+          <span>מסכימים <a href="/glance/terms.html" id="terms">לתנאים</a> ו<a href="/glance/privacy.html" id="privacy">למדיניות הפרטיות</a>.</span>
+        </label>
+        <p class="su-note su-terms">כדי להמשיך, אשרו את התנאים ואת מדיניות הפרטיות.</p>
+        <label class="su-check">
+          <input type="checkbox" id="su-mail" name="mailing">
+          <span class="su-box" aria-hidden="true"></span>
+          <span>עדכונים על המוצר. לא חובה.</span>
+        </label>
+      </div>
+      <p class="su-note su-error"><span>משהו השתבש. לא נשמר דבר.</span> <button type="button" class="su-retry" data-retry>נסו שוב</button></p>
+      <p class="su-note su-success">אתם בפנים. <bdi>Glance</bdi> בדרך.</p>
+      <p class="su-note su-confirm">בדקו את האימייל כדי לאשר.</p>
+    </form>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap wide">
+    <span><bdi>Glance</bdi> · מבית <bdi>Flow</bdi></span>
+    <span class="note">Corner v25 · Glance בעברית · לולאות פתוחות, סגורות · קליק אחד, אתם מאשרים</span>
+  </div>
+</footer>
+
+<script src="/glance/assets/glyphs.js"></script>
+<script src="/glance/assets/brand.js"></script>
+<script src="/glance/assets/theme.js"></script>
+<script src="/glance/assets/integrations.js"></script>
+<script src="/glance/assets/app.js"></script>
+<script src="/glance/assets/meet.js"></script>
+<script src="/glance/assets/v21.js"></script>
+<script src="/glance/assets/v23.js"></script>
+<script src="/assets/site-config.js"></script>
+<script src="/glance/gate.js"></script>
+</body>
+</html>

@@ -40,7 +40,6 @@
   document.querySelectorAll('.site-links a').forEach(function (a) {
     var href = a.getAttribute('href') || '';
     var on =
-      (href.split('?')[0] === '/glance/' && /\/glance\/?$/.test(path)) ||
       (href === '/trial.html' && /\/trial\.html$/.test(path)) ||
       (href === '/pricing.html' && /\/pricing\.html$/.test(path)) ||
       (href === '/security.html' && /\/security\.html$/.test(path)) ||

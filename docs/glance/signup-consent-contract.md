@@ -8,7 +8,7 @@ This is the contract for the corner-v25 closing section at the bottom of `/glanc
 
 | Piece | Path |
 |---|---|
-| Closing section | `flow-landing/glance/index.html` (`#get-glance`) |
+| Page | `flow-landing/glance/index.html` (EN) and `flow-landing/glance/he.html` (HE). Signup is `#get-glance`, last. |
 | Client | `flow-landing/glance/gate.js` |
 | Config | `flow-landing/assets/site-config.js` (`glanceSignupConsentUrl`, `glanceStoreUrl`, `glanceSignupMock`) |
 | First-run placeholder | `flow-landing/glance/welcome.html` (reads the cookie; does not link a device) |

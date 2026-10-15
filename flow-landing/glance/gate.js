@@ -79,9 +79,17 @@
       }
     }
 
+    function lockFields() {
+      email.disabled = true;
+      email.readOnly = true;
+      terms.disabled = true;
+      marketing.disabled = true;
+    }
+
     function unlock() {
       loading = false;
       email.disabled = false;
+      email.readOnly = false;
       terms.disabled = false;
       marketing.disabled = false;
       button.removeAttribute('aria-busy');
@@ -93,6 +101,7 @@
     function showServerError() {
       loading = false;
       email.disabled = false;
+      email.readOnly = false;
       terms.disabled = false;
       marketing.disabled = false;
       button.removeAttribute('aria-busy');
@@ -136,9 +145,7 @@
         return;
       }
       loading = true;
-      email.disabled = true;
-      terms.disabled = true;
-      marketing.disabled = true;
+      lockFields();
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
       form.removeAttribute('data-mail');
@@ -216,9 +223,7 @@
       email.value = 'you@company.com';
       terms.checked = true;
       loading = true;
-      email.disabled = true;
-      terms.disabled = true;
-      marketing.disabled = true;
+      lockFields();
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
       form.setAttribute('data-state', 'loading');

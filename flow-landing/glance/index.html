@@ -1,127 +1,845 @@
 <!doctype html>
-<!-- DRAFT page. The consent endpoint is not deployed; site-config glanceSignupMock records nothing. -->
 <html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Glance works wherever your work happens. One click prepares the close. You approve it.">
-<meta name="theme-color" content="#ffffff">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="canonical" href="https://theflow-ai.com/glance/">
-<title>Glance</title>
-<link rel="stylesheet" href="/assets/fonts.css">
-<link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
-<link rel="stylesheet" href="/glance/glance.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Corner v25 — Glance · open loops, closed · one click, you approve</title>
+<link rel="stylesheet" href="/glance/assets/corner.css">
+<link rel="stylesheet" href="/glance/assets/corner-v19.css">
+<link rel="stylesheet" href="/glance/assets/corner-v20.css">
+<link rel="stylesheet" href="/glance/assets/step-states.css">
+<link rel="stylesheet" href="/glance/assets/corner-v21.css">
+<link rel="stylesheet" href="/glance/assets/corner-v22.css">
+<link rel="stylesheet" href="/glance/assets/corner-v23.css">
+<link rel="stylesheet" href="/glance/assets/corner-v24.css">
+<link rel="stylesheet" href="/glance/assets/corner-v25.css">
 <script>
-(function () {
-  var q = new URLSearchParams(location.search);
-  var lang = q.get('lang') === 'he' || q.get('lang') === 'en' ? q.get('lang') : '';
-  if (!lang) {
-    try { lang = localStorage.getItem('flow_lang') === 'he' ? 'he' : 'en'; } catch (e) { lang = 'en'; }
-  } else {
-    try { localStorage.setItem('flow_lang', lang); } catch (e) {}
-  }
-  var theme = q.get('theme') === 'dark' || q.get('theme') === 'light' ? q.get('theme') : '';
-  if (!theme) {
-    try { theme = localStorage.getItem('glance_theme') === 'dark' ? 'dark' : 'light'; } catch (e) { theme = 'light'; }
-  }
-  var root = document.documentElement;
-  root.lang = lang;
-  root.dir = lang === 'he' ? 'rtl' : 'ltr';
-  if (lang === 'he') root.classList.add('he');
-  root.setAttribute('data-theme', theme);
-})();
+(function(){try{
+  var q=new URLSearchParams(location.search);
+  var t=q.get('theme');
+  if(t!=='dark'&&t!=='light') t=localStorage.getItem('glance.corner.theme')||localStorage.getItem('glance_theme');
+  if(t==='dark') document.documentElement.setAttribute('data-theme','dark');
+  else document.documentElement.removeAttribute('data-theme');
+  localStorage.setItem('flow_lang', document.documentElement.lang==='he'?'he':'en');
+}catch(e){}})();
 </script>
-<script src="/assets/site-config.js"></script>
 </head>
-<body class="corner-v25">
-<a class="skip" href="#get-glance">Skip to content</a>
-<header class="bar">
-  <div class="bar-in">
-    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
-    <nav class="links" id="primaryNav" aria-label="Primary">
-      <a href="/glance/" aria-current="page" data-nav="glance">Glance</a>
-      <a href="/#organization" data-nav="flow">Flow</a>
-      <a href="/pricing.html" data-nav="pricing">Pricing</a>
-      <a href="/security.html" data-nav="security">Security</a>
-      <a href="/contact.html" data-nav="contact">Contact</a>
+<body class="v21">
+
+<header class="nav">
+  <div class="wrap wide">
+    <a class="brand" href="#">
+      <img src="/glance/assets/logo-header.png" alt="Flow">
+      <span class="slash">/</span>
+      <span class="gname">Glance</span>
+    </a>
+    <nav class="links">
+      <a class="on" href="#">Glance</a>
+      <a href="#">Flow</a>
+      <a href="#">Pricing</a>
+      <span class="lang-toggle" role="group" aria-label="Language"><a class="on" href="/glance/" lang="en" aria-current="true">EN</a><a href="/glance/he.html" lang="he">HE</a></span>
+      <button type="button" class="theme-toggle" id="btn-theme" aria-label="Switch to dark theme" title="Theme">
+        <span class="theme-ico theme-ico-moon" aria-hidden="true">◐</span>
+        <span class="theme-label" id="theme-label">Dark</span>
+      </button>
+      <a class="btn sm btn-glow" href="#get-glance">Get Glance</a>
     </nav>
-    <div class="tools">
-      <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
-      <button class="tool icon" id="themeBtn" type="button" aria-label="Dark mode" aria-pressed="false">
-        <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
-      </button>
-      <button class="tool menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primaryNav">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
-    </div>
   </div>
 </header>
-<main id="main">
-  <section class="cta21" id="get-glance" aria-label="Get Glance">
-    <div class="wrap wide">
-      <p class="mono-eye cta21-eye" data-i18n="eye">Get Glance</p>
-      <h2 class="cta21-h" data-i18n="title">Open loops. <em>Closed.</em></h2>
-      <p class="cta21-sub" data-i18n="sub">Glance works wherever your work happens. One click prepares the close. You approve it.</p>
-      <form class="su" id="signup" data-signup action="#" novalidate>
-        <div class="su-row">
-          <label class="su-field" for="su-email">
-            <span class="sr-only" data-i18n="emailLabel">Email</span>
-            <input class="su-input" id="su-email" name="email" type="email" inputmode="email" autocomplete="email" dir="ltr" spellcheck="false" placeholder="you@company.com" required>
-          </label>
-          <button type="submit" class="su-go" data-submit disabled>
-            <span class="su-go-label" data-i18n="submit">Get <bdi>Glance</bdi></span>
-          </button>
+
+<!-- HERO · cinematic scroll story (pinned ~325vh) · Detect → Do It → Prepared → Approve → Closed -->
+<section class="h21" id="hero" aria-label="Glance">
+  <div class="h21-pin">
+    <div class="h21-bg" aria-hidden="true"><div class="h21-glow"></div><div class="h21-glow h21-glow-b"></div><div class="h21-stars"></div><div class="h21-floor"></div></div>
+
+    <div class="h21-copy">
+      <p class="h21-eye">Glance</p>
+      <h1 class="h21-h1"><span class="h1-echo" aria-hidden="true">Open loops.<br><em>Closed.</em></span><span class="h1-main">Open loops.<br><em>Closed.</em></span></h1>
+      <p class="h21-sub">Glance notices the ask, prepares every step, and waits. One click. You approve.</p>
+      <div class="h21-ctas">
+        <a class="btn btn-glow h21-cta" href="#get-glance">Get Glance</a>
+        <button type="button" class="h21-link" id="btn-see-name">See it with my name <span aria-hidden="true">›</span></button>
+      </div>
+      <div class="capture-card" id="capture-card" hidden>
+        <div class="capture-card-inner">
+          <p class="capture-kicker">Preview</p>
+          <h3 class="capture-title">Open Glance with your name</h3>
+          <form class="capture-form" id="capture-form">
+            <label class="sr-only" for="capture-name">Your name</label>
+            <input type="text" id="capture-name" name="name" placeholder="Your name" maxlength="40" autocomplete="name" required>
+            <button type="submit" class="btn capture-go">Show me</button>
+          </form>
+          <button type="button" class="capture-cancel" id="btn-capture-cancel">Cancel</button>
         </div>
-        <p class="su-note su-invalid" data-i18n="invalid">Enter a valid email.</p>
-        <div class="su-checks">
-          <label class="su-check">
-            <input type="checkbox" id="su-terms" name="terms" required>
-            <span class="su-box" aria-hidden="true"></span>
-            <span data-i18n="terms">I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.</span>
-          </label>
-          <p class="su-note su-terms" data-i18n="termsErr">Agree to the Terms and Privacy Policy to continue.</p>
-          <label class="su-check">
-            <input type="checkbox" id="su-mail" name="mailing">
-            <span class="su-box" aria-hidden="true"></span>
-            <span data-i18n="mail">Email me product notes. Optional.</span>
-          </label>
-        </div>
-        <p class="su-note su-error" role="alert"><span data-i18n="fail">Something went wrong. Nothing was saved.</span> <button type="button" class="su-retry" data-retry data-i18n="retry">Retry</button></p>
-        <p class="su-note su-success" role="status" data-i18n="success">You're in. <bdi>Glance</bdi> is on its way.</p>
-        <p class="su-note su-confirm" data-i18n="confirm">Check your email to confirm.</p>
-      </form>
+      </div>
+      <p class="capture-hint" id="capture-hint" hidden></p>
     </div>
-  </section>
-</main>
-<script>
-window.FLOW_PAGE_I18N = {
-  eye: { en: 'Get Glance', he: 'לקבל את <bdi>Glance</bdi>' },
-  title: { en: 'Open loops. <em>Closed.</em>', he: 'לולאות פתוחות. <em>סגורות.</em>' },
-  sub: {
-    en: 'Glance works wherever your work happens. One click prepares the close. You approve it.',
-    he: '<bdi>Glance</bdi> עובד איפה שהעבודה שלך קורית. קליק אחד מכין את הסגירה, ואתם מאשרים.'
-  },
-  emailLabel: { en: 'Email', he: 'אימייל' },
-  submit: { en: 'Get <bdi>Glance</bdi>', he: 'קבלו את <bdi>Glance</bdi>' },
-  invalid: { en: 'Enter a valid email.', he: 'הזינו אימייל תקין.' },
-  terms: {
-    en: 'I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.',
-    he: 'מסכימים <a href="/glance/terms.html">לתנאים</a> ו<a href="/glance/privacy.html">למדיניות הפרטיות</a>.'
-  },
-  termsErr: {
-    en: 'Agree to the Terms and Privacy Policy to continue.',
-    he: 'כדי להמשיך, אשרו את התנאים ואת מדיניות הפרטיות.'
-  },
-  mail: { en: 'Email me product notes. Optional.', he: 'עדכונים על המוצר. לא חובה.' },
-  fail: { en: 'Something went wrong. Nothing was saved.', he: 'משהו השתבש. לא נשמר דבר.' },
-  retry: { en: 'Retry', he: 'נסו שוב' },
-  success: { en: "You're in. <bdi>Glance</bdi> is on its way.", he: 'אתם בפנים. <bdi>Glance</bdi> בדרך.' },
-  confirm: { en: 'Check your email to confirm.', he: 'בדקו את האימייל כדי לאשר.' }
-};
-</script>
-<script src="/glance/gate.js" defer></script>
-<script src="/assets/site-nav.js" defer></script>
+
+    <div class="h21-end" aria-hidden="true">
+      <p class="h21-end-h">Closed. <span>Across 5 tools.</span> <em>One click.</em></p>
+    </div>
+
+    <div class="h21-scene">
+      <div class="h21-rig">
+        <div class="h21-win h21-mail">
+          <div class="gw-top">
+            <span class="gw-dots"><i></i><i></i><i></i></span>
+            <span class="gw-logo"><span class="brand-ico" data-brand="gmail"></span><b>Gmail</b></span>
+            <span class="gw-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg><span>Search mail</span></span>
+            <span class="gw-av viewer-initials" title="Sali Sapan">SS</span>
+          </div>
+          <div class="gw-body">
+            <aside class="gw-side">
+              <span class="gw-nav on"><b>Inbox</b></span>
+              <span class="gw-nav">Starred</span>
+              <span class="gw-nav">Sent</span>
+              <span class="gw-nav">Drafts</span>
+            </aside>
+            <div class="gw-main">
+              <div class="gw-mail">
+                <h4 class="gw-subj"><span data-bind="subj">Thursday for the Lumen review?</span></h4>
+                <div class="gw-msg">
+                  <span class="gw-mav" data-bind="av">JH</span>
+                  <div class="gw-mbody">
+                    <div class="gw-from"><b data-bind="fromName">Jordan Hale</b><span class="gw-addr" data-bind="fromAddr">jordan@lumen.studio</span><span class="gw-time" data-bind="fromTime">09:12</span></div>
+                    <div class="gw-to">to <span class="viewer-first">me</span></div>
+                    <p class="gw-p" data-bind="greet">Sali —</p>
+                    <p class="gw-p"><span class="h21-ask" data-bind="msgBody">Can we move the Lumen client review to Thursday at 3? Zoom, the Notion brief, the Jira epic, the Dropbox deck, and the HubSpot deal still say Tuesday.</span></p>
+                    <p class="gw-p gw-sign" data-bind="sign">Jordan</p>
+                    <div class="h21-ping" aria-hidden="true"><span class="h21-ping-r"></span><span class="h21-ping-r"></span><img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="18" height="18"><b>Glance</b><span class="h21-ping-t" data-bind="pingTxt">can close this · 5 steps</span></div>
+                  </div>
+                </div>
+                <div class="gw-artifact" id="gw-artifact" hidden>
+                  <div class="gw-art-top"><span class="gw-art-k" data-art-k>Draft</span><span class="gw-art-app">Gmail</span></div>
+                  <div class="gw-slack">
+                    <span class="gw-mav viewer-initials" title="Sali Sapan">SS</span>
+                    <div class="gw-slack-body">
+                      <div class="gw-from"><b class="viewer-name">Sali Sapan</b><span class="gw-addr">to</span> <span data-art-who>Jordan Hale</span></div>
+                      <p class="gw-art-body" data-art-body>Thursday at 3 works. Zoom, Notion, Jira, Dropbox, and HubSpot are updated.</p>
+                      <div class="gw-notion"><span class="gw-notion-ic" data-brand="notion"></span><span data-art-notion>Lumen brief</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="h21-sweep" aria-hidden="true"></div>
+          <div class="h21-dim" aria-hidden="true"></div>
+        </div>
+
+        <!-- floating tool tiles (execution) -->
+        <div class="h21-tiles" aria-hidden="true"></div>
+
+        <!-- Glance — the floating extension card (step card · step-states v1) -->
+        <div class="h21-card stage stage-live" id="product-moment" data-state="propose" data-case="launch">
+          <div class="glance-surface g19 h21-gs" id="live-glance">
+            <div class="gs-head">
+              <img class="living-ico" id="live-living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="26" height="26">
+              <div class="gs-head-meta">
+                <div class="gs-brand">Glance</div>
+                <div class="gs-intent-label">Detected intent</div>
+              </div>
+              <span class="handled gs-badge">Closed</span>
+            </div>
+            <p class="gs-intent" data-bind="intent">Jordan wants the Lumen review on Thursday at 3.</p>
+            <div class="acts-head">
+              <span class="acts-label">Glance will</span>
+              <span class="acts-hint">Untick to skip</span>
+            </div>
+            <ol class="acts" id="live-acts"></ol>
+            <div class="ss-add" data-open="true">
+              <button type="button" class="ss-add-btn" id="btn-add-open">+ Add a step</button>
+              <div class="ss-add-row act-row">
+                <span class="act-box act-none" aria-hidden="true"></span>
+                <span class="act-glyph" data-glyph="you"></span>
+                <input type="text" class="ss-add-input" id="custom-step-input" maxlength="80" placeholder="+ Add a step… e.g. also save the menu to Dropbox" aria-label="New step">
+                <kbd class="ss-kbd">↵</kbd>
+              </div>
+            </div>
+            <div class="approve-banner" id="live-approve" hidden>
+              <div class="approve-meta">
+                <div class="approve-title">Prepared · nothing sent</div>
+                <div class="approve-sub">Prepared ≠ closed · one more Do It truly closes</div>
+              </div>
+              <button type="button" class="do-halo approve-btn" id="btn-approve" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+            </div>
+            <div class="chip chip-invoice" id="live-chip">
+              <button type="button" class="chip-hold" id="btn-hold" aria-label="Hold It">Hold It</button>
+              <span class="chip-txt"><b class="gplus"><span class="gplus-name">Glance</span></b> can close this in <b class="file">5 steps</b> · Zoom · Notion · Jira · Dropbox · HubSpot<span class="chip-sugg"> · +1 suggested</span></span>
+              <span class="chip-act">
+                <button type="button" class="chip-x" id="btn-dismiss" aria-label="Dismiss">×</button>
+                <button type="button" class="do-halo h21-doit" id="btn-doit" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span><i class="doit-ripple" aria-hidden="true"></i></button>
+              </span>
+            </div>
+            <div class="parked-banner" id="parked-banner">
+              <span class="receipt-dot"></span>
+              <span><b>Held</b> · still open · nothing prepared · <em class="js-unpark" id="btn-unpark">Bring back</em></span>
+            </div>
+            <div class="receipt-stack" id="live-receipt"></div>
+          </div>
+        </div>
+      </div>
+      <svg class="h21-beams" aria-hidden="true"></svg>
+    </div>
+
+    <div class="h21-cap" aria-live="polite">
+      <ol class="h21-steps">
+        <li data-s="0">Detect</li><li data-s="1">Do It</li><li data-s="2">Prepared</li><li data-s="3">Approve</li><li data-s="4">Closed</li>
+      </ol>
+      <p class="h21-cap-txt">Glance reads the ask. Nothing happens yet.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Works where the loop lives — A · Orbiting Circles (upper overview · Magic UI · https://21st.dev/@dillionverma/components/orbiting-circles) -->
+<section class="ints o20sec" id="integrations" aria-label="Works where the loop lives">
+  <div class="wrap wide">
+    <p class="ints-kicker mono-eye">Works where the loop lives</p>
+    <h2 class="ints-h">The ask arrives anywhere. <em>Glance closes it where it lands.</em></h2>
+    <p class="ints-sub o20-sub">One Glance over the tools you already use.</p>
+    <div class="o20" data-orbit20>
+      <div class="o20-plate o20-plate-out" aria-hidden="true"></div>
+      <div class="o20-plate o20-plate-in" aria-hidden="true"></div>
+      <svg class="o20-tracks" aria-hidden="true"></svg>
+      <div class="o20-ring" data-ring="in" data-speed="7.5">
+        <button type="button" class="o20-orb" data-glyph="gmail" aria-label="Gmail"><span class="o20-tip">Gmail</span></button>
+        <button type="button" class="o20-orb" data-glyph="outlook" aria-label="Outlook"><span class="o20-tip">Outlook</span></button>
+        <button type="button" class="o20-orb" data-glyph="whatsapp" aria-label="WhatsApp"><span class="o20-tip">WhatsApp</span></button>
+        <button type="button" class="o20-orb" data-glyph="slack" aria-label="Slack"><span class="o20-tip">Slack</span></button>
+        <button type="button" class="o20-orb" data-glyph="teams" aria-label="Teams"><span class="o20-tip">Teams</span></button>
+      </div>
+      <div class="o20-ring" data-ring="out" data-speed="-4.8">
+        <button type="button" class="o20-orb" data-glyph="morning" aria-label="Morning"><span class="o20-tip">Morning</span></button>
+        <button type="button" class="o20-orb" data-glyph="calendar" aria-label="Calendar"><span class="o20-tip">Calendar</span></button>
+        <button type="button" class="o20-orb" data-glyph="drive" aria-label="Drive"><span class="o20-tip">Drive</span></button>
+        <button type="button" class="o20-orb" data-glyph="docs" aria-label="Docs"><span class="o20-tip">Docs</span></button>
+        <button type="button" class="o20-orb" data-glyph="sheets" aria-label="Sheets"><span class="o20-tip">Sheets</span></button>
+        <button type="button" class="o20-orb" data-glyph="todo" aria-label="Microsoft To Do"><span class="o20-tip">Microsoft To Do</span></button>
+        <button type="button" class="o20-orb" data-glyph="onedrive" aria-label="OneDrive"><span class="o20-tip">OneDrive</span></button>
+      </div>
+      <div class="o20-core">
+        <span class="o20-ripple" aria-hidden="true"></span><span class="o20-ripple" aria-hidden="true"></span><span class="o20-ripple" aria-hidden="true"></span>
+        <div class="o20-disc"><img class="living-ico o20-ring-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="46" height="46"></div>
+        <b class="o20-name">Glance</b>
+      </div>
+    </div>
+    <p class="o20-legend"><span><i></i>Inner · where the ask arrives</span><span><i class="o"></i>Outer · where the close lands</span></p>
+  </div>
+</section>
+
+
+<!-- Same close · different surfaces — WhatsApp Web (RTL · Hebrew) -->
+<section class="surfaces band s21" id="surfaces" aria-label="Same close on other surfaces">
+  <div class="wrap wide">
+    <p class="surfaces-kicker mono-eye">Same close · different surfaces</p>
+    <h2 class="s21-h">The ask arrives anywhere. <em>Glance closes it where it lands.</em></h2>
+    <article class="surf-demo" id="demo-whatsapp-block">
+      <div class="surf-label">
+        <span class="surf-tag">WhatsApp Web</span>
+        <span class="surf-desc">Dani Lee texts Sali. Type as Dani — Glance adapts. Nothing is sent until you press Do It.</span>
+      </div>
+      <div class="surf-rail surf-rail-rtl" dir="ltr">
+        <div class="surf-card featured">
+          <div class="story-tag accent">Live · multi-step</div>
+          <div class="wa21-wrap stage stage-live stage-demo" id="demo-whatsapp" data-state="propose">
+            <div class="wa21" dir="ltr" lang="en">
+              <aside class="wa21-list">
+                <div class="wa21-lhead">
+                  <span class="wa21-av wa21-av-me" aria-hidden="true"></span>
+                  <span class="wa21-icons"><i data-wa="newchat"></i><i data-wa="dots"></i></span>
+                </div>
+                <div class="wa21-search"><i data-wa="search"></i><span>Search</span></div>
+                <div class="wa21-filters"><span class="on">All</span><span>Unread</span><span>Favorites</span><span>Groups</span></div>
+                <ul class="wa21-chats">
+                  <li class="on"><span class="wa21-av" aria-hidden="true"></span><div><b>Dani Lee</b><span id="wa-list-preview">Can we move Thursday’s tasting to 7:30?</span></div><div class="wa21-meta"><time class="unread">10:42</time><em>1</em></div></li>
+                  <li><span class="wa21-av wa21-av-grp" aria-hidden="true"></span><div><b>Riverview · team</b><span>Chris: Perfect, let’s talk Sunday</span></div><div class="wa21-meta"><time>10:15</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>Alex Rivera</b><span><i class="wa21-ticks read" data-wa="dbl"></i>I sent you the brief</span></div><div class="wa21-meta"><time>09:58</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>Mom</b><span>Coming on Friday?</span></div><div class="wa21-meta"><time>Yesterday</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>Mike from the office</b><span>All set, thanks!</span></div><div class="wa21-meta"><time>Yesterday</time></div></li>
+                  <li><span class="wa21-av" aria-hidden="true"></span><div><b>Jenna · accountant</b><span><i class="wa21-ticks read" data-wa="dbl"></i>Attaching the September report</span></div><div class="wa21-meta"><time>Tuesday</time></div></li>
+                  <li><span class="wa21-av wa21-av-grp" aria-hidden="true"></span><div><b>Building · 5th Ave</b><span>Sam: Stairs get cleaned tomorrow</span></div><div class="wa21-meta"><time>Monday</time></div></li>
+                </ul>
+              </aside>
+              <div class="wa21-chat">
+                <div class="wa21-head">
+                  <span class="wa21-av" aria-hidden="true"></span>
+                  <div class="wa21-who"><b>Dani Lee</b><span>online</span></div>
+                  <span class="wa21-icons"><i data-wa="video"></i><i data-wa="search"></i><i data-wa="dots"></i></span>
+                </div>
+                <div class="wa21-thread">
+                  <div class="wa21-date"><span>Today</span></div>
+                  <div class="wa21-msg bubble in tail" id="wa-pre-in"><p>Hi Sali — running the floor today.</p><span class="wa21-time">10:38</span></div>
+                  <div class="wa21-msg bubble out tail" id="wa-pre-out"><p>I’m here. What do you need?</p><span class="wa21-time">10:40<i class="wa21-ticks read" data-wa="dbl"></i></span></div>
+                  <div class="wa21-msg bubble in tail wa21-ask"><p id="wa-ask-text">Can we move Thursday’s tasting to 7:30?</p><span class="wa21-time">10:42</span></div>
+                  <div class="wa21-msg bubble out tail wa21-art wa21-art-draft">
+                    <p id="wa-draft-text">Thursday’s tasting is now 7:30. I’ll tell the kitchen.</p>
+                    <div class="wa21-file" id="wa-draft-file" hidden><span class="wa21-pdf">PDF</span><span><b id="wa-draft-file-name">Seating.pdf</b><em>Not sent</em></span></div>
+                    <span class="wa21-time"><i class="wa21-draft-tag">Draft</i></span>
+                  </div>
+                  <div class="wa21-msg bubble out tail wa21-art wa21-art-sent">
+                    <p id="wa-sent-text">Thursday’s tasting is now 7:30. I’ll tell the kitchen.</p>
+                    <div class="wa21-file" id="wa-sent-file" hidden><span class="wa21-pdf">PDF</span><span><b>Seating.pdf</b><em>Sent</em></span></div>
+                    <span class="wa21-time">10:44<i class="wa21-ticks read" data-wa="dbl"></i></span>
+                  </div>
+                  <div id="wa-live"></div>
+                </div>
+                <div class="wa21-suggests" id="wa-suggests">
+                  <button type="button" data-i="0">Move Thursday’s tasting to 7:30</button>
+                  <button type="button" data-i="1">Florist needs the centerpiece count</button>
+                  <button type="button" data-i="2">Send Dani the seating chart</button>
+                </div>
+                <p class="wa21-as">Type as Dani — Glance adapts</p>
+                <div class="wa21-compose">
+                  <i data-wa="emoji"></i><i data-wa="plus"></i>
+                  <input class="wa21-input" id="wa-compose" type="text" maxlength="160" placeholder="Type a message" aria-label="Message Dani Lee">
+                  <button type="button" class="wa21-send" id="wa-send" aria-label="Send"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l-.2 6.8L15.2 12 3.2 13.8z"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Glance floats over WhatsApp Web (its own style · Hebrew · RTL) -->
+            <div class="glance-surface gs-demo g19 wa21-glance" id="wa-glance" dir="ltr" lang="en">
+              <div class="gs-head compact">
+                <img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="24" height="24">
+                <div class="gs-head-meta">
+                  <div class="gs-brand">Glance</div>
+                  <div class="gs-intent-label">Detected intent</div>
+                </div>
+                <span class="wa-think act is-active" hidden><span class="act-box" aria-hidden="true"></span></span>
+                <span class="handled gs-badge">Closed</span>
+              </div>
+              <p class="gs-intent" id="wa-intent">Dani wants Thursday’s tasting moved to 7:30.</p>
+              <div class="acts-head">
+                <span class="acts-label">Glance will</span>
+                <span class="acts-hint">Untick to skip</span>
+              </div>
+              <div class="acts-run" hidden>
+                <div class="run-meta"><div class="run-title">Working…</div><div class="run-sub"></div></div>
+                <div class="run-count">1<span>/</span>2</div>
+                <div class="run-track" aria-hidden="true"><div class="run-fill"></div></div>
+              </div>
+              <ol class="acts"></ol>
+              <div class="ss-add" data-open="true">
+                <button type="button" class="ss-add-btn">+ Add a step</button>
+                <div class="ss-add-row act-row">
+                  <span class="act-box act-none" aria-hidden="true"></span>
+                  <span class="act-glyph" data-glyph="you"></span>
+                  <input type="text" class="ss-add-input" maxlength="80" placeholder="+ Add a step… e.g. also save the menu to Dropbox" aria-label="New step">
+                  <kbd class="ss-kbd">↵</kbd>
+                </div>
+              </div>
+              <div class="approve-banner demo-approve" hidden>
+                <div class="approve-meta">
+                  <div class="approve-title">Prepared · nothing sent</div>
+                  <div class="approve-sub">Prepared ≠ closed · Glance never sends for you</div>
+                </div>
+                <button type="button" class="do-halo approve-btn" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+              </div>
+              <div class="chip pulse demo-chip">
+                <button type="button" class="chip-hold" aria-label="Hold It">Hold It</button>
+                <span class="chip-txt"></span>
+                <span class="chip-act">
+                  <button type="button" class="chip-x" aria-label="Dismiss">×</button>
+                  <button type="button" class="do-halo demo-doit" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+                </span>
+              </div>
+              <div class="parked-banner demo-parked">
+                <span class="receipt-dot"></span>
+                <span><b>Held</b> · still open · <em class="js-unpark">Bring back</em></span>
+              </div>
+              <div class="receipt-stack demo-receipt"></div>
+            </div>
+          </div>
+          <p class="demo-hint">Still open until Do It closes it · then Closed + Undo</p>
+        </div>
+        </article>
+  </div>
+</section>
+
+<!-- One intent · four tools — Google Meet → Docs → Drive → Calendar → Gmail → back to Meet -->
+<section class="mj21" id="meet-journey" aria-label="One intent, four tools">
+  <div class="wrap wide">
+    <p class="mono-eye mj-eye">One intent · across the tools you use</p>
+    <h2 class="mj-h">Said in a meeting.<br><em>Done everywhere.</em></h2>
+    <p class="mj-sub">Noa asks on a Meet call. Glance prepares the proposal in Docs, posts it in Slack, opens the quote in Morning, and drafts the note in Outlook — then waits for you.</p>
+
+    <div class="mj" id="mj" data-step="meet" data-state="propose" data-phase="intro">
+      <div class="mj-railbar">
+        <ol class="mj-rail" aria-label="Where Glance is working">
+          <li class="mj-src" data-k="meet"><span class="mj-ic brand-ico" data-brand="meet"></span><b>Meet</b></li>
+          <li data-k="docs"><span class="mj-ic brand-ico" data-brand="docs"></span><b>Docs</b><i class="mj-ok" aria-hidden="true"></i></li>
+          <li data-k="slack"><span class="mj-ic brand-ico" data-brand="slack"></span><b>Slack</b><i class="mj-ok" aria-hidden="true"></i></li>
+          <li data-k="morning"><span class="mj-ic brand-ico" data-brand="morning"></span><b>Morning</b><i class="mj-ok" aria-hidden="true"></i></li>
+          <li data-k="outlook"><span class="mj-ic brand-ico" data-brand="outlook"></span><b>Outlook</b><i class="mj-ok" aria-hidden="true"></i></li>
+        </ol>
+        <button type="button" class="mj-replay" id="mj-replay" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>Replay</button>
+      </div>
+
+      <div class="mj-body">
+        <div class="mj-frame">
+          <div class="mj-chrome" aria-hidden="true">
+            <span class="mj-dots"><i></i><i></i><i></i></span>
+            <span class="mj-url"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9z"/></svg><span class="mj-url-t">meet.google.com/rvs-prop-sync</span></span>
+            <span class="mj-ext" title="Glance"><img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="16" height="16"></span>
+          </div>
+          <div class="mj-viewport">
+            <div class="mj-canvas">
+
+              <!-- MEET -->
+              <div class="mj-screen on" data-screen="meet">
+                <div class="mt">
+                  <div class="mt-grid">
+                    <div class="mt-tile speaking"><span class="mt-av mt-av-n">N</span><span class="mt-name">Noa Levi</span><span class="mt-eq" aria-hidden="true"><i></i><i></i><i></i></span></div>
+                    <div class="mt-tile"><span class="mt-av mt-av-d">D</span><span class="mt-name">Dana · Riverview Studio</span><span class="mt-mute" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3 3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg></span></div>
+                  </div>
+                  <div class="mt-self"><span class="mt-av mt-av-s viewer-initials">SS</span><span class="mt-name viewer-name">Sali Sapan</span></div>
+                  <div class="mt-cc">
+                    <span class="mt-cc-av">N</span>
+                    <div class="mt-cc-body"><b>Noa Levi</b><p class="mt-cc-txt"><span class="mt-w">Sali,</span> <span class="mt-w">can</span> <span class="mt-w">you</span> <mark class="mt-hl"><span class="mt-w">send</span> <span class="mt-w">us</span> <span class="mt-w">the</span> <span class="mt-w">proposal</span> <span class="mt-w">by</span> <span class="mt-w">Sunday?</span></mark></p></div>
+                  </div>
+                  <div class="mt-bar">
+                    <span class="mt-meta"><b>17:32</b><i>|</i>Riverview · proposal sync</span>
+                    <span class="mt-ctrls">
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></i>
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z"/></svg></i>
+                      <i class="mt-btn on"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1z"/></svg></i>
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 5.5v10.75A5.75 5.75 0 0 1 15.25 22h-1.5c-2.07 0-3.4-.9-4.84-2.6l-4.2-4.98a1.6 1.6 0 0 1 2.32-2.2L9 14V4.5a1.5 1.5 0 0 1 3 0V11h.5V2.5a1.5 1.5 0 0 1 3 0V11h.5V4a1.5 1.5 0 0 1 3 0v7h.5V5.5a1.5 1.5 0 0 1 1.5-1.5c.8 0 1.5.7 1.5 1.5z"/></svg></i>
+                      <i class="mt-btn"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></i>
+                      <i class="mt-btn mt-end"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85a1 1 0 0 1-1.41-.01L.29 13.08A1 1 0 0 1 0 12.38c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71s-.11.53-.29.71l-2.48 2.48a1 1 0 0 1-1.41.01 11.3 11.3 0 0 0-2.67-1.85 1 1 0 0 1-.56-.9v-3.1A15.4 15.4 0 0 0 12 9z"/></svg></i>
+                    </span>
+                    <span class="mt-side"><i>ⓘ</i><i class="mt-ppl">3</i></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DOCS -->
+              <div class="mj-screen" data-screen="docs">
+                <div class="gd">
+                  <div class="gd-top">
+                    <span class="gd-ic brand-ico" data-brand="docs"></span>
+                    <div class="gd-title"><b>Riverview Studio — Proposal</b><span class="gd-menu"><i>File</i><i>Edit</i><i>View</i><i>Insert</i><i>Format</i><i>Tools</i><i>Extensions</i><i>Help</i></span></div>
+                    <span class="gd-share">Share</span><span class="gd-av viewer-initials">SS</span>
+                  </div>
+                  <div class="gd-tools"><i class="w2"></i><i></i><i></i><b>100%</b><b>Normal text</b><b>Arial</b><b>11</b><i class="bold">B</i><i class="it">I</i><i class="ul">U</i><i class="w2"></i><i></i></div>
+                  <div class="gd-canvas">
+                    <div class="gd-page">
+                      <span class="gd-tpl">From template · Client proposal</span>
+                      <p class="gd-l gd-k" style="--i:0">PROPOSAL</p>
+                      <h5 class="gd-l gd-h" style="--i:1">Riverview Studio — Brand &amp; Web</h5>
+                      <p class="gd-l gd-meta" style="--i:2">Prepared for Noa Levi · Riverview Studio · Oct 8, 2026</p>
+                      <table class="gd-l gd-tbl" style="--i:3">
+                        <tr><th>Item</th><th>Amount</th></tr>
+                        <tr class="gd-l" style="--i:4"><td>Brand identity</td><td>₪22,000</td></tr>
+                        <tr class="gd-l" style="--i:5"><td>Website design · 8 pages</td><td>₪18,000</td></tr>
+                        <tr class="gd-l" style="--i:6"><td>Launch content kit</td><td>₪8,000</td></tr>
+                        <tr class="gd-l gd-total" style="--i:7"><td>Total</td><td>₪48,000</td></tr>
+                      </table>
+                      <p class="gd-l gd-p" id="meet-summary" style="--i:8">Valid until Oct 31. Half is due on signature, and the walkthrough is Sunday at 10:00.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SLACK -->
+              <div class="mj-screen" data-screen="slack">
+                <div class="sk">
+                  <aside class="sk-side">
+                    <b class="sk-ws">Riverview</b>
+                    <span class="sk-ch on"># riverview</span>
+                    <span class="sk-ch"># design</span>
+                    <span class="sk-ch">Noa Levi</span>
+                    <span class="sk-ch">Dani Lee</span>
+                  </aside>
+                  <div class="sk-main">
+                    <header class="sk-head"><b># riverview</b><span>4 members</span></header>
+                    <div class="sk-thread">
+                      <div class="sk-msg"><i>N</i><div><b>Noa Levi</b><time>17:32</time><p>Sali, can you send us the proposal by Sunday?</p></div></div>
+                      <div class="sk-msg sk-art sk-draft"><i class="me">S</i><div><b>Sali Sapan</b><em class="sk-tag">Draft</em><p>Proposal is ready — Riverview Studio, ₪48,000. I’ll walk you through it Sunday at 10:00.</p><span class="sk-file"><span class="brand-ico" data-brand="docs"></span><b>Riverview-proposal.pdf</b><em>184 KB</em></span></div></div>
+                      <div class="sk-msg sk-art sk-sent"><i class="me">S</i><div><b>Sali Sapan</b><time>17:36</time><p>Proposal is ready — Riverview Studio, ₪48,000. I’ll walk you through it Sunday at 10:00.</p><span class="sk-file"><span class="brand-ico" data-brand="docs"></span><b>Riverview-proposal.pdf</b><em>184 KB · Sent</em></span></div></div>
+                    </div>
+                    <div class="sk-compose">Message #riverview</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MORNING -->
+              <div class="mj-screen" data-screen="morning">
+                <div class="mn">
+                  <header class="mn-top"><span class="mn-logo"><span class="brand-ico" data-brand="morning"></span>Morning</span><span>Quotes</span><span class="mn-new">+ New quote</span></header>
+                  <div class="mn-body">
+                    <aside class="mn-side"><span class="on">Quotes</span><span>Invoices</span><span>Receipts</span><span>Clients</span></aside>
+                    <article class="mn-doc">
+                      <div class="mn-kicker"><span class="mn-tag">Draft</span><span class="mn-tag mn-tag-sent">Issued</span> Quote · not sent</div>
+                      <h4>Q-2208</h4>
+                      <p class="mn-for">Riverview Studio · Noa Levi</p>
+                      <table>
+                        <tr><td>Brand &amp; web proposal</td><td>₪48,000</td></tr>
+                        <tr><td>VAT</td><td>Included in the proposal</td></tr>
+                        <tr class="mn-tot"><td>Total</td><td>₪48,000</td></tr>
+                      </table>
+                      <p class="mn-note">Valid until Oct 31 · follow-up Sunday 10:00</p>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <!-- OUTLOOK -->
+              <div class="mj-screen" data-screen="outlook">
+                <div class="ol">
+                  <header class="ol-top"><span class="ol-logo"><span class="brand-ico" data-brand="outlook"></span>Outlook</span><span class="ol-search">Search</span></header>
+                  <div class="ol-body">
+                    <aside class="ol-side"><span class="ol-new">New mail</span><span class="on">Drafts <em>1</em></span><span>Inbox</span><span>Sent</span></aside>
+                    <article class="ol-draft">
+                      <div class="ol-bar"><b>Riverview proposal</b><span class="ol-state">Draft · not sent</span><span class="ol-state ol-state-sent">Sent</span></div>
+                      <p><em>To</em> Noa Levi</p>
+                      <p><em>Subject</em> Riverview proposal</p>
+                      <div class="ol-txt"><p>Hi Noa,</p><p>Attached is the proposal for Riverview Studio — ₪48,000. Happy to walk you through it on Sunday at 10:00. The quote is Q-2208 in Morning, and I left a note in #riverview.</p><p>Best,<br>Sali</p></div>
+                      <span class="ol-file"><span class="brand-ico" data-brand="docs"></span>Riverview-proposal.pdf</span>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DRIVE (retired) -->
+              <div class="mj-screen" data-screen="drive" hidden>
+                <div class="dv">
+                  <div class="dv-top"><span class="dv-logo"><span class="brand-ico" data-brand="drive"></span>Drive</span><span class="dv-search">Search in Drive</span><span class="gd-av viewer-initials">SS</span></div>
+                  <div class="dv-body">
+                    <aside class="dv-side"><span class="dv-new">+ New</span><span class="dv-nav">Home</span><span class="dv-nav on">My Drive</span><span class="dv-nav">Shared with me</span><span class="dv-nav">Recent</span><span class="dv-nav">Starred</span><span class="dv-nav">Trash</span></aside>
+                    <div class="dv-main">
+                      <div class="dv-crumb">My Drive <i>›</i> Clients <i>›</i> <b>Riverview</b></div>
+                      <div class="dv-chips"><span>Type ▾</span><span>People ▾</span><span>Modified ▾</span></div>
+                      <div class="dv-table">
+                        <div class="dv-row dv-hd"><span>Name</span><span>Owner</span><span>Last modified</span><span>Shared</span></div>
+                        <div class="dv-row dv-new-file"><span class="dv-name"><span class="brand-ico" data-brand="docs"></span><b>Riverview proposal</b></span><span>me</span><span>Just now</span><span class="dv-share"><span class="dv-shav">N</span><em>Noa · Viewer</em></span></div>
+                        <div class="dv-row"><span class="dv-name"><span class="dv-fi pdf">PDF</span>Brief — Riverview.pdf</span><span>Noa Levi</span><span>Oct 2</span><span>—</span></div>
+                        <div class="dv-row"><span class="dv-name"><span class="dv-fi img">IMG</span>Moodboard v3.png</span><span>Dana</span><span>Oct 5</span><span>—</span></div>
+                        <div class="dv-row"><span class="dv-name"><span class="dv-fi fold"></span>Assets</span><span>me</span><span>Sep 28</span><span>—</span></div>
+                      </div>
+                      <div class="dv-toast">Shared with Noa Levi · can view</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CALENDAR -->
+              <div class="mj-screen" data-screen="calendar">
+                <div class="gc">
+                  <div class="gc-top"><span class="dv-logo"><span class="brand-ico" data-brand="calendar"></span>Calendar</span><span class="gc-today">Today</span><span class="gc-nav">‹ ›</span><b class="gc-month">October 2026</b><span class="gc-view">4 days ▾</span></div>
+                  <div class="gc-body">
+                    <aside class="gc-side"><span class="dv-new">+ Create</span>
+                      <div class="gc-mini"><b>October 2026</b><div class="gc-mgrid"><i>S</i><i>M</i><i>T</i><i>W</i><i>T</i><i>F</i><i>S</i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i class="t">8</i><i>9</i><i>10</i><i class="f">11</i><i>12</i><i>13</i><i>14</i><i>15</i><i>16</i><i>17</i><i>18</i><i>19</i><i>20</i><i>21</i><i>22</i><i>23</i><i>24</i></div></div>
+                    </aside>
+                    <div class="gc-grid">
+                      <div class="gc-days"><span></span><span class="t"><em>THU</em><b>8</b></span><span><em>FRI</em><b>9</b></span><span><em>SAT</em><b>10</b></span><span class="f"><em>SUN</em><b>11</b></span></div>
+                      <div class="gc-hours">
+                        <div class="gc-h"><i>8 AM</i></div><div class="gc-h"><i>9 AM</i></div><div class="gc-h"><i>10 AM</i></div><div class="gc-h"><i>11 AM</i></div><div class="gc-h"><i>12 PM</i></div>
+                        <span class="gc-ev gc-ev-old" style="--c:1;--t:1;--d:.5">Standup</span>
+                        <span class="gc-ev gc-ev-old" style="--c:1;--t:2.5;--d:1">Riverview kickoff prep</span>
+                        <span class="gc-ev gc-ev-new" style="--c:4;--t:2;--d:.5"><b>Follow-up · Riverview proposal</b><em>10:00 – 10:30 · Noa Levi</em></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- GMAIL -->
+              <div class="mj-screen" data-screen="gmail">
+                <div class="gm21">
+                  <div class="gm21-top"><span class="gw-logo"><span class="brand-ico" data-brand="slack"></span><b>Slack</b></span><span class="dv-search">Search mail</span><span class="gd-av viewer-initials">SS</span></div>
+                  <div class="gm21-body">
+                    <aside class="gm21-side"><span class="gw-compose">Compose</span><span class="gw-nav on"><b>Inbox</b><em>24</em></span><span class="gw-nav">Starred</span><span class="gw-nav">Sent</span><span class="gw-nav">Drafts<em>2</em></span></aside>
+                    <div class="gm21-list"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="gm21-compose">
+                      <div class="gm21-ch"><b>Riverview proposal</b><span>_ ⤢ ×</span></div>
+                      <div class="gm21-f"><em>To</em><span class="gm21-to"><span class="dv-shav">N</span>Noa Levi</span></div>
+                      <div class="gm21-f"><em>Subject</em>Riverview proposal</div>
+                      <div class="gm21-txt"><p>Hi Noa,</p><p>Attached is the proposal for Riverview Studio — ₪48,000, as we discussed. Happy to walk you through it on Sunday at 10:00.</p><p>Best,<br><span class="viewer-first-name">Sali</span></p></div>
+                      <span class="gm21-att"><span class="brand-ico" data-brand="docs"></span>Riverview proposal</span>
+                      <div class="gm21-foot"><span class="gm21-send">Send</span><span class="gm21-draft">Draft · not sent</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <div class="mj-close" aria-live="polite">
+              <div class="mj-close-card">
+                <img class="living-ico" src="/glance/assets/living/key-done-512.png" alt="" width="36" height="36">
+                <p class="mj-close-k">Closed</p>
+                <ul class="mj-close-lines">
+                  <li><b>Docs</b> Riverview proposal · ₪48,000 · created</li>
+                  <li><b>Slack</b> #riverview · proposal sent</li>
+                  <li><b>Morning</b> Quote Q-2208 · issued</li>
+                  <li><b>Outlook</b> Note sent to Noa</li>
+                </ul>
+                <p class="mj-close-undo">Proposal with Noa · <button type="button" class="linkish js-undo">Undo</button></p>
+              </div>
+            </div>
+            <div class="mj-pill" aria-live="polite"><img class="living-ico" src="/glance/assets/living/thinking.webp" alt="" width="18" height="18"><span class="mj-pill-t">Docs · Creating proposal…</span></div>
+          </div>
+        </div>
+
+        <!-- Glance card (same row components as every demo) -->
+        <div class="mj-card stage stage-live stage-demo" id="demo-meet" data-state="propose">
+          <div class="glance-surface gs-demo g19" id="meet-glance">
+            <div class="gs-head compact">
+              <img class="living-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="24" height="24">
+              <div class="gs-head-meta"><div class="gs-brand">Glance</div><div class="gs-intent-label">Detected intent · Meet</div></div>
+              <span class="handled gs-badge">Closed</span>
+            </div>
+            <p class="mj-side-closed"><b>Closed</b> · 4 tools · <button type="button" class="linkish js-undo">Undo</button></p>
+            <p class="gs-intent">Noa needs the Riverview proposal by Sunday.</p>
+            <div class="acts-head"><span class="acts-label">Glance will</span><span class="acts-hint">Untick to skip</span></div>
+            <div class="acts-run" hidden>
+              <div class="run-meta"><div class="run-title">Working…</div><div class="run-sub"></div></div>
+              <div class="run-count">1<span>/</span>4</div>
+              <div class="run-track" aria-hidden="true"><div class="run-fill"></div></div>
+            </div>
+            <ol class="acts"></ol>
+            <div class="approve-banner demo-approve" hidden>
+              <div class="approve-meta"><div class="approve-title">Prepared · nothing sent</div><div class="approve-sub">4 of 4 verified · nothing reaches Noa until you Approve</div></div>
+              <button type="button" class="do-halo approve-btn" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+            </div>
+            <div class="chip pulse demo-chip">
+              <button type="button" class="chip-hold" aria-label="Hold It">Hold It</button>
+              <span class="chip-txt"></span>
+              <span class="chip-act">
+                <button type="button" class="chip-x" aria-label="Dismiss">×</button>
+                <button type="button" class="do-halo demo-doit" aria-label="Do It"><img class="chip-do" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
+              </span>
+            </div>
+            <div class="parked-banner demo-parked"><span class="receipt-dot"></span><span><b>Held</b> · still open · <em class="js-unpark">Bring back</em></span></div>
+            <div class="receipt-stack demo-receipt"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- One ask · many tools — B · Animated Beam (lower · Magic UI · https://21st.dev/@dillionverma/components/animated-beam) -->
+<section class="ints b20sec" id="one-ask" aria-label="One ask, many tools">
+  <div class="wrap wide">
+    <p class="ints-kicker mono-eye">One ask · many tools</p>
+    <h2 class="ints-h b20-h">One ask in. <em>Every step out.</em></h2>
+    <div class="b20" data-beam20>
+      <svg class="b20-svg" aria-hidden="true"></svg>
+      <div class="b20-col b20-src">
+        <span class="b20-cap">The ask arrives</span>
+        <div class="b20-tile" data-node="file"><span class="b20-ic" data-glyph="file"></span><span class="b20-txt"><b>Files</b><em class="b20-q">“The signed brief just landed.”</em></span></div>
+        <div class="b20-tile" data-node="whatsapp"><span class="b20-ic" data-glyph="whatsapp"></span><span class="b20-txt"><b>WhatsApp</b><em class="b20-q">“Move Thursday’s tasting?”</em></span></div>
+        <div class="b20-tile" data-node="outlook"><span class="b20-ic" data-glyph="outlook"></span><span class="b20-txt"><b>Outlook</b><em class="b20-q">“Confirm Thu 11:00?”</em></span></div>
+      </div>
+      <div class="b20-hub">
+        <div class="b20-core"><span class="b20-halo" aria-hidden="true"></span><img class="living-ico b20-ring-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="44" height="44"></div>
+        <b class="b20-name">Glance</b>
+        <span class="b20-hubsub">you approve once</span>
+      </div>
+      <div class="b20-col b20-dst">
+        <span class="b20-cap">The close lands</span>
+        <div class="b20-tile" data-node="morning"><span class="b20-ic" data-glyph="morning"></span><span class="b20-txt"><b>Morning</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="gmail"><span class="b20-ic" data-glyph="gmail"></span><span class="b20-txt"><b>Gmail</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="calendar"><span class="b20-ic" data-glyph="calendar"></span><span class="b20-txt"><b>Calendar</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="drive"><span class="b20-ic" data-glyph="drive"></span><span class="b20-txt"><b>Drive</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="whatsapp"><span class="b20-ic" data-glyph="whatsapp"></span><span class="b20-txt"><b>WhatsApp</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="outlookcal"><span class="b20-ic" data-glyph="outlookcal"></span><span class="b20-txt"><b>Outlook Calendar</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+        <div class="b20-tile" data-node="outlook"><span class="b20-ic" data-glyph="outlook"></span><span class="b20-txt"><b>Outlook</b></span><i class="b20-ok" aria-hidden="true"></i></div>
+      </div>
+    </div>
+    <p class="b20-line" aria-live="polite"><b>Brief</b> from Files → Drive · Morning<i class="b20-dot"> · </i><span class="b20-n">2 steps, one click</span></p>
+    <div class="b20-pills" role="tablist" aria-label="Pick a case">
+      <button type="button" class="b20-pill" role="tab" data-case="invoice">Brief</button>
+      <button type="button" class="b20-pill" role="tab" data-case="payment">Payment</button>
+      <button type="button" class="b20-pill" role="tab" data-case="calendar">Calendar</button>
+      <button type="button" class="b20-pill" role="tab" data-case="file">File</button>
+      <button type="button" class="b20-pill" role="tab" data-case="whatsapp">WhatsApp</button>
+      <button type="button" class="b20-pill" role="tab" data-case="outlook">Outlook</button>
+    </div>
+  </div>
+</section>
+
+
+<!-- A day with Glance — horizontal snap carousel -->
+<section class="day21" id="day" aria-label="A day with Glance">
+  <div class="wrap wide">
+    <div class="day21-head">
+      <div>
+        <p class="mono-eye day21-eye">A day with Glance</p>
+        <h2 class="day21-h">One ask · <em>closed across tools.</em></h2>
+        <p class="day21-sub">Source, the work, and the close. Five asks, one row.</p>
+      </div>
+      <div class="day21-arrows">
+        <button type="button" class="day21-arrow" data-dir="-1" aria-label="Previous"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></button>
+        <button type="button" class="day21-arrow" data-dir="1" aria-label="Next"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.6 16.6 10 18l6-6-6-6-1.4 1.4 4.6 4.6z"/></svg></button>
+      </div>
+    </div>
+  </div>
+  <div class="day21-track" id="day-track" tabindex="0" aria-label="Cases through the day">
+    <article class="day21-card">
+      <header class="day24-top"><time>08:40</time><span class="day24-av" aria-hidden="true">NK</span><span class="day21-src"><span class="day24-mark" data-brand="gmail"></span>Gmail · Noa Klein</span></header>
+      <p class="day21-ask">“Can you issue the October invoice? ₪12,400 + VAT.”</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="morning"></span><b>Morning</b><span class="day24-res">Invoice INV-4821</span></li><li><span class="day24-mark" data-brand="gmail"></span><b>Gmail</b><span class="day24-res">Reply drafted · PDF attached</span></li><li><span class="day24-mark" data-brand="calendar"></span><b>Calendar</b><span class="day24-res">Payment check · Oct 21</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · INV-4821 issued · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>11:15</time><span class="day24-av" aria-hidden="true">HC</span><span class="day21-src"><span class="day24-mark" data-brand="calendly"></span>Calendly · Harbor &amp; Co</span></header>
+      <p class="day21-ask">“Can we do a 30-minute intro on Thursday?”</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="calendly"></span><b>Calendly</b><span class="day24-res">Intro · Thu 11:00</span></li><li><span class="day24-mark" data-brand="notion"></span><b>Notion</b><span class="day24-res">Harbor page updated</span></li><li><span class="day24-mark" data-brand="gmail"></span><b>Gmail</b><span class="day24-res">Confirmation drafted</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · intro on Thursday · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>13:10</time><span class="day24-av" aria-hidden="true">DL</span><span class="day21-src"><span class="day24-mark" data-brand="whatsapp"></span>WhatsApp · Dani Lee</span></header>
+      <p class="day21-ask">“Can we move Thursday’s tasting to 7:30?”</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="outlook"></span><b>Outlook</b><span class="day24-res">Tasting → Thu 19:30</span></li><li><span class="day24-mark" data-brand="whatsapp"></span><b>WhatsApp</b><span class="day24-res">Reply drafted · not sent</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · Dani has 7:30 · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>15:20</time><span class="day24-av day24-file" data-brand="files" aria-hidden="true"></span><span class="day21-src"><span class="day24-mark" data-brand="files"></span>Downloads · contract-signed.pdf</span></header>
+      <p class="day21-ask">The signed Riverview contract just landed in Downloads.</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="drive"></span><b>Drive</b><span class="day24-res">Filed to /Clients/Riverview</span></li><li><span class="day24-mark" data-brand="sheets"></span><b>Sheets</b><span class="day24-res">Pipeline row → Signed</span></li><li><span class="day24-mark" data-brand="gmail"></span><b>Gmail</b><span class="day24-res">Thank-you to Noa drafted</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · contract filed · <em>Undo</em></p>
+    </article>
+    <article class="day21-card">
+      <header class="day24-top"><time>17:30</time><span class="day24-av" aria-hidden="true">NL</span><span class="day21-src"><span class="day24-mark" data-brand="meet"></span>Meet · Riverview sync</span></header>
+      <p class="day21-ask">“Sali, can you send us the proposal by Sunday?”</p>
+      <ul class="day21-acts"><li><span class="day24-mark" data-brand="docs"></span><b>Docs</b><span class="day24-res">Proposal · ₪48,000</span></li><li><span class="day24-mark" data-brand="slack"></span><b>Slack</b><span class="day24-res">#riverview draft</span></li><li><span class="day24-mark" data-brand="morning"></span><b>Morning</b><span class="day24-res">Quote Q-2208</span></li><li><span class="day24-mark" data-brand="outlook"></span><b>Outlook</b><span class="day24-res">Draft to Noa</span></li></ul>
+      <p class="day21-rcpt"><i></i><b>Closed</b> · proposal with Noa · <em>Undo</em></p>
+    </article>
+    <span class="day21-end" aria-hidden="true"></span>
+  </div>
+  <div class="wrap wide"><div class="day21-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div></div>
+</section>
+
+<!-- Trust creed — one strong section · Quiet / Never sends / Undo -->
+<section class="creed-x band band-alt" id="trust-creed" aria-label="Quiet when unsure · never sends for you · undo always">
+  <div class="creed-glow" aria-hidden="true"></div>
+  <div class="creed-stars" aria-hidden="true"></div>
+  <div class="wrap wide">
+    <p class="creed-eye mono-eye">Trust DNA · lived, not claimed</p>
+    <h2 class="creed-h">Quiet when unsure.<br>Never sends for you.<br><em>Undo always.</em></h2>
+    <p class="creed-sub">A floating layer over the apps you already use — not a chat. Glance prepares the close; <b>you Approve it</b>. Prepared ≠ closed.</p>
+
+    <div class="creed-grid">
+      <article class="pillar pillar-quiet" tabindex="0">
+        <div class="pillar-bloom" aria-hidden="true"></div>
+        <div class="pillar-stage">
+          <div class="mini-mail">
+            <span class="mm-line w80"></span>
+            <span class="mm-line w64"></span>
+            <span class="mm-line w72 mm-vague">“maybe sometime next month?”</span>
+          </div>
+          <div class="pillar-moment">
+            <img class="living-ico sm pillar-ring" src="/glance/assets/living/key-idle-512.png" alt="" width="22" height="22">
+            <span class="pm-txt"><b>Unsure</b> · no chip shown</span>
+          </div>
+        </div>
+        <span class="pillar-num mono-eye">01</span>
+        <h3>Quiet when unsure</h3>
+        <p>If the ask isn’t clear, Glance stays silent. No noisy guesses. No fake confidence.</p>
+      </article>
+
+      <article class="pillar pillar-never" tabindex="0">
+        <div class="pillar-bloom" aria-hidden="true"></div>
+        <div class="pillar-stage">
+          <div class="pillar-chip">
+            <span class="pc-txt"><b class="gplus"><img class="living-ico gplus-ico" src="/glance/assets/living/key-idle-512.png" alt="" width="14" height="14"><span class="gplus-name">Glance</span></b> · 3 actions prepared</span>
+            <img class="chip-do pillar-doit" src="/glance/assets/do-it.png" alt="Do It"><span class="doit-dark pillar" role="img" aria-label="Do It">[Do It]</span>
+          </div>
+          <div class="pillar-moment">
+            <span class="pm-dot"></span>
+            <span class="pm-txt"><b>Prepared</b> · not sent · waits for Approve</span>
+          </div>
+        </div>
+        <span class="pillar-num mono-eye">02</span>
+        <h3>Never sends for you</h3>
+        <p>One click prepares the close. Nothing leaves your account until you press Approve.</p>
+      </article>
+
+      <article class="pillar pillar-undo" tabindex="0">
+        <div class="pillar-bloom" aria-hidden="true"></div>
+        <div class="pillar-stage">
+          <div class="pillar-receipt">
+            <span class="receipt-dot"></span>
+            <span class="pr-txt"><b>Closed</b> · INV-4821 · Morning</span>
+            <span class="pr-undo">Undo</span>
+          </div>
+          <div class="pillar-moment">
+            <span class="pm-timer" aria-hidden="true"></span>
+            <span class="pm-txt"><b>Reopens quietly</b> · back to still open</span>
+          </div>
+        </div>
+        <span class="pillar-num mono-eye">03</span>
+        <h3>Undo always</h3>
+        <p>Every close lands with a receipt and Undo. Change your mind — the loop simply reopens.</p>
+      </article>
+    </div>
+
+    <ul class="trust-strip" aria-label="Glance promises">
+      <li>Not a chat</li>
+      <li>Floats over Gmail, Outlook &amp; WhatsApp</li>
+      <li>Prepared ≠ closed until Approve</li>
+      <li>Your words · your send button</li>
+      <li>Undo on every close</li>
+    </ul>
+  </div>
+</section>
+
+
+
+<!-- Closing signup · the page story, then one field -->
+<section class="cta21" id="get-glance" aria-label="Get Glance">
+  <div class="wrap wide">
+    <p class="mono-eye cta21-eye">Get Glance</p>
+    <h2 class="cta21-h">Open loops. <em>Closed.</em></h2>
+    <p class="cta21-sub">Glance works wherever your work happens. One click prepares the close. You approve it.</p>
+    <form class="su" id="signup" data-signup action="#" novalidate>
+      <div class="su-row">
+        <label class="su-field" for="su-email">
+          <span class="sr-only">Email</span>
+          <input class="su-input" id="su-email" name="email" type="email" inputmode="email" autocomplete="email" dir="ltr" spellcheck="false" placeholder="you@company.com" required>
+        </label>
+        <button type="submit" class="su-go" data-submit>
+          <span class="su-go-label">Get <bdi>Glance</bdi></span>
+        </button>
+      </div>
+      <p class="su-note su-invalid">Enter a valid email.</p>
+      <div class="su-checks">
+        <label class="su-check">
+          <input type="checkbox" id="su-terms" name="terms" required>
+          <span class="su-box" aria-hidden="true"></span>
+          <span>I agree to the <a href="/glance/terms.html" id="terms">Terms</a> and <a href="/glance/privacy.html" id="privacy">Privacy Policy</a>.</span>
+        </label>
+        <p class="su-note su-terms">Agree to the Terms and Privacy Policy to continue.</p>
+        <label class="su-check">
+          <input type="checkbox" id="su-mail" name="mailing">
+          <span class="su-box" aria-hidden="true"></span>
+          <span>Email me product notes. Optional.</span>
+        </label>
+      </div>
+      <p class="su-note su-error"><span>Something went wrong. Nothing was saved.</span> <button type="button" class="su-retry" data-retry>Retry</button></p>
+      <p class="su-note su-success">You're in. <bdi>Glance</bdi> is on its way.</p>
+      <p class="su-note su-confirm">Check your email to confirm.</p>
+    </form>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap wide">
+    <span>Glance · by Flow</span>
+    <span class="note">Corner v25 · Glance · open loops, closed · one click, you approve</span>
+  </div>
+</footer>
+
+<script src="/glance/assets/glyphs.js"></script>
+<script src="/glance/assets/brand.js"></script>
+<script src="/glance/assets/theme.js"></script>
+<script src="/glance/assets/integrations.js"></script>
+<script src="/glance/assets/app.js"></script>
+<script src="/glance/assets/meet.js"></script>
+<script src="/glance/assets/v21.js"></script>
+<script src="/glance/assets/v23.js"></script>
+<script src="/assets/site-config.js"></script>
+<script src="/glance/gate.js"></script>
 </body>
 </html>
