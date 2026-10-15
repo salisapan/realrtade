@@ -220,8 +220,13 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
   });
   const pane = page.locator('#ReadingPaneContainerId');
   await expect(pane.getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
-  await pane.locator('button.flow-chip').click();
-  await expect(pane.getByText('Reconnect Outlook to allow OneDrive')).toBeVisible();
+  // The card can be re-mounted by a rescan just after it first shows, and a click on the card that was replaced is ignored on
+  // purpose (0.9.55: a stale card must not run). So click the card that is there, and click again on the fresh one when nothing
+  // happened. This write fails by design (no file permission), so a second click can never create anything.
+  await expect(async () => {
+    await pane.locator('button.flow-chip').click();
+    await expect(pane.getByText('Reconnect Outlook to allow OneDrive')).toBeVisible({ timeout: 4000 });
+  }).toPass({ timeout: 30000 });
   await expect(pane.getByText("Couldn't confirm")).toHaveCount(0);
   await expect(pane.getByText('Approve close')).toHaveCount(0);
 });
