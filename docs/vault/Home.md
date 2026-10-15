@@ -1,6 +1,6 @@
 ---
 tags: [home]
-updated: 2026-10-08
+updated: 2026-10-16
 ---
 # Home — Glance / Flow context vault
 
@@ -15,8 +15,12 @@ The vault is a view over these. Facts live only there.
 - [[revenue-routines]]: money, Flow sales and outreach (§8), CoS routines (§9)
 - The topic docs that [[README]] §1 lists (for example [[product-identity]], [[true-close]], [[multi-platform]])
 
+## Read first
+- [[shared-rules]] — Shared rules & product locks (Sali). Product, Flow/Sales, and bot operations, each rule dated. A bot that saves a new rule or setting to shared memory adds it here via PR.
+- [[product-locks]] — the Glance locks in short form. The full wording is [[shared-rules]].
+
 ## Before you start a stream (2 minutes)
-1. Skim this page and [[decisions]] (newest at the top).
+1. Read [[product-locks]] and [[shared-rules]], then skim this page and [[decisions]] (newest at the top).
 2. Open the note for the stream you touch (below).
 3. Then the normal reading order: `CLAUDE.md` → [[README]] → [[open-tasks]] → the topic owner doc.
 
