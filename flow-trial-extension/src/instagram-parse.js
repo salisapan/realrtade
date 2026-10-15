@@ -30,15 +30,16 @@ const FlowInstagramParse = (() => {
   //    A heading alone is not one-to-one proof. The exact live heading is
   //    TODO-LIVE-DOM.
   //
-  // Inside the chosen region, img elements that are not inside a message row
-  // are the avatars. Exactly one, and no group wording, is one-to-one. Two or
-  // more, or a group word, is a group. Anything else is unknown.
-  // Source for the images: the same script counts `div[role='dialog'] img[alt]`
-  // after a click, alt "Username's profile picture". Opening that panel is a
-  // click, so the count stays on images already in the chosen region
-  // (TODO-LIVE-DOM). A message-row link `a[aria-label^="Open the profile page"]`
+  // Inside the chosen region, a draft needs a positive one-to-one signal.
+  // One image is not that signal. The signals are one header profile link
+  // (a single href such as /username/, not a message-row "Open the profile
+  // page" link) or a header status line "Active now" / "Active <n>m ago"
+  // (also h or d). The same line inside a message row is not a signal.
+  // No positive signal stays quiet. A participant count, a multi-person
+  // title, or a group word is a group and stays quiet.
+  // A message-row link `a[aria-label^="Open the profile page"]`
   // (https://greasyfork.org/en/scripts/578524-instagram-dm-exporter/code) says
-  // who sent a message, including in a group, so it is not used.
+  // who sent a message, including in a group, so it is not a one-to-one signal.
   // Group words: /\bmembers\b/i, /\bparticipants\b/i, /\bgroup chat\b/i,
   // /\bgroup conversation\b/i, and משתתפים. The details panel is the member
   // list. The exact live string is TODO-LIVE-DOM.
@@ -84,12 +85,9 @@ const FlowInstagramParse = (() => {
     return null;
   }
 
-  function imgsIn(node) {
-    if (!node || typeof node.querySelectorAll !== 'function') return [];
-    return Array.from(node.querySelectorAll('img')).filter((img) => !inRow(img));
-  }
-
   const COUNT_WORD = /\b(\d{1,4})\s*(members|participants|people|others|משתתפים|אנשים)\b/i;
+  const ACTIVE_STATUS = /\bactive\s+now\b|\bactive\s+\d{1,4}\s*[smhd]\s+ago\b/i;
+  const RESERVED_PROFILE = /^(direct|explore|accounts|reels|stories|p|tv|messages|t|groups|watch|latest|inbox)$/i;
 
   function countSaysGroup(text) {
     const m = String(text || '').match(COUNT_WORD);
@@ -131,18 +129,64 @@ const FlowInstagramParse = (() => {
     return false;
   }
 
-  // Avatar count is not a group signal. One picture plus a group title,
-  // a participant count other than 1, or a header marker stays quiet.
   function isGroup(scope) {
     if (groupTitle(regionTitle(scope))) return true;
     if (headerSaysGroup(scope)) return true;
     return false;
   }
 
+  function profileHref(href) {
+    const raw = String(href || '').trim();
+    if (!raw || raw.charAt(0) === '#') return false;
+    let u;
+    try { u = new URL(raw, 'https://example.com'); } catch (e) { return false; }
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/profile.php') return /^\d+$/.test(u.searchParams.get('id') || '');
+    if (/^\/\d{5,}$/.test(path)) return true;
+    const seg = path.match(/^\/([A-Za-z0-9._]{2,30})$/);
+    if (!seg) return false;
+    return !RESERVED_PROFILE.test(seg[1]);
+  }
+
+  function infoAnchor(el) {
+    const label = String(el.getAttribute && el.getAttribute('aria-label') || '').trim();
+    return /^conversation information$/i.test(label) || /chat details/i.test(label);
+  }
+
+  function profileLinks(scope) {
+    if (!scope || typeof scope.querySelectorAll !== 'function') return [];
+    return Array.from(scope.querySelectorAll('a[href]')).filter((a) => {
+      if (inRow(a)) return false;
+      if (a.getAttribute('role') === 'button') return false;
+      if (infoAnchor(a)) return false;
+      return profileHref(a.getAttribute('href'));
+    });
+  }
+
+  function headerMatches(node, re) {
+    if (!node || node.nodeType !== 1) return false;
+    if (node.getAttribute && node.getAttribute('role') === 'row') return false;
+    const label = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
+    if (re.test(label)) return true;
+    const kids = node.childNodes ? Array.from(node.childNodes) : [];
+    for (let i = 0; i < kids.length; i++) {
+      const kid = kids[i];
+      if (kid.nodeType === 3) {
+        if (re.test(kid.textContent || '')) return true;
+      } else if (kid.nodeType === 1 && headerMatches(kid, re)) return true;
+    }
+    return false;
+  }
+
+  function positiveOneToOne(scope) {
+    if (profileLinks(scope).length === 1) return true;
+    if (headerMatches(scope, ACTIVE_STATUS)) return true;
+    return false;
+  }
+
   function decide(scope, via) {
     if (isGroup(scope)) return { kind: 'group', via: via };
-    const avatars = imgsIn(scope);
-    if (avatars.length === 1) return { kind: 'one-to-one', via: via };
+    if (positiveOneToOne(scope)) return { kind: 'one-to-one', via: via };
     return { kind: 'unknown', via: via };
   }
 

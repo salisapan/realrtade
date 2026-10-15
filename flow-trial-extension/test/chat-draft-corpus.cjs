@@ -169,7 +169,7 @@ check('a title is not proof of a direct chat', ['Dana, Noa', 'Dana & Noa', 'Fami
   return FlowMessengerParse.isOneToOne(chatEl(html)) === false && FlowInstagramParse.isOneToOne(chatEl(html)) === false;
 }));
 const directHeader = '<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Conversation information" href="https://www.messenger.com/t/1">Conversation information</a></header></div>';
-check('one header image and Conversation information is a direct chat', FlowMessengerParse.isOneToOne(chatEl(directHeader)) === true);
+check('one header image and Conversation information stays quiet', FlowMessengerParse.isOneToOne(chatEl(directHeader)) === false && FlowMessengerParse.classify(chatEl(directHeader)).kind === 'unknown');
 check('a fixture thread type is not proof', FlowMessengerParse.isOneToOne(chatEl('<div role="main" data-thread-type="one-to-one"><header><h2>Dana</h2></header></div>')) === false);
 check('members text blocks the draft', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><a aria-label="Conversation information">Conversation information</a><span>3 members</span></header></div>')) === false);
 check('a group aria-label blocks the draft', (() => {
@@ -177,7 +177,7 @@ check('a group aria-label blocks the draft', (() => {
   return got.kind === 'group' && got.via === 'heading' && FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Group conversation">Group conversation</a></header></div>')) === false;
 })());
 check('two header images block the draft', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><img alt=""><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false);
-check('Chat details with one header image is a direct chat', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt="Dana\'s profile picture"><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === true);
+check('Chat details with one header image stays quiet', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt="Dana\'s profile picture"><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false);
 check('Chat details alone is unknown', (() => {
   const got = FlowInstagramParse.classify(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>'));
   return got.kind === 'unknown' && got.via === 'aria' && FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false;
@@ -205,11 +205,34 @@ check('live messenger 1:1 is a direct chat named Flow AI', liveDirect.kind === '
 const oneAvatarGroup = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana, Noa</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
 const oneAvatarDirect = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
 check('a group with one avatar stays quiet', FlowMessengerParse.classify(oneAvatarGroup).kind === 'group' && FlowMessengerParse.isOneToOne(oneAvatarGroup) === false);
-check('a one-to-one with one avatar is unchanged', FlowMessengerParse.classify(oneAvatarDirect).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(oneAvatarDirect) === true);
+check('one avatar and a single name stay quiet', FlowMessengerParse.classify(oneAvatarDirect).kind === 'unknown' && FlowMessengerParse.isOneToOne(oneAvatarDirect) === false);
+function namedHeader(title, extra, control) {
+  return chatEl('<div role="main"><header><img alt="" src="data:,"><h2>' + title + '</h2>' + (extra || '') + control + '</header></div>');
+}
+const msInfo = '<a aria-label="Conversation information">Conversation information</a>';
+const igInfo = '<button type="button" aria-label="Chat details">Chat details</button>';
+[['משפחה', 'Hebrew'], ['Book club', 'English']].forEach((pair) => {
+  const ms = namedHeader(pair[0], '', msInfo);
+  const ig = namedHeader(pair[0], '', igInfo);
+  check(pair[1] + ' one-name group with one avatar stays quiet on Messenger', FlowMessengerParse.classify(ms).kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(ms) === false);
+  check(pair[1] + ' one-name group with one avatar stays quiet on Instagram', FlowInstagramParse.classify(ig).kind !== 'one-to-one' && FlowInstagramParse.isOneToOne(ig) === false);
+});
+const msProfile = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a>', msInfo);
+const igProfile = namedHeader('Dana', '<a href="/dana/" role="link">Dana</a>', igInfo);
+check('a one-to-one with a profile link still drafts', FlowMessengerParse.classify(msProfile).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(msProfile) === true);
+check('an Instagram one-to-one with a profile link still drafts', FlowInstagramParse.classify(igProfile).kind === 'one-to-one' && FlowInstagramParse.isOneToOne(igProfile) === true);
+['Active now', 'Active 5m ago'].forEach((status) => {
+  const ms = namedHeader('Dana', '<span>' + status + '</span>', msInfo);
+  const ig = namedHeader('Dana', '<span>' + status + '</span>', igInfo);
+  check('a one-to-one with ' + status + ' still drafts', FlowMessengerParse.classify(ms).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(ms) === true);
+  check('an Instagram one-to-one with ' + status + ' still drafts', FlowInstagramParse.classify(ig).kind === 'one-to-one' && FlowInstagramParse.isOneToOne(ig) === true);
+});
+const activeInRow = chatEl('<div role="main"><h2>Book club</h2><img alt="" src="data:,"><div role="row"><span>Active now</span></div></div>');
+check('Active status inside a message row is not a one-to-one signal', FlowMessengerParse.isOneToOne(activeInRow) === false && FlowInstagramParse.isOneToOne(activeInRow) === false);
 check('a participant count with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Dana</h2><span>4 people</span><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
 check('Family with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Family 🏠</h2><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
 const liveInbox = FlowMessengerParse.classify(liveRoot('live/messenger-page-inbox.html'));
-check('live Business Suite inbox is a direct chat named Sali Sapan', liveInbox.kind === 'one-to-one' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan', liveInbox);
+check('live Business Suite inbox has no one-to-one signal and stays quiet', liveInbox.kind === 'unknown' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-page-inbox.html')) === false, liveInbox);
 const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-unknown.html'));
 check('Business Suite inbox with no image is unknown', inboxUnknown.kind === 'unknown' && inboxUnknown.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html')) === false, inboxUnknown);
 const inboxGroup = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-group.html'));
@@ -389,7 +412,7 @@ console.log('\n--- calendar evidence ---\n');
     ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false],
     ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false],
     ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-flow'],
-    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', 'live-sali'],
+    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', false],
     ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', false],
     ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
     ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
@@ -410,11 +433,10 @@ console.log('\n--- calendar evidence ---\n');
     const page = await open(name, url, surface);
     const keyboard = keys.filter((e) => e.type === 'keydown' || e.type === 'keypress' || e.type === 'keyup' || e.key === 'Enter');
     check(name + ' never clicks and never presses Enter', clicks.length === 0 && keyboard.length === 0 && page.sendClicks === 0, { clicks: clicks.length, keyboard: keyboard });
-    if (expect === true || expect === 'live-flow' || expect === 'live-sali') {
+    if (expect === true || expect === 'live-flow') {
       check(name + ' drafts the maps link', page.text.indexOf('Taizu - ' + MAPS) === 0, page.text);
       check(name + ' leaves the search box alone', page.search === '');
       if (expect === 'live-flow') check(name + ' names Flow AI', page.name === 'Flow AI', page.name);
-      if (expect === 'live-sali') check(name + ' names Sali Sapan', page.name === 'Sali Sapan', page.name);
     } else if (expect === 'fact') {
       check(name + ' drafts the one cell', page.text === '1840', page.text);
     } else if (name === 'whatsapp-filled.html') {
