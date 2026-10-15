@@ -55,6 +55,7 @@ import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same 
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
+import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);

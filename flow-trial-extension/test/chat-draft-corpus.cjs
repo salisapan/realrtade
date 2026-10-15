@@ -6,7 +6,6 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { execFileSync } = require('child_process');
 const { JSDOM } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..');
@@ -76,20 +75,11 @@ check('chat hosts are optional, never required', !required.some((h) => chatHost.
 check('Business Suite inbox is an optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
 check('the enable page is the options page', manifest.options_ui && manifest.options_ui.page === 'lane-chat/enable.html');
 check('the manifest service worker stays background.js', manifest.background.service_worker === 'src/background.js');
-const workerNote = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.js'), 'utf8');
-const workerPatch = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.import.patch'), 'utf8');
-const patchAdded = workerPatch.split('\n').filter((line) => line.startsWith('+') && !line.startsWith('+++'));
-check('the chat worker patch is one static import after #144', patchAdded.length === 1 && patchAdded[0] === "+import './lane-chat-worker.js';");
-let patchApplies = false;
-try {
-  execFileSync('git', ['apply', '--check', path.join(ROOT, 'src/lane-chat-worker.import.patch')], { cwd: path.join(ROOT, '..'), stdio: 'pipe' });
-  patchApplies = true;
-} catch (e) { patchApplies = false; }
-check('the chat worker patch applies beside native-edit.js and does not remove it', patchApplies && /import '\.\/native-edit\.js'/.test(workerPatch) && !/^-import '\.\/native-edit\.js'/m.test(workerPatch));
-check('the patch does not use importScripts', !/importScripts/.test(workerPatch) && !/importScripts/.test(workerNote));
-check('the worker points at that patch', /lane-chat-worker\.import\.patch/.test(workerNote));
 const backgroundSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
-check('background.js does not load the chat worker yet', backgroundSrc.indexOf('lane-chat-worker') < 0);
+const backgroundLines = backgroundSrc.split('\n');
+const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
+check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
+check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
 check('content-whatsapp.js is not hooked by this lane', fs.readFileSync(path.join(ROOT, 'src/content-whatsapp.js'), 'utf8').indexOf('FlowChatLane') < 0);
@@ -377,6 +367,67 @@ console.log('\n--- calendar evidence ---\n');
     fetch: async () => { throw new Error('offline'); }
   });
   check('a failed read is silence, not an empty calendar', broken.sends === false && broken.evidence.events == null && broken.evidence.connected.calendar === true);
+
+  const OTHER = 'North Abraxas, 40 Lilienblum, Tel Aviv';
+  const placeWindow = { kind: 'place', window: { startIso: '2026-10-05T00:00:00.000Z', endIso: '2026-10-12T00:00:00.000Z' } };
+  function googleItems(location) {
+    return { ok: true, json: async () => ({ items: [{ id: 'g1', status: 'confirmed', location: location, start: { dateTime: '2026-10-06T19:00:00+03:00' } }] }) };
+  }
+  function outlookItems(location) {
+    return {
+      ok: true,
+      json: async () => ({
+        value: [{
+          id: 'o1',
+          isCancelled: false,
+          location: { displayName: location },
+          start: { dateTime: '2026-10-06T16:00:00.0000000', timeZone: 'UTC' }
+        }]
+      })
+    };
+  }
+  async function merged(sources) {
+    const urls = [];
+    const evidence = await fetchPlace(placeWindow, {
+      token: async () => sources.google ? 'g-tok' : null,
+      outlookToken: async () => sources.outlook ? 'o-tok' : null,
+      fetch: async (u, init) => {
+        urls.push(u);
+        const bearer = init && init.headers && init.headers.Authorization;
+        if (u.indexOf('/me/calendarView') >= 0) {
+          const decoded = decodeURIComponent(u);
+          check('Outlook calendarView uses the stored Graph token', bearer === 'Bearer o-tok' && init.headers.Prefer === 'outlook.timezone="UTC"' && decoded.indexOf('/me/calendarView') >= 0 && decoded.indexOf('select=id,isCancelled,location,start') >= 0 && decoded.indexOf('subject') < 0);
+          return outlookItems(sources.outlookLocation);
+        }
+        check('Google calendar uses the stored Google token', bearer === 'Bearer g-tok');
+        return googleItems(sources.googleLocation);
+      }
+    });
+    const detected = FlowChatDraft.detect(ASK, { now: NOW, oneToOne: true, fromMe: false });
+    const judged = FlowChatDraft.judge({
+      text: ASK,
+      now: NOW.getTime(),
+      oneToOne: true,
+      fromMe: false,
+      evidence: evidence.evidence,
+      detected: detected
+    });
+    return { urls: urls, evidence: evidence, judged: judged };
+  }
+  const outlookOnly = await merged({ outlook: true, outlookLocation: TAIZU });
+  check('Outlook only drafts the one address', outlookOnly.judged.show === true && outlookOnly.judged.sends === false && outlookOnly.judged.draft.indexOf('Taizu - ' + MAPS) === 0 && outlookOnly.urls.length === 1 && outlookOnly.urls[0].indexOf('/me/calendarView') >= 0 && outlookOnly.evidence.evidence.events[0].location === TAIZU, outlookOnly.judged);
+  const gateAsk = 'איפה המסעדה שהיינו בה שבוע שעבר?';
+  const gateDetected = FlowChatDraft.detect(gateAsk, { now: NOW, oneToOne: true, fromMe: false });
+  const gateJudged = FlowChatDraft.judge({ text: gateAsk, now: NOW.getTime(), oneToOne: true, fromMe: false, evidence: outlookOnly.evidence.evidence, detected: gateDetected });
+  check('the Gate Hebrew place ask drafts from that Outlook address', gateJudged.show === true && gateJudged.sends === false && gateJudged.draft.indexOf('Taizu - ' + MAPS) === 0, gateJudged);
+  const googleOnly = await merged({ google: true, googleLocation: TAIZU });
+  check('Google only drafts the one address', googleOnly.judged.show === true && googleOnly.judged.sends === false && googleOnly.judged.draft.indexOf('Taizu - ' + MAPS) === 0 && googleOnly.urls.length === 1 && googleOnly.urls[0].indexOf('googleapis.com') >= 0, googleOnly.judged);
+  const samePlace = await merged({ google: true, outlook: true, googleLocation: TAIZU, outlookLocation: TAIZU });
+  check('the same address on both calendars drafts once', samePlace.judged.show === true && samePlace.judged.sends === false && samePlace.judged.draft.indexOf('Taizu - ' + MAPS) === 0 && samePlace.urls.length === 2, samePlace.judged);
+  const splitPlace = await merged({ google: true, outlook: true, googleLocation: TAIZU, outlookLocation: OTHER });
+  check('two different addresses stay quiet', splitPlace.judged.show === false && splitPlace.judged.draft == null && splitPlace.judged.sends === false && splitPlace.judged.reason === 'conflict', splitPlace.judged);
+  const neither = await merged({});
+  check('neither calendar connected stays quiet', neither.judged.show === false && neither.judged.draft == null && neither.judged.sends === false && neither.judged.reason === 'not-checked' && neither.urls.length === 0 && neither.evidence.evidence.events == null && neither.evidence.evidence.connected.calendar === false, neither.judged);
 
   global.FlowChatDraft = FlowChatDraft;
   global.FlowChatCompose = FlowChatCompose;
