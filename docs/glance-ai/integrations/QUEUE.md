@@ -27,7 +27,7 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 | Salesforce | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
 | WhatsApp | free | free | - | - | Business Cloud API only (no scraping); needs Meta business verification by owner. Never auto-send |
 | Trello | free | free | - | - | API key + token flow, not OAuth2. CoS: Trello Power-Up key |
-| Asana | free | free | - | - | OAuth2 PKCE. CoS: Asana app |
+| Asana | claude | claimed | `claude/connector-2026-10-15-asana` / PR (draft, stacked on #138 until it merges) | 2026-10-15 | OAuth2 PKCE (secret via the token relay if Asana still needs one: unverified). CoS: Asana app + client id/secret |
 | Dropbox | free | free | - | - | OAuth2 PKCE. CoS: Dropbox app |
 
 Rows still only in `connectors-queue.md` (Linear, DocuSign, Teams via Graph, Stripe, Box, Calendly, Adobe Sign, Google Meet link, open banking; Morning on HOLD) are added here as `free` when a routine is about to take one; until then `connectors-queue.md` remains the Claude routine's detailed design reference, and this file is the source of truth for ownership.
