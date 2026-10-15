@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Glance</title>
+<link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
+<link rel="stylesheet" href="/glance/glance.css">
+<script>
+(function () {
+  var lang = 'en';
+  try { lang = localStorage.getItem('flow_lang') === 'he' ? 'he' : 'en'; } catch (e) {}
+  var theme = 'light';
+  try { theme = localStorage.getItem('glance_theme') === 'dark' ? 'dark' : 'light'; } catch (e) {}
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+</head>
+<body class="corner-v24">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
+    <nav class="links" aria-label="Primary">
+      <a href="/glance/" data-nav="glance">Glance</a>
+    </nav>
+    <div class="tools">
+      <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="tool" id="themeBtn" type="button">Dark</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap">
+    <p class="eyebrow">Glance</p>
+    <h1 data-i18n="h1">Welcome</h1>
+    <p class="lede" data-i18n="body">This page is a placeholder. The first-run link is not built here. The CTO and Dima own that step.</p>
+    <p class="gate-success" id="cookieLine" role="status"></p>
+    <p class="soon"><a href="/glance/">Glance</a></p>
+  </div>
+</main>
+<script>
+window.FLOW_PAGE_I18N = {
+  h1: { en: 'Welcome', he: 'ברוכים הבאים' },
+  body: {
+    en: 'This page is a placeholder. The first-run link is not built here. The CTO and Dima own that step.',
+    he: 'העמוד הזה הוא מציין מקום. החיבור של ההפעלה הראשונה לא נבנה כאן. ה-CTO ודימה אחראים על השלב הזה.'
+  },
+  yes: {
+    en: 'A Glance signup is on this browser.',
+    he: 'יש הרשמה ל-Glance בדפדפן הזה.'
+  },
+  no: {
+    en: 'No Glance signup is on this browser yet.',
+    he: 'עדיין אין הרשמה ל-Glance בדפדפן הזה.'
+  }
+};
+(function () {
+  var match = document.cookie.match(/(?:^|; )glance_signup=([^;]*)/);
+  var line = document.getElementById('cookieLine');
+  function paint() {
+    var lang = document.documentElement.lang === 'he' ? 'he' : 'en';
+    var key = match && match[1] ? 'yes' : 'no';
+    line.textContent = window.FLOW_PAGE_I18N[key][lang];
+  }
+  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  paint();
+})();
+</script>
+<script src="/glance/gate.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
+</body>
+</html>

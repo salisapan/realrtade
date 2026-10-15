@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Unsubscribed — Glance</title>
+<link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
+<link rel="stylesheet" href="/glance/glance.css">
+<script>
+(function () {
+  var lang = 'en';
+  try { lang = localStorage.getItem('flow_lang') === 'he' ? 'he' : 'en'; } catch (e) {}
+  var theme = 'light';
+  try { theme = localStorage.getItem('glance_theme') === 'dark' ? 'dark' : 'light'; } catch (e) {}
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+</head>
+<body class="corner-v24">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
+    <nav class="links" aria-label="Primary">
+      <a href="/glance/" data-nav="glance">Glance</a>
+    </nav>
+    <div class="tools">
+      <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="tool" id="themeBtn" type="button">Dark</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap">
+    <p class="eyebrow">Glance</p>
+    <h1 data-i18n="h1">You’re unsubscribed</h1>
+    <p class="lede" data-i18n="body">Product updates will stop. Your Terms acceptance stays on record until you ask us to delete it. <bdi>Glance</bdi> itself is unchanged.</p>
+    <p class="soon"><a href="/glance/" data-i18n="back">Back to Glance</a></p>
+  </div>
+</main>
+<script>
+window.FLOW_PAGE_I18N = {
+  h1: { en: 'You’re unsubscribed', he: 'העדכונים הופסקו' },
+  body: {
+    en: 'Product updates will stop. Your Terms acceptance stays on record until you ask us to delete it. <bdi>Glance</bdi> itself is unchanged.',
+    he: 'עדכוני המוצר ייפסקו. אישור התנאים נשאר רשום עד שתבקשו למחוק אותו. <bdi>Glance</bdi> עצמה לא משתנה.'
+  },
+  back: { en: 'Back to Glance', he: 'חזרה ל-Glance' }
+};
+</script>
+<script src="/glance/gate.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
+</body>
+</html>

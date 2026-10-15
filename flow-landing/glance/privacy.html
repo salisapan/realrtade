@@ -1,0 +1,103 @@
+<!doctype html>
+<!-- DRAFT - pending legal review. Version 2026-10-15. Not legal advice and not in force. -->
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Privacy Policy (draft) — Glance</title>
+<link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
+<link rel="stylesheet" href="/glance/glance.css">
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var lang = q.get('lang') === 'he' ? 'he' : (q.get('lang') === 'en' ? 'en' : '');
+  if (!lang) { try { lang = localStorage.getItem('flow_lang') === 'he' ? 'he' : 'en'; } catch (e) { lang = 'en'; } }
+  else { try { localStorage.setItem('flow_lang', lang); } catch (e) {} }
+  var theme = q.get('theme') === 'dark' || q.get('theme') === 'light' ? q.get('theme') : '';
+  if (!theme) { try { theme = localStorage.getItem('glance_theme') === 'dark' ? 'dark' : 'light'; } catch (e) { theme = 'light'; } }
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+</head>
+<body class="corner-v24">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
+    <nav class="links" aria-label="Primary">
+      <a href="/glance/" data-nav="glance">Glance</a>
+      <a href="/glance/terms.html">Terms</a>
+    </nav>
+    <div class="tools">
+      <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="tool" id="themeBtn" type="button">Dark</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap legal">
+    <p class="banner" data-i18n="banner">DRAFT — pending legal review. Privacy Policy v2026-10-15. This draft is not in force. The live site policy remains <a href="/privacy.html">privacy.html</a>.</p>
+    <article data-lang-panel="en">
+      <p class="eyebrow">Glance</p>
+      <h1>Privacy Policy</h1>
+      <p class="muted">Draft version 2026-10-15. Pending legal review. It describes the signup gate and the same product behavior already published on the site privacy page.</p>
+      <h2>The account and the email</h2>
+      <p>The signup asks for an email and nothing else. There is no password. That address is the account for this gate. We use it to know who accepted the terms, to send the optional list only after a second confirmation, and to answer a deletion request. We do not sell personal information.</p>
+      <h2>The consent log</h2>
+      <p>A successful signup writes one row through a server function. The row keeps the email, terms version 2026-10-15, privacy version 2026-10-15, the time you accepted them, whether the optional list box was checked, your language, a hash of the network address, the browser string, the referrer, a signup token, and the time the row was created. The browser does not send the network address or a separate timestamp. The server sets those. The row is not readable by the public key. The browser keeps only the signup token in a first-party cookie named glance_signup, for 30 days, so a later first-run page can see that this browser signed up.</p>
+      <h2>The mailing list is separate</h2>
+      <p>The updates box starts unchecked. Checking it does not by itself put you on the list. We email a confirmation, and the list is on only after you click it. That click sets a confirmation time on the same row. It does not replace the terms acceptance. Every marketing email includes an unsubscribe link. Unsubscribing turns the list off and can be done again at any time. It does not delete the terms record. The confirmation page after unsubscribe is <a href="/glance/unsubscribed.html">/glance/unsubscribed.html</a>.</p>
+      <h2>What Glance reads, by place</h2>
+      <p>Judgment runs on your device. <bdi>Gmail</bdi> is where it starts. On an open message it reads the visible text, subject, and sender. It does not upload that text to decide.</p>
+      <p>On your <bdi>Google</bdi> account, and only when you approve a close, it can write a task, a draft, or a calendar change. For calendar it uses the event id, the start time, and the location. A lookup that is only checking whether a time is taken returns ids, times, and addresses, not the notes. Undo puts back the start time and the location it had just changed. A file search in Drive, when one file matches, attaches that file to a draft. The draft is not sent.</p>
+      <p><bdi>Outlook</bdi> stays off until you connect it. It can read recent mail on the device and create a reply draft. The permission it uses cannot send. Undo deletes the draft <bdi>Glance</bdi> created, while it is still a draft.</p>
+      <p><bdi>WhatsApp</bdi> Web stays off until you turn it on. It is read-only, one-to-one, and experimental. Nothing from that chat is sent to us.</p>
+      <p>A reply prepared in the chat box stays in that box. It is not sent. If you later place it into drafts, it is still a draft until you send it yourself. <bdi>Glance</bdi> never sends without your approval.</p>
+      <h2>Receipts and Undo</h2>
+      <p>Each close comes with a receipt that names what was written, and with Undo while the write can still be reversed. A receipt is a record of the action. It is not a claim that a draft was sent.</p>
+      <h2>No sale, and your requests</h2>
+      <p>We do not sell the signup row or the contents of your mail. You can ask for access, correction, export, or deletion by emailing <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>. A delete-my-data endpoint will accept the same request when it is deployed. Uninstalling removes the on-device record.</p>
+      <h2>Israel and the GDPR</h2>
+      <p>If you are in Israel, the Privacy Protection Law, 5741-1981, gives you a right to review information we hold about you and to ask for a correction. If you are in the European Economic Area or the United Kingdom, the GDPR applies in the usual way: we rely on contract for the signup record you ask us to keep, and on consent for the optional list. Consent for the list can be withdrawn without affecting the terms record. You can ask for access, erasure, restriction, and a portable copy, and you can complain to a supervisory authority. Transfers to service providers use those providers’ standard contract terms where the law requires them.</p>
+      <p class="muted">This draft does not change the current site policy until counsel publishes it.</p>
+    </article>
+    <article data-lang-panel="he" hidden>
+      <p class="eyebrow">Glance</p>
+      <h1>מדיניות פרטיות</h1>
+      <p class="muted">טיוטה גרסה 2026-10-15. ממתינה לביקורת משפטית. היא מתארת את שער ההרשמה ואת אותה התנהגות מוצר שכבר מפורסמת במדיניות האתר.</p>
+      <h2>החשבון והאימייל</h2>
+      <p>ההרשמה מבקשת אימייל ותו לא. אין סיסמה. הכתובת הזו היא החשבון של השער. אנחנו משתמשים בה כדי לדעת מי אישר את התנאים, כדי לשלוח את הרשימה האופציונלית רק אחרי אישור שני, וכדי לענות לבקשת מחיקה. אנחנו לא מוכרים מידע אישי.</p>
+      <h2>יומן ההסכמה</h2>
+      <p>הרשמה מוצלחת כותבת שורה אחת דרך פונקציית שרת. השורה שומרת את האימייל, את גרסת התנאים 2026-10-15, את גרסת הפרטיות 2026-10-15, את מועד האישור, אם תיבת הרשימה סומנה, את השפה, גיבוב של כתובת הרשת, את מחרוזת הדפדפן, את המפנה, אסימון הרשמה, ואת מועד יצירת השורה. הדפדפן לא שולח את כתובת הרשת ולא חותמת זמן נפרדת. השרת קובע אותן. אי אפשר לקרוא את השורה עם המפתח הציבורי. הדפדפן שומר רק את אסימון ההרשמה בעוגייה של האתר בשם glance_signup, לשלושים יום, כדי שעמוד הפעלה מאוחר יוכל לראות שהדפדפן הזה נרשם.</p>
+      <h2>רשימת הדיוור נפרדת</h2>
+      <p>תיבת העדכונים מתחילה לא מסומנת. סימון שלה לבדו לא מכניס אתכם לרשימה. אנחנו שולחים אימייל אישור, והרשימה נדלקת רק אחרי הלחיצה. הלחיצה רושמת מועד אישור באותה שורה. היא לא מחליפה את אישור התנאים. לכל אימייל שיווקי יש קישור להסרה. הסרה מכבה את הרשימה ואפשר לעשות אותה שוב בכל עת. היא לא מוחקת את רישום התנאים. עמוד האישור אחרי ההסרה הוא <a href="/glance/unsubscribed.html">/glance/unsubscribed.html</a>.</p>
+      <h2>מה Glance קוראת, לפי מקום</h2>
+      <p>השיפוט רץ על המכשיר. <bdi>Gmail</bdi> הוא המקום שבו זה מתחיל. בהודעה פתוחה היא קוראת את הטקסט הגלוי, את הנושא ואת השולח. היא לא מעלה את הטקסט הזה כדי להחליט.</p>
+      <p>בחשבון <bdi>Google</bdi> שלכם, ורק כשאתם מאשרים סגירה, היא יכולה לכתוב משימה, טיוטה, או שינוי ביומן. ביומן היא משתמשת במזהה האירוע, בשעת ההתחלה ובמיקום. בדיקה שרק בודקת אם שעה תפוסה מחזירה מזהים, זמנים וכתובות, לא את ההערות. ביטול מחזיר את שעת ההתחלה ואת המיקום שהיא הרגע שינתה. חיפוש קובץ ב-Drive, כשיש התאמה אחת, מצרף את הקובץ לטיוטה. הטיוטה לא נשלחת.</p>
+      <p><bdi>Outlook</bdi> כבוי עד שתחברו אותו. הוא יכול לקרוא דואר אחרון על המכשיר וליצור טיוטת תשובה. ההרשאה שלו לא יכולה לשלוח. ביטול מוחק את הטיוטה ש-<bdi>Glance</bdi> יצרה, כל עוד היא עוד טיוטה.</p>
+      <p><bdi>WhatsApp</bdi> Web כבוי עד שתדליקו אותו. הוא לקריאה בלבד, אחד על אחד, וניסיוני. שום דבר מהצ׳אט הזה לא נשלח אלינו.</p>
+      <p>תשובה שהוכנה בתיבת הצ׳אט נשארת בתיבה. היא לא נשלחת. אם אחר כך תשימו אותה בטיוטות, היא עדיין טיוטה עד שתשלחו אותה בעצמכם. <bdi>Glance</bdi> אף פעם לא שולחת בלי האישור שלכם.</p>
+      <h2>קבלות וביטול</h2>
+      <p>כל סגירה באה עם קבלה שמציינת מה נכתב, ועם ביטול כל עוד את הכתיבה עוד אפשר להחזיר. קבלה היא תיעוד של הפעולה. היא אינה טענה שטיוטה נשלחה.</p>
+      <h2>אין מכירה, והבקשות שלכם</h2>
+      <p>אנחנו לא מוכרים את שורת ההרשמה ולא את תוכן הדואר. אפשר לבקש עיון, תיקון, ייצוא או מחיקה בכתובת <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>. נקודת מחיקת-המידע-שלי תקבל את אותה בקשה כשתעלה. הסרת ההתקנה מוחקת את מה שנשמר במכשיר.</p>
+      <h2>ישראל ו-GDPR</h2>
+      <p>אם אתם בישראל, חוק הגנת הפרטיות, התשמ״א-1981, נותן זכות לעיין במידע שאנחנו מחזיקים עליכם ולבקש תיקון. אם אתם באזור הכלכלי האירופי או בבריטניה, GDPR חל כרגיל: אנחנו נשענים על חוזה עבור רישום ההרשמה שביקשתם לשמור, ועל הסכמה עבור הרשימה האופציונלית. את הסכמת הרשימה אפשר למשוך בלי לפגוע ברישום התנאים. אפשר לבקש עיון, מחיקה, הגבלה ועותק ניתן להעברה, ואפשר להגיש תלונה לרשות פיקוח. העברות לספקי שירות נשענות על התנאים החוזיים הסטנדרטיים שלהם כשהדין דורש זאת.</p>
+      <p class="muted">הטיוטה הזו לא משנה את מדיניות האתר הנוכחית עד שיועץ משפטי יפרסם אותה.</p>
+    </article>
+  </div>
+</main>
+<script>
+window.FLOW_PAGE_I18N = {
+  banner: {
+    en: 'DRAFT — pending legal review. Privacy Policy v2026-10-15. This draft is not in force. The live site policy remains <a href="/privacy.html">privacy.html</a>.',
+    he: 'טיוטה — ממתינה לביקורת משפטית. מדיניות פרטיות v2026-10-15. הטיוטה הזו אינה בתוקף. מדיניות האתר החיה נשארת <a href="/privacy.html">privacy.html</a>.'
+  }
+};
+</script>
+<script src="/glance/gate.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
+</body>
+</html>

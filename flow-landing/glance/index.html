@@ -1,0 +1,120 @@
+<!doctype html>
+<!-- DRAFT page. The consent endpoint is not deployed; site-config glanceSignupMock records nothing. -->
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Get Glance. You intend, it closes the loop. A personal layer in your browser that never sends without your approval.">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="canonical" href="https://theflow-ai.com/glance/">
+<title>Get Glance</title>
+<link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
+<link rel="stylesheet" href="/glance/glance.css">
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var lang = q.get('lang') === 'he' || q.get('lang') === 'en' ? q.get('lang') : '';
+  if (!lang) {
+    try { lang = localStorage.getItem('flow_lang') === 'he' ? 'he' : 'en'; } catch (e) { lang = 'en'; }
+  } else {
+    try { localStorage.setItem('flow_lang', lang); } catch (e) {}
+  }
+  var theme = q.get('theme') === 'dark' || q.get('theme') === 'light' ? q.get('theme') : '';
+  if (!theme) {
+    try { theme = localStorage.getItem('glance_theme') === 'dark' ? 'dark' : 'light'; } catch (e) { theme = 'light'; }
+  }
+  var root = document.documentElement;
+  root.lang = lang;
+  root.dir = lang === 'he' ? 'rtl' : 'ltr';
+  root.setAttribute('data-theme', theme);
+})();
+</script>
+<script src="/assets/site-config.js"></script>
+</head>
+<body class="corner-v24">
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
+    <nav class="links" aria-label="Primary">
+      <a href="/glance/" aria-current="page" data-nav="glance">Glance</a>
+      <a href="/#organization" data-nav="flow">Flow</a>
+      <a href="/pricing.html" data-nav="pricing">Pricing</a>
+      <a href="/security.html" data-nav="security">Security</a>
+      <a href="/contact.html" data-nav="contact">Contact</a>
+    </nav>
+    <div class="tools">
+      <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="tool" id="themeBtn" type="button" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="eye">Glance</p>
+    <h1 data-i18n="h1">Get <bdi>Glance</bdi>. You intend, it closes the loop.</h1>
+    <p class="lede" data-i18n="lede"><bdi>Glance</bdi> is a personal layer in your browser. It notices what you meant to do across your apps — <bdi>Gmail</bdi>, <bdi>Outlook</bdi>, calendar, chats, and more — and closes it for you, with a receipt and Undo on every action. It never sends without your approval.</p>
+    <form id="glanceGate" class="gate" novalidate>
+      <label class="step-row" for="gateEmail">
+        <span class="step-k" id="emailLabel" data-i18n="emailLabel">Email</span>
+        <input id="gateEmail" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" required aria-labelledby="emailLabel" aria-describedby="gateError" placeholder="you@example.com">
+      </label>
+      <p class="gate-error" id="gateError" role="alert" hidden>
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 3.6v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="10" r=".7" fill="currentColor"/></svg>
+        <span id="gateErrorText"></span>
+      </p>
+      <label class="step-row check-row">
+        <input id="gateTerms" name="terms" type="checkbox" required>
+        <span class="check-copy" data-i18n="terms">I agree to the <a href="/glance/terms.html">Terms of Service</a> and <a href="/glance/privacy.html">Privacy Policy</a>.</span>
+      </label>
+      <label class="step-row check-row">
+        <input id="gateMarketing" name="marketing" type="checkbox">
+        <span class="check-copy" data-i18n="marketing">Send me product updates and tips (optional)</span>
+      </label>
+      <div class="gate-actions">
+        <!-- .doit placeholder: do-it-inline.png already says Do It, so it is not used here. -->
+        <button class="doit" id="gateSubmit" type="submit" disabled data-i18n="submit">Get Glance</button>
+        <p class="soon" data-i18n="soon"><bdi>iPhone</bdi>: coming soon</p>
+      </div>
+      <p class="gate-success" id="gateSuccess" role="status" hidden data-i18n="success">✓ Closed · You’re in. Opening the Chrome Web Store…</p>
+      <p class="gate-mail" id="gateMail" hidden data-i18n="mail">Check your email to confirm the mailing list.</p>
+    </form>
+  </div>
+</main>
+<script>
+window.FLOW_PAGE_I18N = {
+  eye: { en: 'Glance', he: 'Glance' },
+  h1: {
+    en: 'Get <bdi>Glance</bdi>. You intend, it closes the loop.',
+    he: 'קבלו את <bdi>Glance</bdi>. אתם מתכוונים, זה סוגר את הלולאה.'
+  },
+  lede: {
+    en: '<bdi>Glance</bdi> is a personal layer in your browser. It notices what you meant to do across your apps — <bdi>Gmail</bdi>, <bdi>Outlook</bdi>, calendar, chats, and more — and closes it for you, with a receipt and Undo on every action. It never sends without your approval.',
+    he: '<bdi>Glance</bdi> היא שכבה אישית בדפדפן. היא שמה לב למה שהתכוונתם לעשות באפליקציות שלכם — <bdi>Gmail</bdi>, <bdi>Outlook</bdi>, יומן, צ׳אטים ועוד — וסוגרת את זה בשבילכם, עם קבלה וביטול בכל פעולה. היא אף פעם לא שולחת בלי האישור שלכם.'
+  },
+  emailLabel: { en: 'Email', he: 'אימייל' },
+  terms: {
+    en: 'I agree to the <a href="/glance/terms.html">Terms of Service</a> and <a href="/glance/privacy.html">Privacy Policy</a>.',
+    he: 'אני מסכים/ה ל<a href="/glance/terms.html">תנאי השימוש</a> ול<a href="/glance/privacy.html">מדיניות הפרטיות</a>.'
+  },
+  marketing: {
+    en: 'Send me product updates and tips (optional)',
+    he: 'שלחו לי עדכונים וטיפים על המוצר (לא חובה)'
+  },
+  submit: { en: 'Get Glance', he: 'קבלו את <bdi>Glance</bdi>' },
+  soon: { en: '<bdi>iPhone</bdi>: coming soon', he: '<bdi>iPhone</bdi>: בקרוב' },
+  success: {
+    en: '✓ Closed · You’re in. Opening the <bdi>Chrome</bdi> Web Store…',
+    he: '✓ נסגר · אתם בפנים. פותחים את חנות <bdi>Chrome</bdi>…'
+  },
+  mail: {
+    en: 'Check your email to confirm the mailing list.',
+    he: 'בדקו את האימייל כדי לאשר את רשימת העדכונים.'
+  }
+};
+</script>
+<script src="/glance/gate.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
+</body>
+</html>
