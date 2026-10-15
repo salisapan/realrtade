@@ -267,8 +267,8 @@ advFiles.forEach((name) => {
 // id-nested.html drafts because the URL is /danalevi_88/, an independent
 // username. The h2 text inside that link is not a signal. It did not rely
 // on the title matching itself.
-const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html'];
-const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-thread-mismatch.html'];
+const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html', 'id-block-name.html'];
+const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-thread-mismatch.html', 'id-bare-block.html', 'id-bare-mute.html', 'id-block-other.html', 'id-nested-group.html', 'id-group-viewprofile.html'];
 function numericPage(name) {
   return name === 'id-duplicate.html' || name === 'id-weiss.html';
 }
@@ -281,9 +281,10 @@ identityDraft.forEach((name) => {
 });
 identityQuiet.forEach((name) => {
   const root = liveRoot('identity/' + name);
-  const ms = FlowMessengerParse.classify(root);
-  const ig = FlowInstagramParse.classify(root);
-  check(name + ' stays quiet', ms.kind !== 'one-to-one' && ig.kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(root) === false && FlowInstagramParse.isOneToOne(root) === false, { messenger: ms, instagram: ig });
+  const href = (name === 'id-nested-group.html' || name === 'id-group-viewprofile.html') ? msHref : '';
+  const ms = FlowMessengerParse.classify(root, href);
+  const ig = FlowInstagramParse.classify(root, href);
+  check(name + ' stays quiet', ms.kind !== 'one-to-one' && ig.kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(root, href) === false && FlowInstagramParse.isOneToOne(root, href) === false, { messenger: ms, instagram: ig });
 });
 const team7 = liveRoot('identity/id-team7.html');
 const emoji = liveRoot('identity/id-emoji.html');
@@ -305,7 +306,9 @@ check('that same header drafts when the thread id matches', FlowMessengerParse.i
 const familyMatch = namedHeader('Family', '<a href="/100012345678/" role="link">Family</a>', msInfo);
 check('a group marker vetoes a matching thread id', FlowMessengerParse.classify(familyMatch, msHref).kind === 'group' && FlowMessengerParse.isOneToOne(familyMatch, msHref) === false);
 const muteOnly = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><button type="button">Mute</button>', msInfo);
-check('a mute action with no members list drafts', FlowMessengerParse.isOneToOne(muteOnly) === true && FlowInstagramParse.isOneToOne(muteOnly) === true);
+check('a bare mute action is not a one-to-one signal', FlowMessengerParse.isOneToOne(muteOnly) === false && FlowInstagramParse.isOneToOne(muteOnly) === false);
+const heBlock = namedHeader('דנה', '<a href="/100012345678/" role="link">דנה</a><button type="button">חסום דנה</button>', msInfo);
+check('Hebrew block plus the title drafts', FlowMessengerParse.isOneToOne(heBlock) === true && FlowInstagramParse.isOneToOne(heBlock) === true);
 const membersPanel = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><a href="/100012345678/">View profile</a><span>5 members</span>', msInfo);
 check('a members list vetoes the info panel', FlowMessengerParse.classify(membersPanel).kind === 'group' && FlowMessengerParse.isOneToOne(membersPanel) === false);
 const standaloneVav = chatEl('<div role="main"><header><h2>דנה ו נועה</h2><a href="/100012345678/" role="link">דנה ו נועה</a><a aria-label="Conversation information">Conversation information</a></header></div>');
@@ -495,7 +498,7 @@ console.log('\n--- calendar evidence ---\n');
     pages.push(['adv/' + name, href, 'src/content-messenger.js', name === 'd-link.html']);
   });
   function identityUrl(name) {
-    if (name === 'id-duplicate.html' || name === 'id-weiss.html') return 'https://www.messenger.com/t/100012345678';
+    if (name === 'id-duplicate.html' || name === 'id-weiss.html' || name === 'id-nested-group.html' || name === 'id-group-viewprofile.html') return 'https://www.messenger.com/t/100012345678';
     if (name === 'id-thread-mismatch.html') return 'https://www.messenger.com/t/555111222333';
     if (name === 'id-panel.html') return 'https://www.messenger.com/e2ee/t/424242';
     return 'https://www.messenger.com/t/' + name.replace(/\.html$/, '');

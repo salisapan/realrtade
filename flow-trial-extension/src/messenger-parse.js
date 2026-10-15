@@ -196,9 +196,9 @@ const FlowMessengerParse = (() => {
     'family', 'group', 'chat', 'friends', 'squad'
   ]);
 
-  // A comma, an "and" / "&", "and N others", a digit, an emoji, or a group word
-  // in the raw title. משפחה and family are group words. Book club is not, until
-  // its username is a plain word.
+  // A comma, an "and" / "&", "and N others", a digit, an emoji, a group word,
+  // or a group-looking title (Book club, Team, Weekend crew). A thread id
+  // never overrides this.
   function groupTitle(title) {
     const t = String(title || '').replace(/\s+/g, ' ').trim();
     if (!t) return false;
@@ -212,7 +212,13 @@ const FlowMessengerParse = (() => {
     if (/\S\s+ו\s+\S/.test(t)) return true;
     if (attachedVav(t) === 'group') return true;
     if (GROUP_WORD.test(t)) return true;
+    if (groupLooking(t)) return true;
     return false;
+  }
+
+  function groupLooking(title) {
+    const words = String(title || '').trim().split(/\s+/).map((word) => word.toLowerCase().replace(/[^\p{L}]/gu, '')).filter(Boolean);
+    return words.length > 0 && words.every((word) => PLAIN_USER.has(word));
   }
 
   // 'group' when ו is followed by a first name. 'unclear' when the whole word
@@ -495,7 +501,8 @@ const FlowMessengerParse = (() => {
     return m ? m[1] : '';
   }
 
-  function threadMatches(scope, href) {
+  function threadMatches(scope, href, via) {
+    if (groupTitle(regionTitle(scope, via))) return false;
     const thread = threadIdFromPage(href);
     if (!thread) return false;
     const found = profileGroups(scope);
@@ -521,19 +528,29 @@ const FlowMessengerParse = (() => {
     return /\bmembers\b|\bparticipants\b|\badd people\b|משתתפים/i.test(text);
   }
 
-  function personControl(el) {
+  // "Block Dana" / "Mute Dana" / "חסום דנה" / "השתק את דנה" only, and the
+  // name has to be the title. A bare Block or Mute is not a signal.
+  function namedAction(label, rawTitle) {
+    const text = String(label || '').replace(/\s+/g, ' ').trim();
+    const english = text.match(/^(?:block|mute)\s+(.+)$/i);
+    const hebrew = text.match(/^(?:חסום|השתק)(?:\s+את)?\s+(.+)$/);
+    const named = (english && english[1]) || (hebrew && hebrew[1]) || '';
+    if (!named) return false;
+    return sameIdentity(identityTokens(named), identityTokens(rawTitle));
+  }
+
+  function personControl(el, rawTitle) {
     if (!el || inRow(el) || !el.getAttribute) return false;
     const tag = String(el.tagName || '').toUpperCase();
     const role = el.getAttribute('role') || '';
     if (tag !== 'A' && tag !== 'BUTTON' && role !== 'button' && role !== 'link') return false;
     const label = ((el.getAttribute('aria-label') || '') + ' ' + plainText(el)).replace(/\s+/g, ' ').trim();
     if (/\bview profile\b/i.test(label)) return true;
-    if (/^(block|mute)(\s+.+)?$/i.test(label) && !/\b(notification|conversation|chat|group|members)\b/i.test(label)) return true;
-    return false;
+    return namedAction(label, rawTitle);
   }
 
   // Backup when the URL id is absent. One person, and no members list.
-  function singlePersonPanel(root) {
+  function singlePersonPanel(root, rawTitle) {
     if (!root || typeof root.querySelectorAll !== 'function') return false;
     if (membersListed(root)) return false;
     const ids = new Set();
@@ -542,7 +559,18 @@ const FlowMessengerParse = (() => {
       if (key) ids.add(key);
     });
     if (ids.size > 1) return false;
-    return Array.from(root.querySelectorAll('a, button, [role="button"], [role="link"]')).some(personControl);
+    return Array.from(root.querySelectorAll('a, button, [role="button"], [role="link"]')).some((el) => personControl(el, rawTitle));
+  }
+
+  function firstHeading(node) {
+    if (!node || typeof node.querySelectorAll !== 'function') return '';
+    const list = Array.from(node.querySelectorAll('h1, h2, h3'));
+    for (let i = 0; i < list.length; i++) {
+      if (inRow(list[i])) continue;
+      const text = plainText(list[i]);
+      if (text && !SKIP_HEADING.test(text)) return text;
+    }
+    return '';
   }
 
   function decide(scope, via, href, root) {
@@ -550,9 +578,9 @@ const FlowMessengerParse = (() => {
     const active = headerActive(scope);
     const raw = regionTitle(scope, via);
     const whole = root || scope;
-    if (isGroup(scope, via) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
-    const proved = matchingProfile(scope, via) || threadMatches(scope, href) || singlePersonPanel(whole);
-    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href) && !singlePersonPanel(whole)) {
+    if (isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
+    const proved = matchingProfile(scope, via) || threadMatches(scope, href, via) || singlePersonPanel(whole, raw);
+    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href, via) && !singlePersonPanel(whole, raw)) {
       return { kind: 'unknown', via: via, name: name, active: active };
     }
     if (active && !proved) return { kind: 'unknown', via: via, name: name, active: true };

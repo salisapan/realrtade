@@ -147,7 +147,13 @@ const FlowInstagramParse = (() => {
     if (/\S\s+ו\s+\S/.test(t)) return true;
     if (attachedVav(t) === 'group') return true;
     if (GROUP_WORD.test(t)) return true;
+    if (groupLooking(t)) return true;
     return false;
+  }
+
+  function groupLooking(title) {
+    const words = String(title || '').trim().split(/\s+/).map((word) => word.toLowerCase().replace(/[^\p{L}]/gu, '')).filter(Boolean);
+    return words.length > 0 && words.every((word) => PLAIN_USER.has(word));
   }
 
   // 'group' when ו is followed by a first name. 'unclear' when the whole word
@@ -430,6 +436,7 @@ const FlowInstagramParse = (() => {
   }
 
   function threadMatches(scope, href) {
+    if (groupTitle(regionTitle(scope))) return false;
     const thread = threadIdFromPage(href);
     if (!thread) return false;
     const found = profileGroups(scope);
@@ -455,18 +462,26 @@ const FlowInstagramParse = (() => {
     return /\bmembers\b|\bparticipants\b|\badd people\b|משתתפים/i.test(text);
   }
 
-  function personControl(el) {
+  function namedAction(label, rawTitle) {
+    const text = String(label || '').replace(/\s+/g, ' ').trim();
+    const english = text.match(/^(?:block|mute)\s+(.+)$/i);
+    const hebrew = text.match(/^(?:חסום|השתק)(?:\s+את)?\s+(.+)$/);
+    const named = (english && english[1]) || (hebrew && hebrew[1]) || '';
+    if (!named) return false;
+    return sameIdentity(identityTokens(named), identityTokens(rawTitle));
+  }
+
+  function personControl(el, rawTitle) {
     if (!el || inRow(el) || !el.getAttribute) return false;
     const tag = String(el.tagName || '').toUpperCase();
     const role = el.getAttribute('role') || '';
     if (tag !== 'A' && tag !== 'BUTTON' && role !== 'button' && role !== 'link') return false;
     const label = ((el.getAttribute('aria-label') || '') + ' ' + plainText(el)).replace(/\s+/g, ' ').trim();
     if (/\bview profile\b/i.test(label)) return true;
-    if (/^(block|mute)(\s+.+)?$/i.test(label) && !/\b(notification|conversation|chat|group|members)\b/i.test(label)) return true;
-    return false;
+    return namedAction(label, rawTitle);
   }
 
-  function singlePersonPanel(root) {
+  function singlePersonPanel(root, rawTitle) {
     if (!root || typeof root.querySelectorAll !== 'function') return false;
     if (membersListed(root)) return false;
     const ids = new Set();
@@ -475,16 +490,27 @@ const FlowInstagramParse = (() => {
       if (key) ids.add(key);
     });
     if (ids.size > 1) return false;
-    return Array.from(root.querySelectorAll('a, button, [role="button"], [role="link"]')).some(personControl);
+    return Array.from(root.querySelectorAll('a, button, [role="button"], [role="link"]')).some((el) => personControl(el, rawTitle));
+  }
+
+  function firstHeading(node) {
+    if (!node || typeof node.querySelectorAll !== 'function') return '';
+    const list = Array.from(node.querySelectorAll('h1, h2, h3'));
+    for (let i = 0; i < list.length; i++) {
+      if (inRow(list[i])) continue;
+      const text = String(list[i].textContent || '').replace(/\s+/g, ' ').trim();
+      if (text && !SKIP_HEADING.test(text)) return text;
+    }
+    return '';
   }
 
   function decide(scope, via, href, root) {
     const active = headerActive(scope);
     const raw = regionTitle(scope);
     const whole = root || scope;
-    if (isGroup(scope) || membersListed(whole)) return { kind: 'group', via: via, active: active };
-    const proved = matchingProfile(scope) || threadMatches(scope, href) || singlePersonPanel(whole);
-    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href) && !singlePersonPanel(whole)) {
+    if (isGroup(scope) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, active: active };
+    const proved = matchingProfile(scope) || threadMatches(scope, href) || singlePersonPanel(whole, raw);
+    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href) && !singlePersonPanel(whole, raw)) {
       return { kind: 'unknown', via: via, active: active };
     }
     if (active && !proved) return { kind: 'unknown', via: via, active: true };
