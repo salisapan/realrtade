@@ -74,6 +74,15 @@ const FlowStepKit = (() => {
       '</span>';
   }
 
+  function shownTag(tag, words) {
+    const L = words || {};
+    if (tag === 'Suggested') return L.suggested || tag;
+    if (tag === 'Added') return L.added || tag;
+    if (tag === 'Manual' || tag === 'Manual · for you') return L.manual || tag;
+    if (tag === 'after Approve') return L.afterApprove || tag;
+    return tag;
+  }
+
   function rowHTML(a, L) {
     const words = L || {};
     if (a.kind === 'close') {
@@ -82,14 +91,14 @@ const FlowStepKit = (() => {
         '<span class="act-glyph" data-glyph="glance">' + glyph('glance') + '</span>' +
         '<span class="act-body"><span class="act-text">' + a.text + '</span>' +
         (a.done ? '<span class="act-res"><span class="act-res-txt">' + a.done + '</span></span>' : '') +
-        '</span><span class="act-tag">' + esc(a.tag || words.afterApprove || 'after Approve') + '</span></span></li>';
+        '</span><span class="act-tag">' + esc(shownTag(a.tag, words) || words.afterApprove || 'after Approve') + '</span></span></li>';
     }
     if (a.kind === 'manual') {
       return '<li class="act act-manual" data-step-id="' + esc(a.id || '') + '">' +
         '<span class="act-row"><span class="act-box act-none" aria-hidden="true"></span>' +
         '<span class="act-glyph" data-glyph="manual">' + glyph('manual') + '</span>' +
         '<span class="act-body"><span class="act-text">' + esc(a.text) + '</span></span>' +
-        '<span class="act-tag">' + esc(a.tag || words.manual || 'Manual · for you') + '</span></span></li>';
+        '<span class="act-tag">' + esc(shownTag(a.tag, words) || words.manual || 'Manual · for you') + '</span></span></li>';
     }
     const cls = 'act' + (a.kind === 'suggested' || a.suggested ? ' act-suggested' : '') + (a.added ? ' act-added' : '') + (a.kind === 'multi' ? ' act-multi' : '') + (a.st ? ' ' + a.st : '') + (a.expanded ? ' is-expanded' : '');
     const multi = a.kind === 'multi';
@@ -115,7 +124,7 @@ const FlowStepKit = (() => {
         (res ? '<span class="act-res">' + appB(a.app) + ' · <span class="act-res-txt">' + res + '</span></span>' : '') +
       '</span>' +
       (multi ? '</label>' : '') +
-      (a.tag ? '<span class="act-tag ss-tag">' + esc(a.tag) + '</span>' : '') +
+      (a.tag ? '<span class="act-tag ss-tag">' + esc(shownTag(a.tag, words)) + '</span>' : '') +
       (multi ? pillsHTML(a, words) : '') +
       (multi ? '</div>' : '</label>') + '</li>';
   }

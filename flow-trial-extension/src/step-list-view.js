@@ -86,6 +86,14 @@ const FlowStepListView = (() => {
     return live.length === 1 && live[0].kind === 'attachmentSave' && filesOf(live[0]).length <= 1;
   }
 
+  function displayTag(tag, L) {
+    if (tag === 'Suggested') return (L && L.suggested) || tag;
+    if (tag === 'Added') return (L && L.added) || tag;
+    if (tag === 'Manual' || tag === 'Manual · for you') return (L && L.manual) || tag;
+    if (tag === 'after Approve') return (L && L.afterApprove) || tag;
+    return tag || '';
+  }
+
   function paintModel(row, surface, labels) {
     const L = labels || { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };
     const tool = toolOf(row, surface);
@@ -106,7 +114,7 @@ const FlowStepListView = (() => {
       suggested: row.suggested === true,
       added: row.added === true,
       checked: row.checked !== false,
-      tag: row.suggested ? (L.suggested || 'Suggested') : (row.added ? (L.added || 'Added') : (row.tag || '')),
+      tag: row.suggested ? (L.suggested || 'Suggested') : (row.added ? (L.added || 'Added') : displayTag(row.tag, L)),
       st: stateClass(row.state),
       kind: row.suggested ? 'suggested' : ''
     };

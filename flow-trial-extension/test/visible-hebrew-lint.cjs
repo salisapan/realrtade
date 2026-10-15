@@ -86,6 +86,17 @@ const card = sandbox.FlowStepKit.stageHTML({
 });
 const cardText = String(card).replace(/Confirm the transfer/g, ' ').replace(/<[^>]+>/g, ' ');
 check('a Hebrew card paints no English chrome', offenders(cardText).length === 0, offenders(cardText));
+const tagged = sandbox.FlowStepKit.stageHTML({
+  uiLang: 'he',
+  he: true,
+  intent: 'Reply and Track',
+  state: 'propose',
+  rows: [
+    { id: '1', text: 'Draft reply', tag: 'Suggested', app: 'Outlook', tool: 'outlook', checked: true, out: 'בתור' }
+  ]
+});
+const taggedText = String(tagged).replace(/Reply and Track/g, ' ').replace(/Draft reply/g, ' ').replace(/<[^>]+>/g, ' ');
+check('a step tagged Suggested follows the UI language', /מוצע/.test(tagged) && offenders(taggedText).length === 0, offenders(taggedText));
 check('the popup asks the shared table for Loops chrome', popupJs.indexOf('function words()') >= 0 && popupJs.indexOf('Lw.suggested') >= 0 && popupJs.indexOf('L.dismiss') >= 0 && popupJs.indexOf('L.doIt') >= 0);
 check('the mail page sets card chrome from the UI language', page.indexOf('ctx.uiLang = pageUiLang()') >= 0 && page.indexOf('pageChrome().undo') >= 0 && page.indexOf('pageChrome().handled') >= 0);
 

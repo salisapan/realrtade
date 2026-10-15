@@ -141,7 +141,7 @@ test('Hebrew UI chrome on an English mail keeps the English title', async ({ gla
   await popup.locator('button[data-tab="open"]').click();
   const list = popup.locator('#open-list');
   await expect(list.locator('[data-glance-section="suggested"]')).toHaveText('מוצע');
-  await expect(list.getByRole('button', { name: 'הסתר' })).toBeVisible();
+  await expect(list.getByRole('button', { name: 'הסתר' }).first()).toBeVisible();
   await expect(list.locator('.log-label, .gs-intent, .flow-chip-process-name').first()).toContainText(/[A-Za-z]/);
   const loops = await list.innerText();
   expect(loops).not.toMatch(/\bSuggested\b/);
