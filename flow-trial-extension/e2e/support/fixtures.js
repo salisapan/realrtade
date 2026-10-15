@@ -42,6 +42,11 @@ function outlookHtml(opts) {
   const ccList = Array.isArray(o.cc) ? o.cc : [];
   const files = Array.isArray(o.attachments) ? o.attachments : [];
   const received = o.received && !o.live ? '<div class="received" data-received="' + esc(o.received) + '"></div>' : '';
+  // A conversation id in the address counts only when the open mail's header
+  // shows that same id. The fixture header carries it, the way a confirmed
+  // reading pane does.
+  const convId = o.id && /^A[AQ]Qk/i.test(String(o.id)) ? String(o.id) : '';
+  const convAttr = convId ? (' data-convid="' + esc(convId) + '"') : '';
   const clock = o.live && o.receivedLabel
     ? ('<div class="date">' + esc(o.receivedLabel) + '</div>')
     : '';
@@ -77,7 +82,7 @@ function outlookHtml(opts) {
     unread +
     '<div id="ReadingPaneContainerId">' +
     '<div role="heading" aria-level="2"><span title="' + esc(subject) + '">' + esc(subject) + '</span></div>' +
-    '<div class="hdr"><span title="' + esc(title) + '">' + esc(senderName) + '</span>' +
+    '<div class="hdr"' + convAttr + '><span title="' + esc(title) + '">' + esc(senderName) + '</span>' +
     received +
     clock +
     toLine +

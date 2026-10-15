@@ -383,12 +383,21 @@
   }
 
   // The scan already committed this open mail for this epoch. The suggest
-  // note runs after that and must not replace the reason the card or the
-  // quiet line is showing.
+  // note runs after that and must not replace a card, or a quiet reason
+  // that already names why. A generic "no request" is only the text scan.
+  // The file check replaces that one line with no-candidate or unresolved.
   function pageAlreadyDecided(pane) {
     const id = decisionIdFrom(pane) || openDecisionId;
     const existing = decisionFor(id);
     return Boolean(existing && existing.epoch === renderEpoch);
+  }
+
+  function genericTextQuiet(pane) {
+    const id = decisionIdFrom(pane) || openDecisionId;
+    const existing = decisionFor(id);
+    if (!existing || existing.epoch !== renderEpoch || existing.verdict === 'show') return false;
+    const reason = String(existing.reason || '');
+    return reason === 'page:intent-null' || reason === 'intent-null';
   }
 
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
@@ -4802,7 +4811,9 @@
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
       await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
-      if (!pageAlreadyDecided(pane)) await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
+      if (!pageAlreadyDecided(pane) || genericTextQuiet(pane)) {
+        await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
+      }
       return;
     }
     let bag = {};

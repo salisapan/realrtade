@@ -87,20 +87,20 @@ test('Why-not-shown drops the message once its card is showing', async ({ glance
     body: S.SHOW
   });
   await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+  await expect(page.locator('#ReadingPaneContainerId .flow-why-not')).toHaveCount(0);
   await expect.poll(async () => {
     const bag = await glance.storage();
     const diags = bag.outlookPageDiag || [];
+    const quiet = diags.filter((d) => d && d.verdict !== 'show');
     return {
-      show: diags.some((d) => d && (d.messageId === S.MSG_A || d.subject === 'Show me')),
-      stay: diags.some((d) => d && (d.messageId === S.MSG_B || d.subject === 'Stay quiet'))
+      show: quiet.filter((d) => d.messageId === S.MSG_A || d.subject === 'Show me').length,
+      stay: quiet.filter((d) => d.messageId === S.MSG_B || d.subject === 'Stay quiet').length,
+      current: bag.glanceWhyCurrent || null
     };
-  }).toEqual({ show: false, stay: true });
+  }).toEqual({ show: 0, stay: 1, current: null });
 
   const popup = await glance.openPopup();
   const list = popup.locator('#surface-list');
-  const why = list.getByText(/Why not shown/);
-  await expect(why).toBeVisible();
-  await why.click();
-  await expect(list.getByText('Stay quiet')).toBeVisible();
   await expect(list.getByText('Show me')).toHaveCount(0);
+  await expect(list.locator('[data-glance-why-line]')).toHaveCount(0);
 });

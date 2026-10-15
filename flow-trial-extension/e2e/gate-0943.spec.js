@@ -121,6 +121,6 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
     attachments: pdf(800)
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
-  await expect(skipPane.getByText('Save the file?')).toBeVisible();
   await expect(skipPane.locator('.flow-chip-process-name')).toHaveText('Save the file?');
+  await expect(skipPane.locator('.chip-txt')).toHaveText('Save the file?');
 });
