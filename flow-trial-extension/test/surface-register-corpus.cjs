@@ -33,13 +33,28 @@ function load(opts) {
             const tab = (o.tabs || []).find((t) => t.id === d.target.tabId);
             const src = String(d.func);
             if (/rescan/.test(src)) { log.push('rescan ' + d.target.tabId); return [{ result: null }]; }
-            return [{ result: { globals: Boolean(tab && tab.globals), alive: Boolean(tab && tab.alive), stamp: (tab && tab.stamp) || '' } }];
+            return [{ result: { globals: Boolean(tab && tab.globals), alive: Boolean(tab && tab.alive), stamp: (tab && tab.stamp) || '', refreshShown: Boolean(tab && tab.refreshShown) } }];
           }
           log.push('inject ' + d.target.tabId + ' ' + d.files.length + ' files'); return [{}];
         },
         insertCSS: async (d) => { log.push('css ' + d.target.tabId); }
       },
-      tabs: { query: async (q) => (o.tabs || []).filter((t) => (q.url || []).some((p) => t.url.indexOf(p.replace('/*', '')) === 0)), sendMessage: () => {}, reload: async (id) => { log.push('reload ' + id); } },
+      tabs: {
+        query: async (q) => (o.tabs || []).filter((t) => (q.url || []).some((p) => t.url.indexOf(p.replace('/*', '')) === 0)),
+        sendMessage: async (tabId, msg) => {
+          const tab = (o.tabs || []).find((t) => t.id === tabId);
+          if (msg && msg.type === 'flow:outlook-ping') {
+            if (tab && tab.alive) return { ok: true, alive: true };
+            throw new Error('Receiving end does not exist');
+          }
+          if (msg && msg.type === 'flow:outlook-rescan') {
+            log.push('rescan ' + tabId);
+            return { ok: true };
+          }
+          return undefined;
+        },
+        reload: async (id) => { log.push('reload ' + id); }
+      },
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       alarms: { create: () => {}, onAlarm: { addListener() {} } },
       contextMenus: { create: () => {}, removeAll: (cb) => cb && cb(), onClicked: { addListener() {} } }
@@ -84,7 +99,9 @@ function load(opts) {
     await env.settle();
     check('an open Outlook tab with no Glance gets the CSS and every script', env.log.indexOf('css 1') >= 0 && env.log.some((l) => /^inject 1 \d+ files/.test(l)), env.log);
     check('a tab with a live copy is asked to look again, not injected twice', env.log.indexOf('rescan 2') >= 0 && !env.log.some((l) => /^inject 2/.test(l)), env.log);
-    check('a tab with an old copy cut off by an update is reloaded', !env.log.some((l) => /^inject 3/.test(l)) && env.log.some((l) => /old copy; reload/.test(l)) && env.log.indexOf('reload 3') >= 0, env.log);
+    check('a tab with an old copy cut off by an update is not reloaded',
+      !env.log.some((l) => /^inject 3/.test(l)) && env.log.indexOf('reload 3') < 0 &&
+      env.log.some((l) => /needs a manual refresh/.test(l) && / 3 /.test(l)), env.log);
     check('other sites are never touched', !env.log.some((l) => / 4( |$)/.test(l)), env.log);
   }
 
@@ -97,8 +114,8 @@ function load(opts) {
       { id: 8, url: 'https://outlook.office.com/mail/', globals: true, alive: true, stamp: '0.9.40' }
     ] });
     await env.settle();
-    check('an open Outlook page on the previous stamp is reloaded, not rescanned',
-      env.log.indexOf('reload 8') >= 0 && env.log.indexOf('rescan 8') < 0, env.log);
+    check('an open Outlook page on the previous stamp is not reloaded',
+      env.log.indexOf('reload 8') < 0 && env.log.indexOf('rescan 8') >= 0, env.log);
     check('a page already on this stamp is asked to look again',
       env.log.indexOf('rescan 2') >= 0 && env.log.indexOf('reload 2') < 0, env.log);
     const bg = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'background.js'), 'utf8');

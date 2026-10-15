@@ -225,6 +225,9 @@ const FlowStorage = (() => {
     // The Hold calendar choice (once / always). Settings reads it through get().
     // Null is no policy. A missing key would never arrive, so Always could not be revoked.
     glanceCalendarConsent: null,
+    // Tabs whose Outlook script died and could not paint the refresh line.
+    // The popup reads this through get(). A missing key would never arrive.
+    glanceOutlookRefresh: {},
     // A suggested save is recorded here and not drawn. suggestDismissals is
     // the store API for Not now and Undo. No button writes it in 0.9.38.
     suggestLog: [],

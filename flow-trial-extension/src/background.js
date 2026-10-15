@@ -256,17 +256,54 @@ async function registerSurfaceNow(id) {
 }
 
 // What to do with an Outlook tab after the service worker returns.
-// A live script is asked to look again. A dead script cannot be declared
-// twice in the same page, so that tab is reloaded. An empty page is injected.
-// A window that is not a normal browser window is left alone.
+// A live script is asked to look again. An empty page is injected.
+// A dead script is left in place: reloading the tab would wipe a message
+// the person is still writing. The page paints the refresh line itself.
+// If that line is missing, the icon badge is the fallback. A window that
+// is not a normal browser window is left alone.
 function recoverOutlookTab(probe) {
   const windowType = probe && probe.windowType;
   // "missing" is a failed window lookup, not a popup. Only a known
   // non-browser window is left alone.
   if (windowType && windowType !== 'normal' && windowType !== 'missing') return 'skip';
+  // A fresh injection has its own chrome.runtime.id. That is not the page
+  // script. Only a ping the existing script answers means it is still live.
   if (probe && probe.pingOk) return 'rescan';
-  if (probe && probe.hasPage) return 'reload';
+  if (probe && probe.hasPage && probe.refreshShown) return 'leave';
+  if (probe && probe.hasPage) return 'ask';
   return 'inject';
+}
+
+async function noteOutlookNeedsRefresh(tabId) {
+  try {
+    const cur = await chrome.storage.local.get({ glanceOutlookRefresh: {} });
+    const map = Object.assign({}, (cur && cur.glanceOutlookRefresh) || {});
+    map[String(tabId)] = true;
+    await chrome.storage.local.set({ glanceOutlookRefresh: map });
+  } catch (e) { /* the icon badge still marks the tab */ }
+  try {
+    if (chrome.action && typeof chrome.action.setBadgeText === 'function') {
+      chrome.action.setBadgeText({ text: '!', tabId: tabId });
+      if (typeof chrome.action.setBadgeBackgroundColor === 'function') {
+        chrome.action.setBadgeBackgroundColor({ color: '#123ccb', tabId: tabId });
+      }
+    }
+  } catch (e) { /* the popup still reads the stored flag */ }
+  console.warn('Glance: outlook tab ' + tabId + ' needs a manual refresh');
+}
+
+async function clearOutlookNeedsRefresh(tabId) {
+  try {
+    const cur = await chrome.storage.local.get({ glanceOutlookRefresh: {} });
+    const map = Object.assign({}, (cur && cur.glanceOutlookRefresh) || {});
+    delete map[String(tabId)];
+    await chrome.storage.local.set({ glanceOutlookRefresh: map });
+  } catch (e) { /* the flag expires when the page is fresh */ }
+  try {
+    if (chrome.action && typeof chrome.action.setBadgeText === 'function') {
+      chrome.action.setBadgeText({ text: '', tabId: tabId });
+    }
+  } catch (e) { /* the number badge can return */ }
 }
 
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
@@ -294,11 +331,62 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp) {
       if (windowType && windowType !== 'normal' && windowType !== 'missing') continue;
       if (pingOk) {
         try { await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }); } catch (e) { /* the ping just answered */ }
+        await clearOutlookNeedsRefresh(tab.id);
         continue;
       }
-      // The ping did not answer. A live script answers it. What remains is
-      // the stamp probe: an older package is reloaded, a dead copy is
-      // reloaded, a live copy is asked to look again, an empty page is injected.
+      let seen = { globals: false, refreshShown: false };
+      try {
+        const probe = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            // DOM only. This function runs in a new isolated world, so
+            // chrome.runtime.id here is the new extension, not the page script.
+            let line = null;
+            let marked = false;
+            try {
+              line = document.querySelector('[data-glance-refresh]');
+              const root = document.documentElement;
+              marked = Boolean(root && root.getAttribute('data-glance-outlook')) ||
+                Boolean(document.querySelector('.flow-chip-host, .flow-why-not'));
+            } catch (e) { line = null; marked = false; }
+            return { globals: marked || Boolean(line), refreshShown: Boolean(line) };
+          }
+        });
+        seen = (probe && probe[0] && probe[0].result) || seen;
+      } catch (e) { seen = { globals: false, refreshShown: false }; }
+      const action = recoverOutlookTab({
+        windowType: windowType,
+        pingOk: false,
+        hasPage: Boolean(seen.globals),
+        refreshShown: Boolean(seen.refreshShown)
+      });
+      if (action === 'rescan') {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } }
+          });
+        } catch (e) { /* the next open looks again */ }
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      if (action === 'leave') {
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      if (action === 'ask') {
+        await noteOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      try {
+        if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+        n++;
+      } catch (e) {
+        // A second inject cannot redeclare the dead script. Leave the tab.
+        await noteOutlookNeedsRefresh(tab.id);
+      }
+      continue;
     }
     try {
       const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
@@ -330,14 +418,7 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp) {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
       n++;
     } catch (e) {
-      // A dead Outlook script still owns its declarations. A second inject
-      // throws, so the tab is reloaded instead of staying blank.
-      if (id === 'outlook' && chrome.tabs && chrome.tabs.reload) {
-        console.warn('Glance: an open outlook tab runs an old copy; reload that tab once');
-        try { await chrome.tabs.reload(tab.id); } catch (e2) { /* the next navigation picks it up */ }
-      } else {
-        console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e);
-      }
+      console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e);
     }
   }
   if (n) console.info('Glance: ' + id + ' injected into ' + n + ' open tab(s)');
@@ -4696,6 +4777,15 @@ function reply(sendResponse, promise) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  // The person pressed רענן. Recovery never reloads a tab on its own.
+  if (msg.type === 'flow:outlook-refresh-tab') {
+    const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
+    if (typeof tabId === 'number' && chrome.tabs && typeof chrome.tabs.reload === 'function') {
+      try { chrome.tabs.reload(tabId); } catch (e) { /* the browser tab can be refreshed by hand */ }
+    }
+    try { sendResponse({ ok: true }); } catch (e) { /* the popup closed */ }
+    return true;
+  }
 
   const hybridAnswer = hybrid.handle(msg, sender);
   if (hybridAnswer) return reply(sendResponse, hybridAnswer);

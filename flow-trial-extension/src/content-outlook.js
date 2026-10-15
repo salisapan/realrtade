@@ -37,6 +37,9 @@
     console.error('Glance: outlook page cannot start, missing ' + missing.join(', ') + ' (a file before content-outlook.js failed to load)');
     return;
   }
+  // Survives a dead context. The service worker reads it from the DOM; it
+  // cannot see this world's variables after the extension reloads.
+  try { document.documentElement.setAttribute('data-glance-outlook', '1'); } catch (e) { /* the page is still readable */ }
   if (globalThis.__glanceOutlookPage) { try { globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* old copy */ } return; }
   // DevTools in this isolated world does not see the lexical FlowOwaParse
   // binding. Read-only snapshot for a live check. It does not write storage.
@@ -122,12 +125,8 @@
   function stopQuietly() {
     if (stopped) return;
     stopped = true;
-    try {
-      const slot = mountPoint();
-      if (slot && !document.querySelector('.flow-chip-host')) {
-        paintIfCurrent(captureMailToken(), function () { return paintWhyNot(slot, 'context-dead'); });
-      }
-    } catch (e) { /* the quiet line is not worth another throw */ }
+    // The context is already gone. This paint uses the DOM only.
+    try { paintRefreshAsk(); } catch (e) { /* the quiet line is not worth another throw */ }
     try { if (outlookObserver) outlookObserver.disconnect(); } catch (e) { /* already gone */ }
     outlookObserver = null;
     try { if (paneObs) paneObs.disconnect(); } catch (e) { /* already gone */ }
@@ -1289,10 +1288,47 @@
   let paintDepth = 0;
   function whyNotText(reason) {
     const r = String(reason || '');
-    if (r === 'context-dead') return 'Glance will look at this mail again when this tab is back.';
+    if (r === 'context-dead') return 'Glance התעדכן — רענן את הדף כדי להתחבר מחדש';
     if (r === 'page:not-connected' || r === 'no-token') return 'Connect Microsoft to close this loop.';
     if (r === 'scan-skipped' || r === 'page:scan-skipped') return 'Glance is still reading this mail.';
     return 'Glance stayed quiet on this mail.';
+  }
+
+  // Painted when chrome.runtime.id disappears. No chrome.* call: the dead
+  // script can still touch the page. רענן reloads only after a click.
+  function paintRefreshAsk() {
+    let slot = null;
+    try { slot = mountPoint(); } catch (e) { slot = null; }
+    if (!slot) {
+      try { slot = document.querySelector('#ReadingPaneContainerId') || document.body; } catch (e2) { slot = null; }
+    }
+    if (!slot || typeof slot.appendChild !== 'function') return null;
+    let line = null;
+    try { line = slot.querySelector('.flow-why-not') || slot.querySelector('[data-glance-refresh]'); } catch (e) { line = null; }
+    if (!line) {
+      line = document.createElement('p');
+      line.className = 'flow-why-not';
+      if (slot.firstChild) slot.insertBefore(line, slot.firstChild);
+      else slot.appendChild(line);
+    }
+    line.className = 'flow-why-not';
+    line.setAttribute('data-glance-why', 'context-dead');
+    line.setAttribute('data-glance-refresh', '1');
+    while (line.firstChild) line.removeChild(line.firstChild);
+    const text = document.createElement('span');
+    text.textContent = 'Glance התעדכן — רענן את הדף כדי להתחבר מחדש';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'flow-chip-consent-btn capture-secondary';
+    btn.setAttribute('data-glance-refresh-btn', '1');
+    btn.textContent = 'רענן';
+    btn.addEventListener('click', function () {
+      try { globalThis.__glanceReloaded = (globalThis.__glanceReloaded || 0) + 1; } catch (e) { /* count is only for the page */ }
+      try { location.reload(); } catch (e) { /* the browser refresh is still there */ }
+    });
+    line.appendChild(text);
+    line.appendChild(btn);
+    return line;
   }
 
   function paintWhyNot(slot, reason) {
@@ -3781,6 +3817,7 @@
       .replace(/Connect Microsoft to close this loop\.?/g, '')
       .replace(/Glance is still reading this mail\.?/g, '')
       .replace(/Glance stayed quiet on this mail\.?/g, '')
+      .replace(/Glance התעדכן — רענן את הדף כדי להתחבר מחדש/g, '')
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();

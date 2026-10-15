@@ -300,7 +300,7 @@
     return outlookHostOpen().then((onOutlook) => {
       if (onOutlook) {
         host.appendChild(microsoftConnectCard());
-        return;
+        return renderOutlookRefresh(host);
       }
       // MVP surface is one connector, one decision: sign in, or don't. The rest
       // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
@@ -319,6 +319,34 @@
       const url = (tabs && tabs[0] && tabs[0].url) || '';
       return /https:\/\/outlook\.(live|office|office365)\.com\//i.test(url);
     } catch (e) { return false; }
+  }
+
+  async function renderOutlookRefresh(host) {
+    if (!host) return;
+    let tabId = null;
+    try {
+      if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.query === 'function') {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs && tabs[0];
+        const url = (tab && tab.url) || '';
+        if (!/https:\/\/outlook\.(live|office|office365)\.com\//i.test(url)) return;
+        tabId = tab && typeof tab.id === 'number' ? tab.id : null;
+      }
+    } catch (e) { return; }
+    if (typeof tabId !== 'number') return;
+    const bag = state && state.glanceOutlookRefresh;
+    const flagged = Boolean(bag && (bag[String(tabId)] === true || bag[tabId] === true));
+    if (!flagged) return;
+    const row = el('div', 'conn');
+    row.id = 'glance-outlook-refresh';
+    row.setAttribute('data-glance-refresh', '1');
+    row.appendChild(el('p', 'conn-note', 'Glance התעדכן — רענן את הדף כדי להתחבר מחדש'));
+    const btn = el('button', 'ghost sm', 'רענן');
+    btn.type = 'button';
+    btn.setAttribute('data-glance-refresh-btn', '1');
+    btn.addEventListener('click', () => { send({ type: 'flow:outlook-refresh-tab', tabId: tabId }); });
+    row.appendChild(btn);
+    host.appendChild(row);
   }
 
   function microsoftTokenStatus() {

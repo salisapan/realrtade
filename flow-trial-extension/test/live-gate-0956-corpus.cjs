@@ -851,11 +851,43 @@ function listsRoute() {
   quiet.w.chrome.runtime.id = '';
   try { if (quiet.w.__glanceOutlookPage) quiet.w.__glanceOutlookPage.rescan(); } catch (e) { check('rescan after the context dies does not throw', false, String(e)); }
   await sleep(80);
-  const deadLine = quiet.doc.querySelector('.flow-why-not');
-  check('a dead context stops quietly and leaves whyNotShown on the mail',
-    Boolean(deadLine) && deadLine.getAttribute('data-glance-why') === 'context-dead' && !quiet.doc.querySelector('.flow-chip-host'),
+  const deadLine = quiet.doc.querySelector('[data-glance-refresh]');
+  const deadBtn = deadLine && deadLine.querySelector('[data-glance-refresh-btn]');
+  check('a dead context stops quietly and leaves the refresh line on the mail',
+    Boolean(deadLine) && deadLine.getAttribute('data-glance-why') === 'context-dead' &&
+    /Glance התעדכן/.test(deadLine.textContent) && deadBtn && deadBtn.textContent === 'רענן' &&
+    !quiet.doc.querySelector('.flow-chip-host'),
     { text: deadLine && deadLine.textContent, why: deadLine && deadLine.getAttribute('data-glance-why') });
   quiet.w.close();
+
+  console.log('\n--- an extension reload does not wipe a compose ---\n');
+  const compose = await boot({
+    id: 'MSG-COMPOSE',
+    subject: 'Draft in progress',
+    body: 'Hello'
+  });
+  const box = compose.doc.createElement('textarea');
+  box.id = 'glance-compose';
+  box.value = 'meeting notes I am still writing';
+  compose.doc.body.appendChild(box);
+  const hrefBefore = String(compose.w.location.href);
+  compose.w.chrome.runtime.id = '';
+  try { if (compose.w.__glanceOutlookPage) compose.w.__glanceOutlookPage.rescan(); } catch (e) { check('rescan after reload does not throw', false, String(e)); }
+  await sleep(80);
+  const composeBox = compose.doc.getElementById('glance-compose');
+  const refreshLine = compose.doc.querySelector('[data-glance-refresh]');
+  const refreshBtn = refreshLine && refreshLine.querySelector('[data-glance-refresh-btn]');
+  check('an open compose stays, with the refresh line, and nothing navigates',
+    composeBox && composeBox.value === 'meeting notes I am still writing' &&
+    String(compose.w.location.href) === hrefBefore && !compose.w.__glanceReloaded &&
+    compose.doc.documentElement.getAttribute('data-glance-outlook') === '1' &&
+    Boolean(refreshLine) && /Glance התעדכן — רענן את הדף כדי להתחבר מחדש/.test(refreshLine.textContent) &&
+    refreshBtn && refreshBtn.textContent === 'רענן',
+    { value: composeBox && composeBox.value, href: compose.w.location.href, text: refreshLine && refreshLine.textContent });
+  if (refreshBtn) refreshBtn.click();
+  check('pressing רענן reloads', compose.w.__glanceReloaded === 1 && String(compose.w.location.href) === hrefBefore,
+    { reloads: compose.w.__glanceReloaded, href: compose.w.location.href });
+  compose.w.close();
   const recovered = await boot({
     id: 'MSG-GYM',
     subject: 'Gym renewal',
@@ -871,8 +903,11 @@ function listsRoute() {
   const recoverBg = background();
   check('a live Outlook tab is rescanned and not injected again',
     recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: true, hasPage: true }) === 'rescan');
-  check('a dead Outlook tab is reloaded instead of staying blank',
-    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: true }) === 'reload');
+  check('a dead Outlook tab is left in place for a manual refresh',
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: true, refreshShown: false }) === 'ask' &&
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: true, alive: true }) === 'ask');
+  check('a dead Outlook tab that already shows the refresh line is left alone',
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: true, refreshShown: true }) === 'leave');
   check('an empty Outlook tab is injected',
     recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: false }) === 'inject');
   check('a window that is not a browser window is left alone',

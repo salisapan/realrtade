@@ -1193,6 +1193,17 @@ async function run() {
   check('a missing mail scope is Reconnect in the panel and in Setup, never Connected',
     scopeFace.pill === 'Reconnect Microsoft' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
     scopeFace);
+  const refreshPanel = load({ glanceOutlookRefresh: { '7': true } }, { activeTabs: [{ id: 7, url: 'https://outlook.live.com/mail/0/inbox' }] });
+  vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), refreshPanel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+  const refreshWords = [];
+  (function walk(n) {
+    if (n && n.textContent && n.children && n.children.length === 0) refreshWords.push(n.textContent);
+    (n.children || []).forEach(walk);
+  })(refreshPanel.document.getElementById('connector-list'));
+  check('a tab the dead script could not paint shows the same refresh line in the popup',
+    refreshWords.indexOf('Glance התעדכן — רענן את הדף כדי להתחבר מחדש') >= 0 && refreshWords.indexOf('רענן') >= 0,
+    refreshWords);
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
