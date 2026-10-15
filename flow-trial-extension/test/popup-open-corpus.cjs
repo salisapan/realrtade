@@ -1158,4 +1158,5 @@ async function run() {
   process.exit(failures ? 1 : 0);
 }
 
-run();
+module.exports = { load };
+if (require.main === module) run();

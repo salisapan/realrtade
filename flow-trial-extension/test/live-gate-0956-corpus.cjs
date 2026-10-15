@@ -573,6 +573,75 @@ function listsRoute() {
   alwaysPage.w.close();
   alwaysNext.w.close();
 
+  console.log('\n--- Always is revocable in Settings, and the next Hold asks ---\n');
+  const grantPage = await boot({
+    id: 'MSG-BUDGET-REVIEW',
+    subject: 'Budget review',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: mailOnlyStore()
+  });
+  const grantHost = await waitCard(grantPage);
+  const grantHold = grantHost && grantHost.querySelector('.chip-hold');
+  if (grantHold) grantHold.click();
+  const grantAlways = await waitFor(grantPage.doc, '[data-glance-consent-choice="always"]', 4000);
+  if (grantAlways) grantAlways.click();
+  await waitFor(grantPage.doc, '.flow-chip-undo', 4000);
+  const { load: loadPopup } = require('./popup-open-corpus.cjs');
+  const panel = loadPopup(JSON.parse(JSON.stringify(grantPage.store)), {
+    activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }]
+  });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'popup', 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 20; i++) await sleep(0);
+  const setup = panel.document.getElementById('connector-list');
+  const shown = [];
+  let revokeBtn = null;
+  (function walk(n) {
+    if (!n) return;
+    if (n.textContent === 'הרשאת יומן: תמיד' || n.textContent === 'בטל הרשאת יומן') shown.push(n.textContent);
+    if (n.getAttribute && n.getAttribute('data-glance-revoke-calendar') === 'always') revokeBtn = n;
+    (n.children || []).forEach(walk);
+  })(setup);
+  check('Settings shows הרשאת יומן: תמיד after Always',
+    shown.indexOf('הרשאת יומן: תמיד') >= 0 && shown.indexOf('בטל הרשאת יומן') >= 0,
+    shown);
+  const revokeClick = revokeBtn && revokeBtn.listeners && revokeBtn.listeners.click && revokeBtn.listeners.click[0];
+  if (revokeClick) await revokeClick();
+  for (let i = 0; i < 20; i++) await sleep(0);
+  const afterSetup = panel.document.getElementById('connector-list');
+  let stillAlways = false;
+  (function walk(n) {
+    if (!n) return;
+    if (n.textContent === 'הרשאת יומן: תמיד') stillAlways = true;
+    (n.children || []).forEach(walk);
+  })(afterSetup);
+  const revokedLog = (panel.store().log || []).some((e) => e && e.label === 'הרשאת יומן בוטלה' && e.reason === 'calendar-consent-revoked');
+  check('Revoke logs הרשאת יומן בוטלה and Settings drops תמיד',
+    revokedLog && !stillAlways && panel.store().glanceCalendarConsent && panel.store().glanceCalendarConsent.revoked === true,
+    { log: (panel.store().log || []).map((e) => e && e.label), policy: panel.store().glanceCalendarConsent, stillAlways: stillAlways });
+  grantPage.w.close();
+  const revokedStore = {
+    outlookAuth: JSON.parse(JSON.stringify(panel.store().outlookAuth)),
+    glanceCalendarConsent: JSON.parse(JSON.stringify(panel.store().glanceCalendarConsent))
+  };
+  const askAgain = await boot({
+    id: 'MSG-BUDGET-AFTER-REVOKE',
+    subject: 'Budget review after revoke',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: revokedStore
+  });
+  const askHost = await waitCard(askAgain);
+  const askHold = askHost && askHost.querySelector('.chip-hold');
+  if (askHold) askHold.click();
+  const askOnce = await waitFor(askAgain.doc, '[data-glance-consent-choice="once"]', 4000);
+  const askAlwaysBtn = askAgain.doc.querySelector('[data-glance-consent-choice="always"]');
+  const askLater = askAgain.doc.querySelector('[data-glance-consent-choice="not-now"]');
+  check('the next Hold asks once, always, and not now',
+    Boolean(askOnce) && askOnce.textContent === 'אפשר פעם אחת' &&
+    askAlwaysBtn && askAlwaysBtn.textContent === 'אפשר תמיד' &&
+    askLater && askLater.textContent === 'לא עכשיו',
+    { text: chipText(askAgain.doc) });
+  askAgain.w.close();
+
   const laterPage = await boot({
     id: 'MSG-BUDGET-REVIEW',
     subject: 'Budget review',

@@ -222,6 +222,9 @@ const FlowStorage = (() => {
     // src/outlook.js: the Microsoft sign-in (kept only on this device), the last check, and what waits for an answer. Never message text beyond the loop's own sentence.
     outlookAuth: null,
     outlookSync: {},
+    // The Hold calendar choice (once / always). Settings reads it through get().
+    // Null is no policy. A missing key would never arrive, so Always could not be revoked.
+    glanceCalendarConsent: null,
     // A suggested save is recorded here and not drawn. suggestDismissals is
     // the store API for Not now and Undo. No button writes it in 0.9.38.
     suggestLog: [],
