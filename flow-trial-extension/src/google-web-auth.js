@@ -15,6 +15,14 @@
 
 export const GOOGLE_WEB_AUTH_STORAGE_KEY = 'googleWebAuth';
 
+// One status for the panel, Setup, and the popup. A stored Google grant
+// that cannot write is not "Connected".
+export const GOOGLE_RECONNECT_STORAGE_KEY = 'googleReconnect';
+export const GOOGLE_RECONNECT_LABEL = 'התחבר מחדש ל-Google';
+
+const UNCONFIRMED_EN = "Couldn't confirm it's unchanged. Undo left it alone.";
+const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+
 // Used only when manifest oauth2.scopes is missing. Keep this list identical
 // to manifest.json so a fallback grant covers the same APIs as getAuthToken.
 export const GOOGLE_OAUTH_SCOPES = [
@@ -121,6 +129,60 @@ export function parseGoogleImplicitRedirect(redirectUrl, expectedState) {
     accessToken: accessToken.trim(),
     expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null
   };
+}
+
+// Browser UI language. he and he-IL use the Hebrew refusal. Anything else
+// stays English. Glance has no separate language setting.
+export function unconfirmedRefusal(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (code === 'he' || code.indexOf('he-') === 0) return UNCONFIRMED_HE;
+  return UNCONFIRMED_EN;
+}
+
+// had a Connect record, and a later write was rejected: Connected is false
+// and every surface reads this same object.
+export function googleConnectionState(auth, reconnect, extras) {
+  const had = Boolean(auth);
+  const needs = had && Boolean(reconnect && reconnect.needed);
+  const extra = extras || {};
+  return {
+    connected: had && !needs,
+    needsReconnect: needs,
+    reconnectLabel: GOOGLE_RECONNECT_LABEL,
+    configured: extra.configured != null ? Boolean(extra.configured) : had,
+    detail: had && !needs ? (extra.detail || null) : null
+  };
+}
+
+// Lane writes: a stored Connect token that is still inside its expiry comes
+// first. A lapsed one may refresh silently. chrome.identity.getAuthToken
+// runs only after that, and only with interactive false. This function
+// never opens a consent window.
+export function laneCredential(deps) {
+  const d = deps || {};
+  const read = typeof d.readWebAuth === 'function' ? d.readWebAuth() : Promise.resolve(null);
+  return Promise.resolve(read).then((existing) => {
+    if (webTokenUsable(existing, d.now)) {
+      return { token: existing.accessToken, source: 'web' };
+    }
+    const expired = Boolean(existing && existing.accessToken);
+    const refresh = expired && typeof d.refreshSilent === 'function'
+      ? Promise.resolve().then(() => d.refreshSilent()).catch(() => null)
+      : Promise.resolve(null);
+    return refresh.then((next) => {
+      if (next && typeof next === 'object' && next.token) {
+        return { token: next.token, source: next.source || 'web' };
+      }
+      if (typeof next === 'string' && next) return { token: next, source: 'web' };
+      if (typeof d.getAuthToken !== 'function') {
+        throw new Error('The user is not signed in.');
+      }
+      return Promise.resolve().then(() => d.getAuthToken(false)).then((token) => {
+        if (!token) throw new Error('The user is not signed in.');
+        return { token: token, source: 'chrome' };
+      });
+    });
+  });
 }
 
 export function webTokenUsable(record, now, skewMs) {

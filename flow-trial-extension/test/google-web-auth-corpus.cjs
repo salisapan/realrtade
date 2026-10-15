@@ -33,7 +33,7 @@ function loadPure() {
   const src = stripModuleSyntax(fs.readFileSync(path.join(__dirname, '..', 'src', 'google-web-auth.js'), 'utf8'));
   const sandbox = { URL, URLSearchParams, decodeURIComponent, Date };
   vm.createContext(sandbox);
-  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY };', sandbox, { filename: 'google-web-auth.js' });
+  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
   return sandbox.__api;
 }
 
@@ -214,6 +214,42 @@ async function run() {
   check('interaction required may fall back when interactive', api.shouldFallbackFromGetAuthToken('User interaction required.', { interactive: true }) === true);
   check('access_denied is a cancel', api.isUserCancelMessage('access_denied') === true);
   check('signin-off is not a cancel', api.isUserCancelMessage(SIGNIN_OFF) === false);
+
+  console.log('\n--- lane token order and reconnect status ---\n');
+  const HE_UNDO = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+  check('Hebrew UI refusal', api.unconfirmedRefusal('he') === HE_UNDO && api.unconfirmedRefusal('he-IL') === HE_UNDO);
+  check('English UI refusal', api.unconfirmedRefusal('en') === "Couldn't confirm it's unchanged. Undo left it alone." && api.unconfirmedRefusal('en-US') === "Couldn't confirm it's unchanged. Undo left it alone.");
+  {
+    let chromeCalls = 0;
+    const cred = await api.laneCredential({
+      readWebAuth: async () => ({ accessToken: 'ya29.stored', expiresAt: Date.now() + 3600e3 }),
+      refreshSilent: async () => { throw new Error('should not refresh a valid token'); },
+      getAuthToken: () => { chromeCalls += 1; return 'ya29.chrome'; }
+    });
+    check('a valid stored Connect token is used and getAuthToken is not called', cred.token === 'ya29.stored' && cred.source === 'web' && chromeCalls === 0, cred);
+  }
+  {
+    let interactive = null;
+    const cred = await api.laneCredential({
+      readWebAuth: async () => null,
+      getAuthToken: (flag) => { interactive = flag; return 'ya29.chrome'; }
+    });
+    check('no stored token uses getAuthToken non-interactive', cred.token === 'ya29.chrome' && cred.source === 'chrome' && interactive === false, { cred, interactive });
+  }
+  {
+    let chromeCalls = 0;
+    const cred = await api.laneCredential({
+      readWebAuth: async () => ({ accessToken: 'ya29.old', expiresAt: Date.now() - 5000 }),
+      refreshSilent: async () => ({ token: 'ya29.fresh', source: 'web' }),
+      getAuthToken: () => { chromeCalls += 1; return 'ya29.chrome'; }
+    });
+    check('an expired stored token refreshes silently before getAuthToken', cred.token === 'ya29.fresh' && chromeCalls === 0, cred);
+  }
+  {
+    const on = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { configured: true, detail: 'Glance list' });
+    const off = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { configured: true, detail: 'Glance list' });
+    check('a reconnect flag is not Connected', on.connected === true && off.connected === false && off.needsReconnect === true && off.reconnectLabel === api.GOOGLE_RECONNECT_LABEL && off.detail == null, off);
+  }
 
   console.log('\n--- redirect URI and authorize URL ---\n');
   check('unpacked redirect', api.googleRedirectUriForExtension(EXTENSION_ID) === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/');
@@ -587,6 +623,20 @@ async function run() {
     await new Promise((r) => setImmediate(r));
     check('the late approval is not a saved token', out.ok === false, out);
     check('the late approval does not restore googleWebAuth', env.stored.googleWebAuth == null, env.stored);
+  }
+
+  console.log('\n--- connector status shares the reconnect flag ---\n');
+  {
+    const env = load({
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleReconnect: { needed: true, reason: '401' }
+      }
+    });
+    const status = await env.fn('connectorStatus')();
+    check('connector status hides Connected while a write needs reconnect',
+      status && status.googleTasks && status.googleTasks.connected === false && status.googleTasks.needsReconnect === true && status.googleTasks.reconnectLabel === 'התחבר מחדש ל-Google',
+      status && status.googleTasks);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

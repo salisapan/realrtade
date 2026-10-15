@@ -42,7 +42,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -1426,7 +1426,7 @@ async function disconnectConnector(connectorId) {
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY]));
+    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY]));
     return { ok: true };
   }
   await chrome.storage.local.remove(key);
@@ -1451,18 +1451,64 @@ function googleAuthUnavailableResponse() {
 // Chrome can mint one, and the stored web-flow token otherwise. Both the
 // first fetch and the 401 retry are silent — interactive:true is reserved
 // for an explicit Connect click.
+async function markGoogleReconnect(reason) {
+  const gt = await getGoogleTasksAuth();
+  if (!gt) return;
+  await chrome.storage.local.set({
+    [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: String(reason || 'auth') }
+  });
+}
+
+async function clearGoogleReconnect() {
+  await chrome.storage.local.remove(GOOGLE_RECONNECT_STORAGE_KEY);
+}
+
+// One silent refresh after a 401. Web tokens use prompt=none. Chrome tokens
+// use getAuthToken({ interactive: false }). Neither opens a consent window.
+async function refreshLaneCredential(cred) {
+  await invalidateGoogleCredential(cred);
+  if (cred && cred.source === 'web') {
+    try {
+      const saved = await runGoogleWebAuth(false);
+      return { token: saved.accessToken, source: 'web' };
+    } catch (e) { /* fall through to the non-interactive Chrome token */ }
+  }
+  const token = await getGoogleAuthToken(false);
+  return { token: token, source: 'chrome' };
+}
+
+// The lane host calls these. refreshSilent is getGoogleWebAccessToken(false):
+// expiry and prompt=none live in that function, not a second copy.
+globalThis.FlowGoogleAccess = {
+  refreshSilent() {
+    return getGoogleWebAccessToken(false);
+  },
+  retry(cred) {
+    return refreshLaneCredential(cred);
+  }
+};
+
+async function rememberGoogleAuthResult(res) {
+  if (!res) return res;
+  if (res.status === 401) await markGoogleReconnect('401');
+  else if (res.status === 403) await markGoogleReconnect('missing scope');
+  else if (res.ok) await clearGoogleReconnect();
+  return res;
+}
+
 async function googleAuthedFetch(baseUrl, path, options) {
   let cred;
   try {
     cred = await getGoogleAccessToken(false);
   } catch (e) {
+    await markGoogleReconnect('not signed in');
     return googleAuthUnavailableResponse();
   }
   const doFetch = (t) => fetch(glanceE2eRewrite(baseUrl + path), Object.assign({}, options, {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
   const res = await doFetch(cred.token);
-  if (res.status !== 401) return res;
+  if (res.status !== 401) return rememberGoogleAuthResult(res);
   // A cached token can go stale (revoked access from the Google Account
   // permissions page, expired) without Chrome knowing yet — evict it and
   // request a fresh one once before surfacing the failure, the same
@@ -1478,9 +1524,10 @@ async function googleAuthedFetch(baseUrl, path, options) {
       cred = await getGoogleAccessToken(false);
     }
   } catch (e) {
+    await markGoogleReconnect('not signed in');
     return googleAuthUnavailableResponse();
   }
-  return doFetch(cred.token);
+  return rememberGoogleAuthResult(await doFetch(cred.token));
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -1534,6 +1581,7 @@ async function connectGoogleTasks(interactive) {
   await getGoogleAccessToken(interactive !== false);
   const taskListId = await findOrCreateGlanceTaskList();
   await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
+  await clearGoogleReconnect();
   return true;
 }
 
@@ -4766,12 +4814,13 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
+  const reconnectBag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+  const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
+    configured: googleTasksConfigured(),
+    detail: GLANCE_TASK_LIST_TITLE + ' list'
+  });
   return {
-    googleTasks: {
-      connected: Boolean(gt),
-      configured: googleTasksConfigured(),
-      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
-    },
+    googleTasks: googleTasks,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)

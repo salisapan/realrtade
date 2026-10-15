@@ -386,16 +386,21 @@
       return;
     }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
+    const reconnecting = Object.keys(status || {}).filter((k) => status[k] && status[k].needsReconnect);
     if (live.length) {
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
       pill.textContent = (conn ? conn.label : live[0]) + ' connected';
       pill.className = 'ver on';
       return;
     }
-    stampMicrosoft(pill, microsoft);
-    stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
-    pill.textContent = microsoftFaceLabel(microsoft);
-    pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+    if (reconnecting.length) {
+      pill.textContent = status[reconnecting[0]].reconnectLabel;
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
+      return;
+    }
+    pill.textContent = 'לא מחובר';
+    pill.className = 'ver';
   }
 
   /* ---------------------------------------------------------- connectors */
@@ -674,7 +679,11 @@
     head.appendChild(name);
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
-    else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
+    else if (st.needsReconnect) {
+      const badge = el('span', 'badge', st.reconnectLabel || 'התחבר מחדש');
+      badge.setAttribute('dir', 'auto');
+      head.appendChild(badge);
+    } else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
     else if (c.status === 'live' || st.configured === true) head.appendChild(el('span', 'badge live', 'עובד'));
     else head.appendChild(el('span', 'badge', 'צריך הגדרה'));
     card.appendChild(head);
@@ -724,6 +733,7 @@
     }
 
     const ready = st.configured !== false;
+    const connectLabel = st.needsReconnect && st.reconnectLabel ? st.reconnectLabel : ('התחבר ל-' + c.label);
     // Only the ready (primary/.doit-style) button gets the shell/ring/shine
     // spans — .ghost.wide (missing OAuth config, MVP-inert) stays a plain
     // outlined pill, same distinction the marketing site draws between its
@@ -733,9 +743,11 @@
       btn.appendChild(el('span', 'shell'));
       btn.appendChild(el('span', 'ring'));
       btn.appendChild(el('span', 'shine'));
-      btn.appendChild(el('span', 'btn-label', 'התחבר ל-' + c.label));
+      const label = el('span', 'btn-label', connectLabel);
+      if (st.needsReconnect) label.setAttribute('dir', 'auto');
+      btn.appendChild(label);
     } else {
-      btn.textContent = 'התחבר ל-' + c.label;
+      btn.textContent = connectLabel;
     }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
@@ -750,7 +762,7 @@
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
-        btn.disabled = false; setBtnLabel(btn, 'התחבר ל-' + c.label);
+        btn.disabled = false; setBtnLabel(btn, connectLabel);
         err.textContent = (res && res.error) || 'Connection failed.';
         err.hidden = false;
       }
@@ -2710,7 +2722,7 @@
       if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
         u.disabled = false;
         u.textContent = L.undo;
-        note.textContent = showWords(r.written) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
+        note.textContent = showWords(r.written) || showWords(r.error) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
         note.hidden = false;
         if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
           await FlowStorage.patchGlanceProof(entry.messageId, { undoRefused: 'user-edited', undoLine: note.textContent });
@@ -3374,8 +3386,9 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
-              ? r.written
+            const refusal = r && (r.written || r.error);
+            const line = (refusal && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
+              ? refusal
               : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = Lw.undo;
             u.disabled = false;

@@ -16,6 +16,7 @@ function check(name, cond, detail) {
 const fetches = [];
 let authCalls = 0;
 const listeners = [];
+const stored = { googleTasksAuth: { taskListId: 'glance-list' } };
 const sandbox = {
   module: undefined,
   console,
@@ -43,9 +44,23 @@ const sandbox = {
       onMessage: { addListener: (fn) => { listeners.push(fn); } },
       lastError: null
     },
+    i18n: { getUILanguage: () => 'en' },
     storage: {
       local: {
-        get: async () => ({ googleTasksAuth: { taskListId: 'glance-list' } })
+        get: async (key) => {
+          if (typeof key === 'string') return { [key]: stored[key] };
+          if (Array.isArray(key)) {
+            const out = {};
+            key.forEach((k) => { out[k] = stored[k]; });
+            return out;
+          }
+          return Object.assign({}, stored);
+        },
+        set: async (patch) => { Object.assign(stored, patch); },
+        remove: async (keys) => {
+          const list = Array.isArray(keys) ? keys : [keys];
+          list.forEach((k) => { delete stored[k]; });
+        }
       }
     }
   }
@@ -62,9 +77,16 @@ for (const f of cores) {
 }
 vm.runInContext(fs.readFileSync(path.join(EXT, 'src', 'google-lane.js'), 'utf8'), sandbox, { filename: 'google-lane.js' });
 
+function stripModuleSyntax(source) {
+  return source
+    .replace(/^export const /gm, 'const ')
+    .replace(/^export function /gm, 'function ')
+    .replace(/^export async function /gm, 'async function ');
+}
+const webAuthSrc = stripModuleSyntax(fs.readFileSync(path.join(EXT, 'src', 'google-web-auth.js'), 'utf8'));
 const hostSrc = fs.readFileSync(path.join(EXT, 'src', 'google-lane-host.js'), 'utf8')
   .replace(/^import .*;$/gm, '');
-vm.runInContext(hostSrc, sandbox, { filename: 'google-lane-host.js' });
+vm.runInContext(webAuthSrc + '\n' + hostSrc, sandbox, { filename: 'google-lane-host.js' });
 
 check('startup does not call fetch', fetches.length === 0, fetches.length);
 check('startup does not call getAuthToken', authCalls === 0, authCalls);
@@ -117,7 +139,7 @@ async function main() {
   }
 
   async function flush() {
-    for (let i = 0; i < 8; i++) await Promise.resolve();
+    for (let i = 0; i < 24; i++) await Promise.resolve();
   }
 
   const matchBody = JSON.stringify(Object.assign({ id: 'file1', trashed: false }, SNAP));
@@ -215,6 +237,53 @@ async function main() {
 
   sandbox.setTimeout = savedTimer;
   sandbox.clearTimeout = savedClear;
+
+  const HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+  sandbox.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ id: 'file-he', modifiedTime: SNAP.modifiedTime }) });
+  sandbox.chrome.i18n.getUILanguage = () => 'he';
+  const hebrew = await askUndo('googleDriveSave', { fileId: 'file-he', externalId: 'file-he', created: true, snapshot: { modifiedTime: SNAP.modifiedTime } });
+  check('Hebrew UI refuses an unconfirmed undo in Hebrew', hebrew.ok === false && hebrew.reason === 'unconfirmed' && hebrew.error === HE && hebrew.written === HE, hebrew);
+  sandbox.chrome.i18n.getUILanguage = () => 'en';
+  const english = await askUndo('googleDriveSave', { fileId: 'file-en', externalId: 'file-en', created: true, snapshot: { modifiedTime: SNAP.modifiedTime } });
+  check('English UI keeps the English refusal', english.error === CONFIRM && english.written === CONFIRM, english);
+
+  const beforeAuth = authCalls;
+  stored.googleWebAuth = { accessToken: 'ya29.stored', expiresAt: Date.now() + 60 * 60 * 1000 };
+  sandbox.chrome.identity.getAuthToken = () => { throw new Error('The user is not signed in.'); };
+  const storedFetches = [];
+  sandbox.fetch = async (url, init) => {
+    storedFetches.push({ url: String(url), auth: init && init.headers && init.headers.Authorization });
+    const body = JSON.stringify({ id: 'e2e-gtask-stored', title: 'Pay the invoice', status: 'needsAction' });
+    return { ok: true, status: 200, text: async () => body };
+  };
+  const storedWrite = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      input: { label: 'Pay the invoice' }
+    }, {}, resolve);
+  });
+  check('a write with no getAuthToken uses the stored Connect token', storedWrite && storedWrite.ok === true && authCalls === beforeAuth && storedFetches.some((c) => c.auth === 'Bearer ya29.stored'), { ok: storedWrite && storedWrite.ok, authCalls, beforeAuth, storedFetches });
+
+  delete stored.googleWebAuth;
+  delete stored.googleReconnect;
+  sandbox.chrome.identity.getAuthToken = (details, cb) => {
+    authCalls += 1;
+    if (typeof cb === 'function') cb('ya29.host');
+  };
+  sandbox.fetch = async () => ({ ok: false, status: 401, text: async () => '{"error":{"code":401}}' });
+  const denied = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      input: { label: 'Pay the invoice' }
+    }, {}, resolve);
+  });
+  const view = vm.runInContext('googleConnectionState', sandbox)(stored.googleTasksAuth, stored.googleReconnect, { configured: true, detail: 'Glance list' });
+  check('a 401 write switches Google to reconnect and Connected is gone', denied && denied.ok === false && denied.needsReconnect === true && denied.reconnectLabel === 'התחבר מחדש ל-Google' && view.connected === false && view.needsReconnect === true && view.reconnectLabel === 'התחבר מחדש ל-Google' && view.reconnectLabel !== 'Connected', { denied, view, flag: stored.googleReconnect });
+
+  const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
+  check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && popup.indexOf('needsReconnect') < popup.indexOf("badge on', 'Connected'"));
 
   if (failures) {
     console.log('\n' + failures + ' failed');
