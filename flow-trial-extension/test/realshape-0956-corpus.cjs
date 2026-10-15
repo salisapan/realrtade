@@ -137,4 +137,37 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
     big.body.prefix.length===8192 && sb.FlowNativeEdit.compareContent(big,{body:{content:long}})==='match' &&
     sb.FlowNativeEdit.compareContent(big,{body:{content:long+'friday'}})==='edited');
  }
+ // Live Gate: two external Gmail mails. A is a To Do. B is a Hold.
+ // Missing Tasks or Calendar scope is not an input here: the card is the intent.
+ const eng={module:undefined,console};vm.createContext(eng);
+ for(const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js','file-attach.js','resolution.js','draft-reply.js','incoming-judge.js']){
+  vm.runInContext(fs.readFileSync(B+'/core/'+f,'utf8'),eng,{filename:f});
+ }
+ const Judge=eng.FlowIncomingJudge;
+ const NOW=new Date('2026-10-15T09:00:00Z');
+ const external={name:'Dana Cohen',email:'dana.cohen@gmail.com'};
+ const me=['glance.salisapan@outlook.com'];
+ function gateMail(body,subject){
+  return Judge.judge({text:body,subject,sender:external,surface:'outlook',ownAddresses:me,userName:'Glance',inbound:true,now:NOW,to:me});
+ }
+ const gymBody='please remember to renew your gym membership by Friday 23/10';
+ const gymSubject='Renew gym membership by Friday';
+ const gym=gateMail(gymBody,gymSubject);
+ ck('external gym reminder is a To Do card, due 23/10',
+  gym&&gym.show===true&&gym.intent&&gym.intent.type==='request'&&gym.intent.noReplyDraft===true&&
+  gym.intent.entities&&gym.intent.entities.dateIso==='2026-10-23'&&
+  gym.process&&gym.process.id==='log-it'&&gym.process.steps.length===1&&gym.process.steps[0].kind==='outlookTask'&&
+  gymBody==='please remember to renew your gym membership by Friday 23/10'&&gymSubject==='Renew gym membership by Friday',
+  {show:gym&&gym.show,type:gym&&gym.intent&&gym.intent.type,date:gym&&gym.intent&&gym.intent.entities&&gym.intent.entities.dateIso,id:gym&&gym.process&&gym.process.id,kinds:gym&&gym.process&&gym.process.steps});
+ const holdBody='תשמור לי את הזמן';
+ const holdSubject='פגישה 18/10 11:00 רוטשילד 12';
+ const hold=gateMail(holdBody,holdSubject);
+ const holdInPane=gateMail(holdSubject+'\n'+holdBody,holdSubject);
+ ck('external Hebrew hold is a calendar card at 18/10 11:00',
+  hold&&hold.show===true&&hold.intent&&hold.intent.personalClose==='calendar-hold'&&
+  hold.intent.entities&&hold.intent.entities.dateIso==='2026-10-18'&&hold.intent.entities.hour===11&&hold.intent.entities.minute===0&&
+  hold.process&&hold.process.id==='hold'&&hold.process.steps.length===1&&hold.process.steps[0].kind==='calendar'&&
+  holdInPane&&holdInPane.show===true&&holdInPane.process&&holdInPane.process.id==='hold'&&
+  holdBody==='תשמור לי את הזמן'&&holdSubject==='פגישה 18/10 11:00 רוטשילד 12',
+  {show:hold&&hold.show,close:hold&&hold.intent&&hold.intent.personalClose,date:hold&&hold.intent&&hold.intent.entities,id:hold&&hold.process&&hold.process.id,pane:holdInPane&&holdInPane.show});
  console.log('\nFAILURES: '+F);srv.close();process.exit(F?1:0);});

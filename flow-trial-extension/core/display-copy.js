@@ -163,6 +163,30 @@ const FlowDisplay = (() => {
   // Why not shown lists quiet decisions only. A page record for a mail
   // removes the mailbox-sync line for that same id. A sync line is kept
   // only for mail the page has not decided.
+  // One short Hebrew line for a quiet mail. The page and Setup both call this.
+  // A missing To Do or Calendar scope is named. It is not "stayed quiet".
+  const WHY_HE = {
+    'context-dead': 'התוסף התעדכן',
+    'not-connected': 'לא מחובר',
+    'no-token': 'לא מחובר',
+    'intent-null': 'לא זוהתה בקשה',
+    'too-short': 'לא זוהתה בקשה',
+    'tasks-not-granted': 'אין הרשאת To Do',
+    'third-party': 'משתמש חיצוני',
+    'calendar-write-not-granted': 'צריך הרשאה ליומן',
+    'outlook-calendar-write-not-granted': 'צריך הרשאה ליומן',
+    'scan-skipped': 'עדיין קורא את המייל'
+  };
+
+  function whyNotShownLine(reason) {
+    let r = String(reason || '');
+    r = r.replace(/^(?:page:|quiet:|outlook:)/, '');
+    if (WHY_HE[r]) return WHY_HE[r];
+    const bare = r.replace(/^outlook-/, '');
+    if (WHY_HE[bare]) return WHY_HE[bare];
+    return WHY_HE['intent-null'];
+  }
+
   function whyNotShownRows(pageDiagnostics, diagnostics) {
     const page = Array.isArray(pageDiagnostics) ? pageDiagnostics : [];
     const claimed = Object.create(null);
@@ -196,6 +220,7 @@ const FlowDisplay = (() => {
     isPanelReceipt: isPanelReceipt,
     dropOutlookLoopRow: dropOutlookLoopRow,
     dropAlreadyHandledDiag: dropAlreadyHandledDiag,
+    whyNotShownLine: whyNotShownLine,
     whyNotShownRows: whyNotShownRows
   };
 })();

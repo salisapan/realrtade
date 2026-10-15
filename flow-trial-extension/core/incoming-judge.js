@@ -41,6 +41,27 @@ const FlowIncomingJudge = (() => {
     }).join('\n').trim();
   }
 
+  // A short body still carries the subject when the subject itself is the slot:
+  // a meeting noun, or a slash date that is a day in one locale only.
+  function subjectCarriesSlot(subject) {
+    const s = String(subject || '');
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(s)) return true;
+    const m = s.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+    if (!m) return false;
+    const a = +m[1];
+    const b = +m[2];
+    return (a > 12 && a <= 31 && b >= 1 && b <= 12) || (b > 12 && b <= 31 && a >= 1 && a <= 12);
+  }
+
+  function textForJudge(rawText, subject) {
+    const body = withoutPhoneSignature(prepareForJudge(rawText));
+    const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
+    if (body.length >= MIN_TEXT || !sub) return body;
+    if (body.indexOf(sub) !== -1) return body;
+    if (!subjectCarriesSlot(sub)) return body;
+    return (sub + '\n' + body).trim();
+  }
+
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
@@ -64,8 +85,9 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
-    const text = withoutPhoneSignature(prepareForJudge(i.text));
-    const factProbe = (text.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(text) : null;
+    const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
+    const text = textForJudge(i.text, i.subject);
+    const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
     const sender = i.sender || {};
@@ -118,7 +140,9 @@ const FlowIncomingJudge = (() => {
     // Outlook's Do It writes a reply draft when the process has one. A task-only
     // close writes Microsoft To Do. A calendar event with no draft and no task
     // stays quiet rather than offering a reply in its place.
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process)) {
+    // A calendar hold is the card. Missing Calendars.ReadWrite does not silence it.
+    const calendarHold = intent && intent.personalClose === 'calendar-hold';
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !calendarHold) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.

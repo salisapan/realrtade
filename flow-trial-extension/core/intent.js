@@ -72,7 +72,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
 
   // "This is not happening at the time this message names."
   //
@@ -728,6 +728,8 @@ const FlowIntent = (() => {
       if (googleClose) intent.googleClose = googleClose;
       // "No need to reply, just get it done" still does the work. The draft stays off.
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
+      // "Please remember to renew…" is the task. A reply draft is not the close.
+      if (/\bplease remember to\b/i.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       if (familyAgrees(type, fam)) {
         intent.closeFamily = fam.family;

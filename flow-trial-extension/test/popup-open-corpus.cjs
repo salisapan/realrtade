@@ -748,7 +748,7 @@ async function run() {
     const host = document.getElementById('surface-list');
     const states = find(host, 'wait-state').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
-    check('the Outlook row is there and is off until turned on', states.includes('Off') && !states.includes('Not set up yet'), states);
+    check('the Outlook row is there and is not connected until turned on', states.includes('Not connected') && !states.includes('Not set up yet'), states);
     // Since Mail.ReadWrite (2026-10-05) Outlook writes reply drafts on Do It, so "read-only" is no longer true: the row
     // says what it reads, that it never sends, and that nothing goes to Glance.
     check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Never sends/.test(t) && /reply draft/.test(t) && /nothing is sent to Glance/.test(t)), notes);
@@ -1184,15 +1184,93 @@ async function run() {
     outlookSync: {}
   });
   check('an expired token is Reconnect in the panel and in Setup, never Connected',
-    expiredFace.pill === 'Reconnect Microsoft' && expiredFace.status === 'expired' && !expiredFace.connectedBadge,
+    expiredFace.pill === 'Reconnect' && expiredFace.status === 'expired' && !expiredFace.connectedBadge,
     expiredFace);
   const scopeFace = await microsoftFace({
     outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } },
     outlookSync: {}
   });
   check('a missing mail scope is Reconnect in the panel and in Setup, never Connected',
-    scopeFace.pill === 'Reconnect Microsoft' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
+    scopeFace.pill === 'Reconnect' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
     scopeFace);
+
+  console.log('\n--- popup.js: header, panel, Setup row, and popup read one Microsoft state ---\n');
+  async function fourMicrosoft(store) {
+    const panel = load(store, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    function walk(n, hit) {
+      if (!n) return;
+      if (n.getAttribute && n.getAttribute('data-glance-connect') === 'microsoft' && n.getAttribute('data-glance-microsoft')) hit.card = n;
+      if (n.getAttribute && n.getAttribute('data-glance-surface') === 'outlook') hit.row = n;
+      (n.children || []).forEach((c) => walk(c, hit));
+    }
+    const hit = {};
+    walk(panel.document.getElementById('connector-list'), hit);
+    walk(panel.document.getElementById('surface-list'), hit);
+    function stateOf(node) { return node && node.getAttribute ? (node.getAttribute('data-glance-microsoft') || '') : ''; }
+    function textOf(node, cls) {
+      const found = [];
+      (function w(n) {
+        if (!n) return;
+        const classes = String(n.className || '').split(/\s+/);
+        if (classes.indexOf(cls) >= 0 && n.children && n.children.length === 0) found.push(n.textContent);
+        (n.children || []).forEach(w);
+      })(node);
+      return found[0] || '';
+    }
+    const pill = panel.document.getElementById('statusPill');
+    const block = panel.document.getElementById('outlookBlock');
+    return {
+      header: stateOf(pill),
+      panel: stateOf(hit.card),
+      row: stateOf(hit.row),
+      popup: stateOf(block),
+      headerText: pill ? pill.textContent : '',
+      panelText: textOf(hit.card, 'badge'),
+      rowText: textOf(hit.row, 'wait-state')
+    };
+  }
+  const faces = {
+    valid: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.ReadWrite'] }, account: { address: 'me@outlook.com' } }, outlookSync: {} },
+    expired: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() - 1000, grantedScopes: ['Mail.ReadWrite'] } }, outlookSync: {} },
+    'missing-scope': { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } }, outlookSync: {} },
+    missing: { outlookAuth: null, outlookSync: {} }
+  };
+  const words = { valid: 'Connected', expired: 'Reconnect', 'missing-scope': 'Reconnect', missing: 'Not connected' };
+  for (const key of Object.keys(faces)) {
+    const face = await fourMicrosoft(faces[key]);
+    check('header, panel, Setup row, and popup agree on ' + key,
+      face.header === key && face.panel === key && face.row === key && face.popup === key &&
+      face.headerText === words[key] && face.panelText === words[key] && face.rowText === words[key],
+      face);
+  }
+
+  console.log('\n--- popup.js: Why not shown uses the same Hebrew as the page ---\n');
+  const whyReasons = ['intent-null', 'tasks-not-granted', 'third-party', 'not-connected', 'context-dead', 'too-short', 'no-token', 'calendar-write-not-granted'];
+  const whyStore = {
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.Read'] } },
+    outlookSync: {},
+    outlookPageDiag: whyReasons.map((reason, i) => ({ id: 'w' + i, reason: 'page:' + reason, verdict: 'quiet', subject: 'Mail ' + i }))
+  };
+  const whyPanel = load(whyStore, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+  vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), whyPanel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+  const whyNodes = [];
+  (function walk(n) {
+    if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) whyNodes.push(n);
+    (n.children || []).forEach(walk);
+  })(whyPanel.document.getElementById('surface-list'));
+  const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const pageUsesShared = /function whyNotText\(reason\) \{[\s\S]*?FlowDisplay\.whyNotShownLine\(reason\)/.test(pageSrc);
+  whyReasons.forEach((reason) => {
+    const expected = whyPanel.sandbox.FlowDisplay.whyNotShownLine(reason);
+    const expectedPage = whyPanel.sandbox.FlowDisplay.whyNotShownLine('page:' + reason);
+    const node = whyNodes.filter((n) => n.getAttribute('data-glance-why') === 'page:' + reason)[0];
+    check('page and Setup say the same Hebrew for ' + reason,
+      pageUsesShared && expected === expectedPage && node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0,
+      { expected, page: expectedPage, text: node && node.textContent });
+  });
   const refreshPanel = load({ glanceOutlookRefresh: { '7': true } }, { activeTabs: [{ id: 7, url: 'https://outlook.live.com/mail/0/inbox' }] });
   vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), refreshPanel.sandbox, { filename: 'popup.js' });
   for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));

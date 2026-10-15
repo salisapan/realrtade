@@ -3562,6 +3562,9 @@ async function outlookConsentScope(msg) {
     return { ok: false, reason: 'not-configured' };
   }
   const scope = String((msg && msg.scope) || '');
+  const todoScope = scope === 'Tasks.ReadWrite';
+  const calendarScope = scope === 'Calendars.ReadWrite';
+  if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
   const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
   const auth = bag[OUTLOOK_AUTH_KEY];
   if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
@@ -3587,15 +3590,20 @@ async function outlookConsentScope(msg) {
   // back without Calendars.ReadWrite does not count.
   const Cal = globalThis.FlowOutlookCalendar;
   const effective = (Cal && typeof Cal.scopesFromToken === 'function') ? Cal.scopesFromToken(r.token) : null;
-  if (!Cal || !Cal.hasWriteScope(effective)) return { ok: false, reason: 'calendar-write-not-granted' };
+  const names = Array.isArray(effective) ? effective : [];
+  const has = names.some((s) => String(s).toLowerCase() === scope.toLowerCase());
+  if (calendarScope && (!Cal || !Cal.hasWriteScope(effective))) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (todoScope && !has) return { ok: false, reason: 'tasks-not-granted' };
   const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
-  await chrome.storage.local.set({
+  const policyKey = todoScope ? 'glanceTodoConsent' : 'glanceCalendarConsent';
+  const stored = {
     [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {
       token: r.token,
       requestedScopes: scopes
-    }),
-    glanceCalendarConsent: { mode: policy, scope: scope, revoked: false, at: Date.now() }
-  });
+    })
+  };
+  stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
+  await chrome.storage.local.set(stored);
   return { ok: true, policy: policy, scope: scope };
 }
 

@@ -267,9 +267,28 @@
     }
   }
 
+  function microsoftFaceLabel(connection) {
+    if (connection === 'valid') return 'Connected';
+    if (connection === 'expired' || connection === 'missing-scope') return 'Reconnect';
+    return 'Not connected';
+  }
+
+  function stampMicrosoft(node, connection) {
+    if (node && node.setAttribute) node.setAttribute('data-glance-microsoft', connection);
+  }
+
   async function renderStatusPill() {
     const pill = document.getElementById('statusPill');
     if (!pill) return;
+    const onOutlook = await outlookHostOpen();
+    const microsoft = microsoftTokenStatus();
+    if (onOutlook) {
+      stampMicrosoft(pill, microsoft);
+      stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+      pill.textContent = microsoftFaceLabel(microsoft);
+      pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+      return;
+    }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
@@ -277,19 +296,10 @@
       pill.className = 'ver on';
       return;
     }
-    const microsoft = microsoftTokenStatus();
-    if (microsoft === 'valid') {
-      pill.textContent = 'Outlook connected';
-      pill.className = 'ver on';
-      return;
-    }
-    if (microsoft === 'expired' || microsoft === 'missing-scope') {
-      pill.textContent = 'Reconnect Microsoft';
-      pill.className = 'ver';
-      return;
-    }
-    pill.textContent = 'Not connected';
-    pill.className = 'ver';
+    stampMicrosoft(pill, microsoft);
+    stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+    pill.textContent = microsoftFaceLabel(microsoft);
+    pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
   }
 
   /* ---------------------------------------------------------- connectors */
@@ -414,9 +424,7 @@
     name.appendChild(el('b', null, 'Microsoft'));
     name.appendChild(el('i', null, 'Mail, To Do & Calendar'));
     head.appendChild(name);
-    if (tokenStatus === 'valid') head.appendChild(el('span', 'badge on', 'Connected'));
-    else if (tokenStatus === 'expired' || tokenStatus === 'missing-scope') head.appendChild(el('span', 'badge', 'Reconnect'));
-    else head.appendChild(el('span', 'badge live', 'Works now'));
+    head.appendChild(el('span', 'badge' + (tokenStatus === 'valid' ? ' on' : ''), microsoftFaceLabel(tokenStatus)));
     card.appendChild(head);
     if (tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
       card.appendChild(el('p', 'conn-note', 'Reconnect Microsoft'));
@@ -501,6 +509,25 @@
         await refresh();
       });
       card.appendChild(revoke);
+    }
+    const todoPolicy = state && state.glanceTodoConsent;
+    if (todoPolicy && todoPolicy.mode === 'always' && todoPolicy.revoked !== true) {
+      card.appendChild(el('p', 'conn-note', 'הרשאת To Do: תמיד'));
+      const revokeTodo = el('button', 'ghost', 'בטל הרשאת To Do');
+      revokeTodo.type = 'button';
+      revokeTodo.setAttribute('data-glance-revoke-todo', 'always');
+      revokeTodo.addEventListener('click', async () => {
+        await FlowStorage.set({ glanceTodoConsent: { mode: null, revoked: true, scope: 'Tasks.ReadWrite', at: Date.now() } });
+        await FlowStorage.appendLog({
+          kind: 'shown',
+          label: 'הרשאת To Do בוטלה',
+          app: 'outlook',
+          reason: 'todo-consent-revoked',
+          messageId: 'todo-consent'
+        });
+        await refresh();
+      });
+      card.appendChild(revokeTodo);
     }
     return card;
   }
@@ -1332,12 +1359,16 @@
     const row = el('div', 'wait-item');
     const top = el('div', 'wait-top');
     top.appendChild(el('span', 'wait-who', 'Outlook'));
-    const label = !st.configured ? 'Not set up yet' : st.connected ? (st.needsSignIn ? 'Sign in again' : 'On') : 'Off';
-    top.appendChild(el('span', 'wait-state' + (st.connected && !st.needsSignIn ? ' ok' : ''), label));
+    const link = microsoftTokenStatus();
+    row.setAttribute('data-glance-surface', 'outlook');
+    stampMicrosoft(row, link);
+    stampMicrosoft(document.getElementById('outlookBlock'), link);
+    const label = microsoftFaceLabel(link);
+    top.appendChild(el('span', 'wait-state' + (link === 'valid' ? ' ok' : ''), label));
     row.appendChild(top);
     row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
     if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
-    if (st.connected) {
+    if (link === 'valid' || (st.pageDiagnostics && st.pageDiagnostics.length) || (st.diagnostics && st.diagnostics.length)) {
       // If OWA host permission is already granted (e.g. after reconnect), ensure the content script is registered.
       try {
         const origins = (typeof FlowOutlook !== 'undefined' && FlowOutlook.OWA_ORIGINS) || [
@@ -1358,7 +1389,7 @@
           + (typeof st.lastIncoming === 'number' ? (', ' + st.lastIncoming + ' incoming') : '')
           + '.')
         : 'Not checked yet.';
-      row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
+      if (link === 'valid') row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
       // The mailbox check's reasons, then the Outlook-on-the-web card's own (newest first): every incoming message ends
       // in a card or in a line here.
       const diags = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownRows === 'function')
@@ -1401,7 +1432,13 @@
           const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
           const files = (d.fileCount && d.target) ? (' · ' + d.fileCount + ' ' + d.target) : '';
           const detail = d.detail ? (' (' + String(d.detail).slice(0, 160) + ')') : '';
-          list.appendChild(el('div', 'wait-note', d.reason + detail + ' — “' + sub + '”' + who2 + files));
+          const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function')
+            ? FlowDisplay.whyNotShownLine(d.reason)
+            : String(d.reason || '');
+          const item = el('div', 'wait-note', line + detail + ' — “' + sub + '”' + who2 + files);
+          item.setAttribute('data-glance-why-line', line);
+          item.setAttribute('data-glance-why', String(d.reason || ''));
+          list.appendChild(item);
         });
         details.appendChild(list);
         if (diags.length > shown.length) {
@@ -1438,7 +1475,7 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
     let offRow = null;
-    if (st.configured && !st.connected) {
+    if (link === 'missing' && st.configured) {
       // One Connect screen: Select all, then one checkbox per Graph service.
       // Mail stays on. Extra scopes are added only for a checked box.
       const screen = el('div', 'ms-connect');
@@ -1511,14 +1548,27 @@
       });
       screen.appendChild(c);
       acts.appendChild(screen);
-    } else if (st.connected) {
-      const chk = el('button', 'ghost sm', st.needsSignIn ? 'Sign in again' : 'Check now');
+    } else if (link === 'expired' || link === 'missing-scope') {
+      const again = el('button', 'ghost sm', 'Reconnect');
+      again.type = 'button';
+      again.addEventListener('click', async () => {
+        beginRender();
+        try {
+          again.disabled = true;
+          const r = await o.connect();
+          if (!r.ok) { again.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
+          await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
+        } finally { endRender(); }
+      });
+      acts.appendChild(again);
+    } else if (link === 'valid') {
+      const chk = el('button', 'ghost sm', 'Check now');
       chk.type = 'button';
       chk.addEventListener('click', async () => {
         beginRender();
         try {
           chk.disabled = true;
-          const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
+          const r = await o.sync({ force: true });
           if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
           await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
         } finally { endRender(); }

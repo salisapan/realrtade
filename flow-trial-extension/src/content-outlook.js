@@ -906,6 +906,17 @@
   async function onDoIt(host, chip, ctx, liveSteps) {
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
+    const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
+    const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    const earlyDraft = earlySteps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
+    if (earlyTask && !earlyDraft) {
+      let stNow = null;
+      try { stNow = await FlowStorage.get(); } catch (e) { stNow = null; }
+      if (todoAsk(stNow)) {
+        paintIfCurrent(token, function () { paintTodoConsent(host, ctx); });
+        return;
+      }
+    }
     doItInFlight = true;
     try {
     paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
@@ -1287,11 +1298,10 @@
   // mail-open, or click started on. The check reads the pane and the URL again.
   let paintDepth = 0;
   function whyNotText(reason) {
-    const r = String(reason || '');
-    if (r === 'context-dead') return 'Glance התעדכן — רענן את הדף כדי להתחבר מחדש';
-    if (r === 'page:not-connected' || r === 'no-token') return 'Connect Microsoft to close this loop.';
-    if (r === 'scan-skipped' || r === 'page:scan-skipped') return 'Glance is still reading this mail.';
-    return 'Glance stayed quiet on this mail.';
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function') {
+      return FlowDisplay.whyNotShownLine(reason);
+    }
+    return 'לא זוהתה בקשה';
   }
 
   // Painted when chrome.runtime.id disappears. No chrome.* call: the dead
@@ -2717,6 +2727,7 @@
   }
 
   const CALENDAR_SCOPE = 'Calendars.ReadWrite';
+  const TODO_SCOPE = 'Tasks.ReadWrite';
 
   function calendarAsk(st) {
     const granted = typeof FlowOutlookCalendar !== 'undefined' && FlowOutlookCalendar.hasWriteScope
@@ -2799,6 +2810,23 @@
     return why;
   }
 
+  function hasTasksWrite(scopes) {
+    const list = (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.normalizeDelegatedScopes === 'function')
+      ? FlowOutlookCalendar.normalizeDelegatedScopes(scopes)
+      : (Array.isArray(scopes) ? scopes : null);
+    if (!list) return false;
+    return list.some((s) => String(s).toLowerCase() === 'tasks.readwrite');
+  }
+
+  function todoAsk(st) {
+    const granted = hasTasksWrite(calendarScopes(st));
+    const policy = (st && st.glanceTodoConsent) || null;
+    if (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.holdConsentAsk === 'function') {
+      return FlowOutlookCalendar.holdConsentAsk(granted, policy);
+    }
+    return !granted;
+  }
+
   function paintCalendarConsent(host, ctx) {
     if (paintDepth <= 0) return;
     if (!host || host.querySelector('[data-glance-consent="calendar"]')) return;
@@ -2816,6 +2844,93 @@
     });
     row.appendChild(actions);
     host.appendChild(row);
+  }
+
+  function paintTodoConsent(host, ctx) {
+    if (paintDepth <= 0) return;
+    if (!host || host.querySelector('[data-glance-consent="todo"]')) return;
+    const row = FlowChipHost.el('div', 'flow-chip-consent');
+    row.setAttribute('data-glance-consent', 'todo');
+    row.setAttribute('dir', 'rtl');
+    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'אין הרשאת To Do'));
+    const actions = FlowChipHost.el('span', 'flow-chip-actions');
+    [['אפשר פעם אחת', 'once'], ['אפשר תמיד', 'always'], ['לא עכשיו', 'not-now']].forEach((pair) => {
+      const button = FlowChipHost.el('button', 'flow-chip-consent-btn capture-secondary', pair[0]);
+      button.type = 'button';
+      button.setAttribute('data-glance-consent-choice', pair[1]);
+      button.addEventListener('click', () => { onTodoConsent(host, ctx, pair[1]); });
+      actions.appendChild(button);
+    });
+    row.appendChild(actions);
+    host.appendChild(row);
+  }
+
+  async function logTodoChoice(choice) {
+    const labels = {
+      always: 'הרשאת To Do: תמיד',
+      once: 'הרשאת To Do: פעם אחת',
+      'not-now': 'הרשאת To Do: לא עכשיו'
+    };
+    const reasons = {
+      always: 'todo-consent-always',
+      once: 'todo-consent-once',
+      'not-now': 'todo-consent-not-now'
+    };
+    const label = labels[choice];
+    if (!label) return;
+    await FlowStorage.appendLog({
+      kind: 'shown',
+      label: label,
+      app: 'outlook',
+      reason: reasons[choice],
+      messageId: 'todo-consent'
+    });
+  }
+
+  async function storeTodoPolicy(choice) {
+    const st = await FlowStorage.get();
+    const auth = (st && st.outlookAuth) || {};
+    const token = Object.assign({}, auth.token || {});
+    const known = (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.normalizeDelegatedScopes === 'function')
+      ? FlowOutlookCalendar.normalizeDelegatedScopes(token.grantedScopes)
+      : (Array.isArray(token.grantedScopes) ? token.grantedScopes : []);
+    const scopes = (known || []).slice();
+    if (scopes.indexOf(TODO_SCOPE) < 0) scopes.push(TODO_SCOPE);
+    token.grantedScopes = scopes;
+    const mode = choice === 'always' ? 'always' : 'once';
+    await FlowStorage.set({
+      outlookAuth: Object.assign({}, auth, { token: token }),
+      glanceTodoConsent: { mode: mode, scope: TODO_SCOPE, revoked: false, at: Date.now() }
+    });
+    await logTodoChoice(mode);
+  }
+
+  async function onTodoConsent(host, ctx, choice) {
+    if (!host || ignoreStaleClick(host)) return;
+    if (choice === 'not-now') {
+      await logTodoChoice('not-now');
+      const ask = host.querySelector('[data-glance-consent="todo"]');
+      if (ask) ask.remove();
+      return;
+    }
+    const granted = await send({ type: 'flow:outlook-consent-scope', scope: TODO_SCOPE, policy: choice });
+    if (!granted || granted.ok !== true) {
+      const token = captureMailToken();
+      paintIfCurrent(token, function () { paintHint(host, 'אין הרשאת To Do'); });
+      return;
+    }
+    await storeTodoPolicy(choice);
+    const ask = host.querySelector('[data-glance-consent="todo"]');
+    if (ask) ask.remove();
+  }
+
+  function paintMissingScope(host, ctx, st) {
+    if (!host || !ctx || !ctx.process) return;
+    const steps = ctx.process.steps || [];
+    const taskOnly = steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    const hold = ctx.process.id === 'hold' || (ctx.intent && ctx.intent.personalClose === 'calendar-hold');
+    if (hold && calendarAsk(st)) paintCalendarConsent(host, ctx);
+    if (taskOnly && todoAsk(st)) paintTodoConsent(host, ctx);
   }
 
   async function onCalendarConsent(host, ctx, choice) {
@@ -3768,10 +3883,14 @@
     if (old) paintIfCurrent(token, function () { paintRemove(old); });
     lastKey = key;
 
-    const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
-      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
-      onDismiss: (h, c) => { onDismiss(h, c); }
-    }); });
+    const host = paintIfCurrent(token, function () {
+      const painted = injectCard(mount, ctx, {
+        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDismiss: (h, c) => { onDismiss(h, c); }
+      });
+      if (painted) paintMissingScope(painted, ctx, st);
+      return painted;
+    });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
     const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
     if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
@@ -3818,6 +3937,13 @@
       .replace(/Glance is still reading this mail\.?/g, '')
       .replace(/Glance stayed quiet on this mail\.?/g, '')
       .replace(/Glance התעדכן — רענן את הדף כדי להתחבר מחדש/g, '')
+      .replace(/אין הרשאת To Do/g, '')
+      .replace(/לא זוהתה בקשה/g, '')
+      .replace(/משתמש חיצוני/g, '')
+      .replace(/לא מחובר/g, '')
+      .replace(/התוסף התעדכן/g, '')
+      .replace(/עדיין קורא את המייל/g, '')
+      .replace(/צריך הרשאה ליומן/g, '')
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
@@ -4765,10 +4891,16 @@
     if (existing) paintIfCurrent(token, function () { paintRemove(existing); });
     const ctx = buildCtx(loop, pane, { intent: loop.intent, process: loop.process });
     if (!ctx || !ctx.messageId) return false;
-    const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
-      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
-      onDismiss: (h, c) => { onDismiss(h, c); }
-    }); });
+    let loopSt = null;
+    try { loopSt = await FlowStorage.get(); } catch (e) { loopSt = null; }
+    const host = paintIfCurrent(token, function () {
+      const painted = injectCard(mount, ctx, {
+        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDismiss: (h, c) => { onDismiss(h, c); }
+      });
+      if (painted) paintMissingScope(painted, ctx, loopSt);
+      return painted;
+    });
     if (!host) return false;
     const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
     if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));

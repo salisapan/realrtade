@@ -73,7 +73,7 @@ FlowOutlookConfig.defaultConnectIds = function defaultConnectIds() {
 // Mail.Send and any Shared scope are never added.
 FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(existing, scope) {
   const add = String(scope || '');
-  if (add !== 'Calendars.ReadWrite') return null;
+  if (add !== 'Calendars.ReadWrite' && add !== 'Tasks.ReadWrite') return null;
   const out = [];
   const raw = Array.isArray(existing) ? existing : String(existing || '').split(/[\s,;]+/);
   raw.forEach((s) => {

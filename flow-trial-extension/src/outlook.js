@@ -137,7 +137,7 @@ const FlowOutlook = (() => {
         redirectUri: deps.redirectUri(),
         tokenStatus: (typeof FlowOutlookAuth !== 'undefined' && typeof FlowOutlookAuth.microsoftConnection === 'function')
           ? FlowOutlookAuth.microsoftConnection(auth, st, Date.now())
-          : (auth && auth.token ? 'valid' : 'missing'),
+          : 'missing',
         offers: (pending.offers || []).length, asks: (pending.asks || []).length,
         incoming: (pending.incoming || []).length,
         diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],

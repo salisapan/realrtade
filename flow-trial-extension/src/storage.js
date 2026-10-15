@@ -225,6 +225,8 @@ const FlowStorage = (() => {
     // The Hold calendar choice (once / always). Settings reads it through get().
     // Null is no policy. A missing key would never arrive, so Always could not be revoked.
     glanceCalendarConsent: null,
+    // The To Do consent choice (once / always). Same shape as the calendar policy.
+    glanceTodoConsent: null,
     // Tabs whose Outlook script died and could not paint the refresh line.
     // The popup reads this through get(). A missing key would never arrive.
     glanceOutlookRefresh: {},

@@ -156,6 +156,23 @@ const FlowExtract = (() => {
     return { raw, iso: iso(inWindow[0]) };
   }
 
+  // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
+  function slashDate(text, now) {
+    const m = String(text || '').match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+    if (!m) return null;
+    const a = +m[1];
+    const b = +m[2];
+    let day = null;
+    let monthIdx = null;
+    if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
+    else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+    else return { raw: m[0], iso: null };
+    let year = m[3] ? +m[3] : null;
+    if (year != null && year < 100) year += 2000;
+    const built = monthDay(m[0], monthIdx, day, year, now || new Date());
+    return built || { raw: m[0], iso: null };
+  }
+
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
   function parseDate(text, now) {
@@ -220,6 +237,9 @@ const FlowExtract = (() => {
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta += 7;
       d.setDate(d.getDate() + delta);
+      // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
+      const numbered = slashDate(text, now);
+      if (numbered && numbered.iso) return numbered;
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -337,10 +357,9 @@ const FlowExtract = (() => {
       return { raw: 'היום', iso: iso(d) };
     }
 
-    // Numeric M/D or D/M is genuinely ambiguous across locales, so it is kept as
-    // written and never normalized to an ISO date we cannot justify.
-    m = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-    if (m) return { raw: m[0], iso: null };
+    // One side above 12 is a day or a month, not a guess. 5/6 stays unresolved.
+    const slash = slashDate(text, now);
+    if (slash) return slash.iso ? slash : { raw: slash.raw, iso: null };
 
     return null;
   }
@@ -425,6 +444,18 @@ const FlowExtract = (() => {
       const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
       if (!clock) return null;
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // 11:00 next to a meeting noun is the hour. A bare 11:00 with no meeting
+    // is still a flight, a room, or a price, and stays unresolved.
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text)) {
+      const re = /(?:^|[^\d])(\d{1,2}):(\d{2})(?!\d)/g;
+      let tm;
+      while ((tm = re.exec(text))) {
+        const clock = resolveClock(+tm[1], +tm[2], '');
+        if (!clock) continue;
+        return { raw: tm[1] + ':' + tm[2], hour: clock.hour, minute: clock.minute };
+      }
     }
 
     return null;
