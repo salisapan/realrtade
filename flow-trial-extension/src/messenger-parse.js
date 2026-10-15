@@ -143,25 +143,64 @@ const FlowMessengerParse = (() => {
     return Array.from(node.querySelectorAll('img')).filter((img) => !inRow(img));
   }
 
-  function groupWording(node) {
+  const COUNT_WORD = /\b(\d{1,4})\s*(members|participants|people|others|משתתפים|אנשים)\b/i;
+
+  function countSaysGroup(text) {
+    const m = String(text || '').match(COUNT_WORD);
+    return Boolean(m) && Number(m[1]) !== 1;
+  }
+
+  function regionTitle(scope, via) {
+    const named = nameIn(scope, via);
+    if (named) return named;
+    if (!scope || typeof scope.querySelectorAll !== 'function') return '';
+    const list = Array.from(scope.querySelectorAll('h1, h2, h3'));
+    for (let i = 0; i < list.length; i++) {
+      if (inRow(list[i])) continue;
+      const text = plainText(list[i]);
+      if (text && !SKIP_HEADING.test(text)) return text;
+    }
+    return '';
+  }
+
+  // A comma, an "and", or a group emoji in the title. A single name is not a group.
+  function groupTitle(title) {
+    const t = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!t) return false;
+    if (/,/.test(t)) return true;
+    if (/\s(?:&|and)\s/i.test(t)) return true;
+    if (/🏠|👥/.test(t)) return true;
+    return false;
+  }
+
+  function headerSaysGroup(node) {
     if (!node || node.nodeType !== 1) return false;
     if (node.getAttribute && node.getAttribute('role') === 'row') return false;
     const label = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
-    if (GROUP_WORD.test(label)) return true;
+    if (GROUP_WORD.test(label) || countSaysGroup(label)) return true;
     const kids = node.childNodes ? Array.from(node.childNodes) : [];
     for (let i = 0; i < kids.length; i++) {
       const kid = kids[i];
       if (kid.nodeType === 3) {
-        if (GROUP_WORD.test(kid.textContent || '')) return true;
-      } else if (kid.nodeType === 1 && groupWording(kid)) return true;
+        if (GROUP_WORD.test(kid.textContent || '') || countSaysGroup(kid.textContent || '')) return true;
+      } else if (kid.nodeType === 1 && headerSaysGroup(kid)) return true;
     }
     return false;
   }
 
+  // Avatar count is not a group signal. A group photo is often one image.
+  // A participant count other than 1, a multi-person title, or a header
+  // marker (members, group chat) is a group, and a group stays quiet.
+  function isGroup(scope, via) {
+    if (groupTitle(regionTitle(scope, via))) return true;
+    if (headerSaysGroup(scope)) return true;
+    return false;
+  }
+
   function decide(scope, via) {
-    const avatars = imgsIn(scope);
     const name = nameIn(scope, via);
-    if (avatars.length >= 2 || groupWording(scope)) return { kind: 'group', via: via, name: name };
+    if (isGroup(scope, via)) return { kind: 'group', via: via, name: name };
+    const avatars = imgsIn(scope);
     if (avatars.length === 1) return { kind: 'one-to-one', via: via, name: name };
     return { kind: 'unknown', via: via, name: name };
   }

@@ -116,61 +116,6 @@
         "src/follow.css"
       ],
       "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://web.whatsapp.com/*"],
-      "js": [
-        "core/fact-reply.js",
-        "core/close-chains.js",
-        "src/chat-draft.js",
-        "src/chat-compose.js",
-        "src/chat-lane.js",
-        "src/whatsapp-parse.js",
-        "src/content-whatsapp-draft.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://www.messenger.com/*",
-        "https://messenger.com/*",
-        "https://www.facebook.com/messages",
-        "https://www.facebook.com/messages/*",
-        "https://facebook.com/messages",
-        "https://facebook.com/messages/*",
-        "https://business.facebook.com/latest/inbox",
-        "https://business.facebook.com/latest/inbox/*",
-        "https://www.business.facebook.com/latest/inbox",
-        "https://www.business.facebook.com/latest/inbox/*"
-      ],
-      "js": [
-        "core/fact-reply.js",
-        "core/close-chains.js",
-        "src/chat-draft.js",
-        "src/chat-compose.js",
-        "src/chat-lane.js",
-        "src/messenger-parse.js",
-        "src/content-messenger.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://www.instagram.com/direct",
-        "https://www.instagram.com/direct/*",
-        "https://instagram.com/direct",
-        "https://instagram.com/direct/*"
-      ],
-      "js": [
-        "core/fact-reply.js",
-        "core/close-chains.js",
-        "src/chat-draft.js",
-        "src/chat-compose.js",
-        "src/chat-lane.js",
-        "src/instagram-parse.js",
-        "src/content-instagram.js"
-      ],
-      "run_at": "document_idle"
     }
   ],
   "permissions": [

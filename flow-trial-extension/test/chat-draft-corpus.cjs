@@ -62,11 +62,10 @@ check('the calendar read does not ask for titles', /fields: 'items\(id,status,lo
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 check('the version line stays 0.9.56', manifest.version === '0.9.56');
 check('Gmail is still the first content script', manifest.content_scripts[0].js[manifest.content_scripts[0].js.length - 1] === 'src/content-gmail.js');
-const laneLists = manifest.content_scripts.slice(1);
-check('three chat script lists were added', laneLists.length === 3);
-laneLists.forEach((list) => {
-  check('a chat list does not load the Gmail or Outlook page', list.js.indexOf('src/content-gmail.js') < 0 && list.js.indexOf('src/content-outlook.js') < 0, list.js);
-});
+check('chat drafts are not extra static content scripts', manifest.content_scripts.length === 1);
+const scriptBlob = JSON.stringify(manifest.content_scripts);
+check('business.facebook.com is not a static content script match', scriptBlob.indexOf('business.facebook.com') < 0);
+check('no chat host is a static content script match', !/whatsapp|messenger|instagram/.test(scriptBlob));
 const required = manifest.host_permissions || [];
 const optional = manifest.optional_host_permissions || [];
 const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
@@ -194,6 +193,12 @@ function liveRoot(file) {
 }
 const liveDirect = FlowMessengerParse.classify(liveRoot('live/messenger-1to1.html'));
 check('live messenger 1:1 is a direct chat named Flow AI', liveDirect.kind === 'one-to-one' && liveDirect.via === 'aria' && liveDirect.name === 'Flow AI' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html')) === true, liveDirect);
+const oneAvatarGroup = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana, Noa</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
+const oneAvatarDirect = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
+check('a group with one avatar stays quiet', FlowMessengerParse.classify(oneAvatarGroup).kind === 'group' && FlowMessengerParse.isOneToOne(oneAvatarGroup) === false);
+check('a one-to-one with one avatar is unchanged', FlowMessengerParse.classify(oneAvatarDirect).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(oneAvatarDirect) === true);
+check('a participant count with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Dana</h2><span>4 people</span><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
+check('Family with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Family 🏠</h2><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
 const liveInbox = FlowMessengerParse.classify(liveRoot('live/messenger-page-inbox.html'));
 check('live Business Suite inbox is a direct chat named Sali Sapan', liveInbox.kind === 'one-to-one' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan', liveInbox);
 const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-unknown.html'));
@@ -328,7 +333,8 @@ console.log('\n--- calendar evidence ---\n');
         }
       }
     };
-    const list = manifest.content_scripts.find((c) => c.js[c.js.length - 1] === surface);
+    const lane = lanes.find((item) => item.js[item.js.length - 1] === surface);
+    const list = lane;
     const ctx = dom.getInternalVMContext();
     list.js.forEach((rel) => {
       new vm.Script(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel }).runInContext(ctx);
@@ -352,6 +358,13 @@ console.log('\n--- calendar evidence ---\n');
     };
   }
 
+  const laneDom = new JSDOM(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8'), { runScripts: 'outside-only', url: 'chrome-extension://glance/lane-chat/enable.html' });
+  laneDom.window.chrome = { permissions: { contains: async () => false, request: async () => false }, scripting: { registerContentScripts: async () => {}, unregisterContentScripts: async () => {} }, runtime: { sendMessage() {} } };
+  new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8'), { filename: 'enable.js' }).runInContext(laneDom.getInternalVMContext());
+  const lanes = laneDom.window.__glanceLaneChat;
+  check('runtime registration lists three chats and skips Gmail', Array.isArray(lanes) && lanes.length === 3 && lanes.every((lane) => lane.js.indexOf('src/content-gmail.js') < 0 && lane.js.indexOf('src/content-outlook.js') < 0));
+  laneDom.window.close();
+
   const pages = [
     ['whatsapp-place.html', 'https://web.whatsapp.com/', 'src/content-whatsapp-draft.js', true],
     ['whatsapp-group.html', 'https://web.whatsapp.com/', 'src/content-whatsapp-draft.js', false],
@@ -369,7 +382,8 @@ console.log('\n--- calendar evidence ---\n');
     ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-flow'],
     ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', 'live-sali'],
     ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', false],
-    ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false]
+    ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
+    ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
   ];
   ['messenger', 'instagram'].forEach((app) => {
     ['aria', 'banner', 'heading'].forEach((level) => {
@@ -407,10 +421,15 @@ console.log('\n--- calendar evidence ---\n');
   const enable = new JSDOM(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8'), { runScripts: 'outside-only', url: 'chrome-extension://glance/lane-chat/enable.html' });
   const ew = enable.window;
   const asked = [];
+  const registered = [];
   ew.chrome = {
     permissions: {
       contains: async () => false,
       request: async (spec) => { asked.push(spec.origins.slice()); return true; }
+    },
+    scripting: {
+      unregisterContentScripts: async () => {},
+      registerContentScripts: async (scripts) => { registered.push(scripts); }
     },
     runtime: { sendMessage() { throw new Error('the enable page must not message'); } }
   };
@@ -420,6 +439,8 @@ console.log('\n--- calendar evidence ---\n');
   buttons[1].click();
   await new Promise((r) => setTimeout(r, 20));
   check('Messenger is requested as an optional origin and nothing is sent', asked.length === 1 && asked[0].some((o) => /messenger\.com/.test(o)) && asked[0].some((o) => /business\.facebook\.com\/latest\/inbox/.test(o)) && asked[0].every((o) => /messages|messenger|business\.facebook\.com\/latest\/inbox/.test(o)));
+  const registeredMatches = JSON.stringify(registered);
+  check('Business Suite is registered at runtime, not from the manifest', /business\.facebook\.com/.test(registeredMatches) && JSON.stringify(manifest.content_scripts).indexOf('business.facebook.com') < 0);
   enable.window.close();
 
   console.log('\nTOTAL FAILURES:', failures);

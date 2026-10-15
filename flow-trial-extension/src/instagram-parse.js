@@ -89,24 +89,59 @@ const FlowInstagramParse = (() => {
     return Array.from(node.querySelectorAll('img')).filter((img) => !inRow(img));
   }
 
-  function groupWording(node) {
+  const COUNT_WORD = /\b(\d{1,4})\s*(members|participants|people|others|משתתפים|אנשים)\b/i;
+
+  function countSaysGroup(text) {
+    const m = String(text || '').match(COUNT_WORD);
+    return Boolean(m) && Number(m[1]) !== 1;
+  }
+
+  function regionTitle(scope) {
+    if (!scope || typeof scope.querySelectorAll !== 'function') return '';
+    const list = Array.from(scope.querySelectorAll('h1, h2, h3'));
+    for (let i = 0; i < list.length; i++) {
+      if (inRow(list[i])) continue;
+      const text = String(list[i].textContent || '').replace(/\s+/g, ' ').trim();
+      if (text && !SKIP_HEADING.test(text)) return text;
+    }
+    return '';
+  }
+
+  function groupTitle(title) {
+    const t = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!t) return false;
+    if (/,/.test(t)) return true;
+    if (/\s(?:&|and)\s/i.test(t)) return true;
+    if (/🏠|👥/.test(t)) return true;
+    return false;
+  }
+
+  function headerSaysGroup(node) {
     if (!node || node.nodeType !== 1) return false;
     if (node.getAttribute && node.getAttribute('role') === 'row') return false;
     const label = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
-    if (GROUP_WORD.test(label)) return true;
+    if (GROUP_WORD.test(label) || countSaysGroup(label)) return true;
     const kids = node.childNodes ? Array.from(node.childNodes) : [];
     for (let i = 0; i < kids.length; i++) {
       const kid = kids[i];
       if (kid.nodeType === 3) {
-        if (GROUP_WORD.test(kid.textContent || '')) return true;
-      } else if (kid.nodeType === 1 && groupWording(kid)) return true;
+        if (GROUP_WORD.test(kid.textContent || '') || countSaysGroup(kid.textContent || '')) return true;
+      } else if (kid.nodeType === 1 && headerSaysGroup(kid)) return true;
     }
     return false;
   }
 
+  // Avatar count is not a group signal. One picture plus a group title,
+  // a participant count other than 1, or a header marker stays quiet.
+  function isGroup(scope) {
+    if (groupTitle(regionTitle(scope))) return true;
+    if (headerSaysGroup(scope)) return true;
+    return false;
+  }
+
   function decide(scope, via) {
+    if (isGroup(scope)) return { kind: 'group', via: via };
     const avatars = imgsIn(scope);
-    if (avatars.length >= 2 || groupWording(scope)) return { kind: 'group', via: via };
     if (avatars.length === 1) return { kind: 'one-to-one', via: via };
     return { kind: 'unknown', via: via };
   }
