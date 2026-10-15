@@ -528,5 +528,7 @@ test('Show all keeps the side panel scroll', async ({ glance }) => {
   await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
   await popup.locator('#surface-list').getByRole('button', { name: 'Show all' }).evaluate((el) => el.click());
   await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  await expect(popup.locator('#surface-list').getByText('page:quiet-24')).toBeVisible();
+  const row = popup.locator('#surface-list [data-glance-why="page:quiet-24"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('לא זוהתה בקשה');
 });

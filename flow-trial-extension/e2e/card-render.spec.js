@@ -36,7 +36,7 @@ test('Outlook silent case renders no card and keeps a Why-not-shown reason', asy
   const why = popup.getByText(/Why not shown/);
   await expect(why).toBeVisible();
   await why.click();
-  await expect(popup.getByText(/intent-null|quiet:/)).toBeVisible();
+  await expect(popup.getByText('לא זוהתה בקשה')).toBeVisible();
 });
 
 test('Gmail show case renders a card', async ({ glance }) => {
