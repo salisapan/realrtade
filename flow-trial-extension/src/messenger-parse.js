@@ -259,11 +259,6 @@ const FlowMessengerParse = (() => {
     return false;
   }
 
-  function personTitle(title) {
-    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
-    return Boolean(rule && rule.personShaped(title) && !rule.counts(title));
-  }
-
   function chipLabel(text) {
     const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
     return Boolean(rule && rule.chip(text));
@@ -546,23 +541,21 @@ const FlowMessengerParse = (() => {
     return found.order.length === 1 && found.order[0] === 'id:' + thread;
   }
 
-  function outsideRowText(root) {
-    function walk(node) {
-      if (!node) return '';
-      if (node.nodeType === 1) {
-        if (node.getAttribute && node.getAttribute('role') === 'row') return '';
-        return Array.from(node.childNodes || []).map(walk).join(' ');
-      }
-      if (node.nodeType === 3) return node.textContent || '';
-      return '';
-    }
-    return walk(root).replace(/\s+/g, ' ').trim();
-  }
-
+  // members / participants only when a header or subtitle element is that
+  // line. "Mary Members" in the title is a name.
   function membersListed(root) {
-    const text = outsideRowText(root);
-    if (countSaysGroup(text)) return true;
-    return /\bmembers\b|\bparticipants\b|\badd people\b|משתתפים/i.test(text);
+    if (!root || typeof root.querySelectorAll !== 'function') return false;
+    const nodes = Array.from(root.querySelectorAll('span, div, p, li, h4, h5, h6'));
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      if (inRow(el)) continue;
+      if (el.querySelector && el.querySelector('h1, h2, h3, span, div, p, li')) continue;
+      const text = plainText(el);
+      const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+      if (rule && rule.memberLine(text)) return true;
+      if (countSaysGroup(text)) return true;
+    }
+    return false;
   }
 
   // "Block Dana" / "Mute Dana" / "חסום דנה" / "השתק את דנה" only, and the
@@ -610,27 +603,37 @@ const FlowMessengerParse = (() => {
     return '';
   }
 
+  // A Page inbox drafts only when the open thread has an id and one person.
+  function inboxThreadProof(scope, href, root) {
+    const facts = inboxFacts(scope);
+    if (facts.group || facts.names.length !== 1) return false;
+    const id = threadIdFor(href, facts.names[0], root);
+    return Boolean(id);
+  }
+
+  function classifyKind(facts) {
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    return rule && rule.verdict ? rule.verdict(facts) : 'unknown';
+  }
+
+  // Person-shaped cancels a group-word veto inside FlowGroupWord.verdict.
+  // It is not allowed to return before the proof checks.
   function decide(scope, via, href, root) {
     const name = nameIn(scope, via);
     const active = headerActive(scope);
     const raw = regionTitle(scope, via);
     const whole = root || scope;
-    if (isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
-    const shaped = raw || firstHeading(whole);
-    if (personTitle(shaped)) return { kind: 'one-to-one', via: via, name: name || shaped, active: active };
-    if (via === 'inbox') {
-      const facts = inboxFacts(scope);
-      const person = facts.names.length === 1 ? facts.names[0] : '';
-      if (facts.group || facts.names.length > 1 || (person && groupTitle(person))) {
-        return { kind: 'group', via: via, name: person, active: active };
-      }
-      if (person) return { kind: 'one-to-one', via: via, name: person, active: active };
-      return { kind: 'unknown', via: via, name: '', active: false };
-    }
-    const proved = matchingProfile(scope, via) || threadMatches(scope, href, via) || singlePersonPanel(whole, raw);
-    if (active && !proved) return { kind: 'unknown', via: via, name: name, active: true };
-    if (proved) return { kind: 'one-to-one', via: via, name: name, active: active };
-    return { kind: 'unknown', via: via, name: name, active: false };
+    const title = raw || firstHeading(whole);
+    const structural = isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole);
+    const proved = !structural && (
+      matchingProfile(scope, via) ||
+      threadMatches(scope, href, via) ||
+      singlePersonPanel(whole, raw) ||
+      (via === 'inbox' && inboxThreadProof(scope, href, whole))
+    );
+    const kind = classifyKind({ title: title, structural: structural, proved: proved });
+    const shown = name || (kind === 'one-to-one' ? title : '');
+    return { kind: kind, via: via, name: shown, active: Boolean(active) };
   }
 
   // First matching region wins. No positive one-to-one or group signal there

@@ -138,11 +138,6 @@ const FlowInstagramParse = (() => {
     return false;
   }
 
-  function personTitle(title) {
-    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
-    return Boolean(rule && rule.personShaped(title) && !rule.counts(title));
-  }
-
   function chipLabel(text) {
     const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
     return Boolean(rule && rule.chip(text));
@@ -420,23 +415,19 @@ const FlowInstagramParse = (() => {
     return found.order.length === 1 && found.order[0] === 'id:' + thread;
   }
 
-  function outsideRowText(root) {
-    function walk(node) {
-      if (!node) return '';
-      if (node.nodeType === 1) {
-        if (node.getAttribute && node.getAttribute('role') === 'row') return '';
-        return Array.from(node.childNodes || []).map(walk).join(' ');
-      }
-      if (node.nodeType === 3) return node.textContent || '';
-      return '';
-    }
-    return walk(root).replace(/\s+/g, ' ').trim();
-  }
-
   function membersListed(root) {
-    const text = outsideRowText(root);
-    if (countSaysGroup(text)) return true;
-    return /\bmembers\b|\bparticipants\b|\badd people\b|משתתפים/i.test(text);
+    if (!root || typeof root.querySelectorAll !== 'function') return false;
+    const nodes = Array.from(root.querySelectorAll('span, div, p, li, h4, h5, h6'));
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      if (inRow(el)) continue;
+      if (el.querySelector && el.querySelector('h1, h2, h3, span, div, p, li')) continue;
+      const text = plainText(el);
+      const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+      if (rule && rule.memberLine(text)) return true;
+      if (countSaysGroup(text)) return true;
+    }
+    return false;
   }
 
   function namedAction(label, rawTitle) {
@@ -481,17 +472,20 @@ const FlowInstagramParse = (() => {
     return '';
   }
 
+  function classifyKind(facts) {
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    return rule && rule.verdict ? rule.verdict(facts) : 'unknown';
+  }
+
   function decide(scope, via, href, root) {
     const active = headerActive(scope);
     const raw = regionTitle(scope);
     const whole = root || scope;
-    if (isGroup(scope) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, active: active };
-    const shaped = raw || firstHeading(whole);
-    if (personTitle(shaped)) return { kind: 'one-to-one', via: via, active: active };
-    const proved = matchingProfile(scope) || threadMatches(scope, href) || singlePersonPanel(whole, raw);
-    if (active && !proved) return { kind: 'unknown', via: via, active: true };
-    if (proved) return { kind: 'one-to-one', via: via, active: active };
-    return { kind: 'unknown', via: via, active: false };
+    const title = raw || firstHeading(whole);
+    const structural = isGroup(scope) || groupTitle(firstHeading(whole)) || membersListed(whole);
+    const proved = !structural && (matchingProfile(scope) || threadMatches(scope, href) || singlePersonPanel(whole, raw));
+    const kind = classifyKind({ title: title, structural: structural, proved: proved });
+    return { kind: kind, via: via, active: Boolean(active) };
   }
 
   // First matching region wins. No positive one-to-one or group signal there

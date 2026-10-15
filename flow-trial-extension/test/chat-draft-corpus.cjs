@@ -200,7 +200,7 @@ check('a title is not proof of a direct chat', ['Dana, Noa', 'Dana & Noa', 'Fami
   return FlowMessengerParse.isOneToOne(chatEl(html)) === false && FlowInstagramParse.isOneToOne(chatEl(html)) === false;
 }));
 const directHeader = '<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Conversation information" href="https://www.messenger.com/t/1">Conversation information</a></header></div>';
-check('a person-shaped title is one-to-one', FlowMessengerParse.isOneToOne(chatEl(directHeader)) === true && FlowMessengerParse.classify(chatEl(directHeader)).kind === 'one-to-one');
+check('a person-shaped title is not proof', FlowMessengerParse.isOneToOne(chatEl(directHeader)) === false && FlowMessengerParse.classify(chatEl(directHeader)).kind !== 'one-to-one');
 check('a fixture thread type is not proof', FlowMessengerParse.isOneToOne(chatEl('<div role="main" data-thread-type="one-to-one"><header><h2>Chat 2</h2></header></div>')) === false);
 check('members text blocks the draft', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><a aria-label="Conversation information">Conversation information</a><span>3 members</span></header></div>')) === false);
 check('a group aria-label blocks the draft', (() => {
@@ -208,7 +208,7 @@ check('a group aria-label blocks the draft', (() => {
   return got.kind === 'group' && got.via === 'heading' && FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Group conversation">Group conversation</a></header></div>')) === false;
 })());
 check('two header images block the draft', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><img alt=""><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false);
-check('a person-shaped Instagram title is one-to-one', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt="Dana\'s profile picture"><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === true);
+check('a person-shaped Instagram title is not proof', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt="Dana\'s profile picture"><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false);
 check('Chat details alone is unknown', (() => {
   const got = FlowInstagramParse.classify(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>'));
   return got.kind === 'unknown' && got.via === 'aria' && FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false;
@@ -237,11 +237,11 @@ const liveE2ee = 'https://www.messenger.com/e2ee/t/1358224314037055';
 const liveDirect = FlowMessengerParse.classify(liveRoot('live/messenger-1to1.html'), liveHref);
 check('live messenger 1:1 drafts when the thread id matches the profile', liveDirect.kind === 'one-to-one' && liveDirect.via === 'aria' && liveDirect.name === 'Flow AI' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html'), liveHref) === true, liveDirect);
 check('live messenger 1:1 also drafts on an e2ee thread url', FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html'), liveE2ee) === true);
-check('Flow AI is one-to-one from the title', FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html')) === true);
+check('Flow AI stays quiet without the thread id', FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html')) === false);
 const oneAvatarGroup = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana, Noa</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
 const oneAvatarDirect = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
 check('a group with one avatar stays quiet', FlowMessengerParse.classify(oneAvatarGroup).kind === 'group' && FlowMessengerParse.isOneToOne(oneAvatarGroup) === false);
-check('one avatar and a person-shaped name is one-to-one', FlowMessengerParse.classify(oneAvatarDirect).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(oneAvatarDirect) === true);
+check('one avatar and a person-shaped name is not proof', FlowMessengerParse.classify(oneAvatarDirect).kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(oneAvatarDirect) === false);
 function namedHeader(title, extra, control) {
   return chatEl('<div role="main"><header><img alt="" src="data:,"><h2>' + title + '</h2>' + (extra || '') + control + '</header></div>');
 }
@@ -253,8 +253,7 @@ check('a title that is only the group word stays quiet on Messenger', FlowMessen
 check('a title that is only the group word stays quiet on Instagram', FlowInstagramParse.classify(familyOnlyIg).kind === 'group' && FlowInstagramParse.isOneToOne(familyOnlyIg) === false);
 const bookClub = namedHeader('Book club', '', msInfo);
 const bookClubIg = namedHeader('Book club', '', igInfo);
-check('Book club is a person-shaped title on Messenger', FlowMessengerParse.classify(bookClub).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(bookClub) === true);
-check('Book club is a person-shaped title on Instagram', FlowInstagramParse.classify(bookClubIg).kind === 'one-to-one' && FlowInstagramParse.isOneToOne(bookClubIg) === true);
+check('Book club is not one-to-one without proof', FlowMessengerParse.classify(bookClub).kind !== 'one-to-one' && FlowInstagramParse.classify(bookClubIg).kind !== 'one-to-one');
 const msHref = 'https://www.messenger.com/t/100012345678';
 const msProfile = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a>', msInfo);
 const igProfile = namedHeader('Dana', '<a href="/dana/" role="link">Dana</a>', igInfo);
@@ -265,27 +264,30 @@ check('an Instagram one-to-one with a profile link still drafts', FlowInstagramP
   const ig = namedHeader('Dana', '<span>' + status + '</span>', igInfo);
   const msGot = FlowMessengerParse.classify(ms);
   const igGot = FlowInstagramParse.classify(ig);
-  check(status + ' does not block a person-shaped title on Messenger', msGot.kind === 'one-to-one' && msGot.active === true && FlowMessengerParse.isOneToOne(ms) === true, msGot);
-  check(status + ' does not block a person-shaped title on Instagram', igGot.kind === 'one-to-one' && igGot.active === true && FlowInstagramParse.isOneToOne(ig) === true, igGot);
+  check(status + ' does not prove a person-shaped title on Messenger', msGot.kind !== 'one-to-one' && msGot.active === true && FlowMessengerParse.isOneToOne(ms) === false, msGot);
+  check(status + ' does not prove a person-shaped title on Instagram', igGot.kind !== 'one-to-one' && igGot.active === true && FlowInstagramParse.isOneToOne(ig) === false, igGot);
 });
 const linkedActive = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><span>פעיל/ה עכשיו</span>', msInfo);
 check('a matching profile link still drafts when Hebrew active status is present', FlowMessengerParse.classify(linkedActive, msHref).kind === 'one-to-one' && FlowMessengerParse.isOneToOne(linkedActive, msHref) === true);
 const mismatched = namedHeader('Chat 2', '<a href="/booklovers.tlv/" role="link">Book club</a><span>Active now</span>', msInfo);
 check('active status does not repair a profile link that names someone else', FlowMessengerParse.isOneToOne(mismatched) === false && FlowInstagramParse.isOneToOne(mismatched) === false);
 const activeInRow = chatEl('<div role="main"><h2>Book club</h2><img alt="" src="data:,"><div role="row"><span>Active now</span></div></div>');
-check('a person-shaped title stays one-to-one when active status is inside a row', FlowMessengerParse.isOneToOne(activeInRow) === true && FlowInstagramParse.isOneToOne(activeInRow) === true);
+check('active status inside a row is not proof', FlowMessengerParse.isOneToOne(activeInRow) === false && FlowInstagramParse.isOneToOne(activeInRow) === false);
 check('a participant count with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Dana</h2><span>4 people</span><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
 check('Family with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Family 🏠</h2><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
-const liveInbox = FlowMessengerParse.classify(liveRoot('live/messenger-page-inbox.html'));
-check('a Page inbox names one person and is one-to-one', liveInbox.kind === 'one-to-one' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-page-inbox.html')) === true, liveInbox);
-const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-unknown.html'));
-check('a Page inbox with no image is still one person', inboxUnknown.kind === 'one-to-one' && inboxUnknown.via === 'inbox' && inboxUnknown.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html')) === true, inboxUnknown);
-const suiteExisting = FlowMessengerParse.classify(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/');
-check('an open Business Suite thread is a Page one-to-one', suiteExisting.kind === 'one-to-one' && suiteExisting.via === 'inbox' && suiteExisting.name === 'Dana Levi' && FlowMessengerParse.isOneToOne(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/') === true, suiteExisting);
+const liveInbox = FlowMessengerParse.classify(liveRoot('live/messenger-page-inbox.html'), 'https://business.facebook.com/latest/inbox/?selected_item_id=sali');
+check('a Page inbox names one person and is one-to-one', liveInbox.kind === 'one-to-one' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-page-inbox.html'), 'https://business.facebook.com/latest/inbox/?selected_item_id=sali') === true, liveInbox);
+const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-unknown.html'), 'https://business.facebook.com/latest/inbox/t/unknown');
+check('a Page inbox with no image is still one person', inboxUnknown.kind === 'one-to-one' && inboxUnknown.via === 'inbox' && inboxUnknown.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html'), 'https://business.facebook.com/latest/inbox/t/unknown') === true, inboxUnknown);
+const suiteHref = 'https://business.facebook.com/latest/inbox/all/?selected_item_id=bs-existing';
+const suiteExisting = FlowMessengerParse.classify(liveRoot('live/business-suite-existing.html'), suiteHref);
+check('an open Business Suite thread is a Page one-to-one', suiteExisting.kind === 'one-to-one' && suiteExisting.via === 'inbox' && suiteExisting.name === 'Dana Levi' && FlowMessengerParse.isOneToOne(liveRoot('live/business-suite-existing.html'), suiteHref) === true, suiteExisting);
+const suiteNoId = FlowMessengerParse.classify(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/');
+check('a Page inbox without a thread id is not proof', suiteNoId.kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/') === false, suiteNoId);
 const inboxGroup = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-group.html'));
 check('Business Suite inbox with a group word is a group', inboxGroup.kind === 'group' && inboxGroup.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-group.html')) === false, inboxGroup);
 function suiteKind(file) {
-  return FlowMessengerParse.classify(liveRoot(file), 'https://business.facebook.com/latest/inbox/all/');
+  return FlowMessengerParse.classify(liveRoot(file), 'https://business.facebook.com/latest/inbox/all/?selected_item_id=open');
 }
 const twoPeople = suiteKind('fallback/business-suite-two.html');
 check('a second participant line is a group', twoPeople.kind === 'group' && FlowMessengerParse.isOneToOne(liveRoot('fallback/business-suite-two.html'), 'https://business.facebook.com/latest/inbox/all/') === false, twoPeople);
@@ -304,7 +306,7 @@ const statusKind = FlowMessengerParse.classify(statusHeader, 'https://business.f
 check('a status line is not a second participant', statusKind.kind === 'one-to-one' && statusKind.name === 'Dana Levi', statusKind);
 ['Sales Team', 'Marketing Team', 'Team Alpha', 'צוות מכירות', 'קבוצת ריצה', 'Support Group', 'בקבוצת ריצה', 'מחלקת מכירות'].forEach((title) => {
   const plain = chatEl('<div role="main"><header><h2>' + title + '</h2></header></div>');
-  check(title + ' is one-to-one from the title', FlowMessengerParse.classify(plain).kind === 'one-to-one' && FlowInstagramParse.classify(plain).kind === 'one-to-one' && FlowGroupWord.counts(title) === false, { messenger: FlowMessengerParse.classify(plain), instagram: FlowInstagramParse.classify(plain) });
+  check(title + ' is not one-to-one without proof', FlowMessengerParse.classify(plain).kind !== 'one-to-one' && FlowInstagramParse.classify(plain).kind !== 'one-to-one' && FlowGroupWord.counts(title) === false, { messenger: FlowMessengerParse.classify(plain), instagram: FlowInstagramParse.classify(plain) });
   const marked = chatEl('<div role="main"><header><h2>' + title + '</h2><span>3 members</span></header></div>');
   check(title + ' with a member count is a group', FlowMessengerParse.classify(marked).kind === 'group' && FlowInstagramParse.classify(marked).kind === 'group');
 });
@@ -319,6 +321,36 @@ check('a status line is not a second participant', statusKind.kind === 'one-to-o
 });
 const notATeam = chatEl('<div role="main"><header><h2>הדנה</h2></header></div>');
 check('הדנה is not a group word', FlowMessengerParse.classify(notATeam).kind !== 'group' && FlowInstagramParse.classify(notATeam).kind !== 'group');
+function surfaceKinds(title, extra) {
+  const ms = chatEl('<div role="main"><header><h2>' + title + '</h2>' + (extra || '') + '<a aria-label="Conversation information">Conversation information</a></header></div>');
+  const ig = chatEl('<div role="main"><header><h2>' + title + '</h2>' + (extra || '') + '<button type="button" aria-label="Chat details">Chat details</button></header></div>');
+  const suite = chatEl('<div role="main"><span data-surface="/bizweb/lib:inbox:detail_view_header"><div><div>' + title + '</div></div></span></div>');
+  const suiteHref = extra ? 'https://business.facebook.com/latest/inbox/all/?selected_item_id=parity' : 'https://business.facebook.com/latest/inbox/all/';
+  return [
+    FlowMessengerParse.classify(ms, extra ? msHref : '').kind,
+    FlowInstagramParse.classify(ig).kind,
+    FlowMessengerParse.classify(suite, suiteHref).kind
+  ];
+}
+['Team 🔥', 'Team 7', 'Dana 👯'].forEach((title) => {
+  const bare = surfaceKinds(title, '');
+  check(title + ' has one verdict on Messenger, Instagram, and Business Suite', bare[0] === bare[1] && bare[1] === bare[2] && bare[0] !== 'one-to-one', bare);
+});
+function provedName(title, slug) {
+  const link = '<a href="/' + slug + '/" role="link">' + title + '</a>';
+  const kinds = surfaceKinds(title, link);
+  const suite = chatEl('<div role="main"><span data-surface="/bizweb/lib:inbox:detail_view_header"><div><div>' + title + '</div></div></span></div>');
+  const suiteKind = FlowMessengerParse.classify(suite, 'https://business.facebook.com/latest/inbox/all/?selected_item_id=parity').kind;
+  return [kinds[0], kinds[1], suiteKind];
+}
+['Mary Members', 'Ana Participants'].forEach((title) => {
+  const slug = title.toLowerCase().replace(/[^a-z]+/g, '.');
+  const proved = provedName(title, slug);
+  check(title + ' is one-to-one with proof on every surface', proved[0] === 'one-to-one' && proved[1] === 'one-to-one' && proved[2] === 'one-to-one', proved);
+  const bare = surfaceKinds(title, '');
+  check(title + ' stays quiet without proof on every surface', bare[0] !== 'one-to-one' && bare[1] !== 'one-to-one' && bare[2] !== 'one-to-one' && bare[0] === bare[1] && bare[1] === bare[2], bare);
+});
+check('a person-shaped title cancels a group-word veto only when proof is present', FlowGroupWord.verdict({ title: 'Mary Members', wordVeto: true, proved: true }) === 'one-to-one' && FlowGroupWord.verdict({ title: 'Mary Members', wordVeto: true, proved: false }) === 'unknown' && FlowGroupWord.verdict({ title: 'Team', proved: true }) === 'group');
 check('selected_item_id is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?selected_item_id=abc', 'Dana Levi', statusHeader) === 'ms:abc');
 check('a thread query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?thread=xyz', '', null) === 'ms:xyz');
 check('a thread_id query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/?thread_id=tid', '', null) === 'ms:tid');
@@ -377,20 +409,21 @@ surnamePeople.forEach((title) => {
   const ms = FlowMessengerParse.classify(root);
   const ig = FlowInstagramParse.classify(root);
   check(title + ' is a person on Messenger and Instagram', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true && FlowGroupWord.counts(title) === false, { messenger: ms, instagram: ig });
+  const bare = chatEl('<div role="main"><header><h2>' + title + '</h2></header></div>');
+  check(title + ' stays quiet without proof', FlowMessengerParse.isOneToOne(bare) === false && FlowInstagramParse.isOneToOne(bare) === false && FlowMessengerParse.classify(bare).kind !== 'one-to-one');
 });
 const staffName = 'Dana Levi (Staff)';
 const staffRoot = chatEl(personHtml(staffName, '100012345678'));
 const staffHref = 'https://www.messenger.com/t/100012345678';
 check('a parenthetical staff note is still Dana Levi', FlowGroupWord.counts(staffName) === false && FlowMessengerParse.classify(staffRoot, staffHref).kind === 'one-to-one' && FlowInstagramParse.classify(staffRoot, staffHref).kind === 'one-to-one', { messenger: FlowMessengerParse.classify(staffRoot, staffHref), instagram: FlowInstagramParse.classify(staffRoot, staffHref) });
-check('both parsers call the shared group-word function', /globalThis\.FlowGroupWord/.test(messengerParse) && /globalThis\.FlowGroupWord/.test(instagramParse));
+check('both parsers call the shared classifier', /globalThis\.FlowGroupWord/.test(messengerParse) && /FlowGroupWord\.verdict|rule\.verdict/.test(messengerParse) && /rule\.verdict/.test(instagramParse));
 const advDir = path.join(__dirname, 'fixtures/chat/adv');
 const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html')).sort();
 check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
 advFiles.forEach((name) => {
   const root = liveRoot('adv/' + name);
   const href = name === 'd-link.html' ? msHref : '';
-  const advPerson = ['d-link.html', 'direct.html', 'd-none.html', 'd-active.html', 'd-ago.html', 'd-he-active.html', 'g-single.html', 'g-book-active.html', 'g-book-link.html'];
-  const wantDraft = advPerson.indexOf(name) >= 0;
+  const wantDraft = name === 'd-link.html';
   const wantActive = ['d-active.html', 'd-ago.html', 'd-he-active.html', 'g-book-active.html', 'g-he2-active.html'].indexOf(name) >= 0;
   const ms = FlowMessengerParse.classify(root, href);
   const ig = FlowInstagramParse.classify(root, href);
@@ -399,13 +432,14 @@ advFiles.forEach((name) => {
   const verdict = wantDraft ? 'drafts' : 'stays quiet';
   check('adv ' + name + ' ' + verdict, msDraft === wantDraft && igDraft === wantDraft && ms.active === wantActive && ig.active === wantActive, { messenger: ms, instagram: ig });
 });
+check('38 adversarial cases stay empty', advFiles.length === 20 && advFiles.filter((name) => name !== 'd-link.html').length * 2 === 38);
 // id-nested.html drafts because the URL is /danalevi_88/, an independent
 // username. The h2 text inside that link is not a signal. It did not rely
 // on the title matching itself.
-const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html', 'id-block-name.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-vav-noa.html', 'id-vered.html', 'id-numeric-nested.html', 'id-bare-block.html', 'id-bare-mute.html', 'id-block-other.html', 'id-nested-group.html', 'id-group-viewprofile.html', 'id-thread-mismatch.html'];
-const identityQuiet = ['id-team.html', 'id-team7.html', 'id-emoji.html'];
+const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html', 'id-block-name.html', 'id-nested-group.html', 'id-group-viewprofile.html'];
+const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-thread-mismatch.html', 'id-bare-block.html', 'id-bare-mute.html', 'id-block-other.html'];
 function numericPage(name) {
-  return name === 'id-duplicate.html' || name === 'id-weiss.html';
+  return name === 'id-duplicate.html' || name === 'id-weiss.html' || name === 'id-nested-group.html';
 }
 identityDraft.forEach((name) => {
   const root = liveRoot('identity/' + name);
@@ -426,9 +460,9 @@ const emoji = liveRoot('identity/id-emoji.html');
 const vavNoa = liveRoot('identity/id-vav-noa.html');
 check('Team 7 is not one-to-one', FlowMessengerParse.classify(team7).kind !== 'one-to-one' && FlowInstagramParse.classify(team7).kind !== 'one-to-one');
 check('Dana with a people emoji is not one-to-one', FlowMessengerParse.classify(emoji).kind !== 'one-to-one' && FlowInstagramParse.classify(emoji).kind !== 'one-to-one');
-check('דנה ונועה is one-to-one from the title', FlowMessengerParse.classify(vavNoa).kind === 'one-to-one' && FlowInstagramParse.classify(vavNoa).kind === 'one-to-one');
+check('דנה ונועה stays quiet without a matching thread id', FlowMessengerParse.classify(vavNoa).kind !== 'one-to-one' && FlowInstagramParse.classify(vavNoa).kind !== 'one-to-one');
 const weiss = liveRoot('identity/id-weiss.html');
-check('Weiss is one-to-one from the title', FlowMessengerParse.isOneToOne(weiss) === true && FlowMessengerParse.classify(weiss).kind === 'one-to-one' && FlowInstagramParse.classify(weiss).kind === 'one-to-one');
+check('Weiss stays quiet without the matching thread id', FlowMessengerParse.isOneToOne(weiss) === false && FlowMessengerParse.classify(weiss).kind !== 'one-to-one' && FlowInstagramParse.classify(weiss).kind !== 'one-to-one');
 check('Weiss drafts when the thread id matches the profile', FlowMessengerParse.classify(weiss, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(weiss, msHref).kind === 'one-to-one');
 const mismatchHref = 'https://www.messenger.com/t/555111222333';
 const username = liveRoot('identity/id-username.html');
@@ -436,7 +470,7 @@ const vanity = liveRoot('identity/id-vanity.html');
 check('a username link drafts when the thread id differs', FlowMessengerParse.isOneToOne(username, mismatchHref) === true && FlowInstagramParse.isOneToOne(username, mismatchHref) === true);
 check('a vanity link drafts when the thread id differs', FlowMessengerParse.isOneToOne(vanity, mismatchHref) === true && FlowInstagramParse.isOneToOne(vanity, mismatchHref) === true);
 const mismatch = liveRoot('identity/id-thread-mismatch.html');
-check('a person-shaped title drafts when the thread id differs', FlowMessengerParse.isOneToOne(mismatch, mismatchHref) === true && FlowInstagramParse.isOneToOne(mismatch, mismatchHref) === true);
+check('a person-shaped title stays quiet when the thread id differs', FlowMessengerParse.isOneToOne(mismatch, mismatchHref) === false && FlowInstagramParse.isOneToOne(mismatch, mismatchHref) === false);
 check('that same header drafts when the thread id matches', FlowMessengerParse.isOneToOne(mismatch, msHref) === true);
 const familyMatch = namedHeader('Family', '<a href="/100012345678/" role="link">Family</a>', msInfo);
 check('a group marker vetoes a matching thread id', FlowMessengerParse.classify(familyMatch, msHref).kind === 'group' && FlowMessengerParse.isOneToOne(familyMatch, msHref) === false);
@@ -928,8 +962,7 @@ console.log('\n--- calendar evidence ---\n');
   ];
   fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
     const href = name === 'd-link.html' ? 'https://www.messenger.com/t/100012345678' : 'https://www.messenger.com/t/' + name.replace(/\.html$/, '');
-    const advPersonPage = ['d-link.html', 'direct.html', 'd-none.html', 'd-active.html', 'd-ago.html', 'd-he-active.html', 'g-single.html', 'g-book-active.html', 'g-book-link.html'];
-    pages.push(['adv/' + name, href, 'src/content-messenger.js', advPersonPage.indexOf(name) >= 0]);
+    pages.push(['adv/' + name, href, 'src/content-messenger.js', name === 'd-link.html']);
   });
   function identityUrl(name) {
     if (name === 'id-duplicate.html' || name === 'id-weiss.html' || name === 'id-nested-group.html' || name === 'id-group-viewprofile.html') return 'https://www.messenger.com/t/100012345678';
@@ -1022,7 +1055,7 @@ console.log('\n--- calendar evidence ---\n');
 
   const noIdLogs = [];
   const noId = await open('live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', { logs: noIdLogs });
-  check('a Business Suite thread with no id stays quiet', noId.text.trim() === '' && noIdLogs.some((line) => line.indexOf('[Glance] whyNotShown: no-thread-id') >= 0), { text: noId.text, logs: noIdLogs });
+  check('a Business Suite thread with no id stays quiet', noId.text.trim() === '' && noIdLogs.some((line) => line.indexOf('[Glance] whyNotShown: not-one-to-one') >= 0), { text: noId.text, logs: noIdLogs });
   noId.close();
 
   const threadStore = memoryStorage({});
@@ -1049,6 +1082,11 @@ console.log('\n--- calendar evidence ---\n');
     const draftedPerson = await open('messenger-place.html', 'https://www.messenger.com/t/' + slug, 'src/content-messenger.js', { html: personHtml(title, slug) });
     check(title + ' drafts', draftedPerson.text.indexOf('Taizu - ') === 0 && draftedPerson.sendClicks === 0, draftedPerson.text);
     draftedPerson.close();
+    const quietPerson = await open('messenger-place.html', 'https://www.messenger.com/t/bare-' + slug, 'src/content-messenger.js', {
+      html: personHtml(title, slug).replace(/<a href="\/[^"]*" role="link">[^<]*<\/a>/, '')
+    });
+    check(title + ' stays empty without proof', quietPerson.text.trim() === '' && quietPerson.sendClicks === 0, quietPerson.text);
+    quietPerson.close();
   }
   const staffDraft = await open('messenger-place.html', staffHref, 'src/content-messenger.js', { html: personHtml(staffName, '100012345678') });
   check('Dana Levi (Staff) drafts', staffDraft.text.indexOf('Taizu - ') === 0 && staffDraft.sendClicks === 0, staffDraft.text);

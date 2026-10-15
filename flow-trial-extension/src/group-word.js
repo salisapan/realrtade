@@ -1,8 +1,7 @@
-// One group rule for Messenger and Instagram. No name lists.
-// A person-shaped title (1–3 words, letters only, no digits or emoji) is a
-// one-to-one chat. A title is a group only when it is the group word and
-// nothing else ("Team", "צוות", "הצוות"). A chip, a second participant, a
-// member count, or "3 members" is decided by the parser.
+// One classifier for Messenger, Instagram, and Business Suite. No name lists.
+// A person-shaped title (1–3 words, letters only) cancels a group-word veto.
+// It is not proof. A draft still needs a profile link, a matching thread id,
+// or a one-person panel. A title that is only the group word stays a group.
 const FlowGroupWord = (() => {
   const EN = new Set(['members', 'participants', 'family', 'department', 'dept', 'team', 'group', 'squad', 'crew', 'staff']);
   const HE = new Set(['מחלקת', 'מחלקה', 'משתתפים', 'משפחה', 'קבוצתי', 'קבוצת', 'קבוצה', 'צוות']);
@@ -49,7 +48,29 @@ const FlowGroupWord = (() => {
     return /^(?:group|קבוצה)(?:\s+(?:chat|conversation))?$/i.test(String(text || '').replace(/\s+/g, ' ').trim());
   }
 
-  return { counts, personShaped, chip };
+  // "3 members" / "participants" / "Add people" as the whole text of a
+  // header or subtitle element. A word inside a name is not this.
+  function memberLine(text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t) return false;
+    if (/^add people$/i.test(t)) return true;
+    return /^(?:\d{1,4}\s+)?(?:members|participants|משתתפים)$/i.test(t);
+  }
+
+  // structural: chip, second person, member subtitle, punctuation.
+  // wordVeto: a group word that a person-shaped title is allowed to cancel.
+  // proved: profile link, matching thread id, or one-person panel.
+  function verdict(facts) {
+    const f = facts || {};
+    const title = String(f.title || '').replace(/\s+/g, ' ').trim();
+    const shaped = personShaped(title) && !counts(title);
+    const wordVeto = Boolean(f.wordVeto) && !shaped;
+    if (f.structural || wordVeto || counts(title)) return 'group';
+    if (f.proved) return 'one-to-one';
+    return 'unknown';
+  }
+
+  return { counts, personShaped, chip, memberLine, verdict };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.FlowGroupWord = FlowGroupWord;
