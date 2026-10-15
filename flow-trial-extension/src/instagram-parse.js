@@ -54,7 +54,8 @@ const FlowInstagramParse = (() => {
   // list. The exact live string is TODO-LIVE-DOM.
   // Unknown and group both refuse a draft.
 
-  const GROUP_WORD = /\bmembers\b|\bparticipants\b|\bgroup chat\b|\bgroup conversation\b|\bfamily\b|משתתפים|משפחה|קבוצה|קבוצתי/i;
+  // Word edge, including a Hebrew ה/ו prefix. \b does not see Hebrew letters.
+  const GROUP_WORD = /(?:^|[^\p{L}\p{N}])(?:members|participants|group chat|group conversation|family|department|dept|team|group|squad|crew|staff)(?![\p{L}\p{N}])|(?:^|[^\p{L}\p{N}])ו?ה?(?:מחלקת|מחלקה|משתתפים|משפחה|קבוצתי|קבוצה|צוות)(?![\p{L}\p{N}])/iu;
   const SKIP_HEADING = /^(conversation information|messages|chat details)$/i;
 
   function inRow(el) {

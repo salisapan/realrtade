@@ -74,7 +74,8 @@ const FlowMessengerParse = (() => {
   // The exact live string is TODO-LIVE-DOM.
   // Unknown and group both refuse a draft.
 
-  const GROUP_WORD = /\bmembers\b|\bparticipants\b|\bgroup chat\b|\bgroup conversation\b|\bfamily\b|משתתפים|משפחה|קבוצה|קבוצתי/i;
+  // Word edge, including a Hebrew ה/ו prefix. \b does not see Hebrew letters.
+  const GROUP_WORD = /(?:^|[^\p{L}\p{N}])(?:members|participants|group chat|group conversation|family|department|dept|team|group|squad|crew|staff)(?![\p{L}\p{N}])|(?:^|[^\p{L}\p{N}])ו?ה?(?:מחלקת|מחלקה|משתתפים|משפחה|קבוצתי|קבוצה|צוות)(?![\p{L}\p{N}])/iu;
   const SKIP_HEADING = /^(conversation information|messages|chat details)$/i;
 
   function inRow(el) {
@@ -145,7 +146,7 @@ const FlowMessengerParse = (() => {
       const t = String(text || '').replace(/\s+/g, ' ').trim();
       if (!t) return;
       if (GROUP_CHIP.test(t) || GROUP_WORD.test(t) || countSaysGroup(t)) { group = true; return; }
-      if (ASSIGNED_LINE.test(t) || LABEL_LINE.test(t)) return;
+      if (ASSIGNED_LINE.test(t) || LABEL_LINE.test(t) || statusLine(t)) return;
       if (!/\p{L}/u.test(t)) return;
       names.push(t);
     }
@@ -205,6 +206,15 @@ const FlowMessengerParse = (() => {
   const COUNT_WORD = /\b(\d{1,4})\s*(members|participants|people|others|משתתפים|אנשים)\b/i;
   // Secondary only. Never sufficient for a draft.
   const ACTIVE_STATUS = /\bactive\s+now\b|\bactive\s+\d{1,4}\s*[smhd]\s+ago\b|פעיל\/ה\s+עכשיו|פעילה\s+עכשיו|פעיל\s+עכשיו|פעיל\/ה\s+לפני\s+\S+|פעילה\s+לפני\s+\S+|פעיל\s+לפני\s+\S+/i;
+
+  function statusLine(text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t) return false;
+    if (ACTIVE_STATUS.test(t) && t.length < 40) return true;
+    if (/^(?:messenger|instagram|facebook|whatsapp)$/i.test(t)) return true;
+    if (/^[·•∙]\s*\d{1,4}\s*[smhdw]$/i.test(t)) return true;
+    return false;
+  }
   const RESERVED_PROFILE = /^(direct|explore|accounts|reels|stories|p|tv|messages|t|groups|watch|latest|inbox)$/i;
 
   function countSaysGroup(text) {
@@ -691,11 +701,25 @@ const FlowMessengerParse = (() => {
     return (pieces || []).filter((p) => p && !p.quoted).map((p) => String(p.text || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').slice(0, 4000);
   }
 
-  function threadIdFor(href, title) {
+  function threadIdFor(href, title, root) {
     const where = page(href);
     if (!where) return null;
-    let path = '';
-    try { path = new URL(String(href)).pathname; } catch (e) { path = ''; }
+    let u = null;
+    try { u = new URL(String(href || '')); } catch (e) { u = null; }
+    const host = u ? u.hostname.replace(/^www\./, '') : '';
+    if (host === 'business.facebook.com') {
+      const q = u.searchParams.get('selected_item_id') || u.searchParams.get('thread_id') || u.searchParams.get('thread');
+      const pathMatch = u.pathname.match(/\/(?:t|thread)\/([^/]+)/);
+      const pathId = pathMatch && pathMatch[1] && pathMatch[1] !== 'all' ? decodeURIComponent(pathMatch[1]) : '';
+      let headerId = '';
+      if (root && typeof root.querySelector === 'function') {
+        const el = root.querySelector('[data-thread-id], [data-selected-item-id]');
+        if (el) headerId = el.getAttribute('data-thread-id') || el.getAttribute('data-selected-item-id') || '';
+      }
+      const id = String(q || pathId || headerId || '').trim();
+      return id ? 'ms:' + id : null;
+    }
+    const path = u ? u.pathname : '';
     const name = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     return 'ms:' + (path || name || 'open');
   }

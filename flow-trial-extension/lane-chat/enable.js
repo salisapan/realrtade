@@ -31,7 +31,7 @@ const LANES = [
       'https://www.business.facebook.com/latest/inbox',
       'https://www.business.facebook.com/latest/inbox/*'
     ],
-    js: SCRIPTS.concat(['src/messenger-parse.js', 'src/content-messenger.js'])
+    js: SCRIPTS.concat(['src/lane-draft-store.js', 'src/messenger-parse.js', 'src/content-messenger.js'])
   },
   {
     id: 'instagram',

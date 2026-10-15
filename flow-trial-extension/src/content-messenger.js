@@ -15,6 +15,7 @@
   const RETRY_LIMIT = 8;
   const MAX_ROWS = 40;
   const STALE_MS = 14 * 24 * 60 * 60 * 1000;
+  const FUTURE_MS = 5 * 60 * 1000;
   const DRAFT_STORE = 'glanceLaneDrafts';
   let timer = null;
   let tries = 0;
@@ -103,24 +104,29 @@
     return typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
   }
 
+  function draftKey(threadId, id, text) {
+    if (typeof FlowLaneDraftStore === 'undefined') return null;
+    return FlowLaneDraftStore.hashKey(threadId, id, text);
+  }
+
   async function remembered(key) {
     const area = draftStore();
-    if (!area || typeof area.get !== 'function') return null;
+    if (!area || typeof area.get !== 'function' || typeof FlowLaneDraftStore === 'undefined') return null;
     try {
       const bag = await area.get(DRAFT_STORE);
-      const all = bag && bag[DRAFT_STORE];
-      return all && all[key] ? all[key] : null;
+      const got = FlowLaneDraftStore.get((bag && bag[DRAFT_STORE]) || {}, key, Date.now());
+      if (got.row && typeof area.set === 'function') await area.set({ [DRAFT_STORE]: got.all });
+      return got.row;
     } catch (e) { return null; }
   }
 
   async function remember(key, row) {
     const area = draftStore();
-    if (!area || typeof area.get !== 'function' || typeof area.set !== 'function') return;
+    if (!area || typeof area.get !== 'function' || typeof area.set !== 'function' || typeof FlowLaneDraftStore === 'undefined') return;
     try {
       const bag = await area.get(DRAFT_STORE);
-      const all = (bag && bag[DRAFT_STORE]) || {};
-      all[key] = row;
-      await area.set({ [DRAFT_STORE]: all });
+      const next = FlowLaneDraftStore.put((bag && bag[DRAFT_STORE]) || {}, key, row, Date.now());
+      await area.set({ [DRAFT_STORE]: next });
     } catch (e) { /* a missed save can draft once more; the next save closes it */ }
   }
 
@@ -142,10 +148,12 @@
     const who = author(last);
     const text = textOf(last);
     const id = last.getAttribute('data-message-id') || text.slice(0, 80);
-    const key = String(threadId || party.name || '') + '\n' + id + '\n' + text;
+    const key = draftKey(threadId, id, text);
+    if (!key) { whyNot('no-thread-id', location.href); return; }
     if (who !== 'them') { whyNot(who === 'me' ? 'from-me' : 'sender-not-identified', key); return; }
     if (!text || inflight.has(key)) return;
     const when = sentAt(last);
+    if (when != null && when - Date.now() > FUTURE_MS) { whyNot('future', key); return; }
     if (when != null && Date.now() - when > STALE_MS) { whyNot('stale', key); return; }
     inflight.add(key);
     const box = composerBox(main);
@@ -198,9 +206,10 @@
     globalThis.__glanceChatSurfaces.messenger = globalThis.__glanceChatSurfaces.messenger || {};
     globalThis.__glanceChatSurfaces.messenger.name = t;
     if (!direct) { whyNot('not-one-to-one', t); report(true); return; }
+    const threadId = P.threadIdFor(location.href, t, main);
+    if (!threadId) { whyNot('no-thread-id', location.href); report(true); return; }
     report(true);
     const party = { name: t, phone: null, email: null };
-    const threadId = P.threadIdFor(location.href, t);
     const ctx = {
       channel: 'messenger',
       strict: true,

@@ -608,7 +608,7 @@ async function boot() {
 
   harness.openBusiness = async function openBusiness(html) {
     await watchSend();
-    return openDocument('https://business.facebook.com/latest/inbox/all/', html);
+    return openDocument('https://business.facebook.com/latest/inbox/all/?selected_item_id=bs-existing', html);
   };
 
   harness.openGmail = async function openGmail(opts) {

@@ -100,6 +100,7 @@ const { FlowChatLane } = require('../src/chat-lane.js');
 const { FlowFactReply } = require('../core/fact-reply.js');
 const { FlowMessengerParse } = require('../src/messenger-parse.js');
 const { FlowInstagramParse } = require('../src/instagram-parse.js');
+const { FlowLaneDraftStore } = require('../src/lane-draft-store.js');
 
 function placeEvidence(events) {
   return { connected: { calendar: true }, events: events };
@@ -293,6 +294,48 @@ const agent = suiteKind('fallback/business-suite-agent.html');
 check('the agent name is not the person', agent.kind === 'one-to-one' && agent.name === 'Dana Levi', agent);
 const pageName = suiteKind('fallback/business-suite-page.html');
 check('the Page name is not the person', pageName.kind === 'one-to-one' && pageName.name === 'Dana Levi', pageName);
+const statusHeader = liveRoot('fallback/business-suite-status.html');
+const statusKind = FlowMessengerParse.classify(statusHeader, 'https://business.facebook.com/latest/inbox/all/');
+check('a status line is not a second participant', statusKind.kind === 'one-to-one' && statusKind.name === 'Dana Levi', statusKind);
+['Sales Team', 'Marketing Team', 'Team Alpha', 'צוות מכירות', 'Support Group', 'הצוות', 'וקבוצה', 'והצוות', 'מחלקת מכירות'].forEach((title) => {
+  const html = '<div role="main"><header><img alt="" src="data:,"><h2>' + title + '</h2><a aria-label="Conversation information">Conversation information</a></header></div>';
+  const root = chatEl(html);
+  const ms = FlowMessengerParse.classify(root);
+  const ig = FlowInstagramParse.classify(root);
+  check(title + ' is a group on Messenger and Instagram', ms.kind === 'group' && ig.kind === 'group' && FlowMessengerParse.isOneToOne(root) === false && FlowInstagramParse.isOneToOne(root) === false, { messenger: ms, instagram: ig });
+});
+['fallback/business-suite-sales-team.html', 'fallback/business-suite-marketing-team.html', 'fallback/business-suite-team-alpha.html', 'fallback/business-suite-he-team.html', 'fallback/business-suite-support-group.html'].forEach((file) => {
+  const root = liveRoot(file);
+  const got = FlowMessengerParse.classify(root, 'https://business.facebook.com/latest/inbox/all/?selected_item_id=team');
+  check(file + ' stays a group', got.kind === 'group' && FlowMessengerParse.isOneToOne(root, 'https://business.facebook.com/latest/inbox/all/?selected_item_id=team') === false, got);
+});
+const notATeam = chatEl('<div role="main"><header><h2>הדנה</h2></header></div>');
+check('הדנה is not a group word', FlowMessengerParse.classify(notATeam).kind !== 'group' && FlowInstagramParse.classify(notATeam).kind !== 'group');
+check('selected_item_id is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?selected_item_id=abc', 'Dana Levi', statusHeader) === 'ms:abc');
+check('a thread query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?thread=xyz', '', null) === 'ms:xyz');
+check('a thread_id query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/?thread_id=tid', '', null) === 'ms:tid');
+check('a path id is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/t/unknown', '', null) === 'ms:unknown');
+check('inbox all without an id has no thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/', '', null) === null);
+check('the header id is used when the URL has none', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/', 'Dana Levi', statusHeader) === 'ms:status-1');
+check('the URL id wins over the header', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?selected_item_id=from-url', 'Dana Levi', statusHeader) === 'ms:from-url');
+check('messenger.com keeps its path id', FlowMessengerParse.threadIdFor('https://www.messenger.com/t/100', 'Dana') === 'ms:/t/100');
+const incoming = 'send me the location of the restaurant you were at last week';
+const hashA = FlowLaneDraftStore.hashKey('ms:a', 'm1', incoming);
+const hashB = FlowLaneDraftStore.hashKey('ms:b', 'm1', incoming);
+check('the draft key is a hash and hides the message', hashA !== hashB && hashA.indexOf(incoming) < 0 && hashA.indexOf('restaurant') < 0 && /^[0-9a-f]+$/.test(hashA), hashA);
+check('the same thread, id, and text hash the same', hashA === FlowLaneDraftStore.hashKey('ms:a', 'm1', incoming));
+let draftBag = {};
+const draftNow = 1_700_000_000_000;
+for (let i = 0; i < 501; i++) draftBag = FlowLaneDraftStore.put(draftBag, 'k' + i, { draft: 'Taizu - https://maps.example', closed: false }, draftNow + i);
+check('501 puts leave 500 and drop the oldest', Object.keys(draftBag).length === 500 && !draftBag.k0 && draftBag.k500, Object.keys(draftBag).length);
+const touched = FlowLaneDraftStore.get(draftBag, 'k1', draftNow + 1000);
+draftBag = FlowLaneDraftStore.put(touched.all, 'knew', { draft: 'Taizu - https://maps.example', closed: false }, draftNow + 1001);
+check('touching the oldest keeps it when a new row arrives', draftBag.k1 && !draftBag.k2 && draftBag.knew && Object.keys(draftBag).length === 500);
+const expired = FlowLaneDraftStore.put({}, 'old', { draft: 'Taizu - https://maps.example', closed: true }, draftNow - FlowLaneDraftStore.TTL_MS - 1);
+const dropped = FlowLaneDraftStore.get(expired, 'old', draftNow);
+check('a row older than 30 days is dropped', dropped.row == null && !dropped.all.old && FlowLaneDraftStore.MAX === 500);
+const storedJson = JSON.stringify(draftBag);
+check('stored rows keep the composed draft and omit the incoming text', storedJson.indexOf(incoming) < 0 && storedJson.indexOf('restaurant') < 0 && storedJson.indexOf('Taizu - ') >= 0);
 const advDir = path.join(__dirname, 'fixtures/chat/adv');
 const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html')).sort();
 check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
@@ -747,6 +790,7 @@ console.log('\n--- calendar evidence ---\n');
 
   function memoryStorage(bag) {
     return {
+      bag: bag,
       local: {
         get(name) {
           if (typeof name === 'string') return Promise.resolve({ [name]: bag[name] });
@@ -785,17 +829,25 @@ console.log('\n--- calendar evidence ---\n');
     ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false],
     ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false],
     ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-flow'],
-    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', true],
-    ['live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/?selected_item_id=sali', 'src/content-messenger.js', true],
+    ['live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=bs-existing', 'src/content-messenger.js', true],
     ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', true],
     ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
-    ['fallback/business-suite-two.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', false],
-    ['fallback/business-suite-group-chip.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', false],
-    ['fallback/business-suite-label.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
-    ['fallback/business-suite-assigned.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
-    ['fallback/business-suite-agent.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
-    ['fallback/business-suite-page.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
-    ['fallback/business-suite-stale.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', false],
+    ['fallback/business-suite-two.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=two', 'src/content-messenger.js', false],
+    ['fallback/business-suite-group-chip.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=chip', 'src/content-messenger.js', false],
+    ['fallback/business-suite-label.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=label', 'src/content-messenger.js', true],
+    ['fallback/business-suite-assigned.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=assigned', 'src/content-messenger.js', true],
+    ['fallback/business-suite-agent.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=agent', 'src/content-messenger.js', true],
+    ['fallback/business-suite-page.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=page', 'src/content-messenger.js', true],
+    ['fallback/business-suite-stale.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=stale', 'src/content-messenger.js', false],
+    ['fallback/business-suite-sales-team.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=sales', 'src/content-messenger.js', false],
+    ['fallback/business-suite-marketing-team.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=marketing', 'src/content-messenger.js', false],
+    ['fallback/business-suite-team-alpha.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=alpha', 'src/content-messenger.js', false],
+    ['fallback/business-suite-he-team.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=he-team', 'src/content-messenger.js', false],
+    ['fallback/business-suite-support-group.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=support', 'src/content-messenger.js', false],
+    ['fallback/business-suite-status.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['fallback/business-suite-future-hour.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=fut-h', 'src/content-messenger.js', false],
+    ['fallback/business-suite-future-day.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=fut-d', 'src/content-messenger.js', false],
     ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
   ];
   fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
@@ -849,7 +901,7 @@ console.log('\n--- calendar evidence ---\n');
     keys.length = 0;
   }
 
-  const suiteUrl = 'https://business.facebook.com/latest/inbox/all/';
+  const suiteUrl = 'https://business.facebook.com/latest/inbox/all/?selected_item_id=bs-existing';
   const deletedStore = memoryStorage({});
   const deleted = await open('live/business-suite-existing.html', suiteUrl, 'src/content-messenger.js', { storage: deletedStore });
   await new Promise((r) => setTimeout(r, 40));
@@ -878,9 +930,42 @@ console.log('\n--- calendar evidence ---\n');
   editedAgain.close();
 
   const staleLogs = [];
-  const stale = await open('fallback/business-suite-stale.html', suiteUrl, 'src/content-messenger.js', { logs: staleLogs });
+  const stale = await open('fallback/business-suite-stale.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=stale', 'src/content-messenger.js', { logs: staleLogs });
   check('a message older than 14 days stays quiet', stale.text.trim() === '' && staleLogs.some((line) => line.indexOf('[Glance] whyNotShown: stale') >= 0), { text: stale.text, logs: staleLogs });
   stale.close();
+
+  const futureHourLogs = [];
+  const futureHour = await open('fallback/business-suite-future-hour.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=fut-h', 'src/content-messenger.js', { logs: futureHourLogs });
+  check('a message an hour ahead stays quiet', futureHour.text.trim() === '' && futureHourLogs.some((line) => line.indexOf('[Glance] whyNotShown: future') >= 0), { text: futureHour.text, logs: futureHourLogs });
+  futureHour.close();
+  const futureDayLogs = [];
+  const futureDay = await open('fallback/business-suite-future-day.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=fut-d', 'src/content-messenger.js', { logs: futureDayLogs });
+  check('a message three days ahead stays quiet', futureDay.text.trim() === '' && futureDayLogs.some((line) => line.indexOf('[Glance] whyNotShown: future') >= 0), { text: futureDay.text, logs: futureDayLogs });
+  futureDay.close();
+
+  const noIdLogs = [];
+  const noId = await open('live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', { logs: noIdLogs });
+  check('a Business Suite thread with no id stays quiet', noId.text.trim() === '' && noIdLogs.some((line) => line.indexOf('[Glance] whyNotShown: no-thread-id') >= 0), { text: noId.text, logs: noIdLogs });
+  noId.close();
+
+  const threadStore = memoryStorage({});
+  const threadA = await open('live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=thread-a', 'src/content-messenger.js', { storage: threadStore });
+  await new Promise((r) => setTimeout(r, 40));
+  check('thread A drafts', threadA.text.indexOf('Taizu - ') === 0, threadA.text);
+  threadA.window.document.querySelector('[data-glance-composer="1"]').textContent = '';
+  threadA.scan();
+  await new Promise((r) => setTimeout(r, 40));
+  const threadB = await open('live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=thread-b', 'src/content-messenger.js', { storage: threadStore });
+  await new Promise((r) => setTimeout(r, 40));
+  check('the same message on another thread still drafts', threadB.text.indexOf('Taizu - ') === 0, threadB.text);
+  const threadAAgain = await open('live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/?selected_item_id=thread-a', 'src/content-messenger.js', { storage: threadStore });
+  await new Promise((r) => setTimeout(r, 40));
+  check('the closed thread stays closed', threadAAgain.text.trim() === '', threadAAgain.text);
+  const stored = JSON.stringify(threadStore.local && threadStore.bag ? threadStore.bag : '');
+  check('the saved draft key does not keep the incoming text', stored.indexOf('איפה המסעדה') < 0 && stored.indexOf('שבוע שעבר') < 0);
+  threadA.close();
+  threadB.close();
+  threadAAgain.close();
 
   const guardDom = new JSDOM('<div role="main"></div>', { url: suiteUrl, runScripts: 'outside-only', pretendToBeVisual: true });
   pin(guardDom.window);

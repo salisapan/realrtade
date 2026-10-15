@@ -493,7 +493,7 @@ const LANE_CHAT = [
       'https://www.business.facebook.com/latest/inbox',
       'https://www.business.facebook.com/latest/inbox/*'
     ],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/messenger-parse.js', 'src/content-messenger.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/messenger-parse.js', 'src/content-messenger.js']
   },
   {
     id: 'glance-lane-instagram',
