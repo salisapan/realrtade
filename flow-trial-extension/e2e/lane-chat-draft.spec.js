@@ -231,3 +231,23 @@ test('a deleted fixture draft stays closed ahead of two addresses', async ({ gla
   expect(logs.some((line) => line.indexOf('whyNotShown: conflict') >= 0)).toBe(false);
   await page.close();
 });
+
+test('?reset=1 clears only the lane draft store', async ({ glance }) => {
+  await glance.seed({
+    glanceDevFixture: true,
+    glanceKeep: 'untouched',
+    glanceLaneDrafts: { abc: { hash: 'abc', state: 'closed', ts: Date.now() } }
+  });
+  const logs = [];
+  const page = await glance.context.newPage();
+  page.on('console', (msg) => logs.push(msg.text()));
+  await page.goto('chrome-extension://' + glance.extensionId + '/dev/messenger-fixture.html?reset=1&case=greeting', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await expect(page.locator('[data-glance-reset]')).toHaveText('[Glance] lane store reset', { timeout: 15000 });
+  expect(logs.some((line) => line.indexOf('[Glance] lane store reset') >= 0)).toBe(true);
+  const bag = await glance.storage();
+  expect(bag.glanceLaneDrafts).toEqual({});
+  expect(bag.glanceKeep).toBe('untouched');
+  expect(bag.glanceDevFixture).toBe(true);
+  expect(await page.locator('button').count()).toBe(0);
+  await page.close();
+});

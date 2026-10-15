@@ -24,8 +24,9 @@ This page is for an unpacked copy of `flow-trial-extension` from the repo. It is
    - `?case=self-last` — the last message is yours. Reason `from-me`.
    - `?case=stale` — the row is older than 14 days. Reason `stale`.
    - `?case=future` — the row is five minutes ahead. Reason `future`.
-6. `chrome.storage.local.set({ glanceDevFixture: false })` turns the page off.
-7. A store or outlook zip does not contain this page. A manifest with `update_url` ignores `glanceDevFixture`.
+6. Open `?reset=1` to clear the lane draft store. That removes the hash, state, and time rows under `glanceLaneDrafts` and leaves every other `chrome.storage.local` value in place. The page and the console both say `[Glance] lane store reset`.
+7. `chrome.storage.local.set({ glanceDevFixture: false })` turns the page off.
+8. A store or outlook zip does not contain this page. A manifest with `update_url` ignores `glanceDevFixture`.
 
 דנה ורותם with one profile link whose id is the thread id drafts. The ו before ר is part of the name (the same ו+י/ר surname check as דנה וייס and דנה ורד). The composer gets the draft. Glance does not send it.
 

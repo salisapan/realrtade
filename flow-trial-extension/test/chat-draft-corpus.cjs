@@ -1302,6 +1302,18 @@ console.log('\n--- calendar evidence ---\n');
     check(search + ' stays quiet as ' + reason, page.text.trim() === '' && page.sendClicks === 0 && quietLine(page) === line && logs.some((item) => item.indexOf(line) >= 0), { text: page.text, line: quietLine(page), logs: logs });
     page.close();
   }
+  const resetBag = {
+    glanceDevFixture: true,
+    glanceKeep: 'untouched',
+    glanceLaneDrafts: { abc: { hash: 'abc', state: 'closed', ts: 1 } }
+  };
+  const resetLogs = [];
+  const resetPage = await openFixtureCase('?reset=1&case=greeting', memoryStorage(resetBag), resetLogs);
+  await new Promise((r) => setTimeout(r, 40));
+  const resetNode = resetPage.window.document.querySelector('[data-glance-reset]');
+  const resetText = resetNode ? (resetNode.textContent || '') : '';
+  check('?reset=1 clears only the lane draft rows', resetText === '[Glance] lane store reset' && resetLogs.some((line) => line.indexOf('[Glance] lane store reset') >= 0) && resetBag.glanceLaneDrafts && Object.keys(resetBag.glanceLaneDrafts).length === 0 && resetBag.glanceDevFixture === true && resetBag.glanceKeep === 'untouched' && resetPage.sendClicks === 0, { text: resetText, logs: resetLogs, bag: resetBag });
+  resetPage.close();
   const offLogs = [];
   const offStore = memoryStorage({ glanceDevFixture: false });
   const offPage = await open('messenger-fixture.html', fixturePage, 'src/content-messenger.js', {
