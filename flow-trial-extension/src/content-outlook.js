@@ -4370,25 +4370,32 @@
       if (!pane.senderName && name) patch.senderName = String(name).slice(0, 80);
     }
     if (picked) {
-      if (hydrateHow === 'subject-fallback' && picked.id && !isConversationId(picked.id)) {
-        const pickedConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
-          ? FlowOwaParse.canonId(picked.conversationId) : '';
-        if (pickedConv && openConv && pickedConv === openConv) patch.itemId = String(picked.id);
-      }
-      if (!pane.subject && picked.subject) patch.subject = String(picked.subject);
-      if (needAudience) {
-        const gto = (picked.toRecipients || []).map(graphAddress).filter(Boolean);
-        const gcc = (picked.ccRecipients || []).map(graphAddress).filter(Boolean);
-        if (gto.length || gcc.length) {
-          patch.to = gto;
-          patch.cc = gcc;
-        }
-      }
       const one = graphAddress(picked.from);
-      if (one) {
-        patch.senderEmail = one;
-        const name = picked.from && picked.from.emailAddress && picked.from.emailAddress.name;
-        if (name) patch.senderName = String(name).slice(0, 80);
+      const pageFrom = String(pane.senderEmail || '').trim().toLowerCase();
+      // The open pane already names a person. A Graph row from someone else
+      // is not this message. Copying that address used to hide the mismatch
+      // and paint their card on this mail.
+      const senderAgrees = !pageFrom || !one || pageFrom === one;
+      if (senderAgrees) {
+        if (hydrateHow === 'subject-fallback' && picked.id && !isConversationId(picked.id)) {
+          const pickedConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
+            ? FlowOwaParse.canonId(picked.conversationId) : '';
+          if (pickedConv && openConv && pickedConv === openConv) patch.itemId = String(picked.id);
+        }
+        if (!pane.subject && picked.subject) patch.subject = String(picked.subject);
+        if (needAudience) {
+          const gto = (picked.toRecipients || []).map(graphAddress).filter(Boolean);
+          const gcc = (picked.ccRecipients || []).map(graphAddress).filter(Boolean);
+          if (gto.length || gcc.length) {
+            patch.to = gto;
+            patch.cc = gcc;
+          }
+        }
+        if (one) {
+          patch.senderEmail = one;
+          const name = picked.from && picked.from.emailAddress && picked.from.emailAddress.name;
+          if (name) patch.senderName = String(name).slice(0, 80);
+        }
       }
     }
     hydrateCache[key] = patch;

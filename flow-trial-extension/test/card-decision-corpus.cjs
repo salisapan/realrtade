@@ -394,6 +394,20 @@ function panel(store) {
   const hyd = await boot({
     id: 'MSG-HYDRATE-1',
     graph: (url) => {
+      if (generation === 'other-sender') {
+        if (/conversationId/i.test(url)) {
+          return { value: [{
+            id: 'AQMkOther',
+            subject: 'Transfer',
+            conversationId: CONV,
+            from: { emailAddress: { address: 'other@elsewhere.com', name: 'Other' } },
+            toRecipients: [],
+            ccRecipients: [],
+            receivedDateTime: '2026-10-15T09:00:00.000Z'
+          }] };
+        }
+        return { value: [] };
+      }
       if (generation === 'wrong-file' || generation === 'same-conv') {
         if (/\$filter=conversationId/i.test(url)) return { value: [] };
         if (/\$filter=subject/i.test(url) || /startswith\(subject/i.test(url)) {
@@ -490,6 +504,23 @@ function panel(store) {
   check('subject fallback still names the open conversation when that message is the subject hit',
     kept && kept.itemId === 'm-nw' && kept.conversationId === 'AQQkNw' && kept.hydrateHow === 'subject-fallback',
     { item: kept && kept.itemId, conv: kept && kept.conversationId, how: kept && kept.hydrateHow });
+
+  generation = 'other-sender';
+  await vm.runInContext('__glanceOutlookPage.bumpMailEpoch("other-sender")', hyd.ctx);
+  const refused = await vm.runInContext('__glanceOutlookPage.hydratePane(' + JSON.stringify({
+    conversationId: CONV,
+    idKind: 'conversation',
+    idSource: 'open-mail',
+    subject: 'Transfer',
+    senderEmail: 'dana@acme.com',
+    senderName: 'Dana',
+    to: [ME],
+    cc: [],
+    text: 'Could you confirm the transfer by Friday?'
+  }) + ')', hyd.ctx);
+  check('a confirmed conversation does not replace the open sender with a different Graph sender',
+    refused && refused.senderEmail === 'dana@acme.com' && refused.senderName === 'Dana' && refused.itemId !== 'AQMkOther',
+    { email: refused && refused.senderEmail, name: refused && refused.senderName, item: refused && refused.itemId });
   hyd.w.close();
 
   const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
