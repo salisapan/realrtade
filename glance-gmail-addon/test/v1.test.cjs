@@ -255,6 +255,26 @@ console.log('\n--- calendar proof ---');
   check('a dateless clock is an all-day event', allDay.start.date === '2026-10-22' && allDay.end.date === '2026-10-23' && !allDay.start.dateTime, allDay);
   const late = execute.eventBody({ title: 'Late', dateIso: '2026-10-22', hour: 23, minute: 45, timeZone: 'Etc/UTC' });
   check('thirty minutes can cross midnight', late.end.dateTime === '2026-10-23T00:15:00', late.end);
+  const local = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0, timeZone: 'Asia/Jerusalem' });
+  const fromObject = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0, timeZone: { id: 'America/New_York', offset: -14400000 } });
+  const fallback = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0 });
+  function hasZoneOrDate(body) {
+    if (!body) return false;
+    if (body.start.date && body.end.date && !body.start.dateTime) return true;
+    const start = body.start && body.start.dateTime;
+    const end = body.end && body.end.dateTime;
+    return typeof body.start.timeZone === 'string' && body.start.timeZone === body.end.timeZone &&
+      typeof start === 'string' && start.indexOf('Z') === -1 && !/[+-]\d{2}:\d{2}$/.test(start) &&
+      typeof end === 'string' && end.indexOf('Z') === -1;
+  }
+  check('an insert payload has a timeZone or a date', hasZoneOrDate(timed) && hasZoneOrDate(allDay) && hasZoneOrDate(local) && hasZoneOrDate(fromObject) && hasZoneOrDate(fallback), { local: local, fromObject: fromObject, fallback: fallback });
+  check('14:00 stays 14:00 local', local.start.dateTime === '2026-10-22T14:00:00' && local.end.dateTime === '2026-10-22T14:30:00' && local.start.timeZone === 'Asia/Jerusalem', local);
+  check('14:00 on 22/10 in Asia/Jerusalem is 11:00Z', execute.instantUtc('2026-10-22', 14, 0, 'Asia/Jerusalem') === '2026-10-22T11:00:00Z');
+  check('14:00 on 22/10 in America/New_York is 18:00Z', execute.instantUtc('2026-10-22', 14, 0, 'America/New_York') === '2026-10-22T18:00:00Z' && fromObject.start.timeZone === 'America/New_York' && fromObject.start.dateTime === '2026-10-22T14:00:00', fromObject);
+  check('a missing zone falls back to Asia/Jerusalem', fallback.start.timeZone === 'Asia/Jerusalem');
+  check('a task due is RFC3339 in that zone',
+    execute.dueRfc3339('2026-10-22', 'Asia/Jerusalem') === '2026-10-22T00:00:00+03:00' &&
+    execute.dueRfc3339('2026-10-22', 'America/New_York') === '2026-10-22T00:00:00-04:00');
 }
 function memoryCalendar() {
   const calls = [];
@@ -327,6 +347,71 @@ function memoryCalendar() {
     calendarId: 'primary', title: 'Meeting Oct 22', dateIso: '2026-10-22', hour: null, minute: null
   }, cal);
   check('a read-back that disagrees does not confirm', missed.confirmed === false && missed.reason === 'mismatch', missed);
+}
+{
+  function zonedReadBack(zone, startZ, endZ) {
+    const cal = memoryCalendar();
+    const realGet = cal.get;
+    cal.get = function (calendarId, id) {
+      const ev = realGet(calendarId, id);
+      ev.start = { dateTime: startZ, timeZone: zone };
+      ev.end = { dateTime: endZ, timeZone: zone };
+      return ev;
+    };
+    return execute.performCreateEvent({
+      calendarId: 'primary', title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0, timeZone: zone
+    }, cal);
+  }
+  const jerusalem = zonedReadBack('Asia/Jerusalem', '2026-10-22T11:00:00Z', '2026-10-22T11:30:00Z');
+  check('a Jerusalem read-back matches 14:00 in that zone', jerusalem.confirmed === true && jerusalem.view.when === '2026-10-22 14:00', jerusalem);
+  const newYork = zonedReadBack('America/New_York', '2026-10-22T18:00:00Z', '2026-10-22T18:30:00Z');
+  check('a New York read-back matches 14:00 in that zone', newYork.confirmed === true && newYork.view.when === '2026-10-22 14:00', newYork);
+  const offsetForm = zonedReadBack('Asia/Jerusalem', '2026-10-22T14:00:00+03:00', '2026-10-22T14:30:00+03:00');
+  check('an offset read-back is the same Jerusalem instant', offsetForm.confirmed === true && offsetForm.view.when === '2026-10-22 14:00', offsetForm);
+  const otherHour = zonedReadBack('Asia/Jerusalem', '2026-10-22T12:00:00Z', '2026-10-22T12:30:00Z');
+  check('a different instant in the same zone does not confirm', otherHour.confirmed === false && otherHour.reason === 'mismatch', otherHour);
+  const localEvent = {
+    summary: 'Meet',
+    start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' },
+    end: { dateTime: '2026-10-22T14:30:00', timeZone: 'Asia/Jerusalem' }
+  };
+  const zuluEvent = {
+    summary: 'Meet',
+    start: { dateTime: '2026-10-22T11:00:00Z', timeZone: 'Asia/Jerusalem' },
+    end: { dateTime: '2026-10-22T11:30:00Z', timeZone: 'Asia/Jerusalem' }
+  };
+  const movedEvent = {
+    summary: 'Meet',
+    start: { dateTime: '2026-10-22T15:00:00', timeZone: 'Asia/Jerusalem' },
+    end: { dateTime: '2026-10-22T15:30:00', timeZone: 'Asia/Jerusalem' }
+  };
+  check('the same instant hashes equal in that zone', proof.contentHash(localEvent) === proof.contentHash(zuluEvent) && proof.contentHash(localEvent) !== proof.contentHash(movedEvent));
+}
+{
+  const calls = [];
+  const client = {
+    calls: calls,
+    insert: function (listId, resource) {
+      calls.push(resource.due);
+      return { id: 'task-z', title: resource.title, due: resource.due, etag: 'e1', updated: 'u1' };
+    },
+    get: function () {
+      return { id: 'task-z', title: 'send the contract', due: '2026-10-21T21:00:00.000Z', etag: 'e1', updated: 'u1' };
+    },
+    remove: function () { calls.push('remove'); }
+  };
+  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-10-22', timeZone: 'Asia/Jerusalem' }, client);
+  check('a task due is written in the user zone', calls[0] === '2026-10-22T00:00:00+03:00', calls[0]);
+  check('a task read-back in that zone keeps 22/10', result.confirmed === true && result.view.due === '2026-10-22' && result.snapshot.timeZone === 'Asia/Jerusalem', result);
+  const again = {
+    calls: [],
+    get: function () {
+      this.calls.push('get');
+      return { id: 'task-z', title: 'send the contract', due: '2026-10-21T21:00:00.000Z', etag: 'e1', updated: 'u1' };
+    },
+    remove: function () { this.calls.push('remove'); }
+  };
+  check('undo compares the task due in that zone', execute.performUndo(result.snapshot, again).action === 'deleted' && again.calls.join(',') === 'get,remove', again.calls);
 }
 
 console.log('\n--- prefetch and classifier stubs ---');
@@ -435,6 +520,7 @@ console.log('\n--- host boundaries ---');
   check('host does not patch an event', !/Calendar\.Events\.patch|Calendar\.Events\.update/.test(host));
   check('contextual trigger is message open', manifest.addOns.gmail.contextualTriggers[0].onTriggerFunction === 'onGmailMessageOpen');
   check('locale comes from the app', manifest.addOns.common.useLocaleFromApp === true);
+  check('the script time zone is only the Asia/Jerusalem fallback', manifest.timeZone === 'Asia/Jerusalem');
   check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(host));
   check('host does not patch a task', !/Tasks\.Tasks\.patch|Tasks\.Tasks\.update/.test(host));
   check('host reads the task back through performCreate', host.indexOf('performCreate') !== -1 && host.indexOf('performUndo') !== -1);
@@ -1080,6 +1166,72 @@ console.log('\n--- message path parity ---');
     state.scopeChecks.length === 1 &&
     denied.warns.some(function (line) { return line.indexOf('requireScopes') !== -1 && line.indexOf('calendar.events') !== -1; }),
     { err: authErr && authErr.message, returned: returnedText, events: Object.keys(state.events), tasks: Object.keys(state.tasks), warns: denied.warns });
+
+  const zoneOf = vm.runInContext('timeZoneOf_', sandbox);
+  check('userTimezone.id wins over the card object and the calendar',
+    zoneOf({
+      userTimezone: { id: 'America/New_York' },
+      commonEventObject: { timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } }
+    }) === 'America/New_York');
+  check('a card time zone object becomes its id',
+    zoneOf({ commonEventObject: { timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } } }) === 'Asia/Jerusalem');
+  check('a card time zone string is kept', zoneOf({ commonEventObject: { timeZone: 'Etc/UTC' } }) === 'Etc/UTC');
+  sandbox.CalendarApp = {
+    getDefaultCalendar: function () { throw new Error('full calendar scope'); }
+  };
+  check('a calendar permission failure is not the user zone',
+    zoneOf({ userTimezone: { id: 'America/New_York' } }) === 'America/New_York');
+  let calendarCalls = 0;
+  sandbox.CalendarApp = {
+    getDefaultCalendar: function () {
+      calendarCalls += 1;
+      return { getTimeZone: function () { return 'America/Los_Angeles'; } };
+    }
+  };
+  check('the default calendar is next', zoneOf({}) === 'America/Los_Angeles' && calendarCalls === 1, calendarCalls);
+  sandbox.CalendarApp = {
+    getDefaultCalendar: function () { throw new Error('full calendar scope'); }
+  };
+  sandbox.Session = { getScriptTimeZone: function () { return 'Europe/London'; } };
+  const skipped = withConsole(function () { return zoneOf({}); });
+  check('a calendar failure falls through to the script zone',
+    skipped.value === 'Europe/London' && skipped.warns.some(function (line) { return line.indexOf('calendar zone skipped') !== -1; }),
+    skipped);
+  sandbox.Session = { getScriptTimeZone: function () { return ''; } };
+  check('the last zone is Asia/Jerusalem', zoneOf({}) === 'Asia/Jerusalem');
+  delete sandbox.CalendarApp;
+  delete sandbox.Session;
+
+  reset();
+  state.messages.hebclock = gmailMessage({
+    id: 'hebclock',
+    threadId: 'threadclock',
+    subject: 'פגישה',
+    plain: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+    html: quietHtml,
+    from: 'Glance <owner@ai.local.flow>',
+    to: 'owner@ai.local.flow',
+    date: new Date('2026-10-15T08:00:00Z')
+  });
+  const zonedDo = doIt({
+    gmail: { messageId: 'hebclock', accessToken: 'token', threadId: 'threadclock' },
+    userTimezone: { id: 'America/New_York' },
+    commonEventObject: { userLocale: 'en', timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } },
+    parameters: { messageId: 'hebclock', source: 'message' }
+  }).card;
+  const zonedIds = Object.keys(state.events);
+  const zonedEvent = state.events[zonedIds[0]];
+  const zonedTask = state.tasks[Object.keys(state.tasks)[0]];
+  check('Do it writes 14:00 in the user zone, not the card object',
+    zonedIds.length === 1 &&
+    zonedEvent.start.dateTime === '2026-10-22T14:00:00' &&
+    zonedEvent.end.dateTime === '2026-10-22T14:30:00' &&
+    zonedEvent.start.timeZone === 'America/New_York' &&
+    zonedEvent.end.timeZone === 'America/New_York' &&
+    zonedEvent.start.dateTime.indexOf('Z') === -1 &&
+    zonedTask.due === '2026-10-22T00:00:00-04:00' &&
+    linesOf(zonedDo).join('\n').indexOf('2026-10-22 14:00') !== -1,
+    { event: zonedEvent, due: zonedTask && zonedTask.due, lines: linesOf(zonedDo) });
 
   check('a missing Calendar service is logged and the card still offers',
     missingCalendar.errors.some(function (line) { return line.indexOf('Calendar advanced service is missing') !== -1; }) &&

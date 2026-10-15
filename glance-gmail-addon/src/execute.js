@@ -10,23 +10,24 @@ var GlanceExecute = (function () {
 
   function performCreate(proposal, api) {
     var Proof = proofLib();
+    var zone = Proof.ianaZone(proposal.timeZone) || 'Asia/Jerusalem';
     var resource = { title: proposal.title };
     if (proposal.notes) resource.notes = String(proposal.notes).slice(0, 2000);
-    if (proposal.due) resource.due = proposal.due + 'T00:00:00.000Z';
+    if (proposal.due && /^\d{4}-\d{2}-\d{2}$/.test(proposal.due)) resource.due = Proof.dueRfc3339(proposal.due, zone);
     var inserted;
     try { inserted = api.insert(proposal.listId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
     var fetched;
     try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
-    var cmp = Proof.compareCreated(inserted, fetched);
+    var cmp = Proof.compareCreated(inserted, fetched, zone);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
     return {
       confirmed: true,
-      snapshot: Proof.snapshotOf(fetched, proposal.listId),
+      snapshot: Proof.snapshotOf(fetched, proposal.listId, zone),
       view: {
         id: String(fetched.id),
         title: Proof.normTitle(fetched.title),
-        due: Proof.normalizeDue(fetched.due)
+        due: Proof.normalizeDue(fetched.due, zone)
       }
     };
   }
@@ -79,7 +80,7 @@ var GlanceExecute = (function () {
     if (proposal.description) body.description = String(proposal.description).slice(0, 8000);
     var timed = Number.isInteger(proposal.hour) && Number.isInteger(proposal.minute);
     if (timed) {
-      var zone = proposal.timeZone || 'Etc/UTC';
+      var zone = proofLib().ianaZone(proposal.timeZone) || 'Asia/Jerusalem';
       body.start = { dateTime: wallClock(proposal.dateIso, proposal.hour, proposal.minute, 0), timeZone: zone };
       body.end = { dateTime: wallClock(proposal.dateIso, proposal.hour, proposal.minute, 30), timeZone: zone };
     } else {
@@ -148,6 +149,12 @@ var GlanceExecute = (function () {
     performCreate: performCreate,
     performUndo: performUndo,
     eventBody: eventBody,
+    instantUtc: function (dateIso, hour, minute, timeZone) {
+      return proofLib().instantUtc(dateIso, hour, minute, timeZone);
+    },
+    dueRfc3339: function (dateIso, timeZone) {
+      return proofLib().dueRfc3339(dateIso, timeZone);
+    },
     performCreateEvent: performCreateEvent,
     performUndoEvent: performUndoEvent,
     performUndoSchedule: performUndoSchedule

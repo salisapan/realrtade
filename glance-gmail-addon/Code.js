@@ -95,7 +95,8 @@ function stageDoIt_(e, lang) {
           title: saved.title,
           due: saved.due || null,
           notes: 'Logged by Glance',
-          listId: glanceTaskList_()
+          listId: glanceTaskList_(),
+          timeZone: timeZoneOf_(e)
         }, 'prefetch', lang);
       }
     };
@@ -240,7 +241,8 @@ function finishDecision_(decision, opened, messageId, lang, timeZone) {
     title: decision.title,
     due: decision.due || null,
     notes: notesFor_(opened),
-    listId: glanceTaskList_()
+    listId: glanceTaskList_(),
+    timeZone: timeZone
   }, messageId, lang);
 }
 
@@ -251,7 +253,8 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
     title: decision.title,
     dateIso: decision.dateIso,
     hour: Number.isInteger(decision.hour) ? decision.hour : null,
-    minute: Number.isInteger(decision.minute) ? decision.minute : null
+    minute: Number.isInteger(decision.minute) ? decision.minute : null,
+    timeZone: timeZone
   });
   var eventResult = Glance.execute.performCreateEvent({
     calendarId: 'primary',
@@ -259,7 +262,7 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
     dateIso: decision.dateIso,
     hour: Number.isInteger(decision.hour) ? decision.hour : null,
     minute: Number.isInteger(decision.minute) ? decision.minute : null,
-    timeZone: timeZone || 'Etc/UTC',
+    timeZone: timeZone || 'Asia/Jerusalem',
     description: eventNotes_(opened, decision.quote)
   }, calendarApi_());
   logReadBack_('event', eventResult);
@@ -295,7 +298,8 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
     title: decision.taskTitle,
     due: decision.taskDue || null,
     notes: notesFor_(opened),
-    listId: listId
+    listId: listId,
+    timeZone: timeZone
   }, tasksApi_());
   logReadBack_('task', taskResult);
   if (!taskResult.confirmed || !taskResult.view) {
@@ -662,9 +666,43 @@ function localeOf_(e) {
   return (common && common.userLocale) || (e && e.userLocale) || '';
 }
 
+function zoneId_(value) {
+  if (value && typeof value === 'object') return zoneId_(value.id);
+  if (typeof value !== 'string') return '';
+  var text = value.trim();
+  if (!/^[A-Za-z0-9_+\-\/]{1,80}$/.test(text)) return '';
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: text });
+    return text;
+  } catch (err) {
+    return '';
+  }
+}
+
+// The user's zone first. The script zone in appsscript.json is only a fallback.
 function timeZoneOf_(e) {
-  var common = e && e.commonEventObject;
-  return (common && common.timeZone) || 'Etc/UTC';
+  var id = zoneId_(e && e.userTimezone && e.userTimezone.id);
+  if (!id && e && e.userTimezone) id = zoneId_(e.userTimezone);
+  if (!id && e && e.commonEventObject) id = zoneId_(e.commonEventObject.timeZone);
+  if (id) return id;
+  try {
+    if (typeof CalendarApp !== 'undefined' && CalendarApp.getDefaultCalendar) {
+      var calendar = CalendarApp.getDefaultCalendar();
+      id = zoneId_(calendar && calendar.getTimeZone && calendar.getTimeZone());
+      if (id) return id;
+    }
+  } catch (err) {
+    console.warn('calendar zone skipped ' + (err && err.message ? err.message : err));
+  }
+  try {
+    if (typeof Session !== 'undefined' && Session.getScriptTimeZone) {
+      id = zoneId_(Session.getScriptTimeZone());
+      if (id) return id;
+    }
+  } catch (err) {
+    console.warn('script zone skipped ' + (err && err.message ? err.message : err));
+  }
+  return 'Asia/Jerusalem';
 }
 
 function isPrefetch_(e) {
