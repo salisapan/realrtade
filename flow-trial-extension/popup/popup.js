@@ -752,12 +752,14 @@
       await renderOutlookCards();
       return;
     }
+    const keptSnap = r.created || (r.ref && typeof r.ref === 'object' && r.ref.created) || null;
     const fields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.receiptLogFields)
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
         processName: entry.process && entry.process.name,
         closedLine: entry.process && entry.process.closedLine,
-        status: 'Handled.'
+        status: 'Handled.',
+        created: keptSnap
       })
       : null;
     const provedTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
@@ -778,6 +780,7 @@
       app: 'outlook',
       connectorId: route.connectorId,
       ref: r.ref,
+      created: keptSnap,
       where: r.where,
       url: r.url || null,
       sender: entry.sender || null,

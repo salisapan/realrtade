@@ -175,31 +175,187 @@ function listsRoute() {
   check('the card Undo sends the creation snapshot with the receipt ref',
     pageSrc.indexOf('created: (copy.ref && copy.ref.created)') > 0 && pageSrc.indexOf('copy.ref.created = keptSnap') > 0);
 
+  console.log('\n--- Do It, receipt, remount, Undo ---\n');
+  const proofSrc = fs.readFileSync(path.join(ROOT, 'core/proof-of-close.js'), 'utf8');
+  const proofBox = { console };
+  vm.createContext(proofBox);
+  vm.runInContext(proofSrc, proofBox, { filename: 'proof-of-close.js' });
+  const Proof = proofBox.FlowProofOfClose;
+  const sameWords = fresh.fn('FlowNativeEdit.userEdited')(
+    { title: 'Renew the parking permit', body: 'What: Renew the parking permit\r\nThanks' },
+    { title: 'Renew the parking permit', body: { contentType: 'html', content: '<p>What: Renew the parking permit\nThanks</p>' }, lastModifiedDateTime: '2099-01-01T00:00:00.000Z', '@odata.etag': 'W/"later"', changeKey: 'ck' }
+  );
+  check('HTML and CRLF are the same words, and a new etag is not an edit', sameWords === false, sameWords);
+
+  const storedRow = JSON.parse(JSON.stringify({
+    kind: 'written',
+    connectorId: 'outlookTask',
+    system: 'microsoft/todo',
+    externalId: wrote.ref.taskId,
+    fetchedBack: true,
+    verifiedAt: wrote.proof && wrote.proof.verifiedAt,
+    ref: wrote.ref,
+    created: wrote.ref.created,
+    writtenLine: wrote.written
+  }));
+  const logged = Proof.receiptLogFields(wrote.proof, { writtenLine: wrote.written, status: 'Handled.', created: storedRow.created });
+  const remounted = Proof.remountCopy(Object.assign({}, storedRow, logged));
+  check('remountCopy carries the snapshot Undo needs',
+    remounted && remounted.ref && remounted.ref.created &&
+    remounted.ref.created.title === snap.title && remounted.ref.created.body === snap.body &&
+    remounted.ref.created.dueDateTime === snap.dueDateTime &&
+    remounted.ref.created.lastModifiedDateTime == null,
+    remounted && remounted.ref);
+  const remountUndo = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASK-LIVE$/, reply: (() => {
+      let n = 0;
+      return () => {
+        n += 1;
+        if (n === 1) return { ok: true, status: 200, json: async () => graphTask({ lastModifiedDateTime: '2026-10-15T05:00:00.000Z', '@odata.etag': 'W/"remount"' }), text: async () => '' };
+        return { ok: false, status: 404, json: async () => ({ error: { code: 'ErrorItemNotFound' } }), text: async () => '' };
+      };
+    })() },
+    { method: 'DELETE', test: /\/tasks\/TASK-LIVE$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const fromRemount = await remountUndo.fn('outlookTaskUndo')(remounted.ref);
+  check('Undo after remount deletes an unedited task',
+    fromRemount && fromRemount.ok === true && fromRemount.fetchedBack === true &&
+    remountUndo.calls.some((c) => c.method === 'DELETE') &&
+    remountUndo.calls.filter((c) => c.method === 'GET').length >= 1,
+    fromRemount);
+
   console.log('\n--- Hold It writes one meeting event ---\n');
   const meet = background({ routes: [
-    { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => ({
+    { method: 'POST', test: /\/me\/events$/, reply: () => ({ ok: true, status: 201, json: async () => ({
       id: 'EV-BUDGET',
-      subject: body.subject,
-      body: body.body,
-      start: body.start,
-      end: body.end,
-      location: { displayName: '' },
+      subject: 'CREATED-STUB',
+      body: { contentType: 'text', content: 'stub from the 201' },
       webLink: 'https://outlook.live.com/calendar/item/EV-BUDGET',
-      '@odata.etag': 'W/"ev"',
+      '@odata.etag': 'W/"ev-201"',
+      changeKey: 'ck-201',
       lastModifiedDateTime: '2026-10-15T04:00:00.000Z'
+    }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/events\/EV-BUDGET/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'EV-BUDGET',
+      subject: 'Budget review',
+      body: { contentType: 'html', content: '<html><body>Budget review tomorrow at 10:00.</body></html>' },
+      start: { dateTime: '2026-10-16T10:00:00.0000000', timeZone: 'UTC' },
+      end: { dateTime: '2026-10-16T10:30:00.0000000', timeZone: 'UTC' },
+      location: { displayName: 'Room 4' },
+      '@odata.etag': 'W/"ev-get"',
+      changeKey: 'ck-get',
+      lastModifiedDateTime: '2026-10-15T04:00:05.000Z'
     }), text: async () => '' }) }
   ] });
   const held = await meet.fn('outlookCalendarWrite')({
     params: { meeting: true, title: 'Budget review', dateIso: '2026-10-16', hour: 10, minute: 0, quote: 'Budget review tomorrow at 10:00.' }
   });
   const post = meet.calls.filter((c) => c.method === 'POST' && /\/me\/events$/.test(c.url))[0];
+  const eventGet = meet.calls.filter((c) => c.method === 'GET' && /\/me\/events\/EV-BUDGET/.test(c.url));
   check('Hold It creates one event and keeps a content snapshot',
     held && held.ok === true && held.ref && held.ref.eventId === 'EV-BUDGET' &&
-    held.ref.created && held.ref.created.subject === 'Budget review' && held.ref.created.start &&
-    held.ref.created.lastModifiedDateTime == null &&
+    held.ref.created && held.ref.created.subject === 'Budget review' &&
+    held.ref.created.location === 'Room 4' && held.ref.created.start &&
+    held.ref.created.subject !== 'CREATED-STUB' &&
+    held.ref.created.lastModifiedDateTime == null && held.ref.created.changeKey == null &&
+    eventGet.length === 1 &&
     post && post.body && post.body.subject === 'Budget review' &&
     Array.isArray(post.body.attendees) && post.body.attendees.length === 0 && post.body.isOnlineMeeting == null,
-    { held, attendees: post && post.body && post.body.attendees });
+    { held, gets: eventGet.length, attendees: post && post.body && post.body.attendees });
+  const calStored = JSON.parse(JSON.stringify(held.ref));
+  const calClean = background({ routes: [
+    { method: 'GET', test: /\/me\/events\/EV-BUDGET$/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'EV-BUDGET', subject: 'Budget review',
+      body: { contentType: 'html', content: '<p>Budget review tomorrow at 10:00.</p>' },
+      start: { dateTime: '2026-10-16T10:00:00.0000000', timeZone: 'UTC' },
+      end: { dateTime: '2026-10-16T10:30:00.0000000', timeZone: 'UTC' },
+      location: { displayName: 'Room 4' },
+      '@odata.etag': 'W/"ev-undo"', lastModifiedDateTime: '2026-10-15T06:00:00.000Z'
+    }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/me\/events\/EV-BUDGET$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const calUndone = await calClean.fn('outlookCalendarUndo')(calStored);
+  check('an unedited event deletes after the stored snapshot is reloaded',
+    calUndone && calUndone.ok === true && calClean.calls.some((c) => c.method === 'DELETE'),
+    calUndone);
+  const calEdited = background({ routes: [
+    { method: 'GET', test: /\/me\/events\/EV-BUDGET$/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'EV-BUDGET', subject: 'Budget review moved',
+      body: { contentType: 'html', content: '<p>Budget review tomorrow at 10:00.</p>' },
+      start: { dateTime: '2026-10-16T10:00:00.0000000', timeZone: 'UTC' },
+      end: { dateTime: '2026-10-16T10:30:00.0000000', timeZone: 'UTC' },
+      location: { displayName: 'Room 4' },
+      '@odata.etag': 'W/"ev-edit"', lastModifiedDateTime: '2026-10-15T07:00:00.000Z'
+    }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/me\/events\/EV-BUDGET$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const calKept = await calEdited.fn('outlookCalendarUndo')(calStored);
+  check('an edited event says you edited it and does not delete',
+    calKept && calKept.ok === false && calKept.reason === 'user-edited' &&
+    calKept.written === 'You edited this. Undo left it alone.' &&
+    !calEdited.calls.some((c) => c.method === 'DELETE'),
+    calKept);
+
+  console.log('\n--- a reply draft survives reload, then Undo ---\n');
+  const draftBg = background({ routes: [
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({
+      id: 'DRAFT-1', isDraft: true, subject: 'RE: Q3 summary',
+      toRecipients: [{ emailAddress: { address: 'dana@example.com' } }],
+      body: { contentType: 'html', content: '<html>createReply stub</html>' },
+      '@odata.etag': 'W/"d-201"', changeKey: 'd-ck', lastModifiedDateTime: '2026-10-15T08:00:00.000Z'
+    }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-1$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-1' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'DRAFT-1', isDraft: true, subject: 'RE: Q3 summary',
+      toRecipients: [{ emailAddress: { address: 'Dana@example.com' } }],
+      body: { contentType: 'html', content: '<html><body>Thanks, I will confirm.</body></html>' },
+      '@odata.etag': 'W/"d-get"', changeKey: 'd-get', lastModifiedDateTime: '2026-10-15T08:00:02.000Z'
+    }), text: async () => '' }) }
+  ] });
+  const drafted = await draftBg.fn('outlookDraftWrite')({
+    messageId: 'MSG-Q3',
+    comment: 'Thanks, I will confirm.',
+    subject: 'Q3 summary'
+  });
+  const draftRow = JSON.parse(JSON.stringify({ ref: drafted && drafted.ref, created: drafted && drafted.created }));
+  check('Do It stores a draft snapshot beside the id',
+    drafted && drafted.ok === true && draftRow.ref === 'DRAFT-1' &&
+    draftRow.created && draftRow.created.body === 'Thanks, I will confirm.' &&
+    draftRow.created.subject === 'RE: Q3 summary' &&
+    draftRow.created.lastModifiedDateTime == null && draftRow.created.changeKey == null,
+    drafted);
+  const draftClean = background({ routes: [
+    { method: 'GET', test: /\/me\/messages\/DRAFT-1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'DRAFT-1', isDraft: true, subject: 'RE: Q3 summary',
+      toRecipients: [{ emailAddress: { address: 'dana@example.com' } }],
+      body: { contentType: 'html', content: '<p>Thanks, I will confirm.</p>' },
+      '@odata.etag': 'W/"d-undo"', lastModifiedDateTime: '2026-10-15T09:00:00.000Z', changeKey: 'later'
+    }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/me\/messages\/DRAFT-1$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const draftUndone = await draftClean.fn('outlookDraftUndo')(draftRow.ref, { created: draftRow.created });
+  check('an unedited draft deletes after the receipt is reloaded',
+    draftUndone && draftUndone.ok === true && draftClean.calls.some((c) => c.method === 'DELETE'),
+    draftUndone);
+  const draftEdited = background({ routes: [
+    { method: 'GET', test: /\/me\/messages\/DRAFT-1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'DRAFT-1', isDraft: true, subject: 'RE: Q3 summary',
+      toRecipients: [{ emailAddress: { address: 'dana@example.com' } }],
+      body: { contentType: 'html', content: '<p>I typed this myself.</p>' },
+      '@odata.etag': 'W/"d-edit"', lastModifiedDateTime: '2026-10-15T09:30:00.000Z'
+    }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/me\/messages\/DRAFT-1$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const draftKept = await draftEdited.fn('outlookDraftUndo')(draftRow.ref, { created: draftRow.created });
+  check('an edited draft says you edited it and does not delete',
+    draftKept && draftKept.ok === false && draftKept.reason === 'user-edited' &&
+    draftKept.written === 'You edited this. Undo left it alone.' &&
+    !draftEdited.calls.some((c) => c.method === 'DELETE'),
+    draftKept);
+  const cleanupAt = pageSrc.indexOf("pageReason('outlook:file-found-no-attach'");
+  const cleanupUndo = pageSrc.lastIndexOf("type: 'flow:undo-action'", cleanupAt);
+  check('a failed attach undoes the draft with its snapshot',
+    cleanupUndo > 0 && pageSrc.slice(cleanupUndo, cleanupAt).indexOf('created: r.created') > 0);
 
   console.log('\n--- the open mail keeps done + Undo after a reload ---\n');
   const draftPage = await boot({

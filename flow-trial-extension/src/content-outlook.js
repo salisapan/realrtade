@@ -868,7 +868,7 @@
     // without that id is not a draft we keep, and the receipt never says attached.
     if (!r || !r.ok || (file && !r.attachmentId)) {
       if (r && r.ok && r.ref && file && !r.attachmentId) {
-        await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, outlookImmutableId: ctx.outlookImmutableId === true });
+        await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created || null, outlookImmutableId: ctx.outlookImmutableId === true });
       }
       if (file) {
         await pageReason('outlook:file-found-no-attach', {
@@ -1621,7 +1621,8 @@
         writtenLine: r.written,
         processName: faceTitle(ctx),
         closedLine: ctx.process && ctx.process.closedLine,
-        status: status
+        status: status,
+        created: (r.ref && r.ref.created) || null
       })
       : null;
     const threadId = ctx.threadId || ctx.conversationId || null;

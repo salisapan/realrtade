@@ -385,6 +385,31 @@ console.log('\n--- Microsoft To Do ---\n');
     copy.undoHint === 'Undo removes the To Do task.' && copy.undoneLine === 'Undone — the To Do task was removed.' &&
     copy.externalId === 'todo_1' && copy.ref.taskListId === 'LIST_T',
     copy);
+  const snapRow = Object.assign({}, storedTodo, {
+    ref: {
+      taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1',
+      created: { title: 'Renew the permit', body: 'What: Renew the permit', dueDateTime: '2026-10-20T00:00:00', status: 'notStarted', lastModifiedDateTime: '2026-10-15T01:00:00.000Z', '@odata.etag': 'W/"x"' }
+    }
+  });
+  const snapCopy = FlowProofOfClose.remountCopy(snapRow);
+  check('remount keeps the content snapshot and drops server fields',
+    snapCopy && snapCopy.ref && snapCopy.ref.created &&
+    snapCopy.ref.created.title === 'Renew the permit' &&
+    snapCopy.ref.created.body === 'What: Renew the permit' &&
+    snapCopy.ref.created.dueDateTime === '2026-10-20T00:00:00' &&
+    snapCopy.ref.created.status === 'notStarted' &&
+    snapCopy.ref.created.lastModifiedDateTime == null &&
+    snapCopy.ref.taskId === 'todo_1' && snapCopy.ref.taskListId === 'LIST_T',
+    snapCopy && snapCopy.ref);
+  const loggedSnap = FlowProofOfClose.receiptLogFields(todo, {
+    writtenLine: 'To Do', status: 'Handled.', created: snapRow.ref.created
+  });
+  const fromLogOnly = FlowProofOfClose.remountCopy(Object.assign({}, storedTodo, loggedSnap, { ref: { taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1' } }));
+  check('the stored receipt fields keep the snapshot for a later remount',
+    loggedSnap && loggedSnap.created && loggedSnap.created.title === 'Renew the permit' &&
+    loggedSnap.created.lastModifiedDateTime == null &&
+    fromLogOnly && fromLogOnly.ref.created && fromLogOnly.ref.created.title === 'Renew the permit',
+    { loggedSnap, fromLogOnly });
   check('a newer To Do undo does not remount',
     FlowProofOfClose.taskReceiptFromLog([
       { kind: 'undone', messageId: oldItem, threadId: conv, connectorId: 'outlookTask', system: 'microsoft/todo', undone: true },

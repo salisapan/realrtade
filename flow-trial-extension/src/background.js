@@ -3627,6 +3627,17 @@ async function outlookObjectSnap(url, prefer) {
   return body ? outlookCreationSnap(body) : null;
 }
 
+// The 201 body is not the stored event. Graph rewrites the body and stamps
+// etag and lastModified on that response. The snapshot is the GET after
+// the create. Posted words fill a content field that GET left empty.
+async function outlookStoredEventSnap(eventId, posted) {
+  const settled = await outlookObjectSnap(
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,subject,body,start,end,location'
+  );
+  if (outlookHasSnap(settled)) return outlookMergeSnap(posted, settled);
+  return outlookHasSnap(posted) ? posted : null;
+}
+
 // Read the object Glance created. Undo deletes only after this GET succeeds
 // and still matches the creation snapshot. 404 means it is already gone.
 // A 5xx, a network error, a timeout, or a body that will not parse refuses
@@ -3852,7 +3863,7 @@ async function outlookMeetingWrite(p) {
     return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
   }
   const posted = outlookCreationSnap(body);
-  const eventSnap = outlookMergeSnap(posted, outlookCreationSnap(event));
+  const eventSnap = await outlookStoredEventSnap(event.id, posted);
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
   return {
     ok: true,
@@ -3908,11 +3919,7 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  let eventSnap = outlookCreationSnap(event);
-  if (!outlookHasSnap(eventSnap)) {
-    const settled = await outlookObjectSnap(OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id) + '?$select=id,subject,body,start,end,location');
-    if (settled) eventSnap = outlookMergeSnap(eventSnap, settled);
-  }
+  const eventSnap = await outlookStoredEventSnap(event.id, outlookCreationSnap(body));
   return {
     ok: true,
     where: 'Outlook Calendar',

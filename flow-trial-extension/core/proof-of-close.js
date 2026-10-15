@@ -424,6 +424,10 @@ const FlowProofOfClose = (() => {
     const ref = { taskId: externalId, externalId: externalId };
     const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
     if (listId) ref.taskListId = listId;
+    // The ids alone cannot tell an edit from the original. The snapshot
+    // stored with the write has to ride on the ref Undo sends.
+    const snap = storedSnapshot(row);
+    if (snap) ref.created = snap;
     const microsoft = isMicrosoftTodoRow(row);
     const connector = microsoft
       ? ((row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo') ? row.connectorId : 'outlookTask')
@@ -466,7 +470,34 @@ const FlowProofOfClose = (() => {
     if (display.status === STATUS_HANDLED || display.status === STATUS_HANDLED_HE || display.status === STATUS_PARTIAL) {
       record.receiptStatus = display.status;
     }
+    const snap = contentSnapshot(display.created) || contentSnapshot(display.ref && display.ref.created);
+    if (snap) record.created = snap;
     return record;
+  }
+
+  // Words the person can change. A boolean created flag (a new file versus
+  // a replaced one) is not this snapshot. Server fields are not copied.
+  const SNAP_KEYS = ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to'];
+
+  function contentSnapshot(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const snap = {};
+    let any = false;
+    for (let i = 0; i < SNAP_KEYS.length; i++) {
+      const key = SNAP_KEYS[i];
+      const v = value[key];
+      if (v == null || v === '') continue;
+      snap[key] = v;
+      any = true;
+    }
+    return any ? snap : null;
+  }
+
+  function storedSnapshot(row) {
+    if (!row) return null;
+    const onRef = row.ref && typeof row.ref === 'object' ? contentSnapshot(row.ref.created) : null;
+    if (onRef) return onRef;
+    return contentSnapshot(row.created);
   }
 
   // Shape only. The live Google Tasks path is the service worker writer,

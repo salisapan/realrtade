@@ -18,8 +18,8 @@ const FlowNativeEdit = (() => {
     return '';
   }
 
-  // Graph stores the same sentence as text or as HTML. Tags and whitespace
-  // are not an edit. The words are.
+  // Graph stores the same sentence as text or as HTML. Tags, CRLF, and
+  // extra whitespace are not an edit. The words are.
   function normText(value) {
     return textOf(value)
       .replace(/<[^>]+>/g, ' ')
@@ -29,6 +29,8 @@ const FlowNativeEdit = (() => {
       .replace(/&gt;/gi, '>')
       .replace(/&#39;|&apos;/gi, "'")
       .replace(/&quot;/gi, '"')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -100,12 +102,13 @@ const FlowNativeEdit = (() => {
   // A new etag, changeKey, or lastModifiedDateTime is not an edit.
   function userEdited(snapshot, live) {
     if (!snapshot || !live) return false;
+    const kept = snapshotOf(snapshot);
     const liveSnap = snapshotOf(live);
     for (let i = 0; i < CONTENT_KEYS.length; i++) {
       const key = CONTENT_KEYS[i];
-      if (snapshot[key] == null || snapshot[key] === '') continue;
+      if (kept[key] == null || kept[key] === '') continue;
       if (liveSnap[key] == null || liveSnap[key] === '') continue;
-      if (String(liveSnap[key]) !== String(snapshot[key])) return true;
+      if (String(liveSnap[key]) !== String(kept[key])) return true;
     }
     return false;
   }
