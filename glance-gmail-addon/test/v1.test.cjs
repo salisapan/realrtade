@@ -256,7 +256,8 @@ console.log('\n--- calendar proof ---');
   const late = execute.eventBody({ title: 'Late', dateIso: '2026-10-22', hour: 23, minute: 45, timeZone: 'Etc/UTC' });
   check('thirty minutes can cross midnight', late.end.dateTime === '2026-10-23T00:15:00', late.end);
   const local = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0, timeZone: 'Asia/Jerusalem' });
-  const fromObject = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0, timeZone: { id: 'America/New_York', offset: -14400000 } });
+  const cardZone = { id: 'Asia/Jerusalem', offset: 10800000 };
+  const fromObject = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0, timeZone: cardZone });
   const fallback = execute.eventBody({ title: 'Meet', dateIso: '2026-10-22', hour: 14, minute: 0 });
   function hasZoneOrDate(body) {
     if (!body) return false;
@@ -270,7 +271,12 @@ console.log('\n--- calendar proof ---');
   check('an insert payload has a timeZone or a date', hasZoneOrDate(timed) && hasZoneOrDate(allDay) && hasZoneOrDate(local) && hasZoneOrDate(fromObject) && hasZoneOrDate(fallback), { local: local, fromObject: fromObject, fallback: fallback });
   check('14:00 stays 14:00 local', local.start.dateTime === '2026-10-22T14:00:00' && local.end.dateTime === '2026-10-22T14:30:00' && local.start.timeZone === 'Asia/Jerusalem', local);
   check('14:00 on 22/10 in Asia/Jerusalem is 11:00Z', execute.instantUtc('2026-10-22', 14, 0, 'Asia/Jerusalem') === '2026-10-22T11:00:00Z');
-  check('14:00 on 22/10 in America/New_York is 18:00Z', execute.instantUtc('2026-10-22', 14, 0, 'America/New_York') === '2026-10-22T18:00:00Z' && fromObject.start.timeZone === 'America/New_York' && fromObject.start.dateTime === '2026-10-22T14:00:00', fromObject);
+  check('14:00 on 22/10 in America/New_York is 18:00Z', execute.instantUtc('2026-10-22', 14, 0, 'America/New_York') === '2026-10-22T18:00:00Z');
+  check('a timeZone object becomes its id and a 14:00 hold is 11:00Z',
+    fromObject.start.timeZone === 'Asia/Jerusalem' && typeof fromObject.start.timeZone === 'string' &&
+    fromObject.start.dateTime === '2026-10-22T14:00:00' && fromObject.end.timeZone === 'Asia/Jerusalem' &&
+    execute.instantUtc('2026-10-22', 14, 0, fromObject.start.timeZone) === '2026-10-22T11:00:00Z',
+    fromObject);
   check('a missing zone falls back to Asia/Jerusalem', fallback.start.timeZone === 'Asia/Jerusalem');
   check('a task due is RFC3339 in that zone',
     execute.dueRfc3339('2026-10-22', 'Asia/Jerusalem') === '2026-10-22T00:00:00+03:00' &&
@@ -1168,13 +1174,16 @@ console.log('\n--- message path parity ---');
     { err: authErr && authErr.message, returned: returnedText, events: Object.keys(state.events), tasks: Object.keys(state.tasks), warns: denied.warns });
 
   const zoneOf = vm.runInContext('timeZoneOf_', sandbox);
-  check('userTimezone.id wins over the card object and the calendar',
+  const cardObject = { id: 'Asia/Jerusalem', offset: 10800000 };
+  check('the card time zone object is normalized before userTimezone.id',
     zoneOf({
       userTimezone: { id: 'America/New_York' },
-      commonEventObject: { timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } }
-    }) === 'America/New_York');
+      commonEventObject: { timeZone: cardObject }
+    }) === 'Asia/Jerusalem' && typeof zoneOf({ commonEventObject: { timeZone: cardObject } }) === 'string');
+  check('userTimezone.id is next when the card zone is missing',
+    zoneOf({ userTimezone: { id: 'America/New_York' } }) === 'America/New_York');
   check('a card time zone object becomes its id',
-    zoneOf({ commonEventObject: { timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } } }) === 'Asia/Jerusalem');
+    zoneOf({ commonEventObject: { timeZone: cardObject } }) === 'Asia/Jerusalem');
   check('a card time zone string is kept', zoneOf({ commonEventObject: { timeZone: 'Etc/UTC' } }) === 'Etc/UTC');
   sandbox.CalendarApp = {
     getDefaultCalendar: function () { throw new Error('full calendar scope'); }
@@ -1222,16 +1231,42 @@ console.log('\n--- message path parity ---');
   const zonedIds = Object.keys(state.events);
   const zonedEvent = state.events[zonedIds[0]];
   const zonedTask = state.tasks[Object.keys(state.tasks)[0]];
-  check('Do it writes 14:00 in the user zone, not the card object',
+  check('Do it writes 14:00 from the card time zone object',
     zonedIds.length === 1 &&
     zonedEvent.start.dateTime === '2026-10-22T14:00:00' &&
     zonedEvent.end.dateTime === '2026-10-22T14:30:00' &&
-    zonedEvent.start.timeZone === 'America/New_York' &&
-    zonedEvent.end.timeZone === 'America/New_York' &&
-    zonedEvent.start.dateTime.indexOf('Z') === -1 &&
-    zonedTask.due === '2026-10-22T00:00:00-04:00' &&
+    zonedEvent.start.timeZone === 'Asia/Jerusalem' &&
+    typeof zonedEvent.start.timeZone === 'string' &&
+    zonedEvent.end.timeZone === 'Asia/Jerusalem' &&
+    execute.instantUtc('2026-10-22', 14, 0, zonedEvent.start.timeZone) === '2026-10-22T11:00:00Z' &&
+    zonedTask.due === '2026-10-22T00:00:00+03:00' &&
     linesOf(zonedDo).join('\n').indexOf('2026-10-22 14:00') !== -1,
     { event: zonedEvent, due: zonedTask && zonedTask.due, lines: linesOf(zonedDo) });
+
+  reset();
+  state.messages.hold14 = gmailMessage({
+    id: 'hold14',
+    threadId: 'threadhold14',
+    subject: 'Thursday',
+    plain: 'Could we meet Thursday at 2pm?',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    date: new Date('2026-10-15T09:00:00Z')
+  });
+  const hold14 = doIt({
+    gmail: { messageId: 'hold14', accessToken: 'token', threadId: 'threadhold14' },
+    commonEventObject: { userLocale: 'en', timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } },
+    parameters: { messageId: 'hold14', source: 'message' }
+  }).card;
+  const hold14Ids = Object.keys(state.events);
+  const hold14Event = state.events[hold14Ids[0]];
+  check('a 14:00 hold with a timeZone object lands at 11:00Z',
+    hold14Ids.length === 1 && Object.keys(state.tasks).length === 0 &&
+    hold14Event.start.timeZone === 'Asia/Jerusalem' && typeof hold14Event.start.timeZone === 'string' &&
+    hold14Event.start.dateTime === '2026-10-22T14:00:00' &&
+    execute.instantUtc('2026-10-22', 14, 0, hold14Event.start.timeZone) === '2026-10-22T11:00:00Z' &&
+    linesOf(hold14).join('\n').indexOf('2026-10-22 14:00') !== -1,
+    hold14Event);
 
   check('a missing Calendar service is logged and the card still offers',
     missingCalendar.errors.some(function (line) { return line.indexOf('Calendar advanced service is missing') !== -1; }) &&

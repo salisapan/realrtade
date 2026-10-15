@@ -679,11 +679,13 @@ function zoneId_(value) {
   }
 }
 
-// The user's zone first. The script zone in appsscript.json is only a fallback.
+// commonEventObject.timeZone is {id, offset} when useLocaleFromApp is on.
+// Take .id first. The script zone in appsscript.json is only a fallback.
 function timeZoneOf_(e) {
-  var id = zoneId_(e && e.userTimezone && e.userTimezone.id);
+  var common = e && e.commonEventObject;
+  var id = zoneId_(common && common.timeZone);
+  if (!id) id = zoneId_(e && e.userTimezone && e.userTimezone.id);
   if (!id && e && e.userTimezone) id = zoneId_(e.userTimezone);
-  if (!id && e && e.commonEventObject) id = zoneId_(e.commonEventObject.timeZone);
   if (id) return id;
   try {
     if (typeof CalendarApp !== 'undefined' && CalendarApp.getDefaultCalendar) {
