@@ -241,8 +241,10 @@ console.log('\n--- nothing is drawn ---\n');
   const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
   const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
   check('no Not now chip in the pages',
-    gmail.indexOf('Not now') < 0 && outlook.indexOf('Not now') < 0 &&
-    gmail.indexOf('flow-suggest') < 0 && outlook.indexOf('flow-suggest') < 0);
+    gmail.indexOf('Not now') < 0 &&
+    gmail.indexOf('flow-suggest') < 0 && outlook.indexOf('flow-suggest') < 0 &&
+    outlook.indexOf('Not now') === outlook.indexOf("['Not now', 'not-now']") + 2 &&
+    outlook.indexOf('Not now') === outlook.lastIndexOf('Not now'));
   check('the page records other-card and draws attachmentSave from step.copy',
     outlook.indexOf('recordSuggestNote') > 0 && outlook.indexOf("reason: 'suggest:other-card'") > 0 &&
     outlook.indexOf('attachmentSave') > 0 && outlook.indexOf('Save the file?') > 0 &&

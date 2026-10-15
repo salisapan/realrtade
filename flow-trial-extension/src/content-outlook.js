@@ -1676,6 +1676,47 @@
     return (r && (r.error || r.reason)) || 'Could not confirm the task';
   }
 
+  async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
+    const params = (taskStep && taskStep.params) || {};
+    const live = await livePromiseProof(promiseItem(ctx));
+    if (ignoreStaleClick(host)) return;
+    if (live) {
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
+      return;
+    }
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookTask',
+        params: params,
+        label: (ctx.intent && ctx.intent.label) || params.title || 'Task',
+        senderName: ctx.sender && ctx.sender.name,
+        senderEmail: ctx.sender && ctx.sender.email,
+        subject: ctx.subject || '',
+        text: ctx.bodyText || '',
+        threadUrl: ctx.threadUrl || null,
+        facts: (ctx.intent && ctx.intent.facts) || null,
+        entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
+      }
+    });
+    if (ignoreStaleClick(host)) return;
+    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+      ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
+      : false;
+    if (!proved) {
+      if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
+        await commitProvedTodo(host, ctx, r, taskStep, false);
+        return;
+      }
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
+      const why = todoWriteFailureLine(r);
+      FlowChipHost.setChipState(chip, 'flow-chip-error', why);
+      return;
+    }
+    await commitProvedTodo(host, ctx, r, taskStep, true);
+  }
+
   async function commitProvedTodo(host, ctx, r, taskStep, proved) {
     const params = (taskStep && taskStep.params) || {};
     const he = ctx && ctx.intent && ctx.intent.lang === 'he';
@@ -1789,47 +1830,6 @@
       app: 'outlook'
     }, fields || {});
     if (mount) paintOutlookTodoReceipt(mount, row);
-  }
-
-  async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
-    const params = (taskStep && taskStep.params) || {};
-    const live = await livePromiseProof(promiseItem(ctx));
-    if (ignoreStaleClick(host)) return;
-    if (live) {
-      if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
-      return;
-    }
-    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
-    const r = await send({
-      type: 'flow:execute-action',
-      payload: {
-        connectorId: 'outlookTask',
-        params: params,
-        label: (ctx.intent && ctx.intent.label) || params.title || 'Task',
-        senderName: ctx.sender && ctx.sender.name,
-        senderEmail: ctx.sender && ctx.sender.email,
-        subject: ctx.subject || '',
-        text: ctx.bodyText || '',
-        threadUrl: ctx.threadUrl || null,
-        facts: (ctx.intent && ctx.intent.facts) || null,
-        entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
-      }
-    });
-    if (ignoreStaleClick(host)) return;
-    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
-      ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
-      : false;
-    if (!proved) {
-      if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
-        await commitProvedTodo(host, ctx, r, taskStep, false);
-        return;
-      }
-      if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
-      const why = todoWriteFailureLine(r);
-      FlowChipHost.setChipState(chip, 'flow-chip-error', why);
-      return;
-    }
-    await commitProvedTodo(host, ctx, r, taskStep, true);
   }
 
   async function onOnedriveDoIt(host, chip, ctx, fileStep) {
@@ -2512,7 +2512,7 @@
 
   // Hold It on a meeting mail writes one calendar event and leaves the card
   // on Handled, with Undo. Without calendar scope the card asks once, in one
-  // line. Not now holds the same loop as a To Do task.
+  // line. Declining holds the same loop as a To Do task.
   async function onMeetingHold(host, ctx) {
     if (!host || ignoreStaleClick(host)) return;
     let st = null;
