@@ -1,7 +1,7 @@
 // One classifier for Messenger, Instagram, and Business Suite. No name lists.
-// A person-shaped title (1–3 words, letters only) cancels a group-word veto.
-// It is not proof. A draft still needs a profile link, a matching thread id,
-// or a one-person panel. A title that is only the group word stays a group.
+// Order: a structural group signal, then the title, then one-person proof.
+// Only a person title reaches proof. A multi-person title, a digit, an emoji,
+// or a group noun that is not a surname stays quiet even with proof.
 const FlowGroupWord = (() => {
   const EN = new Set(['members', 'participants', 'family', 'department', 'dept', 'team', 'group', 'squad', 'crew', 'staff']);
   const HE = new Set(['מחלקת', 'מחלקה', 'משתתפים', 'משפחה', 'קבוצתי', 'קבוצת', 'קבוצה', 'צוות']);
@@ -48,12 +48,13 @@ const FlowGroupWord = (() => {
     return /^(?:group|קבוצה)(?:\s+(?:chat|conversation))?$/i.test(String(text || '').replace(/\s+/g, ' ').trim());
   }
 
-  // "3 members" / "participants" / "Add people" as the whole text of a
-  // header or subtitle element. A word inside a name is not this.
+  // "3 members", "Add people", "Add members", "Chat members", "See members"
+  // as the whole text of a header or subtitle element. A word inside a name
+  // ("Mary Members") is not this. Bare Block and Mute are not this.
   function memberLine(text) {
     const t = String(text || '').replace(/\s+/g, ' ').trim();
     if (!t) return false;
-    if (/^add people$/i.test(t)) return true;
+    if (/^(?:add people|add members|chat members|see members)$/i.test(t)) return true;
     return /^(?:\d{1,4}\s+)?(?:members|participants|משתתפים)$/i.test(t);
   }
 
@@ -299,16 +300,26 @@ const FlowGroupWord = (() => {
     const leaves = leafTexts(root);
     let member = inbox.group;
     let chipSeen = inbox.group && leaves.some((item) => chip(item.text));
+    if (memberLine(title)) member = true;
     leaves.forEach((item) => {
-      if (memberLine(item.text) || (countLine(item.text) && item.text !== title)) member = true;
-      if (chip(item.text) || chip(item.el.getAttribute && item.el.getAttribute('aria-label') || '')) chipSeen = true;
+      const aria = String(item.el.getAttribute && item.el.getAttribute('aria-label') || '');
+      if (memberLine(item.text) || memberLine(aria) || (countLine(item.text) && item.text !== title) || (countLine(aria) && aria !== title)) member = true;
+      if (chip(item.text) || chip(aria)) chipSeen = true;
       const surface = (item.el.getAttribute && item.el.getAttribute('data-surface')) || '';
       if (INBOX_GROUP.test(surface)) chipSeen = true;
     });
     if (root && root.querySelectorAll) {
       Array.from(root.querySelectorAll('[aria-label]')).forEach((el) => {
-        if (!inRow(el) && chip(el.getAttribute('aria-label') || '')) chipSeen = true;
+        if (inRow(el)) return;
+        const label = el.getAttribute('aria-label') || '';
+        if (chip(label)) chipSeen = true;
+        if (memberLine(label)) member = true;
       });
+      const header = root.querySelector('header, [role="banner"]');
+      if (header) {
+        const listed = Array.from(header.querySelectorAll('li')).filter((li) => !inRow(li));
+        if (listed.length >= 2) member = true;
+      }
     }
     const anchors = profileAnchors(root);
     const keys = [];
@@ -381,15 +392,52 @@ const FlowGroupWord = (() => {
     };
   }
 
-  // 'person' is the only title that may reach proof. Digits and emoji are
-  // unknown, and unknown stays quiet even when a profile link is present.
-  // A title that is only the group word is a group.
+  // Nouns that are not surnames. Any position keeps the title from being a person.
+  const KILL_PERSON = new Set(['club', 'friends', 'family', 'channel', 'chat', 'committee', 'class', 'cohort', 'department', 'dept', 'squad']);
+  // Nouns that can be surnames. Last token after another word can be a person.
+  // First or only token stays a group.
+  const SURNAME_GROUP = new Set(['crew', 'staff', 'team', 'group']);
+
+  function killNoun(word) {
+    if (KILL_PERSON.has(letters(word).toLowerCase())) return true;
+    const stem = groupStem(word);
+    return stem === 'משפחה' || stem === 'מחלקה' || stem === 'מחלקת';
+  }
+
+  function leadingGroup(word) {
+    if (SURNAME_GROUP.has(letters(word).toLowerCase())) return true;
+    const stem = groupStem(word);
+    return stem === 'צוות' || stem === 'קבוצה' || stem === 'קבוצת';
+  }
+
+  // 'and' / '&' / '+' or a Hebrew ו that means "and".
+  // A ו before י or ר stays inside the name (וייס, ורד). דנה ונועה does not.
+  function joinedPeople(title) {
+    const t = bare(title);
+    if (/\band\b/i.test(t) || /[&+]/.test(t)) return true;
+    const words = t.split(/\s+/).filter(Boolean);
+    for (let i = 1; i < words.length; i++) {
+      if (words[i] === 'ו' && words[i - 1] && words[i + 1]) return true;
+      if (/^ו[^\u05D9\u05E8]\p{L}+$/u.test(words[i]) && /^\p{L}+$/u.test(words[i - 1])) return true;
+    }
+    return false;
+  }
+
+  // 'person' is the only title that may reach proof. Digits, emoji, a
+  // multi-person title, and a non-surname group noun are unknown even when
+  // a profile link or a thread id is present. A surname noun is a person
+  // only as the last token after another letter-word.
   function titleVerdict(title) {
-    const t = String(title || '').replace(/\s+/g, ' ').trim();
+    const raw = String(title || '');
+    const t = bare(raw);
     if (!t) return 'unknown';
-    if (/\p{Extended_Pictographic}/u.test(t) || /\d/.test(t)) return 'unknown';
+    if (/\p{Extended_Pictographic}/u.test(raw) || /\d/.test(t)) return 'unknown';
     if (counts(t)) return 'group';
-    if (personShaped(t)) return 'person';
+    if (joinedPeople(t)) return 'unknown';
+    const words = t.split(/\s+/).filter(Boolean);
+    if (words.length && leadingGroup(words[0]) && words.every((word) => /^\p{L}+$/u.test(word))) return 'group';
+    if (words.some(killNoun)) return 'unknown';
+    if (personShaped(raw)) return 'person';
     return 'unknown';
   }
 

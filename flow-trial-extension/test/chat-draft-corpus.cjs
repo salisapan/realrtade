@@ -351,6 +351,10 @@ function provedName(title, slug) {
   check(title + ' stays quiet without proof on every surface', bare[0] !== 'one-to-one' && bare[1] !== 'one-to-one' && bare[2] !== 'one-to-one' && bare[0] === bare[1] && bare[1] === bare[2], bare);
 });
 check('the pipeline keeps digits and emoji quiet even with proof', FlowGroupWord.pipeline({ title: 'Team 🔥', profileLink: true, threadMatch: true, selectedItem: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Squad 7', profileLink: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: '4 friends', threadMatch: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana 🎉', onePersonPanel: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana', profileLink: true }).kind === 'one-to-one' && FlowGroupWord.pipeline({ title: 'Team', profileLink: true }).kind === 'group' && FlowGroupWord.pipeline({ title: 'Dana', memberLine: true, profileLink: true, selectedItem: true }).kind === 'group');
+check('a multi-person title stays quiet even with proof', FlowGroupWord.pipeline({ title: 'דנה ונועה', threadMatch: true, profileLink: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana & Noa', profileLink: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana and Noa', threadMatch: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana + Noa', selectedItem: true }).kind === 'unknown');
+check('a group noun that is not a surname stays quiet even with proof', FlowGroupWord.pipeline({ title: 'Book club', threadMatch: true, profileLink: true, onePersonPanel: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dept Smith', profileLink: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'James Family', threadMatch: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Maria Squad', profileLink: true }).kind === 'unknown');
+check('a surname group noun still drafts when it is the last word', FlowGroupWord.pipeline({ title: 'Russell Crew', profileLink: true }).kind === 'one-to-one' && FlowGroupWord.pipeline({ title: 'John Staff', profileLink: true }).kind === 'one-to-one' && FlowGroupWord.pipeline({ title: 'Anna Team', threadMatch: true }).kind === 'one-to-one' && FlowGroupWord.pipeline({ title: 'Dana Group', profileLink: true }).kind === 'one-to-one');
+check('a surname group noun as the first word stays a group', FlowGroupWord.pipeline({ title: 'Team Alpha', profileLink: true, threadMatch: true }).kind === 'group' && FlowGroupWord.pipeline({ title: 'Group chat', profileLink: true }).kind === 'group');
 function threeKinds(html, href) {
   const root = chatEl(html);
   return [
@@ -370,18 +374,33 @@ check('a numeric profile.php id drafts through the pipeline when the thread matc
 const fireProof = '<div role="main"><header><h2>Team 🔥</h2><a href="/team/" role="link">Team</a><a aria-label="Conversation information">Conversation information</a></header><span data-surface="/bizweb/lib:inbox:detail_view_header"><div><div>Team 🔥</div></div></span></div>';
 check('Team 🔥 is the same quiet verdict on Messenger, Instagram, and Business Suite', sameKind(fireProof, 'https://business.facebook.com/latest/inbox/all/?selected_item_id=fire') === 'unknown');
 const quietCases = {
-  'q-group-block': '<div role="main"><header><h2>Dana Levi</h2><a href="/danalevi/" role="link">danalevi</a><button type="button">Block group</button><a aria-label="Conversation information">Conversation information</a></header></div>',
-  'q-group-mute-person': '<div role="main"><header><h2>Dana</h2><a href="/dana/" role="link">Dana</a><button type="button">Mute person</button><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-group-block': '<div role="main"><header><h2>Book club</h2><a href="/100012345678/" role="link">Book club</a><button type="button" aria-label="Block">Block</button><span>Add people</span><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-group-mute-person': '<div role="main"><header><h2>Dana</h2><a href="/100012345678/" role="link">Dana</a><button type="button" aria-label="Mute">Mute</button><span>Chat members</span><a aria-label="Conversation information">Conversation information</a></header></div>',
   'q-group-viewprofile': '<div role="main"><header><h2>Book club</h2><a href="/100012345678/" role="link">Book club</a><a href="/100012345678/">View profile</a><span aria-label="Group conversation">Group</span><a aria-label="Conversation information">Conversation information</a></header></div>',
-  'q-nested-numeric-group': '<div role="main"><header><a href="/100012345678/" role="link"><h2>Dana</h2><span>Group</span></a><a aria-label="Conversation information">Conversation information</a></header></div>',
-  'q-vav-noa-numeric': '<div role="main"><header><h2>דנה ו נועה</h2><a href="/100012345678/" role="link">דנה ו נועה</a><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-nested-numeric-group': '<div role="main"><header><a href="/100012345678/" role="link"><h2>Book club</h2></a><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-vav-noa-numeric': '<div role="main"><header><h2>דנה ונועה</h2><a href="/100012345678/" role="link">דנה ונועה</a><a aria-label="Conversation information">Conversation information</a></header></div>',
   'a-two-keys': '<div role="main"><header><h2>Dana</h2><a href="/dana/" role="link">Dana</a><a href="/noa/" role="link">Noa</a><a aria-label="Conversation information">Conversation information</a></header></div>'
 };
 Object.keys(quietCases).forEach((name) => {
-  const href = name === 'q-nested-numeric-group' || name === 'q-vav-noa-numeric' || name === 'q-group-viewprofile' ? msHref : '';
+  const href = name === 'a-two-keys' ? '' : msHref;
   const kind = sameKind(quietCases[name], href);
-  check(name + ' stays quiet', kind === 'group' || kind === 'unknown', kind);
+  const expect = name === 'q-nested-numeric-group' || name === 'q-vav-noa-numeric' ? 'unknown' : 'group';
+  check(name + ' stays quiet', kind === expect, kind);
 });
+const bookClubProof = '<div role="main"><header><h2>Book club</h2><a href="/100012345678/" role="link">Book club</a><a aria-label="Conversation information">Conversation information</a></header></div>';
+check('Book club stays quiet with numeric proof', sameKind(bookClubProof, msHref) === 'unknown');
+const vavProof = '<div role="main"><header><h2>דנה ונועה</h2><a href="/100012345678/" role="link">דנה ונועה</a><a aria-label="Conversation information">Conversation information</a></header></div>';
+check('דנה ונועה stays quiet with numeric proof', sameKind(vavProof, msHref) === 'unknown');
+['Add people', 'Add members', 'Chat members', 'See members'].forEach((line) => {
+  const marked = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><span>' + line + '</span>', msInfo);
+  check(line + ' is a group signal and proof does not override it', FlowGroupWord.memberLine(line) === true && FlowMessengerParse.classify(marked, msHref).kind === 'group' && FlowInstagramParse.classify(marked, msHref).kind === 'group');
+});
+const memberList = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><ul><li>Dana</li><li>Noa</li></ul>', msInfo);
+check('a member list in the header stays quiet', FlowMessengerParse.classify(memberList, msHref).kind === 'group' && FlowInstagramParse.classify(memberList, msHref).kind === 'group');
+const bareBlockProof = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><button type="button" aria-label="Block">Block</button>', msInfo);
+const bareMuteProof = namedHeader('Dana', '<a href="/100012345678/" role="link">Dana</a><button type="button" aria-label="Mute">Mute</button>', msInfo);
+check('a bare Block on a person still drafts when the thread matches', FlowMessengerParse.classify(bareBlockProof, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(bareBlockProof, msHref).kind === 'one-to-one');
+check('a bare Mute on a person still drafts when the thread matches', FlowMessengerParse.classify(bareMuteProof, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(bareMuteProof, msHref).kind === 'one-to-one');
 check('selected_item_id is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?selected_item_id=abc', 'Dana Levi', statusHeader) === 'ms:abc');
 check('a thread query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?thread=xyz', '', null) === 'ms:xyz');
 check('a thread_id query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/?thread_id=tid', '', null) === 'ms:tid');
@@ -433,15 +452,23 @@ const surnamePeople = [
 function personHtml(title, slug) {
   return '<div role="main"><header><img alt="" src="data:,"><h2>' + title + '</h2><a href="/' + slug + '/" role="link">' + slug + '</a><a aria-label="Conversation information">Conversation information</a></header><div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + incoming + '</span></div><div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div><button type="button" aria-label="Send"></button></div>';
 }
+const KILL_SURNAME = new Set(['club', 'friends', 'family', 'channel', 'chat', 'committee', 'class', 'cohort', 'department', 'dept', 'squad']);
+function surnameKeepsPerson(title) {
+  return title.split(/\s+/).every((word) => !KILL_SURNAME.has(word.toLowerCase()));
+}
 check('at least 30 people with a group-word surname are listed', surnamePeople.length >= 30, surnamePeople.length);
 surnamePeople.forEach((title) => {
   const slug = title.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
   const root = chatEl(personHtml(title, slug));
   const ms = FlowMessengerParse.classify(root);
   const ig = FlowInstagramParse.classify(root);
-  check(title + ' is a person on Messenger and Instagram', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true && FlowGroupWord.counts(title) === false, { messenger: ms, instagram: ig });
   const bare = chatEl('<div role="main"><header><h2>' + title + '</h2></header></div>');
   check(title + ' stays quiet without proof', FlowMessengerParse.isOneToOne(bare) === false && FlowInstagramParse.isOneToOne(bare) === false && FlowMessengerParse.classify(bare).kind !== 'one-to-one');
+  if (surnameKeepsPerson(title)) {
+    check(title + ' is a person on Messenger and Instagram', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true && FlowGroupWord.counts(title) === false, { messenger: ms, instagram: ig });
+  } else {
+    check(title + ' stays quiet even with proof', ms.kind !== 'one-to-one' && ig.kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(root) === false && FlowInstagramParse.isOneToOne(root) === false, { messenger: ms, instagram: ig });
+  }
 });
 const staffName = 'Dana Levi (Staff)';
 const staffRoot = chatEl(personHtml(staffName, '100012345678'));
@@ -467,8 +494,8 @@ check('38 adversarial cases stay empty', advFiles.length === 20 && advFiles.filt
 // id-nested.html drafts because the URL is /danalevi_88/, an independent
 // username. The h2 text inside that link is not a signal. It did not rely
 // on the title matching itself.
-const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html', 'id-block-name.html', 'id-nested-group.html', 'id-group-viewprofile.html'];
-const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-thread-mismatch.html', 'id-bare-block.html', 'id-bare-mute.html', 'id-block-other.html'];
+const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html', 'id-block-name.html'];
+const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-thread-mismatch.html', 'id-bare-block.html', 'id-bare-mute.html', 'id-block-other.html', 'id-nested-group.html', 'id-group-viewprofile.html'];
 function numericPage(name) {
   return name === 'id-duplicate.html' || name === 'id-weiss.html' || name === 'id-nested-group.html';
 }
@@ -492,6 +519,9 @@ const vavNoa = liveRoot('identity/id-vav-noa.html');
 check('Team 7 is not one-to-one', FlowMessengerParse.classify(team7).kind !== 'one-to-one' && FlowInstagramParse.classify(team7).kind !== 'one-to-one');
 check('Dana with a people emoji is not one-to-one', FlowMessengerParse.classify(emoji).kind !== 'one-to-one' && FlowInstagramParse.classify(emoji).kind !== 'one-to-one');
 check('דנה ונועה stays quiet without a matching thread id', FlowMessengerParse.classify(vavNoa).kind !== 'one-to-one' && FlowInstagramParse.classify(vavNoa).kind !== 'one-to-one');
+check('דנה ונועה stays quiet when the thread id matches', FlowMessengerParse.classify(vavNoa, msHref).kind !== 'one-to-one' && FlowInstagramParse.classify(vavNoa, msHref).kind !== 'one-to-one');
+const vered = liveRoot('identity/id-vered.html');
+check('דנה ורד drafts when the thread id matches', FlowMessengerParse.classify(vered, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(vered, msHref).kind === 'one-to-one');
 const weiss = liveRoot('identity/id-weiss.html');
 check('Weiss stays quiet without the matching thread id', FlowMessengerParse.isOneToOne(weiss) === false && FlowMessengerParse.classify(weiss).kind !== 'one-to-one' && FlowInstagramParse.classify(weiss).kind !== 'one-to-one');
 check('Weiss drafts when the thread id matches the profile', FlowMessengerParse.classify(weiss, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(weiss, msHref).kind === 'one-to-one');
@@ -996,7 +1026,7 @@ console.log('\n--- calendar evidence ---\n');
     pages.push(['adv/' + name, href, 'src/content-messenger.js', name === 'd-link.html']);
   });
   Object.keys(quietCases).forEach((name) => {
-    const href = name === 'q-nested-numeric-group' || name === 'q-vav-noa-numeric' || name === 'q-group-viewprofile' ? msHref : 'https://www.messenger.com/t/' + name;
+    const href = name === 'a-two-keys' ? 'https://www.messenger.com/t/' + name : msHref;
     const html = quietCases[name].replace('</header>', '</header><div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + incoming + '</span></div><div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div><button type="button" aria-label="Send"></button>');
     pages.push(['messenger-place.html', href, 'src/content-messenger.js', false, html, name]);
   });
@@ -1122,7 +1152,8 @@ console.log('\n--- calendar evidence ---\n');
   for (const title of surnamePeople) {
     const slug = title.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
     const draftedPerson = await open('messenger-place.html', 'https://www.messenger.com/t/' + slug, 'src/content-messenger.js', { html: personHtml(title, slug) });
-    check(title + ' drafts', draftedPerson.text.indexOf('Taizu - ') === 0 && draftedPerson.sendClicks === 0, draftedPerson.text);
+    if (surnameKeepsPerson(title)) check(title + ' drafts', draftedPerson.text.indexOf('Taizu - ') === 0 && draftedPerson.sendClicks === 0, draftedPerson.text);
+    else check(title + ' stays empty even with proof', draftedPerson.text.trim() === '' && draftedPerson.sendClicks === 0, draftedPerson.text);
     draftedPerson.close();
     const quietPerson = await open('messenger-place.html', 'https://www.messenger.com/t/bare-' + slug, 'src/content-messenger.js', {
       html: personHtml(title, slug).replace(/<a href="\/[^"]*" role="link">[^<]*<\/a>/, '')
