@@ -355,7 +355,19 @@ console.log('\n--- a verify miss is not Handled ---\n');
     out);
   check('the miss does not say Handled and does not delete the task',
     miss.fn('globalThis.FlowProofOfClose.allowsHandled')({ ok: out.ok, proof: out.proof }) === false &&
+    out.written === "Created, couldn't verify" && out.fetchedBack === false &&
     !miss.calls.some((c) => c.method === 'DELETE'));
+  const undone = await miss.fn('outlookTaskUndo')(out.ref);
+  check('Undo with no snapshot says Couldn\'t confirm and does not delete',
+    undone.ok === false && undone.reason === 'unconfirmed' &&
+    undone.written === "Couldn't confirm it's unchanged. Undo left it alone." &&
+    !miss.calls.some((c) => c.method === 'DELETE'), undone);
+  const card = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const missCard = card.slice(card.indexOf('async function onOutlookTodoDoIt'), card.indexOf('async function onOnedriveDoIt'));
+  check('the To Do miss paints a receipt with Undo and is not Handled',
+    missCard.indexOf("Created, couldn't verify") > 0 &&
+    missCard.indexOf("type: 'flow:undo-action'") > missCard.indexOf("Created, couldn't verify") &&
+    missCard.indexOf("'Handled.'") > missCard.indexOf("type: 'flow:undo-action'"));
   const empty = background({ routes: [
     { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: true, status: 200, json: async () => LISTS, text: async () => '' }) },
     { method: 'POST', test: /\/tasks$/, reply: () => ({ ok: true, status: 201, json: async () => ({}), text: async () => '' }) }

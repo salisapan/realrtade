@@ -77,10 +77,6 @@ const FlowNativeEdit = (() => {
     return String(value).replace(/\s+/g, ' ').trim();
   }
 
-  function importanceOf(value) {
-    return plain(value).toLowerCase();
-  }
-
   // A category name can contain a comma. The stored set is sorted and joined
   // with a separator that is not part of a name.
   function categoriesOf(value) {
@@ -101,13 +97,6 @@ const FlowNativeEdit = (() => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return null;
-  }
-
-  function minutesOf(value) {
-    if (value == null || value === '') return null;
-    if (typeof value === 'boolean') return null;
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
   }
 
   function emptyToNull(value) {
@@ -142,12 +131,12 @@ const FlowNativeEdit = (() => {
     return { hash: hashText(text), prefix: text.slice(0, BODY_PREFIX) };
   }
 
-  // Every user-editable field. Server fields (lastModifiedDateTime,
-  // @odata.etag, changeKey, cTag, eTag) are not in this list.
+  // Content the person can change. Graph fills importance and the reminder
+  // fields on its own, so they are not stored and not compared.
+  // Server fields (lastModifiedDateTime, @odata.etag, changeKey) are not here.
   const CONTENT_KEYS = [
     'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
-    'location', 'to', 'cc', 'importance', 'attendees', 'categories', 'isAllDay',
-    'isReminderOn', 'reminderMinutesBeforeStart', 'reminderDateTime'
+    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay'
   ];
 
   function rawFor(key, o) {
@@ -165,13 +154,11 @@ const FlowNativeEdit = (() => {
 
   function fieldValue(key, raw) {
     if (key === 'body') return bodyRecord(raw);
-    if (key === 'dueDateTime' || key === 'start' || key === 'end' || key === 'reminderDateTime') return emptyToNull(clockOf(raw));
+    if (key === 'dueDateTime' || key === 'start' || key === 'end') return emptyToNull(clockOf(raw));
     if (key === 'to' || key === 'cc' || key === 'attendees') return emptyToNull(addressesOf(raw));
     if (key === 'location') return emptyToNull(locationOf(raw));
     if (key === 'categories') return emptyToNull(categoriesOf(raw));
-    if (key === 'importance') return emptyToNull(importanceOf(raw));
-    if (key === 'isAllDay' || key === 'isReminderOn') return boolOf(raw);
-    if (key === 'reminderMinutesBeforeStart') return minutesOf(raw);
+    if (key === 'isAllDay') return boolOf(raw);
     if (key === 'status') return emptyToNull(plain(raw));
     return emptyToNull(plain(raw));
   }

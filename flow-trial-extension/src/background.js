@@ -3597,7 +3597,7 @@ function outlookUnconfirmedLine() {
 function outlookContentKeys() {
   const N = globalThis.FlowNativeEdit;
   if (N && Array.isArray(N.CONTENT_KEYS) && N.CONTENT_KEYS.length) return N.CONTENT_KEYS;
-  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'importance', 'attendees', 'categories', 'isAllDay', 'isReminderOn', 'reminderMinutesBeforeStart', 'reminderDateTime'];
+  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay'];
 }
 
 // An owned content key is a snapshot, including an explicit null. An empty
@@ -3651,7 +3651,7 @@ function outlookUnverifiedLine() {
   return "Created, couldn't verify";
 }
 
-const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,importance,attendees,categories,isAllDay,isReminderOn,reminderMinutesBeforeStart';
+const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay';
 
 async function outlookStoredEventSnap(eventId) {
   return outlookReadSnap(

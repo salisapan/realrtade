@@ -89,15 +89,20 @@ console.log('\n--- a changed snapshot is an edit ---\n');
   check('a removed due date is an edit', N.compareContent(full, {
     title: 'File it', body: { content: 'Thanks' }, importance: 'normal', isReminderOn: false
   }) === 'edited');
-  check('importance high is an edit', N.userEdited(full, {
-    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'high', isReminderOn: false
-  }) === true);
+  check('importance and a reminder are not stored and are not an edit',
+    !Object.prototype.hasOwnProperty.call(full, 'importance') &&
+    !Object.prototype.hasOwnProperty.call(full, 'isReminderOn') &&
+    N.compareContent(full, {
+      title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' },
+      importance: 'high', isReminderOn: true, reminderMinutesBeforeStart: 30,
+      reminderDateTime: { dateTime: '2026-10-20T09:00:00' }
+    }) === 'match');
   check('a stored null that is filled later is unconfirmed', N.compareContent(Object.assign({}, full, { body: null }), {
     title: 'File it', body: { content: 'call Dana first' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
   }) === 'unconfirmed');
-  check('a late reminder on an empty field is unconfirmed', N.compareContent({ title: 'File it', reminderDateTime: null, isReminderOn: null }, {
-    title: 'File it', reminderDateTime: { dateTime: '2026-10-20T09:00:00' }, isReminderOn: true
-  }) === 'unconfirmed');
+  check('a reminder Graph adds later is not an edit', N.compareContent({ title: 'File it', isReminderOn: false, importance: 'normal' }, {
+    title: 'File it', isReminderOn: true, importance: 'high', reminderDateTime: { dateTime: '2026-10-20T09:00:00' }, reminderMinutesBeforeStart: 15
+  }) === 'match');
   {
     const long = 'word '.repeat(4000);
     const stored = N.snapshotOf({ body: { content: long } });
@@ -110,23 +115,23 @@ console.log('\n--- a changed snapshot is an edit ---\n');
       N.compareContent(stored, { body: { content: changed } }) === 'edited',
       stored.body && { len: stored.body.prefix.length, same: stored.body.hash === again.body.hash });
   }
-  check('reminder off versus on is an edit', N.userEdited(full, {
-    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: true
-  }) === true);
-  check('reminder off still matches', N.compareContent(full, {
-    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
-  }) === 'match');
+  check('isAllDay false versus true is an edit', N.userEdited(
+    N.snapshotOf({ title: 'File it', isAllDay: false }),
+    { title: 'File it', isAllDay: true }
+  ) === true);
   const partial = { title: 'File it', body: 'Thanks' };
-  check('a field the snapshot never stored is not called an edit', N.userEdited(partial, Object.assign({}, same, { importance: 'high' })) === false);
-  check('a field the snapshot never stored is unconfirmed', N.compareContent(partial, Object.assign({}, same, { importance: 'high' })) === 'unconfirmed');
+  check('a field the snapshot never stored is not called an edit', N.userEdited(partial, Object.assign({}, same, { location: { displayName: 'Room 4' } })) === false);
+  check('a field the snapshot never stored is unconfirmed', N.compareContent(partial, Object.assign({}, same, { location: { displayName: 'Room 4' } })) === 'unconfirmed');
   const meet = N.snapshotOf({
     subject: 'Meet',
     attendees: [{ emailAddress: { address: 'Noa@x.com' } }, { emailAddress: { address: 'dana@x.com' } }],
     reminderMinutesBeforeStart: 0,
     isReminderOn: true
   });
-  check('attendees are a sorted set and zero minutes is a value',
-    meet.attendees === 'dana@x.com,noa@x.com' && meet.reminderMinutesBeforeStart === 0);
+  check('attendees are a sorted set and a reminder is not stored',
+    meet.attendees === 'dana@x.com,noa@x.com' &&
+    !Object.prototype.hasOwnProperty.call(meet, 'reminderMinutesBeforeStart') &&
+    !Object.prototype.hasOwnProperty.call(meet, 'isReminderOn'));
   check('the same attendees in another order are not an edit', N.userEdited(meet, {
     subject: 'Meet',
     attendees: [{ emailAddress: { address: 'dana@x.com' } }, { emailAddress: { address: 'NOA@x.com' } }],

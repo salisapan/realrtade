@@ -1609,6 +1609,46 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
+      if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
+        const status = "Created, couldn't verify";
+        const messageId = ctx.messageId || null;
+        await FlowStorage.appendLog({
+          kind: 'written',
+          label: status,
+          messageId: messageId,
+          itemId: ctx.itemId || null,
+          pathId: ctx.pathId || null,
+          threadId: ctx.threadId || ctx.conversationId || null,
+          outlookConversationId: ctx.conversationId || null,
+          outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
+          app: 'outlook',
+          connectorId: 'outlookTask',
+          ref: r.ref,
+          created: (r.ref && r.ref.created) || null,
+          where: r.where || null,
+          url: r.url || null,
+          fetchedBack: false,
+          receiptStatus: status,
+          intent: ctx.intent,
+          process: ctx.process,
+          sender: ctx.sender,
+          subject: ctx.subject,
+          text: ctx.bodyText
+        });
+        FlowChipHost.showDraftReceipt(host, {
+          status: status,
+          written: status,
+          url: r.url || null,
+          linkLabel: 'View',
+          onUndo: () => send({
+            type: 'flow:undo-action',
+            connectorId: 'outlookTask',
+            ref: r.ref,
+            created: (r.ref && r.ref.created) || null
+          })
+        });
+        return;
+      }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = todoWriteFailureLine(r);
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);

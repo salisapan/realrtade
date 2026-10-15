@@ -60,7 +60,7 @@ const deleted=(it)=>!store[it.id];
 srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port+'/v1.0';vm.runInContext('OUTLOOK_GRAPH=__G',sb);
  const kinds={todo:()=>mkTask(true,true),'todo-bare':()=>mkTask(false,false),calendar:()=>mkEvent(false),holdit:()=>mkEvent(true),draft:mkDraft};
  const edits={
-  todo:[['title word',o=>o.title='Pay invoice 4413',true],['body word',o=>o.body.content=o.body.content.replace('1,200','1,300'),true],['body whitespace only',o=>o.body.content=o.body.content.replace(/\r\n/g,'\r\n  ')+'  ',false],['due changed',o=>o.dueDateTime.dateTime='2026-10-21T00:00:00.0000000',true],['body cleared',o=>o.body.content='',true],['due removed',o=>delete o.dueDateTime,true],['completed',o=>o.status='completed',true],['importance high (star)',o=>o.importance='high',true]],
+  todo:[['title word',o=>o.title='Pay invoice 4413',true],['body word',o=>o.body.content=o.body.content.replace('1,200','1,300'),true],['body whitespace only',o=>o.body.content=o.body.content.replace(/\r\n/g,'\r\n  ')+'  ',false],['due changed',o=>o.dueDateTime.dateTime='2026-10-21T00:00:00.0000000',true],['body cleared',o=>o.body.content='',true],['due removed',o=>delete o.dueDateTime,true],['completed',o=>o.status='completed',true],['importance high (star)',o=>o.importance='high',false]],
   'todo-bare':[['notes added',o=>o.body.content='call Dana first','late'],['due added',o=>o.dueDateTime={dateTime:'2026-10-22T00:00:00.0000000',timeZone:'UTC'},'late']],
   calendar:[['subject word',o=>o.subject=o.subject+' moved',true],['start moved',o=>o.start.dateTime='2026-10-20T13:00:00.0000000',true],['body word',o=>o.body.content=o.body.content.replace('lunch','dinner'),true],['location added',o=>o.location={displayName:'Taizu'},'late'],['body cleared',o=>o.body.content='',true]],
   holdit:[['subject word',o=>o.subject='Budget review v2',true],['end moved',o=>o.end.dateTime='2026-10-20T16:00:00.0000000',true],['location added',o=>o.location={displayName:'Room 4'},'late'],['attendee added',o=>o.attendees=[{emailAddress:{address:'noa@x.com'}}],'late']],
@@ -94,19 +94,24 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
   store={};gets=0;srv.removeAllListeners('request');srv.on('request',(q,s)=>{if(q.method==='GET'&&/events\//.test(q.url)){gets++;if(gets===1){s.writeHead(500);return s.end();}}realH(q,s);});
   const again=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review',quote:'Can we meet Tuesday 14:30?'}});
   const snap=again.ref&&again.ref.created;
-  ck('GET fail then retry ok stores the read-back, including server defaults',
-    gets===2 && again.fetchedBack===true && snap && snap.subject==='Budget review' && snap.importance==='normal' && snap.isAllDay===false && snap.isReminderOn==null && !Object.prototype.hasOwnProperty.call(snap,'isReminderOn'),
+  ck('GET fail then retry ok stores content and omits Graph defaults',
+    gets===2 && again.fetchedBack===true && snap && snap.subject==='Budget review' && snap.isAllDay===false &&
+    !Object.prototype.hasOwnProperty.call(snap,'importance') && !Object.prototype.hasOwnProperty.call(snap,'isReminderOn') &&
+    !Object.prototype.hasOwnProperty.call(snap,'reminderMinutesBeforeStart'),
     {gets, snap});
   srv.removeAllListeners('request');srv.on('request',realH);
   const plain=await call('outlookCalendarUndo',again.ref,{created:snap});
   ck('server defaults unedited -> delete when the snapshot came from the GET', plain.ok&&!store[again.ref.eventId], plain);
   store={};const lateW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
-  store[lateW.ref.eventId].isReminderOn=true;store[lateW.ref.eventId].reminderMinutesBeforeStart=15;
+  const lateId=lateW.ref.eventId;
+  store[lateId].isReminderOn=true;store[lateId].reminderMinutesBeforeStart=30;store[lateId].importance='high';
+  store[lateId].reminderDateTime={dateTime:'2026-10-20T14:00:00.0000000',timeZone:'UTC'};
   const late=await call('outlookCalendarUndo',lateW.ref,{created:lateW.ref.created});
-  ck('a late server default is Couldn\'t confirm, not You edited', late.written===UL && store[lateW.ref.eventId], late);
-  store[lateW.ref.eventId].subject='Budget review v2';
-  const changed=await call('outlookCalendarUndo',lateW.ref,{created:lateW.ref.created});
-  ck('a stored subject that changed is You edited', changed.written===EL && store[lateW.ref.eventId], changed);
+  ck('unedited item where Graph later fills reminder and importance deletes', late.ok&&!store[lateId], late);
+  store={};const editW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
+  store[editW.ref.eventId].subject='Budget review v2';
+  const changed=await call('outlookCalendarUndo',editW.ref,{created:editW.ref.created});
+  ck('a stored subject that changed is You edited', changed.written===EL && store[editW.ref.eventId], changed);
   store={};const clearW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review',quote:'bring the deck'}});
   store[clearW.ref.eventId].body.content='';
   const cleared=await call('outlookCalendarUndo',clearW.ref,{created:clearW.ref.created});
