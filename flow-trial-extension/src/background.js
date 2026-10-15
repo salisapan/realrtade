@@ -1188,10 +1188,16 @@ function invalidateGoogleWebAuthFlight() {
   googleWebAuthInteractiveFlight = null;
 }
 
-// A Gmail content-script flow:connect is ensureGoogleAutoConnect. The
-// popup Connect button has no tab. Only the latter may open a window.
+// A Gmail content-script flow:connect is ensureGoogleAutoConnect and must
+// not open a window. The side panel and the popup have no tab. The popup
+// opened as a normal tab does have one, and it is still our page, so Connect
+// may open a window. A web page, or a sender from another extension, may not.
 function googleConnectWantsInteractive(sender) {
-  return !(sender && sender.tab);
+  if (!sender || !sender.tab) return true;
+  const runtimeId = chrome.runtime && chrome.runtime.id;
+  const url = typeof sender.url === 'string' ? sender.url : '';
+  if (!runtimeId || sender.id !== runtimeId) return false;
+  return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
 }
 
 function googleTasksConfigured() {

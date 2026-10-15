@@ -460,6 +460,34 @@ async function run() {
     check('a content-script sender is not an explicit Connect', env.fn('googleConnectWantsInteractive')({ tab: { id: 3 } }) === false);
     check('the popup sender is an explicit Connect', env.fn('googleConnectWantsInteractive')({ url: 'chrome-extension://id/popup/popup.html' }) === true);
     check('a missing sender stays an explicit Connect', env.fn('googleConnectWantsInteractive')(null) === true);
+    const wants = env.fn('googleConnectWantsInteractive');
+    const own = 'chrome-extension://' + EXTENSION_ID + '/';
+    check('the side panel is an explicit Connect', wants({ id: EXTENSION_ID, url: own + 'sidepanel.html' }) === true);
+    check('the popup opened as a tab is an explicit Connect', wants({
+      id: EXTENSION_ID,
+      url: own + 'popup.html',
+      tab: { id: 7, url: own + 'popup.html' }
+    }) === true);
+    check('a foreign extension id is not an explicit Connect', wants({
+      id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      url: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/popup.html',
+      tab: { id: 8, url: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/popup.html' }
+    }) === false);
+    check('a foreign id claiming our popup url is not an explicit Connect', wants({
+      id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      url: own + 'popup.html',
+      tab: { id: 10, url: own + 'popup.html' }
+    }) === false);
+    check('a content script on an https page is not an explicit Connect', wants({
+      id: EXTENSION_ID,
+      url: 'https://mail.google.com/mail/u/0/',
+      tab: { id: 9, url: 'https://mail.google.com/mail/u/0/' }
+    }) === false);
+    check('a content script on an http page is not an explicit Connect', wants({
+      id: EXTENSION_ID,
+      url: 'http://example.com/inbox',
+      tab: { id: 11, url: 'http://example.com/inbox' }
+    }) === false);
   }
   {
     const env = load({
