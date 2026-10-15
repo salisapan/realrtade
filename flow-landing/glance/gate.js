@@ -7,20 +7,6 @@
   var TERMS_VERSION = '2026-10-15';
   var PRIVACY_VERSION = '2026-10-15';
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var COPY = {
-    invalid: {
-      en: 'Enter a valid email.',
-      he: 'הזינו אימייל תקין.'
-    },
-    terms: {
-      en: 'Agree to the Terms and Privacy Policy to continue.',
-      he: 'כדי להמשיך, אשרו את התנאים ואת מדיניות הפרטיות.'
-    },
-    fail: {
-      en: 'Something went wrong. Nothing was saved.',
-      he: 'משהו השתבש. לא נשמר דבר.'
-    }
-  };
 
   function lang() {
     return document.documentElement.lang === 'he' ? 'he' : 'en';
@@ -30,20 +16,13 @@
     return window.FLOW_CONFIG || {};
   }
 
-  function text(code) {
-    var row = COPY[code] || COPY.fail;
-    return row[lang()] || row.en;
-  }
-
   function onHttp() {
     return location.protocol !== 'https:';
   }
 
   function sourceValue() {
     var q = new URLSearchParams(location.search);
-    var place = q.get('source');
-    if (place !== 'home' && place !== 'nav' && place !== 'glance') place = 'glance';
-    var parts = [place];
+    var parts = ['glance'];
     var utm = [];
     ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(function (key) {
       var value = q.get(key);
@@ -69,72 +48,75 @@
   }
 
   function bind(form) {
-    var email = form.querySelector('#gateEmail');
-    var terms = form.querySelector('#gateTerms');
-    var marketing = form.querySelector('#gateMarketing');
-    var button = form.querySelector('#gateSubmit');
-    var label = button.querySelector('.g1-doit-label');
-    var hint = form.querySelector('#gateHint');
-    var termsHint = form.querySelector('#gateTermsHint');
-    var error = form.querySelector('#gateError');
-    var errorText = form.querySelector('#gateErrorText');
-    var retry = form.querySelector('#gateRetry');
-    var success = form.querySelector('#gateSuccess');
-    var mail = form.querySelector('#gateMail');
+    var email = form.querySelector('#su-email');
+    var terms = form.querySelector('#su-terms');
+    var marketing = form.querySelector('#su-mail');
+    var button = form.querySelector('[data-submit]');
+    var retry = form.querySelector('[data-retry]');
     var loading = false;
-    var serverError = false;
+    var spin = document.createElement('span');
+    spin.className = 'su-spin';
+    spin.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 12; i++) {
+      var tick = document.createElement('i');
+      tick.style.setProperty('--i', String(i));
+      spin.appendChild(tick);
+    }
+    button.appendChild(spin);
 
-    function paintHints() {
-      var value = (email.value || '').trim();
-      var valid = EMAIL_RE.test(value);
-      var showInvalid = value.length > 0 && !valid;
-      hint.hidden = !showInvalid;
-      if (showInvalid) hint.textContent = text('invalid');
-      email.setAttribute('aria-invalid', showInvalid ? 'true' : 'false');
-      if (!termsHint.hidden) termsHint.textContent = text('terms');
-      if (serverError) errorText.textContent = text('fail');
-      if (!loading) button.disabled = !valid;
+    function validEmail() {
+      return EMAIL_RE.test((email.value || '').trim());
     }
 
-    function lock(on) {
-      loading = on;
-      email.disabled = on;
-      terms.disabled = on;
-      marketing.disabled = on;
-      button.disabled = on;
-      button.setAttribute('aria-busy', on ? 'true' : 'false');
-      if (on) form.setAttribute('data-state', 'loading');
-      else form.removeAttribute('data-state');
-      if (label) label.removeAttribute('hidden');
+    function paint() {
+      var value = (email.value || '').trim();
+      var showInvalid = value.length > 0 && !validEmail();
+      if (showInvalid) form.setAttribute('data-show-invalid', '1');
+      else form.removeAttribute('data-show-invalid');
+      email.setAttribute('aria-invalid', showInvalid ? 'true' : 'false');
+      if (!loading && form.getAttribute('data-state') !== 'success') {
+        button.disabled = !(validEmail() && terms.checked);
+      }
+    }
+
+    function unlock() {
+      loading = false;
+      email.disabled = false;
+      terms.disabled = false;
+      marketing.disabled = false;
+      button.removeAttribute('aria-busy');
+      form.removeAttribute('data-mail');
+      if (form.getAttribute('data-state') === 'loading') form.removeAttribute('data-state');
+      paint();
     }
 
     function showServerError() {
-      serverError = true;
-      success.hidden = true;
-      if (mail) mail.hidden = true;
-      errorText.textContent = text('fail');
-      error.hidden = false;
-      lock(false);
-      paintHints();
-      if (retry) retry.focus();
+      loading = false;
+      email.disabled = false;
+      terms.disabled = false;
+      marketing.disabled = false;
+      button.removeAttribute('aria-busy');
+      form.removeAttribute('data-mail');
+      form.setAttribute('data-state', 'error');
+      paint();
     }
 
     email.addEventListener('input', function () {
-      serverError = false;
-      error.hidden = true;
-      paintHints();
+      if (form.getAttribute('data-state') === 'invalid' && validEmail()) form.removeAttribute('data-state');
+      if (form.getAttribute('data-state') === 'error') form.removeAttribute('data-state');
+      paint();
     });
     terms.addEventListener('change', function () {
-      if (terms.checked) termsHint.hidden = true;
-      paintHints();
+      if (terms.checked && form.getAttribute('data-state') === 'terms') form.removeAttribute('data-state');
+      paint();
     });
-    new MutationObserver(paintHints).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
-    paintHints();
+    paint();
 
     if (retry) {
       retry.addEventListener('click', function () {
-        if (typeof form.requestSubmit === 'function') form.requestSubmit();
-        else form.dispatchEvent(new Event('submit', { cancelable: true }));
+        form.removeAttribute('data-state');
+        unlock();
+        email.focus();
       });
     }
 
@@ -143,22 +125,24 @@
       if (loading) return;
       var address = (email.value || '').trim();
       if (!EMAIL_RE.test(address)) {
-        paintHints();
+        form.setAttribute('data-state', 'invalid');
+        paint();
         email.focus();
         return;
       }
       if (!terms.checked) {
-        termsHint.hidden = false;
-        termsHint.textContent = text('terms');
+        form.setAttribute('data-state', 'terms');
         terms.focus();
         return;
       }
-      termsHint.hidden = true;
-      serverError = false;
-      error.hidden = true;
-      success.hidden = true;
-      if (mail) mail.hidden = true;
-      lock(true);
+      loading = true;
+      email.disabled = true;
+      terms.disabled = true;
+      marketing.disabled = true;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      form.removeAttribute('data-mail');
+      form.setAttribute('data-state', 'loading');
 
       var body = {
         email: address,
@@ -176,7 +160,6 @@
       var config = cfg();
       var useMock = onHttp() || !!config.glanceSignupMock;
       var failAddress = address.toLowerCase() === 'fail@flow.dev' || q.get('fail') === '1';
-      if (q.get('load') === '1') return;
 
       var pending = useMock
         ? Promise.resolve(failAddress
@@ -207,14 +190,51 @@
         }
         setCookie(token);
         if (onHttp()) console.log(token);
-        lock(false);
+        loading = false;
+        button.removeAttribute('aria-busy');
         button.disabled = true;
-        success.hidden = false;
-        if (mail) mail.hidden = !marketing.checked;
-        if (q.get('hold') === '1') return;
-        window.setTimeout(function () { location.assign(store); }, 700);
+        form.setAttribute('data-state', 'success');
+        if (marketing.checked) form.setAttribute('data-mail', '1');
+        else form.removeAttribute('data-mail');
+        if (q.get('hold') === '1' || q.get('state')) return;
+        window.setTimeout(function () { location.assign(store); }, 1200);
       });
     });
+
+    var preset = new URLSearchParams(location.search).get('state');
+    if (preset === 'invalid') {
+      email.value = 'not-an-email';
+      form.setAttribute('data-state', 'invalid');
+      form.setAttribute('data-show-invalid', '1');
+      paint();
+    } else if (preset === 'terms') {
+      email.value = 'you@company.com';
+      terms.checked = false;
+      form.setAttribute('data-state', 'terms');
+      paint();
+    } else if (preset === 'loading') {
+      email.value = 'you@company.com';
+      terms.checked = true;
+      loading = true;
+      email.disabled = true;
+      terms.disabled = true;
+      marketing.disabled = true;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      form.setAttribute('data-state', 'loading');
+    } else if (preset === 'error') {
+      email.value = 'you@company.com';
+      terms.checked = true;
+      form.setAttribute('data-state', 'error');
+      paint();
+    } else if (preset === 'success') {
+      email.value = 'you@company.com';
+      terms.checked = true;
+      marketing.checked = true;
+      button.disabled = true;
+      form.setAttribute('data-state', 'success');
+      form.setAttribute('data-mail', '1');
+    }
   }
 
   function themeToggle() {
@@ -225,6 +245,8 @@
       var he = lang() === 'he';
       button.setAttribute('aria-label', dark ? (he ? 'מצב בהיר' : 'Light mode') : (he ? 'מצב כהה' : 'Dark mode'));
       button.setAttribute('aria-pressed', dark ? 'true' : 'false');
+      var section = document.getElementById('get-glance');
+      if (section) section.setAttribute('aria-label', he ? 'לקבל את Glance' : 'Get Glance');
       var menu = document.getElementById('menuBtn');
       if (menu) {
         var open = menu.getAttribute('aria-expanded') === 'true';
@@ -255,7 +277,7 @@
   }
 
   function boot() {
-    var form = document.getElementById('glanceGate');
+    var form = document.getElementById('signup');
     if (form) bind(form);
     themeToggle();
     menuToggle();

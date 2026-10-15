@@ -4,11 +4,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Open loops. Closed. Leave your email. Glance for Chrome opens next.">
+<meta name="description" content="Glance works wherever your work happens. One click prepares the close. You approve it.">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="canonical" href="https://theflow-ai.com/glance/">
-<title>Open loops. Closed.</title>
+<title>Glance</title>
+<link rel="stylesheet" href="/assets/fonts.css">
 <link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
 <link rel="stylesheet" href="/glance/glance.css">
 <script>
@@ -27,13 +28,14 @@
   var root = document.documentElement;
   root.lang = lang;
   root.dir = lang === 'he' ? 'rtl' : 'ltr';
+  if (lang === 'he') root.classList.add('he');
   root.setAttribute('data-theme', theme);
 })();
 </script>
 <script src="/assets/site-config.js"></script>
 </head>
-<body class="corner-v24">
-<a class="skip" href="#main">Skip to content</a>
+<body class="corner-v25">
+<a class="skip" href="#get-glance">Skip to content</a>
 <header class="bar">
   <div class="bar-in">
     <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
@@ -57,90 +59,66 @@
   </div>
 </header>
 <main id="main">
-  <div class="wrap">
-    <p class="eyebrow" data-i18n="eye">Glance</p>
-    <h1><span data-i18n="title">Open loops.</span> <em data-i18n="titleEm">Closed.</em></h1>
-    <p class="lede" data-i18n="lede">Leave your email. <bdi>Glance</bdi> for <bdi>Chrome</bdi> opens next.</p>
-    <ul class="points">
-      <li data-i18n="p1"><bdi>Chrome</bdi>, on the page you already have open</li>
-      <li data-i18n="p2">You approve every close</li>
-      <li data-i18n="p3">Undo on every close</li>
-    </ul>
-    <form id="glanceGate" class="gate" novalidate>
-      <div class="field">
-        <label class="step-row" for="gateEmail">
-          <span class="step-k" id="emailLabel" data-i18n="emailLabel">Email</span>
-          <input id="gateEmail" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" required aria-labelledby="emailLabel" aria-describedby="gateHint" placeholder="you@company.com">
-        </label>
-        <p class="gate-hint" id="gateHint" hidden></p>
-      </div>
-      <div class="field">
-        <label class="step-row check-row">
-          <input id="gateTerms" name="terms" type="checkbox" aria-describedby="gateTermsHint">
-          <span class="check-copy" data-i18n="terms">I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.</span>
-        </label>
-        <p class="gate-hint" id="gateTermsHint" hidden></p>
-      </div>
-      <label class="step-row check-row">
-        <input id="gateMarketing" name="marketing" type="checkbox">
-        <span class="check-copy" data-i18n="marketing">Email me product notes. Optional, and off unless you tick it.</span>
-      </label>
-      <div class="gate-actions">
-        <button class="g1-doit" id="gateSubmit" type="submit" disabled>
-          <span class="g1-doit-label" data-i18n="submit">Get Glance</span>
-          <span class="g1-spin" aria-hidden="true"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i></span>
-        </button>
-        <p class="soon" data-i18n="soon"><bdi>iPhone</bdi>: coming soon</p>
-      </div>
-      <p class="gate-error" id="gateError" role="alert" hidden>
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 3.6v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="10" r=".7" fill="currentColor"/></svg>
-        <span id="gateErrorText"></span>
-        <button class="retry" id="gateRetry" type="button" data-i18n="retry">Retry</button>
-      </p>
-      <p class="gate-success" id="gateSuccess" role="status" hidden>
-        <span class="closed-line" data-i18n="closed">✓ Closed · You're in.</span>
-        <span class="open-line" data-i18n="success">Opening the <bdi>Chrome</bdi> Web Store…</span>
-      </p>
-      <p class="gate-mail" id="gateMail" hidden data-i18n="mailLine">Check your email to confirm the mailing list.</p>
-    </form>
-  </div>
+  <section class="cta21" id="get-glance" aria-label="Get Glance">
+    <div class="wrap wide">
+      <p class="mono-eye cta21-eye" data-i18n="eye">Get Glance</p>
+      <h2 class="cta21-h" data-i18n="title">Open loops. <em>Closed.</em></h2>
+      <p class="cta21-sub" data-i18n="sub">Glance works wherever your work happens. One click prepares the close. You approve it.</p>
+      <form class="su" id="signup" data-signup action="#" novalidate>
+        <div class="su-row">
+          <label class="su-field" for="su-email">
+            <span class="sr-only" data-i18n="emailLabel">Email</span>
+            <input class="su-input" id="su-email" name="email" type="email" inputmode="email" autocomplete="email" dir="ltr" spellcheck="false" placeholder="you@company.com" required>
+          </label>
+          <button type="submit" class="su-go" data-submit disabled>
+            <span class="su-go-label" data-i18n="submit">Get <bdi>Glance</bdi></span>
+          </button>
+        </div>
+        <p class="su-note su-invalid" data-i18n="invalid">Enter a valid email.</p>
+        <div class="su-checks">
+          <label class="su-check">
+            <input type="checkbox" id="su-terms" name="terms" required>
+            <span class="su-box" aria-hidden="true"></span>
+            <span data-i18n="terms">I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.</span>
+          </label>
+          <p class="su-note su-terms" data-i18n="termsErr">Agree to the Terms and Privacy Policy to continue.</p>
+          <label class="su-check">
+            <input type="checkbox" id="su-mail" name="mailing">
+            <span class="su-box" aria-hidden="true"></span>
+            <span data-i18n="mail">Email me product notes. Optional.</span>
+          </label>
+        </div>
+        <p class="su-note su-error" role="alert"><span data-i18n="fail">Something went wrong. Nothing was saved.</span> <button type="button" class="su-retry" data-retry data-i18n="retry">Retry</button></p>
+        <p class="su-note su-success" role="status" data-i18n="success">You're in. <bdi>Glance</bdi> is on its way.</p>
+        <p class="su-note su-confirm" data-i18n="confirm">Check your email to confirm.</p>
+      </form>
+    </div>
+  </section>
 </main>
 <script>
 window.FLOW_PAGE_I18N = {
-  eye: { en: 'Glance', he: 'Glance' },
-  title: { en: 'Open loops.', he: 'לולאות פתוחות.' },
-  titleEm: { en: 'Closed.', he: 'סגור.' },
-  lede: {
-    en: 'Leave your email. <bdi>Glance</bdi> for <bdi>Chrome</bdi> opens next.',
-    he: 'השאירו אימייל. <bdi>Glance</bdi> ל-<bdi>Chrome</bdi> נפתח אחר כך.'
+  eye: { en: 'Get Glance', he: 'לקבל את <bdi>Glance</bdi>' },
+  title: { en: 'Open loops. <em>Closed.</em>', he: 'לולאות פתוחות. <em>סגורות.</em>' },
+  sub: {
+    en: 'Glance works wherever your work happens. One click prepares the close. You approve it.',
+    he: '<bdi>Glance</bdi> עובד איפה שהעבודה שלך קורית. קליק אחד מכין את הסגירה, ואתם מאשרים.'
   },
-  p1: {
-    en: '<bdi>Chrome</bdi>, on the page you already have open',
-    he: '<bdi>Chrome</bdi>, על העמוד שכבר פתוח'
-  },
-  p2: { en: 'You approve every close', he: 'אתם מאשרים כל סגירה' },
-  p3: { en: 'Undo on every close', he: 'אפשר לבטל כל סגירה' },
   emailLabel: { en: 'Email', he: 'אימייל' },
+  submit: { en: 'Get <bdi>Glance</bdi>', he: 'קבלו את <bdi>Glance</bdi>' },
+  invalid: { en: 'Enter a valid email.', he: 'הזינו אימייל תקין.' },
   terms: {
     en: 'I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.',
-    he: 'אני מסכים/ה ל<a href="/glance/terms.html">תנאים</a> ול<a href="/glance/privacy.html">מדיניות הפרטיות</a>.'
+    he: 'מסכימים <a href="/glance/terms.html">לתנאים</a> ו<a href="/glance/privacy.html">למדיניות הפרטיות</a>.'
   },
-  marketing: {
-    en: 'Email me product notes. Optional, and off unless you tick it.',
-    he: 'שלחו לי עדכונים על המוצר. לא חובה, וכבוי עד שמסמנים.'
+  termsErr: {
+    en: 'Agree to the Terms and Privacy Policy to continue.',
+    he: 'כדי להמשיך, אשרו את התנאים ואת מדיניות הפרטיות.'
   },
-  submit: { en: 'Get Glance', he: 'קבלו את <bdi>Glance</bdi>' },
-  closed: { en: "✓ Closed · You're in.", he: '✓ נסגר · אתם בפנים.' },
+  mail: { en: 'Email me product notes. Optional.', he: 'עדכונים על המוצר. לא חובה.' },
+  fail: { en: 'Something went wrong. Nothing was saved.', he: 'משהו השתבש. לא נשמר דבר.' },
   retry: { en: 'Retry', he: 'נסו שוב' },
-  soon: { en: '<bdi>iPhone</bdi>: coming soon', he: '<bdi>iPhone</bdi>: בקרוב' },
-  success: {
-    en: 'Opening the <bdi>Chrome</bdi> Web Store…',
-    he: 'פותחים את חנות <bdi>Chrome</bdi>…'
-  },
-  mailLine: {
-    en: 'Check your email to confirm the mailing list.',
-    he: 'בדקו את האימייל כדי לאשר את רשימת הדיוור.'
-  }
+  success: { en: "You're in. <bdi>Glance</bdi> is on its way.", he: 'אתם בפנים. <bdi>Glance</bdi> בדרך.' },
+  confirm: { en: 'Check your email to confirm.', he: 'בדקו את האימייל כדי לאשר.' }
 };
 </script>
 <script src="/glance/gate.js" defer></script>
