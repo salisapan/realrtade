@@ -38,7 +38,7 @@ var GlanceCards = (function () {
       type: 'button',
       text: i18n().embed(lang, i18n().t(lang, key)),
       action: action,
-      style: key === 'doIt' ? 'filled' : 'text',
+      style: key === 'doIt' || key === 'grant' ? 'filled' : 'text',
       params: params || {}
     };
   }
@@ -136,6 +136,13 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'undone'))]);
   }
 
+  function grant(lang) {
+    return card(lang, [
+      text(lang, i18n().t(lang, 'grant')),
+      button(lang, 'grant', 'authorize', {})
+    ]);
+  }
+
   function quiet(lang) {
     return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
   }
@@ -163,6 +170,7 @@ var GlanceCards = (function () {
     readError: readError,
     edited: edited,
     undone: undone,
+    grant: grant,
     quiet: quiet,
     homepage: homepage,
     buttons: buttons

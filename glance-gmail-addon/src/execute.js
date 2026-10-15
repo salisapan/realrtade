@@ -14,10 +14,10 @@ var GlanceExecute = (function () {
     if (proposal.notes) resource.notes = String(proposal.notes).slice(0, 2000);
     if (proposal.due) resource.due = proposal.due + 'T00:00:00.000Z';
     var inserted;
-    try { inserted = api.insert(proposal.listId, resource); } catch (err) { return { confirmed: false, reason: 'write' }; }
+    try { inserted = api.insert(proposal.listId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
     var fetched;
-    try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return { confirmed: false, reason: 'fetch' }; }
+    try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
     var cmp = Proof.compareCreated(inserted, fetched);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
     return {
@@ -31,13 +31,23 @@ var GlanceExecute = (function () {
     };
   }
 
+  function failedWrite_(reason, err) {
+    return {
+      confirmed: false,
+      action: 'unconfirmed',
+      reason: reason,
+      name: err && err.name ? String(err.name) : '',
+      detail: err && err.message ? String(err.message) : ''
+    };
+  }
+
   function performUndo(snapshot, api) {
     var Proof = proofLib();
     var current;
-    try { current = api.get(snapshot.listId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { current = api.get(snapshot.listId, snapshot.id); } catch (err) { return failedWrite_('fetch', err); }
     var decision = Proof.undoDecision(snapshot, current);
     if (decision.action !== 'delete') return decision;
-    try { api.remove(snapshot.listId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { api.remove(snapshot.listId, snapshot.id); } catch (err) { return failedWrite_('delete', err); }
     return { action: 'deleted' };
   }
 
@@ -85,10 +95,10 @@ var GlanceExecute = (function () {
     if (!resource) return { confirmed: false, reason: 'write' };
     var calendarId = proposal.calendarId || 'primary';
     var inserted;
-    try { inserted = api.insert(calendarId, resource); } catch (err) { return { confirmed: false, reason: 'write' }; }
+    try { inserted = api.insert(calendarId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
     var fetched;
-    try { fetched = api.get(calendarId, inserted.id); } catch (err) { return { confirmed: false, reason: 'fetch' }; }
+    try { fetched = api.get(calendarId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
     var cmp = Proof.compareEvent(inserted, fetched);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
     return {
@@ -106,10 +116,10 @@ var GlanceExecute = (function () {
     var Proof = proofLib();
     if (!snapshot || !snapshot.contentHash) return { action: 'refuse', which: 'event' };
     var current;
-    try { current = api.get(snapshot.calendarId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { current = api.get(snapshot.calendarId, snapshot.id); } catch (err) { return failedWrite_('fetch', err); }
     var decision = Proof.eventUndoDecision(snapshot, current);
     if (decision.action !== 'delete') return decision.action === 'refuse' ? decision : { action: 'unconfirmed' };
-    try { api.remove(snapshot.calendarId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { api.remove(snapshot.calendarId, snapshot.id); } catch (err) { return failedWrite_('delete', err); }
     return { action: 'deleted' };
   }
 
@@ -121,16 +131,16 @@ var GlanceExecute = (function () {
     }
     var eventNow;
     var taskNow;
-    try { eventNow = apis.calendar.get(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return { action: 'unconfirmed' }; }
-    try { taskNow = apis.tasks.get(snapshot.task.listId, snapshot.task.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { eventNow = apis.calendar.get(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return failedWrite_('fetch', err); }
+    try { taskNow = apis.tasks.get(snapshot.task.listId, snapshot.task.id); } catch (err) { return failedWrite_('fetch', err); }
     var eventDecision = Proof.eventUndoDecision(snapshot.event, eventNow);
     var taskDecision = Proof.undoDecision(snapshot.task, taskNow);
     if (eventDecision.action === 'refuse' || taskDecision.action === 'refuse') {
       return { action: 'refuse', which: eventDecision.action === 'refuse' ? 'event' : 'task' };
     }
     if (eventDecision.action !== 'delete' || taskDecision.action !== 'delete') return { action: 'unconfirmed' };
-    try { apis.calendar.remove(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return { action: 'unconfirmed' }; }
-    try { apis.tasks.remove(snapshot.task.listId, snapshot.task.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { apis.calendar.remove(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return failedWrite_('delete', err); }
+    try { apis.tasks.remove(snapshot.task.listId, snapshot.task.id); } catch (err) { return failedWrite_('delete', err); }
     return { action: 'deleted' };
   }
 

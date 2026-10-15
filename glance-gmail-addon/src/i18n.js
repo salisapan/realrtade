@@ -22,7 +22,8 @@ var GlanceI18n = (function () {
       when: 'When',
       onCalendar: 'On your calendar.',
       schedule: 'Calendar and a reminder.',
-      editedEvent: "The event was edited, so I won't undo it"
+      editedEvent: "The event was edited, so I won't undo it",
+      grant: 'Grant permission'
     },
     he: {
       doIt: 'בצע',
@@ -42,7 +43,8 @@ var GlanceI18n = (function () {
       when: 'מתי',
       onCalendar: 'ביומן.',
       schedule: 'יומן ותזכורת.',
-      editedEvent: 'האירוע נערך, אז לא אבטל אותו'
+      editedEvent: 'האירוע נערך, אז לא אבטל אותו',
+      grant: 'תנו הרשאה'
     }
   };
 

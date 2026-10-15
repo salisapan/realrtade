@@ -5638,7 +5638,8 @@ var GlanceI18n = (function () {
       when: 'When',
       onCalendar: 'On your calendar.',
       schedule: 'Calendar and a reminder.',
-      editedEvent: "The event was edited, so I won't undo it"
+      editedEvent: "The event was edited, so I won't undo it",
+      grant: 'Grant permission'
     },
     he: {
       doIt: 'בצע',
@@ -5658,7 +5659,8 @@ var GlanceI18n = (function () {
       when: 'מתי',
       onCalendar: 'ביומן.',
       schedule: 'יומן ותזכורת.',
-      editedEvent: 'האירוע נערך, אז לא אבטל אותו'
+      editedEvent: 'האירוע נערך, אז לא אבטל אותו',
+      grant: 'תנו הרשאה'
     }
   };
 
@@ -6020,6 +6022,68 @@ var GlanceIntent = (function () {
     return raw;
   }
 
+  // Card chrome follows the Gmail locale. The title written on the event
+  // and the reminder comes from the mail. A Hebrew meeting keeps its noun,
+  // the date as written, and the clock. An English meeting keeps the
+  // classifier's short label.
+  var MEETING_NOUNS_HE = [
+    'שיחת טלפון', 'פגישת עבודה', 'שיחת זום', 'שיחת וידאו', 'עמידה יומית',
+    'פגישה', 'שיחה', 'ראיון', 'סנכרון', 'תיאום', 'ייעוץ', 'הדגמה', 'מפגש', 'ועידה'
+  ];
+
+  function mailIsHebrew(text) {
+    var raw = String(text || '');
+    var he = (raw.match(/[\u0590-\u05FF]/g) || []).length;
+    var en = (raw.match(/[A-Za-z]/g) || []).length;
+    return he > 0 && he >= en;
+  }
+
+  function meetingNoun(text) {
+    var raw = String(text || '');
+    for (var i = 0; i < MEETING_NOUNS_HE.length; i++) {
+      if (raw.indexOf(MEETING_NOUNS_HE[i]) !== -1) return MEETING_NOUNS_HE[i];
+    }
+    return 'פגישה';
+  }
+
+  function writtenDate(text, dateIso) {
+    var raw = String(text || '');
+    var re = /(\d{1,2})[./](\d{1,2})(?:[./]\d{2,4})?/g;
+    var match;
+    var fallback = '';
+    var wantDay = null;
+    var wantMonth = null;
+    if (dateIso && /^\d{4}-\d{2}-\d{2}$/.test(dateIso)) {
+      var bits = dateIso.split('-');
+      wantMonth = +bits[1];
+      wantDay = +bits[2];
+    }
+    while ((match = re.exec(raw))) {
+      var shown = String(+match[1]) + '/' + String(+match[2]);
+      if (!fallback) fallback = shown;
+      if (wantDay != null && +match[1] === wantDay && +match[2] === wantMonth) return shown;
+    }
+    if (fallback) return fallback;
+    if (wantDay != null) return String(wantDay) + '/' + String(wantMonth);
+    return '';
+  }
+
+  function contentTitle(text, decision) {
+    if (!decision || (decision.kind !== 'schedule' && decision.kind !== 'hold')) return decision;
+    if (!mailIsHebrew(text)) return decision;
+    var datePart = writtenDate(text, decision.dateIso || decision.due || '');
+    var timePart = '';
+    if (Number.isInteger(decision.hour) && Number.isInteger(decision.minute)) {
+      timePart = pad(decision.hour) + ':' + pad(decision.minute);
+    }
+    var title = meetingNoun(text);
+    if (datePart) title += ' ' + datePart;
+    if (timePart) title += ' ' + timePart;
+    decision.title = sanitizeTitle(title);
+    if (decision.kind === 'schedule') decision.taskTitle = decision.title;
+    return decision;
+  }
+
   function silence(reason, planId) {
     return {
       speak: false,
@@ -6049,7 +6113,7 @@ var GlanceIntent = (function () {
         throw err;
       }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
-      if (mapped) return mapped;
+      if (mapped) return contentTitle(prepared, mapped);
       if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
@@ -6068,6 +6132,7 @@ var GlanceIntent = (function () {
     mapClassifierResult: mapClassifierResult,
     sanitizeTitle: sanitizeTitle,
     prepareText: prepareText,
+    contentTitle: contentTitle,
     silence: silence
   };
 })();
@@ -6245,10 +6310,10 @@ var GlanceExecute = (function () {
     if (proposal.notes) resource.notes = String(proposal.notes).slice(0, 2000);
     if (proposal.due) resource.due = proposal.due + 'T00:00:00.000Z';
     var inserted;
-    try { inserted = api.insert(proposal.listId, resource); } catch (err) { return { confirmed: false, reason: 'write' }; }
+    try { inserted = api.insert(proposal.listId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
     var fetched;
-    try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return { confirmed: false, reason: 'fetch' }; }
+    try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
     var cmp = Proof.compareCreated(inserted, fetched);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
     return {
@@ -6262,13 +6327,23 @@ var GlanceExecute = (function () {
     };
   }
 
+  function failedWrite_(reason, err) {
+    return {
+      confirmed: false,
+      action: 'unconfirmed',
+      reason: reason,
+      name: err && err.name ? String(err.name) : '',
+      detail: err && err.message ? String(err.message) : ''
+    };
+  }
+
   function performUndo(snapshot, api) {
     var Proof = proofLib();
     var current;
-    try { current = api.get(snapshot.listId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { current = api.get(snapshot.listId, snapshot.id); } catch (err) { return failedWrite_('fetch', err); }
     var decision = Proof.undoDecision(snapshot, current);
     if (decision.action !== 'delete') return decision;
-    try { api.remove(snapshot.listId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { api.remove(snapshot.listId, snapshot.id); } catch (err) { return failedWrite_('delete', err); }
     return { action: 'deleted' };
   }
 
@@ -6316,10 +6391,10 @@ var GlanceExecute = (function () {
     if (!resource) return { confirmed: false, reason: 'write' };
     var calendarId = proposal.calendarId || 'primary';
     var inserted;
-    try { inserted = api.insert(calendarId, resource); } catch (err) { return { confirmed: false, reason: 'write' }; }
+    try { inserted = api.insert(calendarId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
     var fetched;
-    try { fetched = api.get(calendarId, inserted.id); } catch (err) { return { confirmed: false, reason: 'fetch' }; }
+    try { fetched = api.get(calendarId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
     var cmp = Proof.compareEvent(inserted, fetched);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
     return {
@@ -6337,10 +6412,10 @@ var GlanceExecute = (function () {
     var Proof = proofLib();
     if (!snapshot || !snapshot.contentHash) return { action: 'refuse', which: 'event' };
     var current;
-    try { current = api.get(snapshot.calendarId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { current = api.get(snapshot.calendarId, snapshot.id); } catch (err) { return failedWrite_('fetch', err); }
     var decision = Proof.eventUndoDecision(snapshot, current);
     if (decision.action !== 'delete') return decision.action === 'refuse' ? decision : { action: 'unconfirmed' };
-    try { api.remove(snapshot.calendarId, snapshot.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { api.remove(snapshot.calendarId, snapshot.id); } catch (err) { return failedWrite_('delete', err); }
     return { action: 'deleted' };
   }
 
@@ -6352,16 +6427,16 @@ var GlanceExecute = (function () {
     }
     var eventNow;
     var taskNow;
-    try { eventNow = apis.calendar.get(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return { action: 'unconfirmed' }; }
-    try { taskNow = apis.tasks.get(snapshot.task.listId, snapshot.task.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { eventNow = apis.calendar.get(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return failedWrite_('fetch', err); }
+    try { taskNow = apis.tasks.get(snapshot.task.listId, snapshot.task.id); } catch (err) { return failedWrite_('fetch', err); }
     var eventDecision = Proof.eventUndoDecision(snapshot.event, eventNow);
     var taskDecision = Proof.undoDecision(snapshot.task, taskNow);
     if (eventDecision.action === 'refuse' || taskDecision.action === 'refuse') {
       return { action: 'refuse', which: eventDecision.action === 'refuse' ? 'event' : 'task' };
     }
     if (eventDecision.action !== 'delete' || taskDecision.action !== 'delete') return { action: 'unconfirmed' };
-    try { apis.calendar.remove(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return { action: 'unconfirmed' }; }
-    try { apis.tasks.remove(snapshot.task.listId, snapshot.task.id); } catch (err) { return { action: 'unconfirmed' }; }
+    try { apis.calendar.remove(snapshot.event.calendarId, snapshot.event.id); } catch (err) { return failedWrite_('delete', err); }
+    try { apis.tasks.remove(snapshot.task.listId, snapshot.task.id); } catch (err) { return failedWrite_('delete', err); }
     return { action: 'deleted' };
   }
 
@@ -6418,7 +6493,7 @@ var GlanceCards = (function () {
       type: 'button',
       text: i18n().embed(lang, i18n().t(lang, key)),
       action: action,
-      style: key === 'doIt' ? 'filled' : 'text',
+      style: key === 'doIt' || key === 'grant' ? 'filled' : 'text',
       params: params || {}
     };
   }
@@ -6516,6 +6591,13 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'undone'))]);
   }
 
+  function grant(lang) {
+    return card(lang, [
+      text(lang, i18n().t(lang, 'grant')),
+      button(lang, 'grant', 'authorize', {})
+    ]);
+  }
+
   function quiet(lang) {
     return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
   }
@@ -6543,6 +6625,7 @@ var GlanceCards = (function () {
     readError: readError,
     edited: edited,
     undone: undone,
+    grant: grant,
     quiet: quiet,
     homepage: homepage,
     buttons: buttons

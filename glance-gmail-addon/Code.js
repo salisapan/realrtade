@@ -55,55 +55,116 @@ function onGmailMessageOpen(e) {
 
 function onDoIt(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
+  var grant = false;
   try {
     if (isPrefetch_(e)) {
       var saved = readPrefetch_();
+      planLog_({
+        speak: !!(saved && saved.title),
+        kind: 'task',
+        planId: 'prefetch',
+        reason: saved && saved.title ? 'prefetch' : 'quiet',
+        title: saved && saved.title
+      }, 'prefetch');
       if (!saved || !saved.title) return update_(render_(Glance.cards.quiet(lang)));
       var prior = readUndo_('prefetch');
       if (prior && prior.view) {
+        stepLog_({ step: 'proof', messageId: 'prefetch' });
         return update_(render_(Glance.cards.proof(prior.view, lang, { messageId: 'prefetch', source: 'prefetch', undo: true })));
       }
-      return finishCreate_({
-        title: saved.title,
-        due: saved.due || null,
-        notes: 'Logged by Glance',
-        listId: glanceTaskList_()
-      }, 'prefetch', lang);
+      if (!scopesGranted_(scopesForKind_('task'))) grant = true;
+      else {
+        return finishCreate_({
+          title: saved.title,
+          due: saved.due || null,
+          notes: 'Logged by Glance',
+          listId: glanceTaskList_()
+        }, 'prefetch', lang);
+      }
+    } else {
+      var openedRead = emptyRead_(e);
+      var opened = readOpen_(e, openedRead);
+      if (!opened) throw readFail_('open', openedRead);
+      var existing = readUndo_(opened.messageId);
+      if (existing && existing.view) {
+        stepLog_({ step: 'proof', messageId: opened.messageId, kind: existing.view.kind || 'task' });
+        return update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true })));
+      }
+      var decision = judgeOpen_(opened, e);
+      planLog_(decision, opened.messageId);
+      if (!decision.speak) return update_(render_(Glance.cards.quiet(lang)));
+      if (!scopesGranted_(scopesForKind_(decision.kind))) grant = true;
+      else return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
     }
-    var openedRead = emptyRead_(e);
-    var opened = readOpen_(e, openedRead);
-    if (!opened) throw readFail_('open', openedRead);
-    var existing = readUndo_(opened.messageId);
-    if (existing && existing.view) {
-      return update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true })));
-    }
-    var decision = judgeOpen_(opened, e);
-    if (!decision.speak) return update_(render_(Glance.cards.quiet(lang)));
-    return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
   } catch (err) {
-    errorLog_(err);
-    if (err && err.diag) return update_(render_(Glance.cards.readError(lang, err.diag)));
-    return update_(render_(Glance.cards.unconfirmed(lang)));
+    if (authFailure_(err)) {
+      grant = true;
+      errorLog_(err);
+      stepLog_({ step: 'scopes', granted: false, reason: 'missing-scope' });
+    } else {
+      errorLog_(err);
+      if (err && err.diag) return update_(render_(Glance.cards.readError(lang, err.diag)));
+      stepLog_({ step: 'unconfirmed', reason: unconfirmedReason_(err) });
+      return update_(render_(Glance.cards.unconfirmed(lang)));
+    }
   }
+  if (grant) raiseGrant_();
 }
 
 function onUndo(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
+  var grant = false;
   try {
     var id = undoId_(e);
     var record = id ? readUndo_(id) : null;
-    if (!record || !record.snapshot) return update_(render_(Glance.cards.unconfirmed(lang)));
-    var result = undoRecord_(record.snapshot);
-    if (result.action === 'deleted') {
-      clearUndo_(id);
-      return update_(render_(Glance.cards.undone(lang)));
+    stepLog_({
+      step: 'undo',
+      messageId: id || '',
+      kind: record && record.snapshot ? record.snapshot.kind || 'task' : null
+    });
+    if (!record || !record.snapshot) {
+      stepLog_({ step: 'unconfirmed', reason: 'no-snapshot' });
+      return update_(render_(Glance.cards.unconfirmed(lang)));
     }
-    if (result.action === 'refuse') return update_(render_(Glance.cards.edited(lang, result.which)));
-    return update_(render_(Glance.cards.unconfirmed(lang)));
+    if (!scopesGranted_(scopesForKind_(record.snapshot.kind))) grant = true;
+    else {
+      var result = undoRecord_(record.snapshot);
+      stepLog_({
+        step: 'read-back',
+        target: record.snapshot.kind || 'task',
+        action: result && result.action || null,
+        which: result && result.which || null,
+        reason: result && result.reason || null
+      });
+      if (resultNeedsGrant_(result)) {
+        grant = true;
+        stepLog_({ step: 'scopes', granted: false, reason: 'missing-scope' });
+      } else if (result.action === 'deleted') {
+        clearUndo_(id);
+        return update_(render_(Glance.cards.undone(lang)));
+      } else if (result.action === 'refuse') {
+        return update_(render_(Glance.cards.edited(lang, result.which)));
+      } else {
+        stepLog_({ step: 'unconfirmed', reason: (result && (result.reason || result.action)) || 'undo-failed' });
+        return update_(render_(Glance.cards.unconfirmed(lang)));
+      }
+    }
   } catch (err) {
-    console.error(err && err.message ? err.message : err);
-    return update_(render_(Glance.cards.unconfirmed(lang)));
+    if (authFailure_(err)) {
+      grant = true;
+      errorLog_(err);
+      stepLog_({ step: 'scopes', granted: false, reason: 'missing-scope' });
+    } else {
+      errorLog_(err);
+      stepLog_({ step: 'unconfirmed', reason: unconfirmedReason_(err) });
+      return update_(render_(Glance.cards.unconfirmed(lang)));
+    }
   }
+  if (grant) raiseGrant_();
+}
+
+function onAuthCard(e) {
+  return render_(Glance.cards.grant(Glance.i18n.locale(localeOf_(e))));
 }
 
 function judgeOpen_(opened, e) {
@@ -151,6 +212,14 @@ function finishDecision_(decision, opened, messageId, lang, timeZone) {
 }
 
 function finishCalendar_(decision, opened, messageId, lang, timeZone) {
+  stepLog_({
+    step: 'write',
+    target: 'event',
+    title: decision.title,
+    dateIso: decision.dateIso,
+    hour: Number.isInteger(decision.hour) ? decision.hour : null,
+    minute: Number.isInteger(decision.minute) ? decision.minute : null
+  });
   var eventResult = Glance.execute.performCreateEvent({
     calendarId: 'primary',
     title: decision.title,
@@ -160,7 +229,8 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
     timeZone: timeZone || 'Etc/UTC',
     description: eventNotes_(opened, decision.quote)
   }, calendarApi_());
-  if (!eventResult.confirmed || !eventResult.view) return update_(render_(Glance.cards.unconfirmed(lang)));
+  logReadBack_('event', eventResult);
+  if (!eventResult.confirmed || !eventResult.view) return unconfirmedResult_(eventResult, lang, 'event');
   if (decision.kind === 'hold') {
     var holdView = {
       kind: 'hold',
@@ -180,18 +250,25 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
   }
   var listId;
   try { listId = glanceTaskList_(); } catch (err) {
+    errorLog_(err);
+    stepLog_({ step: 'undo-event', reason: 'task-list' });
     Glance.execute.performUndoEvent(eventResult.snapshot, calendarApi_());
+    if (authFailure_(err)) throw err;
+    stepLog_({ step: 'unconfirmed', reason: 'task-list' });
     return update_(render_(Glance.cards.unconfirmed(lang)));
   }
+  stepLog_({ step: 'write', target: 'task', title: decision.taskTitle, due: decision.taskDue || null });
   var taskResult = Glance.execute.performCreate({
     title: decision.taskTitle,
     due: decision.taskDue || null,
     notes: notesFor_(opened),
     listId: listId
   }, tasksApi_());
+  logReadBack_('task', taskResult);
   if (!taskResult.confirmed || !taskResult.view) {
+    stepLog_({ step: 'undo-event', reason: (taskResult && taskResult.reason) || 'task-read-back' });
     Glance.execute.performUndoEvent(eventResult.snapshot, calendarApi_());
-    return update_(render_(Glance.cards.unconfirmed(lang)));
+    return unconfirmedResult_(taskResult, lang, 'task');
   }
   var scheduleView = {
     kind: 'schedule',
@@ -233,8 +310,10 @@ function eventNotes_(opened, quote) {
 }
 
 function finishCreate_(proposal, messageId, lang) {
+  stepLog_({ step: 'write', target: 'task', title: proposal.title, due: proposal.due || null });
   var result = Glance.execute.performCreate(proposal, tasksApi_());
-  if (!result.confirmed || !result.view) return update_(render_(Glance.cards.unconfirmed(lang)));
+  logReadBack_('task', result);
+  if (!result.confirmed || !result.view) return unconfirmedResult_(result, lang, 'task');
   var saved = saveUndo_(messageId, { view: result.view, snapshot: result.snapshot });
   return update_(render_(Glance.cards.proof(result.view, lang, {
     messageId: messageId,
@@ -328,6 +407,98 @@ function errorLog_(err) {
     (err && err.message ? err.message : String(err)) + '\n' +
     (err && err.stack ? err.stack : '')
   );
+}
+
+function stepLog_(fields) {
+  console.log(JSON.stringify(fields || {}));
+}
+
+function planLog_(decision, messageId) {
+  var choice = decision || {};
+  stepLog_({
+    step: 'plan',
+    messageId: messageId || '',
+    speak: choice.speak === true,
+    kind: choice.kind || null,
+    planId: choice.planId || null,
+    reason: choice.reason || null,
+    title: choice.title || null,
+    taskTitle: choice.taskTitle || null,
+    dateIso: choice.dateIso || choice.due || null,
+    hour: Number.isInteger(choice.hour) ? choice.hour : null,
+    minute: Number.isInteger(choice.minute) ? choice.minute : null
+  });
+}
+
+function logReadBack_(target, result) {
+  var view = result && result.view;
+  stepLog_({
+    step: 'read-back',
+    target: target,
+    confirmed: !!(result && result.confirmed && view),
+    id: view && view.id ? view.id : null,
+    reason: result && result.reason || null,
+    detail: result && result.detail || null
+  });
+}
+
+function unconfirmedReason_(err) {
+  if (!err) return 'error';
+  if (err.diag) return String(err.diag);
+  if (err.reason) return String(err.reason);
+  return (err.name ? String(err.name) + ': ' : '') + String(err.message || 'error');
+}
+
+function unconfirmedResult_(result, lang, target) {
+  if (resultNeedsGrant_(result)) {
+    var err = new Error((result && result.detail) || 'missing-scope');
+    err.name = (result && result.name) || 'AuthorizationException';
+    throw err;
+  }
+  stepLog_({ step: 'unconfirmed', reason: (result && result.reason) || (target + '-read-back') });
+  return update_(render_(Glance.cards.unconfirmed(lang)));
+}
+
+var SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';
+var SCOPE_CALENDAR_EVENTS = 'https://www.googleapis.com/auth/calendar.events';
+
+function scopesForKind_(kind) {
+  if (kind === 'hold' || kind === 'event') return [SCOPE_CALENDAR_EVENTS];
+  if (kind === 'schedule') return [SCOPE_CALENDAR_EVENTS, SCOPE_TASKS];
+  return [SCOPE_TASKS];
+}
+
+function authFailure_(err) {
+  if (!err) return false;
+  var name = String(err.name || '');
+  var msg = String(err.message || '');
+  if (name === 'AuthorizationException') return true;
+  return /insufficient authentication scopes|insufficient permission|specified permissions are not sufficient|have not been authorized|required scope|authorization required/i.test(msg);
+}
+
+function resultNeedsGrant_(result) {
+  if (!result) return false;
+  return authFailure_({ name: result.name, message: result.detail || '' });
+}
+
+function scopesGranted_(scopes) {
+  try {
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, scopes);
+    stepLog_({ step: 'scopes', granted: true, scopes: scopes });
+    return true;
+  } catch (err) {
+    if (!authFailure_(err)) throw err;
+    errorLog_(err);
+    stepLog_({ step: 'scopes', granted: false, scopes: scopes, reason: 'missing-scope' });
+    return false;
+  }
+}
+
+function raiseGrant_() {
+  CardService.newAuthorizationException()
+    .setAuthorizationUrl(ScriptApp.getAuthorizationUrl())
+    .setCustomUiCallback('onAuthCard')
+    .throwException();
 }
 
 function logOpen_(read, decision) {
@@ -525,6 +696,7 @@ function render_(model) {
   for (var i = 0; i < widgets.length; i++) {
     var widget = widgets[i];
     if (widget.type === 'text') section.addWidget(text_(widget.text));
+    if (widget.type === 'button' && widget.action === 'authorize') section.addWidget(authButton_(widget));
     if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo')) {
       section.addWidget(button_(widget));
     }
@@ -538,6 +710,15 @@ function render_(model) {
 function text_(value) {
   var safe = String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return CardService.newTextParagraph().setText(safe);
+}
+
+function authButton_(widget) {
+  var action = CardService.newAuthorizationAction().setAuthorizationUrl(ScriptApp.getAuthorizationUrl());
+  var button = CardService.newTextButton().setText(String(widget.text || '')).setAuthorizationAction(action);
+  if (widget.style === 'filled' && CardService.TextButtonStyle && CardService.TextButtonStyle.FILLED) {
+    button.setTextButtonStyle(CardService.TextButtonStyle.FILLED);
+  }
+  return button;
 }
 
 function button_(widget) {

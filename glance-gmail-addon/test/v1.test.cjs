@@ -130,10 +130,14 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
 {
   const held = judge('Could we meet Thursday at 3pm?');
   check('a timed meeting ask is a calendar hold', held.speak === true && held.kind === 'hold' && held.hour === 15 && held.minute === 0 && held.dateIso === '2026-10-22', held);
+  check('an English meeting keeps the classifier title', held.title === 'Could we meet Thursday at 3pm?', held.title);
 }
 {
   const meeting = judge('פגישה ביום חמישי 22/10');
   check('the Hebrew meeting is a schedule, not silence', meeting.speak === true && meeting.kind === 'schedule' && meeting.dateIso === '2026-10-22' && meeting.hour === null, meeting);
+  check('a Hebrew meeting title comes from the mail', meeting.title === 'פגישה 22/10' && meeting.taskTitle === 'פגישה 22/10' && meeting.title.indexOf('Meeting') === -1, meeting);
+  const timedHe = judge('פגישה ביום חמישי 22/10 בשעה 14:00');
+  check('a Hebrew meeting with a clock keeps the Hebrew title', timedHe.speak === true && timedHe.title === 'פגישה 22/10 14:00' && timedHe.taskTitle === 'פגישה 22/10 14:00' && timedHe.hour === 14 && timedHe.minute === 0, timedHe);
 }
 
 {
@@ -439,7 +443,13 @@ console.log('\n--- host boundaries ---');
 
 console.log('\n--- message path parity ---');
 {
-  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0 };
+  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0, scopeChecks: [], granted: [] };
+  const ALL_SCOPES = [
+    'https://www.googleapis.com/auth/tasks',
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/gmail.addons.execute',
+    'https://www.googleapis.com/auth/script.locale'
+  ];
   function reset() {
     state.props = {};
     state.messages = {};
@@ -450,11 +460,15 @@ console.log('\n--- message path parity ---');
     state.fetches = 0;
     state.tokenCalls = 0;
     state.tokenThrow = false;
+    state.scopeChecks = [];
+    state.granted = ALL_SCOPES.slice();
+    state.authThrows = [];
   }
   function widget(kind) {
     const node = { type: kind, text: '', action: '', params: {}, style: '' };
     node.setText = function (value) { node.text = value; return node; };
     node.setOnClickAction = function (action) { node.action = action.functionName; node.params = action.params; return node; };
+    node.setAuthorizationAction = function (action) { node.action = 'authorize'; node.authUrl = action.url; return node; };
     node.setTextButtonStyle = function (value) { node.style = value; return node; };
     return node;
   }
@@ -524,11 +538,43 @@ console.log('\n--- message path parity ---');
         remove: function (calendarId, id) { delete state.events[id]; }
       }
     },
+    ScriptApp: {
+      AuthMode: { FULL: 'FULL' },
+      getAuthorizationUrl: function () { return 'https://accounts.google.com/o/oauth2/auth?glance=1'; },
+      requireScopes: function (mode, scopes) {
+        state.scopeChecks.push({ mode: mode, scopes: scopes.slice() });
+        const missing = scopes.filter(function (scope) { return state.granted.indexOf(scope) === -1; });
+        if (missing.length) {
+          const err = new Error('The script does not have the required scope: ' + missing.join(' '));
+          err.name = 'AuthorizationException';
+          throw err;
+        }
+      }
+    },
     CardService: {
       LoadIndicator: { SPINNER: 'spinner' },
       TextButtonStyle: { FILLED: 'filled' },
       newTextParagraph: function () { return widget('text'); },
       newTextButton: function () { return widget('button'); },
+      newAuthorizationAction: function () {
+        const action = { url: '' };
+        action.setAuthorizationUrl = function (url) { action.url = url; return action; };
+        return action;
+      },
+      newAuthorizationException: function () {
+        const ex = { url: '', callback: '' };
+        ex.setAuthorizationUrl = function (url) { ex.url = url; return ex; };
+        ex.setCustomUiCallback = function (name) { ex.callback = name; return ex; };
+        ex.throwException = function () {
+          state.authThrows.push({ url: ex.url, callback: ex.callback });
+          const err = new Error('authorization required');
+          err.name = 'AuthorizationException';
+          err.authUrl = ex.url;
+          err.callback = ex.callback;
+          throw err;
+        };
+        return ex;
+      },
       newCardSection: function () {
         const section = { widgets: [] };
         section.addWidget = function (item) { section.widgets.push(item); return section; };
@@ -572,6 +618,9 @@ console.log('\n--- message path parity ---');
   const openMessage = vm.runInContext('onGmailMessageOpen', sandbox);
   const doIt = vm.runInContext('onDoIt', sandbox);
   const undo = vm.runInContext('onUndo', sandbox);
+  const authCard = vm.runInContext('onAuthCard', sandbox);
+  const contentTitle = vm.runInContext('Glance.intent.contentTitle', sandbox);
+  const prepareText = vm.runInContext('Glance.intent.prepareText', sandbox);
   const classify = vm.runInContext('FlowIntent.classify', sandbox);
   const planFor = vm.runInContext('FlowActions.planFor', sandbox);
   const shouldShow = vm.runInContext('FlowIntent.shouldShowChip', sandbox);
@@ -634,7 +683,21 @@ console.log('\n--- message path parity ---');
     if (bodyPlan) return bodyPlan;
     return extensionOffer(String(fields.subject || ''), fromEmail, fromName, threadUrl);
   }
-  function assertOffer(name, card, plan, lang) {
+  function shownTitle(sourceText, plan) {
+    if (!plan) return '';
+    const calendarStep = plan.steps.filter((step) => step.kind === 'calendar')[0];
+    const taskStep = plan.steps.filter((step) => step.kind === 'googleTask')[0];
+    const shaped = contentTitle(prepareText(sourceText || ''), {
+      kind: plan.id,
+      title: (calendarStep && calendarStep.params.title) || (taskStep && taskStep.params.title) || '',
+      dateIso: calendarStep && calendarStep.params.dateIso,
+      hour: calendarStep && Number.isInteger(calendarStep.params.hour) ? calendarStep.params.hour : null,
+      minute: calendarStep && Number.isInteger(calendarStep.params.minute) ? calendarStep.params.minute : null,
+      taskTitle: taskStep && taskStep.params.title
+    });
+    return shaped && shaped.title ? shaped.title : '';
+  }
+  function assertOffer(name, card, plan, lang, sourceText) {
     const lines = linesOf(card);
     const buttons = buttonsOf(card);
     const joined = lines.join('\n');
@@ -647,17 +710,21 @@ console.log('\n--- message path parity ---');
     check(name + ' offers one Do it', buttons.length === 1 && plain(buttons[0].text) === label && buttons[0].action === 'onDoIt', buttons.map((item) => item.text));
     const calendarStep = plan.steps.filter((step) => step.kind === 'calendar')[0];
     const taskStep = plan.steps.filter((step) => step.kind === 'googleTask')[0];
+    const title = shownTitle(sourceText, plan);
     if (plan.id === 'hold') {
       const mark = lang === 'he' ? 'החזקה ביומן' : 'Calendar hold';
       const clock = String(calendarStep.params.hour).padStart(2, '0') + ':' + String(calendarStep.params.minute).padStart(2, '0');
-      check(name + ' matches the hold', joined.indexOf(mark) !== -1 && joined.indexOf(calendarStep.params.title) !== -1 && joined.indexOf(calendarStep.params.dateIso) !== -1 && joined.indexOf(clock) !== -1, lines);
+      check(name + ' matches the hold', joined.indexOf(mark) !== -1 && joined.indexOf(title) !== -1 && joined.indexOf(calendarStep.params.dateIso) !== -1 && joined.indexOf(clock) !== -1, lines);
     } else if (plan.id === 'schedule') {
       const mark = lang === 'he' ? 'יומן ותזכורת.' : 'Calendar and a reminder.';
       check(name + ' matches the schedule',
         joined.indexOf('Nothing to close.') === -1 && joined.indexOf('אין מה לסגור.') === -1 &&
         joined.indexOf('Calendar hold') === -1 && joined.indexOf('החזקה ביומן') === -1 &&
-        joined.indexOf(mark) !== -1 && joined.indexOf(calendarStep.params.title) !== -1 && joined.indexOf(calendarStep.params.dateIso) !== -1,
+        joined.indexOf(mark) !== -1 && joined.indexOf(title) !== -1 && joined.indexOf(calendarStep.params.dateIso) !== -1,
         lines);
+      if (title !== calendarStep.params.title) {
+        check(name + ' does not use the English meeting label', joined.indexOf(calendarStep.params.title) === -1, lines);
+      }
       if (Number.isInteger(calendarStep.params.hour)) {
         const clock = String(calendarStep.params.hour).padStart(2, '0') + ':' + String(calendarStep.params.minute).padStart(2, '0');
         check(name + ' shows the stated clock', joined.indexOf(clock) !== -1, lines);
@@ -678,7 +745,8 @@ console.log('\n--- message path parity ---');
     check(fields.id + ' reads the plain body, not the html', message.calls.indexOf('getPlainBody') !== -1 && message.calls.indexOf('getSubject') !== -1 && message.calls.indexOf('getFrom') !== -1 && message.calls.indexOf('getTo') !== -1 && message.calls.indexOf('getBody') === -1, message.calls);
     check(fields.id + ' sets the message access token', state.tokenCalls === 1 && state.lastToken === 'token', state.tokenCalls);
     check(fields.id + ' does not call prefetch', state.fetches === 0);
-    assertOffer(fields.id, cards[0], judgedPlan(fields), fields.locale === 'he' || fields.locale === 'he-IL' ? 'he' : 'en');
+    const sourceText = extensionOffer(String(fields.plain || ''), null, null, null) ? fields.plain : (fields.subject || '');
+    assertOffer(fields.id, cards[0], judgedPlan(fields), fields.locale === 'he' || fields.locale === 'he-IL' ? 'he' : 'en', sourceText);
     return { event: event, plan: judgedPlan(fields) };
   }
   const quietHtml = '<div>Hope you are well. Just wanted to say hello and see how things are going this week with the whole team.</div>';
@@ -758,6 +826,7 @@ console.log('\n--- message path parity ---');
   const written = state.events[eventIds[0]];
   const originalSummary = written.summary;
   check('the event is the plan date with no guests', written.start.date === opened.plan.steps[0].params.dateIso && written.end.date && !written.start.dateTime && !written.attendees, written);
+  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה 22/10' && state.tasks[taskIds[0]].title === 'פגישה 22/10', { event: written.summary, task: state.tasks[taskIds[0]].title });
   check('the proof shows the event and the task that were read back',
     proofLines.indexOf('On your calendar.') !== -1 && proofLines.indexOf(eventIds[0]) !== -1 &&
     proofLines.indexOf('In Google Tasks.') !== -1 && proofLines.indexOf(taskIds[0]) !== -1 &&
@@ -962,6 +1031,52 @@ console.log('\n--- message path parity ---');
   sandbox.Calendar = savedCalendar;
   const missingLines = linesOf(missingCalendar.value[0]).map(plain).join('\n');
   const missingRow = logRecord(missingCalendar);
+  const timedMail = openOf({
+    id: 'hebclock',
+    threadId: 'threadclock',
+    subject: 'פגישה',
+    plain: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+    html: quietHtml,
+    from: 'Glance <owner@ai.local.flow>',
+    to: 'owner@ai.local.flow',
+    date: new Date('2026-10-15T08:00:00Z')
+  });
+  check('the card offers פגישה 22/10 14:00', timedMail.plan && linesOf(openMessage({
+    gmail: { messageId: 'hebclock', accessToken: 'token', threadId: 'threadclock' },
+    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
+  })[0]).join('\n').indexOf('פגישה 22/10 14:00') !== -1);
+
+  reset();
+  state.granted = state.granted.filter(function (scope) { return scope.indexOf('calendar.events') === -1; });
+  state.messages.heb1 = gmailMessage(hebrew);
+  let authErr = null;
+  const denied = withConsole(function () {
+    try {
+      return doIt({
+        gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
+        commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
+        parameters: { messageId: 'heb1', source: 'message' }
+      });
+    } catch (err) {
+      authErr = err;
+      return null;
+    }
+  });
+  const grantEn = authCard({ commonEventObject: { userLocale: 'en' } });
+  const grantHe = authCard({ commonEventObject: { userLocale: 'he' } });
+  const grantButton = buttonsOf(grantEn)[0];
+  check('a missing calendar.events scope shows Grant permission and writes nothing',
+    authErr && authErr.name === 'AuthorizationException' && authErr.callback === 'onAuthCard' &&
+    state.authThrows.length === 1 &&
+    Object.keys(state.events).length === 0 && Object.keys(state.tasks).length === 0 &&
+    linesOf(grantEn).map(plain).join('\n').indexOf('Grant permission') !== -1 &&
+    linesOf(grantEn).map(plain).join('\n').indexOf("Couldn't confirm") === -1 &&
+    grantButton && grantButton.action === 'authorize' && grantButton.authUrl.indexOf('https://') === 0 &&
+    linesOf(grantHe).map(plain).join('\n').indexOf('תנו הרשאה') !== -1 &&
+    denied.logs.some(function (line) { return line.indexOf('"granted":false') !== -1 && line.indexOf('missing-scope') !== -1; }) &&
+    denied.errors.some(function (line) { return line.indexOf('AuthorizationException') !== -1 && line.indexOf('required scope') !== -1; }),
+    { err: authErr && authErr.message, events: Object.keys(state.events), tasks: Object.keys(state.tasks), logs: denied.logs, errors: denied.errors, grant: linesOf(grantEn).map(plain) });
+
   check('a missing Calendar service is logged and the card still offers',
     missingCalendar.errors.some(function (line) { return line.indexOf('Calendar advanced service is missing') !== -1; }) &&
     missingLines.indexOf('Calendar hold') !== -1 &&

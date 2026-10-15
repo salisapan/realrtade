@@ -299,6 +299,68 @@ var GlanceIntent = (function () {
     return raw;
   }
 
+  // Card chrome follows the Gmail locale. The title written on the event
+  // and the reminder comes from the mail. A Hebrew meeting keeps its noun,
+  // the date as written, and the clock. An English meeting keeps the
+  // classifier's short label.
+  var MEETING_NOUNS_HE = [
+    'שיחת טלפון', 'פגישת עבודה', 'שיחת זום', 'שיחת וידאו', 'עמידה יומית',
+    'פגישה', 'שיחה', 'ראיון', 'סנכרון', 'תיאום', 'ייעוץ', 'הדגמה', 'מפגש', 'ועידה'
+  ];
+
+  function mailIsHebrew(text) {
+    var raw = String(text || '');
+    var he = (raw.match(/[\u0590-\u05FF]/g) || []).length;
+    var en = (raw.match(/[A-Za-z]/g) || []).length;
+    return he > 0 && he >= en;
+  }
+
+  function meetingNoun(text) {
+    var raw = String(text || '');
+    for (var i = 0; i < MEETING_NOUNS_HE.length; i++) {
+      if (raw.indexOf(MEETING_NOUNS_HE[i]) !== -1) return MEETING_NOUNS_HE[i];
+    }
+    return 'פגישה';
+  }
+
+  function writtenDate(text, dateIso) {
+    var raw = String(text || '');
+    var re = /(\d{1,2})[./](\d{1,2})(?:[./]\d{2,4})?/g;
+    var match;
+    var fallback = '';
+    var wantDay = null;
+    var wantMonth = null;
+    if (dateIso && /^\d{4}-\d{2}-\d{2}$/.test(dateIso)) {
+      var bits = dateIso.split('-');
+      wantMonth = +bits[1];
+      wantDay = +bits[2];
+    }
+    while ((match = re.exec(raw))) {
+      var shown = String(+match[1]) + '/' + String(+match[2]);
+      if (!fallback) fallback = shown;
+      if (wantDay != null && +match[1] === wantDay && +match[2] === wantMonth) return shown;
+    }
+    if (fallback) return fallback;
+    if (wantDay != null) return String(wantDay) + '/' + String(wantMonth);
+    return '';
+  }
+
+  function contentTitle(text, decision) {
+    if (!decision || (decision.kind !== 'schedule' && decision.kind !== 'hold')) return decision;
+    if (!mailIsHebrew(text)) return decision;
+    var datePart = writtenDate(text, decision.dateIso || decision.due || '');
+    var timePart = '';
+    if (Number.isInteger(decision.hour) && Number.isInteger(decision.minute)) {
+      timePart = pad(decision.hour) + ':' + pad(decision.minute);
+    }
+    var title = meetingNoun(text);
+    if (datePart) title += ' ' + datePart;
+    if (timePart) title += ' ' + timePart;
+    decision.title = sanitizeTitle(title);
+    if (decision.kind === 'schedule') decision.taskTitle = decision.title;
+    return decision;
+  }
+
   function silence(reason, planId) {
     return {
       speak: false,
@@ -328,7 +390,7 @@ var GlanceIntent = (function () {
         throw err;
       }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
-      if (mapped) return mapped;
+      if (mapped) return contentTitle(prepared, mapped);
       if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
@@ -347,6 +409,7 @@ var GlanceIntent = (function () {
     mapClassifierResult: mapClassifierResult,
     sanitizeTitle: sanitizeTitle,
     prepareText: prepareText,
+    contentTitle: contentTitle,
     silence: silence
   };
 })();
