@@ -97,6 +97,49 @@ function chipText(doc) {
   return host ? String(host.textContent || '').replace(/\s+/g, ' ').trim() : '';
 }
 
+// OWA already captured pushState, so a reading-pane swap does not run the wrapper.
+function swapPane(doc, win, mail) {
+  const proto = win.History && win.History.prototype;
+  if (!proto || typeof proto.pushState !== 'function') throw new Error('History.prototype.pushState missing');
+  proto.pushState.call(win.history, {}, '', urlFor(mail.id));
+  const body = doc.querySelector('#ReadingPaneContainerId [role="document"]');
+  if (body && body.parentNode) {
+    const next = body.cloneNode(false);
+    next.innerHTML = mail.bodyHtml;
+    body.parentNode.replaceChild(next, body);
+  }
+  const heading = doc.querySelector('#ReadingPaneContainerId [role="heading"] span');
+  if (heading) {
+    heading.textContent = mail.subject;
+    heading.setAttribute('title', mail.subject);
+  }
+}
+
+function proofForA() {
+  return {
+    glanceProofs: {
+      records: {
+        [ID_A]: {
+          messageId: ID_A,
+          ids: [ID_A],
+          kind: 'written',
+          connectorId: 'outlookTask',
+          system: 'microsoft/todo',
+          externalId: 'task-a-only',
+          ref: { taskId: 'task-a-only', externalId: 'task-a-only', created: { title: 'A only', importance: 'normal' } },
+          fetchedBack: true,
+          writtenLine: 'A-ONLY-RECEIPT',
+          receiptStatus: 'Handled.',
+          label: 'A only',
+          objectName: 'To Do',
+          app: 'outlook'
+        }
+      },
+      byId: { [ID_A]: ID_A }
+    }
+  };
+}
+
 async function boot(opts) {
   const o = opts || {};
   const files = registeredFiles();
@@ -119,14 +162,14 @@ async function boot(opts) {
     warn: (...a) => logs.push(a.map(String).join(' ')),
     error: (...a) => logs.push('ERROR ' + a.map(String).join(' '))
   });
-  const store = {
+  const store = Object.assign({
     outlookAuth: {
       token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
       account: { address: ME, name: 'Glance' },
       ownAddresses: [ME]
     },
     outlookSync: { stateVersion: 3 }
-  };
+  }, o.store || {});
   const sent = [];
   const queued = [];
   let armed = false;
@@ -158,8 +201,14 @@ async function boot(opts) {
     }
     if (msg.type === 'flow:execute-action') return { ok: true, ref: 'draft-1', where: 'drafts', url: 'https://outlook.live.com/mail/0/drafts' };
     if (msg.type === 'flow:undo-action') return { ok: true, written: 'Undone' };
+    if (msg.type === 'flow:reconcile-proof') {
+      const status = o.reconcileStatus || 200;
+      return { ok: status === 200, status: status };
+    }
     return { ok: true };
   }
+  const heldReconcile = [];
+  let reconcileOpen = !o.holdReconcile;
   w.chrome = {
     runtime: {
       id: 'ext', lastError: null, getURL: (s) => 'chrome-extension://x/' + s,
@@ -167,6 +216,10 @@ async function boot(opts) {
       onMessage: { addListener() {} },
       sendMessage: (msg, cb) => {
         const r = reply(msg);
+        if (msg && msg.type === 'flow:reconcile-proof' && o.holdReconcile && !reconcileOpen) {
+          heldReconcile.push(() => cb && cb(r));
+          return;
+        }
         const slow = msg && msg.type === 'flow:outlook-fetch' && o.slowFetches > 0;
         if (slow) o.slowFetches -= 1;
         setTimeout(() => cb && cb(r), slow ? (o.fetchDelayMs || 3000) : 5);
@@ -204,8 +257,9 @@ async function boot(opts) {
   w.__onRead = () => { if (o.holdAfterRead && !released) armed = true; };
   showMail(w.document, w, MAIL_A);
   return {
-    w, doc: w.document, logs, sent, queued, store,
-    release() { released = true; const pending = queued.splice(0); pending.forEach((fn) => fn()); }
+    w, doc: w.document, logs, sent, queued, store, heldReconcile,
+    release() { released = true; const pending = queued.splice(0); pending.forEach((fn) => fn()); },
+    releaseReconcile() { reconcileOpen = true; const pending = heldReconcile.splice(0); pending.forEach((fn) => fn()); }
   };
 }
 
@@ -491,6 +545,32 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
     cal.logs.some((line) => line.indexOf('stale card click ignored') >= 0),
     { host: Boolean(calHost), acts: calAfter, text: calHost ? String(calHost.textContent || '').slice(0, 180) : chipText(cal.doc) });
   cal.w.close();
+
+  const slowStatuses = [404, 410, 500];
+  const slowModes = ['url', 'pane'];
+  for (let si = 0; si < slowStatuses.length; si++) {
+    for (let mi = 0; mi < slowModes.length; mi++) {
+      const status = slowStatuses[si];
+      const mode = slowModes[mi];
+      const page = await boot({ holdReconcile: true, reconcileStatus: status, store: proofForA() });
+      const holdUntil = Date.now() + 4000;
+      while (Date.now() < holdUntil && page.heldReconcile.length === 0) await sleep(20);
+      const fetchesBefore = page.sent.filter((m) => m.type === 'flow:outlook-fetch').length;
+      check('a slow ' + status + ' reconcile on Q3 is in flight before the ' + mode + ' switch',
+        page.heldReconcile.length > 0, { held: page.heldReconcile.length });
+      if (mode === 'url') showMail(page.doc, page.w, MAIL_B);
+      else swapPane(page.doc, page.w, MAIL_B);
+      const armUntil = Date.now() + 2000;
+      while (Date.now() < armUntil && page.sent.filter((m) => m.type === 'flow:outlook-fetch').length <= fetchesBefore) await sleep(20);
+      page.releaseReconcile();
+      await sleep(400);
+      const text = chipText(page.doc);
+      const leaked = text.indexOf('Deleted in To Do') >= 0 || text.indexOf('A-ONLY-RECEIPT') >= 0 || text.indexOf("couldn't verify") >= 0;
+      check('a slow ' + status + ' reconcile does not paint Q3 onto Office move after a ' + mode + ' switch',
+        !leaked, { text: text, fetches: page.sent.filter((m) => m.type === 'flow:outlook-fetch').length });
+      page.w.close();
+    }
+  }
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

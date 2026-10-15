@@ -228,7 +228,8 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a changed text-hash still finds the receipt by legacy id and thread id',
     FlowProofOfClose.taskReceiptFromLog([stored], reloadQuery) === stored);
   check('slash and underscore are the same message id',
-    FlowProofOfClose.canonId('18f3/ABC') === FlowProofOfClose.canonId('18f3_abc'));
+    FlowProofOfClose.canonId('18f3/ABC') === FlowProofOfClose.canonId('18f3_ABC') &&
+    FlowProofOfClose.canonId('18f3/ABC') !== FlowProofOfClose.canonId('18f3_abc'));
   const terminalNoHost = FlowProofOfClose.scanReceiptDecision({
     log: [stored],
     messageIds: [newHash, legacy],
@@ -486,6 +487,11 @@ console.log('\n--- Microsoft To Do ---\n');
   check('a Graph id and an OWA address id are the same proof',
     FlowProofOfClose.proofForIds(exchanged, [urlId]) &&
     FlowProofOfClose.proofForIds(exchanged, [urlId]).messageId === graphId);
+  const otherCase = 'aqmkag-ab_cd';
+  check('a Graph id does not match a different case',
+    FlowProofOfClose.canonId(graphId) === FlowProofOfClose.canonId(urlId) &&
+    FlowProofOfClose.canonId(graphId) !== FlowProofOfClose.canonId(otherCase) &&
+    !FlowProofOfClose.proofForIds(exchanged, [otherCase]));
   const gone = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 404 });
   check('a 404 marks the record deleted in To Do',
     gone.deleted === true && gone.deletedLine === 'Deleted in To Do' && gone.verifyNote == null, gone);
@@ -501,7 +507,9 @@ console.log('\n--- Microsoft To Do ---\n');
     outlook.indexOf("type: 'flow:reconcile-proof'") > 0 && outlook.indexOf('patchGlanceProof') > 0 &&
     outlook.indexOf('proofForIds') > 0 && outlook.indexOf('function noteReadingPaneOpen') > 0 &&
     outlook.indexOf('function armReadingPaneWatch') > 0 && outlook.indexOf('function glancePaneNode') > 0 &&
-    outlook.indexOf('function reconcileMountedRow') > 0);
+    outlook.indexOf('function reconcileMountedRow') > 0 &&
+    outlook.indexOf('function mailStill') > 0 &&
+    outlook.indexOf("raw === 'calendar-write-not-granted' ? 'צריך הרשאה ליומן'") > 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

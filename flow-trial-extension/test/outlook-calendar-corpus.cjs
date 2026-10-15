@@ -105,6 +105,11 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
     Cal.hasWriteScope('unknown') === false && Cal.hasWriteScope(['unknown']) === false &&
     Cal.hasWriteScope('UNKNOWN') === false && Cal.holdConsentAsk('unknown', null) === true &&
     Cal.holdConsentAsk('missing', { mode: 'always' }) === true);
+  check('only a short name or the Graph audience is Calendars.ReadWrite',
+    Cal.hasWriteScope('Calendars.ReadWrite') === true &&
+    Cal.hasWriteScope('https://graph.microsoft.com/Calendars.ReadWrite') === true &&
+    Cal.hasWriteScope('api://foo/Calendars.ReadWrite') === false &&
+    Cal.hasWriteScope('https://outlook.office.com/Calendars.ReadWrite') === false);
   function msJwt(scp) {
     const enc = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
     return enc({ alg: 'none', typ: 'JWT' }) + '.' + enc({ scp: scp }) + '.sig';

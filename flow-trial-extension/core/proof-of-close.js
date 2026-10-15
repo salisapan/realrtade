@@ -191,23 +191,18 @@ const FlowProofOfClose = (() => {
     return clean(ref.externalId) || clean(ref.taskId) || clean(ref.fileId) || clean(ref.itemId);
   }
 
-  // Gmail legacy ids and Outlook ids are the same id in more than one
-  // spelling. A hash of the message text is not stable across a reload.
+  // Graph and OWA ids are case-sensitive. The same id is + and / with
+  // padding on Graph, and - and _ without padding in an OWA address.
+  // A hash of the message text is not stable across a reload.
   function canonId(id) {
     if (typeof id !== 'string' && typeof id !== 'number') return '';
-    const s = String(id).trim().toLowerCase().replace(/\//g, '_');
-    return s;
+    return String(id).trim().replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  // Exchange ids arrive as Graph (+ and /) or as an OWA address (- and _).
-  // Padding '=' is only on one of those spellings. Both keys are the same id.
+  // One key after the Graph / OWA spelling is folded. Case stays as it arrived.
   function idAliases(id) {
     const c = canonId(id);
-    if (!c) return [];
-    const out = [c];
-    const exchanged = c.replace(/\+/g, '-').replace(/=+$/, '');
-    if (exchanged && out.indexOf(exchanged) < 0) out.push(exchanged);
-    return out;
+    return c ? [c] : [];
   }
 
   function isGoogleTaskConnector(row) {

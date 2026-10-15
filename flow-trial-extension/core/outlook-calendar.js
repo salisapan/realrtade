@@ -58,12 +58,14 @@ const FlowOutlookCalendar = (() => {
     return normalizeDelegatedScopes(data.scp);
   }
 
-  // One scope token: full Graph URI, short name, any case. "unknown" is not a scope.
+  // One scope token: a short name, or the same name on the Graph audience.
+  // api:// and outlook.office.com are not Calendars.ReadWrite. "unknown" is not a scope.
   function bareScope(value) {
     let s = String(value || '').trim();
     if (!s || /^unknown$/i.test(s)) return '';
-    s = s.replace(/^https:\/\/graph\.microsoft\.com\//i, '');
-    if (s.indexOf('/') >= 0) s = s.slice(s.lastIndexOf('/') + 1);
+    if (/^https:\/\/graph\.microsoft\.com\//i.test(s)) s = s.replace(/^https:\/\/graph\.microsoft\.com\//i, '');
+    else if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return '';
+    if (s.indexOf('/') >= 0) return '';
     if (!s || /^unknown$/i.test(s)) return '';
     const key = s.toLowerCase();
     return SCOPE_CANON[key] || s;

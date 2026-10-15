@@ -1109,6 +1109,27 @@
     return true;
   }
 
+  // The open mail this scan started on. mailEpoch and the live pane mark are
+  // read here, once, before an await. renderEpoch and scanMessageId are not:
+  // the next scan writes those, so a late read of them looks like the new mail.
+  function mailGeneration() {
+    let token = '';
+    let pane = '';
+    try { token = openMailTokenNow() || ''; } catch (e) { token = ''; }
+    try { pane = readingPaneSignal() || ''; } catch (e) { pane = ''; }
+    return { epoch: mailEpoch, conv: token + '|' + pane };
+  }
+
+  function mailStill(gen) {
+    if (!gen) return false;
+    if (gen.epoch !== mailEpoch) return false;
+    let token = '';
+    let pane = '';
+    try { token = openMailTokenNow() || ''; } catch (e) { token = ''; }
+    try { pane = readingPaneSignal() || ''; } catch (e) { pane = ''; }
+    return gen.conv === token + '|' + pane;
+  }
+
   // The card records the open mail it was painted for. No token on the
   // card, or no open mail now, never executes. A different token is a
   // click meant for a mail that is no longer open.
@@ -1514,12 +1535,14 @@
     return next || record;
   }
 
-  async function paintSharedProof(mount, record) {
+  async function paintSharedProof(mount, record, stamp) {
+    const gen = stamp || mailGeneration();
     const live = await reconcileProofRecord(record);
+    if (!mailStill(gen)) return false;
     const row = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.proofAsLogRow)
       ? FlowProofOfClose.proofAsLogRow(live)
       : live;
-    if (!row) return false;
+    if (!row || !mailStill(gen)) return false;
     return Boolean(paintOutlookTodoReceipt(mount, row));
   }
 
@@ -1528,13 +1551,15 @@
   // pane text is not an id. The record is the same one Loops reads.
   async function remountProvedTodoReceipt(pane) {
     if (!pane || typeof FlowProofOfClose === 'undefined' || typeof FlowProofOfClose.taskReceiptFromLog !== 'function') return false;
+    const stamp = mailGeneration();
     const mount = mountPoint();
     if (!mount) return false;
     let bag = null;
     try { bag = await FlowStorage.get(); } catch (e) { return false; }
+    if (!mailStill(stamp)) return false;
     if (typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.proofForIds === 'function') {
       const shared = FlowProofOfClose.proofForIds(bag && bag.glanceProofs, proofIdsForPane(pane));
-      if (shared && await paintSharedProof(mount, shared)) {
+      if (shared && await paintSharedProof(mount, shared, stamp)) {
         lastOutcome = 'card';
         lastKey = (shared.messageId || 'open') + '|task-proof';
         return true;
@@ -1549,7 +1574,7 @@
         fileNames: fileNames,
         subject: pane.subject || ''
       });
-      if (provedFile && paintOutlookTodoReceipt(mount, provedFile)) {
+      if (mailStill(stamp) && provedFile && paintOutlookTodoReceipt(mount, provedFile)) {
         lastOutcome = 'card';
         lastKey = (provedFile.messageId || 'open') + '|task-proof';
         return true;
@@ -1573,7 +1598,7 @@
     if (graphId) rowQuery.messageIds.push(graphId);
     if (graphId && typeof FlowProofOfClose.proofForIds === 'function') {
       const later = FlowProofOfClose.proofForIds(bag && bag.glanceProofs, proofIdsForPane(pane, [graphId]));
-      if (later && await paintSharedProof(mount, later)) {
+      if (later && await paintSharedProof(mount, later, stamp)) {
         lastOutcome = 'card';
         lastKey = (later.messageId || 'open') + '|task-proof';
         return true;
@@ -1583,7 +1608,11 @@
     if (outlookProofRow(row) && typeof FlowStorage.rememberGlanceProof === 'function') {
       try { await FlowStorage.rememberGlanceProof(row); } catch (e) { /* the log row still paints */ }
     }
-    if (outlookProofRow(row)) row = await reconcileMountedRow(row);
+    if (outlookProofRow(row)) {
+      row = await reconcileMountedRow(row);
+      if (!mailStill(stamp)) return false;
+    }
+    if (!mailStill(stamp)) return false;
     const existing = stripDuplicateUndoHosts(mount);
     // An Undo line is not a close. data-glance-undone stays on the click,
     // then this scan drops it so exactly one Do It can return, including
@@ -2493,7 +2522,9 @@
     const granted = await send({ type: 'flow:outlook-consent-scope', scope: CALENDAR_SCOPE, policy: choice });
     if (!granted || granted.ok !== true) {
       if (!host.querySelector('.flow-chip-undo-hint')) {
-        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', (granted && (granted.error || granted.reason)) || 'Calendar permission was not granted.'));
+        const raw = (granted && (granted.error || granted.reason)) || '';
+        const why = raw === 'calendar-write-not-granted' ? 'צריך הרשאה ליומן' : (raw || 'Calendar permission was not granted.');
+        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
       }
       return;
     }
@@ -3486,6 +3517,9 @@
     paneDirty = false;
     lastSig = '';
     lastKey = '';
+    // A new message in the pane is a mail switch even when pushState was
+    // already captured. Bump before the fast scan so A's reconcile cannot draw.
+    if (changed) bumpMailEpoch('reading-pane');
     return true;
   }
 
