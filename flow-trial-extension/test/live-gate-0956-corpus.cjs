@@ -502,7 +502,8 @@ function listsRoute() {
     !onceBtn.querySelector('.shell') &&
     oncePage.doc.querySelector('[data-glance-consent-choice="always"]').textContent === 'אפשר תמיד' &&
     oncePage.doc.querySelector('[data-glance-consent-choice="not-now"]').textContent === 'לא עכשיו' &&
-    /Calendar needs Calendars\.ReadWrite\./.test(chipText(oncePage.doc)),
+    /צריך הרשאה ליומן/.test(chipText(oncePage.doc)) &&
+    !/Calendar needs/.test(chipText(oncePage.doc)),
     { text: chipText(oncePage.doc) });
   if (onceBtn) onceBtn.click();
   const onceDone = await waitFor(oncePage.doc, '.flow-chip-undo', 4000);

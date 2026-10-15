@@ -181,7 +181,8 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
     fromUris.indexOf('unknown') < 0 && fromUris.indexOf('openid') >= 0, fromUris);
   const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
   check('Hold asks in one line with the Hebrew quiet choices',
-    /Calendar needs Calendars\.ReadWrite\./.test(page) &&
+    /צריך הרשאה ליומן/.test(page) &&
+    page.indexOf('Calendar needs Calendars.ReadWrite') < 0 &&
     /אפשר פעם אחת/.test(page) && /אפשר תמיד/.test(page) && /לא עכשיו/.test(page) &&
     /capture-secondary/.test(page) &&
     /data-glance-consent-choice', pair\[1\]/.test(page) &&

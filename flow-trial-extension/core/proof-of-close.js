@@ -770,7 +770,8 @@ const FlowProofOfClose = (() => {
       deletedLine: deleted ? line : null,
       verifyNote: deleted ? null : (record.verifyNote || null),
       objectName: record.objectName || 'To Do',
-      legacyCase: record.legacyCase === true
+      legacyCase: record.legacyCase === true,
+      ids: Array.isArray(record.ids) ? record.ids.filter(Boolean).map(String) : []
     };
   }
 

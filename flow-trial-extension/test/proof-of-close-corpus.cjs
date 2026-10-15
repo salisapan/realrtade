@@ -508,7 +508,7 @@ console.log('\n--- Microsoft To Do ---\n');
   const legacyRow = FlowProofOfClose.proofAsLogRow(legacyHit);
   check('a lowercase id with no message id matches only as a legacy fallback',
     legacyHit && legacyHit.legacyCase === true && legacyHit.writtenLine === 'LEGACY-LINE' &&
-    legacyRow && legacyRow.legacyCase === true &&
+    legacyRow && legacyRow.legacyCase === true && legacyRow.ids && legacyRow.ids[0] === 'aqmkag-ab_cd' &&
     !FlowProofOfClose.proofForIds(exchanged, [otherCase]),
     legacyHit);
   const gone = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 404 });

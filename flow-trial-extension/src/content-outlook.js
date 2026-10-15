@@ -1288,7 +1288,10 @@
     const deletedLine = copy.deletedLine || row.deletedLine || (deleted ? copy.status : '');
     const undoLine = deleted ? '' : (copy.undoLine || row.undoLine || '');
     const verifyNote = deleted ? '' : (copy.verifyNote || row.verifyNote || '');
-    const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
+    const legacyKeys = row.legacyCase === true
+      ? [].concat(row.ids || [], [row.itemId, row.pathId, row.threadId, row.outlookConversationId]).filter(Boolean).map(String)
+      : [];
+    const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].concat(legacyKeys).filter(Boolean).map(String);
     const scope = (typeof readingScope === 'function' && readingScope(mount)) || mount;
     const hosts = scope.querySelectorAll ? Array.prototype.slice.call(scope.querySelectorAll('.flow-chip-host')) : [];
     let host = hosts.filter((h) => h.getAttribute('data-glance-undone') !== '1').pop() || null;
@@ -1351,7 +1354,8 @@
     }
     stampCard(host, {
       messageId: row.messageId || '',
-      itemId: row.itemId || row.messageId || '',
+      itemId: row.itemId || row.messageId || legacyKeys[0] || '',
+      pathId: row.pathId || '',
       conversationId: row.outlookConversationId || row.threadId || '',
       subject: row.subject || '',
       intent: { label: (copy && copy.status) || 'Handled' },
@@ -1360,13 +1364,13 @@
       decisionReason: 'page:receipt-mounted'
     }, 'page:receipt-mounted');
     undo.addEventListener('click', () => {
-      if (ignoreStaleClick(host)) return;
       if (row.legacyCase === true) {
         hint.hidden = false;
         hint.textContent = "Couldn't confirm";
         hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         return;
       }
+      if (ignoreStaleClick(host)) return;
       undo.textContent = 'Undoing…';
       undo.disabled = true;
       readBackOrTimeout(send({
@@ -2600,7 +2604,7 @@
     const row = FlowChipHost.el('div', 'flow-chip-consent');
     row.setAttribute('data-glance-consent', 'calendar');
     row.setAttribute('dir', 'rtl');
-    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite.'));
+    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'צריך הרשאה ליומן'));
     const actions = FlowChipHost.el('span', 'flow-chip-actions');
     [['אפשר פעם אחת', 'once'], ['אפשר תמיד', 'always'], ['לא עכשיו', 'not-now']].forEach((pair) => {
       const button = FlowChipHost.el('button', 'flow-chip-consent-btn capture-secondary', pair[0]);
@@ -2901,8 +2905,22 @@
       host.setAttribute('dir', 'ltr');
       host.setAttribute('data-glance-chain', 'calendar-connect');
       host.setAttribute('data-glance-message', messageId || '');
-      host.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite. In Setup, Connect Microsoft and check Calendar.'));
       mount.appendChild(host);
+      const ctx = {
+        app: 'outlook',
+        messageId: messageId || '',
+        itemId: (pane && pane.itemId) || messageId || '',
+        conversationId: pane && pane.conversationId,
+        subject: (pane && pane.subject) || '',
+        bodyText: holdTextOf(pane),
+        sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
+        glanceChain: 'calendar-connect',
+        decisionReason: 'outlook-calendar-write-not-granted',
+        intent: { label: 'צריך הרשאה ליומן' },
+        process: { id: 'calendar-connect', name: 'צריך הרשאה ליומן', steps: [] }
+      };
+      stampCard(host, ctx, 'outlook-calendar-write-not-granted');
+      paintCalendarConsent(host, ctx);
     });
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-connect';

@@ -60,6 +60,7 @@ function lintPaintGate(src) {
   let fnAwaitingBody = false;
   let fnName = '';
   let fnGated = false;
+  const CARD_DOM = /^(host|mount|verifyMount|earlyMount)\.(appendChild|insertBefore|replaceChildren)$/;
 
   function cur() {
     return scopes.length ? scopes[scopes.length - 1] : null;
@@ -75,7 +76,16 @@ function lintPaintGate(src) {
     }
   }
   function startFn(gated, name, expr) {
-    scopes.push({ brace: brace, paren: paren, bracket: bracket, gated: gated, entry: name && ENTRY[name] ? name : '', expr: expr });
+    const parent = cur();
+    const ownEntry = name && ENTRY[name] ? name : '';
+    scopes.push({
+      brace: brace,
+      paren: paren,
+      bracket: bracket,
+      gated: Boolean(gated) || Boolean(parent && parent.gated),
+      entry: ownEntry || (parent && parent.entry) || '',
+      expr: expr
+    });
   }
   function callHere(name) {
     if (!TARGET[name]) return;
@@ -95,12 +105,23 @@ function lintPaintGate(src) {
     i += 2;
   }
   function skipQuote(q) {
+    const fromBracket = last === '[';
+    const startLine = line;
     i++;
+    let body = '';
     while (i < n) {
-      if (src[i] === '\\') { i += 2; continue; }
+      if (src[i] === '\\') {
+        body += src[i + 1] || '';
+        i += 2;
+        continue;
+      }
       if (src[i] === '\n') line++;
-      if (src[i] === q) { i++; return; }
+      if (src[i] === q) { i++; break; }
+      body += src[i];
       i++;
+    }
+    if (fromBracket && (TARGET[body] || /^paint[A-Z]/.test(body) || body.indexOf('FlowChipHost.') === 0)) {
+      violations.push(startLine + ':bracket ' + body);
     }
   }
   function skipRegex() {
@@ -180,6 +201,11 @@ function lintPaintGate(src) {
       }
       continue;
     }
+    if (c === '=' && src[i + 1] !== '>' && src[i + 1] !== '=' && last !== '=') {
+      i++;
+      last = 'assign';
+      continue;
+    }
     if (/[A-Za-z_$]/.test(c)) {
       const start = i;
       const at = line;
@@ -203,15 +229,28 @@ function lintPaintGate(src) {
       }
       let j = i;
       while (j < n && (src[j] === ' ' || src[j] === '\t' || src[j] === '\n' || src[j] === '\r')) j++;
-      if (src[j] === '(') {
-        if (name === 'paintIfCurrent') expectGate++;
-        else {
-          const saved = line;
-          line = at;
-          callHere(name);
-          line = saved;
-        }
+      const saved = line;
+      line = at;
+      if (last === 'assign' && src[j] !== '(' && (TARGET[name] || /^paint[A-Z]/.test(name))) violations.push(at + ':alias ' + name);
+      if (CARD_DOM.test(name) && src[j] === '(') {
+        const sc = cur();
+        if (!(sc && (sc.gated || sc.entry))) violations.push(at + ':' + name);
       }
+      if (src[j] === '(') {
+        const invoked = name.match(/^(.*)\.(call|apply)$/);
+        if (name === 'paintIfCurrent') expectGate++;
+        else if (invoked && (TARGET[invoked[1]] || /^paint[A-Z]/.test(invoked[1]))) {
+          const sc = cur();
+          if (!(sc && (sc.gated || sc.entry))) violations.push(at + ':' + name);
+        } else callHere(name);
+      } else if (src[j] === '.' && TARGET[name]) {
+        let k = j + 1;
+        let method = '';
+        while (k < n && /[A-Za-z]/.test(src[k])) { method += src[k]; k++; }
+        while (k < n && (src[k] === ' ' || src[k] === '\t')) k++;
+        if ((method === 'call' || method === 'apply') && src[k] === '(') callHere(name + '.' + method);
+      }
+      line = saved;
       last = 'ident';
       continue;
     }
@@ -222,6 +261,23 @@ function lintPaintGate(src) {
     }
     i++;
     last = c;
+  }
+  const guardAt = src.indexOf('function paintIfCurrent');
+  if (guardAt >= 0) {
+    const open = src.indexOf('{', guardAt);
+    let depth = 0;
+    let end = open;
+    for (let p = open; p >= 0 && p < n; p++) {
+      if (src[p] === '{') depth++;
+      else if (src[p] === '}') {
+        depth--;
+        if (depth === 0) { end = p + 1; break; }
+      }
+    }
+    const body = open >= 0 ? src.slice(open, end) : '';
+    if (body.indexOf('mailTokenLive') < 0) {
+      violations.push((src.slice(0, guardAt).split('\n').length) + ':paintIfCurrent missing mailTokenLive guard');
+    }
   }
   return violations;
 }
@@ -496,6 +552,18 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   check('the paint gate lint catches a direct paint', planted.length === 2, planted);
   const allowed = lintPaintGate('function paintHint(host, text) {}\npaintIfCurrent(token, function () { paintOutlookTodoReceipt(mount, row); });\n');
   check('the paint gate lint allows a gated paint', allowed.length === 0, allowed);
+  const aliasHit = lintPaintGate('function sneak() { const p = paintOutlookTodoReceipt; p(mount, row); }\n');
+  check('the paint gate lint catches an alias', aliasHit.some((row) => row.indexOf('alias paintOutlookTodoReceipt') >= 0), aliasHit);
+  const bracketHit = lintPaintGate("function sneak() { obj['paintX'](); obj['paintOutlookTodoReceipt'](); }\n");
+  check('the paint gate lint catches bracket access', bracketHit.length >= 2, bracketHit);
+  const callHit = lintPaintGate('function sneak() { paintOutlookTodoReceipt.call(null, mount, row); paintOutlookTodoReceipt.apply(null, [mount, row]); }\n');
+  check('the paint gate lint catches call and apply', callHit.length >= 2, callHit);
+  const domHit = lintPaintGate('function sneak() { host.appendChild(node); mount.insertBefore(node, mount.firstChild); host.replaceChildren(node); }\n');
+  check('the paint gate lint catches a direct card mutation', domHit.length >= 3, domHit);
+  const unguarded = lintPaintGate('function paintIfCurrent(token, fn) { paintDepth += 1; try { return fn(); } finally { paintDepth -= 1; } }\n');
+  check('the paint gate lint catches a paintIfCurrent with no live-mail guard', unguarded.some((row) => row.indexOf('missing mailTokenLive guard') >= 0), unguarded);
+  const guardedDom = lintPaintGate('function paintHint(host, text) { host.appendChild(node); }\npaintIfCurrent(token, function () { mount.appendChild(host); });\n');
+  check('the paint gate lint allows a card mutation inside the gate', guardedDom.length === 0, guardedDom);
 
   const race = await boot({ holdAfterRead: true });
   const waitHold = Date.now() + 4000;
@@ -932,7 +1000,6 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
         records: {
           'legacy-row': {
             ids: [legacyLower],
-            itemId: legacyLower,
             messageId: '',
             kind: 'written',
             connectorId: 'outlookTask',
@@ -958,18 +1025,28 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
     if (host && String(host.textContent || '').indexOf('LEGACY-LINE') >= 0) legacyHost = host;
     else await sleep(30);
   }
-  check('an old lowercase id with no message id still shows the receipt', Boolean(legacyHost), { text: chipText(legacyPage.doc) });
+  const legacyMarked = legacyHost && String(legacyHost.getAttribute('data-glance-decision') || '').indexOf(legacyLower) >= 0;
+  check('an old lowercase id with no message id still shows the receipt', Boolean(legacyHost) && legacyMarked, { text: chipText(legacyPage.doc), marked: legacyHost && legacyHost.getAttribute('data-glance-decision') });
   const legacyUndo = legacyHost && legacyHost.querySelector('.flow-chip-undo');
-  const legacyUndosBefore = legacyPage.sent.filter((m) => m.type === 'flow:undo-action').length;
+  const legacyUndosBefore = legacyPage.sent.filter((m) => {
+    if (!m) return false;
+    if (m.type === 'flow:undo-action') return true;
+    return String(m.method || '').toUpperCase() === 'DELETE';
+  }).length;
   if (legacyUndo) legacyUndo.click();
   await sleep(200);
   const legacyText = legacyHost ? String(legacyHost.textContent || '') : '';
+  const legacyDeletes = legacyPage.sent.filter((m) => {
+    if (!m) return false;
+    if (m.type === 'flow:undo-action') return true;
+    return String(m.method || '').toUpperCase() === 'DELETE';
+  });
   const stillThere = legacyPage.store.glanceProofs && legacyPage.store.glanceProofs.records && legacyPage.store.glanceProofs.records['legacy-row'];
   check("Undo on a legacy case match says Couldn't confirm and deletes nothing",
     Boolean(legacyUndo) && legacyText.indexOf("Couldn't confirm") >= 0 &&
-    legacyPage.sent.filter((m) => m.type === 'flow:undo-action').length === legacyUndosBefore &&
+    legacyDeletes.length === legacyUndosBefore &&
     stillThere && stillThere.undone !== true,
-    { text: legacyText, undos: legacyPage.sent.filter((m) => m.type === 'flow:undo-action').length, still: Boolean(stillThere) });
+    { text: legacyText, deletes: legacyDeletes.length, still: Boolean(stillThere) });
   await sleep(250);
   legacyPage.w.close();
 
