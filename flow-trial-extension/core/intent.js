@@ -588,10 +588,11 @@ const FlowIntent = (() => {
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
   // the reader's names in that script. A Hebrew name is not "other" just
   // because the only stored name is Latin, and the reverse.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
+  // To, Cc, Subject, and Body are header labels, not names.
   const LABEL_OPEN = /^(?:agreed|approved|reminder|update|urgent|fyi|quote|re|fw|fwd|note|subject|דחוף|תזכורת|עדכון|אושר|השב|הועבר)$/i;
   function personToken(token) {
     if (!token || LABEL_OPEN.test(token) || NOT_A_VOCABLE.test(token) || GROUP_ADDRESSEE.test(token)) return false;
