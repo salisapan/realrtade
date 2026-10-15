@@ -224,9 +224,9 @@ async function run() {
     const cred = await api.laneCredential({
       readWebAuth: async () => ({ accessToken: 'ya29.stored', expiresAt: Date.now() + 3600e3 }),
       refreshSilent: async () => { throw new Error('should not refresh a valid token'); },
-      getAuthToken: () => { chromeCalls += 1; return 'ya29.chrome'; }
+      getAuthToken: () => { chromeCalls += 1; return ''; }
     });
-    check('a valid stored Connect token is used and getAuthToken is not called', cred.token === 'ya29.stored' && cred.source === 'web' && chromeCalls === 0, cred);
+    check('identity runs first and a signed-out call uses the stored Connect token', cred.token === 'ya29.stored' && cred.source === 'web' && chromeCalls === 1, cred);
   }
   {
     let interactive = null;
@@ -241,9 +241,9 @@ async function run() {
     const cred = await api.laneCredential({
       readWebAuth: async () => ({ accessToken: 'ya29.old', expiresAt: Date.now() - 5000 }),
       refreshSilent: async () => ({ token: 'ya29.fresh', source: 'web' }),
-      getAuthToken: () => { chromeCalls += 1; return 'ya29.chrome'; }
+      getAuthToken: () => { chromeCalls += 1; return ''; }
     });
-    check('an expired stored token refreshes silently before getAuthToken', cred.token === 'ya29.fresh' && chromeCalls === 0, cred);
+    check('a signed-out identity refreshes an expired stored token silently', cred.token === 'ya29.fresh' && cred.source === 'web' && chromeCalls === 1, cred);
   }
   {
     const on = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { configured: true, detail: 'Glance list' });

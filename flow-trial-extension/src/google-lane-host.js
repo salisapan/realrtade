@@ -11,56 +11,83 @@ import '../core/google-contacts.js';
 import '../core/google-compose.js';
 import '../core/google-proof.js';
 import './google-lane.js';
-import { GOOGLE_RECONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, laneCredential, unconfirmedRefusal } from './google-web-auth.js';
 
 const Lane = typeof FlowGoogleLane !== 'undefined' ? FlowGoogleLane : globalThis.FlowGoogleLane;
 
-// A valid stored Connect token (googleWebAuth) comes first. That is the
-// same record googleAuthedFetch refreshes. getAuthToken is the second
-// try, and only interactive:false. A headless run may stub getAuthToken
-// via __glanceE2e.googleAuthToken. Nothing here opens a consent window.
-function readWebAuth() {
-  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve(null);
-  return Promise.resolve()
-    .then(() => chrome.storage.local.get(GOOGLE_WEB_AUTH_STORAGE_KEY))
-    .then((bag) => (bag && bag[GOOGLE_WEB_AUTH_STORAGE_KEY]) || null)
-    .catch(() => null);
-}
+const RECONNECT_KEY = 'googleReconnect';
+const RECONNECT_LABEL = 'התחבר מחדש ל-Google';
+let laneSource = 'chrome';
 
-function refreshSilent() {
-  const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
-  if (!bridge || typeof bridge.refreshSilent !== 'function') return Promise.resolve(null);
-  return Promise.resolve().then(() => bridge.refreshSilent());
-}
-
-function chromeGetAuthToken() {
-  const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
-  if (e2e && typeof e2e.googleAuthToken === 'function') {
-    return Promise.resolve().then(() => e2e.googleAuthToken(false));
+// Identity first, then the stored Connect token. Interactive stays false.
+// The stored record is googleWebAuth. No e2e hook is required.
+function laneToken() {
+  const WEB_SKEW_MS = 60 * 1000;
+  function usable(record) {
+    if (!record || typeof record.accessToken !== 'string' || !record.accessToken) return '';
+    if (record.expiresAt == null || record.expiresAt === '') return record.accessToken;
+    const at = Number(record.expiresAt);
+    if (!Number.isFinite(at) || at - WEB_SKEW_MS <= Date.now()) return '';
+    return record.accessToken;
   }
-  return new Promise((resolve, reject) => {
-    const identity = typeof chrome !== 'undefined' ? chrome.identity : null;
-    if (!identity || typeof identity.getAuthToken !== 'function') {
-      reject(new Error('The user is not signed in.'));
-      return;
-    }
-    identity.getAuthToken({ interactive: false }, (token) => {
-      const err = typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.lastError : null;
-      if (err || !token) {
-        reject(new Error((err && err.message) || 'The user is not signed in.'));
+  function storedConnectToken() {
+    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function') return Promise.resolve('');
+    return Promise.resolve()
+      .then(() => store.get('googleWebAuth'))
+      .then((bag) => {
+        const record = bag && (bag.googleWebAuth || (typeof bag.accessToken === 'string' ? bag : null));
+        const ready = usable(record);
+        if (ready) return ready;
+        if (!record || !record.accessToken) return '';
+        const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
+        if (!bridge || typeof bridge.refreshSilent !== 'function') return '';
+        return Promise.resolve().then(() => bridge.refreshSilent()).then((next) => {
+          if (next && typeof next === 'object' && next.token) return next.token;
+          if (typeof next === 'string') return next;
+          return '';
+        }).catch(() => '');
+      })
+      .catch(() => '');
+  }
+  function identityToken() {
+    return new Promise((resolve) => {
+      const identity = typeof chrome !== 'undefined' ? chrome.identity : null;
+      if (!identity || typeof identity.getAuthToken !== 'function') {
+        resolve('');
         return;
       }
-      resolve(token);
+      try {
+        identity.getAuthToken({ interactive: false }, (token) => {
+          const err = typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.lastError : null;
+          if (err || !token) resolve('');
+          else resolve(String(token));
+        });
+      } catch (e) {
+        resolve('');
+      }
     });
+  }
+  return identityToken().then((token) => {
+    if (token) {
+      laneSource = 'chrome';
+      return token;
+    }
+    laneSource = 'web';
+    return storedConnectToken();
   });
 }
 
-function laneCred() {
-  return laneCredential({
-    readWebAuth: readWebAuth,
-    refreshSilent: refreshSilent,
-    getAuthToken: () => chromeGetAuthToken()
-  }).catch(() => null);
+function laneGoogleStatus(auth, reconnect, token) {
+  const had = Boolean(auth);
+  const usable = typeof token === 'string' && token.length > 0;
+  const needs = had && Boolean(reconnect && reconnect.needed);
+  const connected = had && usable && !needs;
+  return {
+    connected: connected,
+    needsReconnect: needs,
+    reconnectLabel: needs ? RECONNECT_LABEL : '',
+    label: connected ? 'Connected' : (needs ? RECONNECT_LABEL : '')
+  };
 }
 
 function hadGoogleGrant() {
@@ -75,7 +102,7 @@ function noteGoogleAuthFailure(reason) {
   return hadGoogleGrant().then((had) => {
     if (!had || typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
     return chrome.storage.local.set({
-      [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: String(reason || 'auth') }
+      [RECONNECT_KEY]: { needed: true, reason: String(reason || 'auth') }
     });
   }).catch(() => {});
 }
@@ -85,7 +112,7 @@ function noteGoogleAuthOk() {
     return Promise.resolve();
   }
   return Promise.resolve()
-    .then(() => chrome.storage.local.remove(GOOGLE_RECONNECT_STORAGE_KEY))
+    .then(() => chrome.storage.local.remove(RECONNECT_KEY))
     .catch(() => {});
 }
 
@@ -205,9 +232,9 @@ function laneHttp(req) {
   const url = laneUrl(request.url);
   const gate = undoGate;
   return Promise.resolve()
-    .then(() => laneCred())
-    .then((cred) => {
-      const token = cred && cred.token;
+    .then(() => laneToken())
+    .then((token) => {
+      const cred = token ? { token: token, source: laneSource } : null;
       if (!token) return noteGoogleAuthFailure('not signed in').then(() => ({ status: 401, ok: false, json: null }));
       if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate)) {
         return { status: 0, ok: false, json: null };
@@ -324,6 +351,14 @@ async function prepareUndo(connectorId, ref) {
   return next;
 }
 
+function unconfirmedRefusal(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (code === 'he' || code.indexOf('he-') === 0) {
+    return 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+  }
+  return "Couldn't confirm it's unchanged. Undo left it alone.";
+}
+
 function uiLanguage() {
   try {
     const i18n = typeof chrome !== 'undefined' && chrome.i18n;
@@ -349,11 +384,11 @@ function decorate(result) {
   if (!value || value.ok !== false || value.reason !== 'not-connected') return Promise.resolve(value);
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve(value);
   return Promise.resolve()
-    .then(() => chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY))
+    .then(() => chrome.storage.local.get(RECONNECT_KEY))
     .then((bag) => {
-      const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+      const flag = bag && bag[RECONNECT_KEY];
       if (!flag || flag.needed !== true) return value;
-      return Object.assign({}, value, { needsReconnect: true, reconnectLabel: GOOGLE_RECONNECT_LABEL });
+      return Object.assign({}, value, { needsReconnect: true, reconnectLabel: RECONNECT_LABEL });
     })
     .catch(() => value);
 }

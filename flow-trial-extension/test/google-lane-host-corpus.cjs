@@ -77,16 +77,9 @@ for (const f of cores) {
 }
 vm.runInContext(fs.readFileSync(path.join(EXT, 'src', 'google-lane.js'), 'utf8'), sandbox, { filename: 'google-lane.js' });
 
-function stripModuleSyntax(source) {
-  return source
-    .replace(/^export const /gm, 'const ')
-    .replace(/^export function /gm, 'function ')
-    .replace(/^export async function /gm, 'async function ');
-}
-const webAuthSrc = stripModuleSyntax(fs.readFileSync(path.join(EXT, 'src', 'google-web-auth.js'), 'utf8'));
 const hostSrc = fs.readFileSync(path.join(EXT, 'src', 'google-lane-host.js'), 'utf8')
   .replace(/^import .*;$/gm, '');
-vm.runInContext(webAuthSrc + '\n' + hostSrc, sandbox, { filename: 'google-lane-host.js' });
+vm.runInContext(hostSrc, sandbox, { filename: 'google-lane-host.js' });
 
 check('startup does not call fetch', fetches.length === 0, fetches.length);
 check('startup does not call getAuthToken', authCalls === 0, authCalls);
@@ -249,7 +242,12 @@ async function main() {
 
   const beforeAuth = authCalls;
   stored.googleWebAuth = { accessToken: 'ya29.stored', expiresAt: Date.now() + 60 * 60 * 1000 };
-  sandbox.chrome.identity.getAuthToken = () => { throw new Error('The user is not signed in.'); };
+  sandbox.chrome.identity.getAuthToken = (details, cb) => {
+    authCalls += 1;
+    sandbox.chrome.runtime.lastError = { message: 'The user is not signed in.' };
+    if (typeof cb === 'function') cb('');
+    sandbox.chrome.runtime.lastError = null;
+  };
   const storedFetches = [];
   sandbox.fetch = async (url, init) => {
     storedFetches.push({ url: String(url), auth: init && init.headers && init.headers.Authorization });
@@ -263,7 +261,7 @@ async function main() {
       input: { label: 'Pay the invoice' }
     }, {}, resolve);
   });
-  check('a write with no getAuthToken uses the stored Connect token', storedWrite && storedWrite.ok === true && authCalls === beforeAuth && storedFetches.some((c) => c.auth === 'Bearer ya29.stored'), { ok: storedWrite && storedWrite.ok, authCalls, beforeAuth, storedFetches });
+  check('identity is tried first and a signed-out call uses the stored Connect token', storedWrite && storedWrite.ok === true && authCalls > beforeAuth && storedFetches.some((c) => c.auth === 'Bearer ya29.stored'), { ok: storedWrite && storedWrite.ok, authCalls, beforeAuth, storedFetches });
 
   delete stored.googleWebAuth;
   delete stored.googleReconnect;
@@ -279,8 +277,8 @@ async function main() {
       input: { label: 'Pay the invoice' }
     }, {}, resolve);
   });
-  const view = vm.runInContext('googleConnectionState', sandbox)(stored.googleTasksAuth, stored.googleReconnect, { configured: true, detail: 'Glance list' });
-  check('a 401 write switches Google to reconnect and Connected is gone', denied && denied.ok === false && denied.needsReconnect === true && denied.reconnectLabel === 'התחבר מחדש ל-Google' && view.connected === false && view.needsReconnect === true && view.reconnectLabel === 'התחבר מחדש ל-Google' && view.reconnectLabel !== 'Connected', { denied, view, flag: stored.googleReconnect });
+  const view = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
+  check('a 401 write switches Google to reconnect and Connected is gone', denied && denied.ok === false && denied.needsReconnect === true && denied.reconnectLabel === 'התחבר מחדש ל-Google' && view.connected === false && view.needsReconnect === true && view.label === 'התחבר מחדש ל-Google' && view.label !== 'Connected', { denied, view, flag: stored.googleReconnect });
 
   const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
   check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && popup.indexOf('needsReconnect') < popup.indexOf("badge on', 'Connected'"));

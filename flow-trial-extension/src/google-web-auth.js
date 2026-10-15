@@ -154,32 +154,34 @@ export function googleConnectionState(auth, reconnect, extras) {
   };
 }
 
-// Lane writes: a stored Connect token that is still inside its expiry comes
-// first. A lapsed one may refresh silently. chrome.identity.getAuthToken
-// runs only after that, and only with interactive false. This function
-// never opens a consent window.
+// Identity first (interactive false). A signed-out getAuthToken falls back
+// to the stored Connect token. A lapsed stored token may refresh silently.
+// This function never opens a consent window.
 export function laneCredential(deps) {
   const d = deps || {};
-  const read = typeof d.readWebAuth === 'function' ? d.readWebAuth() : Promise.resolve(null);
-  return Promise.resolve(read).then((existing) => {
-    if (webTokenUsable(existing, d.now)) {
-      return { token: existing.accessToken, source: 'web' };
-    }
-    const expired = Boolean(existing && existing.accessToken);
-    const refresh = expired && typeof d.refreshSilent === 'function'
-      ? Promise.resolve().then(() => d.refreshSilent()).catch(() => null)
-      : Promise.resolve(null);
-    return refresh.then((next) => {
-      if (next && typeof next === 'object' && next.token) {
-        return { token: next.token, source: next.source || 'web' };
+  const identity = typeof d.getAuthToken === 'function'
+    ? Promise.resolve().then(() => d.getAuthToken(false)).catch(() => '')
+    : Promise.resolve('');
+  return identity.then((chromeToken) => {
+    if (chromeToken) return { token: chromeToken, source: 'chrome' };
+    const read = typeof d.readWebAuth === 'function' ? d.readWebAuth() : Promise.resolve(null);
+    return Promise.resolve(read).then((existing) => {
+      if (webTokenUsable(existing, d.now)) {
+        return { token: existing.accessToken, source: 'web' };
       }
-      if (typeof next === 'string' && next) return { token: next, source: 'web' };
-      if (typeof d.getAuthToken !== 'function') {
+      const expired = Boolean(existing && existing.accessToken);
+      if (!expired || typeof d.refreshSilent !== 'function') {
         throw new Error('The user is not signed in.');
       }
-      return Promise.resolve().then(() => d.getAuthToken(false)).then((token) => {
-        if (!token) throw new Error('The user is not signed in.');
-        return { token: token, source: 'chrome' };
+      return Promise.resolve().then(() => d.refreshSilent()).then((next) => {
+        if (next && typeof next === 'object' && next.token) {
+          return { token: next.token, source: next.source || 'web' };
+        }
+        if (typeof next === 'string' && next) return { token: next, source: 'web' };
+        throw new Error('The user is not signed in.');
+      }).catch((err) => {
+        if (err && /not signed in/i.test(err.message || '')) throw err;
+        throw new Error('The user is not signed in.');
       });
     });
   });
