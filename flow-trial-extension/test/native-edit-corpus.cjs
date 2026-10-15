@@ -236,7 +236,8 @@ function background(opts) {
 console.log('\n--- the page scan does not rewrite a draft ---\n');
 {
   const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
-  const obs = page.slice(page.indexOf('new MutationObserver'), page.indexOf('setInterval'));
+  const obsAt = page.indexOf('const obs = new MutationObserver');
+  const obs = page.slice(obsAt, page.indexOf('setInterval', obsAt));
   const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
   check('the Outlook observer only schedules a scan',
     obs.indexOf('(schedule)') > 0 && obs.indexOf('execCommand') < 0 && obs.indexOf('textContent') < 0, obs);

@@ -456,7 +456,21 @@ async function boot() {
   await closeStrayPopups();
 
   harness.seed = async function seed(data) {
-    await evalWorker(async (bag) => { await chrome.storage.local.set(bag); }, data);
+    await evalWorker(async (bag) => {
+      const e = globalThis.__glanceE2e;
+      if (e && e.todoTasks) {
+        const rows = (bag && bag.log) || [];
+        rows.forEach((row) => {
+          if (!row || row.kind !== 'written' || row.deleted === true || row.glanceDeleted === true) return;
+          const todo = row.system === 'microsoft/todo' || row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo';
+          if (!todo) return;
+          const id = row.externalId || (row.ref && (row.ref.taskId || row.ref.externalId));
+          if (!id || e.todoTasks[id]) return;
+          e.todoTasks[id] = { id: id, title: row.actionTitle || row.label || 'e2e', status: 'notStarted' };
+        });
+      }
+      await chrome.storage.local.set(bag);
+    }, data);
   };
 
   harness.storage = async function storage() {

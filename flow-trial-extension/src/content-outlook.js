@@ -3437,6 +3437,20 @@
     return document.querySelector('#ReadingPaneContainerId') || null;
   }
 
+  // The open message's words, without the card Glance just painted. A Handled
+  // line inside the pane is not a different mail.
+  function readingText(node) {
+    if (!node) return '';
+    let clone = null;
+    try { clone = node.cloneNode(true); } catch (e) { clone = null; }
+    if (!clone) return String(node.textContent || '');
+    const ours = clone.querySelectorAll ? clone.querySelectorAll('.flow-chip-host, .flow-chip-consent') : [];
+    for (let i = ours.length - 1; i >= 0; i--) {
+      if (ours[i].parentNode) ours[i].parentNode.removeChild(ours[i]);
+    }
+    return String(clone.textContent || '');
+  }
+
   // Live OWA opens a mail by replacing the reading pane (role=document and
   // the CONV_ subject id) and then the address. The page captured
   // history.pushState before this script, so that wrapper is not the signal.
@@ -3459,7 +3473,7 @@
     try {
       const root = openMailRoot();
       const body = root && root.querySelector ? (root.querySelector('div[role="document"]') || root.querySelector('[role="document"]')) : null;
-      doc = body ? hashText(String(body.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 240)) : '';
+      doc = body ? hashText(readingText(body).replace(/\s+/g, ' ').trim().slice(0, 240)) : '';
     } catch (e) { doc = ''; }
     return href + '|' + conv + '|' + doc;
   }
