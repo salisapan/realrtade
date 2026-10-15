@@ -156,10 +156,12 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
     /outlookCalendar: outlookCalendarUndo/.test(bg));
   check('the worker still refuses a send', /function outlookAssertNotSend/.test(bg) && /outlookAssertNotSend\(url\)/.test(bg));
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
+  const display = fs.readFileSync(path.join(__dirname, '..', 'core', 'display-copy.js'), 'utf8');
   check('Activity undo does not treat every Outlook row as a draft',
     popup.indexOf("e.connectorId === 'outlookDraft' || e.app === 'outlook'") < 0 &&
     /markOutlookCalendarUndone/.test(popup) &&
-    /פתח אירוע/.test(popup));
+    /פתח אירוע/.test(display) &&
+    /openEvent/.test(popup));
   check('Connect is still one screen with Select all',
     /data-glance-connect', 'microsoft'/.test(popup) && /data-glance-select-all/.test(popup));
   check('Settings names Always and Revoke in Hebrew',

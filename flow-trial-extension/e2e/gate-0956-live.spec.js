@@ -113,3 +113,37 @@ test('the why line is one line for the current mail and hides when a card shows'
   await expect(show.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
   await expect(show.locator('#ReadingPaneContainerId .flow-why-not')).toHaveCount(0);
 });
+
+test('Hebrew UI chrome on an English mail keeps the English title', async ({ glance }) => {
+  test.setTimeout(60000);
+  await glance.seedOutlook({ glanceUiLanguage: 'he' });
+  const page = await glance.openOutlook({
+    id: 'AQMkGlanceUiHeEn',
+    subject: 'Transfer',
+    senderEmail: S.SENDER,
+    senderName: 'flow',
+    body: S.SHOW
+  });
+  const host = page.locator('#ReadingPaneContainerId .flow-chip-host');
+  await expect(host).toHaveCount(1);
+  await expect(host.getByRole('button', { name: 'בצע' })).toBeVisible();
+  await expect(host.getByRole('button', { name: 'הסתר' })).toBeVisible();
+  const title = host.locator('.gs-intent, .flow-chip-process-name').first();
+  await expect(title).toBeVisible();
+  await expect(title).toHaveText(/[A-Za-z]/);
+  const card = await host.innerText();
+  expect(card).not.toMatch(/\bSuggested\b/);
+  expect(card).not.toMatch(/\bDismiss\b/);
+  expect(card).not.toMatch(/\bDo It\b/);
+  expect(card).not.toMatch(/\bQueued\b/);
+
+  const popup = await glance.openPopup();
+  await popup.locator('button[data-tab="open"]').click();
+  const list = popup.locator('#open-list');
+  await expect(list.locator('[data-glance-section="suggested"]')).toHaveText('מוצע');
+  await expect(list.getByRole('button', { name: 'הסתר' })).toBeVisible();
+  await expect(list.locator('.log-label, .gs-intent, .flow-chip-process-name').first()).toContainText(/[A-Za-z]/);
+  const loops = await list.innerText();
+  expect(loops).not.toMatch(/\bSuggested\b/);
+  expect(loops).not.toMatch(/\bDismiss\b/);
+});

@@ -128,5 +128,5 @@ test('two mails with the same promise are one Do It in Loops', async ({ glance }
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="open"]').click();
   await expect(popup.locator('#open-list .log-item')).toHaveCount(1);
-  await expect(popup.locator('#open-list').getByText('בצע')).toHaveCount(1);
+  await expect(popup.locator('#open-list').getByText('Do It')).toHaveCount(1);
 });

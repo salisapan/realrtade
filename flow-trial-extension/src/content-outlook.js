@@ -171,6 +171,32 @@
     }
   }
 
+  let pageUiSetting = null;
+
+  function rememberUi(state) {
+    if (state && typeof state === 'object' && Object.prototype.hasOwnProperty.call(state, 'glanceUiLanguage')) {
+      pageUiSetting = state.glanceUiLanguage;
+    }
+  }
+
+  function pageUiLang() {
+    let ui = '';
+    try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, uiLanguage: ui, navigatorLanguage: nav })
+      : 'en';
+    if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.setUiLang === 'function') FlowChipHost.setUiLang(lang);
+    return lang;
+  }
+
+  function pageChrome() {
+    pageUiLang();
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(pageUiLang());
+    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…', handled: 'Handled.', openEvent: 'Open event', openDraft: 'Open draft', closing: 'Closing…', show: 'View' };
+  }
+
   function wrapStorageMethod(name, fn) {
     return function () {
       if (!guardContext()) {
@@ -181,7 +207,8 @@
       try {
         const out = fn.apply(this, arguments);
         if (out && typeof out.then === 'function') {
-          return out.catch((e) => {
+          const chained = name === 'get' ? out.then((state) => { rememberUi(state); return state; }) : out;
+          return chained.catch((e) => {
             if (invalidatedMessage(e) || !runtimeAlive()) { stopQuietly(); return undefined; }
             throw e;
           });
@@ -201,7 +228,8 @@
   }
 
   try {
-    storageGet({ glanceDebug: false, glanceOutlookFileTrace: 0 }, (r) => {
+    storageGet({ glanceDebug: false, glanceOutlookFileTrace: 0, glanceUiLanguage: null }, (r) => {
+      rememberUi(r);
       if (r && r.glanceDebug) debug = true;
       traceArmed = (Number(r && r.glanceOutlookFileTrace) || 0) > 0;
       dbg('injected', { version: VERSION, href: location.href });
@@ -925,7 +953,7 @@
     }
     doItInFlight = true;
     try {
-    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', pageChrome().closing); });
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
     let resolvedId = null;
     try {
@@ -1448,6 +1476,7 @@
     clearWhyNot(mount);
     noteOpenMail();
     if (ctx && typeof ctx.__epoch === 'number' && ctx.__epoch !== mailEpoch) return null;
+    if (ctx) ctx.uiLang = pageUiLang();
     const src = handlers || {};
     const host = FlowChipHost.inject(mount, ctx, {
       onDoIt: src.onDoIt,
@@ -1541,7 +1570,8 @@
       if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
       done.appendChild(detail);
     }
-    const undo = el('button', 'flow-chip-undo', undoLine ? 'Undo' : copy.undoHint);
+    const chromeWords = pageChrome();
+    const undo = el('button', 'flow-chip-undo', undoLine ? chromeWords.undo : (copy.undoHint || chromeWords.undo));
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = !undoLine;
@@ -1549,7 +1579,7 @@
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
-      const view = el('a', 'flow-chip-link', 'View');
+      const view = el('a', 'flow-chip-link', chromeWords.view);
       view.href = copy.url;
       view.target = '_blank';
       view.rel = 'noopener';
@@ -1574,7 +1604,7 @@
         return;
       }
       if (ignoreStaleClick(host)) return;
-      undo.textContent = 'Undoing…';
+      undo.textContent = pageChrome().undoing;
       undo.disabled = true;
       readBackOrTimeout(send({
         type: 'flow:undo-action',
@@ -1584,7 +1614,7 @@
       })).then(async (result) => {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
         if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited' || result.reason === 'unconfirmed')) {
-          undo.textContent = 'Undo';
+          undo.textContent = pageChrome().undo;
           undo.disabled = false;
           hint.hidden = false;
           hint.textContent = result.written || (result.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : (result.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : "Couldn't verify, try again"));
@@ -2044,7 +2074,6 @@
 
   async function commitProvedTodo(host, ctx, r, taskStep, proved, token) {
     const params = (taskStep && taskStep.params) || {};
-    const he = ctx && ctx.intent && ctx.intent.lang === 'he';
     if (!proved) {
       const status = "Created, couldn't verify";
       const messageId = (ctx && ctx.messageId) || null;
@@ -2075,7 +2104,7 @@
         status: status,
         written: status,
         url: r.url || null,
-        linkLabel: 'View',
+        linkLabel: pageChrome().view,
         onUndo: () => send({
           type: 'flow:undo-action',
           connectorId: 'outlookTask',
@@ -2086,7 +2115,7 @@
       return;
     }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
-    const status = he ? 'טופל.' : 'Handled.';
+    const status = pageChrome().handled;
     const fields = FlowProofOfClose.receiptLogFields
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
@@ -2159,7 +2188,6 @@
 
   async function onOnedriveDoIt(host, chip, ctx, fileStep, token) {
     const params = (fileStep && fileStep.params) || {};
-    const he = ctx.intent && ctx.intent.lang === 'he';
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
     const r = await send({
       type: 'flow:execute-action',
@@ -2190,7 +2218,7 @@
       return;
     }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
-    const status = he ? 'טופל.' : 'Handled.';
+    const status = pageChrome().handled;
     const fields = FlowProofOfClose.receiptLogFields
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
@@ -3075,7 +3103,7 @@
       return;
     }
     const verified = r.fetchedBack === true;
-    const status = verified ? 'Handled.' : "Created, couldn't verify";
+    const status = verified ? pageChrome().handled : "Created, couldn't verify";
     const written = verified ? (r.written || 'On your calendar.') : status;
     const messageId = (ctx && ctx.messageId) || null;
     await FlowStorage.appendLog({
@@ -3111,7 +3139,7 @@
       status: status,
       written: written,
       url: r.url || null,
-      linkLabel: 'Open event',
+      linkLabel: pageChrome().openEvent,
       onUndo: calendarUndoHandler(host, messageId, r.ref)
     }); });
   }
@@ -3157,12 +3185,12 @@
     host.setAttribute('data-glance-message', messageId || '');
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-hold';
-    const status = (row && row.receiptStatus) || (row && row.fetchedBack === false ? "Created, couldn't verify" : 'Handled.');
+    const status = (row && row.receiptStatus) || (row && row.fetchedBack === false ? "Created, couldn't verify" : pageChrome().handled);
     paintIfCurrent(pane && pane.__mailToken, function () { FlowChipHost.showDraftReceipt(host, {
       status: status,
       written: row.label || status,
       url: row.url || null,
-      linkLabel: 'Open event',
+      linkLabel: pageChrome().openEvent,
       onUndo: calendarUndoHandler(host, messageId, row.ref)
     }); });
     await clearReason(pane, 'calendar-hold');
@@ -3377,7 +3405,7 @@
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
     doItInFlight = true;
-    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', pageChrome().closing); });
     let wrote = null;
     try {
       const hold = (ctx && ctx.calendarHold) || {};
@@ -3391,7 +3419,7 @@
         return;
       }
       const verified = r.fetchedBack === true;
-      const status = verified ? 'Handled.' : "Created, couldn't verify";
+      const status = verified ? pageChrome().handled : "Created, couldn't verify";
       const written = verified ? (r.written || 'On your calendar, with the file.') : status;
       wrote = { ref: r.ref, written: written, url: r.url || null, status: status };
       await FlowStorage.appendLog({
@@ -3423,7 +3451,7 @@
         status: status,
         written: written,
         url: r.url || null,
-        linkLabel: 'Open event',
+        linkLabel: pageChrome().openEvent,
         onUndo: calendarUndoHandler(host, ctx.messageId, r.ref)
       }); });
     } catch (e) {
@@ -3431,10 +3459,10 @@
       if (wrote && host && host.isConnected) {
         try {
           paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
-            status: wrote.status || 'Handled.',
+            status: wrote.status || pageChrome().handled,
             written: wrote.written,
             url: wrote.url,
-            linkLabel: 'Open event',
+            linkLabel: pageChrome().openEvent,
             onUndo: calendarUndoHandler(host, ctx.messageId, wrote.ref)
           }); });
         } catch (e2) { glanceError('calendar receipt', e2); }
@@ -4607,7 +4635,7 @@
     if (ignoreStaleClick(host)) return;
     doItInFlight = true;
     try {
-      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', pageChrome().closing); });
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
       const step = (ctx.process.steps || [])[0] || {};
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
@@ -4651,7 +4679,7 @@
           writtenLine: r.written || title,
           processName: 'Save the file?',
           closedLine: '',
-          status: 'Handled.'
+          status: pageChrome().handled
         })
         : null;
       const graphId = ctx.graphMessageId && !isConversationId(ctx.graphMessageId) ? ctx.graphMessageId : '';
@@ -4692,7 +4720,7 @@
           fetchedBack: true,
           writtenLine: r.written || title,
           processName: 'Save the file?',
-          receiptStatus: 'Handled.'
+          receiptStatus: pageChrome().handled
         }, fields || {})); });
       }
     } finally {

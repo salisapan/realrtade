@@ -26,6 +26,22 @@
   // remember to.
   const SOURCE_APP = 'gmail';
   let state = null;
+
+  function glanceUiLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return 'en';
+  }
+
+  function glanceChrome() {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(glanceUiLang());
+    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…' };
+  }
   let watching = false;
   let observer = null;
   // Guards ensureGoogleAutoConnect() below against firing twice for two
@@ -125,6 +141,7 @@
     if (!watching || typeof FlowWeekly === 'undefined') return;
     const summary = await FlowStorage.consumeWeeklySummaryTrigger();
     if (!summary) return; // not due, or due with nothing to report — stay silent either way
+    if (typeof FlowWeekly.setUiLang === 'function') FlowWeekly.setUiLang(glanceUiLang());
     FlowWeekly.showSummary(summary, {
       onOpenList: async () => {
         // Re-read at click time. This opens the same Still Open list the
@@ -1593,7 +1610,7 @@
     mainRow.setAttribute('dir', 'ltr');
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
     mainRow.appendChild(dismiss);
     const chip = el('button', 'flow-chip');
@@ -1642,7 +1659,7 @@
       const done = el('div', 'flow-chip flow-chip-done');
       done.setAttribute('role', 'status');
       done.appendChild(el('span', 'flow-chip-label', he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.'));
-      const undo = el('button', 'flow-chip-undo', 'Undo');
+      const undo = el('button', 'flow-chip-undo', glanceChrome().undo);
       undo.type = 'button';
       undo.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -1690,7 +1707,7 @@
     mainRow.setAttribute('dir', 'ltr');
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
     mainRow.appendChild(dismiss);
 
@@ -1699,7 +1716,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().doIt));
     mainRow.appendChild(chip);
     host.appendChild(mainRow);
 
@@ -1951,7 +1968,7 @@
 
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, ctx); });
     mainRow.appendChild(dismiss);
 
@@ -1960,7 +1977,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().doIt));
     chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveSteps));
     mainRow.appendChild(chip);
 
@@ -1972,6 +1989,7 @@
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
         intent: face.title || ctx.process.name,
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
+        uiLang: glanceUiLang(),
         surface: 'gmail',
         onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
         onDismiss: () => onDismiss(host, ctx),
@@ -1991,6 +2009,7 @@
     if (stepsReady) {
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
       const view = FlowStepListView.mount(host, rows, {
+        uiLang: glanceUiLang(),
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, 'gmail');
           liveSteps.length = 0;
@@ -2472,7 +2491,7 @@
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
-      const view = el('a', 'flow-chip-link', 'View');
+      const view = el('a', 'flow-chip-link', glanceChrome().view);
       view.href = copy.url;
       view.target = '_blank';
       view.rel = 'noopener';
@@ -2480,7 +2499,7 @@
     }
     undo.addEventListener('click', () => {
       if (copy.connectorId === 'computerClose') {
-        undo.textContent = 'Undoing…';
+        undo.textContent = glanceChrome().undoing;
         undo.disabled = true;
         const messageId = row.messageId;
         const mark = typeof FlowStorage.markComputerUndone === 'function'
@@ -2516,7 +2535,7 @@
         });
         return;
       }
-      undo.textContent = 'Undoing…';
+      undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
       new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }, resolve);
@@ -2644,12 +2663,12 @@
     actionsRow.appendChild(undo);
     for (const r of succeeded) {
       if (!r.response.url) continue;
-      const view = el('a', 'flow-chip-link', succeeded.length > 1 ? 'View ' + r.response.where : 'View');
+      const view = el('a', 'flow-chip-link', succeeded.length > 1 ? (glanceChrome().view + ' ' + r.response.where) : glanceChrome().view);
       view.href = r.response.url; view.target = '_blank'; view.rel = 'noopener';
       actionsRow.appendChild(view);
     }
     undo.addEventListener('click', () => {
-      undo.textContent = 'Undoing…';
+      undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
       rollbackChain(succeeded, ctx).then((result) => {
         // Recorded regardless of whether the whole rollback reported ok —
@@ -3070,6 +3089,7 @@
     const match = pending.find((entry) => threadIds.has(entry.messageId));
     if (!match) { FlowBrief.hideResurface(); return; }
 
+    if (typeof FlowBrief.setUiLang === 'function') FlowBrief.setUiLang(glanceUiLang());
     FlowBrief.showResurface({
       id: match.messageId,
       title: match.process.name,
@@ -3114,6 +3134,7 @@
     // panel — closing it is the other moment the indicator's count (and its
     // very existence) might now be stale, e.g. every item was resolved
     // while the panel stayed open and nothing has re-triggered a check since.
+    if (typeof FlowBrief.setUiLang === 'function') FlowBrief.setUiLang(glanceUiLang());
     FlowBrief.openPanel(rows, { onClose: () => { FlowBrief.closePanel(); checkBrief(); } });
   }
 
@@ -3173,6 +3194,7 @@
         .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
     }
 
+    if (typeof FlowBrief.setUiLang === 'function') FlowBrief.setUiLang(glanceUiLang());
     FlowBrief.show(open.length, () => openBriefPanel(open));
 
     // The only thing resembling a daily ritual, and only spent on a day that

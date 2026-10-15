@@ -13,6 +13,19 @@
 // because Zero-Prompt means nothing pending is silence, not an empty widget.
 
 const FlowBrief = (() => {
+  let uiOverride = null;
+  function setUiLang(lang) { uiOverride = lang; }
+  function words() {
+    let ui = '';
+    try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+      ? FlowDisplay.uiLangFrom({ setting: uiOverride, uiLanguage: ui, navigatorLanguage: nav })
+      : 'en';
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(lang);
+    return { doIt: 'Do It', dismiss: 'Dismiss' };
+  }
   const INDICATOR_ID = 'flow-brief-indicator-host';
   const PANEL_ID = 'flow-brief-panel-host';
   const RESURFACE_ID = 'flow-resurface-host';
@@ -86,13 +99,13 @@ const FlowBrief = (() => {
     doIt.appendChild(el('span', 'shell'));
     doIt.appendChild(el('span', 'ring'));
     doIt.appendChild(el('span', 'shine'));
-    doIt.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    doIt.appendChild(el('span', 'flow-chip-do-label', words().doIt));
     doIt.addEventListener('click', () => row.onDoIt(wrap, doIt));
     actions.appendChild(doIt);
 
     const dismiss = el('button', 'flow-brief-row-x', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', words().dismiss);
     dismiss.addEventListener('click', () => row.onDismiss(wrap));
     actions.appendChild(dismiss);
 
@@ -179,5 +192,5 @@ const FlowBrief = (() => {
     return Boolean(panelHost);
   }
 
-  return { show, hide, openPanel, closePanel, isPanelOpen, showResurface, hideResurface };
+  return { show, hide, openPanel, closePanel, isPanelOpen, showResurface, hideResurface, setUiLang };
 })();

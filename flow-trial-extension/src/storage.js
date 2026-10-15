@@ -238,6 +238,9 @@ const FlowStorage = (() => {
     // list reads it through get(); a key absent from DEFAULTS never arrives.
     outlookPageDiag: [],
     glanceWhyCurrent: null,
+    // UI language for card and panel chrome. Null follows the browser
+    // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
+    glanceUiLanguage: null,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

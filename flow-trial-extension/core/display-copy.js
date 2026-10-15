@@ -207,6 +207,65 @@ const FlowDisplay = (() => {
     return day ? ('עד ' + day) : '';
   }
 
+  // Chrome (buttons, headings, receipts) follows the UI language. The action
+  // title stays in the mail's language. A stored setting wins, then
+  // chrome.i18n.getUILanguage, then navigator.language. The host passes
+  // those three strings; this file does not read chrome or the DOM.
+  const CHROME = {
+    en: {
+      brand: 'Glance', intentLabel: 'Detected intent', will: 'Glance will', prepared: 'Prepared · nothing sent', done: 'Done',
+      hold: 'Hold It', add: '+ Add a step', addPh: 'Type a step…',
+      suggested: 'Suggested', added: 'Added', manual: 'Manual · for you',
+      dismiss: 'Dismiss', dismissing: 'Dismissing…', doIt: 'Do It', view: 'View',
+      undo: 'Undo', undoAll: 'Undo all', undoing: 'Undoing…', closing: 'Closing…',
+      fromOutlook: 'From Outlook', expired: 'Expired', openDraft: 'Open draft', openEvent: 'Open event', show: 'View',
+      handled: 'Handled.', approve: 'Approve close',
+      kindHandled: 'Handled', kindUndone: 'Undone', kindClicked: 'Clicked', kindDismissed: 'Dismissed', kindDraft: 'Draft',
+      couldnt: 'Couldn’t confirm', retry: 'Retry', outlookOff: 'Outlook is not connected',
+      saveFiles: 'Save {on} of {all} attachments', attachments: 'Attachments', less: 'Less', newStep: 'New step', afterApprove: 'after Approve',
+      calendarApp: 'Calendar', youApp: 'You', undoUnavailable: 'Undo unavailable.',
+      justNow: 'just now', minsAgo: '{n}m ago', hrsAgo: '{n}h ago', writtenTo: 'Written to ',
+      queued: 'Queued', preparing: 'Preparing', verifying: 'Verifying', verified: 'Verified',
+      seeOpen: 'See what’s open'
+    },
+    he: {
+      brand: 'Glance', intentLabel: 'כוונה שזוהתה', will: 'Glance יבצע', prepared: 'מוכן · שום דבר לא נשלח', done: 'בוצע',
+      hold: 'השהה', add: '+ הוסף צעד', addPh: 'הקלד צעד…',
+      suggested: 'מוצע', added: 'נוסף', manual: 'ידני · בשבילך',
+      dismiss: 'הסתר', dismissing: 'מסתיר…', doIt: 'בצע', view: 'הצג',
+      undo: 'בטל', undoAll: 'בטל הכל', undoing: 'מבטל…', closing: 'סוגר…',
+      fromOutlook: 'מ-Outlook', expired: 'פג תוקף', openDraft: 'פתח טיוטה', openEvent: 'פתח אירוע', show: 'הצג',
+      handled: 'טופל.', approve: 'אשר סגירה',
+      kindHandled: 'טופל', kindUndone: 'בוטל', kindClicked: 'נלחץ', kindDismissed: 'הוסתר', kindDraft: 'טיוטה',
+      couldnt: 'לא אומת', retry: 'נסה שוב', outlookOff: 'Outlook לא מחובר',
+      saveFiles: 'שמור {on} מתוך {all} קבצים', attachments: 'קבצים', less: 'פחות', newStep: 'צעד חדש', afterApprove: 'אחרי אישור',
+      calendarApp: 'יומן', youApp: 'אתה', undoUnavailable: 'אין ביטול.',
+      justNow: 'עכשיו', minsAgo: 'לפני {n} דק׳', hrsAgo: 'לפני {n} שע׳', writtenTo: 'נכתב אל ',
+      queued: 'בתור', preparing: 'מכין', verifying: 'מאמת', verified: 'אומת',
+      seeOpen: 'מה פתוח'
+    }
+  };
+
+  function fillChrome(template, map) {
+    return String(template || '').replace(/\{(\w+)\}/g, function (_, key) {
+      return map && map[key] != null ? String(map[key]) : '';
+    });
+  }
+
+  function uiLangFrom(sources) {
+    const s = sources || {};
+    const setting = s.setting == null ? '' : String(s.setting).trim();
+    const ui = s.uiLanguage == null ? '' : String(s.uiLanguage).trim();
+    const nav = s.navigatorLanguage == null ? '' : String(s.navigatorLanguage).trim();
+    const raw = (setting || ui || nav).toLowerCase();
+    if (raw === 'he' || raw.indexOf('he-') === 0 || raw === 'iw' || raw.indexOf('iw-') === 0) return 'he';
+    return 'en';
+  }
+
+  function chrome(lang) {
+    return CHROME[uiLangFrom({ setting: lang })] || CHROME.en;
+  }
+
   function holdWhenLine(iso, hour, minute) {
     const day = hebrewDay(iso);
     if (!day) return '';
@@ -256,7 +315,10 @@ const FlowDisplay = (() => {
     whyNotShownRows: whyNotShownRows,
     hebrewDay: hebrewDay,
     cardDateLine: cardDateLine,
-    holdWhenLine: holdWhenLine
+    holdWhenLine: holdWhenLine,
+    uiLangFrom: uiLangFrom,
+    chrome: chrome,
+    fillChrome: fillChrome
   };
 })();
 

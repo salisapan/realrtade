@@ -89,6 +89,20 @@ const FlowChipHost = (() => {
     host.appendChild(node);
   }
 
+  let uiLang = 'en';
+
+  function setUiLang(lang) {
+    uiLang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+      ? FlowDisplay.uiLangFrom({ setting: lang })
+      : (lang === 'he' ? 'he' : 'en');
+  }
+
+  function words(lang) {
+    const which = lang || uiLang;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(which);
+    return { dismiss: 'Dismiss', doIt: 'Do It', undo: 'Undo', undoing: 'Undoing…', openDraft: 'Open draft', view: 'View' };
+  }
+
   // mountNode: DOM parent. ctx: { process, intent, messageId, app }.
   // handlers: { onDoIt(host, chip, ctx, liveSteps), onDismiss(host, ctx) }
   function inject(mountNode, ctx, handlers) {
@@ -100,6 +114,7 @@ const FlowChipHost = (() => {
         : '';
       if (!line) return null;
     }
+    if (ctx && ctx.uiLang) setUiLang(ctx.uiLang);
     if (mountNode.querySelector('.flow-chip-host')) return mountNode.querySelector('.flow-chip-host');
 
     const host = el('div', 'flow-chip-host');
@@ -114,6 +129,7 @@ const FlowChipHost = (() => {
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
         intent: face.title || ctx.process.name || 'Reply',
         lang: ctx.intent && ctx.intent.lang,
+        uiLang: ctx.uiLang || 'en',
         fileCard: face.fileCard === true || ctx.fileCard === true,
         surface: ctx.app || 'outlook',
         onDoIt: function (button) { if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps); },
@@ -158,7 +174,10 @@ const FlowChipHost = (() => {
 
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    const uiWords = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
+      ? FlowDisplay.chrome(ctx.uiLang || 'en')
+      : { dismiss: 'Dismiss', doIt: 'Do It' };
+    dismiss.setAttribute('aria-label', uiWords.dismiss || 'Dismiss');
     dismiss.addEventListener('click', (e) => {
       e.stopPropagation();
       if (handlers && handlers.onDismiss) handlers.onDismiss(host, ctx);
@@ -171,7 +190,8 @@ const FlowChipHost = (() => {
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', ctx.doLabel || 'Do It'));
+    const doText = (ctx.doLabel && ctx.doLabel !== 'Do It') ? ctx.doLabel : (uiWords.doIt || ctx.doLabel || 'Do It');
+    chip.appendChild(el('span', 'flow-chip-do-label', doText));
     chip.addEventListener('click', () => {
       if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
     });
@@ -181,6 +201,7 @@ const FlowChipHost = (() => {
     if (typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && (ctx.process.steps || []).length) {
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       const view = FlowStepListView.mount(host, rows, {
+        uiLang: ctx.uiLang || uiLang,
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;
@@ -209,6 +230,8 @@ const FlowChipHost = (() => {
   // In-place receipt after a successful Outlook (or other) draft write.
   function showDraftReceipt(host, opts) {
     const o = opts || {};
+    if (o.uiLang) setUiLang(o.uiLang);
+    const L = words();
     host.classList.add('flow-chip-settled');
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
@@ -221,22 +244,22 @@ const FlowChipHost = (() => {
 
     const actions = el('span', 'flow-chip-actions');
     if (o.url) {
-      const a = el('a', 'flow-chip-link', o.linkLabel || 'Open draft');
+      const a = el('a', 'flow-chip-link', o.linkLabel || L.openDraft);
       a.href = o.url; a.target = '_blank'; a.rel = 'noopener';
       actions.appendChild(a);
     }
     if (typeof o.onUndo === 'function') {
-      const undo = el('button', 'flow-chip-undo', 'Undo');
+      const undo = el('button', 'flow-chip-undo', L.undo);
       undo.type = 'button';
       undo.addEventListener('click', () => {
-        undo.disabled = true; undo.textContent = 'Undoing…';
+        undo.disabled = true; undo.textContent = L.undoing;
         Promise.resolve(o.onUndo()).then((r) => {
           if (r && r.ok) {
             // Caller may remove the host to re-inject Do It (outlookReopen).
             if (r.reopen || !host.isConnected) return;
             done.replaceChildren(el('span', 'flow-chip-label', r.written || 'Reply draft removed. Not sent.'));
           } else {
-            undo.disabled = false; undo.textContent = 'Undo';
+            undo.disabled = false; undo.textContent = L.undo;
             if (r && r.written) {
               let hint = done.querySelector('.flow-chip-undo-hint');
               if (!hint) {
@@ -253,7 +276,7 @@ const FlowChipHost = (() => {
     host.replaceChildren(done);
   }
 
-  return { inject, setChipState, showDraftReceipt, closingSentence, loopMark, el };
+  return { inject, setChipState, showDraftReceipt, setUiLang, closingSentence, loopMark, el };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChipHost };

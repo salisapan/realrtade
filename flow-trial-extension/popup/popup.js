@@ -46,6 +46,23 @@
   let scrollLock = false;
   let renderDepth = 0;
   let surfaceGen = 0;
+  function uiLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return 'en';
+  }
+  function words() {
+    return FlowDisplay.chrome(uiLang());
+  }
+  function fillWords(template, map) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.fillChrome === 'function') return FlowDisplay.fillChrome(template, map);
+    return String(template || '').replace(/\{(\w+)\}/g, function (_, key) { return map && map[key] != null ? String(map[key]) : ''; });
+  }
   function panelScroller() { return document.querySelector('main'); }
   function activeTabId() {
     const tab = document.querySelector('.tab[aria-selected="true"]');
@@ -89,11 +106,13 @@
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local') return;
-      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent)) return;
+      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceUiLanguage)) return;
       refresh().then(() => Promise.all([
         renderSurfaces().catch(() => {}),
         renderOutlookCards().catch(() => {}),
-        renderWaiting().catch(() => {})
+        renderWaiting().catch(() => {}),
+        renderOpen().catch(() => {}),
+        renderLog().catch(() => {})
       ])).catch(() => {});
     });
   } catch (e) { /* the open panel keeps the last status until the next open */ }
@@ -1084,6 +1103,7 @@
     return FlowStepListView.mount(host, rows, {
       intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
       lang: entry.intent && entry.intent.lang,
+      uiLang: uiLang(),
       surface: entry.app || 'gmail',
       // The panel background is dark even when the OS theme is light.
       theme: 'dark',
@@ -1106,7 +1126,8 @@
     // ever existed, rather than showing a blank tag.
     top.appendChild(el('span', 'log-kind', (entry.app || 'gmail').toUpperCase()));
     item.appendChild(top);
-    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', 'From Outlook'));
+    const L = words();
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', L.fromOutlook));
 
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
@@ -1122,8 +1143,7 @@
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
     if (entry.verifying) {
-      const he = /[\u0590-\u05FF]/.test(String(entry.text || '') + String(entry.subject || ''));
-      item.appendChild(el('span', 'log-where', he ? 'מאמת' : 'Verifying…'));
+      item.appendChild(el('span', 'log-where', L.verifying));
       return item;
     }
 
@@ -1135,24 +1155,24 @@
       doIt.appendChild(el('span', 'shell'));
       doIt.appendChild(el('span', 'ring'));
       doIt.appendChild(el('span', 'shine'));
-      doIt.appendChild(el('span', 'btn-label', 'בצע'));
+      doIt.appendChild(el('span', 'btn-label', L.doIt));
       doIt.addEventListener('click', async () => {
         doIt.disabled = true;
         const label = doIt.querySelector('.btn-label');
-        if (label) label.textContent = 'Closing…';
+        if (label) label.textContent = L.closing;
         await closeStillOpenFromPopup(entry);
       });
       acts.appendChild(doIt);
     }
     if (entry.threadUrl || entry.url) {
-      const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? 'Open draft' : 'View');
+      const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? L.openDraft : L.view);
       view.href = entry.url || entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
       acts.appendChild(view);
     }
-    const dismiss = el('button', 'ghost sm', 'Dismiss');
+    const dismiss = el('button', 'ghost sm', L.dismiss);
     dismiss.type = 'button';
     dismiss.addEventListener('click', async () => {
-      dismiss.disabled = true; dismiss.textContent = 'Dismissing…';
+      dismiss.disabled = true; dismiss.textContent = L.dismissing;
       // The exact same storage/module calls content-gmail.js's own
       // onDismiss makes, verbatim — no DOM, no background.js round trip.
       await FlowStorage.appendLog({
@@ -1189,11 +1209,12 @@
     top.appendChild(el('span', 'log-label', why));
     top.appendChild(el('span', 'log-kind', 'expired'));
     item.appendChild(top);
-    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', 'From Outlook'));
+    const Lx = words();
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', Lx.fromOutlook));
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
     if (entry.threadUrl || entry.url) {
-      const view = el('a', 'ghost sm', 'View');
+      const view = el('a', 'ghost sm', Lx.view);
       view.href = entry.url || entry.threadUrl;
       view.target = '_blank';
       view.rel = 'noopener';
@@ -2509,6 +2530,7 @@
   }
 
   function outlookReceiptRow(entry) {
+    const L = words();
     const proof = entry && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.fetchedBack === true) && entry.connectorId !== 'outlookDraft';
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
@@ -2517,22 +2539,22 @@
       : (entry.actionTitle || entry.label || (proof ? 'Handled.' : 'Reply draft ready in Outlook Drafts. Not sent.'));
     top.appendChild(el('span', 'log-label', proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.')));
     const deleted = entry.glanceDeleted === true || entry.deleted === true;
-    top.appendChild(el('span', 'log-kind written', deleted ? (entry.deletedLine || 'Deleted in To Do') : (proof ? 'Handled' : 'Draft')));
+    top.appendChild(el('span', 'log-kind written', deleted ? (entry.deletedLine || 'Deleted in To Do') : (proof ? L.kindHandled : L.kindDraft)));
     item.appendChild(top);
-    item.appendChild(el('span', 'log-where', 'From Outlook'));
+    item.appendChild(el('span', 'log-where', L.fromOutlook));
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
     const acts = el('div', 'log-acts');
     if (!deleted && (entry.url || entry.where)) {
-      const a = el('a', 'ghost sm', proof ? 'View' : 'Open draft');
+      const a = el('a', 'ghost sm', proof ? L.view : L.openDraft);
       a.href = entry.url || entry.where; a.target = '_blank'; a.rel = 'noopener';
       acts.appendChild(a);
     }
-    const u = el('button', 'ghost sm', 'Undo');
+    const u = el('button', 'ghost sm', L.undo);
     u.type = 'button';
     const note = el('span', 'log-undo-note', '');
     note.hidden = true;
     u.addEventListener('click', async () => {
-      u.disabled = true; u.textContent = 'Undoing…';
+      u.disabled = true; u.textContent = L.undoing;
       note.hidden = true;
       let r = { ok: false };
       try {
@@ -2549,7 +2571,7 @@
       }
       if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
         u.disabled = false;
-        u.textContent = 'Undo';
+        u.textContent = L.undo;
         note.textContent = r.written || (r.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : 'You edited this. Undo left it alone.');
         note.hidden = false;
         if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
@@ -2560,7 +2582,7 @@
       const todoUndo = proof && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.system === 'microsoft/todo');
       if (todoUndo && !(r && r.ok && r.fetchedBack === true)) {
         u.disabled = false;
-        u.textContent = 'Undo';
+        u.textContent = L.undo;
         note.textContent = (r && r.written) || 'Still there — the To Do task was not removed.';
         note.hidden = false;
         return;
@@ -2671,7 +2693,8 @@
     function loopsHeading(which) {
       const row = el('div', 'loops-section act-section');
       row.setAttribute('data-glance-section', which);
-      const title = which === 'expired' ? 'Expired' : (which === 'added' ? 'Added' : 'Suggested');
+      const Lw = words();
+      const title = which === 'expired' ? Lw.expired : (which === 'added' ? Lw.added : Lw.suggested);
       row.appendChild(el('span', 'acts-label', title));
       return row;
     }
@@ -2732,7 +2755,7 @@
       box.setAttribute('data-glance-section', 'expired');
       const sum = document.createElement('summary');
       sum.className = 'acts-label';
-      sum.textContent = 'Expired';
+      sum.textContent = words().expired;
       box.appendChild(sum);
       expired.forEach((entry) => box.appendChild(expiredRow(entry)));
       const parent = empty && empty.parentNode;
@@ -2746,10 +2769,11 @@
 
   function when(ts) {
     const mins = Math.round((Date.now() - ts) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return mins + 'm ago';
+    const Lw = words();
+    if (mins < 1) return Lw.justNow;
+    if (mins < 60) return fillWords(Lw.minsAgo, { n: mins });
     const hrs = Math.round(mins / 60);
-    if (hrs < 24) return hrs + 'h ago';
+    if (hrs < 24) return fillWords(Lw.hrsAgo, { n: hrs });
     return new Date(ts).toLocaleDateString();
   }
 
@@ -3119,12 +3143,13 @@
     top.appendChild(el('span', 'log-label', rowTitle));
     // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
-    const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
+    const Lw = words();
+    const KIND_LABEL = { written: Lw.kindHandled, undone: Lw.kindUndone, clicked: Lw.kindClicked, dismissed: Lw.kindDismissed };
     const draftWrite = e.kind === 'written' && e.connectorId === 'outlookDraft';
-    top.appendChild(el('span', 'log-kind ' + e.kind, draftWrite ? 'Draft' : (KIND_LABEL[e.kind] || e.kind)));
+    top.appendChild(el('span', 'log-kind ' + e.kind, draftWrite ? Lw.kindDraft : (KIND_LABEL[e.kind] || e.kind)));
     item.appendChild(top);
 
-    if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
+    if (e.where) item.appendChild(el('span', 'log-where', Lw.writtenTo + e.where));
     if (e.kind === 'undone' && (e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowReceipt !== 'undefined' && FlowReceipt.todoUiCacheLine) {
       item.appendChild(el('span', 'log-where', FlowReceipt.todoUiCacheLine()));
     }
@@ -3134,21 +3159,21 @@
       const acts = el('div', 'log-acts');
       let undoNote = null;
       if (e.url) {
-        const link = e.connectorId === 'outlookCalendar' ? 'פתח אירוע' : (e.connectorId === 'outlookDraft' ? 'פתח טיוטה' : 'הצג');
+        const link = e.connectorId === 'outlookCalendar' ? Lw.openEvent : (e.connectorId === 'outlookDraft' ? Lw.openDraft : Lw.show);
         const a = el('a', 'ghost sm', link);
         a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
         acts.appendChild(a);
       }
       if (e.ref) {
         const hintLine = FlowReceipt.undoHint(e.where ? [e.where] : []);
-        const u = el('button', 'ghost sm', 'Undo');
+        const u = el('button', 'ghost sm', Lw.undo);
         u.type = 'button';
         u.setAttribute('aria-label', hintLine);
         const note = el('span', 'log-undo-note', hintLine);
         undoNote = note;
         u.addEventListener('click', async () => {
           if (isComputerActivityRow(e) && typeof FlowStorage.markComputerUndone === 'function') {
-            u.textContent = 'Undoing…';
+            u.textContent = Lw.undoing;
             u.disabled = true;
             const marked = await FlowStorage.markComputerUndone(e.messageId, e.ref, e.threadId);
             if (marked && marked.hit && marked.stayedHandled === false) {
@@ -3160,8 +3185,8 @@
               await renderLog();
               if (typeof renderOpen === 'function') await renderOpen();
             } else {
-              const line = 'Undo unavailable.';
-              u.textContent = 'Undo';
+              const line = Lw.undoUnavailable;
+              u.textContent = Lw.undo;
               u.disabled = false;
               u.setAttribute('aria-label', line);
               note.textContent = line;
@@ -3169,7 +3194,7 @@
             }
             return;
           }
-          u.textContent = 'Undoing…';
+          u.textContent = Lw.undoing;
           u.disabled = true;
           const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
           const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
@@ -3208,7 +3233,7 @@
             const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
               ? r.written
               : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
-            u.textContent = 'Undo';
+            u.textContent = Lw.undo;
             u.disabled = false;
             u.setAttribute('aria-label', line);
             note.textContent = line;

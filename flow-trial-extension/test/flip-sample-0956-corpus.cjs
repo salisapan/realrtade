@@ -56,6 +56,7 @@ const QUIET = 'quiet';
 const HOLD = 'hold';
 const TASK = 'task';
 const OFFER = 'offer';
+const FILE = 'file';
 
 const ROWS = [
   { id: 'v2syn-14731', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
@@ -118,6 +119,15 @@ const ROWS = [
   { id: 'v2syn-8743', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'אבי בירנבאום', email: 'avi@cyber.co.il' }, to: [OWN.gmail], subject: 'המצגת מצורף',
     body: 'הי סאלי,\nמצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.\nתודה רבה,\nאבי' },
+  { id: 'v2syn-6393', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.outlook], subject: 'Thursday',
+    body: "Hi,\nFollowing the thread.\nNoa, can we meet Thursday at 14:30?\nThanks,\nDana" },
+  { id: 'v2syn-14708', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'הילה שמש', email: 'hila@acme.co.il' }, to: [OWN.outlook], subject: 'שיחת זום',
+    body: 'היי,\nבהמשך לשרשור.\nעומר, נוכל לעשות שיחה קצרה ביום ראשון ב-11:15?\nיום נעים,\nהילה' },
+  { id: 'v2syn-8733', expect: FILE, surface: 'outlook', direction: 'inbound', attachmentCount: 1,
+    from: { name: 'יוסי אברהם', email: 'yossi@initech.co.il' }, to: [OWN.outlook], subject: 'השב: הצעת המחיר מצורף',
+    body: 'בוקר טוב, מצורף גיליון התמחור. נא לשמור אותו ל-Drive עד 20/10. המשך יום טוב' },
   { id: 'v2syn-7321', expect: QUIET, surface: 'gmail', direction: 'outbound', attachmentCount: 0,
     from: { name: 'Sali Sapan', email: OWN.gmail }, to: ['sarah@northwind.co.il'], subject: 'חשבונית ₪450',
     body: 'נא להסדיר את היתרה של ₪450 עד 20/10. תודה רבה' },
@@ -139,7 +149,7 @@ function summarise(out) {
   };
 }
 
-console.log('\n--- 22 labeled flips ---\n');
+console.log('\n--- labeled flips ---\n');
 let wrong = 0;
 for (const row of ROWS) {
   const out = judge(row);
@@ -153,13 +163,17 @@ for (const row of ROWS) {
   } else if (row.expect === TASK) {
     ok = out.show === true && out.intent && out.intent.noReplyDraft === true && out.intent.entities && out.intent.entities.dateIso === '2026-10-20' &&
       out.process && out.process.id === 'log-it' && k.length > 0 && k.every(taskKind);
+  } else if (row.expect === FILE) {
+    ok = out.show === true && out.intent && out.intent.personalClose === 'drive-file' &&
+      out.process && out.process.id === 'file-it' &&
+      k.some((kind) => kind === 'driveFile' || kind === 'onedriveFile');
   } else {
     ok = out.show === true && out.intent && out.intent.entities && out.intent.entities.dateIso === '2026-10-20' && !k.some((kind) => kind === 'calendar');
   }
   if (!ok) wrong++;
   check(row.id + ' ' + row.expect, ok, summarise(out));
 }
-check('0 wrong Do Its in the 22', wrong === 0, wrong);
+check('0 wrong Do Its in the ' + ROWS.length, wrong === 0, wrong);
 
 console.log('\n--- slash context, day first ---\n');
 function iso(text) {

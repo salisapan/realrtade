@@ -222,7 +222,7 @@ test('Undo returns one Do It on the mail and in Loops, including a legacy undone
   await expect(pane.locator('button.flow-chip')).toHaveCount(1);
   await expect(pane.getByText('Undone — the To Do task was removed.')).toHaveCount(0);
   await popup.locator('button[data-tab="open"]').click();
-  await expect(popup.locator('#open-list').getByRole('button', { name: 'בצע' })).toHaveCount(1);
+  await expect(popup.locator('#open-list').getByRole('button', { name: 'Do It' })).toHaveCount(1);
 
   const line = 'Undone — the To Do task was removed.';
   await glance.seedOutlook({
@@ -269,7 +269,7 @@ test('Undo returns one Do It on the mail and in Loops, including a legacy undone
   await expect(legacyPane.getByText(line)).toHaveCount(0);
   const loops = await glance.openPopup();
   await loops.locator('button[data-tab="open"]').click();
-  await expect(loops.locator('#open-list').getByRole('button', { name: 'בצע' })).toHaveCount(1);
+  await expect(loops.locator('#open-list').getByRole('button', { name: 'Do It' })).toHaveCount(1);
 });
 
 test('Activity shown matches the Loops card count', async ({ glance }) => {

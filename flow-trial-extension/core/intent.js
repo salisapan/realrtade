@@ -509,16 +509,32 @@ const FlowIntent = (() => {
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
   // the reader's names in that script. A Hebrew name is not "other" just
   // because the only stored name is Latin, and the reverse.
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  // A name plus a comma or a colon, at the start of any line or sentence.
+  // The opening line is not the only place a mail names who it is for.
+  function vocativeAt(chunk) {
+    let raw = String(chunk || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    const greet = raw.match(OPEN_GREET);
+    if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
+    const named = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*[,:،]/);
+    if (!named) return '';
+    if (GROUP_ADDRESSEE.test(named[1]) || NOT_A_VOCABLE.test(named[1])) return '';
+    return named[1];
+  }
   function vocativeIsOther(text, ctx) {
-    const who = openingAddressee(text);
-    if (!who) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
-    const named = who.toLowerCase();
-    if (names.indexOf(named) !== -1) return false;
     const hebrew = /[\u0590-\u05FF]/;
-    if (!names.some((n) => hebrew.test(n) === hebrew.test(who))) return false;
-    return true;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i]);
+      if (!who) continue;
+      const named = who.toLowerCase();
+      if (names.indexOf(named) !== -1) continue;
+      if (!names.some((n) => hebrew.test(n) === hebrew.test(who))) continue;
+      return true;
+    }
+    return false;
   }
   // The reader's own outbound mail, a note to self, or a sent copy.
   function mailIsOwn(ctx) {
