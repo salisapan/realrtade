@@ -47,8 +47,8 @@ const FlowMessengerParse = (() => {
   //    Business Suite inbox, business.facebook.com/latest/inbox.
   //    Fixture: test/fixtures/chat/live/messenger-page-inbox.html.
   //    The name is the first text that is not inside [role="button"].
-  //    The live inbox has a name and one image and no one-to-one signal, so
-  //    it stays quiet. A group word is a group and also stays quiet.
+  //    A Page-to-person thread is one-to-one: one name, and no group marker.
+  //    A group word, a member count, or a group-looking title stays quiet.
   //
   // Inside the chosen region, a draft needs one header profile link that
   // names the same person as the header title. The title's own text does not
@@ -579,6 +579,8 @@ const FlowMessengerParse = (() => {
     const raw = regionTitle(scope, via);
     const whole = root || scope;
     if (isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
+    // Business Suite names the person in the detail header. That is the Page thread.
+    if (via === 'inbox' && name && !groupTitle(name)) return { kind: 'one-to-one', via: via, name: name, active: active };
     const proved = matchingProfile(scope, via) || threadMatches(scope, href, via) || singlePersonPanel(whole, raw);
     if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href, via) && !singlePersonPanel(whole, raw)) {
       return { kind: 'unknown', via: via, name: name, active: active };

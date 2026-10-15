@@ -83,6 +83,11 @@ const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './nat
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
 check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
+check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
+check('the service worker re-registers Business Suite when it is already allowed', /glance-lane-messenger/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc) && /whyNotShown: messenger-not-granted/.test(backgroundSrc));
+const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
+check('Messenger logs a quiet reason and retries an empty thread', /whyNotShown/.test(messengerSrc) && /RETRY_LIMIT/.test(messengerSrc) && /time\[datetime\]/.test(messengerSrc));
+check('Messenger off is said on the options page', /Messenger is off, so Business Suite stays quiet/.test(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8')));
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
 check('content-whatsapp.js is not hooked by this lane', fs.readFileSync(path.join(ROOT, 'src/content-whatsapp.js'), 'utf8').indexOf('FlowChatLane') < 0);
@@ -132,6 +137,12 @@ check('a quoted message stays silent', decide(ASK, { quoted: true }).reason === 
 check('a weak window stays silent', decide('send me the location of the restaurant you were at').reason === 'weak-window');
 check('Hebrew last week drafts', decide('תשלח לי את המיקום של המסעדה שהייתם בה בשבוע שעבר').show === true);
 check('where did we eat last week drafts', decide('איפה אכלנו בשבוע שעבר?').show === true);
+const HE_PLACE = 'איפה המסעדה שהיינו בה שבוע שעבר?';
+const sentToday = new Date('2026-10-15T09:01:00+03:00');
+const oct8 = decide(HE_PLACE, { now: sentToday, evidence: placeEvidence([one({ location: 'דיזנגוף 99', startIso: '2026-10-08T10:00:00' })]) });
+check('8/10 is 8 October and sits in last week of a message sent 15 October 09:01', oct8.show === true && oct8.sends === false && oct8.draft.indexOf('דיזנגוף 99 - ' + MAPS) === 0 && oct8.draft.indexOf(encodeURIComponent('דיזנגוף 99')) > 0, oct8);
+const openedLater = decide(HE_PLACE, { now: new Date(2026, 9, 22, 12), evidence: placeEvidence([one({ location: 'דיזנגוף 99', startIso: '2026-10-08T10:00:00' })]) });
+check('the same 8 October event is outside last week of 22 October', openedLater.show === false && openedLater.sends === false && openedLater.reason === 'no-venue', openedLater);
 const friday = decide('איך קוראים לבית הקפה שישבת בו ביום שישי?', { evidence: placeEvidence([one({ location: 'Cafe Xoho, 7 King George, Tel Aviv', startIso: '2026-10-09T09:00:00' })]) });
 check('Hebrew Friday drafts that day only', friday.show === true && friday.draft.indexOf('Cafe Xoho - ') === 0, friday);
 check('a holding line is not a chat draft', decide("I'll send it by Friday.").draft == null);
@@ -247,9 +258,11 @@ check('Active status inside a message row is not a one-to-one signal', FlowMesse
 check('a participant count with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Dana</h2><span>4 people</span><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
 check('Family with one avatar stays quiet', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Family 🏠</h2><a aria-label="Conversation information">Conversation information</a></header></div>')) === false);
 const liveInbox = FlowMessengerParse.classify(liveRoot('live/messenger-page-inbox.html'));
-check('live Business Suite inbox has no one-to-one signal and stays quiet', liveInbox.kind === 'unknown' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-page-inbox.html')) === false, liveInbox);
+check('a Page inbox names one person and is one-to-one', liveInbox.kind === 'one-to-one' && liveInbox.via === 'inbox' && liveInbox.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-page-inbox.html')) === true, liveInbox);
 const inboxUnknown = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-unknown.html'));
-check('Business Suite inbox with no image is unknown', inboxUnknown.kind === 'unknown' && inboxUnknown.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html')) === false, inboxUnknown);
+check('a Page inbox with no image is still one person', inboxUnknown.kind === 'one-to-one' && inboxUnknown.via === 'inbox' && inboxUnknown.name === 'Sali Sapan' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-unknown.html')) === true, inboxUnknown);
+const suiteExisting = FlowMessengerParse.classify(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/');
+check('an open Business Suite thread is a Page one-to-one', suiteExisting.kind === 'one-to-one' && suiteExisting.via === 'inbox' && suiteExisting.name === 'Dana Levi' && FlowMessengerParse.isOneToOne(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/') === true, suiteExisting);
 const inboxGroup = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-group.html'));
 check('Business Suite inbox with a group word is a group', inboxGroup.kind === 'group' && inboxGroup.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-group.html')) === false, inboxGroup);
 const advDir = path.join(__dirname, 'fixtures/chat/adv');
@@ -477,7 +490,7 @@ console.log('\n--- calendar evidence ---\n');
   });
   check('Google connected but unreadable stays quiet', unreadJudged.show === false && unreadJudged.sends === false && unreadJudged.reason === 'not-checked' && unread.evidence.events == null && unread.evidence.connected.calendar === true && unreadUrls.every((u) => u.indexOf('googleapis.com') < 0), { judged: unreadJudged, urls: unreadUrls });
   global.chrome.identity.getAuthToken = function () { throw new Error('identity is not the test seam'); };
-  globalThis.__glanceE2e = { googleAuthToken() { return Promise.resolve('ya29.e2e'); } };
+  globalThis.__glanceE2e = { installed: true, googleAuthToken() { return Promise.resolve('ya29.e2e'); } };
   let seamUrl = '';
   const viaSeam = await fetchPlace(placeWindow, {
     outlookToken: async () => null,
@@ -487,6 +500,27 @@ console.log('\n--- calendar evidence ---\n');
     }
   });
   check('the service-worker test seam reads Google', seamUrl.indexOf('calendar/v3') >= 0 && viaSeam.sends === false && viaSeam.evidence.events && viaSeam.evidence.events[0].location === TAIZU, { seamUrl: seamUrl, evidence: viaSeam.evidence });
+  globalThis.__glanceE2e = { googleAuthToken() { return Promise.resolve('ya29.e2e'); } };
+  let bareUrl = '';
+  const viaBare = await fetchPlace(placeWindow, {
+    outlookToken: async () => null,
+    fetch: async (u) => {
+      bareUrl = u;
+      return googleItems(TAIZU);
+    }
+  });
+  check('a token hook without the test build is ignored', bareUrl === '' && viaBare.sends === false && viaBare.evidence.events == null, { bareUrl: bareUrl, evidence: viaBare.evidence });
+  globalThis.__glanceE2e = { installed: true, googleAuthToken() { return Promise.resolve('ya29.e2e'); } };
+  global.chrome.runtime.getManifest = function () { return { update_url: 'https://clients2.google.com/service/update2/crx' }; };
+  let storeUrl = '';
+  const viaStore = await fetchPlace(placeWindow, {
+    outlookToken: async () => null,
+    fetch: async (u) => {
+      storeUrl = u;
+      return googleItems(TAIZU);
+    }
+  });
+  check('a store build ignores the token hook', storeUrl === '' && viaStore.sends === false && viaStore.evidence.events == null, { storeUrl: storeUrl, evidence: viaStore.evidence });
   delete globalThis.__glanceE2e;
   global.chrome = savedChrome;
   globalThis.__glanceGoogleAuth = savedAuth;
@@ -517,6 +551,32 @@ console.log('\n--- calendar evidence ---\n');
   });
   check('a Graph calendarView timeout stays quiet', Date.now() - hungAt < 2000 && hungJudged.show === false && hungJudged.sends === false && hungJudged.reason === 'not-checked' && hung.evidence.events == null && hung.evidence.connected.calendar === true, hungJudged);
 
+  const googleHungAt = Date.now();
+  const googleHung = await fetchPlace(placeWindow, {
+    token: async () => 'g-tok',
+    outlookToken: async () => null,
+    graphTimeout: 40,
+    fetch: (u, init) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ ok: true, json: async () => ({ items: [] }) }), 5000);
+      const signal = init && init.signal;
+      if (signal) {
+        const abort = () => { clearTimeout(timer); reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); };
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort);
+      }
+    })
+  });
+  const googleHungDetected = FlowChatDraft.detect(ASK, { now: NOW, oneToOne: true, fromMe: false });
+  const googleHungJudged = FlowChatDraft.judge({
+    text: ASK,
+    now: NOW.getTime(),
+    oneToOne: true,
+    fromMe: false,
+    evidence: googleHung.evidence,
+    detected: googleHungDetected
+  });
+  check('a Google calendar timeout stays quiet', Date.now() - googleHungAt < 2000 && googleHungJudged.show === false && googleHungJudged.sends === false && googleHungJudged.reason === 'not-checked' && googleHung.evidence.events == null && googleHung.evidence.connected.calendar === true, googleHungJudged);
+
   const named = await fetchPlace(placeWindow, {
     token: async () => null,
     outlookToken: async () => 'o-tok',
@@ -541,7 +601,7 @@ console.log('\n--- calendar evidence ---\n');
     evidence: named.evidence,
     detected: namedDetected
   });
-  check('a name-only Outlook displayName uses street and city', namedJudged.show === true && namedJudged.sends === false && named.evidence.events[0].location === '23 Montefiore, Tel Aviv' && namedJudged.draft.indexOf('23 Montefiore - ' + MAPS) === 0 && namedJudged.draft.indexOf(encodeURIComponent('23 Montefiore, Tel Aviv')) > 0, namedJudged);
+  check('a name-only Outlook displayName keeps the place with the address', namedJudged.show === true && namedJudged.sends === false && named.evidence.events[0].location === 'Taizu, 23 Montefiore, Tel Aviv' && namedJudged.draft.indexOf('Taizu - ' + MAPS) === 0 && namedJudged.draft.indexOf(encodeURIComponent('Taizu, 23 Montefiore, Tel Aviv')) > 0, namedJudged);
   const namedFull = await fetchPlace(placeWindow, {
     token: async () => null,
     outlookToken: async () => 'o-tok',
@@ -676,8 +736,9 @@ console.log('\n--- calendar evidence ---\n');
     ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false],
     ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false],
     ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-flow'],
-    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', false],
-    ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', false],
+    ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', true],
+    ['live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', true],
     ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
     ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
   ];

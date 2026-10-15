@@ -470,9 +470,85 @@ async function restoreSurfaces() {
     }
   } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
 }
+// Chat drafts are registered from the options page. An update keeps the old
+// list, and Chrome does not inject into a tab that is already open. When the
+// person already allowed the host, register again and inject into that tab.
+const LANE_CHAT = [
+  {
+    id: 'glance-lane-whatsapp',
+    origins: ['https://web.whatsapp.com/*'],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp-draft.js']
+  },
+  {
+    id: 'glance-lane-messenger',
+    origins: [
+      'https://www.messenger.com/*',
+      'https://messenger.com/*',
+      'https://www.facebook.com/messages',
+      'https://www.facebook.com/messages/*',
+      'https://facebook.com/messages',
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*'
+    ],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/messenger-parse.js', 'src/content-messenger.js']
+  },
+  {
+    id: 'glance-lane-instagram',
+    origins: [
+      'https://www.instagram.com/direct',
+      'https://www.instagram.com/direct/*',
+      'https://instagram.com/direct',
+      'https://instagram.com/direct/*'
+    ],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/instagram-parse.js', 'src/content-instagram.js']
+  }
+];
+
+async function restoreLaneChats() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  for (const lane of LANE_CHAT) {
+    let on = false;
+    try { on = await chrome.permissions.contains({ origins: lane.origins }); } catch (e) { on = false; }
+    if (!on) {
+      if (lane.id !== 'glance-lane-messenger' || !chrome.tabs || !chrome.tabs.query) continue;
+      let open = [];
+      try {
+        open = await chrome.tabs.query({ url: lane.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) });
+      } catch (e) { open = []; }
+      if (open.length) console.info('[Glance] whyNotShown: messenger-not-granted');
+      continue;
+    }
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
+    try {
+      await chrome.scripting.registerContentScripts([{
+        id: lane.id,
+        matches: lane.origins,
+        js: lane.js,
+        runAt: 'document_idle',
+        persistAcrossSessions: true
+      }]);
+    } catch (e) {
+      console.info('[Glance] whyNotShown: lane-not-registered');
+      continue;
+    }
+    if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) continue;
+    let tabs = [];
+    try { tabs = await chrome.tabs.query({ url: lane.origins }); } catch (e) { tabs = []; }
+    for (const tab of tabs || []) {
+      if (!tab || typeof tab.id !== 'number') continue;
+      try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: lane.js }); }
+      catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
+    }
+  }
+}
+
 restoreSurfaces();
-chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { restoreSurfaces(); });
+restoreLaneChats();
+chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); restoreLaneChats(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { restoreSurfaces(); restoreLaneChats(); });
 
 async function surfaceStatus() {
   const surfaces = await readSurfaces();

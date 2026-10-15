@@ -56,7 +56,9 @@ const FlowChatLane = (() => {
     }
     const judged = FlowChatDraft.judge(Object.assign({}, i, { evidence: evidence || {}, detected: detected }));
     if (!judged || judged.sends !== false || !judged.show || !judged.draft) {
-      return { ok: false, sends: false, reason: (judged && judged.reason) || 'silence', judged: judged };
+      const reason = (judged && judged.reason) || 'silence';
+      try { console.info('[Glance] whyNotShown: ' + reason); } catch (e) { /* the console can be missing */ }
+      return { ok: false, sends: false, reason: reason, judged: judged };
     }
     const wrote = FlowChatCompose.insertDraft(box, judged.draft);
     wrote.sends = false;

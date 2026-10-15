@@ -94,7 +94,17 @@ function row(lane) {
   });
   item.append(name, button);
   list.append(item);
-  granted(lane.origins).then((on) => { mark(button, on); if (on) register(lane); });
+  granted(lane.origins).then((on) => {
+    mark(button, on);
+    if (on) {
+      register(lane).catch(() => {
+        mark(button, false);
+        say(lane.title + ' is allowed, but the reader did not start. Open this page again.');
+      });
+      return;
+    }
+    if (lane.id === 'messenger') say('Messenger is off, so Business Suite stays quiet. Turn Messenger on.');
+  });
 }
 
 LANES.forEach(row);

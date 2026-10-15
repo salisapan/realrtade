@@ -63,6 +63,7 @@ const FlowChatDraft = (() => {
     return addDays(day, -delta);
   }
 
+  // clock is the message time when the host could read one. "Last week" is that week.
   function windowFor(body, now) {
     const clock = now instanceof Date ? now : new Date(typeof now === 'number' ? now : Date.now());
     // שבוע שעבר only at a word edge. מהשבוע שעבר is one word and stays quiet.

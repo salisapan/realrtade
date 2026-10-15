@@ -26,13 +26,27 @@ const FlowLaneChat = (() => {
     return { ok: true, sends: false, evidence: { connected: on, events: null } };
   }
 
+  // The headless copy sets __glanceE2e.installed. A store build has update_url
+  // and never takes this path, even if that global is present.
+  function e2eToken() {
+    const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
+    if (!e2e || e2e.installed !== true || typeof e2e.googleAuthToken !== 'function') return null;
+    try {
+      const manifest = typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function'
+        ? chrome.runtime.getManifest()
+        : null;
+      if (manifest && manifest.update_url) return null;
+    } catch (e) { return null; }
+    return e2e;
+  }
+
   // chrome.identity cannot be replaced inside the service worker. The headless
   // suite sets __glanceE2e.googleAuthToken, the same seam getGoogleAuthToken
   // uses. Production never sets it, so the Chrome call below is unchanged.
   function silentToken() {
     return new Promise((resolve) => {
-      const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
-      if (e2e && typeof e2e.googleAuthToken === 'function') {
+      const e2e = e2eToken();
+      if (e2e) {
         Promise.resolve().then(() => e2e.googleAuthToken(false)).then((token) => resolve(token || null)).catch(() => resolve(null));
         return;
       }
@@ -110,6 +124,8 @@ const FlowLaneChat = (() => {
     const address = location.address || {};
     const line = [address.street, address.city].map((part) => String(part || '').trim()).filter(Boolean).join(', ');
     if (named && fullAddress(named)) return named;
+    // "Taizu" plus "23 Montefiore, Tel Aviv" stays one place: the name and the address.
+    if (line && named) return named + ', ' + line;
     if (line) return line;
     return named;
   }
@@ -125,7 +141,17 @@ const FlowLaneChat = (() => {
     try { return await res.json(); } catch (e) { return null; }
   }
 
-  async function readGoogle(fetchOf, token, start, end) {
+  function abortAfter(timeoutMs) {
+    const limit = timeoutMs == null ? GRAPH_TIMEOUT_MS : timeoutMs;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e) { /* already settled */ } }, limit) : null;
+    return {
+      signal: ctrl && ctrl.signal,
+      done() { if (timer) clearTimeout(timer); }
+    };
+  }
+
+  async function readGoogle(fetchOf, token, start, end, timeoutMs) {
     const q = new URLSearchParams({
       timeMin: new Date(start).toISOString(),
       timeMax: new Date(end).toISOString(),
@@ -134,7 +160,11 @@ const FlowLaneChat = (() => {
       orderBy: 'startTime',
       fields: 'items(id,status,location,start)'
     });
-    const data = await readJson(fetchOf, CALENDAR + '/calendars/primary/events?' + q.toString(), token);
+    const gate = abortAfter(timeoutMs);
+    let data = null;
+    try {
+      data = await readJson(fetchOf, CALENDAR + '/calendars/primary/events?' + q.toString(), token, null, gate.signal);
+    } finally { gate.done(); }
     if (!data) return null;
     return (Array.isArray(data.items) ? data.items : []).slice(0, 20).map((e) => ({
       id: e && e.id || null,
@@ -151,15 +181,11 @@ const FlowLaneChat = (() => {
       $select: 'id,isCancelled,location,start',
       $top: '20'
     });
-    const limit = timeoutMs == null ? GRAPH_TIMEOUT_MS : timeoutMs;
-    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e) { /* already settled */ } }, limit) : null;
+    const gate = abortAfter(timeoutMs);
     let data = null;
     try {
-      data = await readJson(fetchOf, GRAPH + '?' + q.toString(), token, { Prefer: 'outlook.timezone="UTC"' }, ctrl && ctrl.signal);
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
+      data = await readJson(fetchOf, GRAPH + '?' + q.toString(), token, { Prefer: 'outlook.timezone="UTC"' }, gate.signal);
+    } finally { gate.done(); }
     if (!data) return null;
     return (Array.isArray(data.value) ? data.value : []).slice(0, 20).map((e) => ({
       id: e && e.id || null,
@@ -194,7 +220,7 @@ const FlowLaneChat = (() => {
     const events = [];
     let failed = googleFailed;
     if (googleToken) {
-      const rows = await readGoogle(fetchOf, googleToken, start, end);
+      const rows = await readGoogle(fetchOf, googleToken, start, end, d.graphTimeout);
       if (!rows) failed = true;
       else rows.forEach((row) => events.push(row));
     }

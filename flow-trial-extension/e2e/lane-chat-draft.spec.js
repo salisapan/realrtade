@@ -14,6 +14,8 @@ const LANE_JS = [
   'src/content-messenger.js'
 ];
 const PLACE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/messenger-place.html'), 'utf8');
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 async function registerMessenger(glance) {
   const registered = await glance.evaluateWorker(async (files) => {
@@ -94,4 +96,44 @@ test('Google and Outlook at different addresses stay quiet', async ({ glance }) 
   expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
   const calls = await glance.apiCalls();
   expect(calls.some((call) => /\/(send|reply|sendMail)\b/i.test(String(call.url)))).toBe(false);
+});
+
+test('an open Business Suite thread drafts the existing last row and sends nothing', async ({ glance }) => {
+  const registered = await glance.evaluateWorker(async (files) => {
+    const id = 'glance-lane-messenger-e2e';
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* first run */ }
+    await chrome.scripting.registerContentScripts([{
+      id: id,
+      matches: [
+        'https://business.facebook.com/latest/inbox',
+        'https://business.facebook.com/latest/inbox/*',
+        'https://www.business.facebook.com/latest/inbox',
+        'https://www.business.facebook.com/latest/inbox/*'
+      ],
+      js: files,
+      runAt: 'document_idle'
+    }]);
+    const listed = await chrome.scripting.getRegisteredContentScripts({ ids: [id] });
+    return listed.length === 1 && listed[0].matches.indexOf('https://business.facebook.com/latest/inbox/*') >= 0;
+  }, LANE_JS);
+  expect(registered).toBe(true);
+
+  await glance.seedOutlook();
+  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-08T10:00:00.000Z' });
+  const page = await glance.openBusiness(SUITE_HTML);
+  const before = await page.locator('[role="row"]').count();
+  const box = page.locator('[data-glance-composer="1"]');
+  await expect(box).toContainText('דיזנגוף', { timeout: 15000 });
+  const text = await box.innerText();
+  expect(text.indexOf('דיזנגוף 99 - ')).toBe(0);
+  expect(text.indexOf(encodeURIComponent('דיזנגוף 99'))).toBeGreaterThanOrEqual(0);
+  expect(await page.locator('[role="row"]').count()).toBe(before);
+  expect(await page.locator('[role="row"]').last().innerText()).toContain(SUITE_ASK);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+
+  const calls = await glance.apiCalls();
+  expect(calls.some((call) => call.method === 'GET' && String(call.url).indexOf('/me/calendarView') >= 0)).toBe(true);
+  expect(calls.some((call) => /\/(send|reply|sendMail)\b/i.test(String(call.url)))).toBe(false);
+  const flows = await glance.flows();
+  expect(flows.length).toBe(0);
 });

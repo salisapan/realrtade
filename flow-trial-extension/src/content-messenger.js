@@ -9,11 +9,22 @@
   if (typeof FlowMessengerParse === 'undefined') return;
   const P = FlowMessengerParse;
   const DEBOUNCE_MS = 1200;
+  const RETRY_MS = 1000;
+  const RETRY_LIMIT = 8;
   const MAX_ROWS = 40;
   let timer = null;
+  let tries = 0;
   let lastReportedHealth = null;
   const drafted = new Set();
   const inflight = new Set();
+  const quietLogged = new Set();
+
+  function whyNot(reason, key) {
+    const id = String(reason || 'silence') + '\n' + String(key || '');
+    if (quietLogged.has(id)) return;
+    quietLogged.add(id);
+    try { console.info('[Glance] whyNotShown: ' + reason); } catch (e) { /* the console can be missing */ }
+  }
 
   function root() {
     return document.querySelector('[data-glance-chat], [role="main"]') || document.body;
@@ -36,12 +47,22 @@
   }
 
   function author(row) {
+    const surface = String(row.getAttribute('data-surface') || '');
+    if (/message_out|from_page/.test(surface)) return 'me';
+    if (/message_in|from_user/.test(surface)) return 'them';
     return P.authorOf({
       author: row.getAttribute('data-author'),
       label: row.getAttribute('aria-label') || '',
       outgoing: Boolean(row.querySelector('[data-scope="outgoing"], [data-testid="outgoing"]')),
       incoming: Boolean(row.querySelector('[data-scope="incoming"], [data-testid="incoming"]'))
     });
+  }
+
+  function sentAt(row) {
+    const node = row.querySelector('time[datetime]');
+    if (!node) return null;
+    const n = Date.parse(node.getAttribute('datetime') || '');
+    return Number.isFinite(n) ? n : null;
   }
 
   function textOf(row) {
@@ -62,7 +83,7 @@
       if (el.getAttribute('data-glance-composer') === '1') return el;
       const label = ((el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('placeholder') || '')).toLowerCase();
       if (/search|חפש/.test(label)) continue;
-      if (/message|הודעה/.test(label)) return el;
+      if (/message|הודעה|reply|השב|תגובה/.test(label)) return el;
     }
     return null;
   }
@@ -75,17 +96,22 @@
   }
 
   function maybeDraft(main, list, party, direct) {
-    if (typeof FlowChatLane === 'undefined' || !direct) return;
+    if (typeof FlowChatLane === 'undefined' || !direct) {
+      if (!direct) whyNot('not-one-to-one', location.href);
+      else whyNot('missing-lane', location.href);
+      return;
+    }
     const last = list[list.length - 1];
     if (!last) return;
     const who = author(last);
-    if (who !== 'them') return;
     const text = textOf(last);
     const id = last.getAttribute('data-message-id') || text.slice(0, 80);
-    const key = id + '\n' + text;
+    const key = (party.name || '') + '\n' + id + '\n' + text;
+    if (who !== 'them') { whyNot(who === 'me' ? 'from-me' : 'sender-not-identified', key); return; }
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
     const box = composerBox(main);
+    const when = sentAt(last);
     FlowChatLane.draftInto(box, {
       text: text,
       fromMe: false,
@@ -93,27 +119,33 @@
       group: false,
       quoted: forwarded(last),
       channel: 'messenger',
-      now: Date.now(),
+      now: when == null ? Date.now() : when,
       sender: { name: party.name }
     }).then((r) => {
+      if (r && r.reason === 'no-box') whyNot('no-box', key);
       if (!r || r.reason !== 'no-box') drafted.add(key);
-    }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
+    }).catch(() => { whyNot('draft-failed', key); drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
 
   function scan() {
-    if (!P.page(location.href)) return;
+    if (!P.page(location.href)) { whyNot('not-a-messenger-page', location.href); return; }
     const main = root();
     const list = rows(main);
-    if (!list.length) { report(false, 'no-messages-recognised'); return; }
+    if (!list.length) {
+      if (tries < RETRY_LIMIT) { tries += 1; clearTimeout(timer); timer = setTimeout(scan, RETRY_MS); return; }
+      whyNot('no-messages-recognised', location.href);
+      report(false, 'no-messages-recognised');
+      return;
+    }
+    tries = 0;
     const thread = P.classify(main, location.href);
     const t = String((thread && thread.name) || titleOf(main) || '').replace(/\s+/g, ' ').trim();
-    if (!t) { report(false, 'chat-not-identified'); return; }
+    if (!t) { whyNot('chat-not-identified', location.href); report(false, 'chat-not-identified'); return; }
     const direct = thread && thread.kind === 'one-to-one';
     globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
     globalThis.__glanceChatSurfaces.messenger = globalThis.__glanceChatSurfaces.messenger || {};
     globalThis.__glanceChatSurfaces.messenger.name = t;
-    if (!direct) { report(true); return; }
-    if (list.some((n) => author(n) == null)) { report(false, 'sender-not-identified'); return; }
+    if (!direct) { whyNot('not-one-to-one', t); report(true); return; }
     report(true);
     const party = { name: t, phone: null, email: null };
     const threadId = P.threadIdFor(location.href, t);
@@ -138,7 +170,8 @@
   }
 
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+  const watch = document.documentElement || document.body;
+  if (watch) new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
   schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.messenger = { scan: scan };
