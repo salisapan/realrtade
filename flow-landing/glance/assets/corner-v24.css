@@ -1,0 +1,299 @@
+/* Corner v24 — email hero, one-way scroll, real brand marks, American WhatsApp, day cards. */
+
+.h21-beams{display:none !important}
+
+/* Closed. — static ink-to-blue gradient, italic semibold, WebKit clip. */
+.h21-h1 em,
+.h21-h1 .h1-echo em,
+.cta21-h em{
+  font-style:italic !important;
+  font-weight:600 !important;
+  background-image:linear-gradient(105deg,#1d1d1f 0%,#0071e3 62%,#2a6fd6 100%) !important;
+  background-size:100% 100% !important;
+  background-repeat:no-repeat !important;
+  background-position:0 0 !important;
+  -webkit-background-clip:text !important;
+  background-clip:text !important;
+  -webkit-text-fill-color:transparent !important;
+  color:transparent !important;
+  animation:none !important;
+  filter:none !important;
+}
+html[data-theme="dark"] .h21-h1 em,
+html[data-theme="dark"] .h21-h1 .h1-echo,
+html[data-theme="dark"] .h21-h1 .h1-echo em,
+html[data-theme="dark"] .cta21-h em{
+  background-image:linear-gradient(105deg,#f5f5f7 0%,#0071e3 58%,#2a6fd6 100%) !important;
+  -webkit-background-clip:text !important;
+  background-clip:text !important;
+  -webkit-text-fill-color:transparent !important;
+  color:transparent !important;
+  animation:none !important;
+}
+
+/* Lock — 16px stroke glyph inside a 28px circle. */
+.act-lock,
+html[data-theme="dark"] .act-lock{
+  width:28px !important;
+  height:28px !important;
+  min-width:28px;
+  border-radius:50% !important;
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  background:#f5f5f7 !important;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.08) !important;
+  color:#8e8e93 !important;
+  position:relative;
+  padding:0;
+}
+html[data-theme="dark"] .act-lock{
+  background:rgba(255,255,255,.06) !important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14) !important;
+  color:#aeaeb2 !important;
+}
+.act-lock::before,
+.act-lock::after{
+  content:none !important;
+  display:none !important;
+  border:0 !important;
+  background:none !important;
+  width:0 !important;
+  height:0 !important;
+}
+.act-lock svg{display:block;width:16px;height:16px}
+.act-close .act-row{grid-template-columns:28px 30px minmax(0,1fr) auto !important}
+.stage-demo[data-state="settled"] .act-close .act-row{grid-template-columns:28px 22px minmax(0,1fr) !important}
+
+/* Real brand marks stay in their own colors. */
+.act-glyph.is-brand,
+.h21-tile-ic.is-brand{
+  background:transparent !important;
+  box-shadow:none !important;
+  color:inherit !important;
+}
+.act-glyph.is-brand svg{width:18px;height:18px}
+html[data-theme="dark"] .glance-surface .act-glyph.is-brand[data-brand="notion"] svg{filter:invert(1)}
+
+/* Hero card stays compact enough for six steps. */
+.h21-card .gs-intent{font-size:14px;margin-bottom:8px}
+.h21-card .acts{gap:4px}
+.h21-card .act-row{padding:6px 8px}
+.h21-card .act-text{font-size:13px}
+.h21-card .ss-add{margin:4px 0 6px}
+.h21-mail .gw-subj{font-size:20px;margin-bottom:12px;min-width:0;flex-wrap:wrap}
+.h21-mail .gw-subj > span{min-width:0;overflow-wrap:anywhere}
+.h21-mail .gw-mail{padding:16px 22px 0 20px}
+.h21-mail .gw-msg,.h21-mail .gw-mbody,.h21-mail .gw-from{min-width:0}
+.h21-mail .gw-p{margin:0 0 8px;max-width:100%}
+.gw-artifact .gw-notion{display:flex;align-items:center;gap:8px}
+.gw-notion-ic{width:16px;height:16px;display:inline-flex}
+.gw-notion-ic svg{width:16px;height:16px}
+
+/* Add-a-step field, quiet, always the typing row. */
+.ss-add[data-open="true"] .ss-add-row{
+  background:transparent !important;
+  border:1px dashed rgba(0,0,0,.16) !important;
+  box-shadow:none !important;
+}
+html[data-theme="dark"] .ss-add[data-open="true"] .ss-add-row{
+  background:transparent !important;
+  border-color:rgba(255,255,255,.16) !important;
+  box-shadow:none !important;
+}
+.ss-add-input::placeholder{font-weight:450}
+
+/* WhatsApp list: time never collides with the name. */
+.wa21-chats li > div:not(.wa21-meta){padding-inline-end:86px}
+.wa21-chats b,.wa21-chats li > div:not(.wa21-meta) > span{
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.wa21-suggests{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 0}
+.wa21-suggests button{
+  appearance:none;border:0;background:transparent;cursor:pointer;
+  color:#54656f;font:500 12px/1.25 Inter,system-ui,sans-serif;
+  padding:6px 10px;border-radius:999px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.1);
+}
+.wa21-suggests button:hover{background:rgba(0,0,0,.03)}
+html[data-theme="dark"] .wa21-suggests button{color:#aebac1;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.wa21-as{margin:0;padding:6px 16px 0;font:450 11.5px/1.3 Inter,system-ui,sans-serif;color:#8696a0}
+.wa21-send{
+  border:0;background:transparent;color:#00a884;width:34px;height:34px;border-radius:50%;
+  display:grid;place-items:center;cursor:pointer;flex:none;padding:0;
+}
+.wa21-send:hover{background:rgba(0,168,132,.08)}
+.wa21-just{animation:wa24in .28s ease}
+@keyframes wa24in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.wa-think{position:relative;width:18px;height:18px;margin-inline-start:8px;flex:none}
+.wa-think[hidden]{display:none !important}
+#wa-glance.is-thinking .gs-intent{opacity:.55}
+
+/* Meet replay stays out until the first run finishes. */
+.mj-replay[hidden]{display:none !important}
+
+/* Day carousel — depth, real logos, room to breathe. */
+.day21-arrow{
+  background:#fff !important;
+  box-shadow:0 0 0 1px rgba(0,0,0,.08), 0 4px 8px -6px rgba(0,0,0,.22) !important;
+}
+html[data-theme="dark"] .day21-arrow{
+  background:#161922 !important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.1), 0 4px 8px -6px rgba(0,0,0,.45) !important;
+}
+.day21-card{
+  min-height:392px;
+  padding:22px 22px 18px;
+  border-radius:28px;
+  background:linear-gradient(180deg,#fff 0%,#f6f6f8 100%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 1px rgba(0,0,0,.04),
+    0 10px 20px -14px rgba(0,0,0,.16),
+    0 28px 44px -24px rgba(0,0,0,.22),
+    0 0 0 1px rgba(0,0,0,.05) !important;
+}
+html[data-theme="dark"] .day21-card{
+  background:linear-gradient(180deg,#141824 0%,#0e1118 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 1px 1px rgba(0,0,0,.3),
+    0 18px 36px -18px rgba(0,0,0,.55),
+    0 0 0 1px rgba(255,255,255,.08) !important;
+}
+.day24-top{display:flex;align-items:center;gap:10px;width:100%}
+.day24-av{
+  width:36px;height:36px;border-radius:50%;flex:none;
+  display:grid;place-items:center;
+  background:#1d1d1f;color:#fff;
+  font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.02em;
+}
+.day24-file{
+  border-radius:10px;
+  background:#f5f5f7;
+  color:inherit;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);
+}
+.day24-file svg{width:20px;height:20px;display:block}
+html[data-theme="dark"] .day24-av.day24-file{
+  background:#2c2c2e;
+  color:inherit;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.day21-src{
+  background:transparent;padding:0;margin-inline-start:0;max-width:none;
+  font-weight:600;color:#6e6e73;
+}
+.day24-mark{
+  width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;
+  background:transparent !important;box-shadow:none !important;color:inherit !important;border-radius:0;
+}
+.day24-mark svg{width:18px;height:18px;display:block}
+.day21-acts li{min-height:44px}
+.day24-res{margin-inline-start:auto;text-align:end;font-size:12.5px;color:#6e6e73;letter-spacing:-.01em}
+html[data-theme="dark"] .day24-res{color:#a1a1a6}
+html[data-theme="dark"] .day24-mark[data-brand="notion"] svg{filter:invert(1)}
+html[data-theme="dark"] .day24-av{background:#f5f5f7;color:#1d1d1f}
+.day21-ask{font-weight:560;letter-spacing:-.025em}
+.day21-rcpt{padding-top:4px}
+@media (max-width:760px){
+  .day21-card{min-height:0}
+  .wa21-suggests{padding-inline:10px}
+  .day24-res{max-width:46%}
+}
+
+/* Email text stays clear of the Glance card. Padding is the card’s overlap plus a gap. */
+@media (min-width:1100px){
+  .h21-mail .gw-mail{padding-block:16px 8px !important;padding-inline:20px 128px !important}
+  .h21-mail #gw-artifact:not([hidden]){
+    inset-inline-start:16px !important;
+    inset-inline-end:124px !important;
+  }
+}
+@media (min-width:761px) and (max-width:1099px){
+  .h21-win{height:520px}
+  .h21-mail .gw-mail{padding-block:14px 8px !important;padding-inline:16px 320px !important}
+  .h21-mail .gw-subj{font-size:18px}
+  .h21-mail #gw-artifact:not([hidden]){
+    inset-inline-start:12px !important;
+    inset-inline-end:316px !important;
+  }
+}
+@media (max-width:760px){
+  .h21-win{height:min(64vh,540px) !important}
+  .h21-mail .gw-body{height:calc(100% - 46px);min-height:0;overflow:hidden}
+  .h21-mail .gw-main,.h21-mail .gw-mail{min-height:0}
+  .h21-mail .gw-mail{padding:12px 18px 10px !important;overflow:auto}
+  .h21-mail .gw-p{font-size:13.5px;line-height:1.45}
+  .h21-card{top:calc(min(64vh,540px) + 16px) !important}
+  .h21-mail #gw-artifact:not([hidden]){margin-inline:0;max-width:100%}
+}
+
+/* WhatsApp fills the headline column. The list is 420px; the card is 400px inside it. */
+#demo-whatsapp-block .surf-rail{
+  display:block !important;
+  grid-template-columns:minmax(0,1fr) !important;
+}
+#demo-whatsapp .wa21-wrap,
+#demo-whatsapp .wa21{width:100% !important;max-width:none !important}
+#wa-glance .act-text{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#wa-glance .act-row{
+  grid-template-columns:28px 28px minmax(0,1fr) auto !important;
+  column-gap:8px;
+}
+#wa-glance .chip{flex-wrap:nowrap !important;align-items:center}
+#wa-glance .chip-txt{
+  flex:1 1 auto;
+  min-width:0 !important;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#wa-glance .ss-add-input{text-overflow:ellipsis}
+@media (min-width:1100px){
+  #demo-whatsapp .wa21-list{width:420px !important}
+  html:not([dir="rtl"]) .wa21-wrap .wa21-glance.glance-surface{
+    left:10px !important;
+    right:auto !important;
+    width:400px !important;
+    max-width:400px !important;
+  }
+  html[dir="rtl"] .wa21-wrap:has(.wa21[dir="rtl"]) .wa21-glance.glance-surface{
+    left:auto !important;
+    right:10px !important;
+    width:400px !important;
+    max-width:400px !important;
+  }
+}
+@media (min-width:761px) and (max-width:1099px){
+  #wa-glance .act-row{grid-template-columns:28px 28px minmax(0,1fr) !important}
+  #wa-glance .act-tag{grid-column:3;justify-self:start}
+  #demo-whatsapp .wa21-list{width:min(420px,48%) !important}
+  html:not([dir="rtl"]) .wa21-wrap .wa21-glance.glance-surface{
+    left:10px !important;
+    right:auto !important;
+    width:min(400px,calc(48% - 20px)) !important;
+    max-width:min(400px,calc(48% - 20px)) !important;
+  }
+  html[dir="rtl"] .wa21-wrap:has(.wa21[dir="rtl"]) .wa21-glance.glance-surface{
+    left:auto !important;
+    right:10px !important;
+    width:min(400px,calc(48% - 20px)) !important;
+    max-width:min(400px,calc(48% - 20px)) !important;
+  }
+}
+@media (max-width:760px){
+  html .wa21-wrap .wa21-glance.glance-surface{
+    position:relative !important;
+    top:auto !important;
+    left:auto !important;
+    right:auto !important;
+    width:auto !important;
+    max-width:none !important;
+    margin:0 !important;
+  }
+}

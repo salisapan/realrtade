@@ -36,6 +36,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Other apps (WhatsApp Web, Outlook, capture) | `multi-platform.md` | `src/content-whatsapp.js`, `core/graph-mail.js`, `outlook-*.js` | `whatsapp-harness`, `outlook-*-corpus` |
 | Community (cross-user) learning (**dormant**) | `community-learning.md` | `core/community.js` | `community-corpus` |
 | Packaging, the Chrome Web Store, setup | `flow-trial-extension/docs/SETUP.md`, `chrome-web-store-submission.md`, `hybrid-execution-architecture.md` §0c | `scripts/package_trial_extension.py` (lite/full), `scripts/verify_trial_install.py` | `verify_trial_install.py` |
+| Glance website signup gate (draft, not deployed) | `docs/glance/signup-consent-contract.md`, `docs/glance/signup-gate-benchmark.md`, `docs/glance/emails/marketing-confirm.md`, `docs/glance/emails/marketing-confirm.html` | `flow-landing/glance/gate.js`, `flow-landing/assets/site-config.js` | - |
 | Open work, blockers, decisions | `open-tasks.md` | - | - |
 
 ## 2. When X changes, update these in the SAME commit

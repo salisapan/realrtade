@@ -669,7 +669,7 @@ canvas.terrain-canvas.show{opacity:1}
    docs/design-principles.md, "the more foundational one leads"), not because
    of an oversight. */
 .cta-paths{display:grid; gap:18px; width:100%; max-width:760px; margin:6px 0 22px; text-align:start; align-items:start}
-@media (min-width:760px){ .cta-paths{grid-template-columns:1fr 1fr} }
+@media (min-width:760px){ .cta-paths{grid-template-columns:1fr} }
 .cta-path{
   display:flex; flex-direction:column; gap:8px; padding:24px 26px; border-radius:20px;
   border:1px solid var(--line); background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
