@@ -110,22 +110,51 @@ const FlowGoogleCompose = (() => {
     return stamp(planned, applied.before, clock);
   }
 
+  function unconfirmedCompose() {
+    return {
+      ok: false,
+      reason: 'unconfirmed',
+      closes: false,
+      sent: false,
+      error: "Couldn't confirm it's unchanged. Undo left it alone."
+    };
+  }
+
+  function editedCompose() {
+    return {
+      ok: false,
+      reason: 'user-edited',
+      closes: false,
+      sent: false,
+      error: 'You edited this. Undo left it alone.'
+    };
+  }
+
+  // A live read is three strings. A missing state, a thrown read, or a timeout
+  // is not an empty compose and is not an edit.
+  function liveHash(state) {
+    if (!state || typeof state !== 'object') return null;
+    if (state.readFailed === true || state.timeout === true) return null;
+    if (state.reason === 'verify-timeout' || state.reason === 'timeout') return null;
+    if (typeof state.to !== 'string' || typeof state.subject !== 'string' || typeof state.body !== 'string') return null;
+    try {
+      return contentHash(state.to, state.subject, state.body);
+    } catch (e) {
+      return null;
+    }
+  }
+
   function undo(ref, state) {
-    const current = state || { to: '', subject: '', body: '', sendClicks: 0 };
-    if ((current.sendClicks || 0) > 0 || (ref && ref.sendClicks > 0)) {
+    const current = state && typeof state === 'object' ? state : null;
+    if ((current && (current.sendClicks || 0) > 0) || (ref && ref.sendClicks > 0)) {
       return { ok: false, reason: 'already-sent', sent: true, closes: false, written: 'Already sent. Nothing was cleared.' };
     }
-    const before = ref && ref.before;
-    if (!before) return { ok: false, reason: 'unclear', closes: false };
-    if (ref.contentHash && contentHash(current.to, current.subject, current.body) !== ref.contentHash) {
-      return {
-        ok: false,
-        reason: 'user-edited',
-        closes: false,
-        sent: false,
-        error: 'Undo stopped. You changed the compose, so nothing was rewritten.'
-      };
-    }
+    if (!ref || ref.contentHash == null || ref.contentHash === '') return unconfirmedCompose();
+    const live = liveHash(current);
+    if (!live) return unconfirmedCompose();
+    if (live !== String(ref.contentHash)) return editedCompose();
+    const before = ref.before;
+    if (!before || typeof before !== 'object') return unconfirmedCompose();
     current.to = before.to || '';
     current.subject = before.subject || '';
     current.body = before.body || '';

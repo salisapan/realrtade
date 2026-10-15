@@ -336,7 +336,7 @@ test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the bo
   expect(order).toBe(true);
   await body.locator('[data-glance-draft]').evaluate((el) => { el.textContent = 'Typed by the person'; });
   await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   await expect(body.locator('[data-glance-draft]')).toHaveText('Typed by the person');
   await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
 });
@@ -384,7 +384,7 @@ test('Compose Undo refuses after the person types and leaves their text', async 
   await body.evaluate((el) => { el.textContent = 'Edited by the person'; });
   const before = server.calls.length;
   await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   await expect(body).toHaveText('Edited by the person');
   expect(server.calls.slice(before).filter((c) => c.method !== 'GET').length).toBe(0);
 });

@@ -212,12 +212,19 @@ const FlowGoogleComposePage = (() => {
     if (!bodyEl) return closed();
     const toEl = findTo(doc);
     const subEl = findSubject(doc);
-    const state = {
-      to: toEl ? readValue(toEl) : '',
-      subject: subEl ? readValue(subEl) : '',
-      body: readValue(bodyEl),
-      sendClicks: (ref && ref.sendClicks) || 0
-    };
+    let state = null;
+    try {
+      const to = toEl ? readValue(toEl) : '';
+      const subject = subEl ? readValue(subEl) : '';
+      const body = readValue(bodyEl);
+      if (typeof to !== 'string' || typeof subject !== 'string' || typeof body !== 'string') {
+        state = { readFailed: true, sendClicks: (ref && ref.sendClicks) || 0 };
+      } else {
+        state = { to: to, subject: subject, body: body, sendClicks: (ref && ref.sendClicks) || 0 };
+      }
+    } catch (e) {
+      state = { readFailed: true, sendClicks: (ref && ref.sendClicks) || 0 };
+    }
     const result = Compose.undo(ref, state);
     if (!result.ok) return result;
     if (toEl) writeValue(toEl, state.to);
