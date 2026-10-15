@@ -17,9 +17,17 @@ This page is for an unpacked copy of `flow-trial-extension` from the repo. It is
 2. On `chrome://extensions`, copy the extension id.
 3. Open the service worker console and run `chrome.storage.local.set({ glanceDevFixture: true })`.
 4. Open `chrome-extension://<ID>/dev/messenger-fixture.html`. No manifest entry is required. The composer should show `דיזנגוף 99` and a maps link. The page has no Send button. The row is dated about an hour ago. The fake event is 8 October 2026 at דיזנגוף 99. Run it while that date is still in last week (through Saturday 17 October 2026).
-5. Open the same address with `?case=two`. The composer stays empty. That case has two addresses, דיזנגוף 99 and אבן גבירול 30.
+5. Each quiet case stays empty, shows one line `[Glance] whyNotShown: <reason>` on the page, and prints that same line in the page console. Nothing is sent.
+   - `?case=two` — two addresses, דיזנגוף 99 and אבן גבירול 30. Reason `conflict`. A draft that was already deleted wins instead: the stored row is `closed`, and the line is `closed`, not `conflict`. If nothing was deleted, the line stays `conflict` and the row is not closed.
+   - `?case=greeting` — the row says היי. Reason `no-ask`.
+   - `?case=group` — the header has a Group chip and the line Chat members. Reason `not-one-to-one`.
+   - `?case=self-last` — the last message is yours. Reason `from-me`.
+   - `?case=stale` — the row is older than 14 days. Reason `stale`.
+   - `?case=future` — the row is five minutes ahead. Reason `future`.
 6. `chrome.storage.local.set({ glanceDevFixture: false })` turns the page off.
 7. A store or outlook zip does not contain this page. A manifest with `update_url` ignores `glanceDevFixture`.
+
+דנה ורותם with one profile link whose id is the thread id drafts. The ו before ר is part of the name (the same ו+י/ר surname check as דנה וייס and דנה ורד). The composer gets the draft. Glance does not send it.
 
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
 engine for organizations with sensitive or regulated data) — not a stripped

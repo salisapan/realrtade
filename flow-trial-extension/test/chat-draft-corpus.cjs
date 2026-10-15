@@ -75,9 +75,31 @@ const optional = manifest.optional_host_permissions || [];
 const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
 check('chat hosts are optional, never required', !required.some((h) => chatHost.test(h)) && optional.some((h) => /messenger\.com/.test(h)) && optional.some((h) => /instagram\.com\/direct/.test(h)) && optional.some((h) => /web\.whatsapp\.com/.test(h)));
 check('Business Suite inbox is an optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
+function chromeHostCovers(pattern, url) {
+  const u = new URL(url);
+  const m = String(pattern || '').match(/^(https?):\/\/([^/]+)(\/.*)$/);
+  if (!m || (m[1] + ':') !== u.protocol || m[2] !== u.hostname) return false;
+  const body = m[3].split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
+  const re = new RegExp('^' + body + '$');
+  return re.test(u.pathname);
+}
+function originsAfter(src, marker) {
+  const at = src.indexOf(marker);
+  if (at < 0) return [];
+  const slice = src.slice(at, src.indexOf('js:', at));
+  return slice.match(/https:\/\/[^'"]+/g) || [];
+}
+const e2eePages = [
+  'https://www.facebook.com/messages/e2ee/t/1358224314037055',
+  'https://facebook.com/messages/e2ee/t/1358224314037055'
+];
 check('the enable page is the options page', manifest.options_ui && manifest.options_ui.page === 'lane-chat/enable.html');
 check('the manifest service worker stays background.js', manifest.background.service_worker === 'src/background.js');
 const backgroundSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
+const enableSrc = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8');
+const messengerLaneOrigins = originsAfter(backgroundSrc, "id: 'glance-lane-messenger'");
+const enableMessengerOrigins = originsAfter(enableSrc, "id: 'messenger'");
+check('facebook.com/messages/e2ee is already covered by messages/*', e2eePages.every((url) => optional.some((h) => chromeHostCovers(h, url)) && messengerLaneOrigins.some((h) => chromeHostCovers(h, url)) && enableMessengerOrigins.some((h) => chromeHostCovers(h, url))));
 const backgroundLines = backgroundSrc.split('\n');
 const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
@@ -522,6 +544,8 @@ check('דנה ונועה stays quiet without a matching thread id', FlowMessenge
 check('דנה ונועה stays quiet when the thread id matches', FlowMessengerParse.classify(vavNoa, msHref).kind !== 'one-to-one' && FlowInstagramParse.classify(vavNoa, msHref).kind !== 'one-to-one');
 const vered = liveRoot('identity/id-vered.html');
 check('דנה ורד drafts when the thread id matches', FlowMessengerParse.classify(vered, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(vered, msHref).kind === 'one-to-one');
+const rutem = namedHeader('דנה ורותם', '<a href="/100012345678/" role="link">דנה ורותם</a>', msInfo);
+check('דנה ורותם drafts when one profile thread id matches', FlowMessengerParse.classify(rutem, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(rutem, msHref).kind === 'one-to-one' && FlowBusinessParse.classify(rutem, msHref).kind === 'one-to-one');
 const weiss = liveRoot('identity/id-weiss.html');
 check('Weiss stays quiet without the matching thread id', FlowMessengerParse.isOneToOne(weiss) === false && FlowMessengerParse.classify(weiss).kind !== 'one-to-one' && FlowInstagramParse.classify(weiss).kind !== 'one-to-one');
 check('Weiss drafts when the thread id matches the profile', FlowMessengerParse.classify(weiss, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(weiss, msHref).kind === 'one-to-one');
@@ -1164,6 +1188,9 @@ console.log('\n--- calendar evidence ---\n');
   const staffDraft = await open('messenger-place.html', staffHref, 'src/content-messenger.js', { html: personHtml(staffName, '100012345678') });
   check('Dana Levi (Staff) drafts', staffDraft.text.indexOf('Taizu - ') === 0 && staffDraft.sendClicks === 0, staffDraft.text);
   staffDraft.close();
+  const rutemDraft = await open('messenger-place.html', staffHref, 'src/content-messenger.js', { html: personHtml('דנה ורותם', '100012345678') });
+  check('דנה ורותם drafts and nothing is sent', rutemDraft.text.indexOf('Taizu - ') === 0 && rutemDraft.sendClicks === 0, rutemDraft.text);
+  rutemDraft.close();
 
   function skewHtml(stamp) {
     return personHtml('Dana Levi', 'danalevi').replace('data-message-id="m1">', 'data-message-id="m1"><time datetime="' + stamp + '"></time>');
@@ -1216,28 +1243,65 @@ console.log('\n--- calendar evidence ---\n');
   enable.window.close();
 
   const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
-  check('the fixture page has the sentence and no send button', fixtureHtml.indexOf('איפה היה המסעדה משבוע שעבר?') >= 0 && fixtureHtml.indexOf('<button') < 0 && !/>\s*Send\s*</.test(fixtureHtml));
+  const fixtureClock = fs.readFileSync(path.join(ROOT, 'dev/fixture-clock.js'), 'utf8');
+  check('the fixture page has the sentence and no send button', fixtureHtml.indexOf('איפה היה המסעדה משבוע שעבר?') >= 0 && fixtureHtml.indexOf('<button') < 0 && !/>\s*Send\s*</.test(fixtureHtml) && fixtureHtml.indexOf('data-glance-quiet') >= 0);
   const fixturePage = 'chrome-extension://glanceid/dev/messenger-fixture.html';
   function fixtureReply(pageUrl, store, manifest) {
     return () => FlowLaneChat.devFixtureReply({ url: pageUrl }, (key) => store.local.get(key), manifest);
   }
+  function openFixtureCase(search, store, logs, manifest) {
+    const pageUrl = fixturePage + (search || '');
+    return open('messenger-fixture.html', pageUrl, 'src/content-messenger.js', {
+      html: fixtureHtml,
+      storage: store,
+      logs: logs,
+      manifest: manifest,
+      reply: fixtureReply(pageUrl, store, manifest || (() => ({}))),
+      beforeScan(w) { w.eval(fixtureClock); }
+    });
+  }
+  function quietLine(page) {
+    const node = page.window.document.querySelector('[data-glance-quiet]');
+    return node ? (node.textContent || '') : '';
+  }
   const oneStore = memoryStorage({ glanceDevFixture: true });
   const oneLogs = [];
-  const onePage = await open('messenger-fixture.html', fixturePage, 'src/content-messenger.js', {
-    html: fixtureHtml, storage: oneStore, logs: oneLogs, reply: fixtureReply(fixturePage, oneStore, () => ({}))
-  });
+  const onePage = await openFixtureCase('', oneStore, oneLogs);
   await new Promise((r) => setTimeout(r, 40));
   check('the fixture page drafts Dizengoff 99', onePage.text.indexOf('דיזנגוף 99 - ') === 0 && onePage.sendClicks === 0, { text: onePage.text, logs: oneLogs });
   onePage.close();
   const twoStore = memoryStorage({ glanceDevFixture: true });
   const twoLogs = [];
-  const twoPageUrl = fixturePage + '?case=two';
-  const twoPage = await open('messenger-fixture.html', twoPageUrl, 'src/content-messenger.js', {
-    html: fixtureHtml, storage: twoStore, logs: twoLogs, reply: fixtureReply(twoPageUrl, twoStore, () => ({}))
-  });
+  const twoPage = await openFixtureCase('?case=two', twoStore, twoLogs);
   await new Promise((r) => setTimeout(r, 40));
-  check('two fixture addresses stay quiet', twoPage.text.trim() === '' && twoLogs.some((line) => line.indexOf('[Glance] whyNotShown:') >= 0), { text: twoPage.text, logs: twoLogs });
+  const twoKey = FlowLaneDraftStore.hashKey('ms:dev-fixture?case=two', 'm-fixture', 'איפה היה המסעדה משבוע שעבר?');
+  const twoRow = twoStore.bag.glanceLaneDrafts && twoStore.bag.glanceLaneDrafts[twoKey];
+  check('two fixture addresses stay conflict', twoPage.text.trim() === '' && twoPage.sendClicks === 0 && quietLine(twoPage) === '[Glance] whyNotShown: conflict' && twoLogs.some((line) => line.indexOf('[Glance] whyNotShown: conflict') >= 0) && !twoLogs.some((line) => line.indexOf('whyNotShown: closed') >= 0) && (!twoRow || twoRow.state !== 'closed'), { text: twoPage.text, line: quietLine(twoPage), logs: twoLogs, row: twoRow });
   twoPage.close();
+  const closedStore = memoryStorage({
+    glanceDevFixture: true,
+    glanceLaneDrafts: { [twoKey]: { hash: 'abc', state: 'closed', ts: Date.now() } }
+  });
+  const closedLogs = [];
+  const closedPage = await openFixtureCase('?case=two', closedStore, closedLogs);
+  await new Promise((r) => setTimeout(r, 40));
+  check('a deleted fixture draft stays closed ahead of conflict', closedPage.text.trim() === '' && quietLine(closedPage) === '[Glance] whyNotShown: closed' && closedLogs.some((line) => line.indexOf('[Glance] whyNotShown: closed') >= 0) && !closedLogs.some((line) => line.indexOf('whyNotShown: conflict') >= 0), { text: closedPage.text, line: quietLine(closedPage), logs: closedLogs });
+  closedPage.close();
+  const fixtureCases = [
+    ['?case=greeting', 'no-ask'],
+    ['?case=group', 'not-one-to-one'],
+    ['?case=self-last', 'from-me'],
+    ['?case=stale', 'stale'],
+    ['?case=future', 'future']
+  ];
+  for (const [search, reason] of fixtureCases) {
+    const logs = [];
+    const page = await openFixtureCase(search, memoryStorage({ glanceDevFixture: true }), logs);
+    await new Promise((r) => setTimeout(r, 40));
+    const line = '[Glance] whyNotShown: ' + reason;
+    check(search + ' stays quiet as ' + reason, page.text.trim() === '' && page.sendClicks === 0 && quietLine(page) === line && logs.some((item) => item.indexOf(line) >= 0), { text: page.text, line: quietLine(page), logs: logs });
+    page.close();
+  }
   const offLogs = [];
   const offStore = memoryStorage({ glanceDevFixture: false });
   const offPage = await open('messenger-fixture.html', fixturePage, 'src/content-messenger.js', {

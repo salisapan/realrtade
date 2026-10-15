@@ -178,10 +178,56 @@ test('the dev fixture drafts one address and stays quiet for two', async ({ glan
   expect(await page.locator('button').count()).toBe(0);
   await page.close();
 
-  const quiet = await glance.openFixture('?case=two');
-  const quietBox = quiet.locator('[data-glance-composer="1"]');
-  await quiet.waitForTimeout(3500);
-  expect((await quietBox.innerText()).trim()).toBe('');
+  await glance.seed({ glanceDevFixture: true, glanceLaneDrafts: {} });
+  const quietLogs = [];
+  const quiet = await glance.context.newPage();
+  quiet.on('console', (msg) => quietLogs.push(msg.text()));
+  await quiet.goto('chrome-extension://' + glance.extensionId + '/dev/messenger-fixture.html?case=two', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await expect(quiet.locator('[data-glance-quiet]')).toHaveText('[Glance] whyNotShown: conflict', { timeout: 15000 });
+  expect((await quiet.locator('[data-glance-composer="1"]').innerText()).trim()).toBe('');
   expect(await quiet.locator('button').count()).toBe(0);
+  expect(quietLogs.some((line) => line.indexOf('[Glance] whyNotShown: conflict') >= 0)).toBe(true);
+  expect(quietLogs.some((line) => line.indexOf('whyNotShown: closed') >= 0)).toBe(false);
   await quiet.close();
+});
+
+test('each fixture quiet case shows its own reason', async ({ glance }) => {
+  await glance.seed({ glanceDevFixture: true });
+  const cases = [
+    ['?case=greeting', 'no-ask'],
+    ['?case=group', 'not-one-to-one'],
+    ['?case=self-last', 'from-me'],
+    ['?case=stale', 'stale'],
+    ['?case=future', 'future']
+  ];
+  for (const [search, reason] of cases) {
+    const logs = [];
+    const page = await glance.context.newPage();
+    page.on('console', (msg) => logs.push(msg.text()));
+    await page.goto('chrome-extension://' + glance.extensionId + '/dev/messenger-fixture.html' + search, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const line = '[Glance] whyNotShown: ' + reason;
+    await expect(page.locator('[data-glance-quiet]')).toHaveText(line, { timeout: 15000 });
+    expect((await page.locator('[data-glance-composer="1"]').innerText()).trim()).toBe('');
+    expect(await page.locator('button').count()).toBe(0);
+    expect(logs.some((item) => item.indexOf(line) >= 0)).toBe(true);
+    await page.close();
+  }
+});
+
+test('a deleted fixture draft stays closed ahead of two addresses', async ({ glance }) => {
+  const { FlowLaneDraftStore } = require('../src/lane-draft-store.js');
+  const key = FlowLaneDraftStore.hashKey('ms:dev-fixture?case=two', 'm-fixture', 'איפה היה המסעדה משבוע שעבר?');
+  await glance.seed({
+    glanceDevFixture: true,
+    glanceLaneDrafts: { [key]: { hash: 'abc', state: 'closed', ts: Date.now() } }
+  });
+  const logs = [];
+  const page = await glance.context.newPage();
+  page.on('console', (msg) => logs.push(msg.text()));
+  await page.goto('chrome-extension://' + glance.extensionId + '/dev/messenger-fixture.html?case=two', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await expect(page.locator('[data-glance-quiet]')).toHaveText('[Glance] whyNotShown: closed', { timeout: 15000 });
+  expect((await page.locator('[data-glance-composer="1"]').innerText()).trim()).toBe('');
+  expect(logs.some((line) => line.indexOf('[Glance] whyNotShown: closed') >= 0)).toBe(true);
+  expect(logs.some((line) => line.indexOf('whyNotShown: conflict') >= 0)).toBe(false);
+  await page.close();
 });

@@ -32,7 +32,13 @@
     const id = String(reason || 'silence') + '\n' + String(key || '');
     if (quietLogged.has(id)) return;
     quietLogged.add(id);
-    try { console.info('[Glance] whyNotShown: ' + reason); } catch (e) { /* the console can be missing */ }
+    const line = '[Glance] whyNotShown: ' + reason;
+    try { console.info(line); } catch (e) { /* the console can be missing */ }
+    // The dev fixture draws the same line. A real chat has no such node.
+    try {
+      const node = document.querySelector('[data-glance-quiet]');
+      if (node) { node.hidden = false; node.textContent = line; }
+    } catch (e) { /* the page is closing */ }
   }
 
   function root() {
@@ -223,9 +229,16 @@
       if (!runtimeAlive()) { stopQuietly(); return; }
       const saved = await remembered(key);
       if (!runtimeAlive()) { stopQuietly(); return; }
+      // Precedence, in this order, and only this order:
+      // 1. A store row already closed (the draft was deleted) wins. The
+      //    judge is not asked, so a two-address thread does not also say
+      //    conflict.
+      // 2. An open row whose composer text was edited is closed as an edit.
+      // 3. Otherwise the judge speaks. Two addresses are conflict, and that
+      //    row is not closed.
+      if (saved && saved.state === 'closed') { whyNot('closed', key); return; }
       const shown = boxText(box).trim();
       const shownHash = FlowLaneDraftStore.hashKey('draft', key, shown);
-      if (saved && saved.state === 'closed') { whyNot('closed', key); return; }
       if (saved && saved.hash && shownHash !== saved.hash) {
         await remember(key, { hash: saved.hash, state: 'closed' });
         whyNot('closed', key);
@@ -245,9 +258,11 @@
       });
       if (!runtimeAlive() || (r && r.reason === 'invalidated')) { stopQuietly(); return; }
       if (r && r.reason === 'no-box') { whyNot('no-box', key); return; }
-      if (r && r.ok && r.judged && r.judged.draft) {
-        await remember(key, { hash: FlowLaneDraftStore.hashKey('draft', key, r.judged.draft), state: 'open' });
+      if (!(r && r.ok && r.judged && r.judged.draft)) {
+        whyNot((r && r.reason) || 'silence', key);
+        return;
       }
+      await remember(key, { hash: FlowLaneDraftStore.hashKey('draft', key, r.judged.draft), state: 'open' });
       drafted.add(key);
     })();
     finish.catch(() => { whyNot('draft-failed', key); drafted.add(key); }).finally(() => { inflight.delete(key); });
