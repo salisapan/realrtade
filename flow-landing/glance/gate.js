@@ -73,8 +73,7 @@
     var terms = form.querySelector('#gateTerms');
     var marketing = form.querySelector('#gateMarketing');
     var button = form.querySelector('#gateSubmit');
-    var label = button.querySelector('.doit-label');
-    var spin = button.querySelector('.spin');
+    var label = button.querySelector('.g1-doit-label');
     var hint = form.querySelector('#gateHint');
     var termsHint = form.querySelector('#gateTermsHint');
     var error = form.querySelector('#gateError');
@@ -103,10 +102,10 @@
       terms.disabled = on;
       marketing.disabled = on;
       button.disabled = on;
-      button.classList.toggle('is-loading', on);
       button.setAttribute('aria-busy', on ? 'true' : 'false');
-      if (label) label.hidden = on;
-      if (spin) spin.hidden = !on;
+      if (on) form.setAttribute('data-state', 'loading');
+      else form.removeAttribute('data-state');
+      if (label) label.removeAttribute('hidden');
     }
 
     function showServerError() {
@@ -223,8 +222,14 @@
     if (!button) return;
     function paint() {
       var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-      button.textContent = dark ? (lang() === 'he' ? 'בהיר' : 'Light') : (lang() === 'he' ? 'כהה' : 'Dark');
+      var he = lang() === 'he';
+      button.setAttribute('aria-label', dark ? (he ? 'מצב בהיר' : 'Light mode') : (he ? 'מצב כהה' : 'Dark mode'));
       button.setAttribute('aria-pressed', dark ? 'true' : 'false');
+      var menu = document.getElementById('menuBtn');
+      if (menu) {
+        var open = menu.getAttribute('aria-expanded') === 'true';
+        menu.setAttribute('aria-label', open ? (he ? 'סגירת התפריט' : 'Close menu') : (he ? 'פתיחת התפריט' : 'Open menu'));
+      }
     }
     button.addEventListener('click', function () {
       var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -236,10 +241,24 @@
     paint();
   }
 
+  function menuToggle() {
+    var button = document.getElementById('menuBtn');
+    var nav = document.getElementById('primaryNav');
+    if (!button || !nav) return;
+    button.addEventListener('click', function () {
+      var open = button.getAttribute('aria-expanded') !== 'true';
+      nav.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var he = lang() === 'he';
+      button.setAttribute('aria-label', open ? (he ? 'סגירת התפריט' : 'Close menu') : (he ? 'פתיחת התפריט' : 'Open menu'));
+    });
+  }
+
   function boot() {
     var form = document.getElementById('glanceGate');
     if (form) bind(form);
     themeToggle();
+    menuToggle();
     if (document.querySelector('[data-lang-panel]')) {
       function show() {
         var current = lang();

@@ -37,7 +37,7 @@
 <header class="bar">
   <div class="bar-in">
     <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
-    <nav class="links" aria-label="Primary">
+    <nav class="links" id="primaryNav" aria-label="Primary">
       <a href="/glance/" aria-current="page" data-nav="glance">Glance</a>
       <a href="/#organization" data-nav="flow">Flow</a>
       <a href="/pricing.html" data-nav="pricing">Pricing</a>
@@ -46,7 +46,13 @@
     </nav>
     <div class="tools">
       <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
-      <button class="tool" id="themeBtn" type="button" aria-pressed="false">Dark</button>
+      <button class="tool icon" id="themeBtn" type="button" aria-label="Dark mode" aria-pressed="false">
+        <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+      <button class="tool menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primaryNav">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -80,10 +86,9 @@
         <span class="check-copy" data-i18n="marketing">Email me product notes. Optional, and off unless you tick it.</span>
       </label>
       <div class="gate-actions">
-        <!-- .doit placeholder: do-it-inline.png already says Do It, so it is not used here. -->
-        <button class="doit" id="gateSubmit" type="submit" disabled>
-          <span class="doit-label" data-i18n="submit">Get Glance for Chrome</span>
-          <span class="spin" hidden aria-hidden="true"></span>
+        <button class="g1-doit" id="gateSubmit" type="submit" disabled>
+          <span class="g1-doit-label" data-i18n="submit">Get Glance</span>
+          <span class="g1-spin" aria-hidden="true"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i></span>
         </button>
         <p class="soon" data-i18n="soon"><bdi>iPhone</bdi>: coming soon</p>
       </div>
@@ -92,7 +97,10 @@
         <span id="gateErrorText"></span>
         <button class="retry" id="gateRetry" type="button" data-i18n="retry">Retry</button>
       </p>
-      <p class="gate-success" id="gateSuccess" role="status" hidden data-i18n="success">Opening the <bdi>Chrome</bdi> Web Store…</p>
+      <p class="gate-success" id="gateSuccess" role="status" hidden>
+        <span class="closed-line" data-i18n="closed">✓ Closed · You're in.</span>
+        <span class="open-line" data-i18n="success">Opening the <bdi>Chrome</bdi> Web Store…</span>
+      </p>
       <p class="gate-mail" id="gateMail" hidden data-i18n="mailLine">Check your email to confirm the mailing list.</p>
     </form>
   </div>
@@ -121,7 +129,8 @@ window.FLOW_PAGE_I18N = {
     en: 'Email me product notes. Optional, and off unless you tick it.',
     he: 'שלחו לי עדכונים על המוצר. לא חובה, וכבוי עד שמסמנים.'
   },
-  submit: { en: 'Get Glance for Chrome', he: 'קבלו את <bdi>Glance</bdi> ל-<bdi>Chrome</bdi>' },
+  submit: { en: 'Get Glance', he: 'קבלו את <bdi>Glance</bdi>' },
+  closed: { en: "✓ Closed · You're in.", he: '✓ נסגר · אתם בפנים.' },
   retry: { en: 'Retry', he: 'נסו שוב' },
   soon: { en: '<bdi>iPhone</bdi>: coming soon', he: '<bdi>iPhone</bdi>: בקרוב' },
   success: {

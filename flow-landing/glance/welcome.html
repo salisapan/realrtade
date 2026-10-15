@@ -30,12 +30,18 @@
 <header class="bar">
   <div class="bar-in">
     <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow"></a>
-    <nav class="links" aria-label="Primary">
+    <nav class="links" id="primaryNav" aria-label="Primary">
       <a href="/glance/?source=nav" data-nav="glance">Glance</a>
     </nav>
     <div class="tools">
       <button class="tool" id="langBtn" type="button" aria-label="Language">EN</button>
-      <button class="tool" id="themeBtn" type="button">Dark</button>
+      <button class="tool icon" id="themeBtn" type="button" aria-label="Dark mode" aria-pressed="false">
+        <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+      <button class="tool menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primaryNav">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -65,7 +71,7 @@
           </label>
         </li>
       </ul>
-      <button class="doit" id="connectAll" type="button" data-i18n="connectAll">Connect all</button>
+      <button class="g1-doit" id="connectAll" type="button"><span class="g1-doit-label" data-i18n="connectAll">Connect all</span></button>
     </section>
     <section id="stateUnknown" hidden>
       <h1 data-i18n="unknownTitle">We didn’t recognize your email</h1>
@@ -78,7 +84,7 @@
           </label>
           <p class="gate-hint" id="magicHint" hidden></p>
         </div>
-        <button class="doit" id="magicSubmit" type="submit" disabled data-i18n="magicBtn">Send magic link</button>
+        <button class="g1-doit" id="magicSubmit" type="submit" disabled><span class="g1-doit-label" data-i18n="magicBtn">Send magic link</span></button>
       </form>
     </section>
     <section id="stateInbox" hidden>

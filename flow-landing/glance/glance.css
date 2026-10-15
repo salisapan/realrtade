@@ -1,8 +1,6 @@
 /* Glance corner-v24 (Dana, 2026-10-15).
-   Palette is #0071e3 plus grays. No second hue, no gradient, no glow.
-   .doit is a placeholder: the only button image in the repo is
-   /do-it-inline.png, which already reads "Do It", and the site .doit
-   shell uses a blue halo. Dana still needs to supply the glossy asset. */
+   Page chrome is #0071e3 plus neutral grays.
+   The submit control is Dana's .g1-doit, including its highlight. */
 :root{
   --bg:#ffffff;
   --alt:#f5f5f7;
@@ -19,15 +17,15 @@
   --row-line:rgba(0,0,0,.1);
 }
 html[data-theme="dark"]{
-  --bg:#05070d;
-  --alt:#0a0f1c;
+  --bg:#0b0b0c;
+  --alt:#161618;
   --ink:#f5f5f7;
   --muted:#a1a1a6;
   --faint:#6e6e73;
-  --line:rgba(120,160,220,.12);
+  --line:rgba(255,255,255,.08);
   --accent:#0071e3;
   --accent-h:#1482f0;
-  --row-line:rgba(120,160,220,.18);
+  --row-line:rgba(255,255,255,.12);
 }
 html[lang="he"]{
   --disp:'Heebo','Inter Tight','Inter',system-ui,sans-serif;
@@ -58,6 +56,7 @@ a:hover{color:var(--accent-h); text-decoration:underline}
   border-bottom:1px solid var(--line);
 }
 .bar-in{
+  position:relative;
   max-width:var(--wide);
   margin:0 auto;
   padding:14px 24px;
@@ -89,6 +88,12 @@ a:hover{color:var(--accent-h); text-decoration:underline}
 }
 .tool:hover{border-color:var(--faint)}
 .tool:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.tool.icon,.menu-btn{width:36px; padding:0; display:inline-flex; align-items:center; justify-content:center}
+.tool.icon svg,.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7}
+.tool.icon .sun{display:none}
+html[data-theme="dark"] .tool.icon .moon{display:none}
+html[data-theme="dark"] .tool.icon .sun{display:block}
+.menu-btn{display:none}
 .wrap{max-width:var(--max); margin:0 auto; padding:56px 24px 80px}
 .eyebrow{
   margin:0 0 12px;
@@ -168,7 +173,7 @@ h1 em{font-style:italic; font-weight:560}
   color:var(--muted);
   font-size:.92rem;
 }
-.gate-error[hidden],.gate-success[hidden],.gate-mail[hidden],.gate-hint[hidden],.spin[hidden]{display:none}
+.gate-error[hidden],.gate-success[hidden],.gate-mail[hidden],.gate-hint[hidden]{display:none}
 .gate-hint{margin:0; color:var(--muted); font-size:.92rem}
 .gate-error svg{flex:none; color:#d70015}
 .retry{
@@ -184,54 +189,31 @@ h1 em{font-style:italic; font-weight:560}
   cursor:pointer;
 }
 .retry:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
-.gate-actions{display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin-top:4px}
-/* Placeholder until Dana supplies a glossy button image without a halo. */
-.doit{
-  position:relative;
-  appearance:none;
-  border:0;
-  border-radius:980px;
-  min-height:48px;
-  min-width:220px;
-  padding:12px 28px;
-  background:var(--accent);
-  color:#fff;
-  font-family:var(--disp);
-  font-weight:600;
-  font-size:1.05rem;
-  cursor:pointer;
-  box-shadow:0 8px 18px rgba(0,0,0,.12);
-}
-.spin{
-  width:16px;
-  height:16px;
-  border-radius:50%;
-  border:2px solid rgba(255,255,255,.35);
-  border-top-color:#fff;
-  animation:glance-spin .7s linear infinite;
-}
-.doit.is-loading{display:inline-flex; align-items:center; justify-content:center}
-@keyframes glance-spin{to{transform:rotate(360deg)}}
-.doit:hover:not(:disabled){background:var(--accent-h)}
-.doit:focus{outline:none}
-.doit:focus-visible{box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--ink)}
-.doit:disabled{
-  background:var(--muted);
-  box-shadow:none;
-  cursor:default;
-}
-.doit.is-loading,
-.doit.is-loading:disabled{
-  background:var(--accent);
-  box-shadow:0 8px 18px rgba(0,0,0,.12);
-  cursor:progress;
-}
+.gate-actions{display:flex; flex-direction:column; align-items:stretch; gap:10px; margin-top:4px}
+.g1-doit{position:relative;appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;width:100%;height:48px;margin-top:4px;padding:0 18px;border:0;border-radius:999px;cursor:pointer;color:#fff;font:600 16px/1 var(--ui),Inter,sans-serif;letter-spacing:-.02em;white-space:nowrap;background:linear-gradient(180deg,rgba(255,255,255,.32),rgba(255,255,255,0) 46%),linear-gradient(180deg,#3c98f2 0%,#0071e3 46%,#0064c8 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.12),0 4px 8px -6px rgba(0,0,0,.22)}
+.g1-doit::after{content:"";position:absolute;inset:3px;border-radius:inherit;border:1px solid rgba(255,255,255,.42);pointer-events:none}
+.g1-doit:disabled{opacity:.42;cursor:not-allowed}
+[data-state=loading] .g1-doit:disabled{opacity:1;cursor:progress}
+[data-state=loading] .field,[data-state=loading] > .step-row{opacity:.55}
+.g1-doit:focus-visible{outline:2px solid #1d1d1f;outline-offset:3px}
+.g1-doit-label{position:relative;z-index:1}
+[data-state=loading] .g1-doit-label{opacity:0}
+.g1-spin{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;color:#fff;opacity:0;pointer-events:none;z-index:1}
+.g1-spin i{position:absolute;left:50%;top:0;width:1.5px;height:28%;margin-left:-.75px;border-radius:999px;background:currentColor;transform-origin:50% 178.5%;transform:rotate(calc(var(--i)*30deg));opacity:.22}
+[data-state=loading] .g1-spin{opacity:1}
+[data-state=loading] .g1-spin i{animation:spin-line 840ms linear infinite;animation-delay:calc(var(--i)*-70ms)}
+@keyframes spin-line{0%{opacity:1}100%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.g1-spin i{animation:none!important;opacity:.9}}
+html[data-theme=dark] .g1-doit{color:#e6efff;background:linear-gradient(180deg,rgba(228,236,250,.22),rgba(9,13,24,.5));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.28)}
+html[data-theme=dark] .g1-doit::after{inset:2px;border-color:#0071e3}
+html[data-theme=dark] .g1-spin{color:#e6efff}
 .soon{margin:0; color:var(--faint); font-size:.92rem}
 .ecos{list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:10px}
 .ecos .check-copy,.ecos .step-row span{display:flex; flex-direction:column; gap:2px}
 .scope{color:var(--muted); font-size:.9rem; font-weight:400}
-.gate-success,.gate-mail{margin:0; color:var(--ink); font-size:.98rem}
-.gate-mail{color:var(--muted)}
+.gate-success{display:flex; flex-direction:column; gap:4px; margin:0; color:var(--ink); font-size:.98rem}
+.gate-mail{margin:0; color:var(--muted); font-size:.98rem}
+.closed-line,.open-line{display:block}
 .banner{
   margin:0 0 20px;
   padding:12px 14px;
@@ -261,6 +243,18 @@ h1 em{font-style:italic; font-weight:560}
   font-size:.86rem;
 }
 @media (max-width:720px){
+  .menu-btn{display:inline-flex}
   .links{display:none}
+  .links.open{
+    display:flex;
+    flex-direction:column;
+    position:absolute;
+    inset-inline:0;
+    top:100%;
+    background:var(--bg);
+    border-bottom:1px solid var(--line);
+    padding:12px 24px 16px;
+    z-index:5;
+  }
   .wrap{padding-top:36px}
 }

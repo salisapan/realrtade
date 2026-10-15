@@ -100,7 +100,7 @@ section{position:relative; z-index:2; padding-block:clamp(52px,7vw,100px)}
 .progress{position:fixed; inset-block-start:0; inset-inline-start:0; height:2px; width:0; background:linear-gradient(90deg,var(--accent),var(--accent-2)); z-index:60; box-shadow:0 0 12px var(--glow)}
 
 /* nav */
-header.nav{position:fixed; inset-block-start:0; inset-inline:0; z-index:50; transition:background .4s, border-color .4s; border-block-end:1px solid transparent}
+header.nav{--accent:#0071e3; --glow:transparent; position:fixed; inset-block-start:0; inset-inline:0; z-index:50; transition:background .4s, border-color .4s; border-block-end:1px solid transparent}
 header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturate(1.2); border-block-end:1px solid var(--line)}
 .nav-in{max-width:var(--maxw); margin-inline:auto; padding:14px clamp(18px,5vw,40px); display:flex; align-items:center; justify-content:space-between; gap:20px}
 .brand{display:flex; align-items:center; gap:12px}
@@ -117,7 +117,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .cursor-trail{position:fixed; inset:0; width:100%; height:100%; z-index:70; pointer-events:none}
 .nav-tools{display:flex; align-items:center; gap:10px}
 .icon-btn{width:38px; height:38px; border-radius:11px; border:1px solid var(--line-hi); background:transparent; color:var(--txt-hi); cursor:pointer; display:grid; place-items:center; transition:border-color .25s, background .25s, transform .25s; font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.04em}
-.icon-btn:hover{border-color:var(--accent); background:rgba(59,116,255,.08); transform:translateY(-1px)}
+.icon-btn:hover{border-color:#0071e3; background:rgba(0,113,227,.08); transform:none}
 .icon-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7}
 .icon-btn .sun{display:none}
 :root[data-theme="light"] .icon-btn .sun{display:block}
@@ -143,31 +143,22 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .skip{position:fixed; inset-block-start:8px; inset-inline-start:8px; z-index:80; padding:10px 16px; border-radius:10px; background:#1741C4; color:#fff; font-family:var(--disp); font-weight:600; transform:translateY(-160%); transition:transform .2s}
 .skip:focus{transform:none}
 
-/* Do It button */
+/* Do It button — flat #0071e3. No glow, no #3B74FF. */
 .magnetic{display:inline-flex}
-.doit{--pad-y:16px; --pad-x:34px; position:relative; display:inline-flex; align-items:center; justify-content:center; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; -webkit-tap-highlight-color:transparent; font-family:var(--disp); font-weight:700; font-size:1.05rem; color:var(--doit-text); text-shadow:0 1px 10px var(--glow); transition:transform .28s cubic-bezier(.2,.8,.2,1)}
-.doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2;
-  background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--glass-top),var(--glass-bot));
-  border:1px solid var(--glass-border);
-  box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -12px 26px rgba(14,32,80,.24), 0 16px 46px -10px var(--glow); transition:box-shadow .3s}
-.doit .ring{position:absolute; inset:6px; border-radius:999px; z-index:-1; border:2px solid var(--ring); box-shadow:0 0 12px var(--glow), inset 0 0 0 1px rgba(255,255,255,.22), inset 0 0 11px color-mix(in srgb,var(--ring) 42%,transparent); transition:box-shadow .3s, border-color .3s}
-.doit .shine{position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:-1}
-.doit .shine::before{content:""; position:absolute; inset-block:-40%; inline-size:40%; inset-inline-start:-60%; background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent); transform:skewX(-18deg)}
-.doit:hover{transform:translateY(-2px) scale(1.035)}
-.doit:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -10px 22px rgba(14,32,80,.4), 0 20px 60px -8px var(--glow)}
-.doit:hover .ring{border-color:var(--accent-2); box-shadow:0 0 22px var(--glow), inset 0 0 16px var(--glow)}
-.doit:hover .shine::before{animation:sweep .85s cubic-bezier(.3,.6,.2,1) forwards}
-.doit .btn-spin{display:none; width:18px; height:18px; border-radius:50%; border:2px solid color-mix(in srgb,var(--doit-text) 30%,transparent); border-top-color:var(--doit-text); animation:spin .7s linear infinite}
-.doit.loading{cursor:default}
+.doit{--pad-y:16px; --pad-x:34px; position:relative; display:inline-flex; align-items:center; justify-content:center; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; border-radius:999px; background:#0071e3; -webkit-tap-highlight-color:transparent; font-family:var(--disp); font-weight:700; font-size:1.05rem; color:#fff; text-shadow:none; box-shadow:0 1px 2px rgba(0,0,0,.12); transition:background .2s}
+.doit .shell,.doit .ring,.doit .shine{display:none}
+.doit:hover{background:#0077ed; transform:none}
+.doit .btn-spin{display:none; width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; animation:spin .7s linear infinite}
+.doit.loading{cursor:progress}
 .doit.loading .btn-label{opacity:0}
 .doit.loading .btn-spin{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.doit:active{transform:translateY(0) scale(.99)}
+.doit:active{transform:none}
 .doit.lg{--pad-y:21px; --pad-x:52px; font-size:1.35rem}
 .doit.sm{--pad-y:10px; --pad-x:20px; font-size:.92rem}
-@keyframes sweep{to{inset-inline-start:130%}}
-@keyframes breathe{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.4), inset 0 -10px 22px rgba(14,32,80,.28), 0 14px 44px -12px var(--glow)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.45), inset 0 -10px 22px rgba(14,32,80,.28), 0 18px 60px -10px var(--glow)}}
-.doit.breathe .shell{animation:breathe 3.6s ease-in-out infinite}
+.doit.ghost{background:transparent; color:inherit; box-shadow:none; border:1px solid rgba(0,0,0,.16)}
+:root[data-theme="dark"] .doit.ghost{color:#f5f5f7; border-color:rgba(255,255,255,.16)}
+.doit.ghost:hover{background:transparent; border-color:#0071e3}
 
 .ghost{display:inline-flex; align-items:center; gap:10px; padding:15px 26px; border-radius:999px; font-family:var(--disp); font-weight:500; font-size:1rem; color:var(--txt-hi); border:1px solid var(--line-hi); background:transparent; cursor:pointer; transition:border-color .3s, background .3s}
 .ghost .arw{transition:transform .3s}
@@ -733,28 +724,20 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .skip-link:focus{left:0}
 
 /* Two-path hero + how-it-works. First-viewport text is not .reveal / .p-reveal. */
-.hero.hero-paths{min-height:auto; align-items:flex-start; padding-block:128px 48px}
+.hero.hero-paths{--accent:#0071e3; --accent-2:#6e6e73; --glow:transparent; min-height:auto; align-items:flex-start; padding-block:128px 48px}
 .hero.hero-paths .hero-in{align-items:center; text-align:center}
 .hero.hero-paths .hero-logo{width:min(160px,38vw); margin-inline:auto; margin-bottom:28px}
 .hero.hero-paths .eyebrow{justify-content:center}
-.hero.hero-paths .eyebrow::before,.loop-sec .eyebrow::before{width:7px; height:7px; border-radius:50%; background:#5B8CFF; box-shadow:0 0 10px var(--glow)}
+.hero.hero-paths .eyebrow::before,.loop-sec .eyebrow::before{width:7px; height:7px; border-radius:50%; background:#0071e3; box-shadow:none}
 .hero.hero-paths h1{font-size:clamp(2.05rem,1.45rem + 2.1vw,3.05rem); max-width:16em; line-height:1.12; margin-inline:auto}
 .hero.hero-paths .lead{margin-inline:auto; max-width:48ch}
 .path-label{margin:52px 0 0; font-family:var(--mono); font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
 .path-split{display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; text-align:start; margin-top:16px}
 .path-card{background:color-mix(in srgb, var(--panel) 88%, transparent); border:1px solid var(--line); border-radius:20px; padding:32px 28px 28px; display:flex; flex-direction:column; gap:14px}
-.path-card.glance-card{border-color:color-mix(in srgb, #5B8CFF 35%, var(--line))}
-.path-card .who{font-family:var(--mono); font-size:.68rem; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-2)}
-.path-card.glance-card .who{color:#5B8CFF}
-.glance-card h3 em{font-style:italic; font-weight:500}
-.glance-ecos{display:flex; flex-wrap:wrap; gap:8px 16px; margin:0 0 14px; font-weight:650; letter-spacing:.01em}
-.open-glance{font-weight:650; text-decoration:none}
+.path-card .who{font-family:var(--mono); font-size:.68rem; letter-spacing:.16em; text-transform:uppercase; color:#6e6e73}
 .path-card h3{font-family:var(--disp); font-weight:700; font-size:1.45rem; color:var(--txt-hi); margin:0; letter-spacing:-.02em}
 .path-card p{color:var(--txt); font-size:1rem; line-height:1.6; margin:0; flex:1}
 .path-card .cta-row{margin-top:8px}
-.doit.ghost{color:var(--txt-hi); text-shadow:none}
-.doit.ghost .shell{background:transparent; box-shadow:none; border-color:var(--line-hi)}
-.doit.ghost .ring,.doit.ghost .shine{display:none}
 .loop-sec{padding:72px 0 28px; text-align:center}
 .loop-sec .eyebrow{justify-content:center}
 .loop-sec h2{margin-bottom:12px}
