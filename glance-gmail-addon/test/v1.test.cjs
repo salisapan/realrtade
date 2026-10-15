@@ -545,9 +545,7 @@ console.log('\n--- message path parity ---');
         state.scopeChecks.push({ mode: mode, scopes: scopes.slice() });
         const missing = scopes.filter(function (scope) { return state.granted.indexOf(scope) === -1; });
         if (missing.length) {
-          const err = new Error('The script does not have the required scope: ' + missing.join(' '));
-          err.name = 'AuthorizationException';
-          throw err;
+          throw new Error('The script does not have sufficient permissions to continue the execution. Missing permissions: (calendar.events && tasks)');
         }
       }
     },
@@ -618,7 +616,6 @@ console.log('\n--- message path parity ---');
   const openMessage = vm.runInContext('onGmailMessageOpen', sandbox);
   const doIt = vm.runInContext('onDoIt', sandbox);
   const undo = vm.runInContext('onUndo', sandbox);
-  const authCard = vm.runInContext('onAuthCard', sandbox);
   const contentTitle = vm.runInContext('Glance.intent.contentTitle', sandbox);
   const prepareText = vm.runInContext('Glance.intent.prepareText', sandbox);
   const classify = vm.runInContext('FlowIntent.classify', sandbox);
@@ -881,19 +878,25 @@ console.log('\n--- message path parity ---');
   function withConsole(fn) {
     const logs = [];
     const errors = [];
+    const warns = [];
     const log = console.log;
     const error = console.error;
+    const warn = console.warn;
     console.log = function () {
       logs.push(Array.prototype.map.call(arguments, String).join(' '));
     };
     console.error = function () {
       errors.push(Array.prototype.map.call(arguments, String).join(' '));
     };
+    console.warn = function () {
+      warns.push(Array.prototype.map.call(arguments, String).join(' '));
+    };
     try {
-      return { value: fn(), logs: logs, errors: errors };
+      return { value: fn(), logs: logs, errors: errors, warns: warns };
     } finally {
       console.log = log;
       console.error = error;
+      console.warn = warn;
     }
   }
   function openEvent(fields) {
@@ -1046,36 +1049,37 @@ console.log('\n--- message path parity ---');
     commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
   })[0]).join('\n').indexOf('פגישה 22/10 14:00') !== -1);
 
+  const scopeMiss = 'The script does not have sufficient permissions to continue the execution. Missing permissions: (calendar.events && tasks)';
+  const authFailure = vm.runInContext('authFailure_', sandbox);
+  check('the live requireScopes message counts as a missing scope', authFailure({ name: 'Error', message: scopeMiss }) === true);
   reset();
   state.granted = state.granted.filter(function (scope) { return scope.indexOf('calendar.events') === -1; });
   state.messages.heb1 = gmailMessage(hebrew);
   let authErr = null;
+  let returned = 'unset';
   const denied = withConsole(function () {
     try {
-      return doIt({
+      returned = doIt({
         gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
         commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
         parameters: { messageId: 'heb1', source: 'message' }
       });
+      return returned;
     } catch (err) {
       authErr = err;
+      returned = null;
       return null;
     }
   });
-  const grantEn = authCard({ commonEventObject: { userLocale: 'en' } });
-  const grantHe = authCard({ commonEventObject: { userLocale: 'he' } });
-  const grantButton = buttonsOf(grantEn)[0];
-  check('a missing calendar.events scope shows Grant permission and writes nothing',
-    authErr && authErr.name === 'AuthorizationException' && authErr.callback === 'onAuthCard' &&
-    state.authThrows.length === 1 &&
+  const returnedText = returned && returned.card ? linesOf(returned.card).map(plain).join('\n') : '';
+  check('a missing scope propagates and writes nothing',
+    authErr && authErr.message === scopeMiss &&
+    returned === null &&
+    returnedText.indexOf("Couldn't confirm") === -1 &&
     Object.keys(state.events).length === 0 && Object.keys(state.tasks).length === 0 &&
-    linesOf(grantEn).map(plain).join('\n').indexOf('Grant permission') !== -1 &&
-    linesOf(grantEn).map(plain).join('\n').indexOf("Couldn't confirm") === -1 &&
-    grantButton && grantButton.action === 'authorize' && grantButton.authUrl.indexOf('https://') === 0 &&
-    linesOf(grantHe).map(plain).join('\n').indexOf('תנו הרשאה') !== -1 &&
-    denied.logs.some(function (line) { return line.indexOf('"granted":false') !== -1 && line.indexOf('missing-scope') !== -1; }) &&
-    denied.errors.some(function (line) { return line.indexOf('AuthorizationException') !== -1 && line.indexOf('required scope') !== -1; }),
-    { err: authErr && authErr.message, events: Object.keys(state.events), tasks: Object.keys(state.tasks), logs: denied.logs, errors: denied.errors, grant: linesOf(grantEn).map(plain) });
+    state.scopeChecks.length === 1 &&
+    denied.warns.some(function (line) { return line.indexOf('requireScopes') !== -1 && line.indexOf('calendar.events') !== -1; }),
+    { err: authErr && authErr.message, returned: returnedText, events: Object.keys(state.events), tasks: Object.keys(state.tasks), warns: denied.warns });
 
   check('a missing Calendar service is logged and the card still offers',
     missingCalendar.errors.some(function (line) { return line.indexOf('Calendar advanced service is missing') !== -1; }) &&

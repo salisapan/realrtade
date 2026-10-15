@@ -55,25 +55,42 @@ function onGmailMessageOpen(e) {
 
 function onDoIt(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
-  var grant = false;
+  var job;
   try {
-    if (isPrefetch_(e)) {
-      var saved = readPrefetch_();
-      planLog_({
-        speak: !!(saved && saved.title),
-        kind: 'task',
-        planId: 'prefetch',
-        reason: saved && saved.title ? 'prefetch' : 'quiet',
-        title: saved && saved.title
-      }, 'prefetch');
-      if (!saved || !saved.title) return update_(render_(Glance.cards.quiet(lang)));
-      var prior = readUndo_('prefetch');
-      if (prior && prior.view) {
-        stepLog_({ step: 'proof', messageId: 'prefetch' });
-        return update_(render_(Glance.cards.proof(prior.view, lang, { messageId: 'prefetch', source: 'prefetch', undo: true })));
-      }
-      if (!scopesGranted_(scopesForKind_('task'))) grant = true;
-      else {
+    job = stageDoIt_(e, lang);
+  } catch (err) {
+    return finishDoError_(err, lang);
+  }
+  if (job.card) return job.card;
+  // requireScopes must not be caught. Apps Script turns that exception
+  // into its own authorization prompt. A caught copy never shows it.
+  requireScopesNow_(job.scopes);
+  try {
+    return job.write();
+  } catch (err) {
+    return finishDoError_(err, lang);
+  }
+}
+
+function stageDoIt_(e, lang) {
+  if (isPrefetch_(e)) {
+    var saved = readPrefetch_();
+    planLog_({
+      speak: !!(saved && saved.title),
+      kind: 'task',
+      planId: 'prefetch',
+      reason: saved && saved.title ? 'prefetch' : 'quiet',
+      title: saved && saved.title
+    }, 'prefetch');
+    if (!saved || !saved.title) return { card: update_(render_(Glance.cards.quiet(lang))) };
+    var prior = readUndo_('prefetch');
+    if (prior && prior.view) {
+      stepLog_({ step: 'proof', messageId: 'prefetch' });
+      return { card: update_(render_(Glance.cards.proof(prior.view, lang, { messageId: 'prefetch', source: 'prefetch', undo: true }))) };
+    }
+    return {
+      scopes: scopesForKind_('task'),
+      write: function () {
         return finishCreate_({
           title: saved.title,
           due: saved.due || null,
@@ -81,53 +98,59 @@ function onDoIt(e) {
           listId: glanceTaskList_()
         }, 'prefetch', lang);
       }
-    } else {
-      var openedRead = emptyRead_(e);
-      var opened = readOpen_(e, openedRead);
-      if (!opened) throw readFail_('open', openedRead);
-      var existing = readUndo_(opened.messageId);
-      if (existing && existing.view) {
-        stepLog_({ step: 'proof', messageId: opened.messageId, kind: existing.view.kind || 'task' });
-        return update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true })));
-      }
-      var decision = judgeOpen_(opened, e);
-      planLog_(decision, opened.messageId);
-      if (!decision.speak) return update_(render_(Glance.cards.quiet(lang)));
-      if (!scopesGranted_(scopesForKind_(decision.kind))) grant = true;
-      else return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
-    }
-  } catch (err) {
-    if (authFailure_(err)) {
-      grant = true;
-      errorLog_(err);
-      stepLog_({ step: 'scopes', granted: false, reason: 'missing-scope' });
-    } else {
-      errorLog_(err);
-      if (err && err.diag) return update_(render_(Glance.cards.readError(lang, err.diag)));
-      stepLog_({ step: 'unconfirmed', reason: unconfirmedReason_(err) });
-      return update_(render_(Glance.cards.unconfirmed(lang)));
-    }
+    };
   }
-  if (grant) raiseGrant_();
+  var openedRead = emptyRead_(e);
+  var opened = readOpen_(e, openedRead);
+  if (!opened) throw readFail_('open', openedRead);
+  var existing = readUndo_(opened.messageId);
+  if (existing && existing.view) {
+    stepLog_({ step: 'proof', messageId: opened.messageId, kind: existing.view.kind || 'task' });
+    return { card: update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true }))) };
+  }
+  var decision = judgeOpen_(opened, e);
+  planLog_(decision, opened.messageId);
+  if (!decision.speak) return { card: update_(render_(Glance.cards.quiet(lang))) };
+  return {
+    scopes: scopesForKind_(decision.kind),
+    write: function () {
+      return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
+    }
+  };
 }
 
 function onUndo(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
-  var grant = false;
+  var job;
   try {
-    var id = undoId_(e);
-    var record = id ? readUndo_(id) : null;
-    stepLog_({
-      step: 'undo',
-      messageId: id || '',
-      kind: record && record.snapshot ? record.snapshot.kind || 'task' : null
-    });
-    if (!record || !record.snapshot) {
-      stepLog_({ step: 'unconfirmed', reason: 'no-snapshot' });
-      return update_(render_(Glance.cards.unconfirmed(lang)));
-    }
-    if (!scopesGranted_(scopesForKind_(record.snapshot.kind))) grant = true;
-    else {
+    job = stageUndo_(e, lang);
+  } catch (err) {
+    return finishUndoError_(err, lang);
+  }
+  if (job.card) return job.card;
+  requireScopesNow_(job.scopes);
+  try {
+    return job.write();
+  } catch (err) {
+    return finishUndoError_(err, lang);
+  }
+}
+
+function stageUndo_(e, lang) {
+  var id = undoId_(e);
+  var record = id ? readUndo_(id) : null;
+  stepLog_({
+    step: 'undo',
+    messageId: id || '',
+    kind: record && record.snapshot ? record.snapshot.kind || 'task' : null
+  });
+  if (!record || !record.snapshot) {
+    stepLog_({ step: 'unconfirmed', reason: 'no-snapshot' });
+    return { card: update_(render_(Glance.cards.unconfirmed(lang))) };
+  }
+  return {
+    scopes: scopesForKind_(record.snapshot.kind),
+    write: function () {
       var result = undoRecord_(record.snapshot);
       stepLog_({
         step: 'read-back',
@@ -137,30 +160,40 @@ function onUndo(e) {
         reason: result && result.reason || null
       });
       if (resultNeedsGrant_(result)) {
-        grant = true;
-        stepLog_({ step: 'scopes', granted: false, reason: 'missing-scope' });
-      } else if (result.action === 'deleted') {
+        var err = new Error((result && result.detail) || 'missing-scope');
+        err.name = (result && result.name) || 'Error';
+        throw err;
+      }
+      if (result.action === 'deleted') {
         clearUndo_(id);
         return update_(render_(Glance.cards.undone(lang)));
-      } else if (result.action === 'refuse') {
-        return update_(render_(Glance.cards.edited(lang, result.which)));
-      } else {
-        stepLog_({ step: 'unconfirmed', reason: (result && (result.reason || result.action)) || 'undo-failed' });
-        return update_(render_(Glance.cards.unconfirmed(lang)));
       }
-    }
-  } catch (err) {
-    if (authFailure_(err)) {
-      grant = true;
-      errorLog_(err);
-      stepLog_({ step: 'scopes', granted: false, reason: 'missing-scope' });
-    } else {
-      errorLog_(err);
-      stepLog_({ step: 'unconfirmed', reason: unconfirmedReason_(err) });
+      if (result.action === 'refuse') return update_(render_(Glance.cards.edited(lang, result.which)));
+      stepLog_({ step: 'unconfirmed', reason: (result && (result.reason || result.action)) || 'undo-failed' });
       return update_(render_(Glance.cards.unconfirmed(lang)));
     }
+  };
+}
+
+function finishDoError_(err, lang) {
+  if (authFailure_(err)) {
+    console.warn(scopeWarn_(err));
+    throw err;
   }
-  if (grant) raiseGrant_();
+  errorLog_(err);
+  if (err && err.diag) return update_(render_(Glance.cards.readError(lang, err.diag)));
+  stepLog_({ step: 'unconfirmed', reason: unconfirmedReason_(err) });
+  return update_(render_(Glance.cards.unconfirmed(lang)));
+}
+
+function finishUndoError_(err, lang) {
+  if (authFailure_(err)) {
+    console.warn(scopeWarn_(err));
+    throw err;
+  }
+  errorLog_(err);
+  stepLog_({ step: 'unconfirmed', reason: unconfirmedReason_(err) });
+  return update_(render_(Glance.cards.unconfirmed(lang)));
 }
 
 function onAuthCard(e) {
@@ -473,7 +506,7 @@ function authFailure_(err) {
   var name = String(err.name || '');
   var msg = String(err.message || '');
   if (name === 'AuthorizationException') return true;
-  return /insufficient authentication scopes|insufficient permission|specified permissions are not sufficient|have not been authorized|required scope|authorization required/i.test(msg);
+  return /insufficient authentication scopes|insufficient permission|specified permissions are not sufficient|have not been authorized|required scope|authorization required|sufficient permissions|missing permissions/i.test(msg);
 }
 
 function resultNeedsGrant_(result) {
@@ -481,17 +514,16 @@ function resultNeedsGrant_(result) {
   return authFailure_({ name: result.name, message: result.detail || '' });
 }
 
-function scopesGranted_(scopes) {
-  try {
-    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, scopes);
-    stepLog_({ step: 'scopes', granted: true, scopes: scopes });
-    return true;
-  } catch (err) {
-    if (!authFailure_(err)) throw err;
-    errorLog_(err);
-    stepLog_({ step: 'scopes', granted: false, scopes: scopes, reason: 'missing-scope' });
-    return false;
-  }
+function scopeWarn_(err) {
+  return (err && err.name ? err.name : 'Error') + '\n' +
+    (err && err.message ? err.message : String(err)) + '\n' +
+    (err && err.stack ? err.stack : '');
+}
+
+function requireScopesNow_(scopes) {
+  console.warn('requireScopes ' + scopes.join(' '));
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, scopes);
+  stepLog_({ step: 'scopes', granted: true, scopes: scopes });
 }
 
 function raiseGrant_() {

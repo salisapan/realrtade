@@ -14,7 +14,7 @@ Do it creates that task, that event, or both, then reads each write back. The ca
 
 Nothing in this host sends mail. There is no draft. The event has no guests.
 
-The card language follows the Gmail locale (`he` / `iw` → Hebrew, anything else → English). Hebrew lines carry right-to-left marks because Card Service has no direction setting. The event title and the reminder title come from the mail. A Hebrew meeting is titled in Hebrew, for example `פגישה 22/10 14:00`. An English meeting keeps the short English label. Do it checks the scopes that write needs. If `calendar.events` or Tasks was never granted, the card says **Grant permission** (Hebrew: **תנו הרשאה**) and nothing is written until the person grants it.
+The card language follows the Gmail locale (`he` / `iw` → Hebrew, anything else → English). Hebrew lines carry right-to-left marks because Card Service has no direction setting. The event title and the reminder title come from the mail. A Hebrew meeting is titled in Hebrew, for example `פגישה 22/10 14:00`. An English meeting keeps the short English label. Do it calls `ScriptApp.requireScopes` for the scopes that write needs and does not catch that exception, so Apps Script shows its own authorization prompt. Nothing is written until `calendar.events` and Tasks are granted.
 
 ## What the card will say
 
