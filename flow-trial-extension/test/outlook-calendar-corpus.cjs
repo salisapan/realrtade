@@ -162,6 +162,13 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
     /Open event/.test(popup));
   check('Connect is still one screen with Select all',
     /data-glance-connect', 'microsoft'/.test(popup) && /data-glance-select-all/.test(popup));
+  check('Settings names Always and Revoke in Hebrew',
+    popup.indexOf('הרשאת יומן: תמיד') >= 0 &&
+    popup.indexOf('בטל הרשאת יומן') >= 0 &&
+    popup.indexOf('הרשאת יומן בוטלה') >= 0 &&
+    popup.indexOf('Calendar permission: Always') < 0 &&
+    popup.indexOf('Revoke calendar permission') < 0 &&
+    popup.indexOf('Calendar permission revoked') < 0);
   const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
   check('a calendar undo flips that written row and does not invent a draft',
     /function markOutlookCalendarUndone/.test(storage) && /Calendar event removed\./.test(storage));

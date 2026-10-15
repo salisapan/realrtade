@@ -442,15 +442,15 @@
     card.appendChild(err);
     const calendarPolicy = state && state.glanceCalendarConsent;
     if (calendarPolicy && calendarPolicy.mode === 'always' && calendarPolicy.revoked !== true) {
-      card.appendChild(el('p', 'conn-note', 'Calendar permission: Always.'));
-      const revoke = el('button', 'ghost', 'Revoke calendar permission');
+      card.appendChild(el('p', 'conn-note', 'הרשאת יומן: תמיד'));
+      const revoke = el('button', 'ghost', 'בטל הרשאת יומן');
       revoke.type = 'button';
       revoke.setAttribute('data-glance-revoke-calendar', 'always');
       revoke.addEventListener('click', async () => {
         await FlowStorage.set({ glanceCalendarConsent: { mode: null, revoked: true, scope: 'Calendars.ReadWrite', at: Date.now() } });
         await FlowStorage.appendLog({
           kind: 'shown',
-          label: 'Calendar permission revoked',
+          label: 'הרשאת יומן בוטלה',
           app: 'outlook',
           reason: 'calendar-consent-revoked',
           messageId: 'calendar-consent'
