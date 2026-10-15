@@ -30,8 +30,9 @@ const FlowMessengerParse = (() => {
   //    the control is a sibling of the name. It contains no image and no name.
   //    The region is the nearest ancestor that also contains h3 and a[role="link"].
   //    The one image sits inside that link. The name is that h3's text.
-  //    That h3 sits inside a numeric-id link, so the title text is not a
-  //    one-to-one signal. The live header stays quiet.
+  //    That h3 sits inside a numeric-id link. The title text is not the proof.
+  //    The page URL /messages/t/1358224314037055 matches that id, so the live
+  //    header is one-to-one. A group thread has its own id.
   //    When no such ancestor exists, the header or banner that holds the control
   //    is the region, which is what the synthetic fixtures use.
   // 2. [role="banner"]
@@ -54,8 +55,11 @@ const FlowMessengerParse = (() => {
   // count when that title sits inside the link. A draft then needs a username
   // in the URL that matches the name. A numeric id with no other signal stays
   // quiet. A username that is one plain word (bookclub, weekendcrew, team) is
-  // not a first-and-last name and stays quiet. Link text and aria-label still
-  // count when the title is not nested in that link. Group checks read the
+  // not a first-and-last name and stays quiet. A numeric id is not a name.
+  // It proves a one-to-one chat only when the page thread id (/t/<id> or
+  // /e2ee/t/<id>) equals that id, or when the conversation info panel shows
+  // one person (View profile, or a block/mute action) and no members list.
+  // Link text still counts for a username slug. Group checks read the
   // raw title before digits and emoji are stripped. "Active now", "Active 5m ago", "פעיל/ה עכשיו",
   // "פעיל עכשיו", "פעילה עכשיו", and "פעיל/ה לפני X" are secondary: they
   // never draft a chat whose link is missing or names someone else, and
@@ -359,6 +363,7 @@ const FlowMessengerParse = (() => {
     const text = nested ? textOutsideHeading(el) : plainText(el);
     const aria = el.getAttribute('aria-label') || '';
     const parsed = parsedProfile(el.getAttribute('href'));
+    if (parsed && parsed.id && !parsed.slug) return [];
     if (parsed && parsed.slug && !slugProvesPerson(parsed.slug, rawTitle)) return null;
     function push(value, fromSlug) {
       const tokens = identityTokens(value);
@@ -479,16 +484,79 @@ const FlowMessengerParse = (() => {
     return headerMatches(scope, ACTIVE_STATUS);
   }
 
-  function decide(scope, via) {
+  // Page URL thread id. Group threads use their own id, not a member's.
+  function threadIdFromPage(href) {
+    let u;
+    try { u = new URL(String(href || ''), 'https://www.messenger.com'); } catch (e) { return ''; }
+    const host = u.hostname.replace(/^www\./, '');
+    if (host !== 'messenger.com' && host !== 'facebook.com' && host !== 'business.facebook.com') return '';
+    if (/\/direct\//.test(u.pathname)) return '';
+    const m = u.pathname.match(/\/(?:e2ee\/)?t\/(\d+)\/?$/);
+    return m ? m[1] : '';
+  }
+
+  function threadMatches(scope, href) {
+    const thread = threadIdFromPage(href);
+    if (!thread) return false;
+    const found = profileGroups(scope);
+    return found.order.length === 1 && found.order[0] === 'id:' + thread;
+  }
+
+  function outsideRowText(root) {
+    function walk(node) {
+      if (!node) return '';
+      if (node.nodeType === 1) {
+        if (node.getAttribute && node.getAttribute('role') === 'row') return '';
+        return Array.from(node.childNodes || []).map(walk).join(' ');
+      }
+      if (node.nodeType === 3) return node.textContent || '';
+      return '';
+    }
+    return walk(root).replace(/\s+/g, ' ').trim();
+  }
+
+  function membersListed(root) {
+    const text = outsideRowText(root);
+    if (countSaysGroup(text)) return true;
+    return /\bmembers\b|\bparticipants\b|\badd people\b|משתתפים/i.test(text);
+  }
+
+  function personControl(el) {
+    if (!el || inRow(el) || !el.getAttribute) return false;
+    const tag = String(el.tagName || '').toUpperCase();
+    const role = el.getAttribute('role') || '';
+    if (tag !== 'A' && tag !== 'BUTTON' && role !== 'button' && role !== 'link') return false;
+    const label = ((el.getAttribute('aria-label') || '') + ' ' + plainText(el)).replace(/\s+/g, ' ').trim();
+    if (/\bview profile\b/i.test(label)) return true;
+    if (/^(block|mute)(\s+.+)?$/i.test(label) && !/\b(notification|conversation|chat|group|members)\b/i.test(label)) return true;
+    return false;
+  }
+
+  // Backup when the URL id is absent. One person, and no members list.
+  function singlePersonPanel(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') return false;
+    if (membersListed(root)) return false;
+    const ids = new Set();
+    profileLinks(root).forEach((el) => {
+      const key = profileKey(el.getAttribute('href'));
+      if (key) ids.add(key);
+    });
+    if (ids.size > 1) return false;
+    return Array.from(root.querySelectorAll('a, button, [role="button"], [role="link"]')).some(personControl);
+  }
+
+  function decide(scope, via, href, root) {
     const name = nameIn(scope, via);
     const active = headerActive(scope);
     const raw = regionTitle(scope, via);
-    if (isGroup(scope, via)) return { kind: 'group', via: via, name: name, active: active };
-    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw)) {
+    const whole = root || scope;
+    if (isGroup(scope, via) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
+    const proved = matchingProfile(scope, via) || threadMatches(scope, href) || singlePersonPanel(whole);
+    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href) && !singlePersonPanel(whole)) {
       return { kind: 'unknown', via: via, name: name, active: active };
     }
-    if (active && !matchingProfile(scope, via)) return { kind: 'unknown', via: via, name: name, active: true };
-    if (matchingProfile(scope, via)) return { kind: 'one-to-one', via: via, name: name, active: active };
+    if (active && !proved) return { kind: 'unknown', via: via, name: name, active: true };
+    if (proved) return { kind: 'one-to-one', via: via, name: name, active: active };
     return { kind: 'unknown', via: via, name: name, active: false };
   }
 
@@ -503,21 +571,21 @@ const FlowMessengerParse = (() => {
     return node.parentElement || node;
   }
 
-  function classify(root) {
+  function classify(root, href) {
     if (!root || typeof root.querySelector !== 'function') return { kind: 'unknown', via: null, name: '' };
     const info = infoControl(root);
-    if (info) return decide(headerRow(info) || scopeFor(info, root), 'aria');
+    if (info) return decide(headerRow(info) || scopeFor(info, root), 'aria', href, root);
     const banner = root.querySelector('[role="banner"]');
-    if (banner && !inRow(banner)) return decide(banner, 'banner');
+    if (banner && !inRow(banner)) return decide(banner, 'banner', href, root);
     const heading = headingIn(root);
-    if (heading) return decide(regionAround(heading), 'heading');
+    if (heading) return decide(regionAround(heading), 'heading', href, root);
     const inbox = root.querySelector('[data-surface$="inbox:detail_view_header"]');
-    if (inbox && !inRow(inbox)) return decide(inbox, 'inbox');
+    if (inbox && !inRow(inbox)) return decide(inbox, 'inbox', href, root);
     return { kind: 'unknown', via: null, name: '' };
   }
 
-  function isOneToOne(root) {
-    return classify(root).kind === 'one-to-one';
+  function isOneToOne(root, href) {
+    return classify(root, href).kind === 'one-to-one';
   }
 
   function authorOf(row) {

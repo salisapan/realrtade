@@ -105,7 +105,7 @@
     const main = root();
     const list = rows(main);
     if (!list.length) { report(false, 'no-messages-recognised'); return; }
-    const thread = P.classify(main);
+    const thread = P.classify(main, location.href);
     const t = String((thread && thread.name) || titleOf(main) || '').replace(/\s+/g, ' ').trim();
     if (!t) { report(false, 'chat-not-identified'); return; }
     const direct = thread && thread.kind === 'one-to-one';

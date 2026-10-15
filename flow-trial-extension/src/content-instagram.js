@@ -66,7 +66,7 @@
   }
 
   function oneToOne(main) {
-    return P.isOneToOne(main) === true;
+    return P.isOneToOne(main, location.href) === true;
   }
 
   function report(ok, reason) {
