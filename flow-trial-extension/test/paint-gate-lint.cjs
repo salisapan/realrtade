@@ -5,7 +5,7 @@ const acorn = require('./vendor/acorn');
 
 const ENTRY = new Set([
   'paintOutlookTodoReceipt', 'paintUndoneStatus', 'paintCalendarConsent',
-  'paintTodoConsent', 'paintSuggestCard', 'paintSkippedOnly', 'injectCard',
+  'paintTodoConsent', 'paintTodoScopeCard', 'paintSuggestCard', 'paintSkippedOnly', 'injectCard',
   'paintRemove', 'paintCalendarFailure', 'paintHint', 'stripDuplicateUndoHosts'
 ]);
 const HOST_NAMES = new Set(['host', 'mount', 'pane', 'verifyMount', 'earlyMount']);

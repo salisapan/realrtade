@@ -748,12 +748,12 @@ async function run() {
     const host = document.getElementById('surface-list');
     const states = find(host, 'wait-state').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
-    check('the Outlook row is there and is not connected until turned on', states.includes('Not connected') && !states.includes('Not set up yet'), states);
+    check('the Outlook row is there and is not connected until turned on', states.includes('לא מחובר') && !states.includes('Not set up yet'), states);
     // Since Mail.ReadWrite (2026-10-05) Outlook writes reply drafts on Do It, so "read-only" is no longer true: the row
     // says what it reads, that it never sends, and that nothing goes to Glance.
-    check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Never sends/.test(t) && /reply draft/.test(t) && /nothing is sent to Glance/.test(t)), notes);
+    check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /14/.test(t) && /לא שולח/.test(t) && /טיוטת תשובה/.test(t) && /לא נשלח ל-Glance/.test(t)), notes);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('and offers Connect once a client id is set', buttons.includes('Connect'), buttons);
+    check('and offers Connect once a client id is set', buttons.includes('התחבר'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
   }
 
@@ -791,9 +791,9 @@ async function run() {
     const whos = find(host, 'wait-who').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('the row is there, off by default', whos.includes('A model on your computer'));
-    check('it says it runs here, costs nothing, only proposes, and is switched on per language only after a test', notes.some((t) => /on this computer/.test(t) && /nothing leaves this computer/.test(t) && /you still tap/.test(t) && /per language only after it passes a precision test/.test(t)), notes);
-    check('Find models and Test and turn on are offered, Turn off is not (it is off)', buttons.includes('Find models') && buttons.includes('Test and turn on') && !buttons.includes('Turn off'), buttons);
+    check('the row is there, off by default', whos.includes('מודל על המחשב'));
+    check('it says it runs here, costs nothing, only proposes, and is switched on per language only after a test', notes.some((t) => /על המחשב הזה/.test(t) && /שום דבר לא יוצא מהמחשב/.test(t) && /אתה עדיין לוחץ/.test(t) && /מבחן דיוק/.test(t)), notes);
+    check('Find models and Test and turn on are offered, Turn off is not (it is off)', buttons.includes('מצא מודלים') && buttons.includes('בדוק והפעל') && !buttons.includes('כבה'), buttons);
   }
   {
     const status = { en: { ok: true, precision: 0.98, recall: 0.61 }, he: { ok: false, precision: 0.91, recall: 0.5 }, checkedAt: Date.now(), nextCheckAt: Date.now() + 1e9 };
@@ -803,8 +803,8 @@ async function run() {
     const host = document.getElementById('surface-list');
     const notes = find(host, 'wait-note').map((n) => n.textContent);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /English: on \(precision 0\.98, recall 0\.61\)/.test(t) && /Hebrew: off \(precision 0\.91, needs 0\.97\)/.test(t)), notes);
-    check('and offers Test again and Turn off', buttons.includes('Test again') && buttons.includes('Turn off'), buttons);
+    check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /אנגלית: פעיל \(דיוק 0\.98, כיסוי 0\.61\)/.test(t) && /עברית: כבוי \(דיוק 0\.91, צריך 0\.97\)/.test(t)), notes);
+    check('and offers Test again and Turn off', buttons.includes('בדוק שוב') && buttons.includes('כבה'), buttons);
   }
 
   console.log('\n--- popup.js: a stale worker asks for Reload Glance ---\n');
@@ -817,11 +817,11 @@ async function run() {
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), stale.sandbox, { filename: 'popup.js' });
     for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
     const staleLine = stale.document.getElementById('reloadGlance');
-    check('a worker still on the previous stamp shows Reload Glance', staleLine.hidden === false && staleLine.textContent === 'Reload Glance', staleLine.textContent);
+    check('a worker still on the previous stamp shows Reload Glance', staleLine.hidden === false && staleLine.textContent === 'רענן את Glance', staleLine.textContent);
     const quiet = load({}, { pageStamp: '0.9.40', workerBuild: '' });
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), quiet.sandbox, { filename: 'popup.js' });
     for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
-    check('a worker that does not answer the stamp shows Reload Glance', quiet.document.getElementById('reloadGlance').hidden === false && quiet.document.getElementById('reloadGlance').textContent === 'Reload Glance');
+    check('a worker that does not answer the stamp shows Reload Glance', quiet.document.getElementById('reloadGlance').hidden === false && quiet.document.getElementById('reloadGlance').textContent === 'רענן את Glance');
     const same = load({}, { pageStamp: '0.9.40', workerBuild: '0.9.40' });
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), same.sandbox, { filename: 'popup.js' });
     for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
@@ -1143,12 +1143,12 @@ async function run() {
       if (n && n.getAttribute && n.getAttribute('data-glance-scope-line')) scopeLines.push(n.textContent);
       (n.children || []).forEach(walk);
     })(list);
-    check('Outlook Setup says Connect Microsoft and offers Calendar',
-      words.indexOf('Connect Microsoft') >= 0 && services.indexOf('calendar') >= 0 && words.indexOf('Connect Google') < 0,
+    check('Outlook Setup says התחבר ל-Microsoft and offers שמירת זמן ביומן',
+      words.indexOf('התחבר ל-Microsoft') >= 0 && services.indexOf('calendar') >= 0 && words.indexOf('Connect Google') < 0 && words.indexOf('שמירת זמן ביומן') >= 0,
       { words, services });
     check('each unchecked service names its scope and how to connect',
-      scopeLines.some((t) => t.indexOf('Tasks.ReadWrite') >= 0 && t.indexOf('Connect Microsoft') >= 0 && t.indexOf('To Do') >= 0) &&
-      scopeLines.some((t) => t.indexOf('Calendars.ReadWrite') >= 0 && t.indexOf('Calendar') >= 0) &&
+      scopeLines.some((t) => t.indexOf('Tasks.ReadWrite') >= 0 && t.indexOf('To Do') >= 0) &&
+      scopeLines.some((t) => t.indexOf('Calendars.ReadWrite') >= 0 && t.indexOf('שמירת זמן ביומן') >= 0) &&
       scopeLines.some((t) => t.indexOf('Files.ReadWrite') >= 0) &&
       !scopeLines.some((t) => t.indexOf('Mail.Read') === 0),
       scopeLines);
@@ -1184,14 +1184,14 @@ async function run() {
     outlookSync: {}
   });
   check('an expired token is Reconnect in the panel and in Setup, never Connected',
-    expiredFace.pill === 'Reconnect' && expiredFace.status === 'expired' && !expiredFace.connectedBadge,
+    expiredFace.pill === 'התחבר מחדש' && expiredFace.status === 'expired' && !expiredFace.connectedBadge,
     expiredFace);
   const scopeFace = await microsoftFace({
     outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } },
     outlookSync: {}
   });
   check('a missing mail scope is Reconnect in the panel and in Setup, never Connected',
-    scopeFace.pill === 'Reconnect' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
+    scopeFace.pill === 'התחבר מחדש' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
     scopeFace);
 
   console.log('\n--- popup.js: header, panel, Setup row, and popup read one Microsoft state ---\n');
@@ -1237,7 +1237,7 @@ async function run() {
     'missing-scope': { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } }, outlookSync: {} },
     missing: { outlookAuth: null, outlookSync: {} }
   };
-  const words = { valid: 'Connected', expired: 'Reconnect', 'missing-scope': 'Reconnect', missing: 'Not connected' };
+  const words = { valid: 'מחובר', expired: 'התחבר מחדש', 'missing-scope': 'התחבר מחדש', missing: 'לא מחובר' };
   for (const key of Object.keys(faces)) {
     const face = await fourMicrosoft(faces[key]);
     check('header, panel, Setup row, and popup agree on ' + key,
@@ -1249,8 +1249,9 @@ async function run() {
   console.log('\n--- popup.js: Why not shown uses the same Hebrew as the page ---\n');
   const whyReasons = ['intent-null', 'tasks-not-granted', 'third-party', 'not-connected', 'context-dead', 'too-short', 'no-token', 'calendar-write-not-granted'];
   const whyStore = {
-    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.Read'] } },
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.Read'] }, account: { address: 'me@outlook.com' } },
     outlookSync: {},
+    glanceWhyCurrent: { reason: 'page:intent-null', subject: 'Mail 0', messageId: 'w0' },
     outlookPageDiag: whyReasons.map((reason, i) => ({ id: 'w' + i, reason: 'page:' + reason, verdict: 'quiet', subject: 'Mail ' + i }))
   };
   const whyPanel = load(whyStore, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
@@ -1263,12 +1264,14 @@ async function run() {
   })(whyPanel.document.getElementById('surface-list'));
   const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
   const pageUsesShared = /function whyNotText\(reason\) \{[\s\S]*?FlowDisplay\.whyNotShownLine\(reason\)/.test(pageSrc);
+  check('Setup shows one why line, for the current mail only', whyNodes.length === 1, whyNodes.map((n) => n.textContent));
   whyReasons.forEach((reason) => {
     const expected = whyPanel.sandbox.FlowDisplay.whyNotShownLine(reason);
     const expectedPage = whyPanel.sandbox.FlowDisplay.whyNotShownLine('page:' + reason);
     const node = whyNodes.filter((n) => n.getAttribute('data-glance-why') === 'page:' + reason)[0];
+    const shown = reason === 'intent-null';
     check('page and Setup say the same Hebrew for ' + reason,
-      pageUsesShared && expected === expectedPage && node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0,
+      pageUsesShared && expected === expectedPage && (shown ? (node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0) : !node),
       { expected, page: expectedPage, text: node && node.textContent });
   });
   const refreshPanel = load({ glanceOutlookRefresh: { '7': true } }, { activeTabs: [{ id: 7, url: 'https://outlook.live.com/mail/0/inbox' }] });

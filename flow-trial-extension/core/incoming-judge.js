@@ -104,6 +104,7 @@ const FlowIncomingJudge = (() => {
       cc: i.cc || i.ccRecipients || null,
       ownAddresses: i.ownAddresses || i.own || null,
       userName: i.userName || null,
+      ownNames: i.ownNames || null,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,
@@ -140,8 +141,9 @@ const FlowIncomingJudge = (() => {
     // Outlook's Do It writes a reply draft when the process has one. A task-only
     // close writes Microsoft To Do. A calendar event with no draft and no task
     // stays quiet rather than offering a reply in its place.
-    // A calendar hold is the card. Missing Calendars.ReadWrite does not silence it.
-    const calendarHold = intent && intent.personalClose === 'calendar-hold';
+    // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
+    // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
+    const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
     if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !calendarHold) {
       return { show: false, reason: 'no-draft-close', intent };
     }

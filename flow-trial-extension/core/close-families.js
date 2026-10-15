@@ -472,12 +472,10 @@ const FlowCloseFamilies = (() => {
         date: date, time: time, fromDate: oldDate, fromTime: oldTime
       });
     }
-    if (date && time) {
-      return hit({
-        family: 'G', type: 'event', confidence: 'high', personalClose: 'calendar-hold',
-        what: sentence, requestWhat: sentence, date: date, time: time
-      });
-    }
+    // Postpone or reschedule that does not name two different clocks is
+    // not a new hold. A cancel that names one slot still falls through
+    // to the delete below.
+    if (date && time && move) return 'suppress';
     if (date && move) {
       return hit({
         family: 'G', type: 'decision', confidence: 'high', personalClose: 'dated-commitment',
@@ -563,11 +561,12 @@ const FlowCloseFamilies = (() => {
     if (!meet && !commit && !slot) return null;
     if (!date) return null;
     if (time) {
-      // A timed promise stays a decision. A meet, or a sentence that is
-      // only the slot, is the event. Both are one calendar hold.
+      // A sender's promise plus a clock is not a hold. A meet, or a
+      // sentence that is only the slot, is the event.
+      if (commit && !meet) return null;
       return hit({
         family: 'D',
-        type: (commit && !meet) ? 'decision' : 'event',
+        type: 'event',
         confidence: 'high',
         personalClose: 'calendar-hold',
         what: sentence,

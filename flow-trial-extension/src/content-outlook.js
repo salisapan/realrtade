@@ -315,6 +315,12 @@
       });
       list.unshift(stored);
       const patch = { [PAGE_DIAG_KEY]: list.slice(0, 40) };
+      patch.glanceWhyCurrent = stored.verdict === 'show' ? null : {
+        reason: stored.reason,
+        subject: stored.subject || '',
+        messageId: stored.messageId || null,
+        at: stored.at
+      };
       const sync = bag.outlookSync || {};
       if (Array.isArray(sync.diagnostics)) {
         const diagnostics = sync.diagnostics.filter((d) => {
@@ -1196,6 +1202,8 @@
     if (!keepCard) {
       clearOpenCards();
       lastOutcome = '';
+      try { clearWhyNot(mountPoint()); } catch (e) { /* no pane */ }
+      try { chrome.storage.local.set({ glanceWhyCurrent: null }); } catch (e) { /* storage gone */ }
     }
     lastSig = '';
     try { console.info('Glance: stale card cleared', why || '', String(mailEpoch)); } catch (e) { /* console gone */ }
@@ -1360,6 +1368,7 @@
     if (!slot || !slot.querySelectorAll) return;
     const nodes = slot.querySelectorAll('.flow-why-not');
     for (let i = nodes.length - 1; i >= 0; i--) {
+      if (nodes[i].getAttribute && nodes[i].getAttribute('data-glance-refresh') === '1') continue;
       try { nodes[i].remove(); } catch (e) { /* already gone */ }
     }
   }
@@ -1367,8 +1376,10 @@
   function paintIfCurrent(token, fn) {
     if (!mailTokenLive(token) || typeof fn !== 'function') return null;
     paintDepth += 1;
-    try { return fn(); }
-    finally { paintDepth -= 1; }
+    try {
+      try { clearWhyNot(mountPoint()); } catch (e) { /* the pane is gone */ }
+      return fn();
+    } finally { paintDepth -= 1; }
   }
 
   function bindMailToken(pane, token) {
@@ -1984,7 +1995,7 @@
       if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) {
         return FlowReceipt.missingScopeLine('Tasks.ReadWrite', 'To Do');
       }
-      return 'Tasks.ReadWrite is not on this sign-in. In Setup, Connect Microsoft and check To Do.';
+      return 'Tasks.ReadWrite לא כלול בכניסה. בהגדרות, סמן To Do.';
     }
     if (r && (r.reason === 'token-expired' || r.needsSignIn)) return 'Reconnect Outlook';
     return (r && (r.error || r.reason)) || 'Could not confirm the task';
@@ -2846,6 +2857,23 @@
     host.appendChild(row);
   }
 
+  function paintTodoScopeCard(mount, ctx) {
+    if (paintDepth <= 0 || !mount || !ctx) return null;
+    const host = FlowChipHost.el('div', 'flow-chip-host');
+    host.setAttribute('dir', 'rtl');
+    host.setAttribute('data-glance-chain', 'todo-consent');
+    if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
+    else mount.appendChild(host);
+    stampCard(host, Object.assign({}, ctx, { decisionReason: 'tasks-not-granted' }), 'tasks-not-granted');
+    paintTodoConsent(host, ctx);
+    return host;
+  }
+
+  function taskOnlyProcess(process) {
+    const steps = (process && process.steps) || [];
+    return steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+  }
+
   function paintTodoConsent(host, ctx) {
     if (paintDepth <= 0) return;
     if (!host || host.querySelector('[data-glance-consent="todo"]')) return;
@@ -2955,6 +2983,12 @@
   async function holdAsTodo(host, ctx) {
     const token = captureMailToken();
     if (!host || ignoreStaleClick(host)) return;
+    let stAsk = null;
+    try { stAsk = await FlowStorage.get(); } catch (e) { stAsk = null; }
+    if (todoAsk(stAsk)) {
+      paintIfCurrent(token, function () { paintTodoConsent(host, ctx); });
+      return;
+    }
     const clock = meetingClock(ctx);
     const title = (clock && clock.title) || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Hold';
     const params = { title: title };
@@ -3270,6 +3304,13 @@
       fileName: file.name || (hold.params && hold.params.fileTerm) || null,
       quote: holdTextOf(pane) || (hold.params && hold.params.quote) || null
     });
+    const holdLine = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function')
+      ? FlowDisplay.holdWhenLine(params.dateIso, params.hour, params.minute)
+      : '';
+    if (!holdLine) {
+      await pageReason('page:hold-without-clock', pane);
+      return;
+    }
     const ctx = {
       app: 'outlook',
       doLabel: 'Do It',
@@ -3882,6 +3923,21 @@
     const old = mount.querySelector('.flow-chip-host');
     if (old) paintIfCurrent(token, function () { paintRemove(old); });
     lastKey = key;
+
+    const holdCard = ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold';
+    if (holdCard && !meetingClock(ctx)) {
+      await pageReason('page:hold-without-clock', pane);
+      return;
+    }
+    if (taskOnlyProcess(ctx.process) && todoAsk(st)) {
+      const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
+      if (!asked) { await pageReason('page:inject-failed', pane); return; }
+      const askedIds = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+      if (askedIds.length) asked.setAttribute('data-glance-message', askedIds.join('|'));
+      lastOutcome = 'card';
+      await clearReason(pane, 'tasks-not-granted');
+      return;
+    }
 
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
@@ -4893,6 +4949,17 @@
     if (!ctx || !ctx.messageId) return false;
     let loopSt = null;
     try { loopSt = await FlowStorage.get(); } catch (e) { loopSt = null; }
+    if ((ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold') && !meetingClock(ctx)) return false;
+    if (taskOnlyProcess(ctx.process) && todoAsk(loopSt)) {
+      const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
+      if (!asked) return false;
+      const askedIds = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+      if (askedIds.length) asked.setAttribute('data-glance-message', askedIds.join('|'));
+      lastOutcome = 'card';
+      lastKey = ctx.messageId + '|' + ((ctx.intent && ctx.intent.label) || '');
+      await clearReason(pane, 'tasks-not-granted');
+      return true;
+    }
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
         onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },

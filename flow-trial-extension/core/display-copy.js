@@ -187,6 +187,38 @@ const FlowDisplay = (() => {
     return WHY_HE['intent-null'];
   }
 
+  // Card dates are Hebrew. A deadline is "עד 23 באוק׳". A hold prints the
+  // day and the clock, and an empty string means there is no hold to show.
+  const HE_MON = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
+
+  function hebrewDay(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    const y = +m[1];
+    const mo = +m[2];
+    const d = +m[3];
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return '';
+    return d + ' ב' + HE_MON[mo - 1];
+  }
+
+  function cardDateLine(iso) {
+    const day = hebrewDay(iso);
+    return day ? ('עד ' + day) : '';
+  }
+
+  function holdWhenLine(iso, hour, minute) {
+    const day = hebrewDay(iso);
+    if (!day) return '';
+    if (hour == null || minute == null || hour === '' || minute === '') return '';
+    const h = Number(hour);
+    const min = Number(minute);
+    if (!Number.isInteger(h) || h < 0 || h > 23) return '';
+    if (!Number.isInteger(min) || min < 0 || min > 59) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return day + ' ' + pad(h) + ':' + pad(min);
+  }
+
   function whyNotShownRows(pageDiagnostics, diagnostics) {
     const page = Array.isArray(pageDiagnostics) ? pageDiagnostics : [];
     const claimed = Object.create(null);
@@ -221,7 +253,10 @@ const FlowDisplay = (() => {
     dropOutlookLoopRow: dropOutlookLoopRow,
     dropAlreadyHandledDiag: dropAlreadyHandledDiag,
     whyNotShownLine: whyNotShownLine,
-    whyNotShownRows: whyNotShownRows
+    whyNotShownRows: whyNotShownRows,
+    hebrewDay: hebrewDay,
+    cardDateLine: cardDateLine,
+    holdWhenLine: holdWhenLine
   };
 })();
 

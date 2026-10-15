@@ -425,9 +425,9 @@ const FlowIntent = (() => {
   // A reply draft is offered only for an inbound ask addressed to the user.
   // No To and no Cc is not that ask: the page did not show who it was for.
   // "Hi," is a greeting, not a person named Hi. "Hi Dana," names Dana.
-  const OPEN_GREET = /^(?:good\s+(?:morning|afternoon|evening)|greetings|hi|hey|hello|dear)\b|^(?:בוקר\s+טוב|ערב\s+טוב|שלום|היי|הי)(?![\u0590-\u05FF])/i;
+  const OPEN_GREET = /^(?:good\s+(?:morning|afternoon|evening)|greetings|hi|hey|hello|dear)\b|^(?:בוקר\s+טוב|ערב\s+טוב|שלום\s+רב|שלום|היי\s+לכולם|היי\s+לכולן|היי|הי)(?![\u0590-\u05FF])/i;
   // "Hi all," is the group, not a person named All. A real name still counts.
-  const GROUP_ADDRESSEE = /^(?:all|team|everyone|everybody|there|folks|guys|y['’]all|colleagues|both|כולם|צוות|חברים|חבר['׳’]ה)$/i;
+  const GROUP_ADDRESSEE = /^(?:all|team|everyone|everybody|there|folks|guys|y['’]all|colleagues|both|כולם|לכולם|לכולן|צוות|חברים|חבר['׳’]ה)$/i;
   function openingAddressee(text) {
     let raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
     const greet = raw.match(OPEN_GREET);
@@ -489,6 +489,46 @@ const FlowIntent = (() => {
       if (named !== userName && named !== first) return true;
     }
     return false;
+  }
+  // Names the reader may be called. The account display name, its first
+  // word, and any other names the host already knows (סאלי beside Sali).
+  function readerNameList(ctx) {
+    const c = ctx || {};
+    const names = [];
+    function add(raw) {
+      const s = String(raw || '').trim().toLowerCase();
+      if (!s) return;
+      if (names.indexOf(s) === -1) names.push(s);
+      const first = s.split(/\s+/)[0];
+      if (first && names.indexOf(first) === -1) names.push(first);
+    }
+    add(c.userName);
+    if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
+    return names;
+  }
+  // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
+  // the reader's names in that script. A Hebrew name is not "other" just
+  // because the only stored name is Latin, and the reverse.
+  function vocativeIsOther(text, ctx) {
+    const who = openingAddressee(text);
+    if (!who) return false;
+    const names = readerNameList(ctx);
+    if (!names.length) return false;
+    const named = who.toLowerCase();
+    if (names.indexOf(named) !== -1) return false;
+    const hebrew = /[\u0590-\u05FF]/;
+    if (!names.some((n) => hebrew.test(n) === hebrew.test(who))) return false;
+    return true;
+  }
+  // The reader's own outbound mail, a note to self, or a sent copy.
+  function mailIsOwn(ctx) {
+    const c = ctx || {};
+    if (c.noteToSelf === true || c.senderIsUser === true || c.inSent === true) return true;
+    if (c.direction === 'outbound' || c.direction === 'self') return true;
+    if (c.inbound === false) return true;
+    const sender = String(c.senderEmail || '').toLowerCase();
+    const own = addressList(c.ownAddresses || c.own);
+    return Boolean(sender && own.length && own.indexOf(sender) !== -1);
   }
   function readerDecisionAsk(text) {
     const raw = String(text || '');
@@ -728,8 +768,9 @@ const FlowIntent = (() => {
       if (googleClose) intent.googleClose = googleClose;
       // "No need to reply, just get it done" still does the work. The draft stays off.
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
-      // "Please remember to renew…" is the task. A reply draft is not the close.
-      if (/\bplease remember to\b/i.test(text)) intent.noReplyDraft = true;
+      // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
+      // "תזכורת" (a payment reminder) is not this phrase.
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       if (familyAgrees(type, fam)) {
         intent.closeFamily = fam.family;
@@ -756,6 +797,17 @@ const FlowIntent = (() => {
         const iso = intent.entities && intent.entities.dateIso;
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
         if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
+      }
+      // Outlook may show a hold that has no reply draft. Only an explicit
+      // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
+      // A file placed on a calendar is not that exemption.
+      if (personalClose === 'calendar-hold') {
+        const held = familyBox.hit;
+        const fileHold = Boolean(held && held.fileTarget);
+        const familyMeet = Boolean(held && held.family === 'D' && held.type === 'event' && held.personalClose === 'calendar-hold');
+        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
+          intent.explicitHold = true;
+        }
       }
       return gateCreateWhenMissing(intent);
     }
@@ -904,6 +956,10 @@ const FlowIntent = (() => {
     const replyOk = !replyAsk || replyDraftAllowed(text, ctx);
     const replyMisaddressed = replyAsk && replyAimedElsewhere(text, ctx);
     if (replyMisaddressed && !quietHint) quietHint = 'hedge';
+    // Own outbound, a note to self, or a vocative that names someone else
+    // is not this person's Do It. A hold does not get past that by not
+    // being a reply ask.
+    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {
@@ -1037,7 +1093,9 @@ const FlowIntent = (() => {
       // event, not the schedule process's extra reminder task. A bare
       // announcement ("let's do a call Friday at 3") and a confirm ask on
       // an already-stated meeting stay the schedule processes.
-      const meetingHold = Boolean(clock) && (explicitMeetingAsk || s.flags.commit || s.flags.senderPromise);
+      // A hold here is an explicit ask to meet at that clock. A sender's
+      // promise plus a time ("I'll send it at 9am") is not a hold.
+      const meetingHold = explicitMeetingAsk;
       if (meetingHold) {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
@@ -1157,14 +1215,15 @@ const FlowIntent = (() => {
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso
       };
-      // A clock time makes the close a calendar hold. A date alone stays a
-      // task (dated-commitment). "The report is due at 3pm" never reaches
-      // here — it has no agreement word and no sender promise.
-      if (clock) {
+      // An explicit meet at this clock is the hold. A sender's own promise
+      // plus a clock ("I'll send the form tomorrow at 9am", "אחזור אליך ב-11")
+      // is quiet. "We agreed … at 3pm" stays a task, not a new event.
+      if (clock && explicitMeetingAsk) {
         committed.hour = facts.time.hour;
         committed.minute = facts.time.minute;
-        return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'calendar-hold');
+        return finish(TYPES.SCHEDULED_EVENT, 'high', committed, 'calendar-hold');
       }
+      if (clock && s.flags.senderPromise) return stayQuiet('hedge');
       return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {

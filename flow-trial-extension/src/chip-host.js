@@ -37,10 +37,69 @@ const FlowChipHost = (() => {
     chip.replaceChildren(el('span', 'flow-chip-label', text));
   }
 
+  function bagClock(bag) {
+    if (!bag) return null;
+    const dateIso = bag.dateIso || (bag.date && bag.date.iso) || null;
+    const hour = bag.hour != null ? bag.hour : (bag.time && bag.time.hour);
+    const minute = bag.minute != null ? bag.minute : (bag.time && bag.time.minute);
+    if (!dateIso) return null;
+    return { dateIso: dateIso, hour: hour, minute: minute };
+  }
+
+  function clockOf(ctx) {
+    const bags = [];
+    if (ctx.holdClock) bags.push(ctx.holdClock);
+    if (ctx.calendarHold && ctx.calendarHold.params) bags.push(ctx.calendarHold.params);
+    ((ctx.process && ctx.process.steps) || []).forEach((step) => { if (step && step.params) bags.push(step.params); });
+    if (ctx.intent) {
+      bags.push(ctx.intent);
+      if (ctx.intent.entities) bags.push(ctx.intent.entities);
+      if (ctx.intent.facts) bags.push(ctx.intent.facts);
+      const rem = ctx.intent.entities && ctx.intent.entities.reminder;
+      if (rem) bags.push(rem);
+    }
+    for (let i = 0; i < bags.length; i++) {
+      const found = bagClock(bags[i]);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function holdCard(ctx) {
+    if (!ctx) return false;
+    if (ctx.glanceChain === 'calendar-hold') return true;
+    return Boolean(ctx.process && ctx.process.id === 'hold');
+  }
+
+  function paintWhen(host, ctx) {
+    if (!host || typeof FlowDisplay === 'undefined') return;
+    const clock = clockOf(ctx);
+    let line = '';
+    if (holdCard(ctx)) {
+      line = clock && typeof FlowDisplay.holdWhenLine === 'function'
+        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
+        : '';
+    } else if (clock && clock.dateIso && typeof FlowDisplay.cardDateLine === 'function') {
+      line = FlowDisplay.cardDateLine(clock.dateIso);
+    }
+    if (!line) return;
+    const node = el('p', 'flow-chip-when', line);
+    node.setAttribute('data-glance-when', line);
+    node.setAttribute('dir', 'rtl');
+    host.appendChild(node);
+  }
+
   // mountNode: DOM parent. ctx: { process, intent, messageId, app }.
   // handlers: { onDoIt(host, chip, ctx, liveSteps), onDismiss(host, ctx) }
   function inject(mountNode, ctx, handlers) {
     if (!mountNode || !ctx || !ctx.process) return null;
+    if (holdCard(ctx)) {
+      const clock = clockOf(ctx);
+      const line = clock && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function'
+        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
+        : '';
+      if (!line) return null;
+    }
     if (mountNode.querySelector('.flow-chip-host')) return mountNode.querySelector('.flow-chip-host');
 
     const host = el('div', 'flow-chip-host');
@@ -79,6 +138,7 @@ const FlowChipHost = (() => {
           if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps);
         }
       });
+      paintWhen(host, ctx);
       if (mountNode.firstChild) mountNode.insertBefore(host, mountNode.firstChild);
       else mountNode.appendChild(host);
       return host;
@@ -140,6 +200,7 @@ const FlowChipHost = (() => {
       host.__glanceSteps = view;
     }
 
+    paintWhen(host, ctx);
     if (mountNode.firstChild) mountNode.insertBefore(host, mountNode.firstChild);
     else mountNode.appendChild(host);
     return host;

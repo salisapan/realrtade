@@ -1204,9 +1204,6 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   }
 
   const holds = [
-    ['EN promise + date + time', 'I will send you the signed contract by Friday, September 18 at 3pm.'],
-    ['EN agreed + date + time, no meeting noun', 'We agreed to file the amendment by September 21 at 3pm.'],
-    ['HE promise + date + time', 'אני אשלח לך את החוזה ביום שישי בשעה 15:00.'],
     ['EN explicit schedule-a-call ask', 'Can you schedule a call Friday, September 18 at 3pm?'],
     ['EN could-you-meet ask', 'Could you meet Friday, September 18 at 3pm to review the contract?'],
     ['EN can-we-meet ask', 'Can we meet Friday, September 18 at 10:00am?'],
@@ -1227,12 +1224,15 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   }
 
   const promise = planOf('I will send you the signed contract by Friday, September 18 at 3pm.');
-  check('a timed promise stays a decision, and the step carries 15:00',
-    promise.intent.type === FlowIntent.TYPES.DECISION_TO_LOG &&
-      promise.process.steps[0].params.hour === 15 && promise.process.steps[0].params.minute === 0,
-    promise.process.steps[0].params);
-  check('a timed promise does not also open a task or a draft',
-    promise.process.steps.every((s) => s.kind === 'calendar'));
+  check('a timed sender promise is quiet, not a hold',
+    !promise.intent.type && !promise.intent.personalClose, { type: promise.intent.type, close: promise.intent.personalClose });
+  const agreed = planOf('We agreed to file the amendment by September 21 at 3pm.');
+  check('an agreed day with a clock stays a task, not a hold',
+    agreed.intent.personalClose === 'dated-commitment' && agreed.process.id === 'log-it',
+    { close: agreed.intent.personalClose, id: agreed.process && agreed.process.id });
+  const hePromise = planOf('אני אשלח לך את החוזה ביום שישי בשעה 15:00.');
+  check('a Hebrew timed sender promise is quiet, not a hold',
+    !hePromise.intent.type && !hePromise.intent.personalClose, { type: hePromise.intent.type, close: hePromise.intent.personalClose });
 
   const ask = planOf('Can you schedule a call Friday, September 18 at 3pm?');
   check('an explicit meeting ask stays an event, not a draft',
@@ -1296,8 +1296,11 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   const suppressedPromise = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyDecision });
   check('heavy decision dismissals suppress a timed commitment', !suppressedPromise.type, suppressedPromise.type);
   const notThat = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyEvent });
-  check('event-dismissal history does not suppress a timed commitment',
-    notThat.personalClose === 'calendar-hold', notThat.personalClose);
+  check('a timed sender promise stays quiet under event-dismissal history',
+    !notThat.type && !notThat.personalClose, notThat.personalClose);
+  const meetDespite = classify('Can we meet Friday, September 18 at 10:00am?', { calibrationByType: heavyDecision });
+  check('decision-dismissal history does not suppress an explicit meet',
+    meetDespite.personalClose === 'calendar-hold', meetDespite.personalClose);
 
   const Q3 = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
   const q3open = classify(Q3, { to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });

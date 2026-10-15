@@ -81,8 +81,8 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
 test('the header says Connected when Microsoft is on', async ({ glance }) => {
   await glance.seedOutlook();
   const popup = await glance.openPopup();
-  await expect(popup.locator('#statusPill')).toHaveText('Connected');
-  await expect(popup.getByText('Connect Google')).toBeVisible();
+  await expect(popup.locator('#statusPill')).toHaveText('מחובר');
+  await expect(popup.getByText('התחבר ל-Google')).toBeVisible();
 });
 
 test('a Hebrew To line in one text node still offers the Q3 draft', async ({ glance }) => {

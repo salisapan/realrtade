@@ -129,7 +129,7 @@ const FlowReceipt = (() => {
     const name = String(scope || '').trim();
     const box = String(service || '').trim();
     if (!name || !box) return '';
-    return name + ' is not on this sign-in. In Setup, Connect Microsoft and check ' + box + '.';
+    return name + ' לא כלול בכניסה. בהגדרות, סמן ' + box + '.';
   }
 
   function verifyTimeoutLine() {

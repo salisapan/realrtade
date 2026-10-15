@@ -33,9 +33,7 @@ test('Outlook silent case renders no card and keeps a Why-not-shown reason', asy
   }).toEqual({ chips: 0, reason: true });
 
   const popup = await glance.openPopup();
-  const why = popup.getByText(/Why not shown/);
-  await expect(why).toBeVisible();
-  await why.click();
+  await expect(popup.locator('[data-glance-why-line]')).toHaveCount(1);
   await expect(popup.getByText('לא זוהתה בקשה')).toBeVisible();
 });
 

@@ -222,7 +222,7 @@ test('Undo returns one Do It on the mail and in Loops, including a legacy undone
   await expect(pane.locator('button.flow-chip')).toHaveCount(1);
   await expect(pane.getByText('Undone — the To Do task was removed.')).toHaveCount(0);
   await popup.locator('button[data-tab="open"]').click();
-  await expect(popup.locator('#open-list').getByRole('button', { name: 'Do It' })).toHaveCount(1);
+  await expect(popup.locator('#open-list').getByRole('button', { name: 'בצע' })).toHaveCount(1);
 
   const line = 'Undone — the To Do task was removed.';
   await glance.seedOutlook({
@@ -269,7 +269,7 @@ test('Undo returns one Do It on the mail and in Loops, including a legacy undone
   await expect(legacyPane.getByText(line)).toHaveCount(0);
   const loops = await glance.openPopup();
   await loops.locator('button[data-tab="open"]').click();
-  await expect(loops.locator('#open-list').getByRole('button', { name: 'Do It' })).toHaveCount(1);
+  await expect(loops.locator('#open-list').getByRole('button', { name: 'בצע' })).toHaveCount(1);
 });
 
 test('Activity shown matches the Loops card count', async ({ glance }) => {
@@ -509,26 +509,20 @@ test('an older undone promise shows one Do It on a mail with the same words', as
   await expect(pane.getByText(line)).toHaveCount(0);
 });
 
-test('Show all keeps the side panel scroll', async ({ glance }) => {
+test('the why line is the current mail only', async ({ glance }) => {
   test.setTimeout(60000);
   const diags = [];
   for (let i = 0; i < 25; i++) {
     diags.push({ key: 'page:quiet|' + i, reason: 'page:quiet-' + i, subject: 'Quiet mail ' + i, at: i });
   }
-  await glance.seedOutlook({ outlookPageDiag: diags });
+  await glance.seedOutlook({
+    outlookPageDiag: diags,
+    glanceWhyCurrent: { reason: 'page:intent-null', subject: 'Quiet mail 24', messageId: 'current' }
+  });
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="setup"]').click();
-  await popup.setViewportSize({ width: 380, height: 420 });
-  const before = await popup.locator('main').evaluate((el) => {
-    el.scrollTop = 140;
-    return el.scrollTop;
-  });
-  expect(before).toBe(140);
-  await popup.locator('#surface-list summary').evaluate((el) => el.click());
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  await popup.locator('#surface-list').getByRole('button', { name: 'Show all' }).evaluate((el) => el.click());
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  const row = popup.locator('#surface-list [data-glance-why="page:quiet-24"]');
-  await expect(row).toBeVisible();
-  await expect(row).toContainText('לא זוהתה בקשה');
+  const lines = popup.locator('#surface-list [data-glance-why-line]');
+  await expect(lines).toHaveCount(1);
+  await expect(lines).toContainText('לא זוהתה בקשה');
+  await expect(popup.locator('#surface-list').getByRole('button', { name: 'Show all' })).toHaveCount(0);
 });

@@ -156,21 +156,58 @@ const FlowExtract = (() => {
     return { raw, iso: iso(inWindow[0]) };
   }
 
+  function localToday(now) {
+    const d = now || new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  // An invoice number, a version, or a phone is not a day.
+  function slashRejected(text, index) {
+    const before = text.slice(Math.max(0, index - 32), index);
+    if (/(?:invoice|inv|version|ver|חשבונית|גרסה|טלפון|phone|ext)\.?\s*[#:]?\s*$/i.test(before)) return true;
+    if (/(?:^|[^A-Za-z])v\s*$/i.test(before)) return true;
+    return false;
+  }
+  // A slash is a date only beside a preposition, a weekday, or a time or meeting word.
+  function slashDateContext(text, index, raw) {
+    const before = text.slice(Math.max(0, index - 40), index);
+    const window = text.slice(Math.max(0, index - 48), Math.min(text.length, index + String(raw || '').length + 48));
+    if (/(?:עד|ב-|ב־|לפני|ביום)\s*$/.test(before)) return true;
+    if (/\b(?:on|by|until|before|due|no later than)\s*$/i.test(before)) return true;
+    if (/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(window)) return true;
+    if (/יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window)) return true;
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(window)) return true;
+    if (/(?:בשעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
+    return false;
+  }
   // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
+  // Day-first stays. A bare slash, a past day, or a number inside an invoice is not a date.
   function slashDate(text, now) {
-    const m = String(text || '').match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-    if (!m) return null;
-    const a = +m[1];
-    const b = +m[2];
-    let day = null;
-    let monthIdx = null;
-    if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
-    else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
-    else return { raw: m[0], iso: null };
-    let year = m[3] ? +m[3] : null;
-    if (year != null && year < 100) year += 2000;
-    const built = monthDay(m[0], monthIdx, day, year, now || new Date());
-    return built || { raw: m[0], iso: null };
+    const src = String(text || '');
+    const re = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    const today = localToday(now || new Date());
+    let ambiguous = null;
+    let m;
+    while ((m = re.exec(src))) {
+      if (slashRejected(src, m.index)) continue;
+      const a = +m[1];
+      const b = +m[2];
+      let day = null;
+      let monthIdx = null;
+      if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
+      else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+      else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
+      let year = m[3] ? +m[3] : null;
+      if (year != null && year < 100) year += 2000;
+      const built = monthDay(m[0], monthIdx, day, year, now || new Date());
+      const iso = built && built.iso;
+      if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
+        if (!ambiguous) ambiguous = { raw: m[0], iso: null };
+        continue;
+      }
+      return built;
+    }
+    return ambiguous;
   }
 
   // Only dates the message states outright. A date guessed from context is worse

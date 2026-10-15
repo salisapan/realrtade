@@ -237,6 +237,7 @@ const FlowStorage = (() => {
     // src/content-outlook.js writes this directly. The panel's Why not shown
     // list reads it through get(); a key absent from DEFAULTS never arrives.
     outlookPageDiag: [],
+    glanceWhyCurrent: null,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

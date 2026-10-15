@@ -5,7 +5,7 @@ const { test, expect } = require('./support/harness');
 // fall through to launchWebAuthFlow (0.9.39, open-tasks row 50).
 
 async function connectButton(page) {
-  return page.getByRole('button', { name: 'Connect Google' });
+  return page.getByRole('button', { name: 'התחבר ל-Google' });
 }
 
 test('Disconnect does not silently reconnect until Connect is clicked', async ({ glance }) => {
@@ -50,5 +50,5 @@ test('getAuthToken failure leaves Google disconnected and does not open a window
   const flows = await glance.flows();
   expect(flows.length).toBe(0);
   expect(glance.context.pages().length).toBe(pagesBefore);
-  await expect(page.locator('#statusPill')).toHaveText('Not connected');
+  await expect(page.locator('#statusPill')).toHaveText('לא מחובר');
 });
