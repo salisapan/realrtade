@@ -186,7 +186,10 @@ function isGateCallee(callee, scope) {
 function isChipCall(callee, scope) {
   const node = unwrap(callee);
   const resolved = resolveExpr(node, scope);
-  return Boolean(resolved && resolved.kind === 'chip-fn');
+  if (!resolved || resolved.kind !== 'chip-fn') return false;
+  // setUiLang stores the UI language. It does not paint a card.
+  if (resolved.name === 'setUiLang') return false;
+  return true;
 }
 
 function isHostDomCall(node, scope) {

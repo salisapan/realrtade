@@ -302,6 +302,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
   const gateViolations = lintPaintGate(outlookSrc);
   check('every paint goes through paintIfCurrent', gateViolations.length === 0, gateViolations.slice(0, 12));
+  check('setting the UI language is not a card paint', lintPaintGate('function pageUiLang() { FlowChipHost.setUiLang(lang); }\n').length === 0);
   function mustFail(name, src, needle) {
     const hit = lintPaintGate(src);
     check(name, hit.some((row) => String(row).indexOf(needle) >= 0), hit);

@@ -336,12 +336,13 @@ console.log('\n--- To Do Do It rechecks the open mail after the proof read ---\n
     failFn.indexOf('token-expired') > 0 && reconnectAt > failFn.indexOf('token-expired') &&
     page.indexOf('Reconnect Outlook to allow To Do') < 0,
     { scopeAt, reconnectAt });
-  const undoClick = page.slice(page.indexOf("undo.textContent = 'Undoing…'"), page.indexOf('async function livePromiseProof'));
+  const undoClick = page.slice(page.indexOf('undo.textContent = pageChrome().undoing'), page.indexOf('async function livePromiseProof'));
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
   check('an undo that does not answer shows try again instead of staying on Undoing',
     undoClick.indexOf('readBackOrTimeout') > 0 &&
     undoClick.indexOf("reason === 'verify-timeout'") > 0 &&
     undoClick.indexOf("Couldn't verify, try again") > 0 &&
+    page.indexOf("undoing: 'Undoing…'") > 0 &&
     popup.indexOf('readBackOrTimeout') > 0 &&
     popup.indexOf("r.reason === 'verify-timeout'") > 0);
 }
@@ -367,7 +368,8 @@ console.log('\n--- a verify miss is not Handled ---\n');
   check('the To Do miss paints a receipt with Undo and is not Handled',
     missCard.indexOf("Created, couldn't verify") > 0 &&
     missCard.indexOf("type: 'flow:undo-action'") > missCard.indexOf("Created, couldn't verify") &&
-    missCard.indexOf("'Handled.'") > missCard.indexOf("type: 'flow:undo-action'"));
+    missCard.indexOf('pageChrome().handled') > missCard.indexOf("type: 'flow:undo-action'") &&
+    card.indexOf("handled: 'Handled.'") > 0);
   const empty = background({ routes: [
     { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: true, status: 200, json: async () => LISTS, text: async () => '' }) },
     { method: 'POST', test: /\/tasks$/, reply: () => ({ ok: true, status: 201, json: async () => ({}), text: async () => '' }) }
