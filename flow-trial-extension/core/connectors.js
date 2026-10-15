@@ -109,6 +109,17 @@ const FLOW_CONNECTORS = [
       { key: 'board', label: 'Board ID', placeholder: '1234567890', type: 'text' }
     ]
   },
+  {
+    id: 'asana',
+    label: 'Asana',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one task to the Asana project you choose and reads it back before it counts as handled. Off in this build; needs an Asana app Client ID (docs/glance-ai/connectors/asana.md).',
+    fields: [
+      { key: 'project', label: 'Project URL or ID', placeholder: 'https://app.asana.com/0/…', type: 'text' }
+    ]
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 

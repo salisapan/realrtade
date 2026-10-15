@@ -20,7 +20,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 0 | FOUNDATION: token relay + consent catalogue + learning hook (build once, with row 1) | - | - | **built 2026-10-14, tested against mocks, not deployed, not wired to any screen**: `token-relay/` ([doc](connectors/token-relay.md)), `core/consent-catalog.js` (the owner designs the screen), `core/connector-outcome.js` (events + pure conclusions; the card does not read the conclusions yet). The older exchange functions are not moved onto the relay yet |
 | 0b | LEARNING: per-user calibration (path C), then the path D design and its dormant code, one slice per run, after the foundation | - | - | not started |
 | 1 | Notion | a task or a page row exists | OAuth2 + secret (relay) | **ready, waiting for owner** (2026-10-14): [doc](connectors/notion.md); built and tested against a mock; DRAFT PR; switches `notionReadBack`, `notionOAuth` off. Waiting: app registration, relay deploy, `api.notion.com` host, unverified vendor facts, steps-list destination wiring |
-| 2 | Asana | a task exists | OAuth2 PKCE | not started |
+| 2 | Asana | a task exists | OAuth2 PKCE | **ready, waiting for owner** (2026-10-15): [doc](connectors/asana.md); built and tested against a mock; DRAFT PR #156 (stacked on #138); switches `asanaReadBack`, `asanaOAuth` off. Waiting: app registration, relay deploy, `app.asana.com` host, unverified vendor facts, steps-list destination wiring |
 | 3 | Jira | an issue exists | OAuth2 3LO + secret (relay) | not started |
 | 4 | Linear | an issue exists | OAuth2 | not started |
 | 5 | DocuSign | the envelope is signed | OAuth2 + secret (relay); vendor go-live review | not started |

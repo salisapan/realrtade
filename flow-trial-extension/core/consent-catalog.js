@@ -29,8 +29,9 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'microsoft-service', service: 'teams' }] },
     { id: 'notion', label: 'Notion', detail: 'Add one row to the Notion database you pick, then read it back. Undo archives it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'notion' }, { type: 'host-permission', origin: 'https://api.notion.com/*' }] },
+    { id: 'asana', label: 'Asana', detail: 'Add one task to the Asana project you pick, then read it back. Undo removes it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'asana' }, { type: 'host-permission', origin: 'https://app.asana.com/*' }] },
     // Listed so the screen can show them honestly. Select all never includes these.
-    { id: 'asana', label: 'Asana', detail: 'Create one task and read it back.', group: 'tasks', state: 'coming', steps: [] },
     { id: 'jira', label: 'Jira', detail: 'Create one issue and read it back.', group: 'tasks', state: 'coming', steps: [] },
     { id: 'linear', label: 'Linear', detail: 'Create one issue and read it back.', group: 'tasks', state: 'coming', steps: [] },
     { id: 'docusign', label: 'DocuSign', detail: 'Count a request closed when the envelope is signed.', group: 'sign', state: 'coming', steps: [] },
