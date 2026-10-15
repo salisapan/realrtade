@@ -53,7 +53,9 @@ read it,** the shape may be stood in for by independent evidence: the word list 
 - **Free: 120 units a month** (about 4 a day), fast model only. **Pro: 1,500 units a month** (about 50 a day), fast first and the strong pair when torn. About 12 times as many, **and** a stronger
   reading for the sentences the fast one could not settle, **and** the stand-in for the shape. The numbers are the owner's to change: `PLANS` in `core/ai-ladder.js`, one place.
 - **Counted on the server**, atomically, three ways: the person (a hash of the random install id, or of the Pro key) per month; the network address per day (300 units, so a new install id is not a new
-  allowance); everyone together per day (3,000 units, the automatic off switch). The device only shows what the server last said. Stored: a hash and a number. Never a sentence, never an answer.
+  allowance); everyone together per day (3,000 units, the automatic off switch). The three counts are taken together, so a read waits for one round trip to the counter, not three, before a model is asked.
+  If the same person asks about the same masked sentence again while that read is still running, the second ask waits for the first: it is not charged and it is not sent to a model. When the read finishes, that
+  wait is forgotten. The device only shows what the server last said. Stored: a hash and a number. Never a sentence, never an answer.
 - **When it ends.** The page stops asking (no round trip). Glance keeps working on the device exactly as before; the popup says once: "This month's second readings are used up. Glance keeps working on
   your device, as before. It starts again on Nov 1." Free also sees "Pro has about 12 times as many." Nothing in Gmail, no banner, no broken state. From 80% used the popup says how many are left.
   Pro at the end sees the same line without the sales sentence. A server failure rests the layer for 15 minutes and says so in the same quiet place.
