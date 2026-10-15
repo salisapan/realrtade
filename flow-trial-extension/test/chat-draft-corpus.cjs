@@ -254,25 +254,30 @@ const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html'))
 check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
 advFiles.forEach((name) => {
   const root = liveRoot('adv/' + name);
-  const wantDraft = false;
+  const href = name === 'd-link.html' ? msHref : '';
+  const wantDraft = name === 'd-link.html';
   const wantActive = ['d-active.html', 'd-ago.html', 'd-he-active.html', 'g-book-active.html', 'g-he2-active.html'].indexOf(name) >= 0;
-  const ms = FlowMessengerParse.classify(root);
-  const ig = FlowInstagramParse.classify(root);
-  const msDraft = ms.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true;
-  const igDraft = ig.kind === 'one-to-one' && FlowInstagramParse.isOneToOne(root) === true;
+  const ms = FlowMessengerParse.classify(root, href);
+  const ig = FlowInstagramParse.classify(root, href);
+  const msDraft = ms.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root, href) === true;
+  const igDraft = ig.kind === 'one-to-one' && FlowInstagramParse.isOneToOne(root, href) === true;
   const verdict = wantDraft ? 'drafts' : 'stays quiet';
   check('adv ' + name + ' ' + verdict, msDraft === wantDraft && igDraft === wantDraft && ms.active === wantActive && ig.active === wantActive, { messenger: ms, instagram: ig });
 });
 // id-nested.html drafts because the URL is /danalevi_88/, an independent
 // username. The h2 text inside that link is not a signal. It did not rely
 // on the title matching itself.
-const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html'];
-const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-duplicate.html', 'id-weiss.html', 'id-thread-mismatch.html'];
+const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-panel.html', 'id-duplicate.html', 'id-weiss.html'];
+const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html', 'id-thread-mismatch.html'];
+function numericPage(name) {
+  return name === 'id-duplicate.html' || name === 'id-weiss.html';
+}
 identityDraft.forEach((name) => {
   const root = liveRoot('identity/' + name);
-  const ms = FlowMessengerParse.classify(root);
-  const ig = FlowInstagramParse.classify(root);
-  check(name + ' drafts', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true, { messenger: ms, instagram: ig });
+  const href = numericPage(name) ? msHref : '';
+  const ms = FlowMessengerParse.classify(root, href);
+  const ig = FlowInstagramParse.classify(root, href);
+  check(name + ' drafts', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root, href) === true && FlowInstagramParse.isOneToOne(root, href) === true, { messenger: ms, instagram: ig });
 });
 identityQuiet.forEach((name) => {
   const root = liveRoot('identity/' + name);
@@ -289,8 +294,12 @@ check('attached vav plus a Hebrew first name is a group', FlowMessengerParse.cla
 const weiss = liveRoot('identity/id-weiss.html');
 check('Weiss without a matching thread id stays quiet', FlowMessengerParse.isOneToOne(weiss) === false && FlowMessengerParse.classify(weiss).kind !== 'group' && FlowInstagramParse.classify(weiss).kind !== 'group');
 check('Weiss drafts when the thread id matches the profile', FlowMessengerParse.classify(weiss, msHref).kind === 'one-to-one' && FlowInstagramParse.classify(weiss, msHref).kind === 'one-to-one');
-const mismatch = liveRoot('identity/id-thread-mismatch.html');
 const mismatchHref = 'https://www.messenger.com/t/555111222333';
+const username = liveRoot('identity/id-username.html');
+const vanity = liveRoot('identity/id-vanity.html');
+check('a username link drafts when the thread id differs', FlowMessengerParse.isOneToOne(username, mismatchHref) === true && FlowInstagramParse.isOneToOne(username, mismatchHref) === true);
+check('a vanity link drafts when the thread id differs', FlowMessengerParse.isOneToOne(vanity, mismatchHref) === true && FlowInstagramParse.isOneToOne(vanity, mismatchHref) === true);
+const mismatch = liveRoot('identity/id-thread-mismatch.html');
 check('a group thread id that differs from the header profile stays quiet', FlowMessengerParse.isOneToOne(mismatch, mismatchHref) === false && FlowInstagramParse.isOneToOne(mismatch, mismatchHref) === false);
 check('that same header drafts when the thread id matches', FlowMessengerParse.isOneToOne(mismatch, msHref) === true);
 const familyMatch = namedHeader('Family', '<a href="/100012345678/" role="link">Family</a>', msInfo);
@@ -482,9 +491,11 @@ console.log('\n--- calendar evidence ---\n');
     ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
   ];
   fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
-    pages.push(['adv/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', false]);
+    const href = name === 'd-link.html' ? 'https://www.messenger.com/t/100012345678' : 'https://www.messenger.com/t/' + name.replace(/\.html$/, '');
+    pages.push(['adv/' + name, href, 'src/content-messenger.js', name === 'd-link.html']);
   });
   function identityUrl(name) {
+    if (name === 'id-duplicate.html' || name === 'id-weiss.html') return 'https://www.messenger.com/t/100012345678';
     if (name === 'id-thread-mismatch.html') return 'https://www.messenger.com/t/555111222333';
     if (name === 'id-panel.html') return 'https://www.messenger.com/e2ee/t/424242';
     return 'https://www.messenger.com/t/' + name.replace(/\.html$/, '');
