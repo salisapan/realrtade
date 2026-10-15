@@ -29,7 +29,7 @@ const FORM_ONLY_FILES = ['flow-landing/solutions/browser-ai-agent-extension-hija
 // Pricing mixes Flow and Glance; only its Glance block is scanned.
 function pricingGlance() {
   const s = fs.readFileSync(path.join(ROOT, 'flow-landing/pricing.html'), 'utf8');
-  const a = s.indexOf('For you, in Gmail');
+  const a = s.indexOf('For you, across your apps');
   const b = s.indexOf('</section>', a);
   return a > 0 ? s.slice(a, b > a ? b : undefined) : '';
 }
