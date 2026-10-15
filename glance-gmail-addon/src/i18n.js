@@ -1,0 +1,66 @@
+// UI strings for the Workspace card. Language comes from the user locale,
+// not from the language of the open mail. Hebrew is wrapped by the card
+// builder with bidi marks so a fixed card layout stays readable.
+
+var GlanceI18n = (function () {
+  var STR = {
+    en: {
+      doIt: 'Do it',
+      undo: 'Undo',
+      couldntConfirm: "Couldn't confirm",
+      edited: "The task was edited, so I won't undo it",
+      quiet: 'Nothing to close.',
+      openMessage: 'Open a message.',
+      next: 'Next',
+      due: 'Due',
+      inTasks: 'In Google Tasks.',
+      undone: 'Undone.',
+      id: 'Id'
+    },
+    he: {
+      doIt: 'בצע',
+      undo: 'בטל',
+      couldntConfirm: 'לא הצלחתי לאשר',
+      edited: 'המשימה נערכה, אז לא אבטל אותה',
+      quiet: 'אין מה לסגור.',
+      openMessage: 'פתחו הודעה.',
+      next: 'הפעולה הבאה',
+      due: 'יעד',
+      inTasks: 'ב-Google Tasks.',
+      undone: 'בוטל.',
+      id: 'מזהה'
+    }
+  };
+
+  function locale(userLocale) {
+    var value = String(userLocale || '').toLowerCase().replace('_', '-');
+    var primary = value.split('-')[0];
+    if (primary === 'he' || primary === 'iw') return 'he';
+    return 'en';
+  }
+
+  function t(lang, key) {
+    var pack = STR[lang] || STR.en;
+    return pack[key] || STR.en[key] || '';
+  }
+
+  function rtl(lang) {
+    return lang === 'he';
+  }
+
+  // Right-to-left embedding for a whole Hebrew line. Card Service has no
+  // dir attribute, so the mark travels with the string.
+  function embed(lang, text) {
+    var value = String(text == null ? '' : text);
+    if (lang !== 'he' || !value) return value;
+    return '\u202B' + value + '\u202C';
+  }
+
+  function isolateLtr(text) {
+    return '\u2066' + String(text == null ? '' : text) + '\u2069';
+  }
+
+  return { STR: STR, locale: locale, t: t, rtl: rtl, embed: embed, isolateLtr: isolateLtr };
+})();
+
+if (typeof module !== 'undefined') module.exports = GlanceI18n;

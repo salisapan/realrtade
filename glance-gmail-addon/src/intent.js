@@ -1,0 +1,236 @@
+// One task, or silence.
+//
+// Order: an explicit "please remember to" / "don't forget" / "תזכיר לי"
+// ask is a task even when the shared classifier would plan a meeting or a
+// draft. Otherwise the shared classifier is asked, and only a plan whose
+// single step is a Google Task is shown. Anything else stays quiet.
+// This file does not write and does not send.
+
+var GlanceIntent = (function () {
+  var MONTHS = {
+    january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4,
+    may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8,
+    september: 9, sept: 9, sep: 9, october: 10, oct: 10, november: 11, nov: 11,
+    december: 12, dec: 12
+  };
+  var DAYS = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6 };
+
+  function collapse(value) {
+    return String(value == null ? '' : value).replace(/[\u2018\u2019\u201B]/g, "'").replace(/\s+/g, ' ').trim();
+  }
+
+  function sanitizeTitle(value) {
+    var text = collapse(value).replace(/<[^>]*>/g, '').replace(/[\u0000-\u001F]/g, '').trim();
+    if (text.length > 300) text = text.slice(0, 299) + '…';
+    return text;
+  }
+
+  function pad(n) {
+    n = Number(n);
+    return (n < 10 ? '0' : '') + n;
+  }
+
+  function todayIso(now, timeZone) {
+    var date = now ? new Date(now) : new Date();
+    if (isNaN(date.getTime())) date = new Date();
+    try {
+      var fmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timeZone || 'UTC',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      var parts = fmt.formatToParts(date);
+      var y = '';
+      var m = '';
+      var d = '';
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].type === 'year') y = parts[i].value;
+        if (parts[i].type === 'month') m = parts[i].value;
+        if (parts[i].type === 'day') d = parts[i].value;
+      }
+      if (/^\d{4}$/.test(y) && /^\d{2}$/.test(m) && /^\d{2}$/.test(d)) return y + '-' + m + '-' + d;
+    } catch (err) { /* UTC below */ }
+    return date.getUTCFullYear() + '-' + pad(date.getUTCMonth() + 1) + '-' + pad(date.getUTCDate());
+  }
+
+  function validIso(iso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+    var parts = iso.split('-');
+    var y = +parts[0];
+    var m = +parts[1];
+    var d = +parts[2];
+    var dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+  }
+
+  function addDays(iso, days) {
+    var parts = iso.split('-');
+    var dt = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2] + days));
+    return dt.getUTCFullYear() + '-' + pad(dt.getUTCMonth() + 1) + '-' + pad(dt.getUTCDate());
+  }
+
+  function notPast(iso, now, timeZone) {
+    if (!validIso(iso)) return null;
+    if (iso < todayIso(now, timeZone)) return null;
+    return iso;
+  }
+
+  function pullDue(text, now, timeZone) {
+    var rest = text;
+    var due = null;
+    function accept(iso, raw) {
+      var kept = notPast(iso, now, timeZone);
+      if (!kept) return false;
+      due = kept;
+      rest = rest.replace(raw, ' ');
+      return true;
+    }
+
+    var iso = rest.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+    if (iso) accept(iso[1], iso[0]);
+
+    if (!due) {
+      var dmy = rest.match(/\b(\d{1,2})[./](\d{1,2})[./](20\d{2})\b/);
+      if (dmy) accept(dmy[3] + '-' + pad(dmy[2]) + '-' + pad(dmy[1]), dmy[0]);
+    }
+
+    if (!due) {
+      var named = rest.match(/\b(?:by|on|due|before|until)\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\s+(\d{1,2})(?:,?\s*(20\d{2}))?\b/i);
+      if (named) {
+        var month = MONTHS[named[1].toLowerCase()];
+        var year = named[3] ? +named[3] : +todayIso(now, timeZone).slice(0, 4);
+        var candidate = year + '-' + pad(month) + '-' + pad(named[2]);
+        if (!notPast(candidate, now, timeZone) && !named[3]) candidate = (year + 1) + '-' + pad(month) + '-' + pad(named[2]);
+        accept(candidate, named[0]);
+      }
+    }
+
+    if (!due) {
+      var weekday = rest.match(/\b(?:by|on|due)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\b/i);
+      if (weekday) {
+        var today = todayIso(now, timeZone);
+        var current = new Date(today + 'T00:00:00Z').getUTCDay();
+        var target = DAYS[weekday[1].toLowerCase()];
+        var delta = (target - current + 7) % 7;
+        accept(addDays(today, delta), weekday[0]);
+      }
+    }
+
+    if (!due) {
+      var word = rest.match(/(?:^|\s)(tomorrow)(?=\s|[.,]|$)/i) || rest.match(/(?:^|\s)(מחר)(?=\s|[.,]|$)/);
+      if (word) accept(addDays(todayIso(now, timeZone), 1), word[0]);
+    }
+
+    rest = collapse(rest)
+      .replace(/\b(?:by|on|due|before|until)\b(?=\s*[.,;:]?\s*$)/i, '')
+      .replace(/\s+עד(?=\s*[.,;:]?\s*$)/, '')
+      .replace(/[.,;:\-–—]+$/g, '')
+      .trim();
+    rest = collapse(rest);
+    return { due: due, text: rest };
+  }
+
+  function localRemember(text, now, timeZone) {
+    var raw = collapse(text);
+    if (!raw || raw.length > 8000) return null;
+    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
+    raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
+    var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
+    var lang = 'en';
+    if (!match) {
+      match = raw.match(/^תזכיר(?:י)?\s+לי\s+(.+)$/);
+      if (match) lang = 'he';
+    }
+    if (!match) {
+      match = raw.match(/^אל תשכח(?:י)?\s+(.+)$/);
+      if (match) lang = 'he';
+    }
+    if (!match) return null;
+    var pulled = pullDue(match[1], now, timeZone);
+    var title = sanitizeTitle(pulled.text);
+    if (!title || title.length < 2) return null;
+    return { speak: true, source: 'local', title: title, due: pulled.due, lang: lang };
+  }
+
+  function isoOrNull(value, now, timeZone) {
+    if (typeof value !== 'string' || !validIso(value)) return null;
+    return notPast(value, now, timeZone);
+  }
+
+  // A plan that is exactly one Google Task. A draft or a calendar step is
+  // not rewritten into a task: this host cannot do that close.
+  function mapEngine(result, now, timeZone) {
+    if (!result || !result.plan || !result.plan.steps) return null;
+    var steps = result.plan.steps;
+    if (steps.length !== 1) return null;
+    var step = steps[0];
+    if (!step || step.kind !== 'googleTask') return null;
+    var params = step.params || {};
+    if (params.send === true) return null;
+    var title = sanitizeTitle(params.title || params.what || step.label || '');
+    if (!title) return null;
+    return {
+      speak: true,
+      source: 'engine',
+      title: title,
+      due: isoOrNull(params.dateIso, now, timeZone),
+      lang: null
+    };
+  }
+
+  // glance-assist action "classify" shape. A request or an event is not a
+  // task on this host. Commitment, decision, and follow-up are.
+  function mapClassifierResult(body, now, timeZone) {
+    var parsed = body;
+    if (typeof body === 'string') {
+      try { parsed = JSON.parse(body); } catch (err) { return null; }
+    }
+    if (!parsed || typeof parsed !== 'object') return null;
+    var result = parsed.result && typeof parsed.result === 'object' ? parsed.result : parsed;
+    if (!result || typeof result.type !== 'string') return null;
+    if (result.type !== 'commitment' && result.type !== 'decision' && result.type !== 'followup') return null;
+    var title = sanitizeTitle(result.what || result.requestWhat || '');
+    if (!title) return null;
+    return {
+      speak: true,
+      source: 'classifier',
+      title: title,
+      due: isoOrNull(result.dateIso, now, timeZone),
+      lang: null
+    };
+  }
+
+  function silence() {
+    return { speak: false, source: null, title: null, due: null, lang: null };
+  }
+
+  function resolveTask(text, ctx) {
+    ctx = ctx || {};
+    var local = localRemember(text, ctx.now, ctx.timeZone);
+    if (local) return local;
+    if (typeof ctx.engine === 'function') {
+      var hit = null;
+      try { hit = ctx.engine(text, ctx); } catch (err) { hit = null; }
+      var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
+      if (mapped) return mapped;
+    }
+    if (ctx.classifierResult) {
+      var fromApi = mapClassifierResult(ctx.classifierResult, ctx.now, ctx.timeZone);
+      if (fromApi) return fromApi;
+    }
+    return silence();
+  }
+
+  return {
+    resolveTask: resolveTask,
+    localRemember: localRemember,
+    mapEngine: mapEngine,
+    mapClassifierResult: mapClassifierResult,
+    sanitizeTitle: sanitizeTitle,
+    silence: silence
+  };
+})();
+
+if (typeof module !== 'undefined') module.exports = GlanceIntent;
