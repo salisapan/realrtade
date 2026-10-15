@@ -447,7 +447,8 @@ function listsRoute() {
   });
   const editedKept = await waitForText(editedAgain.doc, 'You edited this', 4000);
   check('a refused Undo is still shown after reopen',
-    editedKept && Boolean(editedAgain.doc.querySelector('.flow-chip-undo')),
+    editedKept && Boolean(editedAgain.doc.querySelector('.flow-chip-undo')) &&
+    chipText(editedAgain.doc).indexOf('Undo removes the To Do task.') < 0,
     { text: chipText(editedAgain.doc), record: editedAgain.store.glanceProofs && editedAgain.store.glanceProofs.records['MSG-PARK'] });
   edited.w.close();
   editedAgain.w.close();
@@ -495,8 +496,12 @@ function listsRoute() {
   if (onceHold) onceHold.click();
   const onceBtn = await waitFor(oncePage.doc, '[data-glance-consent-choice="once"]', 4000);
   check('Hold without calendar asks Once, Always, and Not now',
-    Boolean(onceBtn) && Boolean(oncePage.doc.querySelector('[data-glance-consent-choice="always"]')) &&
-    Boolean(oncePage.doc.querySelector('[data-glance-consent-choice="not-now"]')) &&
+    Boolean(onceBtn) && onceBtn.textContent === 'אפשר פעם אחת' &&
+    onceBtn.classList.contains('capture-secondary') &&
+    !onceBtn.classList.contains('do-halo') && !onceBtn.classList.contains('flow-chip') &&
+    !onceBtn.querySelector('.shell') &&
+    oncePage.doc.querySelector('[data-glance-consent-choice="always"]').textContent === 'אפשר תמיד' &&
+    oncePage.doc.querySelector('[data-glance-consent-choice="not-now"]').textContent === 'לא עכשיו' &&
     /Calendar needs Calendars\.ReadWrite\./.test(chipText(oncePage.doc)),
     { text: chipText(oncePage.doc) });
   if (onceBtn) onceBtn.click();
@@ -586,6 +591,106 @@ function listsRoute() {
     /Handled|To Do/i.test(chipText(laterPage.doc)),
     { text: chipText(laterPage.doc), reminder: reminder });
   laterPage.w.close();
+
+  console.log('\n--- a real Microsoft token, and a real OWA mail open ---\n');
+  function msJwt(scp) {
+    const enc = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+    return enc({ alg: 'none', typ: 'JWT' }) + '.' + enc({ scp: scp }) + '.sig';
+  }
+  const liveToken = {
+    outlookAuth: {
+      token: {
+        accessToken: msJwt('Mail.ReadWrite Tasks.ReadWrite User.Read email'),
+        refreshToken: 'RT',
+        expiresAt: Date.now() + 3600e3,
+        rtIssuedAt: Date.now(),
+        scope: 'unknown',
+        grantedScopes: 'https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Calendars.ReadWrite openid profile offline_access'
+      },
+      account: { address: ME, name: 'Glance' },
+      ownAddresses: [ME],
+      requestedScopes: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite']
+    }
+  };
+  const liveHold = await boot({
+    id: 'MSG-BUDGET-REVIEW',
+    subject: 'Budget review',
+    body: 'Hi,\nCan you reply and confirm whether we can meet tomorrow at 10:00 to review the budget?\nThanks,\nFlow',
+    store: liveToken
+  });
+  const liveHost = await waitCard(liveHold);
+  const liveBtn = liveHost && liveHost.querySelector('.chip-hold');
+  if (liveBtn) liveBtn.click();
+  const liveOnce = await waitFor(liveHold.doc, '[data-glance-consent-choice="once"]', 4000);
+  const liveWrote = liveHold.sent.filter((m) => m.type === 'flow:execute-action');
+  check('a real MS token without calendar in scp asks, and does not write a To Do',
+    Boolean(liveOnce) && liveOnce.textContent === 'אפשר פעם אחת' && liveWrote.length === 0,
+    { text: chipText(liveHold.doc), wrote: liveWrote.map((m) => m.payload && m.payload.connectorId) });
+  liveHold.w.close();
+
+  let paneStatus = 200;
+  const paneOpen = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: parkProofStore(),
+    reconcile: () => ({ ok: paneStatus === 200, status: paneStatus })
+  });
+  const paneUndo = await waitFor(paneOpen.doc, '.flow-chip-undo', 4000);
+  const reconBefore = paneOpen.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  paneStatus = 404;
+  const docNode = paneOpen.doc.querySelector('#ReadingPaneContainerId [role="document"]');
+  const nextBody = docNode.cloneNode(false);
+  nextBody.innerHTML = docNode.innerHTML;
+  docNode.parentNode.replaceChild(nextBody, docNode);
+  const conv = paneOpen.doc.createElement('span');
+  conv.id = 'CONV_PARKTAIL_SUBJECT';
+  paneOpen.doc.querySelector('#ReadingPaneContainerId').appendChild(conv);
+  const paneDeleted = await waitForText(paneOpen.doc, 'Deleted in To Do', 4000);
+  const reconAfter = paneOpen.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  check('opening the mail through the reading pane reconciles a deleted task',
+    Boolean(paneUndo) && paneDeleted && reconAfter > reconBefore && !paneOpen.doc.querySelector('.flow-chip-undo'),
+    { text: chipText(paneOpen.doc), before: reconBefore, after: reconAfter });
+  paneOpen.w.close();
+
+  const graphId = 'AQMkAG+ab/cd=';
+  const urlId = 'AQMkAG-ab_cd';
+  const graphStore = {
+    glanceProofs: {
+      records: {
+        [graphId]: {
+          messageId: graphId,
+          ids: [graphId.toLowerCase().replace(/\//g, '_')],
+          kind: 'written',
+          connectorId: 'outlookTask',
+          system: 'microsoft/todo',
+          externalId: 'task-park',
+          ref: { taskId: 'task-park', taskListId: 'list-1', externalId: 'task-park', created: { title: 'Renew the parking permit', importance: 'normal' } },
+          fetchedBack: true,
+          writtenLine: 'To Do · Renew the parking permit',
+          receiptStatus: 'Handled.',
+          label: 'Renew the parking permit',
+          url: 'https://to-do.office.com/tasks/task-park',
+          objectName: 'To Do',
+          app: 'outlook'
+        }
+      },
+      byId: { [graphId.toLowerCase().replace(/\//g, '_')]: graphId }
+    },
+    log: []
+  };
+  const graphPage = await boot({
+    id: urlId,
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: graphStore,
+    reconcile: () => ({ ok: false, status: 404 })
+  });
+  const graphGone = await waitForText(graphPage.doc, 'Deleted in To Do', 4000);
+  check('an OWA address id reconciles the Graph proof',
+    graphGone && !graphPage.doc.querySelector('.flow-chip-undo'),
+    { text: chipText(graphPage.doc) });
+  graphPage.w.close();
 
   console.log('\n--- a draft both reads missed is not Draft ready ---\n');
   const missPage = await boot({

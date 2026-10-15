@@ -243,8 +243,8 @@ console.log('\n--- nothing is drawn ---\n');
   check('no Not now chip in the pages',
     gmail.indexOf('Not now') < 0 &&
     gmail.indexOf('flow-suggest') < 0 && outlook.indexOf('flow-suggest') < 0 &&
-    outlook.indexOf('Not now') === outlook.indexOf("['Not now', 'not-now']") + 2 &&
-    outlook.indexOf('Not now') === outlook.lastIndexOf('Not now'));
+    outlook.indexOf('Not now') < 0 &&
+    outlook.indexOf('לא עכשיו') > 0);
   check('the page records other-card and draws attachmentSave from step.copy',
     outlook.indexOf('recordSuggestNote') > 0 && outlook.indexOf("reason: 'suggest:other-card'") > 0 &&
     outlook.indexOf('attachmentSave') > 0 && outlook.indexOf('Save the file?') > 0 &&

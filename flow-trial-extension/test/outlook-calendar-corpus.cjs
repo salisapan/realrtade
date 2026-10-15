@@ -101,6 +101,35 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
   check('ReadWrite.Shared is not this scope', Cal.hasWriteScope(['Calendars.ReadWrite.Shared']) === false);
   check('Calendars.ReadWrite can write', Cal.hasWriteScope(['offline_access', 'Calendars.ReadWrite']) === true);
   check('the Graph URL form of that same scope can write', Cal.hasWriteScope(['https://graph.microsoft.com/Calendars.ReadWrite']) === true);
+  check('unknown is missing, in any spelling',
+    Cal.hasWriteScope('unknown') === false && Cal.hasWriteScope(['unknown']) === false &&
+    Cal.hasWriteScope('UNKNOWN') === false && Cal.holdConsentAsk('unknown', null) === true &&
+    Cal.holdConsentAsk('missing', { mode: 'always' }) === true);
+  function msJwt(scp) {
+    const enc = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+    return enc({ alg: 'none', typ: 'JWT' }) + '.' + enc({ scp: scp }) + '.sig';
+  }
+  const liveMissing = {
+    accessToken: msJwt('Mail.ReadWrite Tasks.ReadWrite User.Read email'),
+    scope: 'unknown',
+    grantedScopes: 'https://graph.microsoft.com/Mail.ReadWrite, https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Calendars.ReadWrite openid profile offline_access'
+  };
+  check('a real token trusts scp over a stale cache and an unknown scope field',
+    Cal.hasWriteScope(Cal.scopesFromToken(liveMissing)) === false &&
+    Cal.scopesFromToken(liveMissing).indexOf('Calendars.ReadWrite') < 0, Cal.scopesFromToken(liveMissing));
+  const liveGranted = {
+    accessToken: msJwt('Mail.ReadWrite Calendars.ReadWrite'),
+    scope: 'HTTPS://GRAPH.MICROSOFT.COM/Calendars.ReadWrite,openid,offline_access,profile'
+  };
+  check('a real token grants calendar from scp and from a comma-separated Graph URI',
+    Cal.hasWriteScope(Cal.scopesFromToken(liveGranted)) === true &&
+    Cal.hasWriteScope(Cal.normalizeDelegatedScopes(liveGranted.scope)) === true);
+  const fromEndpoint = Cal.grantedScopesFromResponse({
+    access_token: msJwt('Mail.ReadWrite Tasks.ReadWrite'),
+    scope: 'unknown'
+  }, { grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] });
+  check('a token response of unknown does not keep a stale calendar grant',
+    fromEndpoint && fromEndpoint.indexOf('Calendars.ReadWrite') < 0 && fromEndpoint.indexOf('Tasks.ReadWrite') >= 0, fromEndpoint);
   const mailOnly = Cfg.scopesFor(Cfg.defaultConnectIds());
   check('mail-only sign-in does not ask Calendars.ReadWrite', mailOnly.indexOf('Calendars.ReadWrite') < 0 && mailOnly.indexOf('Mail.Send') < 0, mailOnly);
   const asked = Cfg.scopesFor(['mail', 'calendar']);
@@ -141,9 +170,17 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
   check('incremental consent adds only Calendars.ReadWrite to scopes already granted',
     added.indexOf('Calendars.ReadWrite') >= 0 && added.indexOf('Tasks.ReadWrite') >= 0 &&
     added.indexOf('Mail.Send') < 0 && Cfg.incrementalConsentScopes(added, 'Files.ReadWrite') == null, added);
-  check('Hold asks in one line with Once, Always, and Not now',
-    /Calendar needs Calendars\.ReadWrite\./.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8')) &&
-    /data-glance-consent-choice', pair\[1\]/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8')));
+  const fromUris = Cfg.incrementalConsentScopes('unknown https://graph.microsoft.com/Mail.ReadWrite,openid', 'Calendars.ReadWrite');
+  check('incremental consent folds a real scope string and drops unknown',
+    fromUris.indexOf('Calendars.ReadWrite') >= 0 && fromUris.indexOf('Mail.ReadWrite') >= 0 &&
+    fromUris.indexOf('unknown') < 0 && fromUris.indexOf('openid') >= 0, fromUris);
+  const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  check('Hold asks in one line with the Hebrew quiet choices',
+    /Calendar needs Calendars\.ReadWrite\./.test(page) &&
+    /אפשר פעם אחת/.test(page) && /אפשר תמיד/.test(page) && /לא עכשיו/.test(page) &&
+    /capture-secondary/.test(page) &&
+    /data-glance-consent-choice', pair\[1\]/.test(page) &&
+    page.indexOf("['Once', 'once']") < 0 && page.indexOf("['Not now', 'not-now']") < 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

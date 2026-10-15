@@ -1207,10 +1207,10 @@
     if (!mount || !copy) return null;
     const keptSnap = (row.ref && typeof row.ref === 'object' && row.ref.created) || row.created || null;
     if (keptSnap && typeof keptSnap === 'object' && copy.ref) copy.ref.created = keptSnap;
-    const deleted = row.glanceDeleted === true || row.deleted === true;
-    const deletedLine = row.deletedLine || (deleted ? copy.status : '');
-    const undoLine = deleted ? '' : (row.undoLine || '');
-    const verifyNote = deleted ? '' : (row.verifyNote || '');
+    const deleted = copy.deleted === true || row.glanceDeleted === true || row.deleted === true;
+    const deletedLine = copy.deletedLine || row.deletedLine || (deleted ? copy.status : '');
+    const undoLine = deleted ? '' : (copy.undoLine || row.undoLine || '');
+    const verifyNote = deleted ? '' : (copy.verifyNote || row.verifyNote || '');
     const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
     const scope = (typeof readingScope === 'function' && readingScope(mount)) || mount;
     const hosts = scope.querySelectorAll ? Array.prototype.slice.call(scope.querySelectorAll('.flow-chip-host')) : [];
@@ -1258,7 +1258,7 @@
       if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
       done.appendChild(detail);
     }
-    const undo = el('button', 'flow-chip-undo', copy.undoHint);
+    const undo = el('button', 'flow-chip-undo', undoLine ? 'Undo' : copy.undoHint);
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = !undoLine;
@@ -1579,10 +1579,11 @@
         return true;
       }
     }
-    const row = FlowProofOfClose.taskReceiptFromLog(todoLog, rowQuery);
+    let row = FlowProofOfClose.taskReceiptFromLog(todoLog, rowQuery);
     if (outlookProofRow(row) && typeof FlowStorage.rememberGlanceProof === 'function') {
       try { await FlowStorage.rememberGlanceProof(row); } catch (e) { /* the log row still paints */ }
     }
+    if (outlookProofRow(row)) row = await reconcileMountedRow(row);
     const existing = stripDuplicateUndoHosts(mount);
     // An Undo line is not a close. data-glance-undone stays on the click,
     // then this scan drops it so exactly one Do It can return, including
@@ -1594,12 +1595,33 @@
       if (existing && existing.isConnected) existing.remove();
       return false;
     }
-    if (existing && existing.classList.contains('flow-chip-settled')) {
+    if (existing && existing.classList.contains('flow-chip-settled') && row && row.deleted !== true && !row.verifyNote && !row.undoLine) {
       lastOutcome = 'card';
       lastKey = (row.messageId || 'open') + '|task-proof';
       return true;
     }
     return Boolean(paintOutlookTodoReceipt(mount, row));
+  }
+
+  // A log row is the same proof. Reconcile it on open, including when the
+  // shared map was missed. 404/410 drops Undo. Any other miss keeps it.
+  async function reconcileMountedRow(row) {
+    if (!row) return row;
+    const base = (typeof FlowProofOfClose.proofRecordFromRow === 'function' && FlowProofOfClose.proofRecordFromRow(row)) || {
+      messageId: row.messageId,
+      system: row.system || 'microsoft/todo',
+      connectorId: row.connectorId || 'outlookTask',
+      externalId: row.externalId || (row.ref && (row.ref.externalId || row.ref.taskId)) || '',
+      ref: row.ref,
+      objectName: row.objectName || 'To Do',
+      deleted: row.deleted === true || row.glanceDeleted === true,
+      undoLine: row.undoLine || null,
+      undoRefused: row.undoRefused || null,
+      verifyNote: row.verifyNote || null
+    };
+    const live = await reconcileProofRecord(base);
+    const view = (live && typeof FlowProofOfClose.proofAsLogRow === 'function') ? FlowProofOfClose.proofAsLogRow(live) : null;
+    return view ? Object.assign({}, row, view) : Object.assign({}, row, live || {});
   }
 
   function promiseItem(ctx, pane) {
@@ -2285,7 +2307,12 @@
 
   function calendarScopes(st) {
     const token = st && st.outlookAuth && st.outlookAuth.token;
-    return (token && token.grantedScopes) || [];
+    if (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.scopesFromToken === 'function') {
+      return FlowOutlookCalendar.scopesFromToken(token) || [];
+    }
+    const raw = token && (token.grantedScopes != null ? token.grantedScopes : token.scope);
+    if (raw == null || raw === 'unknown') return [];
+    return raw;
   }
 
   function glanceError(where, err) {
@@ -2417,7 +2444,10 @@
     const st = await FlowStorage.get();
     const auth = (st && st.outlookAuth) || {};
     const token = Object.assign({}, auth.token || {});
-    const scopes = Array.isArray(token.grantedScopes) ? token.grantedScopes.slice() : [];
+    const known = (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.normalizeDelegatedScopes === 'function')
+      ? FlowOutlookCalendar.normalizeDelegatedScopes(token.grantedScopes)
+      : (Array.isArray(token.grantedScopes) ? token.grantedScopes : []);
+    const scopes = (known || []).slice();
     if (scopes.indexOf(CALENDAR_SCOPE) < 0) scopes.push(CALENDAR_SCOPE);
     token.grantedScopes = scopes;
     const mode = choice === 'always' ? 'always' : 'once';
@@ -2440,10 +2470,11 @@
     if (!host || host.querySelector('[data-glance-consent="calendar"]')) return;
     const row = FlowChipHost.el('div', 'flow-chip-consent');
     row.setAttribute('data-glance-consent', 'calendar');
+    row.setAttribute('dir', 'rtl');
     row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite.'));
     const actions = FlowChipHost.el('span', 'flow-chip-actions');
-    [['Once', 'once'], ['Always', 'always'], ['Not now', 'not-now']].forEach((pair) => {
-      const button = FlowChipHost.el('button', 'flow-chip-consent-btn', pair[0]);
+    [['אפשר פעם אחת', 'once'], ['אפשר תמיד', 'always'], ['לא עכשיו', 'not-now']].forEach((pair) => {
+      const button = FlowChipHost.el('button', 'flow-chip-consent-btn capture-secondary', pair[0]);
       button.type = 'button';
       button.setAttribute('data-glance-consent-choice', pair[1]);
       button.addEventListener('click', () => { onCalendarConsent(host, ctx, pair[1]); });
@@ -2526,6 +2557,17 @@
 
   async function finishMeetingHold(host, ctx) {
     if (!host || ignoreStaleClick(host)) return;
+    let st = null;
+    try { st = await FlowStorage.get(); } catch (e) { st = null; }
+    // Once means ask on the next Hold, not again inside this one. Re-ask only
+    // when Calendars.ReadWrite is still missing from the token.
+    const grantedNow = typeof FlowOutlookCalendar !== 'undefined' && FlowOutlookCalendar.hasWriteScope
+      ? FlowOutlookCalendar.hasWriteScope(calendarScopes(st))
+      : false;
+    if (!grantedNow) {
+      paintCalendarConsent(host, ctx);
+      return;
+    }
     const params = meetingClock(ctx);
     if (!params) {
       await holdAsTodo(host, ctx);
@@ -2541,6 +2583,10 @@
       }
     });
     if (ignoreStaleClick(host)) return;
+    if (r && r.reason === 'calendar-write-not-granted') {
+      paintCalendarConsent(host, ctx);
+      return;
+    }
     if (!r || !r.ok || !r.ref || !r.ref.eventId) {
       const why = (r && (r.error || r.reason)) || 'Could not add the event';
       if (!host.querySelector('.flow-chip-undo-hint')) {
@@ -3391,14 +3437,103 @@
     return document.querySelector('#ReadingPaneContainerId') || null;
   }
 
+  // Live OWA opens a mail by replacing the reading pane (role=document and
+  // the CONV_ subject id) and then the address. The page captured
+  // history.pushState before this script, so that wrapper is not the signal.
+  let lastPaneSignal = '';
+  let paneDirty = false;
+  let paneWatch = null;
+  let paneObs = null;
+  function readingPaneSignal() {
+    let href = '';
+    let conv = '';
+    let doc = '';
+    try { href = location.href || ''; } catch (e) { href = ''; }
+    try {
+      const node = document.querySelector('#ReadingPaneContainerId [id^="CONV_"][id$="_SUBJECT"]')
+        || document.querySelector('[data-testid="ReadingPane"] [id^="CONV_"][id$="_SUBJECT"]')
+        || document.querySelector('[data-app-section="ReadingPane"] [id^="CONV_"][id$="_SUBJECT"]')
+        || document.querySelector('[role="main"] [id^="CONV_"][id$="_SUBJECT"]');
+      conv = node && node.id ? node.id : '';
+    } catch (e) { conv = ''; }
+    try {
+      const root = openMailRoot();
+      const body = root && root.querySelector ? (root.querySelector('div[role="document"]') || root.querySelector('[role="document"]')) : null;
+      doc = body ? hashText(String(body.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 240)) : '';
+    } catch (e) { doc = ''; }
+    return href + '|' + conv + '|' + doc;
+  }
+
+  function noteReadingPaneOpen() {
+    const signal = readingPaneSignal();
+    const changed = Boolean(signal) && signal !== lastPaneSignal;
+    if (changed) lastPaneSignal = signal;
+    if (!changed && !paneDirty) return false;
+    paneDirty = false;
+    lastSig = '';
+    lastKey = '';
+    return true;
+  }
+
+  // A node Glance painted. Appending the card is not a mail open, or the
+  // scan would clear its own key and read the task again forever.
+  function glancePaneNode(node) {
+    if (!node || node.nodeType !== 1) return false;
+    const cls = node.classList;
+    if (cls && (cls.contains('flow-chip-host') || cls.contains('flow-chip-consent') || cls.contains('flow-skip-host'))) return true;
+    return Boolean(node.closest && node.closest('.flow-chip-host, .flow-chip-consent'));
+  }
+
+  // A replacement of the open message, including the same words, is a mail
+  // open. A chip we just painted is not. Ads sit outside this pane.
+  function armReadingPaneWatch() {
+    let pane = null;
+    try {
+      pane = document.querySelector('#ReadingPaneContainerId')
+        || document.querySelector('[data-testid="ReadingPane"]')
+        || document.querySelector('[data-app-section="ReadingPane"]');
+    } catch (e) { pane = null; }
+    if (!pane || pane === paneWatch) return;
+    if (paneObs) paneObs.disconnect();
+    paneWatch = pane;
+    paneObs = new MutationObserver((records) => {
+      let mail = false;
+      for (let i = 0; i < (records || []).length; i++) {
+        const rec = records[i];
+        const t = rec.target;
+        if (t && t.closest && t.closest('.flow-chip-host, .flow-chip-consent')) continue;
+        if (rec.type === 'childList') {
+          const nodes = [];
+          const added = rec.addedNodes || [];
+          const removed = rec.removedNodes || [];
+          for (let a = 0; a < added.length; a++) nodes.push(added[a]);
+          for (let r = 0; r < removed.length; r++) nodes.push(removed[r]);
+          if (!nodes.length) continue;
+          let foreign = false;
+          for (let n = 0; n < nodes.length; n++) {
+            if (!glancePaneNode(nodes[n])) { foreign = true; break; }
+          }
+          if (!foreign) continue;
+        }
+        mail = true;
+      }
+      if (!mail) return;
+      paneDirty = true;
+      schedule();
+    });
+    try { paneObs.observe(pane, { childList: true, subtree: true }); } catch (e) { /* pane is sealed */ }
+  }
+
   // OWA never stops changing the page (ads, presence, "x min ago"). A debounce that restarts on every change never fires
   // there, which is how 0.9.14 stayed silent: so this is a throttle. One scan at a time; a change during a scan runs one more.
   function schedule() {
+    armReadingPaneWatch();
+    const paneOpened = noteReadingPaneOpen();
     const switched = noteOpenMail();
     // A switch that arrived while a scan was already reading the previous
     // mail has already stored the token. That follow-up is still the fast
     // path. Waiting out the 0.8s throttle is how a card came back in 3–4s.
-    if (switched || switchPending) {
+    if (switched || switchPending || paneOpened) {
       if (timer) { clearTimeout(timer); timer = null; }
       timer = setTimeout(runScan, 40);
       return;

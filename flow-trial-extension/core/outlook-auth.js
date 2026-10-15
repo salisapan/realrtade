@@ -67,6 +67,16 @@ const FlowOutlookAuth = (() => {
 
   // The scopes this sign-in will ask for. A passed list wins (the Connect screen).
   // Otherwise the config default (mail). Mail.Send is dropped if it ever appears.
+  // A real token answer. "unknown", a missing scope, and a stale requested
+  // list are not a grant. The calendar module folds Graph URIs and scp.
+  function grantedFromResponse(resp, previous) {
+    const Cal = typeof FlowOutlookCalendar !== 'undefined' ? FlowOutlookCalendar : null;
+    if (Cal && typeof Cal.grantedScopesFromResponse === 'function') return Cal.grantedScopesFromResponse(resp, previous);
+    const raw = resp && resp.scope != null ? String(resp.scope).trim() : '';
+    if (raw && !/^unknown$/i.test(raw)) return raw.split(/[\s,;]+/).filter(Boolean);
+    return (previous && previous.grantedScopes) || null;
+  }
+
   function scopeList(cfg, scopes) {
     const base = Array.isArray(cfg && cfg.SCOPES) ? cfg.SCOPES : [];
     const raw = Array.isArray(scopes) && scopes.length ? scopes : base;
@@ -91,7 +101,7 @@ const FlowOutlookAuth = (() => {
       refreshToken: resp.refresh_token ? String(resp.refresh_token) : (previous && previous.refreshToken) || null,
       expiresAt: t + Math.max(0, (Number(resp.expires_in) || 3600) - 60) * 1000,
       rtIssuedAt: rtIssuedAt,
-      grantedScopes: resp.scope ? String(resp.scope).split(/\s+/).filter(Boolean) : (previous && previous.grantedScopes) || null
+      grantedScopes: grantedFromResponse(resp, previous)
     };
   }
 

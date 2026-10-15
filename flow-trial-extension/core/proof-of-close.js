@@ -199,6 +199,17 @@ const FlowProofOfClose = (() => {
     return s;
   }
 
+  // Exchange ids arrive as Graph (+ and /) or as an OWA address (- and _).
+  // Padding '=' is only on one of those spellings. Both keys are the same id.
+  function idAliases(id) {
+    const c = canonId(id);
+    if (!c) return [];
+    const out = [c];
+    const exchanged = c.replace(/\+/g, '-').replace(/=+$/, '');
+    if (exchanged && out.indexOf(exchanged) < 0) out.push(exchanged);
+    return out;
+  }
+
   function isGoogleTaskConnector(row) {
     const kind = row && row.connectorId;
     return kind === 'googleTask' || kind === 'googleTasks';
@@ -429,6 +440,9 @@ const FlowProofOfClose = (() => {
     const snap = storedSnapshot(row);
     if (snap) ref.created = snap;
     const microsoft = isMicrosoftTodoRow(row);
+    const deleted = row.glanceDeleted === true || row.deleted === true;
+    const refusedLine = deleted ? '' : clip(row.undoLine, 180);
+    const verifyNote = deleted ? '' : clip(row.verifyNote, 180);
     const connector = microsoft
       ? ((row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo') ? row.connectorId : 'outlookTask')
       : ((row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask');
@@ -438,7 +452,12 @@ const FlowProofOfClose = (() => {
       writtenLine: clip(row.writtenLine, 180) || (microsoft ? 'To Do' : 'Google Task'),
       processName: clip(row.processName, 80),
       closedLine: clip(row.closedLine, 180),
-      undoHint: microsoft ? TODO_UNDO_HINT : UNDO_HINT,
+      undoHint: refusedLine || (microsoft ? TODO_UNDO_HINT : UNDO_HINT),
+      undoLine: refusedLine,
+      undoRefused: refusedLine ? (row.undoRefused || 'user-edited') : null,
+      deleted: deleted,
+      deletedLine: deleted ? (clip(row.deletedLine, 180) || clip(row.receiptStatus, 180)) : '',
+      verifyNote: verifyNote,
       undoneLine: microsoft ? TODO_UNDONE_LINE : UNDONE_LINE,
       undoFailed: microsoft ? TODO_UNDO_FAILED : 'Still there — the Google Task was not removed.',
       url: url.slice(0, 8) === 'https://' ? url : '',
@@ -519,8 +538,7 @@ const FlowProofOfClose = (() => {
     const ids = [];
     if (!row) return ids;
     [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId, row.outlookIncomingId, row.graphMessageId, row.legacyMessageId].forEach((id) => {
-      const c = canonId(id);
-      if (c && ids.indexOf(c) < 0) ids.push(c);
+      idAliases(id).forEach((c) => { if (c && ids.indexOf(c) < 0) ids.push(c); });
     });
     return ids;
   }
@@ -608,8 +626,7 @@ const FlowProofOfClose = (() => {
   function proofLookupKeys(ids) {
     const keys = [];
     function add(id) {
-      const c = canonId(id);
-      if (c && keys.indexOf(c) < 0) keys.push(c);
+      idAliases(id).forEach((c) => { if (c && keys.indexOf(c) < 0) keys.push(c); });
     }
     if (Array.isArray(ids)) {
       ids.forEach(add);
@@ -633,6 +650,20 @@ const FlowProofOfClose = (() => {
       const mid = byId[keys[i]];
       const rec = mid && store.records[mid];
       if (rec && rec.undone !== true && rec.kind !== 'undone') return rec;
+    }
+    const want = {};
+    keys.forEach((k) => { want[k] = true; });
+    const mids = Object.keys(store.records);
+    for (let i = 0; i < mids.length; i++) {
+      const rec = store.records[mids[i]];
+      if (!rec || rec.undone === true || rec.kind === 'undone') continue;
+      const stored = [].concat(rec.ids || [], [rec.messageId, rec.itemId, rec.pathId, rec.threadId, rec.outlookConversationId]);
+      for (let j = 0; j < stored.length; j++) {
+        const aliases = idAliases(stored[j]);
+        for (let k = 0; k < aliases.length; k++) {
+          if (want[aliases[k]]) return rec;
+        }
+      }
     }
     return null;
   }

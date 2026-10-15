@@ -472,6 +472,20 @@ console.log('\n--- Microsoft To Do ---\n');
   const refused = FlowProofOfClose.noteUndoRefused(byItem, 'You edited this. Undo left it alone.');
   check('a refused Undo stays on the record',
     refused.undoRefused === 'user-edited' && refused.undoLine === 'You edited this. Undo left it alone.');
+  const refusedCopy = FlowProofOfClose.remountCopy(FlowProofOfClose.proofAsLogRow(refused));
+  check('remountCopy renders the refused Undo, not the default To Do hint',
+    refusedCopy && refusedCopy.undoLine === 'You edited this. Undo left it alone.' &&
+    refusedCopy.undoHint === 'You edited this. Undo left it alone.' &&
+    refusedCopy.undoRefused === 'user-edited' &&
+    refusedCopy.undoHint !== 'Undo removes the To Do task.', refusedCopy);
+  const graphId = 'AQMkAG+ab/cd=';
+  const urlId = 'AQMkAG-ab_cd';
+  const exchanged = FlowProofOfClose.rememberProof(null, Object.assign({}, proved, {
+    messageId: graphId, itemId: graphId, pathId: graphId
+  }));
+  check('a Graph id and an OWA address id are the same proof',
+    FlowProofOfClose.proofForIds(exchanged, [urlId]) &&
+    FlowProofOfClose.proofForIds(exchanged, [urlId]).messageId === graphId);
   const gone = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 404 });
   check('a 404 marks the record deleted in To Do',
     gone.deleted === true && gone.deletedLine === 'Deleted in To Do' && gone.verifyNote == null, gone);
@@ -485,7 +499,9 @@ console.log('\n--- Microsoft To Do ---\n');
     FlowProofOfClose.proofForIds(dropped, ['owa-1']) == null);
   check('the page reconciles from that record and persists a refused Undo',
     outlook.indexOf("type: 'flow:reconcile-proof'") > 0 && outlook.indexOf('patchGlanceProof') > 0 &&
-    outlook.indexOf('proofForIds') > 0);
+    outlook.indexOf('proofForIds') > 0 && outlook.indexOf('function noteReadingPaneOpen') > 0 &&
+    outlook.indexOf('function armReadingPaneWatch') > 0 && outlook.indexOf('function glancePaneNode') > 0 &&
+    outlook.indexOf('function reconcileMountedRow') > 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

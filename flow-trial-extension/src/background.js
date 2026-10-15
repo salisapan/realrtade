@@ -3455,14 +3455,16 @@ async function outlookConsentScope(msg) {
     loginHint: outlookPrimaryHint(auth)
   });
   if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
-  const granted = [];
-  [].concat(r.token.grantedScopes || [], scopes).forEach((s) => {
-    if (s && granted.indexOf(s) < 0) granted.push(s);
-  });
+  // The scopes we asked for are not a grant. The new token's scp (or its
+  // scope string, never the word unknown) is. A consent window that comes
+  // back without Calendars.ReadWrite does not count.
+  const Cal = globalThis.FlowOutlookCalendar;
+  const effective = (Cal && typeof Cal.scopesFromToken === 'function') ? Cal.scopesFromToken(r.token) : null;
+  if (!Cal || !Cal.hasWriteScope(effective)) return { ok: false, reason: 'calendar-write-not-granted' };
   const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
   await chrome.storage.local.set({
     [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {
-      token: Object.assign({}, r.token, { grantedScopes: granted }),
+      token: r.token,
       requestedScopes: scopes
     }),
     glanceCalendarConsent: { mode: policy, scope: scope, revoked: false, at: Date.now() }
@@ -3944,7 +3946,8 @@ async function outlookMeetingWrite(p) {
   const Cal = globalThis.FlowOutlookCalendar;
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
-  if (!Cal || !Cal.hasWriteScope(session.token.grantedScopes)) {
+  const meetingScopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : (session.token.grantedScopes);
+  if (!Cal || !Cal.hasWriteScope(meetingScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
   const params = (p && p.params) || {};
@@ -4010,7 +4013,8 @@ async function outlookCalendarWrite(p) {
   if (!Cal || typeof Cal.eventBody !== 'function') return { ok: false, reason: 'not-configured' };
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
-  if (!Cal.hasWriteScope(session.token.grantedScopes)) {
+  const fileScopes = Cal.scopesFromToken ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  if (!Cal.hasWriteScope(fileScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
   const body = Cal.eventBody({

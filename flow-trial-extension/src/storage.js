@@ -1723,7 +1723,26 @@ const FlowStorage = (() => {
     const key = rec && rec.messageId;
     if (!key || !records[key]) return { ok: false };
     const next = Object.assign({}, records[key], patch);
-    await set({ glanceProofs: { records: Object.assign({}, records, { [key]: next }), byId: store.byId || {} } });
+    const logTouch = {};
+    ['undoRefused', 'undoLine', 'deleted', 'deletedLine', 'verifyNote'].forEach((name) => {
+      if (Object.prototype.hasOwnProperty.call(patch, name)) logTouch[name] = patch[name];
+    });
+    if (patch.deleted === true) logTouch.glanceDeleted = true;
+    let log = state.log;
+    if (Object.keys(logTouch).length) {
+      log = (state.log || []).slice();
+      for (let i = 0; i < log.length; i++) {
+        const e = log[i];
+        if (!e || e.kind !== 'written') continue;
+        const ids = [e.messageId, e.itemId, e.pathId, e.threadId, e.outlookConversationId];
+        if (ids.indexOf(key) < 0 && e.messageId !== next.messageId) continue;
+        log[i] = Object.assign({}, e, logTouch);
+        break;
+      }
+    }
+    const stored = { glanceProofs: { records: Object.assign({}, records, { [key]: next }), byId: store.byId || {} } };
+    if (log !== state.log) stored.log = log;
+    await set(stored);
     return { ok: true, record: next };
   });
 

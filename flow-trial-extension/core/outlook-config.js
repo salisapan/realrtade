@@ -75,9 +75,14 @@ FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(e
   const add = String(scope || '');
   if (add !== 'Calendars.ReadWrite') return null;
   const out = [];
-  (Array.isArray(existing) ? existing : []).forEach((s) => {
-    if (!s || /Mail\.Send/i.test(s) || /Shared$/i.test(s)) return;
-    if (out.indexOf(s) < 0) out.push(s);
+  const raw = Array.isArray(existing) ? existing : String(existing || '').split(/[\s,;]+/);
+  raw.forEach((s) => {
+    let name = String(s || '').trim();
+    if (!name || /^unknown$/i.test(name)) return;
+    name = name.replace(/^https:\/\/graph\.microsoft\.com\//i, '');
+    if (name.indexOf('/') >= 0) name = name.slice(name.lastIndexOf('/') + 1);
+    if (!name || /Mail\.Send/i.test(name) || /Shared$/i.test(name)) return;
+    if (out.indexOf(name) < 0) out.push(name);
   });
   if (out.indexOf(add) < 0) out.push(add);
   return out;
