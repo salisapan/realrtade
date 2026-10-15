@@ -142,6 +142,10 @@ check('where did we eat last week drafts', decide('איפה אכלנו בשבו�
 const friday = decide('איך קוראים לבית הקפה שישבת בו ביום שישי?', { evidence: placeEvidence([one({ location: 'Cafe Xoho, 7 King George, Tel Aviv', startIso: '2026-10-09T09:00:00' })]) });
 check('Hebrew Friday drafts that day only', friday.show === true && friday.draft.indexOf('Cafe Xoho - ') === 0, friday);
 check('a holding line is not a chat draft', decide("I'll send it by Friday.").draft == null);
+['hi', 'היי'].forEach((text) => {
+  const r = decide(text);
+  check('a greeting stays quiet: ' + text, r.show === false && r.draft == null && r.sends === false && r.reason === 'no-ask', r);
+});
 
 const factText = "What's the Q3 total in the budget sheet?";
 const fact = decide(factText, {
@@ -479,6 +483,8 @@ console.log('\n--- calendar evidence ---\n');
     ['whatsapp-quoted.html', 'https://web.whatsapp.com/', 'src/content-whatsapp-draft.js', false],
     ['whatsapp-filled.html', 'https://web.whatsapp.com/', 'src/content-whatsapp-draft.js', false],
     ['messenger-place.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', true],
+    ['messenger-greeting.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', false],
+    ['messenger-greeting-he.html', 'https://www.messenger.com/t/100012345678', 'src/content-messenger.js', false],
     ['messenger-live.html', 'https://www.messenger.com/t/2', 'src/content-messenger.js', false],
     ['instagram-place.html', 'https://www.instagram.com/direct/t/abc/', 'src/content-instagram.js', true],
     ['instagram-fact.html', 'https://www.instagram.com/direct/t/fact/', 'src/content-instagram.js', 'fact'],
