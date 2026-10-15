@@ -25,11 +25,8 @@ const dangling = paths.filter((p) => !candidates(p).some(exists));
 check('every file the map names exists', dangling.length === 0, dangling);
 check('open-tasks has a valid "Last updated" date', /Last updated: \d{4}-\d{2}-\d{2}/.test(read('docs/open-tasks.md')));
 const coreReadme = read('flow-trial-extension/core/README.md');
-// These six stay out of core/README.md. That file is the 0.9.56 copy for this lane.
-const laneKeptOut = ['lane-ms-host.js', 'outlook-contacts.js', 'outlook-word.js', 'outlook-excel.js', 'teams-chat.js', 'outlook-send.js'];
-const undescribed = fs.readdirSync(path.join(EXT, 'core')).filter((f) => f.endsWith('.js') && coreReadme.indexOf('`' + f + '`') < 0 && laneKeptOut.indexOf(f) < 0);
+const undescribed = fs.readdirSync(path.join(EXT, 'core')).filter((f) => f.endsWith('.js') && coreReadme.indexOf('`' + f + '`') < 0);
 check('every core/ module is described in core/README.md', undescribed.length === 0, undescribed);
-check('the lane modules stay out of core/README.md', laneKeptOut.every((f) => coreReadme.indexOf('`' + f + '`') < 0 && exists('flow-trial-extension/core/' + f)));
 const cfgs = fs.readdirSync(path.join(EXT, 'config')).filter((f) => f.endsWith('.js'));
 const extReadme = read('flow-trial-extension/README.md');
 check('every public config switch is named in the extension README', cfgs.every((c) => extReadme.indexOf(c.replace('.public.js', '')) >= 0), cfgs);

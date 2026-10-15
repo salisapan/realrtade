@@ -159,6 +159,60 @@ const deps = (call, scopes) => ({ call: call, grantedScopes: scopes || ['Files.R
   const left = await X.undo(added.ref, deps(changedRow.call));
   check('undo of an append refuses a different row and does not delete the workbook', left.ok === false && left.reason === 'row-changed' && changedRow.calls.every((c) => c.method !== 'DELETE' && c.path.indexOf('/delete') < 0), changedRow.calls.map((c) => c.method + ' ' + c.path));
 
+  const ownSnap = { address: 'Sheet1!A1:B1', values: [['Name', 'Amount']] };
+  const own = fake((req) => {
+    if (req.method === 'GET' && /root:/.test(req.path)) return { ok: true, status: 200, body: { id: 'wb-own', name: 'budget.xlsx' } };
+    if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'PATCH') return { ok: true, status: 200, body: req.body };
+    if (req.method === 'POST' && /tables\/add/.test(req.path)) return { ok: true, status: 201, body: { id: 't-own', name: 'Table1' } };
+    if (req.method === 'GET' && /\/rows$/.test(req.path)) return { ok: true, status: 200, body: { value: [{ index: 0, values: [['Name', 'Amount']] }] } };
+    if (req.method === 'GET' && /\/range$/.test(req.path)) return { ok: true, status: 200, body: ownSnap };
+    if (req.method === 'POST' && /closeSession/.test(req.path)) return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const owned = await X.run({ params: tableOffer.params, messageId: 'm-own' }, deps(own.call));
+  check('a table in the person\'s workbook keeps a creation snapshot', owned.ok === true && owned.ref.createdFile === false && owned.ref.createdTable === true && owned.ref.tableSnapshot.address === 'Sheet1!A1:B1' && owned.ref.tableSnapshot.rows.length === 1, owned);
+
+  const sameTable = fake((req) => {
+    if (req.method === 'GET' && /\/range$/.test(req.path)) return { ok: true, status: 200, body: { address: 'Sheet1!A1:B1', values: [['Name', 'Amount']] } };
+    if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'DELETE' && /\/tables\/t-own$/.test(req.path)) return { ok: true, status: 204, body: null };
+    if (req.method === 'POST' && /closeSession/.test(req.path)) return { ok: true, status: 204, body: null };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const cleared = await X.undo(owned.ref, deps(sameTable.call));
+  check('an unchanged table is deleted', cleared.ok === true && /table was deleted/.test(cleared.written) && sameTable.calls.some((c) => c.method === 'GET' && /\/range$/.test(c.path)) && sameTable.calls.some((c) => c.method === 'DELETE' && /\/tables\/t-own$/.test(c.path)) && sameTable.calls.filter((c) => c.method === 'DELETE').length === 1, sameTable.calls.map((c) => c.method + ' ' + c.path));
+
+  const addedRow = fake((req) => {
+    if (req.method === 'GET' && /\/range$/.test(req.path)) return { ok: true, status: 200, body: { address: 'Sheet1!A1:B2', values: [['Name', 'Amount'], ['Dana', '12']] } };
+    if (req.method === 'POST' && /createSession/.test(req.path)) return { ok: true, status: 201, body: { id: 'sess' } };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const edited = await X.undo(owned.ref, deps(addedRow.call));
+  check('a row the person added refuses and does not delete', edited.ok === false && edited.reason === 'user-edited' && edited.written === 'You edited this. Undo left it alone.' && addedRow.calls.every((c) => c.method !== 'DELETE' && c.path.indexOf('createSession') < 0), edited);
+
+  const failed = fake((req) => {
+    if (req.method === 'GET' && /\/range$/.test(req.path)) return { ok: false, status: 500, body: {} };
+    if (req.method === 'DELETE') return { ok: true, status: 204, body: null };
+    return { ok: false, status: 404, body: {} };
+  });
+  const down = await X.undo(owned.ref, deps(failed.call));
+  check('a table read 500 refuses and does not delete', down.ok === false && down.reason === 'unconfirmed' && down.written === "Couldn't confirm it's unchanged. Undo left it alone." && failed.calls.every((c) => c.method !== 'DELETE'), down);
+
+  const bare = fake((req) => (req.method === 'DELETE' ? { ok: true, status: 204, body: null } : { ok: true, status: 200, body: ownSnap }));
+  const noSnap = await X.undo(Object.assign({}, owned.ref, { tableSnapshot: null }), deps(bare.call));
+  check('a table with no snapshot refuses and does not delete', noSnap.ok === false && noSnap.reason === 'unconfirmed' && noSnap.written === "Couldn't confirm it's unchanged. Undo left it alone." && bare.calls.length === 0, noSnap);
+
+  const hung = fake(() => new Promise(() => {}));
+  const slowDeps = deps(hung.call);
+  slowDeps.confirmMs = 30;
+  const timed = await X.undo(owned.ref, slowDeps);
+  check('a table read timeout refuses and does not delete', timed.ok === false && timed.reason === 'unconfirmed' && timed.written === "Couldn't confirm it's unchanged. Undo left it alone." && hung.calls.every((c) => c.method !== 'DELETE'), timed);
+  const excelSrc = require('fs').readFileSync(require('path').join(__dirname, '../core/outlook-excel.js'), 'utf8');
+  check('the table confirm wait is 8 seconds', excelSrc.indexOf('const CONFIRM_MS = 8000') > 0);
+
   const denied = fake(() => ({ ok: true, status: 200, body: {} }));
   const no = await X.run({ params: { fileName: 'pay.xlsx', mode: 'append', values: ['1'] } }, deps(denied.call, ['Files.Read']));
   check('without Files.ReadWrite nothing is called', no.reason === 'files-not-granted' && denied.calls.length === 0);

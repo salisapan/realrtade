@@ -176,7 +176,9 @@
       verify_failed: 'Could not confirm.',
       'cells-differ': 'The row that came back does not match what was written.',
       'row-changed': 'That row changed, so it was left as it is.',
-      'file-changed': 'The file changed, so it was left as it is.'
+      'file-changed': 'The file changed, so it was left as it is.',
+      'user-edited': 'You edited this. Undo left it alone.',
+      unconfirmed: "Couldn't confirm it's unchanged. Undo left it alone."
     };
     status.textContent = Object.prototype.hasOwnProperty.call(quiet, res.reason) ? quiet[res.reason] : (res.written || 'Could not finish that.');
   }

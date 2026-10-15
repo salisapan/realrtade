@@ -8,7 +8,11 @@
 // never the workbook. Undo deletes a workbook this write created only when
 // both eTag and lastModifiedDateTime are present and unchanged since that
 // write. A missing or changed stamp is file-changed and the workbook stays.
-// Files.ReadWrite. Never sends. No network in this file: pass call().
+// Undo of a table created inside the person's own workbook first reads that
+// table's range (rows and address) and compares it to the creation snapshot.
+// An added or changed row is left alone. A failed read, a timeout, or a
+// missing snapshot is left alone. Files.ReadWrite. Never sends.
+// No network in this file: pass call().
 const FlowOutlookExcel = (() => {
   const CONNECTOR = 'outlookExcel';
   const SYSTEM = 'microsoft/excel';
@@ -16,6 +20,9 @@ const FlowOutlookExcel = (() => {
   const CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const MAX_COLS = 8;
   const MAX_CELL = 200;
+  const CONFIRM_MS = 8000;
+  const EDITED_LINE = 'You edited this. Undo left it alone.';
+  const UNCONFIRMED_LINE = "Couldn't confirm it's unchanged. Undo left it alone.";
 
   function scopeList(scopes) {
     if (scopes == null) return null;
@@ -191,6 +198,56 @@ const FlowOutlookExcel = (() => {
     return Array.isArray(first) ? first.map((cell) => String(cell)) : row.values.map((cell) => String(cell));
   }
 
+  function tableSnap(body) {
+    if (!body || !body.address || !Array.isArray(body.values) || !body.values.length) return null;
+    const rows = body.values.map((row) => (Array.isArray(row) ? row : [row]).map((cell) => String(cell == null ? '' : cell)));
+    if (!rows.length || !rows.some((row) => row.some((cell) => cell))) return null;
+    return { address: String(body.address), rows: rows };
+  }
+
+  function sameSnap(left, right) {
+    if (!left || !right || String(left.address) !== String(right.address)) return false;
+    if (!Array.isArray(left.rows) || !Array.isArray(right.rows) || left.rows.length !== right.rows.length) return false;
+    for (let i = 0; i < left.rows.length; i++) if (!sameRow(left.rows[i], right.rows[i])) return false;
+    return true;
+  }
+
+  function readWithin(call, req, ms) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: false, status: 0, timedOut: true });
+      }, ms);
+      let pending;
+      try { pending = call(req); }
+      catch (e) {
+        if (!settled) { settled = true; clearTimeout(timer); resolve({ ok: false, status: 0 }); }
+        return;
+      }
+      Promise.resolve(pending).then((res) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(res || { ok: false, status: 0 });
+      }, () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ ok: false, status: 0 });
+      });
+    });
+  }
+
+  function refuseUnconfirmed() {
+    return { ok: false, reason: 'unconfirmed', written: UNCONFIRMED_LINE };
+  }
+
+  function hasSnap(snap) {
+    return Boolean(snap && snap.address && Array.isArray(snap.rows) && snap.rows.length);
+  }
+
   async function run(input, deps) {
     const params = (input && input.params) || {};
     const fileName = safeXlsx((input && input.fileName) || params.fileName);
@@ -264,12 +321,27 @@ const FlowOutlookExcel = (() => {
               : null;
             const hit = rowList(rows && rows.body).find((row) => sameRow(rowCells(row), columns));
             if (!tableId || !hit) outcome = { ok: false, reason: 'verify_failed', proof: null };
-            else outcome = finish(input, deps, itemId, tableId, hit.index, {
-              createdFile: createdFile,
-              createdTable: true,
-              eTag: stamp.eTag,
-              lastModifiedDateTime: stamp.lastModifiedDateTime
-            });
+            else if (createdFile) {
+              outcome = finish(input, deps, itemId, tableId, hit.index, {
+                createdFile: true,
+                createdTable: true,
+                eTag: stamp.eTag,
+                lastModifiedDateTime: stamp.lastModifiedDateTime
+              });
+            } else {
+              const range = await call({
+                method: 'GET',
+                path: base + '/workbook/tables/' + encodeURIComponent(tableId) + '/range',
+                headers: headers
+              });
+              const tableSnapshot = range && range.ok === true ? tableSnap(range.body) : null;
+              if (!tableSnapshot) outcome = { ok: false, reason: 'verify_failed', proof: null };
+              else outcome = finish(input, deps, itemId, tableId, hit.index, {
+                createdFile: false,
+                createdTable: true,
+                tableSnapshot: tableSnapshot
+              });
+            }
           }
         } else {
           const values = cellsOf(params.values);
@@ -329,6 +401,7 @@ const FlowOutlookExcel = (() => {
       lastModifiedDateTime: flags.lastModifiedDateTime ? String(flags.lastModifiedDateTime) : '',
       values: Array.isArray(flags.values) ? flags.values.map((cell) => String(cell)) : []
     };
+    if (hasSnap(flags.tableSnapshot)) ref.tableSnapshot = flags.tableSnapshot;
     return {
       ok: true,
       connectorId: CONNECTOR,
@@ -367,6 +440,10 @@ const FlowOutlookExcel = (() => {
       if (!del || del.ok !== true) return { ok: false, reason: 'undo-failed' };
       return { ok: true, written: 'Undone. The new workbook was deleted.', log: undone(ref) };
     }
+    if (ref.createdTable === true) {
+      const gate = await tableStillOurs(ref, call, base, deps);
+      if (gate) return gate;
+    }
     const sess = await call({ method: 'POST', path: base + '/workbook/createSession', body: { persistChanges: true } });
     if (!sess || !sess.body || !sess.body.id) return { ok: false, reason: 'undo-failed' };
     const headers = { 'workbook-session-id': String(sess.body.id) };
@@ -398,6 +475,21 @@ const FlowOutlookExcel = (() => {
       written: ref.createdTable ? 'Undone. The new table was deleted.' : 'Undone. That row was deleted.',
       log: undone(ref)
     };
+  }
+
+  async function tableStillOurs(ref, call, base, deps) {
+    if (!ref.tableId || !hasSnap(ref.tableSnapshot)) return refuseUnconfirmed();
+    const wait = deps && Number(deps.confirmMs) > 0 ? Number(deps.confirmMs) : CONFIRM_MS;
+    const seen = await readWithin(call, {
+      method: 'GET',
+      path: base + '/workbook/tables/' + encodeURIComponent(ref.tableId) + '/range'
+    }, wait);
+    if (seen && seen.status === 404) return { ok: false, reason: 'not-found' };
+    if (!seen || seen.timedOut || seen.ok !== true) return refuseUnconfirmed();
+    const live = tableSnap(seen.body);
+    if (!live) return refuseUnconfirmed();
+    if (!sameSnap(ref.tableSnapshot, live)) return { ok: false, reason: 'user-edited', written: EDITED_LINE };
+    return null;
   }
 
   function undone(ref) {
