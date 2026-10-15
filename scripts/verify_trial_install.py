@@ -114,6 +114,7 @@ def check_profiles() -> None:
                 names = set(archive.namelist())
                 if archive.testzip() is not None:
                     die(f"{profile} zip is corrupt")
+                assert_dev_fixture_absent(archive, profile)
             sizes[profile] = out.stat().st_size
             for rel in REQUIRED:
                 if rel not in names:
@@ -125,7 +126,6 @@ def check_profiles() -> None:
                 die(f"full zip is missing runtime files: {sorted(set(RUNTIME_MARKERS) - set(have))}")
             if profile == "full" and "vendor/web-llm.LICENSE" not in names:
                 die("full zip ships the runtime without its licence text")
-            assert_dev_fixture_absent(archive, profile)
         if not sizes["lite"] < sizes["full"] / 3:
             die(f"lite ({sizes['lite']}) is not much smaller than full ({sizes['full']}); something large is still bundled")
         if package.encoded_size(sizes["lite"]) > package.FUNCTION_RESPONSE_BUDGET:

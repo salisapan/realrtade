@@ -1,57 +1,55 @@
-// One group-word rule for Messenger and Instagram.
-// A group word counts only when it is the first token (Team Alpha, צוות מכירות),
-// or the last token and the word before it is not a first name (Sales Team).
-// Anna Team, Russell Crew, and Dept Smith are people. A word in parentheses
-// after a name, as in Dana Levi (Staff), does not count. Hebrew stems take a
-// ב / ל / ה / ו prefix. Another signal (a Group chip, a second person, a
-// member count) is decided by the parser, not here.
+// One group rule for Messenger and Instagram. No name lists.
+// A person-shaped title (1–3 words, letters only, no digits or emoji) is a
+// one-to-one chat. A title is a group only when it is the group word and
+// nothing else ("Team", "צוות", "הצוות"). A chip, a second participant, a
+// member count, or "3 members" is decided by the parser.
 const FlowGroupWord = (() => {
   const EN = new Set(['members', 'participants', 'family', 'department', 'dept', 'team', 'group', 'squad', 'crew', 'staff']);
   const HE = new Set(['מחלקת', 'מחלקה', 'משתתפים', 'משפחה', 'קבוצתי', 'קבוצת', 'קבוצה', 'צוות']);
-  const FIRST = new Set([
-    'anna', 'john', 'russell', 'dana', 'maria', 'james', 'olivia', 'noah', 'emma', 'liam',
-    'sophia', 'mason', 'isabella', 'ethan', 'mia', 'lucas', 'charlotte', 'benjamin', 'amelia', 'henry',
-    'harper', 'jack', 'evelyn', 'alexander', 'abigail', 'daniel', 'ella', 'matthew', 'scarlett', 'david',
-    'michael', 'sarah', 'robert', 'jennifer', 'noa', 'yael'
-  ]);
-  const SURNAME = new Set([
-    'smith', 'jones', 'brown', 'davis', 'wilson', 'taylor', 'anderson', 'thomas', 'moore', 'martin',
-    'lee', 'white', 'harris', 'clark', 'lewis', 'walker', 'hall', 'young', 'king', 'wright', 'levi'
-  ]);
+
+  function bare(text) {
+    return String(text || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function wordsOf(text) {
+    return bare(text).split(' ').filter(Boolean);
+  }
 
   function letters(word) {
     return String(word || '').replace(/[^\p{L}]/gu, '');
   }
 
-  function isGroupToken(word) {
+  function groupStem(word) {
     const raw = letters(word);
-    if (!raw) return false;
-    if (EN.has(raw.toLowerCase())) return true;
-    if (HE.has(raw)) return true;
+    if (!raw) return '';
+    if (EN.has(raw.toLowerCase())) return raw.toLowerCase();
+    if (HE.has(raw)) return raw;
     const prefixed = raw.match(/^([בלהו]{1,3})(.+)$/u);
-    return Boolean(prefixed && HE.has(prefixed[2]));
+    return prefixed && HE.has(prefixed[2]) ? prefixed[2] : '';
   }
 
+  // True only when the title is the group word by itself.
   function counts(text) {
-    const bare = String(text || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!bare) return false;
-    const tokens = bare.split(' ').filter(Boolean);
-    if (!tokens.length) return false;
-    if (isGroupToken(tokens[0])) {
-      if (tokens.length === 1) return true;
-      const next = letters(tokens[1]).toLowerCase();
-      if (FIRST.has(next) || SURNAME.has(next)) return false;
-      return true;
-    }
-    if (tokens.length >= 2 && isGroupToken(tokens[tokens.length - 1])) {
-      const prev = letters(tokens[tokens.length - 2]).toLowerCase();
-      if (FIRST.has(prev)) return false;
-      return true;
-    }
-    return false;
+    const words = wordsOf(text);
+    return words.length === 1 && Boolean(groupStem(words[0]));
   }
 
-  return { counts };
+  // 1–3 words of letters. Digits, emoji, and punctuation are not a person.
+  function personShaped(text) {
+    const title = bare(text);
+    if (!title) return false;
+    if (/\p{Extended_Pictographic}/u.test(title) || /\d/.test(title)) return false;
+    if (/[^\p{L}\s]/u.test(title)) return false;
+    const words = title.split(/\s+/).filter(Boolean);
+    if (words.length < 1 || words.length > 3) return false;
+    return words.every((word) => /^\p{L}+$/u.test(word));
+  }
+
+  function chip(text) {
+    return /^(?:group|קבוצה)(?:\s+(?:chat|conversation))?$/i.test(String(text || '').replace(/\s+/g, ' ').trim());
+  }
+
+  return { counts, personShaped, chip };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.FlowGroupWord = FlowGroupWord;

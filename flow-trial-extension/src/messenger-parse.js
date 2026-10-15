@@ -238,75 +238,47 @@ const FlowMessengerParse = (() => {
     return '';
   }
 
-  // Checked on the raw title, before identityTokens drops digits and emoji.
-  const EMOJI = /\p{Extended_Pictographic}/u;
-  // A word after an attached ו is a second person when it is a first name
-  // (ונועה). וייס is a surname. ורד is itself a first name, so it is unclear.
-  const HE_FIRST = new Set([
-    'נועה', 'דנה', 'מיכל', 'תמר', 'רוני', 'מאיה', 'עומר', 'דניאל', 'יוסי', 'אבי', 'יונתן',
-    'יעל', 'שירה', 'עדי', 'הדר', 'ליאור', 'אורי', 'דוד', 'משה', 'רועי', 'עידו', 'גל', 'תום',
-    'נעמה', 'רחל', 'לאה', 'שרה', 'מרים', 'אסתר', 'חנה', 'רבקה', 'דינה', 'נועם', 'איתי',
-    'יובל', 'שחר', 'ליאם', 'אריאל', 'מאור', 'טל', 'עדן', 'מיה', 'אגם', 'הילה', 'קרן', 'סיון',
-    'מור', 'נטע', 'איתן', 'אלון', 'ניר', 'אסף', 'גיא', 'עמית', 'ירון', 'אביגיל', 'ליאת', 'ענבר',
-    'נוי', 'שני', 'אברהם', 'יצחק', 'יעקב', 'אהרן', 'שלמה', 'חיים', 'רות', 'חן', 'אביב', 'סתיו',
-    'איתמר', 'יואב', 'נדב', 'תומר', 'גיל', 'רון', 'דני', 'ורד'
-  ]);
   // One plain word is not a first-and-last name. danalevi_88 and dana.levi.5 are.
   const PLAIN_USER = new Set([
     'bookclub', 'weekendcrew', 'team', 'book', 'club', 'weekend', 'crew',
     'family', 'group', 'chat', 'friends', 'squad'
   ]);
 
-  // A comma, an "and" / "&", "and N others", a digit, an emoji, a group word,
-  // or a group-looking title (Book club, Team, Weekend crew). A thread id
-  // never overrides this.
+  // More than one person in the title, a member count, or a title that is
+  // only the group word. A person-shaped title is not a group by itself.
   function groupTitle(title) {
     const t = String(title || '').replace(/\s+/g, ' ').trim();
     if (!t) return false;
-    if (EMOJI.test(t)) return true;
-    if (/\d/.test(t)) return true;
     if (/[,，、]/.test(t)) return true;
     if (/\s(?:&|and)\s/i.test(t)) return true;
     if (/\band\s+\d{1,4}\s+others\b/i.test(t)) return true;
     if (/ועוד\s*\d|\d\s*אחרים/.test(t)) return true;
-    // A standalone ו between two names ("דנה ו נועה"). ו inside "דנה וייס" is not one.
     if (/\S\s+ו\s+\S/.test(t)) return true;
-    if (attachedVav(t) === 'group') return true;
+    if (countSaysGroup(t)) return true;
     if (groupWord(t)) return true;
-    if (groupLooking(t)) return true;
     return false;
   }
 
-  function groupLooking(title) {
-    const words = String(title || '').trim().split(/\s+/).map((word) => word.toLowerCase().replace(/[^\p{L}]/gu, '')).filter(Boolean);
-    return words.length > 0 && words.every((word) => PLAIN_USER.has(word));
+  function personTitle(title) {
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    return Boolean(rule && rule.personShaped(title) && !rule.counts(title));
   }
 
-  // 'group' when ו is followed by a first name. 'unclear' when the whole word
-  // is a first name (ורד). null when ו belongs to the word (וייס).
-  function attachedVav(title) {
-    const words = String(title || '').trim().split(/\s+/);
-    let unclear = false;
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i];
-      if (!/^ו[\u0590-\u05FF]{2,}$/.test(word)) continue;
-      const rest = word.slice(1);
-      if (HE_FIRST.has(rest)) return 'group';
-      if (HE_FIRST.has(word)) unclear = true;
-    }
-    return unclear ? 'unclear' : null;
+  function chipLabel(text) {
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    return Boolean(rule && rule.chip(text));
   }
 
   function headerSaysGroup(node) {
     if (!node || node.nodeType !== 1) return false;
     if (node.getAttribute && node.getAttribute('role') === 'row') return false;
     const label = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
-    if (groupWord(label) || countSaysGroup(label)) return true;
+    if (chipLabel(label) || groupWord(label) || countSaysGroup(label)) return true;
     const kids = node.childNodes ? Array.from(node.childNodes) : [];
     for (let i = 0; i < kids.length; i++) {
       const kid = kids[i];
       if (kid.nodeType === 3) {
-        if (groupWord(kid.textContent || '') || countSaysGroup(kid.textContent || '')) return true;
+        if (chipLabel(kid.textContent || '') || groupWord(kid.textContent || '') || countSaysGroup(kid.textContent || '')) return true;
       } else if (kid.nodeType === 1 && headerSaysGroup(kid)) return true;
     }
     return false;
@@ -644,6 +616,8 @@ const FlowMessengerParse = (() => {
     const raw = regionTitle(scope, via);
     const whole = root || scope;
     if (isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
+    const shaped = raw || firstHeading(whole);
+    if (personTitle(shaped)) return { kind: 'one-to-one', via: via, name: name || shaped, active: active };
     if (via === 'inbox') {
       const facts = inboxFacts(scope);
       const person = facts.names.length === 1 ? facts.names[0] : '';
@@ -654,9 +628,6 @@ const FlowMessengerParse = (() => {
       return { kind: 'unknown', via: via, name: '', active: false };
     }
     const proved = matchingProfile(scope, via) || threadMatches(scope, href, via) || singlePersonPanel(whole, raw);
-    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href, via) && !singlePersonPanel(whole, raw)) {
-      return { kind: 'unknown', via: via, name: name, active: active };
-    }
     if (active && !proved) return { kind: 'unknown', via: via, name: name, active: true };
     if (proved) return { kind: 'one-to-one', via: via, name: name, active: active };
     return { kind: 'unknown', via: via, name: name, active: false };
