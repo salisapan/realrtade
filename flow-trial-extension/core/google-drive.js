@@ -76,7 +76,41 @@ const FlowGoogleDrive = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,contentHash');
+    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,contentHash,headRevisionId,version,modifiedTime');
+  }
+
+  function fileSnapshot(json) {
+    const snap = {};
+    if (!json || typeof json !== 'object') return null;
+    if (json.headRevisionId) snap.headRevisionId = String(json.headRevisionId);
+    if (json.version != null && String(json.version) !== '') snap.version = String(json.version);
+    if (json.modifiedTime) snap.modifiedTime = String(json.modifiedTime);
+    return Object.keys(snap).length ? snap : null;
+  }
+
+  // match, edited, unconfirmed, or missing. A live field that was stored and
+  // is now absent cannot prove the file is the one Glance created.
+  function unchanged(snapshot, live) {
+    if (!snapshot || typeof snapshot !== 'object') return 'missing';
+    const keys = ['headRevisionId', 'version', 'modifiedTime'];
+    let saw = false;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (snapshot[key] == null || snapshot[key] === '') continue;
+      saw = true;
+      const got = live && live[key];
+      if (got == null || got === '') return 'unconfirmed';
+      if (String(got) !== String(snapshot[key])) return 'edited';
+    }
+    return saw ? 'match' : 'missing';
+  }
+
+  function editedResult() {
+    return { ok: false, reason: 'user-edited', error: 'You edited this. Undo left it alone.' };
+  }
+
+  function unconfirmedResult() {
+    return { ok: false, reason: 'unconfirmed', error: "Couldn't confirm it's unchanged. Undo left it alone." };
   }
 
   function hashBytes(bytes) {
@@ -128,7 +162,8 @@ const FlowGoogleDrive = (() => {
       externalId: file.id,
       created: true,
       name: (got.json && got.json.name) || ready.name,
-      contentHash: remoteHash
+      contentHash: remoteHash,
+      snapshot: fileSnapshot(got.json)
     };
     if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
     return Object.assign({ ok: true, ref: ref, proof: proof }, base);
@@ -140,13 +175,10 @@ const FlowGoogleDrive = (() => {
     const got = await call(http, { method: 'GET', url: fileUrl(id) });
     if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
     if (got.status === 404) return { ok: true, written: 'Drive file removed.' };
-    if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
-    if (ref.name && got.json.name && got.json.name !== ref.name) {
-      return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the file, so it was left as you left it.' };
-    }
-    if (ref.contentHash && got.json.contentHash && String(got.json.contentHash) !== String(ref.contentHash)) {
-      return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the file, so it was left as you left it.' };
-    }
+    if (!got.ok || got.status === 0) return unconfirmedResult();
+    const verdict = unchanged(ref.snapshot, got.json);
+    if (verdict === 'edited') return editedResult();
+    if (verdict !== 'match') return unconfirmedResult();
     const del = await call(http, {
       method: 'PATCH',
       url: FILES + encodeURIComponent(id),

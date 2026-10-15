@@ -167,7 +167,7 @@ test('Drive Undo refuses after the file is renamed and leaves it', async ({ glan
   server.editFile(id, { name: 'board-edited.pdf' });
   const before = server.calls.length;
   await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   expect(server.calls.slice(before).every((c) => c.method === 'GET')).toBe(true);
   expect(server.file(id).name).toBe('board-edited.pdf');
   expect(server.file(id).trashed).not.toBe(true);
@@ -233,7 +233,7 @@ test('Docs Undo refuses after the inserted text is edited and leaves it', async 
   server.editDocText(id, 'The person rewrote this paragraph.');
   const before = server.calls.length;
   await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   expect(server.calls.slice(before).every((c) => c.method === 'GET')).toBe(true);
   const text = server.doc(id).body.content[0].paragraph.elements[0].textRun.content;
   expect(text).toBe('The person rewrote this paragraph.');
@@ -295,9 +295,50 @@ test('Sheets Undo refuses after the row is edited and leaves it', async ({ glanc
   server.editSheetRow(id, edited);
   const before = server.calls.length;
   await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   expect(server.calls.slice(before).every((c) => c.method === 'GET')).toBe(true);
   expect(server.sheet(id).row).toEqual(edited);
+});
+
+test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-reply',
+      threadId: 't-reply',
+      subject: 'Transfer',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: DRAFT,
+      composeReply: true,
+      composeTo: S.SENDER,
+      composeSubject: 'Re: Transfer',
+      signature: 'Best, Ada',
+      quoted: 'Could you confirm the transfer by Friday?'
+    }
+  });
+  await uncheck(page, 'task');
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText('Compose filled');
+  await expect(page.locator('textarea[name="to"]')).toHaveValue(S.SENDER);
+  await expect(page.locator('input[name="subjectbox"]')).toHaveValue('Re: Transfer');
+  const body = page.locator('[aria-label="Message Body"]');
+  await expect(body).toContainText('Could you confirm the transfer by Friday?');
+  await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
+  await expect(body.locator('blockquote')).toHaveText('Could you confirm the transfer by Friday?');
+  const order = await body.evaluate((el) => {
+    const draft = el.querySelector('[data-glance-draft]');
+    const sig = el.querySelector('.gmail_signature');
+    const quote = el.querySelector('.gmail_quote');
+    if (!draft || !sig || !quote) return false;
+    const after = Node.DOCUMENT_POSITION_FOLLOWING;
+    return (draft.compareDocumentPosition(sig) & after) !== 0 && (sig.compareDocumentPosition(quote) & after) !== 0;
+  });
+  expect(order).toBe(true);
+  await body.locator('[data-glance-draft]').evaluate((el) => { el.textContent = 'Typed by the person'; });
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(body.locator('[data-glance-draft]')).toHaveText('Typed by the person');
+  await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
 });
 
 test('Compose fill writes the Gmail window, reads it back, and Undo clears it', async ({ glance }) => {

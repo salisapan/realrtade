@@ -2053,7 +2053,8 @@
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
-    if (response.reason === 'user-edited') return response.error || 'You changed this. Glance did not rewrite it.';
+    if (response.reason === 'user-edited') return response.error || 'You edited this. Undo left it alone.';
+    if (response.reason === 'unconfirmed') return response.error || "Couldn't confirm it's unchanged. Undo left it alone.";
     if (response.reason === 'range-edited') return response.error || 'Undo stopped. That text was edited, so nothing was deleted.';
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
@@ -2898,7 +2899,7 @@
             remaining: succeeded.length - result.undoneIds.length,
             keptWhere: result.keptWhere
           });
-          const refused = result.reason === 'user-edited' || result.reason === 'range-edited' || result.reason === 'range-missing';
+          const refused = result.reason === 'user-edited' || result.reason === 'range-edited' || result.reason === 'range-missing' || result.reason === 'unconfirmed';
           undo.textContent = glanceShow(refused ? 'Undo' : copy.undoLabel);
           undo.disabled = refused;
           hint.hidden = false;

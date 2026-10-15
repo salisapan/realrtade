@@ -161,22 +161,32 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('task undo refuses a changed task and does not delete it', taskRefused.ok === false && taskRefused.reason === 'user-edited' && taskEdited.calls.length === 1 && taskEdited.calls[0].method === 'GET', taskRefused);
 
   console.log('\n--- one Drive file is read back, then undo trashes it ---\n');
+  const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z' };
   const saved = scripted([
-    { status: 200, ok: true, json: { id: 'file1', name: 'note.txt', trashed: false } },
-    { status: 200, ok: true, json: { id: 'file1', name: 'note.txt', trashed: false } }
+    { status: 200, ok: true, json: { id: 'file1', name: 'note.txt', trashed: false, contentHash: 'abc' } },
+    { status: 200, ok: true, json: Object.assign({ id: 'file1', name: 'note.txt', trashed: false, contentHash: 'abc' }, SNAP) }
   ]);
   const drive = await Drive.write({ scopes: Cfg.SCOPES, fileName: 'note.txt', base64: Buffer.from('hi').toString('base64'), mimeType: 'text/plain' }, saved.http, CLOCK);
   check('drive write is proved from the GET', proved(drive) && drive.proof.system === 'google/drive' && drive.ref.created === true && saved.calls[1].method === 'GET', drive);
   check('drive calls stay off gmail', noGmail(saved.calls));
   const trashed = scripted([
-    { status: 200, ok: true, json: { id: 'file1', name: 'note.txt', trashed: false } },
+    { status: 200, ok: true, json: Object.assign({ id: 'file1', name: 'note.txt', trashed: false }, SNAP) },
     { status: 200, ok: true, json: { id: 'file1', trashed: true } }
   ]);
   const driveUndo = await Drive.undo(drive.ref, trashed.http);
-  check('drive undo reads the file, then trashes it', driveUndo.ok === true && trashed.calls[0].method === 'GET' && trashed.calls[1].method === 'PATCH', driveUndo);
-  const driveEdited = scripted([{ status: 200, ok: true, json: { id: 'file1', name: 'note-edited.txt', trashed: false } }]);
+  check('drive undo reads the file, then trashes it', driveUndo.ok === true && drive.ref.snapshot.headRevisionId === 'rev-1' && trashed.calls[0].method === 'GET' && trashed.calls[1].method === 'PATCH', driveUndo);
+  const driveEdited = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', name: 'note-edited.txt', trashed: false }, SNAP, { headRevisionId: 'rev-2', modifiedTime: '2026-10-15T01:00:00.000Z' }) }]);
   const driveRefused = await Drive.undo(drive.ref, driveEdited.http);
-  check('drive undo refuses a renamed file and does not trash it', driveRefused.ok === false && driveRefused.reason === 'user-edited' && driveEdited.calls.length === 1 && driveEdited.calls[0].method === 'GET', driveRefused);
+  check('drive undo refuses a changed file and does not trash it', driveRefused.ok === false && driveRefused.reason === 'user-edited' && driveRefused.error === 'You edited this. Undo left it alone.' && driveEdited.calls.length === 1 && driveEdited.calls[0].method === 'GET', driveRefused);
+  const driveDown = scripted([{ status: 500, ok: false, json: null }]);
+  const driveUnread = await Drive.undo(drive.ref, driveDown.http);
+  check('drive undo refuses when the read fails and does not trash', driveUnread.ok === false && driveUnread.reason === 'unconfirmed' && driveUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && driveDown.calls.length === 1, driveUnread);
+  let driveThrew = false;
+  const driveTimeout = await Drive.undo(drive.ref, async () => { driveThrew = true; throw new Error('timeout'); });
+  check('drive undo refuses on a timeout and does not trash', driveTimeout.ok === false && driveTimeout.reason === 'unconfirmed' && driveThrew === true, driveTimeout);
+  const bareDrive = Object.assign({}, drive.ref, { snapshot: null });
+  const driveNoSnap = await Drive.undo(bareDrive, scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP) }]).http);
+  check('drive undo without a snapshot does not trash', driveNoSnap.ok === false && driveNoSnap.reason === 'unconfirmed' && driveNoSnap.error === "Couldn't confirm it's unchanged. Undo left it alone.", driveNoSnap);
 
   function markedDoc(name, parts, rangeText, revisionId) {
     let cursor = 1;
@@ -212,25 +222,30 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     { status: 200, ok: true, json: { id: 'doc1', name: 'Receipt', mimeType: 'application/vnd.google-apps.document', trashed: false } },
     { status: 200, ok: true, json: { id: 'doc1', trashed: false } },
     { status: 200, ok: true, json: {} },
-    { status: 200, ok: true, json: markedDoc(createdMark, [docText], docText) }
+    { status: 200, ok: true, json: markedDoc(createdMark, [docText], docText) },
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) }
   ]);
   const doc = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', text: docText }, created.http, CLOCK);
-  check('doc create is proved from the named range', proved(doc) && doc.proof.system === 'google/docs' && doc.ref.created === true && doc.ref.rangeName === createdMark && created.calls.length === 4 && created.calls[3].method === 'GET', doc);
+  check('doc create is proved from the named range', proved(doc) && doc.proof.system === 'google/docs' && doc.ref.created === true && doc.ref.rangeName === createdMark && doc.ref.snapshot.headRevisionId === 'rev-1' && created.calls.length === 5 && created.calls[3].method === 'GET' && created.calls[4].method === 'GET', doc);
   const createdBatch = JSON.parse(created.calls[2].body);
   check('the insert is stored in a named range',
     createdBatch.requests[0].insertText.text === docText &&
     createdBatch.requests[1].createNamedRange.name === createdMark);
   check('doc calls stay off gmail and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('/auth/documents') < 0));
   const docTrash = scripted([
-    { status: 200, ok: true, json: markedDoc(createdMark, [docText], docText, 'rev-c') },
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) },
     { status: 200, ok: true, json: { trashed: true } }
   ]);
   const docUndo = await Docs.undo(doc.ref, docTrash.http);
-  check('undo of a created doc reads the range, then trashes it', docUndo.ok === true && docTrash.calls[0].method === 'GET' && docTrash.calls[1].method === 'PATCH', docUndo);
-  const docEditedText = 'Please find the receipt!!';
-  const docEdited = scripted([{ status: 200, ok: true, json: markedDoc(createdMark, [docEditedText], docEditedText, 'rev-e') }]);
+  check('undo of a created doc reads the file snapshot, then trashes it', docUndo.ok === true && docTrash.calls[0].method === 'GET' && docTrash.calls[0].url.indexOf('headRevisionId') >= 0 && docTrash.calls[1].method === 'PATCH', docUndo);
+  const docEdited = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP, { headRevisionId: 'rev-edited', version: '2' }) }]);
   const docRefused = await Docs.undo(doc.ref, docEdited.http);
-  check('undo of a created doc refuses an edited range and does not trash it', docRefused.ok === false && docRefused.reason === 'range-edited' && docEdited.calls.length === 1 && docEdited.calls[0].method === 'GET', docRefused);
+  check('undo of a created doc refuses an edited file and does not trash it', docRefused.ok === false && docRefused.reason === 'user-edited' && docRefused.error === 'You edited this. Undo left it alone.' && docEdited.calls.length === 1 && docEdited.calls[0].method === 'GET', docRefused);
+  const docDown = scripted([{ status: 500, ok: false, json: null }]);
+  const docUnread = await Docs.undo(doc.ref, docDown.http);
+  check('doc undo refuses when the read fails and does not trash', docUnread.ok === false && docUnread.reason === 'unconfirmed' && docUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && docDown.calls.length === 1, docUnread);
+  const docNoSnap = await Docs.undo(Object.assign({}, doc.ref, { snapshot: null }), scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) }]).http);
+  check('doc undo without a snapshot does not trash', docNoSnap.ok === false && docNoSnap.reason === 'unconfirmed', docNoSnap);
   const added = 'Added line';
   const editMark = Docs.rangeName('doc9', added, CLOCK);
   const edited = scripted([
@@ -310,21 +325,34 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     { status: 200, ok: true, json: { id: 'sheet1', trashed: false } },
     { status: 200, ok: true, json: { id: 'sheet1', trashed: false } },
     { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A1:B1', updatedRows: 1 } } },
-    { status: 200, ok: true, json: { values: [row] } }
+    { status: 200, ok: true, json: { values: [row] } },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP) }
   ]);
   const appended = await Sheets.write({ scopes: Cfg.SCOPES, name: 'Payments', row: row }, sheet.http, CLOCK);
-  check('sheet create append is proved', proved(appended) && appended.proof.system === 'google/sheets' && appended.ref.created === true && sheet.calls[3].method === 'GET', appended);
+  check('sheet create append is proved', proved(appended) && appended.proof.system === 'google/sheets' && appended.ref.created === true && appended.ref.snapshot.version === '1' && sheet.calls[3].method === 'GET' && sheet.calls[4].method === 'GET', appended);
   check('sheet calls stay off gmail', noGmail(sheet.calls));
   check('a nested row is refused', Sheets.rowOf({ row: [['a']] }) === null && Sheets.rowOf({ row: ['only'] }) && Sheets.rowOf({ row: ['only'] }).length === 1);
   const sheetTrash = scripted([
     { status: 200, ok: true, json: { values: [row] } },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP) },
     { status: 200, ok: true, json: { trashed: true } }
   ]);
   const sheetUndo = await Sheets.undo(appended.ref, sheetTrash.http);
-  check('undo of a created sheet reads the row, then trashes it', sheetUndo.ok === true && sheetTrash.calls[0].method === 'GET' && sheetTrash.calls[1].method === 'PATCH', sheetUndo);
+  check('undo of a created sheet reads the row and the file, then trashes it', sheetUndo.ok === true && sheetTrash.calls[0].method === 'GET' && sheetTrash.calls[1].method === 'GET' && sheetTrash.calls[2].method === 'PATCH', sheetUndo);
   const sheetEdited = scripted([{ status: 200, ok: true, json: { values: [['Ada', '999']] } }]);
   const sheetRefused = await Sheets.undo(appended.ref, sheetEdited.http);
-  check('sheet undo refuses a changed row and does not trash it', sheetRefused.ok === false && sheetRefused.reason === 'user-edited' && sheetEdited.calls.length === 1 && sheetEdited.calls[0].method === 'GET', sheetRefused);
+  check('sheet undo refuses a changed row and does not trash it', sheetRefused.ok === false && sheetRefused.reason === 'user-edited' && sheetRefused.error === 'You edited this. Undo left it alone.' && sheetEdited.calls.length === 1 && sheetEdited.calls[0].method === 'GET', sheetRefused);
+  const sheetFileEdited = scripted([
+    { status: 200, ok: true, json: { values: [row] } },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP, { version: '9', headRevisionId: 'rev-9' }) }
+  ]);
+  const sheetFileRefused = await Sheets.undo(appended.ref, sheetFileEdited.http);
+  check('sheet undo refuses a changed file and does not trash it', sheetFileRefused.ok === false && sheetFileRefused.error === 'You edited this. Undo left it alone.' && sheetFileEdited.calls.length === 2 && sheetFileEdited.calls.every((c) => c.method === 'GET'), sheetFileRefused);
+  const sheetDown = scripted([{ status: 500, ok: false, json: null }]);
+  const sheetUnread = await Sheets.undo(appended.ref, sheetDown.http);
+  check('sheet row undo refuses when the read fails and does not delete', sheetUnread.ok === false && sheetUnread.reason === 'unconfirmed' && sheetUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && sheetDown.calls.length === 1, sheetUnread);
+  const sheetNoRow = await Sheets.undo(Object.assign({}, appended.ref, { row: null }), scripted([]).http);
+  check('sheet row undo without a row snapshot does not delete', sheetNoRow.ok === false && sheetNoRow.reason === 'unconfirmed' && sheetNoRow.error === "Couldn't confirm it's unchanged. Undo left it alone.", sheetNoRow);
   const picked = scripted([
     { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A2:B2', updatedRows: 1 } } },
     { status: 200, ok: true, json: { values: [['Bea', '200']] } }
@@ -411,6 +439,28 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('a second fill does not rewrite text the person typed', pageRewrite.ok === false && pageRewrite.reason === 'user-edited' && dom.body.textContent === 'Edited by you' && dom.to.value === 'ada@example.com', pageRewrite);
   const pageRefused = Page.undo(pageAgain.ref, root);
   check('page undo refuses a changed hash and leaves the text', pageRefused.ok === false && pageRefused.reason === 'user-edited' && dom.body.textContent === 'Edited by you', pageRefused);
+  const { JSDOM } = require('jsdom');
+  const reply = new JSDOM('<form><textarea name="to">ada@example.com</textarea><input name="subjectbox" value="Re: Receipt"><div aria-label="Message Body" contenteditable="true" role="textbox"><br><div class="gmail_signature">Best, Ada</div><div class="gmail_quote">On Thursday Flow wrote:<blockquote>Original ask</blockquote></div></div></form>');
+  const replyRoot = reply.window.document;
+  const replyFill = Page.fill({ to: 'other@example.com', subject: 'Other', body: 'Thanks for the note.' }, replyRoot);
+  const replyBody = replyRoot.querySelector('[aria-label="Message Body"]');
+  const replyText = replyBody.textContent;
+  check('a reply fill leaves To, Subject, signature, and the quote, and inserts the body above them',
+    replyFill.ok === true &&
+    replyRoot.querySelector('textarea[name="to"]').value === 'ada@example.com' &&
+    replyRoot.querySelector('input[name="subjectbox"]').value === 'Re: Receipt' &&
+    replyText.indexOf('Thanks for the note.') >= 0 &&
+    replyText.indexOf('Thanks for the note.') < replyText.indexOf('Best, Ada') &&
+    replyText.indexOf('Original ask') > replyText.indexOf('Best, Ada') &&
+    replyBody.querySelectorAll('[data-glance-draft]').length === 1, replyText);
+  const replyAgain = Page.fill({ to: 'other@example.com', subject: 'Other', body: 'Nope.' }, replyRoot);
+  check('fillOnce does not write the reply a second time',
+    replyAgain === replyFill && replyBody.querySelectorAll('[data-glance-draft]').length === 1 && replyBody.textContent.indexOf('Nope') < 0, replyAgain);
+  replyBody.querySelector('[data-glance-draft]').textContent = 'Typed by the person';
+  const replyStop = Page.fill({ to: 'other@example.com', subject: 'Other', body: 'Nope.' }, replyRoot);
+  check('the first user edit stops a later fill',
+    replyStop.ok === false && replyStop.reason === 'user-edited' &&
+    replyBody.textContent.indexOf('Typed by the person') >= 0 && replyBody.textContent.indexOf('Best, Ada') >= 0, replyStop);
 
   console.log('\n--- lane proof: a preview is not a trusted close ---\n');
   const holdStep = { action: { kind: 'googleHold' }, response: wrote };

@@ -55,7 +55,39 @@ const FlowGoogleSheets = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed');
+    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,headRevisionId,version,modifiedTime');
+  }
+
+  function fileSnapshot(json) {
+    const snap = {};
+    if (!json || typeof json !== 'object') return null;
+    if (json.headRevisionId) snap.headRevisionId = String(json.headRevisionId);
+    if (json.version != null && String(json.version) !== '') snap.version = String(json.version);
+    if (json.modifiedTime) snap.modifiedTime = String(json.modifiedTime);
+    return Object.keys(snap).length ? snap : null;
+  }
+
+  function unchanged(snapshot, live) {
+    if (!snapshot || typeof snapshot !== 'object') return 'missing';
+    const keys = ['headRevisionId', 'version', 'modifiedTime'];
+    let saw = false;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (snapshot[key] == null || snapshot[key] === '') continue;
+      saw = true;
+      const got = live && live[key];
+      if (got == null || got === '') return 'unconfirmed';
+      if (String(got) !== String(snapshot[key])) return 'edited';
+    }
+    return saw ? 'match' : 'missing';
+  }
+
+  function editedResult() {
+    return { ok: false, reason: 'user-edited', error: 'You edited this. Undo left it alone.' };
+  }
+
+  function unconfirmedResult() {
+    return { ok: false, reason: 'unconfirmed', error: "Couldn't confirm it's unchanged. Undo left it alone." };
   }
 
   function appendUrl(id) {
@@ -141,21 +173,34 @@ const FlowGoogleSheets = (() => {
     if (!got.ok || !got.json || got.json.id !== file.id || got.json.trashed === true) {
       return { ok: false, reason: 'verify_failed', ref: { spreadsheetId: file.id, externalId: file.id, created: true }, proof: null };
     }
-    return appendRow(file.id, row, http, clock, true, name);
+    const appended = await appendRow(file.id, row, http, clock, true, name);
+    if (appended && appended.ref && appended.ref.created === true && appended.ok) {
+      const meta = await call(http, { method: 'GET', url: fileUrl(file.id) });
+      if (meta.ok && meta.json) appended.ref.snapshot = fileSnapshot(meta.json);
+    }
+    return appended;
   }
 
   async function undo(ref, http) {
     const id = sheetId(ref && (ref.spreadsheetId || ''));
     if (!id) return { ok: false, reason: 'unclear' };
-    if (ref.row && rangeOk(ref.updatedRange)) {
-      const got = await call(http, { method: 'GET', url: valuesUrl(id, ref.updatedRange) });
-      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
-      if (!got.ok) return { ok: false, reason: 'http-' + got.status };
-      if (!sameRow(got.json, ref.row)) {
-        return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the row, so the sheet was left as you left it.' };
-      }
+    if (!ref.row || !rangeOk(ref.updatedRange)) return unconfirmedResult();
+    const got = await call(http, { method: 'GET', url: valuesUrl(id, ref.updatedRange) });
+    if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+    if (got.status === 404) {
+      if (ref.created === true) return unconfirmedResult();
+      return { ok: true, written: 'Sheet row removed.' };
     }
+    if (!got.ok || got.status === 0) return unconfirmedResult();
+    if (!sameRow(got.json, ref.row)) return editedResult();
     if (ref.created === true) {
+      const file = await call(http, { method: 'GET', url: fileUrl(id) });
+      if (file.status === 401 || file.status === 403) return { ok: false, reason: 'not-connected' };
+      if (file.status === 404) return { ok: true, written: 'Sheet removed.' };
+      if (!file.ok || file.status === 0) return unconfirmedResult();
+      const verdict = unchanged(ref.snapshot, file.json);
+      if (verdict === 'edited') return editedResult();
+      if (verdict !== 'match') return unconfirmedResult();
       const del = await call(http, {
         method: 'PATCH',
         url: FILES + '/' + encodeURIComponent(id),

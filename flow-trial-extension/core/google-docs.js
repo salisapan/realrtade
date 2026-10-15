@@ -45,7 +45,39 @@ const FlowGoogleDocs = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed');
+    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,headRevisionId,version,modifiedTime');
+  }
+
+  function fileSnapshot(json) {
+    const snap = {};
+    if (!json || typeof json !== 'object') return null;
+    if (json.headRevisionId) snap.headRevisionId = String(json.headRevisionId);
+    if (json.version != null && String(json.version) !== '') snap.version = String(json.version);
+    if (json.modifiedTime) snap.modifiedTime = String(json.modifiedTime);
+    return Object.keys(snap).length ? snap : null;
+  }
+
+  function unchanged(snapshot, live) {
+    if (!snapshot || typeof snapshot !== 'object') return 'missing';
+    const keys = ['headRevisionId', 'version', 'modifiedTime'];
+    let saw = false;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (snapshot[key] == null || snapshot[key] === '') continue;
+      saw = true;
+      const got = live && live[key];
+      if (got == null || got === '') return 'unconfirmed';
+      if (String(got) !== String(snapshot[key])) return 'edited';
+    }
+    return saw ? 'match' : 'missing';
+  }
+
+  function editedResult() {
+    return { ok: false, reason: 'user-edited', error: 'You edited this. Undo left it alone.' };
+  }
+
+  function unconfirmedResult() {
+    return { ok: false, reason: 'unconfirmed', error: "Couldn't confirm it's unchanged. Undo left it alone." };
   }
 
   function hash(text) {
@@ -192,28 +224,25 @@ const FlowGoogleDocs = (() => {
     if (!got.ok || !got.json || got.json.id !== file.id || got.json.trashed === true) {
       return Object.assign({ ok: false, reason: 'verify_failed', ref: { documentId: file.id, externalId: file.id, created: true }, proof: null }, base);
     }
-    return insertAndRead(file.id, text, http, clock, true, name);
+    const inserted = await insertAndRead(file.id, text, http, clock, true, name);
+    if (inserted && inserted.ref && inserted.ref.created === true) {
+      const meta = await call(http, { method: 'GET', url: fileUrl(file.id) });
+      if (meta.ok && meta.json) inserted.ref.snapshot = fileSnapshot(meta.json);
+    }
+    return inserted;
   }
 
   async function undo(ref, http) {
     const id = docId(ref && (ref.documentId || ref.externalId));
     if (!id) return { ok: false, reason: 'unclear' };
     if (ref.created === true) {
-      const inserted = ref.inserted ? String(ref.inserted) : '';
-      const mark = ref.rangeName ? String(ref.rangeName) : '';
-      if (inserted && mark) {
-        const got = await call(http, { method: 'GET', url: DOCS + encodeURIComponent(id) });
-        if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
-        if (!got.ok) return { ok: false, reason: 'http-' + got.status };
-        const span = namedSpan(got.json, mark);
-        const covered = span ? textInRange(got.json, span.startIndex, span.endIndex) : null;
-        if (!span || covered == null) {
-          return { ok: false, reason: 'range-missing', error: 'Undo stopped. The marked text is no longer in the doc.' };
-        }
-        if (covered !== inserted) {
-          return { ok: false, reason: 'range-edited', error: 'Undo stopped. That text was edited, so nothing was deleted.' };
-        }
-      }
+      const got = await call(http, { method: 'GET', url: fileUrl(id) });
+      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+      if (got.status === 404) return { ok: true, written: 'Doc removed.' };
+      if (!got.ok || got.status === 0) return unconfirmedResult();
+      const verdict = unchanged(ref.snapshot, got.json);
+      if (verdict === 'edited') return editedResult();
+      if (verdict !== 'match') return unconfirmedResult();
       const del = await call(http, {
         method: 'PATCH',
         url: FILES + '/' + encodeURIComponent(id),

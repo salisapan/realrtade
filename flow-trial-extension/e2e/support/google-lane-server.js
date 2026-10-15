@@ -26,6 +26,23 @@ function parseDriveUpload(buf) {
   return { meta: meta, bytes: bytes };
 }
 
+function stampFile(file) {
+  if (!file) return file;
+  if (!file.headRevisionId) file.headRevisionId = 'rev-' + file.id + '-1';
+  if (file.version == null || file.version === '') file.version = '1';
+  if (!file.modifiedTime) file.modifiedTime = '2026-10-15T00:00:00.000Z';
+  return file;
+}
+
+function bumpFile(file) {
+  if (!file) return file;
+  const n = Number(file.version || '1') + 1;
+  file.version = String(n);
+  file.headRevisionId = 'rev-' + file.id + '-' + n;
+  file.modifiedTime = '2026-10-15T00:0' + String(n % 10) + ':00.000Z';
+  return file;
+}
+
 function docBody(text, name) {
   const body = String(text || '');
   const end = 1 + body.length;
@@ -127,7 +144,7 @@ function startGoogleLaneServer() {
       if (path === '/drive/v3/files' && method === 'POST') {
         const meta = readJson(raw);
         const id = 'e2e-file-' + (state.seq++);
-        const file = { id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, contentHash: 'created' };
+        const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, contentHash: 'created' });
         state.files[id] = file;
         if (meta.mimeType === 'application/vnd.google-apps.document') {
           state.docs[id] = docBody('', '');
@@ -144,13 +161,13 @@ function startGoogleLaneServer() {
       if (path.indexOf('/upload/drive/v3/files') === 0 && method === 'POST') {
         const packed = parseDriveUpload(raw);
         const id = 'e2e-upload-' + (state.seq++);
-        const file = {
+        const file = stampFile({
           id: id,
           name: packed.meta.name || 'upload.bin',
           mimeType: packed.meta.mimeType || 'application/octet-stream',
           trashed: false,
           contentHash: hashBytes(packed.bytes)
-        };
+        });
         state.files[id] = file;
         state.last.file = id;
         send(res, 200, file);
@@ -234,6 +251,7 @@ function startGoogleLaneServer() {
           if (item.createNamedRange && item.createNamedRange.name) name = item.createNamedRange.name;
         });
         state.docs[id] = docBody(text, name);
+        bumpFile(state.files[id]);
         state.last.doc = id;
         send(res, 200, {});
         return;
@@ -254,6 +272,7 @@ function startGoogleLaneServer() {
         const end = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.max(row.length - 1, 0)] || 'A';
         const range = 'Sheet1!A1:' + end + '1';
         state.sheets[id] = { row: row, range: range };
+        bumpFile(state.files[id]);
         state.last.sheet = id;
         send(res, 200, { updates: { updatedRange: range, updatedRows: 1 } });
         return;
@@ -290,15 +309,17 @@ function startGoogleLaneServer() {
         sheet: (id) => state.sheets[id],
         editTask: (id, patch) => Object.assign(state.tasks[id], patch),
         editEvent: (id, patch) => Object.assign(state.events[id], patch),
-        editFile: (id, patch) => Object.assign(state.files[id], patch),
+        editFile: (id, patch) => { Object.assign(state.files[id], patch); bumpFile(state.files[id]); },
         editDocText: (id, text) => {
           const doc = state.docs[id];
           if (!doc) return;
           const name = Object.keys(doc.namedRanges || {})[0] || '';
           state.docs[id] = docBody(text, name);
+          bumpFile(state.files[id]);
         },
         editSheetRow: (id, row) => {
           if (state.sheets[id]) state.sheets[id].row = row;
+          bumpFile(state.files[id]);
         },
         close: () => new Promise((done) => server.close(() => done()))
       });

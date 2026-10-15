@@ -31,10 +31,17 @@ function gmailHtml(opts) {
   const file = o.downloadUrl
     ? ('<span download_url="' + esc(o.downloadUrl) + '"></span>')
     : '';
-  const compose = o.compose
-    ? ('<form><textarea name="to"></textarea><input name="subjectbox" value="">' +
-      '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></form>')
-    : '';
+  const compose = o.composeReply
+    ? ('<form><textarea name="to">' + esc(o.composeTo || senderEmail) + '</textarea>' +
+      '<input name="subjectbox" value="' + esc(o.composeSubject || ('Re: ' + subject)) + '">' +
+      '<div aria-label="Message Body" contenteditable="true" role="textbox"><br>' +
+      '<div class="gmail_signature">' + esc(o.signature || 'Best, Ada') + '</div>' +
+      '<div class="gmail_quote">On Thursday Flow wrote:<blockquote>' + esc(o.quoted || body) + '</blockquote></div>' +
+      '</div></form>')
+    : (o.compose
+      ? ('<form><textarea name="to"></textarea><input name="subjectbox" value="">' +
+        '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></form>')
+      : '');
   return '<!doctype html><html><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
     '<div role="main">' +
     '<h2 class="hP">' + esc(subject) + '</h2>' +
