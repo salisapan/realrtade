@@ -32,6 +32,8 @@ Glance closes open loops. Gmail is where it starts today. A line below is a lock
 - **2026-10-15 23:01.** Every integrated product is on by default, with one consent per ecosystem. There is no off-by-default toggle. Glance must work on iPhone. A permanent Chrome extension detects intent on every site.
 - **2026-10-16 00:45 / 00:47.** Native embeds in every integrated system's own apps (the official add-on, add-in, or app), on every device type: iPhone, Android, iPad, Mac, Windows, and web. Install once from signup, and it appears on all devices. An integration is done only when this works.
 - **iPhone order, read from 2026-10-15 23:01 and 2026-10-16 together.** Add-ins first, then Safari. The official add-ins are the first iPhone surface and part of done. Safari is the every-site intent surface after that.
+- **2026-10-16 00:50.** The Do It card must pop up automatically in native apps too, not only on an icon tap. Native embeds (the Gmail add-on and the Outlook add-in) start immediately, in parallel with the urgent ecosystems work. Where a platform forbids an automatic surface, use the closest official route: a prefetched card, push notifications with Do It, and event-based activation.
+- **2026-10-16 00:51.** The auto-pop card and the native embeds apply to every ecosystem, across all of that ecosystem's apps and devices. Meta: WhatsApp, Messenger, Instagram. Google: Gmail, Calendar, Drive, Docs, Sheets. Microsoft: Outlook, Teams, Word, Excel, OneDrive, To Do.
 
 ### The close bar
 
