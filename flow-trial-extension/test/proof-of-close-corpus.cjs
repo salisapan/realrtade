@@ -410,7 +410,7 @@ console.log('\n--- Microsoft To Do ---\n');
   check('remount keeps an emptied body and a removed due date',
     emptySnap && emptySnap.ref && emptySnap.ref.created &&
     emptySnap.ref.created.body === null && emptySnap.ref.created.dueDateTime === null &&
-    !Object.prototype.hasOwnProperty.call(emptySnap.ref.created, 'importance') &&
+    emptySnap.ref.created.importance === 'normal' &&
     !Object.prototype.hasOwnProperty.call(emptySnap.ref.created, 'isReminderOn'),
     emptySnap && emptySnap.ref);
   const loggedSnap = FlowProofOfClose.receiptLogFields(todo, {

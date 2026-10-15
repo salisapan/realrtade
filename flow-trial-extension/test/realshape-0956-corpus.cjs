@@ -36,7 +36,7 @@ const srv=http.createServer((q,s)=>{let b='';q.on('data',c=>b+=c);q.on('end',()=
  if(q.method==='GET'&&/\/me\/todo\/lists$/.test(p))return j(200,{value:[{id:'L1',displayName:'Tasks',wellknownListName:'defaultList',isOwner:true}]});
  if(q.method==='POST'&&/\/tasks$/.test(p)){const id='T'+(++seq);const o={'@odata.etag':'W/"c'+seq+'"',importance:'normal',isReminderOn:false,status:'notStarted',title:body.title,createdDateTime:ts(0),lastModifiedDateTime:ts(0),hasAttachments:false,categories:[],id,body:{content:body.body?body.body.content:'',contentType:'text'},linkedResources:[]};if(body.dueDateTime)o.dueDateTime={dateTime:body.dueDateTime.dateTime,timeZone:'UTC'};store[id]=o;const r=pub(o);o.body={content:norm(o.body.content),contentType:'text'};if(o.dueDateTime)o.dueDateTime={dateTime:o.dueDateTime.dateTime.slice(0,19)+'.0000000',timeZone:'UTC'};return j(201,r);}
  if(q.method==='POST'&&/\/me\/events$/.test(p)){const id='E'+(++seq);const o={'@odata.etag':'W/"c'+seq+'"',id,createdDateTime:ts(0),lastModifiedDateTime:ts(0),changeKey:'CK0',subject:body.subject,importance:'normal',isAllDay:false,showAs:'busy',type:'singleInstance',webLink:'https://outlook.office365.com/owa/?itemid='+id,body:{contentType:'html',content:html(body.body&&body.body.content||'')},start:{dateTime:body.start.dateTime+'.0000000',timeZone:body.start.timeZone},end:{dateTime:body.end.dateTime+'.0000000',timeZone:body.end.timeZone},location:{displayName:'',locationType:'default'},attendees:[],organizer:{emailAddress:{name:'Sali',address:'sali@x.com'}}};store[id]=o;const r=pub(o);r.body={contentType:'html',content:r.body.content.replace('<html>','<html>\r\n')};o.body={contentType:'html',content:o.body.content.replace('<div>','<div style="font-family:Aptos">')};return j(201,r);}
- if(q.method==='POST'&&/createReply$/.test(p)){const id='D'+(++seq);const o={'@odata.etag':'W/"c'+seq+'"',id,createdDateTime:ts(0),lastModifiedDateTime:ts(0),changeKey:'CK0',isDraft:true,subject:'RE: Thursday',toRecipients:[{emailAddress:{name:'Dana',address:'Dana@X.com'}}],webLink:'https://outlook.office.com/mail/drafts/'+id,body:{contentType:'html',content:html(body.comment||'')}};store[id]=o;return j(201,pub(o));}
+ if(q.method==='POST'&&/createReply$/.test(p)){const id='D'+(++seq);const o={'@odata.etag':'W/"c'+seq+'"',id,createdDateTime:ts(0),lastModifiedDateTime:ts(0),changeKey:'CK0',isDraft:true,importance:'normal',subject:'RE: Thursday',toRecipients:[{emailAddress:{name:'Dana',address:'Dana@X.com'}}],webLink:'https://outlook.office.com/mail/drafts/'+id,body:{contentType:'html',content:html(body.comment||'')}};store[id]=o;return j(201,pub(o));}
  if(q.method==='POST'&&/attachments$/.test(p))return j(201,{id:'A1'});
  const o=m&&store[decodeURIComponent(m[2])];
  if(!o)return j(404,{error:{code:'ErrorItemNotFound'}});
@@ -60,11 +60,11 @@ const deleted=(it)=>!store[it.id];
 srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port+'/v1.0';vm.runInContext('OUTLOOK_GRAPH=__G',sb);
  const kinds={todo:()=>mkTask(true,true),'todo-bare':()=>mkTask(false,false),calendar:()=>mkEvent(false),holdit:()=>mkEvent(true),draft:mkDraft};
  const edits={
-  todo:[['title word',o=>o.title='Pay invoice 4413',true],['body word',o=>o.body.content=o.body.content.replace('1,200','1,300'),true],['body whitespace only',o=>o.body.content=o.body.content.replace(/\r\n/g,'\r\n  ')+'  ',false],['due changed',o=>o.dueDateTime.dateTime='2026-10-21T00:00:00.0000000',true],['body cleared',o=>o.body.content='',true],['due removed',o=>delete o.dueDateTime,true],['completed',o=>o.status='completed',true],['importance high (star)',o=>o.importance='high',false]],
+  todo:[['title word',o=>o.title='Pay invoice 4413',true],['body word',o=>o.body.content=o.body.content.replace('1,200','1,300'),true],['body whitespace only',o=>o.body.content=o.body.content.replace(/\r\n/g,'\r\n  ')+'  ',false],['due changed',o=>o.dueDateTime.dateTime='2026-10-21T00:00:00.0000000',true],['body cleared',o=>o.body.content='',true],['due removed',o=>delete o.dueDateTime,true],['completed',o=>o.status='completed',true],['importance high (star)',o=>o.importance='high',true]],
   'todo-bare':[['notes added',o=>o.body.content='call Dana first','late'],['due added',o=>o.dueDateTime={dateTime:'2026-10-22T00:00:00.0000000',timeZone:'UTC'},'late']],
-  calendar:[['subject word',o=>o.subject=o.subject+' moved',true],['start moved',o=>o.start.dateTime='2026-10-20T13:00:00.0000000',true],['body word',o=>o.body.content=o.body.content.replace('lunch','dinner'),true],['location added',o=>o.location={displayName:'Taizu'},'late'],['body cleared',o=>o.body.content='',true]],
+  calendar:[['subject word',o=>o.subject=o.subject+' moved',true],['start moved',o=>o.start.dateTime='2026-10-20T13:00:00.0000000',true],['body word',o=>o.body.content=o.body.content.replace('lunch','dinner'),true],['location added',o=>o.location={displayName:'Taizu'},'late'],['body cleared',o=>o.body.content='',true],['importance high (star)',o=>o.importance='high',true]],
   holdit:[['subject word',o=>o.subject='Budget review v2',true],['end moved',o=>o.end.dateTime='2026-10-20T16:00:00.0000000',true],['location added',o=>o.location={displayName:'Room 4'},'late'],['attendee added',o=>o.attendees=[{emailAddress:{address:'noa@x.com'}}],'late']],
-  draft:[['body word',o=>o.body.content=o.body.content.replace('>x<','>x, see you Friday<'),true],['subject word',o=>o.subject='RE: Thursday?',true],['to added',o=>o.toRecipients=o.toRecipients.concat([{emailAddress:{address:'noa@x.com'}}]),true],['body cleared',o=>o.body.content='',true],['body whitespace only',o=>o.body.content=o.body.content.replace('<div>','<div> &nbsp;'),false]]};
+  draft:[['body word',o=>o.body.content=o.body.content.replace('>x<','>x, see you Friday<'),true],['subject word',o=>o.subject='RE: Thursday?',true],['to added',o=>o.toRecipients=o.toRecipients.concat([{emailAddress:{address:'noa@x.com'}}]),true],['body cleared',o=>o.body.content='',true],['body whitespace only',o=>o.body.content=o.body.content.replace('<div>','<div> &nbsp;'),false],['importance high (star)',o=>o.importance='high',true]]};
  for(mode of ['stable','touch','bodyonly']){console.log('\n=== mode '+mode);
   for(const k of Object.keys(kinds)){fail=null;let it=await kinds[k]();
    if(!it.w.ok){ck(k+' write ok',false,it.w);continue;}
@@ -94,9 +94,9 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
   store={};gets=0;srv.removeAllListeners('request');srv.on('request',(q,s)=>{if(q.method==='GET'&&/events\//.test(q.url)){gets++;if(gets===1){s.writeHead(500);return s.end();}}realH(q,s);});
   const again=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review',quote:'Can we meet Tuesday 14:30?'}});
   const snap=again.ref&&again.ref.created;
-  ck('GET fail then retry ok stores content and omits Graph defaults',
+  ck('GET fail then retry ok stores importance and omits reminder fields',
     gets===2 && again.fetchedBack===true && snap && snap.subject==='Budget review' && snap.isAllDay===false &&
-    !Object.prototype.hasOwnProperty.call(snap,'importance') && !Object.prototype.hasOwnProperty.call(snap,'isReminderOn') &&
+    snap.importance==='normal' && !Object.prototype.hasOwnProperty.call(snap,'isReminderOn') &&
     !Object.prototype.hasOwnProperty.call(snap,'reminderMinutesBeforeStart'),
     {gets, snap});
   srv.removeAllListeners('request');srv.on('request',realH);
@@ -104,10 +104,26 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
   ck('server defaults unedited -> delete when the snapshot came from the GET', plain.ok&&!store[again.ref.eventId], plain);
   store={};const lateW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
   const lateId=lateW.ref.eventId;
-  store[lateId].isReminderOn=true;store[lateId].reminderMinutesBeforeStart=30;store[lateId].importance='high';
+  store[lateId].isReminderOn=true;store[lateId].reminderMinutesBeforeStart=30;
   store[lateId].reminderDateTime={dateTime:'2026-10-20T14:00:00.0000000',timeZone:'UTC'};
   const late=await call('outlookCalendarUndo',lateW.ref,{created:lateW.ref.created});
-  ck('unedited item where Graph later fills reminder and importance deletes', late.ok&&!store[lateId], late);
+  ck('unedited item where Graph later fills a reminder deletes', late.ok&&!store[lateId], late);
+  store={};const missImp=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
+  delete store[missImp.ref.eventId].importance;
+  const missImpU=await call('outlookCalendarUndo',missImp.ref,{created:missImp.ref.created});
+  ck('importance missing later deletes', missImpU.ok&&!store[missImp.ref.eventId], missImpU);
+  store={};const lateNorm=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
+  const bare=JSON.parse(JSON.stringify(lateNorm.ref.created));delete bare.importance;
+  store[lateNorm.ref.eventId].importance='normal';
+  const lateNormU=await call('outlookCalendarUndo',lateNorm.ref,{created:bare});
+  ck('importance late-default normal deletes', lateNormU.ok&&!store[lateNorm.ref.eventId], lateNormU);
+  store={};let draftGets=0;
+  srv.removeAllListeners('request');srv.on('request',(q,s)=>{if(q.method==='GET'&&/\/messages\//.test(q.url)){draftGets++;s.writeHead(500);return s.end();}realH(q,s);});
+  const dw=await call('outlookDraftWrite',{outlookIncomingId:'M1',body:'x'});
+  ck('draft GET fail twice is Created, couldn\'t verify',
+    draftGets===2 && dw.ok===true && dw.fetchedBack===false && dw.created==null && dw.written==="Created, couldn't verify" && dw.ref,
+    {draftGets,dw});
+  srv.removeAllListeners('request');srv.on('request',realH);
   store={};const editW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
   store[editW.ref.eventId].subject='Budget review v2';
   const changed=await call('outlookCalendarUndo',editW.ref,{created:editW.ref.created});

@@ -403,6 +403,37 @@ function listsRoute() {
     { text: chipText(meetPage.doc), cal: cal.map((m) => m.payload && m.payload.params) });
   meetPage.w.close();
 
+  console.log('\n--- a draft both reads missed is not Draft ready ---\n');
+  const missPage = await boot({
+    id: 'MSG-DRAFT-MISS',
+    subject: 'Gate A 0.9.41 – Q3 summary',
+    body: 'Hi,\nCan you reply and confirm whether the Q3 summary will include the October numbers?\nThanks,\nFlow',
+    execute: () => ({
+      ok: true,
+      fetchedBack: false,
+      reason: 'unverified',
+      ref: 'draft-miss',
+      created: null,
+      written: "Created, couldn't verify",
+      url: 'https://outlook.live.com/mail/0/drafts/draft-miss',
+      where: 'Outlook Drafts'
+    })
+  });
+  const missHost = await waitCard(missPage);
+  const missGo = missHost && (missHost.querySelector('.do-halo') || missHost.querySelector('button.flow-chip'));
+  if (missGo) missGo.click();
+  const missUndo = await waitFor(missPage.doc, '.flow-chip-undo', 4000);
+  const handled = missPage.doc.querySelector('.flow-chip-handled');
+  await sleep(80);
+  check('a missed draft read-back says Created, couldn\'t verify, with Undo',
+    Boolean(missUndo) && handled && handled.textContent === "Created, couldn't verify" &&
+    !/Draft ready/i.test(handled.textContent || ''),
+    { text: chipText(missPage.doc) });
+  check('a missed draft read-back does not record a close',
+    !missPage.store.closeQuality && !missPage.store.stillOpenMetrics,
+    { closeQuality: missPage.store.closeQuality, stillOpen: missPage.store.stillOpenMetrics });
+  missPage.w.close();
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })().catch((err) => {
@@ -502,6 +533,7 @@ async function boot(opts) {
       if (/\/me\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
       return { ok: false, status: 404, body: '{}' };
     }
+    if (msg.type === 'flow:execute-action' && typeof o.execute === 'function') return o.execute(msg);
     if (msg.type === 'flow:execute-action' && msg.payload && msg.payload.connectorId === 'outlookCalendar') {
       return {
         ok: true,

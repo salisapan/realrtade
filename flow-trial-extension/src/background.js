@@ -3597,7 +3597,7 @@ function outlookUnconfirmedLine() {
 function outlookContentKeys() {
   const N = globalThis.FlowNativeEdit;
   if (N && Array.isArray(N.CONTENT_KEYS) && N.CONTENT_KEYS.length) return N.CONTENT_KEYS;
-  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay'];
+  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'];
 }
 
 // An owned content key is a snapshot, including an explicit null. An empty
@@ -3647,11 +3647,27 @@ async function outlookReadSnap(url, prefer) {
   return null;
 }
 
+// A draft verify read fails only when both GETs are not ok. A 200 whose
+// body has no content keys is a read: there is no snapshot, and the card
+// still says the draft is ready. Undo then cannot confirm it is unchanged.
+async function outlookDraftRead(url, prefer) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try { res = await outlookFetch(url, { method: 'GET', headers: prefer || {} }); }
+    catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const body = await outlookReadJson(res);
+    const snap = body ? outlookCreationSnap(body) : null;
+    return { ok: true, snap: outlookHasSnap(snap) ? snap : null };
+  }
+  return { ok: false, snap: null };
+}
+
 function outlookUnverifiedLine() {
   return "Created, couldn't verify";
 }
 
-const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay';
+const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance';
 
 async function outlookStoredEventSnap(eventId) {
   return outlookReadSnap(
@@ -3787,20 +3803,33 @@ async function outlookDraftWrite(p) {
   const keys = Object.keys(saved.map);
   if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
   await outlookSaveDraftMap(saved.st, saved.map);
-  const created = await outlookReadSnap(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
-  return {
-    ok: true,
+  const read = await outlookDraftRead(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
+  const base = {
     ref: draft.id,
-    created: created,
     where: draft.webLink || null,
     url: draft.webLink || null,
     attachmentId: attachmentId,
-    written: attachmentId
-      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
-      : 'Reply draft ready in Outlook Drafts. Not sent.',
     fromAddress: wantFrom || null,
     fromSet: fromSet
   };
+  if (!read.ok) {
+    return Object.assign({}, base, {
+      ok: true,
+      fetchedBack: false,
+      reason: 'unverified',
+      created: null,
+      proof: null,
+      written: outlookUnverifiedLine()
+    });
+  }
+  return Object.assign({}, base, {
+    ok: true,
+    fetchedBack: read.snap ? true : undefined,
+    created: read.snap,
+    written: attachmentId
+      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+      : 'Reply draft ready in Outlook Drafts. Not sent.'
+  });
 }
 async function outlookFileForDraft(p) {
   if (p.driveFileId) {

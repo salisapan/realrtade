@@ -888,15 +888,34 @@ const FlowOutlook = (() => {
       }
       await rememberDraft(incomingId, draft.id);
       let created = null;
-      for (let attempt = 0; attempt < 2 && !created; attempt++) {
+      let readOk = false;
+      for (let attempt = 0; attempt < 2 && !readOk; attempt++) {
         try {
           const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories');
+          readOk = true;
           const snap = globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf ? FlowNativeEdit.snapshotOf(settled) : null;
           created = snap && Object.keys(snap).length ? snap : null;
         } catch (e) { created = null; }
       }
+      if (!readOk) {
+        return {
+          ok: true,
+          fetchedBack: false,
+          reason: 'unverified',
+          ref: draft.id,
+          created: null,
+          proof: null,
+          where: draft.webLink || null,
+          attachmentId: attachmentId,
+          written: "Created, couldn't verify",
+          fromAddress: wantFrom || null,
+          fromSet: fromSet,
+          fromHint: fromHint
+        };
+      }
       return {
         ok: true,
+        fetchedBack: true,
         ref: draft.id,
         created: created,
         where: draft.webLink || null,

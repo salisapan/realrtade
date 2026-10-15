@@ -89,19 +89,29 @@ console.log('\n--- a changed snapshot is an edit ---\n');
   check('a removed due date is an edit', N.compareContent(full, {
     title: 'File it', body: { content: 'Thanks' }, importance: 'normal', isReminderOn: false
   }) === 'edited');
-  check('importance and a reminder are not stored and are not an edit',
-    !Object.prototype.hasOwnProperty.call(full, 'importance') &&
-    !Object.prototype.hasOwnProperty.call(full, 'isReminderOn') &&
+  check('importance is stored and a reminder is not',
+    full.importance === 'normal' &&
+    !Object.prototype.hasOwnProperty.call(full, 'isReminderOn'));
+  check('a starred task is an edit', N.compareContent(full, {
+    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' },
+    importance: 'high', isReminderOn: true, reminderMinutesBeforeStart: 30,
+    reminderDateTime: { dateTime: '2026-10-20T09:00:00' }
+  }) === 'edited');
+  check('importance normal or missing is not an edit',
     N.compareContent(full, {
-      title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' },
-      importance: 'high', isReminderOn: true, reminderMinutesBeforeStart: 30,
-      reminderDateTime: { dateTime: '2026-10-20T09:00:00' }
-    }) === 'match');
+      title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }
+    }) === 'match' &&
+    N.compareContent({ title: 'File it' }, {
+      title: 'File it', importance: 'normal'
+    }) === 'match' &&
+    N.compareContent({ title: 'File it' }, {
+      title: 'File it', importance: 'high'
+    }) === 'edited');
   check('a stored null that is filled later is unconfirmed', N.compareContent(Object.assign({}, full, { body: null }), {
     title: 'File it', body: { content: 'call Dana first' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
   }) === 'unconfirmed');
   check('a reminder Graph adds later is not an edit', N.compareContent({ title: 'File it', isReminderOn: false, importance: 'normal' }, {
-    title: 'File it', isReminderOn: true, importance: 'high', reminderDateTime: { dateTime: '2026-10-20T09:00:00' }, reminderMinutesBeforeStart: 15
+    title: 'File it', isReminderOn: true, importance: 'normal', reminderDateTime: { dateTime: '2026-10-20T09:00:00' }, reminderMinutesBeforeStart: 15
   }) === 'match');
   {
     const long = 'word '.repeat(4000);

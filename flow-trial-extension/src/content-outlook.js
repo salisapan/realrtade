@@ -788,6 +788,10 @@
     return (entry && (entry.writtenLine || entry.label)) || '';
   }
 
+  function draftUnverifiedStatus(written) {
+    return written === "Created, couldn't verify" ? written : undefined;
+  }
+
   async function onDoIt(host, chip, ctx, liveSteps) {
     if (ignoreStaleClick(host)) return;
     doItInFlight = true;
@@ -880,9 +884,12 @@
       FlowChipHost.setChipState(chip, 'flow-chip-error', (r && !r.ok && (r.reason || r.error)) || (file ? 'Could not attach that file.' : 'Could not create draft'));
       return;
     }
-    const written = file
-      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
-      : (r.written || 'Reply draft ready in Outlook Drafts. Not sent.');
+    const unverified = r.fetchedBack === false || r.reason === 'unverified';
+    const written = unverified
+      ? "Created, couldn't verify"
+      : (file
+        ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+        : (r.written || 'Reply draft ready in Outlook Drafts. Not sent.'));
     await FlowStorage.appendLog({
       kind: 'written',
       label: written,
@@ -894,9 +901,10 @@
       app: 'outlook',
       connectorId: 'outlookDraft',
       ref: r.ref,
-      created: r.created || null,
+      created: unverified ? null : (r.created || null),
       where: r.where,
       url: r.url || r.where,
+      fetchedBack: unverified ? false : undefined,
       outlookIncomingId: ctx.outlookIncomingId,
       outlookReceipt: true,
       intent: ctx.intent,
@@ -905,11 +913,12 @@
       subject: ctx.subject,
       text: ctx.bodyText
     });
-    if (ctx.messageId) {
+    if (!unverified && ctx.messageId) {
       await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
       await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
     }
     FlowChipHost.showDraftReceipt(host, {
+      status: draftUnverifiedStatus(written),
       written: written,
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
@@ -1426,8 +1435,10 @@
     }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
     if (!host) return false;
     lastOutcome = 'card';
+    const draftWritten = draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.';
     FlowChipHost.showDraftReceipt(host, {
-      written: draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.',
+      status: draftUnverifiedStatus(draftWritten),
+      written: draftWritten,
       url: draft.url || draft.where,
       onUndo: guardedUndo(host, async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref, created: draft.created });
@@ -3013,8 +3024,10 @@
       if (host) {
         lastOutcome = 'card';
         dbg('rendered', { receipt: true, messageId: entry.messageId });
+        const draftWritten = entry.label || 'Reply draft ready in Outlook Drafts. Not sent.';
         FlowChipHost.showDraftReceipt(host, {
-          written: entry.label || 'Reply draft ready in Outlook Drafts. Not sent.',
+          status: draftUnverifiedStatus(draftWritten),
+          written: draftWritten,
           url: entry.url || entry.where,
           onUndo: guardedUndo(host, async () => {
             const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: entry.ref, created: entry.created });

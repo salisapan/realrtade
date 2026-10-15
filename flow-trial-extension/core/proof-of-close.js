@@ -481,7 +481,7 @@ const FlowProofOfClose = (() => {
   // Keep this list aligned with FlowNativeEdit.CONTENT_KEYS.
   const SNAP_KEYS = [
     'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
-    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay'
+    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'
   ];
 
   function contentSnapshot(value) {

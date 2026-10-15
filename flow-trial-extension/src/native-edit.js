@@ -131,12 +131,14 @@ const FlowNativeEdit = (() => {
     return { hash: hashText(text), prefix: text.slice(0, BODY_PREFIX) };
   }
 
-  // Content the person can change. Graph fills importance and the reminder
-  // fields on its own, so they are not stored and not compared.
+  // Content the person can change. Reminder fields stay out: Graph fills
+  // those on its own. Importance is stored. A later value of normal, or a
+  // missing importance, is Graph's default and is not an edit. A current
+  // value other than normal that differs from the snapshot is an edit.
   // Server fields (lastModifiedDateTime, @odata.etag, changeKey) are not here.
   const CONTENT_KEYS = [
     'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
-    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay'
+    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'
   ];
 
   function rawFor(key, o) {
@@ -159,8 +161,27 @@ const FlowNativeEdit = (() => {
     if (key === 'location') return emptyToNull(locationOf(raw));
     if (key === 'categories') return emptyToNull(categoriesOf(raw));
     if (key === 'isAllDay') return boolOf(raw);
+    if (key === 'importance') return importanceOf(raw);
     if (key === 'status') return emptyToNull(plain(raw));
     return emptyToNull(plain(raw));
+  }
+
+  // Graph's own default is normal. low and high are a star the person set.
+  function importanceOf(raw) {
+    const v = emptyToNull(plain(raw));
+    if (v == null) return null;
+    return String(v).toLowerCase();
+  }
+
+  // Current normal or missing is not an edit, even when the snapshot held
+  // a different value. A non-default current that differs from the snapshot
+  // is an edit, including when the snapshot never stored the key.
+  function importanceEdited(snapshot, live) {
+    const liveVal = present('importance', live) ? importanceOf(rawFor('importance', live)) : null;
+    if (liveVal == null || liveVal === 'normal') return false;
+    const has = Object.prototype.hasOwnProperty.call(snapshot, 'importance');
+    const stored = has ? importanceOf(snapshot.importance) : null;
+    return stored !== liveVal;
   }
 
   // Only keys the read actually returned. An empty value is null.
@@ -189,9 +210,11 @@ const FlowNativeEdit = (() => {
   // match of every stored value and no new non-null field.
   function compareContent(snapshot, live) {
     if (!snapshot || !live || typeof snapshot !== 'object') return 'unconfirmed';
+    if (importanceEdited(snapshot, live)) return 'edited';
     let unseen = false;
     for (let i = 0; i < CONTENT_KEYS.length; i++) {
       const key = CONTENT_KEYS[i];
+      if (key === 'importance') continue;
       const liveVal = present(key, live) ? fieldValue(key, rawFor(key, live)) : null;
       if (!Object.prototype.hasOwnProperty.call(snapshot, key)) {
         if (liveVal != null) unseen = true;
