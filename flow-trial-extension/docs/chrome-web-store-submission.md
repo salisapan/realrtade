@@ -121,6 +121,16 @@ financial value, governing law). The file is read entirely on-device;
 again, only masked placeholder text is sent to generate the summary. PDF
 attachments aren't supported yet.
 
+CHAT DRAFTS
+On WhatsApp Web, Messenger and Instagram, when that app is turned on,
+Glance writes a suggested reply as a draft into the chat input box. It
+never sends. You review it and send it yourself. A draft in the box is
+not a closed loop.
+
+CALENDAR READS
+Calendar reads include the event location and start time, not only ids
+and times, and are used only to understand and close your own loops.
+
 WHAT GLANCE NEVER DOES
 Glance doesn't read your mailbox in bulk, doesn't send full email content
 anywhere to decide whether to act, doesn't sell data, and doesn't use your
@@ -152,16 +162,18 @@ write to, say what kind of work you do, and open an email.
 ```
 Glance's single purpose is to help the user close their open loops: what
 they asked someone for, what they promised, and what was asked of them. It
-starts in Gmail. On the user's device it detects when the currently open
-Gmail message reflects a real decision or request, and only when the user
-clicks an on-screen button does it close it by writing the appropriate
-record(s) — a Google Calendar event, a Google Tasks reminder, a Gmail draft
-reply, or a combination of these — to the user's own, already-signed-in
-Google account; and, only when the user says yes, it stays on something the
-user is waiting on until the other side really answers. It never sends
-anything for the user, does not scan the mailbox in bulk, does not act
-automatically, and does not serve any purpose unrelated to closing the
-user's own open loops.
+starts in Gmail. On the user's device it detects when the open Gmail
+message reflects a real decision or request, and only when the user clicks
+an on-screen button does it close it by writing the appropriate record(s)
+— a Google Calendar event, a Google Tasks reminder, a Gmail draft reply,
+or a combination of these — to the user's own Google account; and, only
+when the user says yes, it stays on something the user is waiting on until
+the other side answers. On WhatsApp Web, Messenger and Instagram a
+suggested reply is a draft in the chat box; the user sends it. Calendar
+reads include location and start time, not only ids and times, only for
+the user's own loops. It never sends anything for the user, does not scan
+the mailbox in bulk, does not act automatically, and does not serve any
+purpose unrelated to closing the user's own open loops.
 ```
 
 ## Permission justifications (Privacy practices tab)
@@ -173,18 +185,20 @@ Use these verbatim — each is traceable to the exact code that uses it.
 |---|---|
 | `storage` | Stores the user's chosen connector, line-of-work profile, sensitivity calibration, the local activity log, and the local Execution Memory log (which steps of a process this account tends to keep or remove) — entirely in `chrome.storage.local` on the user's own device (`src/storage.js`, `core/execution-memory.js`). Never synced to a Glance-owned server. |
 | `identity` | Used only for `chrome.identity.getAuthToken()` — Chrome's own native Google account chooser — so Glance can write to Google Calendar, Google Tasks, and Gmail drafts using an OAuth grant to the Google account the user is already signed into (`src/background.js`). No redirect page, no third-party auth screen. |
-| `scripting` | Registers Glance's reader for other websites (WhatsApp Web; Outlook on the web when Outlook is on) after the person turns them on in the setup and the browser grants that site's optional permission (`src/background.js`, `registerSurface`). Nothing is injected anywhere else. |
+| `scripting` | Registers Glance's reader for other websites (WhatsApp Web, Messenger, and Instagram; Outlook on the web when Outlook is on) after the person turns them on and the browser grants that site's optional permission (`src/background.js`, `registerSurface`). Nothing is injected anywhere else. |
 | `contextMenus` | Adds one right-click item, "Glance: stay on this", on selected text. Only the selection and the page's address without its query are stored, until the person answers one question (`src/background.js`, `core/capture.js`). |
 | `offscreen` | Opens ONE hidden page that would hold an on-device language model (`src/hybrid-sw.js`, `src/offscreen.html`). **Declared but inert in this build:** `config/hybrid.public.js` has `enabled: false`, so the page is never created and nothing is downloaded. When it is turned on it runs only on a computer that passes a silent capability check, and the person can switch it off and free the disk. The extension-pages policy also gains `'wasm-unsafe-eval'`, which the model's WebAssembly library needs (the library is a file of the package: `vendor/`, Apache-2.0 for the runtime). |
 | _Which zip to upload_ | Upload the **full** build: `python3 scripts/package_trial_extension.py --profile full --out <path>`. The zip the site serves is the **lite** profile while the switch is off: same manifest (so the permission is still declared), without `src/offscreen.*` and `vendor/`, 0.88 MB instead of 3.88 MB. `docs/hybrid-execution-architecture.md` §0c. |
-| `optional_host_permissions: https://web.whatsapp.com/*` | Requested only when the person turns on WhatsApp Web in the setup, and removed when they turn it off. The reader (`src/content-whatsapp.js`) is read-only, reads only the open one-to-one chat, never a group, list, channel or status, and sends nothing to Glance's servers. |
-| `optional_host_permissions: https://graph.microsoft.com/*` | Requested only when the person turns on Outlook in the setup, and removed when they turn it off. Microsoft Graph (Mail.Read, Mail.ReadWrite, User.Read): read the last 14 days of inbox and sent, and on Do It create/delete Glance's own reply drafts in Outlook Drafts — never send. Made from the extension panel while it is open and from an open Outlook-on-the-web tab (`src/outlook.js`, Graph GETs under /me through the worker). The worker also renews the Microsoft sign-in on an alarm (token endpoint on login.microsoftonline.com only). Nothing is sent to Glance's servers. |
+| `optional_host_permissions: https://web.whatsapp.com/*` | Requested only when the person turns on WhatsApp Web, and removed when they turn it off. The loop reader (`src/content-whatsapp.js`) reads only the open one-to-one chat, never a group, list, channel or status, and sends nothing to Glance's servers. Glance also writes a suggested reply as a draft into the chat input box. It never sends; the person reviews it and sends it themselves. |
+| `optional_host_permissions: https://www.messenger.com/*`, `https://www.facebook.com/messages/*`, `https://business.facebook.com/latest/inbox/*` | Requested only when the person turns Messenger on, and removed when they turn it off. Glance writes a suggested reply as a draft into the chat input box of the open chat. It never sends; the person reviews it and sends it themselves. Nothing is sent to Glance's servers. |
+| `optional_host_permissions: https://www.instagram.com/direct/*` | Requested only when the person turns Instagram on, and removed when they turn it off. Glance writes a suggested reply as a draft into the chat input box. It never sends; the person reviews it and sends it themselves. Nothing is sent to Glance's servers. |
+| `optional_host_permissions: https://graph.microsoft.com/*` | Requested only when the person turns on Outlook in the setup, and removed when they turn it off. Microsoft Graph (Mail.Read, Mail.ReadWrite, User.Read): read the last 14 days of inbox and sent, and on Do It create/delete Glance's own reply drafts in Outlook Drafts — never send. Made from the extension panel while it is open and from an open Outlook-on-the-web tab (`src/outlook.js`, Graph GETs under /me through the worker). The worker also renews the Microsoft sign-in on an alarm (token endpoint on login.microsoftonline.com only). Calendar reads on this same connection include event location and start time, not only ids and times, and are used only to understand and close the user's own loops. No new scope. Nothing is sent to Glance's servers. |
 | `optional_host_permissions: https://outlook.live.com/*`, `https://outlook.office.com/*`, `https://outlook.office365.com/*` | Requested with Outlook Turn on. Injects the same Glance Do It card as Gmail into the open message on Outlook on the web (`src/content-outlook.js`). Reads the open reading pane on-device to match a Graph-synced ask; writes only via Graph createReply (draft, never send). Removed when Outlook is turned off. |
 | `optional_host_permissions: http://127.0.0.1/*, http://localhost/*` | Requested only when the person turns on "A model on your computer" in the extension panel, and only for the address of a program they run themselves (Ollama or LM Studio). Used to send one sentence at a time to that local program, and only after it has passed the precision test shown in the panel. The address is checked twice to be this computer (no other host is ever contacted), nothing is sent to Glance's servers, and the answer only proposes a loop that the person still has to tap. |
 | `optional_host_permissions: https://login.microsoftonline.com/*` | Requested together with the one above. Microsoft's own OAuth endpoints: the sign-in (PKCE, through `chrome.identity.launchWebAuthFlow`) and the token refresh for that sign-in. |
 | `host_permissions: https://mail.google.com/*` | The content script (`src/content-gmail.js`) runs only on Gmail to read the open message's visible text, subject, and sender, and to inject the Do It button / Morning Brief UI. |
 | `host_permissions: https://tasks.googleapis.com/*` | Direct API calls to create/undo a Google Tasks reminder after the user clicks Do It. |
-| `host_permissions: https://www.googleapis.com/calendar/*` | Direct API calls to create/undo a Google Calendar event after the user clicks Do It. Also one read: when the extension is opened, events with a given person on the invite, to close a "pick a time" loop (ids, times and invitee addresses only; `flow:outside-calendar`). |
+| `host_permissions: https://www.googleapis.com/calendar/*` | Direct API calls to create/undo a Google Calendar event after the user clicks Do It. Calendar reads include event location and start time, not only ids and times, and are used only to understand and close the user's own loops. A pick-a-time check when the extension is opened can also see invitee addresses (`flow:outside-calendar`). |
 | `host_permissions: https://www.googleapis.com/drive/*` | Read calls (`drive.readonly`) when the user clicks Do It on a message that clearly asks for one file: search that account's Drive and attach only a single high-confidence match to an unsent Gmail draft (`searchDriveFiles` in `src/background.js`, ranked in `core/file-attach.js`). The same read confirms there is exactly one file before a calendar, task, or template create. If more than one file could be the one, Glance stays silent. The optional Drive picker remains a secondary control, not the close. |
 | `host_permissions: https://www.googleapis.com/oauth2/*` | Hand-armed Outlook file trace only. One call to Google's tokeninfo endpoint reads the scopes on the token Chrome already issued, so a silence can say whether Drive read is on that token. The access token is not logged and not stored. No new OAuth scope. No mail content. |
 | `host_permissions: https://www.googleapis.com/upload/drive/*` | `drive.file` only. When a clear ask has no safe match and exactly one company template for that object exists, Do It uploads a new file made from that template and attaches it to the unsent draft. The same upload creates a Doc, Sheet, or saved file for a create-and-share close. Undo deletes that new file. Glance does not edit the template or any other Drive file. No full `drive`, `documents`, or `spreadsheets` scope. |
