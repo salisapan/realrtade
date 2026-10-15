@@ -435,8 +435,9 @@ test('Task Undo refuses after the title is edited and leaves it', async ({ glanc
 
 const HEBREW_HOLD = 'פגישה ביום חמישי 22/10 בשעה 14:00';
 
-test('Hebrew weekday date and hour posts a Jerusalem-wall-clock hold', async ({ glance }) => {
+test('Hebrew weekday date and hour posts one Jerusalem hold at 11:00Z', async ({ glance }) => {
   const page = await open(glance, {
+    seed: { glanceTimeZone: 'Asia/Jerusalem' },
     mail: {
       messageId: 'm-he-hold',
       threadId: 't-he-hold',
@@ -448,12 +449,14 @@ test('Hebrew weekday date and hour posts a Jerusalem-wall-clock hold', async ({ 
   });
   await clickDoIt(page);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
-  const post = server.calls.find((c) => c.method === 'POST' && c.path.indexOf('/calendar/v3/calendars/primary/events') >= 0);
-  expect(post && post.body && post.body.start).toBeTruthy();
-  expect(post.body.start.dateTime).toBe('2026-10-22T14:00:00');
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  expect(post.body.start.timeZone).toBe(zone);
-  if (process.env.TZ === 'Asia/Jerusalem') expect(post.body.start.timeZone).toBe('Asia/Jerusalem');
+  const posts = server.calls.filter((c) => c.method === 'POST' && c.path.indexOf('/calendar/v3/calendars/primary/events') >= 0);
+  expect(posts).toHaveLength(1);
+  const post = posts[0];
+  expect(post.search || '').toContain('sendUpdates=none');
+  expect(post.body.attendees || []).toEqual([]);
+  expect(post.body.start.timeZone).toBe('Asia/Jerusalem');
+  expect(post.body.start.dateTime).toBe('2026-10-22T11:00:00Z');
+  expect(new Date(post.body.start.dateTime).toISOString()).toBe('2026-10-22T11:00:00.000Z');
   expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/events/' + server.last.event) >= 0)).toBe(true);
 });
 

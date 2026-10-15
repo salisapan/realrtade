@@ -193,13 +193,13 @@ try {
   });
 } catch (e) { console.error('[Glance] right-click menu unavailable', e); }
 chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
-chrome.runtime.onInstalled.addListener(() => {
-  const fn = globalThis.reinjectGmailTabs;
-  if (typeof fn === 'function') fn();
+chrome.runtime.onInstalled.addListener((details) => {
+  const reason = details && details.reason;
+  if (reason !== 'install' && reason !== 'update') return;
+  injectOpenGmailTabs();
 });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
-  const fn = globalThis.reinjectGmailTabs;
-  if (typeof fn === 'function') fn();
+  injectOpenGmailTabs();
 });
 
 /* ---------------------------------------------------- other apps (opt-in) */
@@ -316,8 +316,30 @@ async function clearOutlookNeedsRefresh(tabId) {
   } catch (e) { /* the number badge can return */ }
 }
 
+function gmailSurfaceScript() {
+  let blocks = [];
+  try { blocks = chrome.runtime.getManifest().content_scripts || []; } catch (e) { blocks = []; }
+  const block = blocks.find((s) => (s.matches || []).some((m) => String(m).indexOf('mail.google.com') >= 0));
+  if (!block || !block.js || !block.js.length) return null;
+  return { matches: block.matches, js: block.js, css: block.css || [] };
+}
+
+// Already-open Gmail tabs on install, update, and browser start. No reload.
+async function injectOpenGmailTabs() {
+  const script = gmailSurfaceScript();
+  if (!script) return 0;
+  const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+  return injectSurfaceIntoOpenTabs('gmail', script, stamp, { reload: false });
+}
+
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
-async function injectSurfaceIntoOpenTabs(id, script, stamp) {
+async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
+  const gmail = id === 'gmail' || (script && Array.isArray(script.matches) && script.matches.some((m) => String(m).indexOf('mail.google.com') >= 0));
+  if (gmail) {
+    const fn = globalThis.reinjectGmailTabs;
+    if (typeof fn === 'function') return fn();
+    return 0;
+  }
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
   const want = stamp || ((typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '');
   let tabs = [];
@@ -1499,7 +1521,8 @@ async function rememberGoogleAuthResult(res) {
   if (!res) return res;
   if (res.status === 401) await markGoogleReconnect('401');
   else if (res.status === 403) await markGoogleReconnect('missing scope');
-  else if (res.ok) await clearGoogleReconnect();
+  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
+  // after Connect stores a new token.
   return res;
 }
 

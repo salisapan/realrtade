@@ -304,6 +304,58 @@ async function main() {
   const noGrantView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
   check('a 401 with no grant is reconnect, not Connect', noGrant && noGrant.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && noGrant.needsReconnect === true && noGrantView.connected === false && noGrantView.needsReconnect === true && noGrantView.label === 'Reconnect Google', { noGrant, noGrantView, flag: stored.googleReconnect });
 
+  stored.googleTasksAuth = { taskListId: 'glance-list' };
+  delete stored.googleReconnect;
+  sandbox.chrome.i18n.getUILanguage = () => 'en';
+  sandbox.chrome.identity.getAuthToken = (details, cb) => {
+    if (typeof cb === 'function') cb('ya29.host');
+  };
+  const stickyFetches = [];
+  sandbox.fetch = async (url, init) => {
+    const u = String(url);
+    stickyFetches.push({ url: u, method: (init && init.method) || 'GET' });
+    if (u.indexOf('tasks.googleapis.com') >= 0) {
+      return { ok: false, status: 401, text: async () => '{"error":{"code":401}}' };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        id: 'evt-sticky',
+        status: 'confirmed',
+        summary: 'פגישה',
+        start: { dateTime: '2026-10-22T11:00:00Z', timeZone: 'Asia/Jerusalem' },
+        htmlLink: 'https://calendar.google.com/calendar/event?eid=evt-sticky'
+      })
+    };
+  };
+  const taskDenied = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      input: { label: 'Pay the invoice', taskListId: 'glance-list' }
+    }, {}, resolve);
+  });
+  const calendarOk = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleHold',
+      input: {
+        dateIso: '2026-10-22',
+        hour: 14,
+        minute: 0,
+        title: 'פגישה',
+        quote: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+        timeZone: 'Asia/Jerusalem'
+      }
+    }, {}, resolve);
+  });
+  const stickyView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
+  const calendarPosts = stickyFetches.filter((c) => c.method === 'POST' && c.url.indexOf('/calendar/v3/calendars/primary/events') >= 0);
+  check('a Task 401 then a Calendar 200 stays reconnect', taskDenied && taskDenied.ok === false && calendarOk && calendarOk.ok === true && stored.googleReconnect && stored.googleReconnect.needed === true && stickyView.connected === false && stickyView.needsReconnect === true && stickyView.label === 'Reconnect Google' && stickyView.label !== 'Connected' && calendarPosts.length === 1 && calendarPosts[0].url.indexOf('sendUpdates=none') >= 0, { taskDenied, calendarOk: calendarOk && { ok: calendarOk.ok, reason: calendarOk.reason }, flag: stored.googleReconnect, stickyView, posts: calendarPosts.length });
+  check('a later success does not call noteGoogleAuthOk', hostSrc.indexOf('if (res.ok) return noteGoogleAuthOk()') < 0);
+  check('a 2xx in the service worker does not clear reconnect', bg.indexOf('else if (res.ok) await clearGoogleReconnect()') < 0 && bg.indexOf('await clearGoogleReconnect()') > 0);
+
   const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
   check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && popup.indexOf('needsReconnect') < popup.indexOf("badge on', 'Connected'"));
   check('a lane warning is not the Connected header', popup.indexOf('status[k].warning') > 0 && popup.indexOf('warningLabel') > 0 && popup.indexOf('googleLaneWarning') > 0);

@@ -48,12 +48,19 @@ const body = Cal.eventBody({
   quote: TEXT,
   timeZone: 'Asia/Jerusalem'
 });
-check('the hold is 14:00 in Asia/Jerusalem and names no file', body && body.start.dateTime === '2026-10-22T14:00:00' && body.start.timeZone === 'Asia/Jerusalem' && body.summary === 'פגישה' && !/File:/.test(body.description || ''), body);
+const startInstant = body && body.start && new Date(body.start.dateTime).toISOString();
+check('14:00 Asia/Jerusalem is 2026-10-22T11:00:00Z with no attendees and no file', body && body.start.dateTime === '2026-10-22T11:00:00Z' && startInstant === '2026-10-22T11:00:00.000Z' && body.end.dateTime === '2026-10-22T11:30:00Z' && body.start.timeZone === 'Asia/Jerusalem' && Array.isArray(body.attendees) && body.attendees.length === 0 && body.summary === 'פגישה' && !/File:/.test(body.description || ''), body);
+
+const hostZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const implicit = Cal.eventBody({ dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה' });
+check('a missing zone uses the host zone', implicit && implicit.start.timeZone === hostZone && implicit.start.dateTime.indexOf('Z') > 0, implicit && implicit.start);
 
 const missing = Cal.eventBody({ title: 'פגישה' });
 check('a hold with no clock is refused without the word file', missing === null);
+check('an unknown zone is not written', Cal.eventBody({ dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', timeZone: 'Not/AZone' }) === null);
 const src = fs.readFileSync(path.join(ROOT, 'core', 'google-calendar.js'), 'utf8');
 check('the calendar refusal does not say file', src.indexOf('No single time for this event.') > 0 && src.indexOf('No single file and time') < 0);
+check('the zone is not defaulted to UTC', src.indexOf("'UTC'") < 0 && src.indexOf('"UTC"') < 0);
 
 const posted = [];
 const http = async (req) => {
@@ -72,8 +79,10 @@ Cal.write({
   quote: TEXT,
   timeZone: 'Asia/Jerusalem'
 }, http, '2026-10-15T12:00:00.000Z').then((result) => {
-  const start = posted[0] && JSON.parse(posted[0].body).start;
-  check('the calendar write reads the event back and proves it', result && result.ok === true && result.proof && result.proof.fetchedBack === true && result.ref && result.ref.contentHash && posted.some((r) => r.method === 'GET') && start && start.dateTime === '2026-10-22T14:00:00' && start.timeZone === 'Asia/Jerusalem', { result: result && { ok: result.ok, reason: result.reason }, start });
+  const posts = posted.filter((r) => r.method === 'POST');
+  const sent = posts[0] && JSON.parse(posts[0].body);
+  const start = sent && sent.start;
+  check('one Calendar POST, sendUpdates=none, read-back, proof and contentHash', result && result.ok === true && result.proof && result.proof.fetchedBack === true && result.ref && result.ref.contentHash && posts.length === 1 && posts[0].url.indexOf('sendUpdates=none') >= 0 && sent && Array.isArray(sent.attendees) && sent.attendees.length === 0 && posted.some((r) => r.method === 'GET') && start && start.dateTime === '2026-10-22T11:00:00Z' && new Date(start.dateTime).toISOString() === '2026-10-22T11:00:00.000Z' && start.timeZone === 'Asia/Jerusalem', { result: result && { ok: result.ok, reason: result.reason }, posts: posts.length, start });
   if (failures) {
     console.log('\n' + failures + ' failed');
     process.exit(1);

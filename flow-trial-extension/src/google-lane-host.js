@@ -109,28 +109,20 @@ function noteGoogleAuthFailure(reason) {
     .catch(() => {});
 }
 
-function noteGoogleAuthOk() {
-  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.remove !== 'function') {
-    return Promise.resolve();
-  }
-  return Promise.resolve()
-    .then(() => chrome.storage.local.remove(RECONNECT_KEY))
-    .catch(() => {});
-}
-
 function retryLane(cred) {
   const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
   if (!bridge || typeof bridge.retry !== 'function') return Promise.resolve(null);
   return Promise.resolve().then(() => bridge.retry(cred)).catch(() => null);
 }
 
+// A later 2xx does not clear googleReconnect. Only Connect, which stores a
+// new token, removes the flag.
 function settleAuth(res) {
   if (!res) return Promise.resolve(res);
   if (res.status === 401 || res.status === 403) {
     const reason = res.status === 403 ? 'missing scope' : '401';
     return noteGoogleAuthFailure(reason).then(() => res);
   }
-  if (res.ok) return noteGoogleAuthOk().then(() => res);
   return Promise.resolve(res);
 }
 
@@ -279,6 +271,19 @@ function plainText(value) {
     .trim();
 }
 
+async function storedTimeZone() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return '';
+    const bag = await chrome.storage.local.get('glanceTimeZone');
+    const raw = bag && bag.glanceTimeZone;
+    if (typeof raw === 'string') return raw.trim().slice(0, 80);
+    if (raw && typeof raw.timeZone === 'string') return raw.timeZone.trim().slice(0, 80);
+    return '';
+  } catch (e) {
+    return '';
+  }
+}
+
 async function storedTaskListId() {
   try {
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return '';
@@ -309,9 +314,10 @@ async function prepareWrite(connectorId, input) {
     };
   }
   if (connectorId === 'googleHold') {
-    let zone = params.timeZone || i.timeZone || '';
+    let zone = String(params.timeZone || i.timeZone || '').trim();
+    if (!zone) zone = await storedTimeZone();
     if (!zone) {
-      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { zone = 'UTC'; }
+      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
     }
     return {
       dateIso: params.dateIso || i.dateIso,

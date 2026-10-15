@@ -41,11 +41,51 @@ const FlowGoogleCalendar = (() => {
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
-  function dateTime(dateIso, hour, minute, addMinutes) {
+  // The person's zone, never a silent UTC default. An explicit zone wins.
+  // Otherwise the host zone (Intl). An empty result means the hold stays quiet.
+  function zoneName(explicit) {
+    const given = String(explicit || '').trim().slice(0, 80);
+    if (given) return given;
+    try {
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (zone) return String(zone).trim().slice(0, 80);
+    } catch (e) { /* no host zone */ }
+    return '';
+  }
+
+  // Wall-clock fields of utcMs as they read in timeZone, encoded as UTC
+  // milliseconds. hourCycle h23 can report 24 at midnight.
+  function zoneWallUtc(timeZone, utcMs) {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    const bag = {};
+    fmt.formatToParts(new Date(utcMs)).forEach((part) => {
+      if (part.type !== 'literal') bag[part.type] = part.value;
+    });
+    let hour = Number(bag.hour);
+    if (hour === 24) hour = 0;
+    return Date.UTC(Number(bag.year), Number(bag.month) - 1, Number(bag.day), hour, Number(bag.minute), Number(bag.second));
+  }
+
+  // 14:00 in Asia/Jerusalem is 2026-10-22T11:00:00Z, whether this process
+  // runs in UTC or Jerusalem. The offset is applied twice so a DST boundary
+  // uses the offset of the resulting instant.
+  function instantIso(dateIso, hour, minute, addMinutes, timeZone) {
     const parts = dateIso.split('-').map(Number);
-    const dt = new Date(parts[0], parts[1] - 1, parts[2], hour, minute + (addMinutes || 0));
-    return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) +
-      'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) + ':00';
+    const wall = Date.UTC(parts[0], parts[1] - 1, parts[2], hour, minute + (addMinutes || 0), 0);
+    const offset = zoneWallUtc(timeZone, wall) - wall;
+    let utc = wall - offset;
+    const offset2 = zoneWallUtc(timeZone, utc) - utc;
+    if (offset2 !== offset) utc = wall - offset2;
+    return new Date(utc).toISOString().replace(/\.000Z$/, 'Z');
   }
 
   function fileLink(url) {
@@ -67,7 +107,17 @@ const FlowGoogleCalendar = (() => {
     if (wantsFile && (!link || !name)) return null;
     const title = String(i.title || i.quote || name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
-    const zone = String(i.timeZone || 'UTC').trim().slice(0, 80) || 'UTC';
+    const zone = zoneName(i.timeZone);
+    if (!zone) return null;
+    let startIso = '';
+    let endIso = '';
+    try {
+      startIso = instantIso(date, hour, minute, 0, zone);
+      endIso = instantIso(date, hour, minute, DURATION_MIN, zone);
+    } catch (e) {
+      return null;
+    }
+    if (!startIso || !endIso) return null;
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     const lines = [];
     if (quote && quote !== title) lines.push(quote);
@@ -80,8 +130,8 @@ const FlowGoogleCalendar = (() => {
     return {
       summary: name || title,
       description: lines.join('\n'),
-      start: { dateTime: dateTime(date, hour, minute, 0), timeZone: zone },
-      end: { dateTime: dateTime(date, hour, minute, DURATION_MIN), timeZone: zone },
+      start: { dateTime: startIso, timeZone: zone },
+      end: { dateTime: endIso, timeZone: zone },
       attendees: []
     };
   }

@@ -85,6 +85,30 @@ function glanceUiCopy(kind) {
   }
   let watching = false;
   let observer = null;
+  let laneDead = false;
+
+  function tearDownOrphan() {
+    laneDead = true;
+    watching = false;
+    if (observer) {
+      try { observer.disconnect(); } catch (e) { /* already disconnected */ }
+      observer = null;
+    }
+  }
+
+  // One read of chrome.runtime.id. When the extension context is gone that
+  // read throws, and it is the only chrome touch this copy may make.
+  function chromeLive() {
+    if (laneDead) return false;
+    try {
+      const id = chrome.runtime.id;
+      if (!id) throw new Error('Extension context invalidated');
+      return true;
+    } catch (e) {
+      tearDownOrphan();
+      return false;
+    }
+  }
   // Guards ensureGoogleAutoConnect() below against firing twice for two
   // messages classified in the same debounced scanReadingPane pass, before
   // either call's FlowStorage.set({ onboarded: true }) has landed.
@@ -99,6 +123,7 @@ function glanceUiCopy(kind) {
   let currentContext = null; // { message, messages, sender, subject, legacyId }
 
   async function init() {
+    if (!chromeLive()) return;
     state = await FlowStorage.get();
     // Watching starts regardless of onboarded state now — scanReadingPane()
     // still runs the real judgment pipeline on every message either way, and
@@ -473,11 +498,16 @@ function glanceUiCopy(kind) {
   }
 
   function observe() {
-    const onMutate = debounce(() => {
+    const run = debounce(() => {
+      if (!chromeLive()) return;
       maybeScanInbox()
         .catch((e) => console.error('[Glance] inbox scan failed', e))
         .then(() => scanReadingPane());
     }, 400);
+    const onMutate = () => {
+      if (!chromeLive()) return;
+      run();
+    };
     observer = new MutationObserver(onMutate);
     observer.observe(document.body, { childList: true, subtree: true });
     onMutate();
@@ -2211,6 +2241,10 @@ function glanceUiCopy(kind) {
         if (!params.fileUrl) params.fileUrl = file.url;
         if (!params.fileName) params.fileName = file.name || params.fileTerm || '';
       }
+      if (!params.timeZone) {
+        const zone = await glanceUserTimeZone();
+        if (zone) params.timeZone = zone;
+      }
       return Object.assign(base, { params: params });
     }
 
@@ -2363,14 +2397,42 @@ function glanceUiCopy(kind) {
     return '';
   }
 
+  async function glanceUserTimeZone() {
+    let stored = '';
+    if (chromeLive()) {
+      try {
+        const bag = await chrome.storage.local.get('glanceTimeZone');
+        const raw = bag && bag.glanceTimeZone;
+        if (typeof raw === 'string') stored = raw.trim();
+        else if (raw && typeof raw.timeZone === 'string') stored = raw.timeZone.trim();
+      } catch (e) { stored = ''; }
+    }
+    if (stored) return stored.slice(0, 80);
+    try {
+      return String(Intl.DateTimeFormat().resolvedOptions().timeZone || '').slice(0, 80);
+    } catch (e) {
+      return '';
+    }
+  }
+
   function sendRuntime(msg) {
     return new Promise((resolve) => {
+      if (!chromeLive()) {
+        resolve({ ok: false, reason: 'unavailable' });
+        return;
+      }
       try {
         chrome.runtime.sendMessage(msg, (res) => {
-          if (chrome.runtime && chrome.runtime.lastError && !res) resolve({ ok: false, reason: 'unavailable' });
-          else resolve(res);
+          try {
+            if (chrome.runtime && chrome.runtime.lastError && !res) resolve({ ok: false, reason: 'unavailable' });
+            else resolve(res);
+          } catch (e) {
+            tearDownOrphan();
+            resolve({ ok: false, reason: 'unavailable' });
+          }
         });
       } catch (e) {
+        tearDownOrphan();
         resolve({ ok: false, reason: 'unavailable' });
       }
     });
@@ -2453,7 +2515,8 @@ function glanceUiCopy(kind) {
 
   function rememberLaneUndo(messageId, steps) {
     if (!messageId || !steps || !steps.length) return Promise.resolve();
-    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!chromeLive()) return Promise.resolve();
+    const store = chrome.storage && chrome.storage.local;
     if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
     return Promise.resolve()
       .then(() => store.get(LANE_UNDO_KEY))
@@ -2471,7 +2534,8 @@ function glanceUiCopy(kind) {
 
   function readLaneUndo(messageId) {
     if (!messageId) return Promise.resolve(null);
-    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!chromeLive()) return Promise.resolve(null);
+    const store = chrome.storage && chrome.storage.local;
     if (!store || typeof store.get !== 'function') return Promise.resolve(null);
     return Promise.resolve()
       .then(() => store.get(LANE_UNDO_KEY))
@@ -2507,7 +2571,8 @@ function glanceUiCopy(kind) {
   }
 
   function noteLaneOutcome(results) {
-    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!chromeLive()) return;
+    const store = chrome.storage && chrome.storage.local;
     if (!store) return;
     const lane = (results || []).filter((r) => r && r.action && laneConnectorId(r.action.kind));
     if (!lane.length) return;
@@ -3736,7 +3801,8 @@ function glanceUiCopy(kind) {
     }
   }
 
-  chrome.storage.onChanged.addListener((changes) => {
+  if (chromeLive()) chrome.storage.onChanged.addListener((changes) => {
+    if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
     else if (changes.proLicense) applyProState();
   });
