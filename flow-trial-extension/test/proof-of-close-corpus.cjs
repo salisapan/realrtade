@@ -401,6 +401,17 @@ console.log('\n--- Microsoft To Do ---\n');
     snapCopy.ref.created.lastModifiedDateTime == null &&
     snapCopy.ref.taskId === 'todo_1' && snapCopy.ref.taskListId === 'LIST_T',
     snapCopy && snapCopy.ref);
+  const emptySnap = FlowProofOfClose.remountCopy(Object.assign({}, snapRow, {
+    ref: {
+      taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1',
+      created: { title: 'Renew the permit', body: null, dueDateTime: null, status: 'notStarted', importance: 'normal', isReminderOn: false }
+    }
+  }));
+  check('remount keeps an emptied body and a removed due date',
+    emptySnap && emptySnap.ref && emptySnap.ref.created &&
+    emptySnap.ref.created.body === null && emptySnap.ref.created.dueDateTime === null &&
+    emptySnap.ref.created.importance === 'normal' && emptySnap.ref.created.isReminderOn === false,
+    emptySnap && emptySnap.ref);
   const loggedSnap = FlowProofOfClose.receiptLogFields(todo, {
     writtenLine: 'To Do', status: 'Handled.', created: snapRow.ref.created
   });

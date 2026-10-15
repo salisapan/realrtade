@@ -889,7 +889,7 @@ const FlowOutlook = (() => {
       await rememberDraft(incomingId, draft.id);
       let created = null;
       try {
-        const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients');
+        const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories');
         if (globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf) created = FlowNativeEdit.snapshotOf(settled);
       } catch (e) { created = null; }
       return {
@@ -974,7 +974,7 @@ const FlowOutlook = (() => {
       const sess = await ensureSession({});
       if (!sess.ok) return { ok: false, error: sess.error };
       const token = holderFor(sess.token);
-      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,subject,body,toRecipients';
+      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,subject,body,toRecipients,ccRecipients,importance,categories';
       let msg;
       try { msg = await graphGet(token, getUrl); }
       catch (e) {
@@ -986,7 +986,11 @@ const FlowOutlook = (() => {
       }
       if (!msg) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
       if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
-      if (created && globalThis.FlowNativeEdit && FlowNativeEdit.userEdited(created, msg)) {
+      if (created && globalThis.FlowNativeEdit && FlowNativeEdit.compareContent) {
+        const verdict = FlowNativeEdit.compareContent(created, msg);
+        if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: FlowNativeEdit.userEditedLine() };
+        if (verdict === 'unconfirmed') return { ok: false, reason: 'unconfirmed', written: FlowNativeEdit.unconfirmedLine() };
+      } else if (created && globalThis.FlowNativeEdit && FlowNativeEdit.userEdited(created, msg)) {
         return { ok: false, reason: 'user-edited', written: FlowNativeEdit.userEditedLine() };
       }
       await graphWrite(token, 'DELETE', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId), null);

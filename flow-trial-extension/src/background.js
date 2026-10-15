@@ -3594,19 +3594,40 @@ function outlookUnconfirmedLine() {
   return (N && N.unconfirmedLine) ? N.unconfirmedLine() : "Couldn't confirm it's unchanged. Undo left it alone.";
 }
 
-function outlookHasSnap(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') return false;
-  const content = ['title', 'body', 'dueDateTime', 'status', 'subject', 'start', 'end', 'location', 'to', 'name'];
-  return content.some((key) => snapshot[key] != null && snapshot[key] !== '');
+function outlookContentKeys() {
+  const N = globalThis.FlowNativeEdit;
+  if (N && Array.isArray(N.CONTENT_KEYS) && N.CONTENT_KEYS.length) return N.CONTENT_KEYS;
+  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'importance', 'attendees', 'categories', 'isAllDay', 'isReminderOn', 'reminderMinutesBeforeStart', 'reminderDateTime'];
 }
 
+// An owned content key is a snapshot, including an explicit null. An empty
+// object and a changeKey-only object are not.
+function outlookHasSnap(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+  const keys = outlookContentKeys();
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(snapshot, keys[i])) return true;
+  }
+  return false;
+}
+
+// A later read replaces a field it actually returned, including null and false.
 function outlookMergeSnap(base, extra) {
   const out = Object.assign({}, base || {});
   const add = extra || {};
-  Object.keys(add).forEach((key) => {
-    if (add[key] != null && add[key] !== '') out[key] = add[key];
-  });
+  const keys = outlookContentKeys();
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (Object.prototype.hasOwnProperty.call(add, key)) out[key] = add[key];
+  }
   return out;
+}
+
+function outlookEditVerdict(snapshot, live) {
+  const N = globalThis.FlowNativeEdit;
+  if (N && N.compareContent) return N.compareContent(snapshot, live);
+  if (N && N.userEdited && N.userEdited(snapshot, live)) return 'edited';
+  return 'match';
 }
 
 function outlookUnconfirmed() {
@@ -3632,7 +3653,7 @@ async function outlookObjectSnap(url, prefer) {
 // the create. Posted words fill a content field that GET left empty.
 async function outlookStoredEventSnap(eventId, posted) {
   const settled = await outlookObjectSnap(
-    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,subject,body,start,end,location'
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,subject,body,start,end,location,importance,attendees,categories,isAllDay,isReminderOn,reminderMinutesBeforeStart'
   );
   if (outlookHasSnap(settled)) return outlookMergeSnap(posted, settled);
   return outlookHasSnap(posted) ? posted : null;
@@ -3655,10 +3676,11 @@ async function outlookRefuseIfEdited(url, snapshot, prefer) {
   let body = null;
   try { body = await got.json(); } catch (e) { body = null; }
   if (!body) return outlookUnconfirmed();
-  const N = globalThis.FlowNativeEdit;
-  if (N && N.userEdited(snapshot, body)) {
+  const verdict = outlookEditVerdict(snapshot, body);
+  if (verdict === 'edited') {
     return { ok: false, reason: 'user-edited', written: outlookUserEditedLine(), fetchedBack: true };
   }
+  if (verdict === 'unconfirmed') return outlookUnconfirmed();
   return null;
 }
 
@@ -3770,7 +3792,7 @@ async function outlookDraftWrite(p) {
     body: { contentType: 'Text', content: comment },
     toRecipients: draft.toRecipients
   });
-  const settled = await outlookObjectSnap(patchUrl + '?$select=id,subject,body,toRecipients', prefer);
+  const settled = await outlookObjectSnap(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
   const created = outlookHasSnap(outlookMergeSnap(posted, settled)) ? outlookMergeSnap(posted, settled) : null;
   return {
     ok: true,
@@ -4141,7 +4163,7 @@ async function outlookDraftUndo(ref, hint) {
   // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
   if (!outlookHasSnap(snapshot)) return outlookUnconfirmed();
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,subject,body,toRecipients';
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,subject,body,toRecipients,ccRecipients,importance,categories';
   outlookAssertNotSend(getUrl);
   let got;
   try { got = await outlookUndoConfirm(getUrl, prefer); }
@@ -4154,10 +4176,9 @@ async function outlookDraftUndo(ref, hint) {
   try { msg = await got.json(); } catch (e) { msg = null; }
   if (!msg) return outlookUnconfirmed();
   if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
-  const N = globalThis.FlowNativeEdit;
-  if (snapshot && N && N.userEdited(snapshot, msg)) {
-    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
-  }
+  const verdict = outlookEditVerdict(snapshot, msg);
+  if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  if (verdict === 'unconfirmed') return outlookUnconfirmed();
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id);
   outlookAssertNotSend(delUrl);
   const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });

@@ -71,6 +71,58 @@ console.log('\n--- a changed snapshot is an edit ---\n');
   check('a new title is an edit', N.userEdited(snap, Object.assign({}, same, { title: 'File it RENAMED' })) === true);
   check('a new body is an edit', N.userEdited(snap, Object.assign({}, same, { body: { contentType: 'html', content: '<p>I rewrote this</p>' } })) === true);
   check('the refusal is one line', N.userEditedLine() === 'You edited this. Undo left it alone.');
+  check('an empty body is stored as null', snap.body === 'Thanks' && N.snapshotOf({ title: 'File it', body: { content: '' } }).body === null);
+  check('a missing due date is stored as null',
+    Object.prototype.hasOwnProperty.call(N.snapshotOf({ title: 'File it' }), 'dueDateTime') &&
+    N.snapshotOf({ title: 'File it' }).dueDateTime === null);
+  const full = N.snapshotOf({
+    title: 'File it',
+    body: { content: 'Thanks' },
+    dueDateTime: { dateTime: '2026-10-20T00:00:00.0000000', timeZone: 'UTC' },
+    importance: 'normal',
+    isReminderOn: false
+  });
+  check('an emptied body is an edit', N.compareContent(full, {
+    title: 'File it', body: { content: '' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
+  }) === 'edited');
+  check('a removed due date is an edit', N.compareContent(full, {
+    title: 'File it', body: { content: 'Thanks' }, importance: 'normal', isReminderOn: false
+  }) === 'edited');
+  check('importance high is an edit', N.userEdited(full, {
+    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'high', isReminderOn: false
+  }) === true);
+  check('an explicit null body versus a new note is an edit', N.compareContent(Object.assign({}, full, { body: null }), {
+    title: 'File it', body: { content: 'call Dana first' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
+  }) === 'edited');
+  check('reminder off versus on is an edit', N.userEdited(full, {
+    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: true
+  }) === true);
+  check('reminder off still matches', N.compareContent(full, {
+    title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
+  }) === 'match');
+  const partial = { title: 'File it', body: 'Thanks' };
+  check('a field the snapshot never stored is not called an edit', N.userEdited(partial, Object.assign({}, same, { importance: 'high' })) === false);
+  check('a field the snapshot never stored is unconfirmed', N.compareContent(partial, Object.assign({}, same, { importance: 'high' })) === 'unconfirmed');
+  const meet = N.snapshotOf({
+    subject: 'Meet',
+    attendees: [{ emailAddress: { address: 'Noa@x.com' } }, { emailAddress: { address: 'dana@x.com' } }],
+    reminderMinutesBeforeStart: 0,
+    isReminderOn: true
+  });
+  check('attendees are a sorted set and zero minutes is a value',
+    meet.attendees === 'dana@x.com,noa@x.com' && meet.reminderMinutesBeforeStart === 0);
+  check('the same attendees in another order are not an edit', N.userEdited(meet, {
+    subject: 'Meet',
+    attendees: [{ emailAddress: { address: 'dana@x.com' } }, { emailAddress: { address: 'NOA@x.com' } }],
+    reminderMinutesBeforeStart: 0,
+    isReminderOn: true
+  }) === false);
+  check('a new attendee is an edit', N.userEdited(meet, {
+    subject: 'Meet',
+    attendees: [{ emailAddress: { address: 'dana@x.com' } }],
+    reminderMinutesBeforeStart: 0,
+    isReminderOn: true
+  }) === true);
 }
 
 function background(opts) {

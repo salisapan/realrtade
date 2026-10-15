@@ -72,45 +72,111 @@ const FlowNativeEdit = (() => {
     return '';
   }
 
-  function put(snap, key, value) {
-    if (value == null || value === '') return;
-    snap[key] = value;
+  function plain(value) {
+    if (value == null) return '';
+    return String(value).replace(/\s+/g, ' ').trim();
   }
 
-  // Content the person can change. Server fields (lastModifiedDateTime,
-  // @odata.etag, changeKey, cTag) are not content and are not stored.
+  function importanceOf(value) {
+    return plain(value).toLowerCase();
+  }
+
+  // A category name can contain a comma. The stored set is sorted and joined
+  // with a separator that is not part of a name.
+  function categoriesOf(value) {
+    const list = [];
+    const push = (item) => {
+      const s = plain(item);
+      if (s && list.indexOf(s) < 0) list.push(s);
+    };
+    if (Array.isArray(value)) value.forEach(push);
+    else if (typeof value === 'string' && value) value.split('\u001f').forEach(push);
+    list.sort();
+    return list.join('\u001f');
+  }
+
+  // false and 0 are values. Missing and blank are empty, stored as null.
+  function boolOf(value) {
+    if (value === true || value === false) return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return null;
+  }
+
+  function minutesOf(value) {
+    if (value == null || value === '') return null;
+    if (typeof value === 'boolean') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function emptyToNull(value) {
+    if (value == null || value === '') return null;
+    return value;
+  }
+
+  // Every user-editable field. Server fields (lastModifiedDateTime,
+  // @odata.etag, changeKey, cTag, eTag) are not in this list.
+  const CONTENT_KEYS = [
+    'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
+    'location', 'to', 'cc', 'importance', 'attendees', 'categories', 'isAllDay',
+    'isReminderOn', 'reminderMinutesBeforeStart', 'reminderDateTime'
+  ];
+
+  function rawFor(key, o) {
+    if (key === 'to') return o.toRecipients || o.to;
+    if (key === 'cc') return o.ccRecipients || o.cc;
+    return o[key];
+  }
+
+  function fieldValue(key, raw) {
+    if (key === 'body') return emptyToNull(normText(raw));
+    if (key === 'dueDateTime' || key === 'start' || key === 'end' || key === 'reminderDateTime') return emptyToNull(clockOf(raw));
+    if (key === 'to' || key === 'cc' || key === 'attendees') return emptyToNull(addressesOf(raw));
+    if (key === 'location') return emptyToNull(locationOf(raw));
+    if (key === 'categories') return emptyToNull(categoriesOf(raw));
+    if (key === 'importance') return emptyToNull(importanceOf(raw));
+    if (key === 'isAllDay' || key === 'isReminderOn') return boolOf(raw);
+    if (key === 'reminderMinutesBeforeStart') return minutesOf(raw);
+    if (key === 'status') return emptyToNull(plain(raw));
+    return emptyToNull(plain(raw));
+  }
+
+  // Every content key is present. An empty field is null, not omitted,
+  // so clearing it later is a difference.
   function snapshotOf(obj) {
     const o = obj || {};
     const snap = {};
-    put(snap, 'title', o.title != null ? String(o.title).replace(/\s+/g, ' ').trim() : '');
-    put(snap, 'subject', o.subject != null ? String(o.subject).replace(/\s+/g, ' ').trim() : '');
-    put(snap, 'name', o.name != null ? String(o.name).replace(/\s+/g, ' ').trim() : '');
-    put(snap, 'body', normText(o.body));
-    put(snap, 'dueDateTime', clockOf(o.dueDateTime));
-    put(snap, 'status', o.status != null ? String(o.status).trim() : '');
-    put(snap, 'start', clockOf(o.start));
-    put(snap, 'end', clockOf(o.end));
-    put(snap, 'location', locationOf(o.location));
-    put(snap, 'to', addressesOf(o.toRecipients || o.to));
+    for (let i = 0; i < CONTENT_KEYS.length; i++) {
+      const key = CONTENT_KEYS[i];
+      snap[key] = fieldValue(key, rawFor(key, o));
+    }
     return snap;
   }
 
-  const CONTENT_KEYS = ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to'];
-
-  // A stored content field that the live object also has, and that no longer
-  // matches, is an edit. A field the live read omitted is not an edit.
-  // A new etag, changeKey, or lastModifiedDateTime is not an edit.
-  function userEdited(snapshot, live) {
-    if (!snapshot || !live) return false;
-    const kept = snapshotOf(snapshot);
+  // 'edited' when a stored field differs, including empty versus a value.
+  // 'unconfirmed' when the live object has a field the snapshot never stored.
+  // 'match' only when every stored field matches and nothing new is present.
+  // The snapshot's own keys are what it stored. Normalizing it as a fresh
+  // snapshot would invent nulls and hide a field it never recorded.
+  function compareContent(snapshot, live) {
+    if (!snapshot || !live || typeof snapshot !== 'object') return 'unconfirmed';
     const liveSnap = snapshotOf(live);
+    let unseen = false;
     for (let i = 0; i < CONTENT_KEYS.length; i++) {
       const key = CONTENT_KEYS[i];
-      if (kept[key] == null || kept[key] === '') continue;
-      if (liveSnap[key] == null || liveSnap[key] === '') continue;
-      if (String(liveSnap[key]) !== String(kept[key])) return true;
+      const liveVal = liveSnap[key];
+      if (!Object.prototype.hasOwnProperty.call(snapshot, key)) {
+        if (liveVal != null) unseen = true;
+        continue;
+      }
+      if (fieldValue(key, snapshot[key]) !== liveVal) return 'edited';
     }
-    return false;
+    return unseen ? 'unconfirmed' : 'match';
+  }
+
+  function userEdited(snapshot, live) {
+    return compareContent(snapshot, live) === 'edited';
   }
 
   // Write the compose box once. A later call, or the first input after the
@@ -141,7 +207,10 @@ const FlowNativeEdit = (() => {
     return { wrote: true };
   }
 
-  return { userEditedLine, unconfirmedLine, snapshotOf, userEdited, fillOnce, textOf, normText, clockOf };
+  return {
+    userEditedLine, unconfirmedLine, snapshotOf, userEdited, compareContent, CONTENT_KEYS,
+    fillOnce, textOf, normText, clockOf
+  };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.FlowNativeEdit = FlowNativeEdit;

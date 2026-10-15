@@ -477,7 +477,13 @@ const FlowProofOfClose = (() => {
 
   // Words the person can change. A boolean created flag (a new file versus
   // a replaced one) is not this snapshot. Server fields are not copied.
-  const SNAP_KEYS = ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to'];
+  // An owned key is kept when it is null: an emptied field is still a field.
+  // Keep this list aligned with FlowNativeEdit.CONTENT_KEYS.
+  const SNAP_KEYS = [
+    'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
+    'location', 'to', 'cc', 'importance', 'attendees', 'categories', 'isAllDay',
+    'isReminderOn', 'reminderMinutesBeforeStart', 'reminderDateTime'
+  ];
 
   function contentSnapshot(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -485,9 +491,9 @@ const FlowProofOfClose = (() => {
     let any = false;
     for (let i = 0; i < SNAP_KEYS.length; i++) {
       const key = SNAP_KEYS[i];
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
       const v = value[key];
-      if (v == null || v === '') continue;
-      snap[key] = v;
+      snap[key] = (v == null || v === '') ? null : v;
       any = true;
     }
     return any ? snap : null;
