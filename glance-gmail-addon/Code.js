@@ -26,19 +26,30 @@ function onHomepage(e) {
 
 function onGmailMessageOpen(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
+  var read = emptyRead_(e);
   try {
-    var opened = readOpen_(e);
-    if (!opened) return [render_(Glance.cards.quiet(lang))];
+    var calendarService = noteCalendar_();
+    var opened = readOpen_(e, read);
+    if (!opened) throw readFail_('open', read);
     var existing = readUndo_(opened.messageId);
     if (existing && existing.view) {
+      logOpen_(read, { speak: true, reason: 'proof', planId: existing.view.kind || 'task', calendarService: calendarService });
       return [render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true }))];
     }
     var decision = judgeOpen_(opened, e);
+    logOpen_(read, {
+      speak: decision.speak,
+      reason: decision.reason,
+      planId: decision.planId,
+      calendarService: calendarService
+    });
     if (!decision.speak) return [render_(Glance.cards.quiet(lang))];
     return [render_(Glance.cards.proposal(decision, opened.messageId, lang))];
   } catch (err) {
-    console.error(err && err.message ? err.message : err);
-    return [render_(Glance.cards.quiet(lang))];
+    errorLog_(err);
+    var snap = err && err.read ? err.read : read;
+    logOpen_(snap, { speak: false, reason: 'error', planId: null, calendarService: calendarReady_() });
+    return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'open'))];
   }
 }
 
@@ -59,8 +70,9 @@ function onDoIt(e) {
         listId: glanceTaskList_()
       }, 'prefetch', lang);
     }
-    var opened = readOpen_(e);
-    if (!opened) return update_(render_(Glance.cards.quiet(lang)));
+    var openedRead = emptyRead_(e);
+    var opened = readOpen_(e, openedRead);
+    if (!opened) throw readFail_('open', openedRead);
     var existing = readUndo_(opened.messageId);
     if (existing && existing.view) {
       return update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true })));
@@ -69,7 +81,8 @@ function onDoIt(e) {
     if (!decision.speak) return update_(render_(Glance.cards.quiet(lang)));
     return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
   } catch (err) {
-    console.error(err && err.message ? err.message : err);
+    errorLog_(err);
+    if (err && err.diag) return update_(render_(Glance.cards.readError(lang, err.diag)));
     return update_(render_(Glance.cards.unconfirmed(lang)));
   }
 }
@@ -106,6 +119,7 @@ function judgeOpen_(opened, e) {
 
 function engineHit_(text, opened, now) {
   if (typeof Glance.classify !== 'function' || typeof Glance.plan !== 'function') return null;
+  // A mail the person sent to themself is still judged. senderIsUser is not set.
   var intent = Glance.classify(text, {
     senderEmail: opened.fromEmail || null,
     senderName: opened.fromName || null,
@@ -229,24 +243,138 @@ function finishCreate_(proposal, messageId, lang) {
   })));
 }
 
-function readOpen_(e) {
-  if (!e || !e.gmail || !e.gmail.accessToken || !e.gmail.messageId) return null;
-  var messageId = String(e.gmail.messageId);
-  if (!/^[A-Za-z0-9]+$/.test(messageId)) return null;
-  GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
-  var message = GmailApp.getMessageById(messageId);
-  if (!message) return null;
-  var from = parseFrom_(message.getFrom());
+function readOpen_(e, read) {
+  read = read || emptyRead_(e);
+  if (!e || !e.gmail || !e.gmail.messageId) throw readFail_('no-event', read);
+  read.messageId = String(e.gmail.messageId);
+  if (!e.gmail.accessToken) throw readFail_('no-token', read);
+  if (!messageIdOk_(read.messageId)) throw readFail_('bad-id', read);
+  read.tokenCalled = true;
+  try {
+    GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
+  } catch (err) {
+    read.tokenOk = false;
+    throw readFail_('token', read, err);
+  }
+  read.tokenOk = true;
+  var message;
+  try {
+    message = GmailApp.getMessageById(read.messageId);
+  } catch (err) {
+    throw readFail_('message', read, err);
+  }
+  if (!message) throw readFail_('message', read);
+  var plain;
+  var subject;
+  var fromRaw;
+  var toRaw;
+  try {
+    plain = String(message.getPlainBody() || '');
+    read.plainBodyLength = plain.length;
+    subject = String(message.getSubject() || '');
+    read.subject = subject.slice(0, 300);
+    fromRaw = message.getFrom();
+    var parsed = parseFrom_(fromRaw);
+    read.from = parsed.email;
+    toRaw = typeof message.getTo === 'function' ? message.getTo() : '';
+    read.isSelf = isSelfMail_(parsed.email, toRaw);
+  } catch (err) {
+    throw readFail_('body', read, err);
+  }
+  var from = parseFrom_(fromRaw);
   var threadId = e.gmail.threadId ? String(e.gmail.threadId) : '';
   return {
-    messageId: messageId,
+    messageId: read.messageId,
     threadId: threadId,
-    threadUrl: /^[A-Za-z0-9]+$/.test(threadId) ? 'https://mail.google.com/mail/u/0/#all/' + threadId : '',
-    body: String(message.getPlainBody() || '').slice(0, 20000),
-    subject: String(message.getSubject() || '').slice(0, 300),
+    threadUrl: messageIdOk_(threadId) ? 'https://mail.google.com/mail/u/0/#all/' + encodeURIComponent(threadId) : '',
+    body: plain.slice(0, 20000),
+    plainBodyLength: plain.length,
+    subject: read.subject,
     fromName: from.name,
-    fromEmail: from.email
+    fromEmail: from.email,
+    isSelf: read.isSelf
   };
+}
+
+function messageIdOk_(id) {
+  return /^[A-Za-z0-9:_-]{1,200}$/.test(String(id || ''));
+}
+
+function emptyRead_(e) {
+  var gmail = e && e.gmail;
+  return {
+    messageId: gmail && gmail.messageId ? String(gmail.messageId) : '',
+    tokenCalled: false,
+    tokenOk: false,
+    subject: '',
+    plainBodyLength: null,
+    from: '',
+    isSelf: false
+  };
+}
+
+function readFail_(diag, read, cause) {
+  var err = new Error(cause && cause.message ? String(cause.message) : String(diag));
+  err.name = cause && cause.name ? String(cause.name) : 'Error';
+  err.diag = diag;
+  err.read = read;
+  if (cause && cause.stack) err.stack = cause.stack;
+  return err;
+}
+
+function errorLog_(err) {
+  console.error(
+    (err && err.name ? err.name : 'Error') + '\n' +
+    (err && err.message ? err.message : String(err)) + '\n' +
+    (err && err.stack ? err.stack : '')
+  );
+}
+
+function logOpen_(read, decision) {
+  var snap = read || {};
+  var choice = decision || {};
+  console.log(JSON.stringify({
+    messageId: snap.messageId || '',
+    tokenCalled: snap.tokenCalled === true,
+    tokenOk: snap.tokenOk === true,
+    subject: snap.subject == null ? '' : String(snap.subject).slice(0, 300),
+    plainBodyLength: typeof snap.plainBodyLength === 'number' ? snap.plainBodyLength : null,
+    from: snap.from || '',
+    isSelf: snap.isSelf === true,
+    speak: choice.speak === true,
+    reason: choice.reason || null,
+    planId: choice.planId || null,
+    calendarService: choice.calendarService === true
+  }));
+}
+
+function calendarReady_() {
+  return typeof Calendar !== 'undefined' && !!Calendar && !!Calendar.Events && typeof Calendar.Events.insert === 'function';
+}
+
+function noteCalendar_() {
+  if (calendarReady_()) return true;
+  console.error('Calendar advanced service is missing. Push appsscript.json with the Calendar advanced service (userSymbol Calendar, serviceId calendar, version v3) and update the test deployment so calendar.events is granted.');
+  return false;
+}
+
+function emailsIn_(raw) {
+  var found = String(raw || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  var out = [];
+  for (var i = 0; i < found.length; i++) {
+    var email = found[i].toLowerCase();
+    if (out.indexOf(email) === -1) out.push(email);
+  }
+  return out;
+}
+
+function isSelfMail_(fromEmail, toRaw) {
+  var from = String(fromEmail || '').trim().toLowerCase();
+  if (!from || from.indexOf('@') === -1) return false;
+  var tos = emailsIn_(toRaw);
+  if (!tos.length) return false;
+  for (var i = 0; i < tos.length; i++) if (tos[i] !== from) return false;
+  return true;
 }
 
 function parseFrom_(raw) {
@@ -345,9 +473,13 @@ function undoId_(e) {
   var params = e && e.parameters;
   var id = params && params.messageId ? String(params.messageId) : '';
   if (id === 'prefetch') return 'prefetch';
-  if (/^[A-Za-z0-9]+$/.test(id)) return id;
+  if (messageIdOk_(id)) return id;
   var fromEvent = e && e.gmail && e.gmail.messageId ? String(e.gmail.messageId) : '';
-  return /^[A-Za-z0-9]+$/.test(fromEvent) ? fromEvent : '';
+  return messageIdOk_(fromEvent) ? fromEvent : '';
+}
+
+function undoKey_(messageId) {
+  return UNDO_PREFIX + String(messageId || '').replace(/[^A-Za-z0-9_-]/g, '_');
 }
 
 function props_() {
@@ -355,14 +487,14 @@ function props_() {
 }
 
 function readUndo_(messageId) {
-  var raw = props_().getProperty(UNDO_PREFIX + messageId);
+  var raw = props_().getProperty(undoKey_(messageId));
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (err) { return null; }
 }
 
 function saveUndo_(messageId, record) {
   try {
-    props_().setProperty(UNDO_PREFIX + messageId, JSON.stringify(record));
+    props_().setProperty(undoKey_(messageId), JSON.stringify(record));
     return true;
   } catch (err) {
     return false;
@@ -370,7 +502,7 @@ function saveUndo_(messageId, record) {
 }
 
 function clearUndo_(messageId) {
-  props_().deleteProperty(UNDO_PREFIX + messageId);
+  props_().deleteProperty(undoKey_(messageId));
 }
 
 function readPrefetch_() {

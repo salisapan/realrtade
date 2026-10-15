@@ -72,6 +72,10 @@ console.log('\n--- intent ---');
   check('Friday from 2026-10-15 is 2026-10-16', remembered.due === '2026-10-16', remembered.due);
 }
 {
+  const marked = judge('\u202B\u200FPlease remember to call the client.\u202C');
+  check('bidi marks still remember', marked.speak === true && marked.source === 'local' && marked.title === 'call the client', marked);
+}
+{
   const forgot = judge("Don't forget to file the taxes by 2026-11-01.");
   check("don't forget is a task", forgot.speak === true && forgot.source === 'local' && forgot.title === 'file the taxes', forgot);
   check("don't forget keeps the iso due", forgot.due === '2026-11-01', forgot.due);
@@ -435,7 +439,7 @@ console.log('\n--- host boundaries ---');
 
 console.log('\n--- message path parity ---');
 {
-  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0 };
+  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0 };
   function reset() {
     state.props = {};
     state.messages = {};
@@ -444,6 +448,8 @@ console.log('\n--- message path parity ---');
     state.eventSeq = 1;
     state.taskSeq = 1;
     state.fetches = 0;
+    state.tokenCalls = 0;
+    state.tokenThrow = false;
   }
   function widget(kind) {
     const node = { type: kind, text: '', action: '', params: {}, style: '' };
@@ -456,7 +462,11 @@ console.log('\n--- message path parity ---');
     console: console,
     module: undefined,
     GmailApp: {
-      setCurrentMessageAccessToken: function () {},
+      setCurrentMessageAccessToken: function (token) {
+        state.tokenCalls += 1;
+        state.lastToken = token;
+        if (state.tokenThrow) throw new Error('token refused');
+      },
       getMessageById: function (id) { return state.messages[id] || null; }
     },
     PropertiesService: {
@@ -577,9 +587,18 @@ console.log('\n--- message path parity ---');
     return {
       calls: calls,
       getSubject: function () { calls.push('getSubject'); return fields.subject; },
-      getPlainBody: function () { calls.push('getPlainBody'); return fields.plain; },
+      getPlainBody: function () {
+        calls.push('getPlainBody');
+        if (fields.plainThrows) {
+          const err = new Error('plain body failed');
+          err.name = 'PlainBodyError';
+          throw err;
+        }
+        return fields.plain;
+      },
       getBody: function () { calls.push('getBody'); return fields.html; },
       getFrom: function () { calls.push('getFrom'); return fields.from; },
+      getTo: function () { calls.push('getTo'); return fields.to == null ? '' : fields.to; },
       getDate: function () { calls.push('getDate'); return fields.date; }
     };
   }
@@ -600,10 +619,17 @@ console.log('\n--- message path parity ---');
     if (kinds.length === 1 && kinds[0] === 'googleTask') return plan;
     return null;
   }
+  function parsedFrom(raw) {
+    const text = String(raw || '');
+    const match = text.match(/^(.*)<([^>]+)>\s*$/);
+    if (!match) return { name: '', email: text.trim() };
+    return { name: match[1].replace(/"/g, '').trim(), email: match[2].trim() };
+  }
   function judgedPlan(fields) {
-    const fromEmail = 'dana@meridian.com';
-    const fromName = 'Dana Levi';
-    const threadUrl = 'https://mail.google.com/mail/u/0/#all/' + fields.threadId;
+    const from = parsedFrom(fields.from);
+    const fromEmail = from.email || null;
+    const fromName = from.name || null;
+    const threadUrl = 'https://mail.google.com/mail/u/0/#all/' + encodeURIComponent(fields.threadId);
     const bodyPlan = extensionOffer(String(fields.plain || ''), fromEmail, fromName, threadUrl);
     if (bodyPlan) return bodyPlan;
     return extensionOffer(String(fields.subject || ''), fromEmail, fromName, threadUrl);
@@ -649,7 +675,8 @@ console.log('\n--- message path parity ---');
       commonEventObject: { userLocale: fields.locale || 'en', timeZone: 'Etc/UTC' }
     };
     const cards = openMessage(event);
-    check(fields.id + ' reads the plain body, not the html', message.calls.indexOf('getPlainBody') !== -1 && message.calls.indexOf('getSubject') !== -1 && message.calls.indexOf('getFrom') !== -1 && message.calls.indexOf('getBody') === -1, message.calls);
+    check(fields.id + ' reads the plain body, not the html', message.calls.indexOf('getPlainBody') !== -1 && message.calls.indexOf('getSubject') !== -1 && message.calls.indexOf('getFrom') !== -1 && message.calls.indexOf('getTo') !== -1 && message.calls.indexOf('getBody') === -1, message.calls);
+    check(fields.id + ' sets the message access token', state.tokenCalls === 1 && state.lastToken === 'token', state.tokenCalls);
     check(fields.id + ' does not call prefetch', state.fetches === 0);
     assertOffer(fields.id, cards[0], judgedPlan(fields), fields.locale === 'he' || fields.locale === 'he-IL' ? 'he' : 'en');
     return { event: event, plan: judgedPlan(fields) };
@@ -781,6 +808,166 @@ console.log('\n--- message path parity ---');
     parameters: { messageId: 'hold1', source: 'message' }
   }).card;
   check('undo with no snapshot does not delete the event', state.events[holdIds[0]] && plain(linesOf(noSnap)[0]) === "Couldn't confirm", linesOf(noSnap));
+
+  function withConsole(fn) {
+    const logs = [];
+    const errors = [];
+    const log = console.log;
+    const error = console.error;
+    console.log = function () {
+      logs.push(Array.prototype.map.call(arguments, String).join(' '));
+    };
+    console.error = function () {
+      errors.push(Array.prototype.map.call(arguments, String).join(' '));
+    };
+    try {
+      return { value: fn(), logs: logs, errors: errors };
+    } finally {
+      console.log = log;
+      console.error = error;
+    }
+  }
+  function openEvent(fields) {
+    return {
+      gmail: { messageId: fields.id, accessToken: fields.token == null ? 'token' : fields.token, threadId: fields.threadId },
+      commonEventObject: { userLocale: fields.locale || 'en', timeZone: 'Etc/UTC' }
+    };
+  }
+  function loggedOpen(fields) {
+    reset();
+    if (fields.message) state.messages[fields.id] = fields.message;
+    else state.messages[fields.id] = gmailMessage(fields);
+    return withConsole(function () { return openMessage(openEvent(fields)); });
+  }
+  function logRecord(captured) {
+    const parsed = [];
+    captured.logs.forEach(function (line) {
+      try { parsed.push(JSON.parse(line)); } catch (err) { /* check() lines are not JSON */ }
+    });
+    return parsed.filter(function (row) { return row && Object.prototype.hasOwnProperty.call(row, 'messageId'); })[0] || null;
+  }
+
+  const selfTask = openOf({
+    id: 'self1',
+    threadId: 'threadself',
+    subject: 'Contract',
+    plain: 'Approved — go ahead on the contract.',
+    html: quietHtml,
+    from: 'Glance <owner@ai.local.flow>',
+    to: 'owner@ai.local.flow',
+    date: new Date('2026-10-15T11:00:00Z')
+  });
+  check('a self-sent mail is still offered', selfTask.plan && selfTask.plan.steps && selfTask.plan.steps[0].kind === 'googleTask', selfTask.plan);
+
+  const quotedPlain = '\u202B\u200Fפגישה ביום חמישי 22/10\u202C\n\nOn Thu, Oct 1, 2026 at 9:00 AM Dana Levi <dana@meridian.com> wrote:\nplease send the signed contract';
+  const quoted = openOf({
+    id: 'rtl1',
+    threadId: 'threadrtl',
+    subject: 'פגישה',
+    plain: quotedPlain,
+    html: '<div>quoted html that must not be read</div>',
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow',
+    date: new Date('2026-10-15T08:00:00Z')
+  });
+  check('rtl marks and a quoted reply still schedule', quoted.plan && quoted.plan.id === 'schedule', quoted.plan && quoted.plan.id);
+
+  const realId = 'msg-f:1762895788594548046';
+  const realThread = 'thread-f:1762895788594548046';
+  const realPlain = 'פגישה ביום חמישי 22/10';
+  const real = {
+    id: realId,
+    threadId: realThread,
+    subject: realPlain,
+    plain: realPlain,
+    html: '<div>homepage stays unrelated</div>',
+    from: 'Glance <owner@ai.local.flow>',
+    to: 'owner@ai.local.flow',
+    date: new Date('2026-10-15T08:00:00Z')
+  };
+  const realOpened = openOf(real);
+  check('the real message id is a schedule', realOpened.plan && realOpened.plan.id === 'schedule', realOpened.plan && realOpened.plan.id);
+  const realLog = withConsole(function () {
+    return openMessage(openEvent(real));
+  });
+  const realRow = logRecord(realLog);
+  check('the open log names the token, the sender, and the schedule',
+    !!realRow && realRow.messageId === realId && realRow.tokenCalled === true && realRow.tokenOk === true &&
+    realRow.subject === realPlain && realRow.plainBodyLength === realPlain.length &&
+    realRow.from === 'owner@ai.local.flow' && realRow.isSelf === true &&
+    realRow.speak === true && realRow.reason === 'schedule' && realRow.planId === 'schedule' &&
+    realRow.calendarService === true && !Object.prototype.hasOwnProperty.call(realRow, 'body'),
+    realRow);
+  const realClick = doIt({
+    gmail: { messageId: realId, accessToken: 'token', threadId: realThread },
+    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
+    parameters: { messageId: realId, source: 'message' }
+  }).card;
+  check('a msg-f id stores undo without a colon in the key',
+    Object.prototype.hasOwnProperty.call(state.props, 'glanceUndo_msg-f_1762895788594548046') &&
+    !Object.prototype.hasOwnProperty.call(state.props, 'glanceUndo_' + realId) &&
+    buttonsOf(realClick)[0].params.messageId === realId,
+    Object.keys(state.props));
+
+  const thrown = loggedOpen({
+    id: 'errbody',
+    threadId: 'threaderr',
+    subject: 'Secret subject',
+    plain: 'please remember to send the contract',
+    plainThrows: true,
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow'
+  });
+  const thrownLines = linesOf(thrown.value[0]).map(plain).join('\n');
+  check('a plain-body error is the read card, not quiet',
+    thrownLines.indexOf("Couldn't read this message.") !== -1 &&
+    thrownLines.indexOf('diag: body') !== -1 &&
+    thrownLines.indexOf('Nothing to close.') === -1,
+    thrownLines);
+  check('a plain-body error logs name, message, and stack',
+    thrown.errors.some(function (line) {
+      return line.indexOf('PlainBodyError') !== -1 && line.indexOf('plain body failed') !== -1 && line.indexOf('PlainBodyError') < line.indexOf('\n');
+    }),
+    thrown.errors);
+
+  const badId = loggedOpen({
+    id: 'not valid',
+    threadId: 'threadbad',
+    subject: 'Nope',
+    plain: 'Please remember to call the client.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow',
+    message: null
+  });
+  const badLines = linesOf(badId.value[0]).map(plain).join('\n');
+  check('a message id with a space is diag bad-id and does not set the token',
+    badLines.indexOf('diag: bad-id') !== -1 &&
+    badLines.indexOf('Nothing to close.') === -1 &&
+    state.tokenCalls === 0,
+    { lines: badLines, tokenCalls: state.tokenCalls });
+
+  const savedCalendar = sandbox.Calendar;
+  delete sandbox.Calendar;
+  const missingCalendar = loggedOpen({
+    id: 'nocal',
+    threadId: 'threadnocal',
+    subject: 'Thursday',
+    plain: 'Could we meet Thursday at 3pm?',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow'
+  });
+  sandbox.Calendar = savedCalendar;
+  const missingLines = linesOf(missingCalendar.value[0]).map(plain).join('\n');
+  const missingRow = logRecord(missingCalendar);
+  check('a missing Calendar service is logged and the card still offers',
+    missingCalendar.errors.some(function (line) { return line.indexOf('Calendar advanced service is missing') !== -1; }) &&
+    missingLines.indexOf('Calendar hold') !== -1 &&
+    missingLines.indexOf('Nothing to close.') === -1 &&
+    missingRow && missingRow.calendarService === false,
+    { errors: missingCalendar.errors, lines: missingLines, row: missingRow });
 }
 
 if (failures) {

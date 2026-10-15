@@ -118,6 +118,15 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'couldntConfirm'))]);
   }
 
+  function readError(lang, diag) {
+    var L = i18n();
+    var code = String(diag || 'open').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || 'open';
+    return card(lang, [
+      text(lang, L.t(lang, 'couldntRead')),
+      text(lang, L.t(lang, 'diag') + ': ' + L.isolateLtr(code))
+    ]);
+  }
+
   function edited(lang, which) {
     var key = which === 'event' ? 'editedEvent' : 'edited';
     return card(lang, [text(lang, i18n().t(lang, key))]);
@@ -151,6 +160,7 @@ var GlanceCards = (function () {
     proposal: proposal,
     proof: proof,
     unconfirmed: unconfirmed,
+    readError: readError,
     edited: edited,
     undone: undone,
     quiet: quiet,

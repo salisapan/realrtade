@@ -74,6 +74,18 @@ npx clasp create --type standalone --title "Glance" --rootDir .
 7. In the Apps Script editor: **Deploy → Test deployments**. Install from that dialog. Do not use **Deploy → New deployment** for the Marketplace, and do not open the Workspace Marketplace SDK.
 8. Share the Apps Script project with each test account (editor is enough), and have each account open the test-deployment install link while logged into that account.
 
+### Update an existing test deployment
+
+A test deployment keeps the manifest it was installed with. `npx clasp push` updates the script project. An already installed card does not ask for a new scope until that deployment is updated and the account installs it again.
+
+1. `appsscript.json` lists the Calendar advanced service under `dependencies.enabledAdvancedServices`: `userSymbol` `Calendar`, `serviceId` `calendar`, `version` `v3`. `oauthScopes` includes `https://www.googleapis.com/auth/calendar.events`. It does not include `https://www.googleapis.com/auth/calendar`.
+2. `node scripts/build-bundle.js`, then `npx clasp push`.
+3. In the Apps Script editor, open **Project Settings** and confirm the Calendar advanced service is on (identifier `Calendar`, version `v3`). If the editor added the full calendar scope, delete `https://www.googleapis.com/auth/calendar` from `appsscript.json` and keep `calendar.events`, then push again.
+4. **Deploy → Test deployments**. Update that test deployment, or delete it and create the test deployment again. Copy the new install link. An old link keeps the old manifest, so Gmail does not show a consent screen for `calendar.events`.
+5. Each test account opens that link and accepts the consent screen. If no consent screen appears, that account is still on the previous deployment.
+6. Open a message. **Executions** for `onGmailMessageOpen` shows one log line with `messageId`, `tokenCalled`, `tokenOk`, `subject`, `plainBodyLength`, `from`, `isSelf`, `speak`, `reason`, `planId`, and `calendarService`. `calendarService` false means the Calendar advanced service was missing in the project that ran; the card still offers, and Do it cannot create the event until the service is on. The log includes the subject and the plain-body length. It does not include the body.
+7. A card that says **Couldn't read this message.** includes a short `diag` code: `no-event`, `no-token`, `bad-id`, `token`, `message`, `body`, `judge`, or `open`. **Nothing to close.** means the message was read and there was nothing to close. A mail you sent to yourself is still offered when there is something to close. A Gmail message id looks like `msg-f:` followed by digits.
+
 The unverified-app screen says Google has not verified the app. The test user chooses **Advanced**, then **Go to Glance (unsafe)**. That is expected while the consent screen stays in Testing. Do not click through it on an account that is not one of the 100 test users: Google will block it.
 
 ### Gmail on the web

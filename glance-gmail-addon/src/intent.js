@@ -153,7 +153,7 @@ var GlanceIntent = (function () {
     var pulled = pullDue(match[1], now, timeZone);
     var title = sanitizeTitle(pulled.text);
     if (!title || title.length < 2) return null;
-    return { speak: true, source: 'local', kind: 'task', title: title, due: pulled.due, lang: lang };
+    return { speak: true, source: 'local', kind: 'task', title: title, due: pulled.due, lang: lang, reason: 'local', planId: null };
   }
 
   function isoOrNull(value, now, timeZone) {
@@ -196,7 +196,9 @@ var GlanceIntent = (function () {
         kind: 'task',
         title: title,
         due: isoOrNull(taskParams.dateIso, now, timeZone),
-        lang: null
+        lang: null,
+        reason: 'task',
+        planId: result.plan.id || 'task'
       };
     }
     if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
@@ -215,7 +217,9 @@ var GlanceIntent = (function () {
         hour: holdClock.hour,
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
-        lang: null
+        lang: null,
+        reason: 'hold',
+        planId: 'hold'
       };
     }
     if (steps.length === 2 && result.plan.id === 'schedule') {
@@ -246,7 +250,9 @@ var GlanceIntent = (function () {
         quote: sanitizeTitle(calendarParams.quote || ''),
         taskTitle: taskTitle,
         taskDue: isoOrNull(reminderParams.dateIso, now, timeZone),
-        lang: null
+        lang: null,
+        reason: 'schedule',
+        planId: 'schedule'
       };
     }
     return null;
@@ -271,29 +277,67 @@ var GlanceIntent = (function () {
       kind: 'task',
       title: title,
       due: isoOrNull(result.dateIso, now, timeZone),
-      lang: null
+      lang: null,
+      reason: 'classifier',
+      planId: null
     };
   }
 
-  function silence() {
-    return { speak: false, source: null, title: null, due: null, lang: null };
+  // Same invisible-format strip the extension applies before it judges,
+  // then the same quote cut (FlowJudgment.newContent) so a flattened
+  // getPlainBody does not judge the quoted history.
+  function prepareText(text) {
+    var raw = String(text == null ? '' : text)
+      .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/[\u00A0\u202F]/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    if (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.newContent === 'function') {
+      return FlowJudgment.newContent(raw);
+    }
+    return raw;
+  }
+
+  function silence(reason, planId) {
+    return {
+      speak: false,
+      source: null,
+      kind: null,
+      title: null,
+      due: null,
+      lang: null,
+      reason: reason || 'quiet',
+      planId: planId || null
+    };
   }
 
   function resolveTask(text, ctx) {
     ctx = ctx || {};
-    var local = localRemember(text, ctx.now, ctx.timeZone);
+    var prepared;
+    try { prepared = prepareText(text); } catch (err) {
+      err.diag = err.diag || 'judge';
+      throw err;
+    }
+    var local = localRemember(prepared, ctx.now, ctx.timeZone);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
-      try { hit = ctx.engine(text, ctx); } catch (err) { hit = null; }
+      try { hit = ctx.engine(prepared, ctx); } catch (err) {
+        err.diag = err.diag || 'judge';
+        throw err;
+      }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
       if (mapped) return mapped;
+      if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
+      if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
+      return silence('no-plan', null);
     }
     if (ctx.classifierResult) {
       var fromApi = mapClassifierResult(ctx.classifierResult, ctx.now, ctx.timeZone);
       if (fromApi) return fromApi;
     }
-    return silence();
+    return silence('quiet', null);
   }
 
   return {
@@ -302,6 +346,7 @@ var GlanceIntent = (function () {
     mapEngine: mapEngine,
     mapClassifierResult: mapClassifierResult,
     sanitizeTitle: sanitizeTitle,
+    prepareText: prepareText,
     silence: silence
   };
 })();
