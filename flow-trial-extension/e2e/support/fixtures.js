@@ -8,8 +8,25 @@ function esc(value) {
     .replace(/"/g, '&quot;');
 }
 
+function inboxRowsHtml(rows) {
+  if (!Array.isArray(rows) || !rows.length) return '';
+  return '<table><tbody>' + rows.map((r) => {
+    const threadId = r.threadId || 't-row';
+    const email = r.email || 'dana@acme.com';
+    const name = r.name || 'Dana';
+    return '<tr class="zA" data-legacy-thread-id="' + esc(threadId) + '" data-thread-id="' + esc(threadId) + '">' +
+      '<td><span class="yP" email="' + esc(email) + '">' + esc(name) + '</span></td>' +
+      '<td><span class="bog">' + esc(r.subject || '') + '</span><span class="y2"> - ' + esc(r.snippet || '') + '</span></td>' +
+      '</tr>';
+  }).join('') + '</tbody></table>';
+}
+
 function gmailHtml(opts) {
   const o = opts || {};
+  if (o.inboxOnly) {
+    return '<!doctype html><html><head><title>Inbox - me@x.com - Gmail</title></head><body>' +
+      '<div role="main">' + inboxRowsHtml(o.inboxRows) + '</div></body></html>';
+  }
   const senderEmail = o.senderEmail || 'dana@acme.com';
   const senderName = o.senderName || 'Dana';
   const subject = o.subject || 'Hello';

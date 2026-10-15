@@ -29,6 +29,12 @@
         <div id="connector-list" class="conn-list"></div>
       </div>
 
+      <div class="block" id="firstClose" hidden>
+        <p class="label">One close</p>
+        <p class="hint" id="firstCloseHint"></p>
+        <div id="firstCloseCard"></div>
+      </div>
+
       <button id="save" class="primary"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label">Save &amp; start</span></button>
       <p id="saved-note" class="saved-note" hidden>Saved. Open an email in Gmail — Glance will stay quiet until one matters.</p>
 
@@ -201,6 +207,7 @@
   <script src="../core/close-families.js"></script>
   <script src="../core/intent.js"></script>
   <script src="../core/still-open.js"></script>
+  <script src="../core/first-close.js"></script>
   <!-- Wires execution-memory.js and close-memory.js to chrome.storage.local.
        Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>
