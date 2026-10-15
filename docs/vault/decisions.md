@@ -1,11 +1,13 @@
 ---
 tags: [decisions]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 # Decisions log (newest first)
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-16 · The Do It card pops up on its own in native apps, not only on an icon tap. The Gmail add-on and the Outlook add-in start immediately, in parallel with the ecosystems work. Where a platform forbids an automatic surface, use a prefetched card, a push notification with Do It, or event-based activation. The auto-pop card and the native embeds cover every listed Meta, Google, and Microsoft app, on every device. · Sali · [[shared-rules]], [[product-locks]], `CLAUDE.md` "Product locks — read first"
+- 2026-10-16 · Shared-memory rules compiled for every agent: Glance locks, Flow/sales, and bot operations. Short form in `CLAUDE.md` and `AGENTS.md` ("Product locks — read first"). Full dated text: [[shared-rules]]. Glance summary: [[product-locks]] · Sali (shared memory) · `CLAUDE.md`, [[shared-rules]], [[product-locks]]
 - 2026-10-15 · Workspace card normalizes `commonEventObject.timeZone` before a Calendar insert. With `useLocaleFromApp` that value is `{id, offset}`; the insert receives `id`, then `userTimezone.id`, then the default calendar, then the script zone, then `Asia/Jerusalem`. A 14:00 hold in `Asia/Jerusalem` is 11:00Z. Test deployment only. Not verified on web, iOS, or Android. Never sends. · Claude · `glance-gmail-addon/README.md`, [[open-tasks]] row 70
 - 2026-10-15 · Workspace card writes a timed event as a local time in the user's zone, with `Asia/Jerusalem` only as the script fallback. An all-day event uses a date and an exclusive end. A task due is RFC3339 in that same zone. The read-back compares that instant in the zone. Test deployment only. Not verified on web, iOS, or Android. Never sends. · Claude · `glance-gmail-addon/README.md`, [[open-tasks]] row 70
 - 2026-10-15 · Workspace card lets `ScriptApp.requireScopes` propagate so Apps Script shows its own authorization prompt. Nothing is written until the scope is granted. A Hebrew meeting is titled from the mail. Card chrome still follows the Gmail locale. Test deployment only. Not verified on web, iOS, or Android. Never sends. · Claude · `glance-gmail-addon/README.md`, [[open-tasks]] row 70
