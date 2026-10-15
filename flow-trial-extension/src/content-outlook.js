@@ -1609,6 +1609,22 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
+      if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
+        if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
+        FlowChipHost.showDraftReceipt(host, {
+          status: r.written,
+          written: r.written,
+          url: r.url || null,
+          linkLabel: 'View',
+          onUndo: () => send({
+            type: 'flow:undo-action',
+            connectorId: 'outlookTask',
+            ref: r.ref,
+            created: (r.ref && r.ref.created) || null
+          })
+        });
+        return;
+      }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = todoWriteFailureLine(r);
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
@@ -1709,10 +1725,26 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
+      if (r && r.ref && (r.ref.fileId || r.ref.itemId) && r.written === "Created, couldn't verify") {
+        if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
+        FlowChipHost.showDraftReceipt(host, {
+          status: r.written,
+          written: r.written,
+          url: r.url || null,
+          linkLabel: 'View',
+          onUndo: () => send({
+            type: 'flow:undo-action',
+            connectorId: 'onedriveFile',
+            ref: r.ref,
+            created: (r.ref && r.ref.editSnap) || null
+          })
+        });
+        return;
+      }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = (r && r.reason === 'files-not-granted')
         ? 'Reconnect Outlook to allow OneDrive'
-        : ((r && (r.error || r.reason)) || 'Could not confirm the file');
+        : ((r && r.written === "Created, couldn't verify") ? r.written : ((r && (r.error || r.reason)) || 'Could not confirm the file'));
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
       return;
     }
@@ -2280,7 +2312,9 @@
       }
       return;
     }
-    const written = r.written || 'On your calendar.';
+    const verified = r.fetchedBack === true;
+    const status = verified ? 'Handled.' : "Created, couldn't verify";
+    const written = verified ? (r.written || 'On your calendar.') : status;
     const messageId = (ctx && ctx.messageId) || null;
     await FlowStorage.appendLog({
       kind: 'written',
@@ -2292,6 +2326,8 @@
       created: r.ref.created || null,
       where: r.where,
       url: r.url || null,
+      fetchedBack: verified,
+      receiptStatus: status,
       intent: ctx && ctx.intent,
       process: ctx && ctx.process,
       sender: ctx && ctx.sender,
@@ -2301,7 +2337,7 @@
       pathId: (ctx && ctx.pathId) || null,
       itemId: (ctx && ctx.itemId) || null
     });
-    if (messageId) {
+    if (verified && messageId) {
       await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: messageId });
       await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: messageId });
     }
@@ -2310,7 +2346,7 @@
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-hold';
     FlowChipHost.showDraftReceipt(host, {
-      status: 'Handled.',
+      status: status,
       written: written,
       url: r.url || null,
       linkLabel: 'Open event',
@@ -2358,9 +2394,10 @@
     host.setAttribute('data-glance-message', messageId || '');
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-hold';
+    const status = (row && row.receiptStatus) || (row && row.fetchedBack === false ? "Created, couldn't verify" : 'Handled.');
     FlowChipHost.showDraftReceipt(host, {
-      status: 'Handled.',
-      written: row.label || 'On your calendar, with the file.',
+      status: status,
+      written: row.label || status,
       url: row.url || null,
       linkLabel: 'Open event',
       onUndo: calendarUndoHandler(host, messageId, row.ref)
@@ -2564,8 +2601,10 @@
         FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.error || r.reason)) || 'Could not add the event');
         return;
       }
-      const written = r.written || 'On your calendar, with the file.';
-      wrote = { ref: r.ref, written: written, url: r.url || null };
+      const verified = r.fetchedBack === true;
+      const status = verified ? 'Handled.' : "Created, couldn't verify";
+      const written = verified ? (r.written || 'On your calendar, with the file.') : status;
+      wrote = { ref: r.ref, written: written, url: r.url || null, status: status };
       await FlowStorage.appendLog({
         kind: 'written',
         label: written,
@@ -2575,6 +2614,8 @@
         ref: r.ref,
         where: r.where,
         url: r.url || null,
+        fetchedBack: verified,
+        receiptStatus: status,
         intent: ctx.intent,
         process: ctx.process,
         sender: ctx.sender,
@@ -2585,12 +2626,12 @@
         itemId: ctx.itemId || null,
         calendarHoldKey: ctx.calendarHoldKey || calendarHoldKey(hold.params, hold.params && hold.params.fileTerm)
       });
-      if (ctx.messageId) {
+      if (verified && ctx.messageId) {
         await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
         await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
       }
       FlowChipHost.showDraftReceipt(host, {
-        status: 'Handled.',
+        status: status,
         written: written,
         url: r.url || null,
         linkLabel: 'Open event',
@@ -2601,7 +2642,7 @@
       if (wrote && host && host.isConnected) {
         try {
           FlowChipHost.showDraftReceipt(host, {
-            status: 'Handled.',
+            status: wrote.status || 'Handled.',
             written: wrote.written,
             url: wrote.url,
             linkLabel: 'Open event',

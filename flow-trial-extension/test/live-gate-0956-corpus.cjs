@@ -202,7 +202,8 @@ function listsRoute() {
   const remounted = Proof.remountCopy(Object.assign({}, storedRow, logged));
   check('remountCopy carries the snapshot Undo needs',
     remounted && remounted.ref && remounted.ref.created &&
-    remounted.ref.created.title === snap.title && remounted.ref.created.body === snap.body &&
+    remounted.ref.created.title === snap.title &&
+    remounted.ref.created.body && snap.body && remounted.ref.created.body.hash === snap.body.hash &&
     remounted.ref.created.dueDateTime === snap.dueDateTime &&
     remounted.ref.created.lastModifiedDateTime == null,
     remounted && remounted.ref);
@@ -320,7 +321,7 @@ function listsRoute() {
   const draftRow = JSON.parse(JSON.stringify({ ref: drafted && drafted.ref, created: drafted && drafted.created }));
   check('Do It stores a draft snapshot beside the id',
     drafted && drafted.ok === true && draftRow.ref === 'DRAFT-1' &&
-    draftRow.created && draftRow.created.body === 'Thanks, I will confirm.' &&
+    draftRow.created && draftRow.created.body && draftRow.created.body.prefix === 'Thanks, I will confirm.' &&
     draftRow.created.subject === 'RE: Q3 summary' &&
     draftRow.created.lastModifiedDateTime == null && draftRow.created.changeKey == null,
     drafted);
@@ -504,6 +505,7 @@ async function boot(opts) {
     if (msg.type === 'flow:execute-action' && msg.payload && msg.payload.connectorId === 'outlookCalendar') {
       return {
         ok: true,
+        fetchedBack: true,
         ref: { eventId: 'EV-BUDGET', created: { subject: 'Budget review', start: '2026-10-16T10:00:00', body: 'Budget review' } },
         written: 'Calendar · Budget review · 10:00',
         url: 'https://outlook.live.com/calendar/item/EV-BUDGET',

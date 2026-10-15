@@ -56,7 +56,8 @@ console.log('\n--- a changed snapshot is an edit ---\n');
   });
   check('a snapshot keeps content and drops server fields',
     snap.changeKey == null && snap.lastModifiedDateTime == null && snap.eTag == null &&
-    snap.title === 'File it' && snap.body === 'Thanks' && snap.dueDateTime === '2026-10-20T00:00:00' && snap.status === 'notStarted',
+    snap.title === 'File it' && snap.body && snap.body.prefix === 'Thanks' && snap.body.hash &&
+    snap.dueDateTime === '2026-10-20T00:00:00' && snap.status === 'notStarted',
     snap);
   const same = {
     '@odata.etag': 'W/"zzz"',
@@ -71,10 +72,10 @@ console.log('\n--- a changed snapshot is an edit ---\n');
   check('a new title is an edit', N.userEdited(snap, Object.assign({}, same, { title: 'File it RENAMED' })) === true);
   check('a new body is an edit', N.userEdited(snap, Object.assign({}, same, { body: { contentType: 'html', content: '<p>I rewrote this</p>' } })) === true);
   check('the refusal is one line', N.userEditedLine() === 'You edited this. Undo left it alone.');
-  check('an empty body is stored as null', snap.body === 'Thanks' && N.snapshotOf({ title: 'File it', body: { content: '' } }).body === null);
-  check('a missing due date is stored as null',
-    Object.prototype.hasOwnProperty.call(N.snapshotOf({ title: 'File it' }), 'dueDateTime') &&
-    N.snapshotOf({ title: 'File it' }).dueDateTime === null);
+  check('an empty body is stored as null', snap.body && snap.body.prefix === 'Thanks' && N.snapshotOf({ title: 'File it', body: { content: '' } }).body === null);
+  check('a field the read did not return is omitted',
+    !Object.prototype.hasOwnProperty.call(N.snapshotOf({ title: 'File it' }), 'dueDateTime') &&
+    !Object.prototype.hasOwnProperty.call(N.snapshotOf({ title: 'File it' }), 'importance'));
   const full = N.snapshotOf({
     title: 'File it',
     body: { content: 'Thanks' },
@@ -91,9 +92,24 @@ console.log('\n--- a changed snapshot is an edit ---\n');
   check('importance high is an edit', N.userEdited(full, {
     title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'high', isReminderOn: false
   }) === true);
-  check('an explicit null body versus a new note is an edit', N.compareContent(Object.assign({}, full, { body: null }), {
+  check('a stored null that is filled later is unconfirmed', N.compareContent(Object.assign({}, full, { body: null }), {
     title: 'File it', body: { content: 'call Dana first' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: false
-  }) === 'edited');
+  }) === 'unconfirmed');
+  check('a late reminder on an empty field is unconfirmed', N.compareContent({ title: 'File it', reminderDateTime: null, isReminderOn: null }, {
+    title: 'File it', reminderDateTime: { dateTime: '2026-10-20T09:00:00' }, isReminderOn: true
+  }) === 'unconfirmed');
+  {
+    const long = 'word '.repeat(4000);
+    const stored = N.snapshotOf({ body: { content: long } });
+    const again = N.snapshotOf({ body: { contentType: 'html', content: '<p>' + long + '</p>' } });
+    const changed = long + 'friday';
+    check('a body stores a hash and a prefix no longer than 8KB',
+      stored.body && stored.body.prefix.length === N.BODY_PREFIX && stored.body.prefix.length <= 8192 &&
+      stored.body.hash === again.body.hash &&
+      N.compareContent(stored, { body: { content: long } }) === 'match' &&
+      N.compareContent(stored, { body: { content: changed } }) === 'edited',
+      stored.body && { len: stored.body.prefix.length, same: stored.body.hash === again.body.hash });
+  }
   check('reminder off versus on is an edit', N.userEdited(full, {
     title: 'File it', body: { content: 'Thanks' }, dueDateTime: { dateTime: '2026-10-20T00:00:00' }, importance: 'normal', isReminderOn: true
   }) === true);

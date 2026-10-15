@@ -3611,18 +3611,6 @@ function outlookHasSnap(snapshot) {
   return false;
 }
 
-// A later read replaces a field it actually returned, including null and false.
-function outlookMergeSnap(base, extra) {
-  const out = Object.assign({}, base || {});
-  const add = extra || {};
-  const keys = outlookContentKeys();
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    if (Object.prototype.hasOwnProperty.call(add, key)) out[key] = add[key];
-  }
-  return out;
-}
-
 function outlookEditVerdict(snapshot, live) {
   const N = globalThis.FlowNativeEdit;
   if (N && N.compareContent) return N.compareContent(snapshot, live);
@@ -3648,15 +3636,27 @@ async function outlookObjectSnap(url, prefer) {
   return body ? outlookCreationSnap(body) : null;
 }
 
-// The 201 body is not the stored event. Graph rewrites the body and stamps
-// etag and lastModified on that response. The snapshot is the GET after
-// the create. Posted words fill a content field that GET left empty.
-async function outlookStoredEventSnap(eventId, posted) {
-  const settled = await outlookObjectSnap(
-    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,subject,body,start,end,location,importance,attendees,categories,isAllDay,isReminderOn,reminderMinutesBeforeStart'
+// The snapshot is a successful GET of the stored object, tried twice.
+// The POST body and the 201 body are not a snapshot. A miss is null,
+// and Undo then says it could not confirm the object is unchanged.
+async function outlookReadSnap(url, prefer) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const snap = await outlookObjectSnap(url, prefer);
+    if (outlookHasSnap(snap)) return snap;
+  }
+  return null;
+}
+
+function outlookUnverifiedLine() {
+  return "Created, couldn't verify";
+}
+
+const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,importance,attendees,categories,isAllDay,isReminderOn,reminderMinutesBeforeStart';
+
+async function outlookStoredEventSnap(eventId) {
+  return outlookReadSnap(
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT
   );
-  if (outlookHasSnap(settled)) return outlookMergeSnap(posted, settled);
-  return outlookHasSnap(posted) ? posted : null;
 }
 
 // Read the object Glance created. Undo deletes only after this GET succeeds
@@ -3787,13 +3787,7 @@ async function outlookDraftWrite(p) {
   const keys = Object.keys(saved.map);
   if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
   await outlookSaveDraftMap(saved.st, saved.map);
-  const posted = outlookCreationSnap({
-    subject: draft.subject,
-    body: { contentType: 'Text', content: comment },
-    toRecipients: draft.toRecipients
-  });
-  const settled = await outlookObjectSnap(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
-  const created = outlookHasSnap(outlookMergeSnap(posted, settled)) ? outlookMergeSnap(posted, settled) : null;
+  const created = await outlookReadSnap(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
   return {
     ok: true,
     ref: draft.id,
@@ -3884,17 +3878,21 @@ async function outlookMeetingWrite(p) {
   if (!event || typeof event.id !== 'string' || !event.id) {
     return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
   }
-  const posted = outlookCreationSnap(body);
-  const eventSnap = await outlookStoredEventSnap(event.id, posted);
+  const eventSnap = await outlookStoredEventSnap(event.id);
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
-  return {
-    ok: true,
+  const ref = { eventId: event.id, created: eventSnap };
+  const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
-    written: 'Calendar · ' + title + (when ? ' · ' + when : ''),
-    ref: { eventId: event.id, created: eventSnap },
     url: event.webLink || null
   };
+  if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
+  return Object.assign({
+    ok: true,
+    fetchedBack: true,
+    written: 'Calendar · ' + title + (when ? ' · ' + when : ''),
+    ref: ref
+  }, base);
 }
 
 async function outlookCalendarWrite(p) {
@@ -3941,15 +3939,31 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  const eventSnap = await outlookStoredEventSnap(event.id, outlookCreationSnap(body));
-  return {
-    ok: true,
+  const eventSnap = await outlookStoredEventSnap(event.id);
+  const ref = { eventId: event.id, created: eventSnap };
+  const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
-    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
-    ref: { eventId: event.id, created: eventSnap },
     url: event.webLink || null
   };
+  if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
+  return Object.assign({
+    ok: true,
+    fetchedBack: true,
+    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
+    ref: ref
+  }, base);
+}
+
+function outlookUnverifiedWrite(base, ref) {
+  return Object.assign({}, base, {
+    ok: true,
+    fetchedBack: false,
+    reason: 'unverified',
+    written: outlookUnverifiedLine(),
+    ref: ref,
+    proof: null
+  });
 }
 
 async function outlookCalendarUndo(ref, hint) {
@@ -4047,18 +4061,13 @@ async function outlookTaskWrite(p) {
   if (!task || typeof task.id !== 'string' || !task.id) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
-  const posted = outlookCreationSnap({
-    title: title,
-    body: body.body,
-    dueDateTime: body.dueDateTime,
-    status: (task && task.status) || 'notStarted'
-  });
-  let created = outlookMergeSnap(posted, outlookCreationSnap(task));
-  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: created };
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: null };
   const fetched = await outlookTaskFetchBack(taskListId, task.id);
-  if (fetched && fetched.task) ref.created = outlookMergeSnap(ref.created, outlookCreationSnap(fetched.task));
-  if (!fetched.ok) {
-    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  if (fetched && fetched.task) ref.created = outlookCreationSnap(fetched.task);
+  if (!fetched.ok || !outlookHasSnap(ref.created)) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
+      written: outlookUnverifiedLine()
+    });
   }
   const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
   if (link) base.url = link;
@@ -4075,7 +4084,7 @@ async function outlookTaskWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
-async function outlookTaskFetchBack(taskListId, taskId) {
+async function outlookTaskFetchOnce(taskListId, taskId) {
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
   let res;
@@ -4089,6 +4098,15 @@ async function outlookTaskFetchBack(taskListId, taskId) {
   try { body = await res.json(); } catch (e) { return { ok: false }; }
   if (!body || body.id !== taskId) return { ok: false };
   return { ok: true, task: body };
+}
+
+async function outlookTaskFetchBack(taskListId, taskId) {
+  let last = { ok: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    last = await outlookTaskFetchOnce(taskListId, taskId);
+    if (last.ok) return last;
+  }
+  return last;
 }
 
 async function outlookTaskUndo(ref, hint) {
@@ -4298,7 +4316,11 @@ async function outlookFileWrite(p) {
   if (previousVersionId) ref.previousVersionId = previousVersionId;
   const fetched = await outlookFileFetchBack(itemId);
   if (fetched && fetched.item) ref.editSnap = outlookCreationSnap(fetched.item);
-  if (!fetched.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  if (!fetched.ok || !outlookHasSnap(ref.editSnap)) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
+      written: outlookUnverifiedLine()
+    });
+  }
   const link = fetched.item && fetched.item.webUrl && String(fetched.item.webUrl).slice(0, 8) === 'https://' ? fetched.item.webUrl : null;
   if (link) base.url = link;
   const proof = Proof && Proof.buildProof({
@@ -4312,7 +4334,7 @@ async function outlookFileWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
-async function outlookFileFetchBack(itemId) {
+async function outlookFileFetchOnce(itemId) {
   const Files = globalThis.FlowOnedriveFile;
   if (!Files || !itemId) return { ok: false };
   const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
@@ -4323,6 +4345,15 @@ async function outlookFileFetchBack(itemId) {
   const body = await outlookReadJson(res);
   if (!body || body.id !== itemId) return { ok: false };
   return { ok: true, item: body };
+}
+
+async function outlookFileFetchBack(itemId) {
+  let last = { ok: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    last = await outlookFileFetchOnce(itemId);
+    if (last.ok) return last;
+  }
+  return last;
 }
 
 async function outlookFileUndo(ref) {

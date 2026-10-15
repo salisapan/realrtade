@@ -115,6 +115,33 @@ const FlowNativeEdit = (() => {
     return value;
   }
 
+  // The stored body is a hash of the full normalized text plus a prefix.
+  // The prefix is what a person can look at. The hash is what Undo compares,
+  // so a change past the prefix is still an edit.
+  const BODY_PREFIX = 8192;
+
+  function hashText(text) {
+    let h1 = 2166136261;
+    let h2 = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i);
+      h1 ^= c;
+      h1 = Math.imul(h1, 16777619);
+      h2 ^= (c + 1);
+      h2 = Math.imul(h2, 16777619);
+    }
+    return (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+  }
+
+  function bodyRecord(raw) {
+    if (raw && typeof raw === 'object' && typeof raw.hash === 'string' && raw.content == null) {
+      return { hash: raw.hash, prefix: String(raw.prefix || '').slice(0, BODY_PREFIX) };
+    }
+    const text = normText(raw);
+    if (!text) return null;
+    return { hash: hashText(text), prefix: text.slice(0, BODY_PREFIX) };
+  }
+
   // Every user-editable field. Server fields (lastModifiedDateTime,
   // @odata.etag, changeKey, cTag, eTag) are not in this list.
   const CONTENT_KEYS = [
@@ -129,8 +156,15 @@ const FlowNativeEdit = (() => {
     return o[key];
   }
 
+  function present(key, o) {
+    if (!o || typeof o !== 'object') return false;
+    if (key === 'to') return Object.prototype.hasOwnProperty.call(o, 'toRecipients') || Object.prototype.hasOwnProperty.call(o, 'to');
+    if (key === 'cc') return Object.prototype.hasOwnProperty.call(o, 'ccRecipients') || Object.prototype.hasOwnProperty.call(o, 'cc');
+    return Object.prototype.hasOwnProperty.call(o, key);
+  }
+
   function fieldValue(key, raw) {
-    if (key === 'body') return emptyToNull(normText(raw));
+    if (key === 'body') return bodyRecord(raw);
     if (key === 'dueDateTime' || key === 'start' || key === 'end' || key === 'reminderDateTime') return emptyToNull(clockOf(raw));
     if (key === 'to' || key === 'cc' || key === 'attendees') return emptyToNull(addressesOf(raw));
     if (key === 'location') return emptyToNull(locationOf(raw));
@@ -142,35 +176,46 @@ const FlowNativeEdit = (() => {
     return emptyToNull(plain(raw));
   }
 
-  // Every content key is present. An empty field is null, not omitted,
-  // so clearing it later is a difference.
+  // Only keys the read actually returned. An empty value is null.
+  // A key Graph did not send is omitted, not stored as null.
   function snapshotOf(obj) {
     const o = obj || {};
     const snap = {};
     for (let i = 0; i < CONTENT_KEYS.length; i++) {
       const key = CONTENT_KEYS[i];
+      if (!present(key, o)) continue;
       snap[key] = fieldValue(key, rawFor(key, o));
     }
     return snap;
   }
 
-  // 'edited' when a stored field differs, including empty versus a value.
-  // 'unconfirmed' when the live object has a field the snapshot never stored.
-  // 'match' only when every stored field matches and nothing new is present.
-  // The snapshot's own keys are what it stored. Normalizing it as a fresh
-  // snapshot would invent nulls and hide a field it never recorded.
+  function sameField(key, stored, liveVal) {
+    if (key !== 'body') return stored === liveVal;
+    const a = stored && stored.hash;
+    const b = liveVal && liveVal.hash;
+    return a != null && a === b;
+  }
+
+  // 'edited' only when a stored non-null value changed, including to empty.
+  // A stored null, or a key the snapshot never had, that is non-null now is
+  // 'unconfirmed': the server may have filled a default. 'match' is an exact
+  // match of every stored value and no new non-null field.
   function compareContent(snapshot, live) {
     if (!snapshot || !live || typeof snapshot !== 'object') return 'unconfirmed';
-    const liveSnap = snapshotOf(live);
     let unseen = false;
     for (let i = 0; i < CONTENT_KEYS.length; i++) {
       const key = CONTENT_KEYS[i];
-      const liveVal = liveSnap[key];
+      const liveVal = present(key, live) ? fieldValue(key, rawFor(key, live)) : null;
       if (!Object.prototype.hasOwnProperty.call(snapshot, key)) {
         if (liveVal != null) unseen = true;
         continue;
       }
-      if (fieldValue(key, snapshot[key]) !== liveVal) return 'edited';
+      const stored = fieldValue(key, snapshot[key]);
+      if (stored == null) {
+        if (liveVal != null) unseen = true;
+        continue;
+      }
+      if (!sameField(key, stored, liveVal)) return 'edited';
     }
     return unseen ? 'unconfirmed' : 'match';
   }
@@ -208,7 +253,7 @@ const FlowNativeEdit = (() => {
   }
 
   return {
-    userEditedLine, unconfirmedLine, snapshotOf, userEdited, compareContent, CONTENT_KEYS,
+    userEditedLine, unconfirmedLine, snapshotOf, userEdited, compareContent, CONTENT_KEYS, BODY_PREFIX,
     fillOnce, textOf, normText, clockOf
   };
 })();

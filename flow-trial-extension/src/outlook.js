@@ -888,10 +888,13 @@ const FlowOutlook = (() => {
       }
       await rememberDraft(incomingId, draft.id);
       let created = null;
-      try {
-        const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories');
-        if (globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf) created = FlowNativeEdit.snapshotOf(settled);
-      } catch (e) { created = null; }
+      for (let attempt = 0; attempt < 2 && !created; attempt++) {
+        try {
+          const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories');
+          const snap = globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf ? FlowNativeEdit.snapshotOf(settled) : null;
+          created = snap && Object.keys(snap).length ? snap : null;
+        } catch (e) { created = null; }
+      }
       return {
         ok: true,
         ref: draft.id,
@@ -986,6 +989,12 @@ const FlowOutlook = (() => {
       }
       if (!msg) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
       if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+      if (ref && typeof ref === 'object' && !created) {
+        const line = globalThis.FlowNativeEdit && FlowNativeEdit.unconfirmedLine
+          ? FlowNativeEdit.unconfirmedLine()
+          : "Couldn't confirm it's unchanged. Undo left it alone.";
+        return { ok: false, reason: 'unconfirmed', written: line };
+      }
       if (created && globalThis.FlowNativeEdit && FlowNativeEdit.compareContent) {
         const verdict = FlowNativeEdit.compareContent(created, msg);
         if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: FlowNativeEdit.userEditedLine() };

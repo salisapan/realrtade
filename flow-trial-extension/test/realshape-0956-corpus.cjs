@@ -61,9 +61,9 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
  const kinds={todo:()=>mkTask(true,true),'todo-bare':()=>mkTask(false,false),calendar:()=>mkEvent(false),holdit:()=>mkEvent(true),draft:mkDraft};
  const edits={
   todo:[['title word',o=>o.title='Pay invoice 4413',true],['body word',o=>o.body.content=o.body.content.replace('1,200','1,300'),true],['body whitespace only',o=>o.body.content=o.body.content.replace(/\r\n/g,'\r\n  ')+'  ',false],['due changed',o=>o.dueDateTime.dateTime='2026-10-21T00:00:00.0000000',true],['body cleared',o=>o.body.content='',true],['due removed',o=>delete o.dueDateTime,true],['completed',o=>o.status='completed',true],['importance high (star)',o=>o.importance='high',true]],
-  'todo-bare':[['notes added',o=>o.body.content='call Dana first',true],['due added',o=>o.dueDateTime={dateTime:'2026-10-22T00:00:00.0000000',timeZone:'UTC'},true]],
-  calendar:[['subject word',o=>o.subject=o.subject+' moved',true],['start moved',o=>o.start.dateTime='2026-10-20T13:00:00.0000000',true],['body word',o=>o.body.content=o.body.content.replace('lunch','dinner'),true],['location added',o=>o.location={displayName:'Taizu'},true],['body cleared',o=>o.body.content='',true]],
-  holdit:[['subject word',o=>o.subject='Budget review v2',true],['end moved',o=>o.end.dateTime='2026-10-20T16:00:00.0000000',true],['location added',o=>o.location={displayName:'Room 4'},true],['attendee added',o=>o.attendees=[{emailAddress:{address:'noa@x.com'}}],true]],
+  'todo-bare':[['notes added',o=>o.body.content='call Dana first','late'],['due added',o=>o.dueDateTime={dateTime:'2026-10-22T00:00:00.0000000',timeZone:'UTC'},'late']],
+  calendar:[['subject word',o=>o.subject=o.subject+' moved',true],['start moved',o=>o.start.dateTime='2026-10-20T13:00:00.0000000',true],['body word',o=>o.body.content=o.body.content.replace('lunch','dinner'),true],['location added',o=>o.location={displayName:'Taizu'},'late'],['body cleared',o=>o.body.content='',true]],
+  holdit:[['subject word',o=>o.subject='Budget review v2',true],['end moved',o=>o.end.dateTime='2026-10-20T16:00:00.0000000',true],['location added',o=>o.location={displayName:'Room 4'},'late'],['attendee added',o=>o.attendees=[{emailAddress:{address:'noa@x.com'}}],'late']],
   draft:[['body word',o=>o.body.content=o.body.content.replace('>x<','>x, see you Friday<'),true],['subject word',o=>o.subject='RE: Thursday?',true],['to added',o=>o.toRecipients=o.toRecipients.concat([{emailAddress:{address:'noa@x.com'}}]),true],['body cleared',o=>o.body.content='',true],['body whitespace only',o=>o.body.content=o.body.content.replace('<div>','<div> &nbsp;'),false]]};
  for(mode of ['stable','touch','bodyonly']){console.log('\n=== mode '+mode);
   for(const k of Object.keys(kinds)){fail=null;let it=await kinds[k]();
@@ -72,7 +72,8 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
    if(mode==='stable'&&k!=='todo'&&k!=='todo-bare')console.log('  '+k+' snapshot: '+JSON.stringify(k==='draft'?it.w.created:it.w.ref.created));
    log=[];let u=await it.undo();ck(mode+' '+k+' unedited -> deleted',u.ok&&deleted(it),{u,log});
    for(const [en,fn,isEdit] of edits[k]){it=await kinds[k]();fn(store[it.id]);u=await it.undo();
-    if(isEdit)ck(mode+' '+k+' edit "'+en+'" -> You edited, kept',u.written===EL&&!deleted(it),{u:u.reason,deleted:deleted(it)});
+    if(isEdit==='late')ck(mode+' '+k+' edit "'+en+'" -> Couldn\'t confirm, kept',u.written===UL&&!deleted(it),{u:u.reason,deleted:deleted(it)});
+    else if(isEdit)ck(mode+' '+k+' edit "'+en+'" -> You edited, kept',u.written===EL&&!deleted(it),{u:u.reason,deleted:deleted(it)});
     else ck(mode+' '+k+' "'+en+'" is NOT an edit -> deleted',u.ok&&deleted(it),{u});}
    if(mode==='stable')for(const fm of [500,'hang']){it=await kinds[k]();fail=fm;store[it.id].__armed=true;const t=Date.now();u=await it.undo();fail=null;ck(mode+' '+k+' '+fm+' -> Couldn\'t confirm, kept',u.written===UL&&!deleted(it),{u,ms:Date.now()-t});}
   }}
@@ -80,5 +81,39 @@ srv.listen(0,'127.0.0.1',async()=>{sb.__G='http://127.0.0.1:'+srv.address().port
  mode='stable';{store={};const w=await call('outlookDraftWrite',{outlookIncomingId:'M1',body:'x'});const u=await call('outlookDraftUndo',w.ref,{type:'flow:undo-action',connectorId:'outlookDraft',ref:w.ref,created:w.created||null});ck('attachment-cleanup undo with r.created deletes unedited leftover draft',u.ok&&!store[w.ref],u);}
  // Hold It read-back: GET after create fails
  {store={};const realH=srv.listeners('request')[0];let n=0;srv.removeAllListeners('request');srv.on('request',(q,s)=>{if(q.method==='GET'&&/events\//.test(q.url)){s.writeHead(500);return s.end();}realH(q,s);});
-  const w=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});console.log('INFO Hold It when read-back GET is 500: write.ok='+w.ok+' snapshot='+JSON.stringify(w.ref&&w.ref.created));srv.removeAllListeners('request');srv.on('request',realH);}
+  let gets=0;srv.removeAllListeners('request');srv.on('request',(q,s)=>{if(q.method==='GET'&&/events\//.test(q.url)){gets++;s.writeHead(500);return s.end();}realH(q,s);});
+  const w=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
+  ck('GET fail twice leaves no snapshot', gets===2 && w.ref && !w.ref.created, {gets, created:w.ref&&w.ref.created});
+  ck('Hold It read-back fail is Created, couldn\'t verify, not Handled',
+    w.ok===true && w.fetchedBack===false && w.written==="Created, couldn't verify" && w.proof==null &&
+    w.ref && w.ref.eventId &&
+    sb.FlowProofOfClose.allowsHandled({ok:w.ok, proof:w.proof})===false, w);
+  const u=await call('outlookCalendarUndo',w.ref,{created:w.ref&&w.ref.created});
+  ck('that Undo says Couldn\'t confirm and does not delete', u.written===UL && store[w.ref.eventId], {u, still:!!store[w.ref.eventId]});
+  srv.removeAllListeners('request');srv.on('request',realH);
+  store={};gets=0;srv.removeAllListeners('request');srv.on('request',(q,s)=>{if(q.method==='GET'&&/events\//.test(q.url)){gets++;if(gets===1){s.writeHead(500);return s.end();}}realH(q,s);});
+  const again=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review',quote:'Can we meet Tuesday 14:30?'}});
+  const snap=again.ref&&again.ref.created;
+  ck('GET fail then retry ok stores the read-back, including server defaults',
+    gets===2 && again.fetchedBack===true && snap && snap.subject==='Budget review' && snap.importance==='normal' && snap.isAllDay===false && snap.isReminderOn==null && !Object.prototype.hasOwnProperty.call(snap,'isReminderOn'),
+    {gets, snap});
+  srv.removeAllListeners('request');srv.on('request',realH);
+  const plain=await call('outlookCalendarUndo',again.ref,{created:snap});
+  ck('server defaults unedited -> delete when the snapshot came from the GET', plain.ok&&!store[again.ref.eventId], plain);
+  store={};const lateW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review'}});
+  store[lateW.ref.eventId].isReminderOn=true;store[lateW.ref.eventId].reminderMinutesBeforeStart=15;
+  const late=await call('outlookCalendarUndo',lateW.ref,{created:lateW.ref.created});
+  ck('a late server default is Couldn\'t confirm, not You edited', late.written===UL && store[lateW.ref.eventId], late);
+  store[lateW.ref.eventId].subject='Budget review v2';
+  const changed=await call('outlookCalendarUndo',lateW.ref,{created:lateW.ref.created});
+  ck('a stored subject that changed is You edited', changed.written===EL && store[lateW.ref.eventId], changed);
+  store={};const clearW=await call('outlookCalendarWrite',{params:{meeting:true,dateIso:'2026-10-20',hour:14,minute:30,title:'Budget review',quote:'bring the deck'}});
+  store[clearW.ref.eventId].body.content='';
+  const cleared=await call('outlookCalendarUndo',clearW.ref,{created:clearW.ref.created});
+  ck('a stored body cleared to empty is You edited', cleared.written===EL && store[clearW.ref.eventId], cleared);
+  const long='word '.repeat(4000);const big=sb.FlowNativeEdit.snapshotOf({body:{content:long}});
+  ck('a body over 8KB matches until a word past the prefix changes',
+    big.body.prefix.length===8192 && sb.FlowNativeEdit.compareContent(big,{body:{content:long}})==='match' &&
+    sb.FlowNativeEdit.compareContent(big,{body:{content:long+'friday'}})==='edited');
+ }
  console.log('\nFAILURES: '+F);srv.close();process.exit(F?1:0);});
