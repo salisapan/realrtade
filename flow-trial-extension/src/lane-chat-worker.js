@@ -245,6 +245,34 @@ const FlowLaneChat = (() => {
     return typeof chrome !== 'undefined' && chrome.runtime && sender.id === chrome.runtime.id;
   }
 
+  // Dev Gate only. A store build has update_url and this returns null even if
+  // glanceDevFixture is set. The fixture page is not in that build.
+  async function devFixtureReply(sender, storeGet, manifestOf) {
+    const url = String((sender && (sender.url || (sender.tab && sender.tab.url))) || '');
+    if (url.indexOf('/dev/messenger-fixture.html') < 0) return null;
+    let manifest = null;
+    try {
+      manifest = typeof manifestOf === 'function'
+        ? manifestOf()
+        : (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function' ? chrome.runtime.getManifest() : null);
+    } catch (e) { return null; }
+    if (manifest && manifest.update_url) return null;
+    const read = storeGet || (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && chrome.storage.local.get.bind(chrome.storage.local));
+    if (typeof read !== 'function') return null;
+    let bag = null;
+    try { bag = await read('glanceDevFixture'); } catch (e) { return null; }
+    if (!bag || bag.glanceDevFixture !== true) return null;
+    const one = { id: 'dev-oct-8', status: 'confirmed', location: 'דיזנגוף 99', startIso: '2026-10-08T10:00:00+03:00' };
+    const events = /[?&]case=two(?:&|$)/.test(url)
+      ? [one, { id: 'dev-oct-8-b', status: 'confirmed', location: 'אבן גבירול 30', startIso: '2026-10-08T19:00:00+03:00' }]
+      : [one];
+    return {
+      ok: true,
+      sends: false,
+      evidence: { connected: { calendar: true, outlook: false }, events: events }
+    };
+  }
+
   function install() {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage || !chrome.runtime.onMessage.addListener) return;
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -254,17 +282,17 @@ const FlowLaneChat = (() => {
         return;
       }
       const payload = msg.payload || {};
-      if (payload.kind !== 'place') {
-        sendResponse(notChecked(false));
-        return;
-      }
-      placeEvidence(payload).then(sendResponse).catch(() => sendResponse(notChecked(true)));
+      devFixtureReply(sender).then((fake) => {
+        if (fake) return fake;
+        if (payload.kind !== 'place') return notChecked(false);
+        return placeEvidence(payload);
+      }).then(sendResponse).catch(() => sendResponse(notChecked(true)));
       return true;
     });
   }
 
   install();
-  return { placeEvidence };
+  return { placeEvidence, devFixtureReply };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowLaneChat };

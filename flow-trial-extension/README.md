@@ -9,6 +9,18 @@ other side really answers, and when an email decides something it puts one `Do I
 files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. A chat draft whose message timestamp is more than two minutes ahead of this device stays quiet (`whyNotShown: future`). Those two minutes are an intentional clock-skew margin, in `src/content-messenger.js`. The judgment engine itself knows nothing about Gmail: it scores plain
 text, so Gmail is the first surface, not the architecture's ceiling (see "What is still deliberately narrow" below).
 
+## Live Gate fixture (David)
+
+This page is for an unpacked copy of `flow-trial-extension` from the repo. It is not in the store zip, and a build whose manifest has `update_url` ignores the flag.
+
+1. Load the unpacked `flow-trial-extension` folder from this repo. Do not load the store zip, and do not load a build whose manifest has `update_url`.
+2. On `chrome://extensions`, copy the extension id.
+3. Open the service worker console and run `chrome.storage.local.set({ glanceDevFixture: true })`.
+4. Open `chrome-extension://<ID>/dev/messenger-fixture.html`. No manifest entry is required. The composer should show `דיזנגוף 99` and a maps link. The page has no Send button. The row is dated about an hour ago. The fake event is 8 October 2026 at דיזנגוף 99. Run it while that date is still in last week (through Saturday 17 October 2026).
+5. Open the same address with `?case=two`. The composer stays empty. That case has two addresses, דיזנגוף 99 and אבן גבירול 30.
+6. `chrome.storage.local.set({ glanceDevFixture: false })` turns the page off.
+7. A store or outlook zip does not contain this page. A manifest with `update_url` ignores `glanceDevFixture`.
+
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
 engine for organizations with sensitive or regulated data) — not a stripped
 tier of it. Glance is general-purpose, free-to-start, and makes no security

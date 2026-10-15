@@ -20,6 +20,8 @@
   const FUTURE_SKEW_MS = 2 * 60 * 1000;
   const DRAFT_STORE = 'glanceLaneDrafts';
   let timer = null;
+  let observer = null;
+  let stopped = false;
   let tries = 0;
   let lastReportedHealth = null;
   const drafted = new Set();
@@ -102,7 +104,54 @@
     return String(el.innerText || el.textContent || '');
   }
 
+  function runtimeAlive() {
+    try { return Boolean(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id); }
+    catch (e) { return false; }
+  }
+
+  function isFixturePath() {
+    try { return /\/dev\/messenger-fixture\.html$/i.test(String(location.pathname || '')); }
+    catch (e) { return false; }
+  }
+
+  function stopQuietly() {
+    if (stopped) return;
+    stopped = true;
+    try { if (observer) observer.disconnect(); } catch (e) { /* already gone */ }
+    observer = null;
+    if (timer) { try { clearTimeout(timer); } catch (e) { /* already gone */ } timer = null; }
+    try {
+      if (window.__glanceLaneChat && window.__glanceLaneChat.observers > 0) window.__glanceLaneChat.observers -= 1;
+    } catch (e) { /* the page is closing */ }
+  }
+
+  function guard() {
+    if (stopped) return false;
+    if (runtimeAlive()) return true;
+    stopQuietly();
+    return false;
+  }
+
+  // The live Gate page. A store build has update_url, so the flag cannot turn it on.
+  async function readDevFlag() {
+    if (!runtimeAlive()) return false;
+    try {
+      const manifest = typeof chrome.runtime.getManifest === 'function' ? chrome.runtime.getManifest() : null;
+      if (manifest && manifest.update_url) return false;
+    } catch (e) { return false; }
+    if (!chrome.storage || !chrome.storage.local || typeof chrome.storage.local.get !== 'function') return false;
+    try {
+      const bag = await chrome.storage.local.get('glanceDevFixture');
+      if (!runtimeAlive()) { stopQuietly(); return false; }
+      return Boolean(bag && bag.glanceDevFixture === true);
+    } catch (e) {
+      if (/invalidated/i.test(String(e && e.message || e)) || !runtimeAlive()) stopQuietly();
+      return false;
+    }
+  }
+
   function draftStore() {
+    if (!runtimeAlive()) return null;
     return typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
   }
 
@@ -119,24 +168,35 @@
       const got = FlowLaneDraftStore.get((bag && bag[DRAFT_STORE]) || {}, key, Date.now());
       if (got.row && typeof area.set === 'function') await area.set({ [DRAFT_STORE]: got.all });
       return got.row;
-    } catch (e) { return null; }
+    } catch (e) {
+      if (/invalidated/i.test(String(e && e.message || e)) || !runtimeAlive()) stopQuietly();
+      return null;
+    }
   }
 
   async function remember(key, row) {
+    if (!runtimeAlive()) { stopQuietly(); return; }
     const area = draftStore();
     if (!area || typeof area.get !== 'function' || typeof area.set !== 'function' || typeof FlowLaneDraftStore === 'undefined') return;
     try {
       const bag = await area.get(DRAFT_STORE);
+      if (!runtimeAlive()) { stopQuietly(); return; }
       const next = FlowLaneDraftStore.put((bag && bag[DRAFT_STORE]) || {}, key, row, Date.now());
       await area.set({ [DRAFT_STORE]: next });
-    } catch (e) { /* a missed save can draft once more; the next save closes it */ }
+    } catch (e) {
+      if (/invalidated/i.test(String(e && e.message || e)) || !runtimeAlive()) stopQuietly();
+    }
   }
 
   function report(ok, reason) {
+    if (!guard()) return;
     const key = ok ? 'ok' : 'bad:' + reason;
     if (key === lastReportedHealth) return;
     lastReportedHealth = key;
-    try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'messenger', ok: ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* the page may be closing */ }
+    try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'messenger', ok: ok, reason: reason || null }, () => void chrome.runtime.lastError); }
+    catch (e) {
+      if (/invalidated/i.test(String(e && e.message || e)) || !runtimeAlive()) stopQuietly();
+    }
   }
 
   function maybeDraft(main, list, party, direct, threadId) {
@@ -160,7 +220,9 @@
     inflight.add(key);
     const box = composerBox(main);
     const finish = (async () => {
+      if (!runtimeAlive()) { stopQuietly(); return; }
       const saved = await remembered(key);
+      if (!runtimeAlive()) { stopQuietly(); return; }
       const shown = boxText(box).trim();
       const shownHash = FlowLaneDraftStore.hashKey('draft', key, shown);
       if (saved && saved.state === 'closed') { whyNot('closed', key); return; }
@@ -181,6 +243,7 @@
         now: when == null ? Date.now() : when,
         sender: { name: party.name }
       });
+      if (!runtimeAlive() || (r && r.reason === 'invalidated')) { stopQuietly(); return; }
       if (r && r.reason === 'no-box') { whyNot('no-box', key); return; }
       if (r && r.ok && r.judged && r.judged.draft) {
         await remember(key, { hash: FlowLaneDraftStore.hashKey('draft', key, r.judged.draft), state: 'open' });
@@ -190,12 +253,18 @@
     finish.catch(() => { whyNot('draft-failed', key); drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
 
-  function scan() {
-    if (!P.page(location.href)) { whyNot('not-a-messenger-page', location.href); return; }
+  async function scan() {
+    if (!guard()) return;
+    const onFixture = isFixturePath();
+    if (onFixture) {
+      const devOn = await readDevFlag();
+      if (!guard()) return;
+      if (!devOn) { whyNot('dev-fixture-off', location.href); return; }
+    } else if (!P.page(location.href)) { whyNot('not-a-messenger-page', location.href); return; }
     const main = root();
     const list = rows(main);
     if (!list.length) {
-      if (tries < RETRY_LIMIT) { tries += 1; clearTimeout(timer); timer = setTimeout(scan, RETRY_MS); return; }
+      if (tries < RETRY_LIMIT) { tries += 1; clearTimeout(timer); timer = setTimeout(() => { if (guard()) scan(); }, RETRY_MS); return; }
       whyNot('no-messages-recognised', location.href);
       report(false, 'no-messages-recognised');
       return;
@@ -209,7 +278,7 @@
     globalThis.__glanceChatSurfaces.messenger = globalThis.__glanceChatSurfaces.messenger || {};
     globalThis.__glanceChatSurfaces.messenger.name = t;
     if (!direct) { whyNot('not-one-to-one', t); report(true); return; }
-    const threadId = P.threadIdFor(location.href, t, main);
+    const threadId = onFixture ? ('ms:dev-fixture' + (location.search || '')) : P.threadIdFor(location.href, t, main);
     if (!threadId) { whyNot('no-thread-id', location.href); report(true); return; }
     report(true);
     const party = { name: t, phone: null, email: null };
@@ -233,10 +302,15 @@
     maybeDraft(main, list, party, direct, threadId);
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
+  function schedule() {
+    if (!guard()) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => { if (guard()) scan(); }, DEBOUNCE_MS);
+  }
   const watch = document.documentElement || document.body;
   if (watch) {
-    new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
+    observer = new MutationObserver(() => { if (guard()) schedule(); });
+    observer.observe(watch, { childList: true, subtree: true });
     window.__glanceLaneChat.observers += 1;
   }
   schedule();

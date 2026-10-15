@@ -41,6 +41,19 @@ def die(message: str) -> None:
     raise SystemExit(1)
 
 
+def assert_dev_fixture_absent(archive: zipfile.ZipFile, label: str) -> None:
+    """The live Gate fixture is dev-only. A store zip omits the page, and the worker refuses the flag when update_url is set."""
+    for name in archive.namelist():
+        if name.startswith("dev/") or name.endswith("messenger-fixture.html"):
+            die(f"{label} zip contains the dev fixture {name}")
+    worker_name = "src/lane-chat-worker.js"
+    if worker_name not in archive.namelist():
+        die(f"{label} zip is missing {worker_name}")
+    worker = archive.read(worker_name).decode("utf-8")
+    if "glanceDevFixture" not in worker or "update_url" not in worker:
+        die(f"{label} chat worker does not force the dev fixture off for a store build")
+
+
 def check_zip() -> None:
     if not package.ZIP_PATH.is_file():
         die("packager did not write a zip")
@@ -75,6 +88,7 @@ def check_zip() -> None:
         manifest = archive.read("manifest.json")
         if b'"manifest_version": 3' not in manifest and b'"manifest_version":3' not in manifest:
             die("packaged manifest is not version 3")
+        assert_dev_fixture_absent(archive, "install")
 
 
 RUNTIME_MARKERS = ("vendor/web-llm.js", "vendor/Phi-3-mini-4k-instruct-q4f16_1-MLC-webgpu.wasm", "src/offscreen.html", "src/offscreen.js")
@@ -111,6 +125,7 @@ def check_profiles() -> None:
                 die(f"full zip is missing runtime files: {sorted(set(RUNTIME_MARKERS) - set(have))}")
             if profile == "full" and "vendor/web-llm.LICENSE" not in names:
                 die("full zip ships the runtime without its licence text")
+            assert_dev_fixture_absent(archive, profile)
         if not sizes["lite"] < sizes["full"] / 3:
             die(f"lite ({sizes['lite']}) is not much smaller than full ({sizes['full']}); something large is still bundled")
         if package.encoded_size(sizes["lite"]) > package.FUNCTION_RESPONSE_BUDGET:

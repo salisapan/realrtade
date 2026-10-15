@@ -166,3 +166,22 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
   expect(reinjected.actions).toEqual(['skip', 'skip', 'skip']);
   expect(reinjected.observers).toBe(1);
 });
+
+test('the dev fixture drafts one address and stays quiet for two', async ({ glance }) => {
+  await glance.seed({ glanceDevFixture: true });
+  const page = await glance.openFixture('');
+  const box = page.locator('[data-glance-composer="1"]');
+  await expect(box).toContainText('דיזנגוף', { timeout: 15000 });
+  const text = await box.innerText();
+  expect(text.indexOf('דיזנגוף 99 - ')).toBe(0);
+  expect(text.indexOf(encodeURIComponent('דיזנגוף 99'))).toBeGreaterThanOrEqual(0);
+  expect(await page.locator('button').count()).toBe(0);
+  await page.close();
+
+  const quiet = await glance.openFixture('?case=two');
+  const quietBox = quiet.locator('[data-glance-composer="1"]');
+  await quiet.waitForTimeout(3500);
+  expect((await quietBox.innerText()).trim()).toBe('');
+  expect(await quiet.locator('button').count()).toBe(0);
+  await quiet.close();
+});

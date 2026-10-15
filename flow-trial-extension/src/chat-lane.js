@@ -4,18 +4,29 @@
 // A fact ask uses the existing flow:fact-sources message. A place ask uses
 // flow:chat-evidence, which returns locations only.
 const FlowChatLane = (() => {
+  function runtimeAlive() {
+    try { return Boolean(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage); }
+    catch (e) { return false; }
+  }
+
   function ask(type, payload) {
     return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-        resolve({ ok: false, reason: 'no-runtime' });
+      if (!runtimeAlive()) {
+        resolve({ ok: false, reason: 'invalidated' });
         return;
       }
       try {
         chrome.runtime.sendMessage({ type: type, payload: payload }, (r) => {
-          if (chrome.runtime.lastError) { resolve({ ok: false, reason: 'runtime' }); return; }
+          let err = null;
+          try { err = chrome.runtime && chrome.runtime.lastError; } catch (e) { resolve({ ok: false, reason: 'invalidated' }); return; }
+          if (!runtimeAlive()) { resolve({ ok: false, reason: 'invalidated' }); return; }
+          if (err && /invalidated/i.test(String(err.message || ''))) { resolve({ ok: false, reason: 'invalidated' }); return; }
+          if (err) { resolve({ ok: false, reason: 'runtime' }); return; }
           resolve(r || { ok: false });
         });
-      } catch (e) { resolve({ ok: false, reason: 'runtime' }); }
+      } catch (e) {
+        resolve({ ok: false, reason: /invalidated/i.test(String(e && e.message || e)) ? 'invalidated' : 'runtime' });
+      }
     });
   }
 
@@ -48,9 +59,11 @@ const FlowChatLane = (() => {
     if (evidence == null && detected && detected.fetch) {
       if (detected.kind === 'fact') {
         const reply = await ask('flow:fact-sources', detected.fact || {});
+        if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated' };
         evidence = bagFromFact(detected, reply);
       } else {
         const reply = await ask('flow:chat-evidence', detected.fetch);
+        if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated' };
         evidence = (reply && reply.evidence) || { connected: { calendar: false }, events: null };
       }
     }

@@ -167,6 +167,8 @@ check('a holding line is not a chat draft', decide("I'll send it by Friday.").dr
 });
 const weekMemory = decide('מהשבוע שעבר אני לא זוכר איפה היינו');
 check('מהשבוע שעבר stays quiet', weekMemory.show === false && weekMemory.draft == null && weekMemory.sends === false && weekMemory.reason === 'no-ask', weekMemory);
+const fixtureSentence = decide('איפה היה המסעדה משבוע שעבר?', { now: sentToday, evidence: placeEvidence([one({ location: 'דיזנגוף 99', startIso: '2026-10-08T10:00:00+03:00' })]) });
+check('משבוע שעבר drafts the one 8 October address', fixtureSentence.show === true && fixtureSentence.sends === false && fixtureSentence.draft.indexOf('דיזנגוף 99 - ') === 0 && fixtureSentence.draft.indexOf(encodeURIComponent('דיזנגוף 99')) > 0, fixtureSentence);
 ['איפה המסעדה שהיינו בה שבוע שעבר?', 'איך קוראים למסעדה שהייתם בה שבוע שעבר?', 'שלח לי את המיקום של המסעדה שהיינו בה שבוע שעבר'].forEach((text) => {
   const r = decide(text);
   check('a real last-week place ask still drafts: ' + text.slice(0, 24), r.show === true && r.sends === false && r.draft.indexOf('Taizu - ' + MAPS) === 0, r);
@@ -473,6 +475,17 @@ console.log('\n--- calendar evidence ---\n');
 (async () => {
   const { FlowLaneChat } = require('../src/lane-chat-worker.js');
   const fetchPlace = FlowLaneChat.placeEvidence;
+  const fixtureUrl = 'chrome-extension://glanceid/dev/messenger-fixture.html';
+  const oneFixture = await FlowLaneChat.devFixtureReply({ url: fixtureUrl }, async () => ({ glanceDevFixture: true }), () => ({}));
+  check('the fixture calendar returns one Dizengoff address', oneFixture && oneFixture.sends === false && oneFixture.evidence.events.length === 1 && oneFixture.evidence.events[0].location === 'דיזנגוף 99' && oneFixture.evidence.events[0].startIso === '2026-10-08T10:00:00+03:00', oneFixture);
+  const twoFixture = await FlowLaneChat.devFixtureReply({ url: fixtureUrl + '?case=two' }, async () => ({ glanceDevFixture: true }), () => ({}));
+  check('two fixture addresses are both returned', twoFixture && twoFixture.sends === false && twoFixture.evidence.events.length === 2 && twoFixture.evidence.events[1].location === 'אבן גבירול 30', twoFixture);
+  const flagOff = await FlowLaneChat.devFixtureReply({ url: fixtureUrl }, async () => ({ glanceDevFixture: false }), () => ({}));
+  check('the fixture flag off returns null', flagOff === null, flagOff);
+  const storeBuild = await FlowLaneChat.devFixtureReply({ url: fixtureUrl }, async () => ({ glanceDevFixture: true }), () => ({ update_url: 'https://clients2.google.com/service/update2/crx' }));
+  check('a store manifest ignores the fixture flag', storeBuild === null, storeBuild);
+  const liveTab = await FlowLaneChat.devFixtureReply({ url: 'https://www.messenger.com/t/1' }, async () => ({ glanceDevFixture: true }), () => ({}));
+  check('a messenger tab does not get the fixture calendar', liveTab === null, liveTab);
   let called = 0;
   const quiet = await fetchPlace({ kind: 'place', window: { startIso: '2026-10-05T00:00:00.000Z', endIso: '2026-10-12T00:00:00.000Z' } }, {
     token: async () => null,
@@ -736,6 +749,7 @@ console.log('\n--- calendar evidence ---\n');
   global.FlowFactReply = FlowFactReply;
   global.chrome = {
     runtime: {
+      id: 'glance-test',
       lastError: null,
       sendMessage(msg, cb) {
         if (msg.type !== 'flow:fact-sources') { cb({ ok: false }); return; }
@@ -787,14 +801,30 @@ console.log('\n--- calendar evidence ---\n');
     const sent = [];
     w.chrome = {
       runtime: {
+        id: 'glance-test',
         lastError: null,
+        getManifest: typeof o.manifest === 'function' ? o.manifest : () => ({}),
         sendMessage(msg, cb) {
           sent.push(msg && msg.type);
+          const finish = (reply) => { if (cb) setTimeout(() => cb(reply), 0); };
+          if (typeof o.reply === 'function') {
+            try {
+              const out = o.reply(msg);
+              if (out && typeof out.then === 'function') {
+                out.then(finish, () => finish({ ok: false, reason: 'runtime' }));
+                return;
+              }
+              finish(out);
+            } catch (e) {
+              throw e;
+            }
+            return;
+          }
           let reply = { ok: true, sends: false, evidence: placeEvidence([one()]) };
           if (msg && msg.type === 'flow:fact-sources') {
             reply = { ok: true, truncated: false, sources: [{ id: 'sheet-1', name: 'Budget', kind: 'sheet', text: 'Q3 total,1840\n' }] };
           }
-          if (cb) setTimeout(() => cb(reply), 0);
+          finish(reply);
         }
       },
       storage: o.storage
@@ -1030,7 +1060,7 @@ console.log('\n--- calendar evidence ---\n');
 
   const guardDom = new JSDOM('<div role="main"></div>', { url: suiteUrl, runScripts: 'outside-only', pretendToBeVisual: true });
   pin(guardDom.window);
-  guardDom.window.chrome = { runtime: { lastError: null, sendMessage() {} } };
+  guardDom.window.chrome = { runtime: { id: 'glance-test', lastError: null, getManifest: () => ({}), sendMessage() {} } };
   const guardCtx = guardDom.getInternalVMContext();
   const guardLane = lanes.find((item) => item.js[item.js.length - 1] === 'src/content-messenger.js');
   guardLane.js.slice(0, -1).forEach((rel) => {
@@ -1066,6 +1096,120 @@ console.log('\n--- calendar evidence ---\n');
   const registeredMatches = JSON.stringify(registered);
   check('Business Suite is registered at runtime, not from the manifest', /business\.facebook\.com/.test(registeredMatches) && JSON.stringify(manifest.content_scripts).indexOf('business.facebook.com') < 0);
   enable.window.close();
+
+  const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
+  check('the fixture page has the sentence and no send button', fixtureHtml.indexOf('איפה היה המסעדה משבוע שעבר?') >= 0 && fixtureHtml.indexOf('<button') < 0 && !/>\s*Send\s*</.test(fixtureHtml));
+  const fixturePage = 'chrome-extension://glanceid/dev/messenger-fixture.html';
+  function fixtureReply(pageUrl, store, manifest) {
+    return () => FlowLaneChat.devFixtureReply({ url: pageUrl }, (key) => store.local.get(key), manifest);
+  }
+  const oneStore = memoryStorage({ glanceDevFixture: true });
+  const oneLogs = [];
+  const onePage = await open('messenger-fixture.html', fixturePage, 'src/content-messenger.js', {
+    html: fixtureHtml, storage: oneStore, logs: oneLogs, reply: fixtureReply(fixturePage, oneStore, () => ({}))
+  });
+  await new Promise((r) => setTimeout(r, 40));
+  check('the fixture page drafts Dizengoff 99', onePage.text.indexOf('דיזנגוף 99 - ') === 0 && onePage.sendClicks === 0, { text: onePage.text, logs: oneLogs });
+  onePage.close();
+  const twoStore = memoryStorage({ glanceDevFixture: true });
+  const twoLogs = [];
+  const twoPageUrl = fixturePage + '?case=two';
+  const twoPage = await open('messenger-fixture.html', twoPageUrl, 'src/content-messenger.js', {
+    html: fixtureHtml, storage: twoStore, logs: twoLogs, reply: fixtureReply(twoPageUrl, twoStore, () => ({}))
+  });
+  await new Promise((r) => setTimeout(r, 40));
+  check('two fixture addresses stay quiet', twoPage.text.trim() === '' && twoLogs.some((line) => line.indexOf('[Glance] whyNotShown:') >= 0), { text: twoPage.text, logs: twoLogs });
+  twoPage.close();
+  const offLogs = [];
+  const offStore = memoryStorage({ glanceDevFixture: false });
+  const offPage = await open('messenger-fixture.html', fixturePage, 'src/content-messenger.js', {
+    html: fixtureHtml, storage: offStore, logs: offLogs, reply: fixtureReply(fixturePage, offStore, () => ({}))
+  });
+  check('the fixture flag off stays quiet', offPage.text.trim() === '' && offLogs.some((line) => line.indexOf('whyNotShown: dev-fixture-off') >= 0), { text: offPage.text, logs: offLogs });
+  offPage.close();
+  const storeLogs = [];
+  const storePage = await open('messenger-fixture.html', fixturePage, 'src/content-messenger.js', {
+    html: fixtureHtml,
+    storage: memoryStorage({ glanceDevFixture: true }),
+    logs: storeLogs,
+    manifest: () => ({ update_url: 'https://clients2.google.com/service/update2/crx' })
+  });
+  check('a store manifest stays quiet on the fixture page', storePage.text.trim() === '' && storeLogs.some((line) => line.indexOf('whyNotShown: dev-fixture-off') >= 0), { text: storePage.text, logs: storeLogs });
+  storePage.close();
+
+  let invalidatedThrew = false;
+  try {
+    const dead = await open('messenger-place.html', 'https://www.messenger.com/t/dead-context', 'src/content-messenger.js', {
+      beforeScan(w) { w.chrome.runtime.sendMessage = function () { throw new Error('Extension context invalidated'); }; }
+    });
+    await new Promise((r) => setTimeout(r, 40));
+    check('a dead extension context leaves the composer empty', dead.text.trim() === '', dead.text);
+    check('a dead extension context removes the observer', dead.window.__glanceLaneChat.observers === 0, dead.window.__glanceLaneChat.observers);
+    dead.close();
+  } catch (e) {
+    invalidatedThrew = true;
+    check('a dead extension context does not throw', false, String(e && e.stack || e));
+  }
+  if (!invalidatedThrew) check('a dead extension context does not throw', true);
+
+  let clearedThrew = false;
+  try {
+    const cleared = await open('messenger-place.html', 'https://www.messenger.com/t/cleared-id', 'src/content-messenger.js', {
+      beforeScan(w) { w.chrome.runtime.id = ''; }
+    });
+    check('a missing extension id leaves the composer empty', cleared.text.trim() === '', cleared.text);
+    check('a missing extension id removes the observer', cleared.window.__glanceLaneChat.observers === 0, cleared.window.__glanceLaneChat.observers);
+    cleared.close();
+  } catch (e) {
+    clearedThrew = true;
+    check('a missing extension id does not throw', false, String(e && e.stack || e));
+  }
+  if (!clearedThrew) check('a missing extension id does not throw', true);
+
+  let outlookThrew = false;
+  let outlookDisconnected = false;
+  try {
+    const outlookDom = new JSDOM('<div id="ReadingPaneContainerId"></div>', { url: 'https://outlook.live.com/mail/0/inbox/id/aaa', runScripts: 'outside-only', pretendToBeVisual: true });
+    const ow = outlookDom.window;
+    const OrigObserver = ow.MutationObserver;
+    ow.MutationObserver = class extends OrigObserver {
+      disconnect() { outlookDisconnected = true; return OrigObserver.prototype.disconnect.call(this); }
+    };
+    ow.chrome = {
+      runtime: {
+        id: 'ext',
+        lastError: null,
+        getManifest: () => ({ version: '0.0.0' }),
+        sendMessage() { throw new Error('Extension context invalidated'); },
+        onMessage: { addListener() {}, removeListener() {} }
+      },
+      storage: {
+        local: {
+          get(defaults, cb) { if (typeof cb === 'function') cb(defaults || {}); return Promise.resolve(defaults || {}); },
+          set(_obj, cb) { if (typeof cb === 'function') cb(); return Promise.resolve(); }
+        },
+        onChanged: { addListener() {}, removeListener() {} }
+      }
+    };
+    ow.FlowChipHost = {};
+    ow.FlowOwaParse = { readPane() { return null; }, readingPaneRoots() { return []; }, urlIds() { return {}; } };
+    ow.FlowStorage = { get: async () => ({}), set: async () => {} };
+    ow.FlowIncomingJudge = { judge() { return null; } };
+    new vm.Script(fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8'), { filename: 'src/content-outlook.js' }).runInContext(outlookDom.getInternalVMContext());
+    await new Promise((r) => setTimeout(r, 30));
+    outlookDom.window.close();
+  } catch (e) {
+    outlookThrew = true;
+    check('a dead Outlook context does not throw', false, String(e && e.stack || e));
+  }
+  if (!outlookThrew) check('a dead Outlook context does not throw', true);
+  check('a dead Outlook context removes the observer', outlookDisconnected === true, outlookDisconnected);
+  const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
+  const sendAt = outlookSrc.indexOf('function send(msg)');
+  const sendBody = outlookSrc.slice(sendAt, outlookSrc.indexOf('function proxyFetch', sendAt));
+  check('Outlook checks the extension id before sendMessage', sendBody.indexOf('guardContext') >= 0 && sendBody.indexOf('guardContext') < sendBody.indexOf('chrome.runtime.sendMessage') && /function runtimeAlive[\s\S]{0,200}chrome\.runtime\.id/.test(outlookSrc));
+  const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
+  check('Messenger checks the extension id before a runtime message', /function runtimeAlive[\s\S]{0,200}chrome\.runtime\.id/.test(messengerSrc) && messengerSrc.indexOf('chrome.runtime.sendMessage') > messengerSrc.indexOf('function runtimeAlive'));
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

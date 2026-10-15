@@ -551,7 +551,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('business.facebook.com') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }
@@ -604,6 +604,15 @@ async function boot() {
   harness.openMessenger = async function openMessenger(html) {
     await watchSend();
     return openDocument('https://www.messenger.com/t/100012345678', html);
+  };
+
+  harness.openFixture = async function openFixture(search) {
+    const url = 'chrome-extension://' + extensionId + '/dev/messenger-fixture.html' + (search || '');
+    const page = await context.newPage();
+    page.on('pageerror', () => {});
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    harness.page = page;
+    return page;
   };
 
   harness.openBusiness = async function openBusiness(html) {
