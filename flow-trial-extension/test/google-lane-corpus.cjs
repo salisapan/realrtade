@@ -187,6 +187,16 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const bareDrive = Object.assign({}, drive.ref, { snapshot: null });
   const driveNoSnap = await Drive.undo(bareDrive, scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP) }]).http);
   check('drive undo without a snapshot does not trash', driveNoSnap.ok === false && driveNoSnap.reason === 'unconfirmed' && driveNoSnap.error === "Couldn't confirm it's unchanged. Undo left it alone.", driveNoSnap);
+  const timeOnly = { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime };
+  const driveTimeOnly = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, timeOnly) }]);
+  const driveTimeRefused = await Drive.undo(Object.assign({}, drive.ref, { snapshot: timeOnly }), driveTimeOnly.http);
+  check('drive undo refuses a modifiedTime match when version is missing and does not trash', driveTimeRefused.ok === false && driveTimeRefused.reason === 'unconfirmed' && driveTimeRefused.error === "Couldn't confirm it's unchanged. Undo left it alone." && driveTimeOnly.calls.length === 1, driveTimeRefused);
+  const driveVersion = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP, { version: '2' }) }]);
+  const driveVersionRefused = await Drive.undo(drive.ref, driveVersion.http);
+  check('drive undo refuses a version mismatch and does not trash', driveVersionRefused.ok === false && driveVersionRefused.reason === 'user-edited' && driveVersionRefused.error === 'You edited this. Undo left it alone.' && driveVersion.calls.length === 1, driveVersionRefused);
+  const driveRevOnly = scripted([{ status: 200, ok: true, json: { id: 'file1', trashed: false, version: '1', modifiedTime: SNAP.modifiedTime, headRevisionId: 'rev-live' } }]);
+  const driveRevRefused = await Drive.undo(Object.assign({}, drive.ref, { snapshot: { version: '1', modifiedTime: SNAP.modifiedTime } }), driveRevOnly.http);
+  check('drive undo refuses when only the live file has a head revision and does not trash', driveRevRefused.ok === false && driveRevRefused.reason === 'unconfirmed' && driveRevOnly.calls.length === 1, driveRevRefused);
 
   function markedDoc(name, parts, rangeText, revisionId) {
     let cursor = 1;
@@ -246,6 +256,12 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('doc undo refuses when the read fails and does not trash', docUnread.ok === false && docUnread.reason === 'unconfirmed' && docUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && docDown.calls.length === 1, docUnread);
   const docNoSnap = await Docs.undo(Object.assign({}, doc.ref, { snapshot: null }), scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) }]).http);
   check('doc undo without a snapshot does not trash', docNoSnap.ok === false && docNoSnap.reason === 'unconfirmed', docNoSnap);
+  const docTimeOnly = scripted([{ status: 200, ok: true, json: { id: 'doc1', trashed: false, headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }]);
+  const docTimeRefused = await Docs.undo(Object.assign({}, doc.ref, { snapshot: { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }), docTimeOnly.http);
+  check('doc undo refuses a modifiedTime match when version is missing and does not trash', docTimeRefused.ok === false && docTimeRefused.reason === 'unconfirmed' && docTimeRefused.error === "Couldn't confirm it's unchanged. Undo left it alone." && docTimeOnly.calls.length === 1, docTimeRefused);
+  const docVersion = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP, { version: '4' }) }]);
+  const docVersionRefused = await Docs.undo(doc.ref, docVersion.http);
+  check('doc undo refuses a version mismatch and does not trash', docVersionRefused.ok === false && docVersionRefused.reason === 'user-edited' && docVersionRefused.error === 'You edited this. Undo left it alone.' && docVersion.calls.length === 1, docVersionRefused);
   const added = 'Added line';
   const editMark = Docs.rangeName('doc9', added, CLOCK);
   const edited = scripted([
@@ -353,6 +369,18 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('sheet row undo refuses when the read fails and does not delete', sheetUnread.ok === false && sheetUnread.reason === 'unconfirmed' && sheetUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && sheetDown.calls.length === 1, sheetUnread);
   const sheetNoRow = await Sheets.undo(Object.assign({}, appended.ref, { row: null }), scripted([]).http);
   check('sheet row undo without a row snapshot does not delete', sheetNoRow.ok === false && sheetNoRow.reason === 'unconfirmed' && sheetNoRow.error === "Couldn't confirm it's unchanged. Undo left it alone.", sheetNoRow);
+  const sheetTimeOnly = scripted([
+    { status: 200, ok: true, json: { values: [row] } },
+    { status: 200, ok: true, json: { id: 'sheet1', trashed: false, headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }
+  ]);
+  const sheetTimeRefused = await Sheets.undo(Object.assign({}, appended.ref, { snapshot: { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }), sheetTimeOnly.http);
+  check('sheet undo refuses a modifiedTime match when version is missing and does not trash', sheetTimeRefused.ok === false && sheetTimeRefused.reason === 'unconfirmed' && sheetTimeRefused.error === "Couldn't confirm it's unchanged. Undo left it alone." && sheetTimeOnly.calls.length === 2 && sheetTimeOnly.calls.every((c) => c.method === 'GET'), sheetTimeRefused);
+  const sheetVersion = scripted([
+    { status: 200, ok: true, json: { values: [row] } },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP, { version: '3' }) }
+  ]);
+  const sheetVersionRefused = await Sheets.undo(appended.ref, sheetVersion.http);
+  check('sheet undo refuses a version mismatch and does not trash', sheetVersionRefused.ok === false && sheetVersionRefused.reason === 'user-edited' && sheetVersionRefused.error === 'You edited this. Undo left it alone.' && sheetVersion.calls.length === 2, sheetVersionRefused);
   const picked = scripted([
     { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A2:B2', updatedRows: 1 } } },
     { status: 200, ok: true, json: { values: [['Bea', '200']] } }

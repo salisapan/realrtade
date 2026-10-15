@@ -23,6 +23,9 @@ const sandbox = {
   TextEncoder,
   Uint8Array,
   Date,
+  setTimeout,
+  clearTimeout,
+  AbortController,
   fetch: async (url, init) => {
     fetches.push({ url: String(url), init: init || {} });
     const body = JSON.stringify({ id: 'e2e-gtask-1', title: 'Pay the invoice', status: 'needsAction' });
@@ -96,6 +99,122 @@ async function main() {
   check('a write calls fetch, not the status-0 stub', fetches.length >= 2 && written && written.ok === true && written.proof && written.proof.fetchedBack === true, { fetches: fetches.length, written: written && written.ok, reason: written && written.reason });
   check('the request is the Tasks API with the stored list and a bearer token', fetches.some((c) => c.url.indexOf('https://tasks.googleapis.com/tasks/v1/lists/glance-list/tasks') >= 0 && c.init.headers && c.init.headers.Authorization === 'Bearer ya29.host'), fetches.map((c) => c.url));
   check('the read-back is a GET of the created task', fetches.some((c) => c.init.method === 'GET' && /\/tasks\/e2e-gtask-1$/.test(c.url)));
+
+  const CONFIRM = "Couldn't confirm it's unchanged. Undo left it alone.";
+  const EDITED = 'You edited this. Undo left it alone.';
+  const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z' };
+  const driveRef = {
+    fileId: 'file1',
+    externalId: 'file1',
+    created: true,
+    snapshot: SNAP
+  };
+
+  function askUndo(connectorId, ref) {
+    return new Promise((resolve) => {
+      listeners[0]({ type: 'flow:google-undo', connectorId: connectorId, ref: ref }, {}, resolve);
+    });
+  }
+
+  async function flush() {
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+  }
+
+  const matchBody = JSON.stringify(Object.assign({ id: 'file1', trashed: false }, SNAP));
+  const matched = [];
+  sandbox.fetch = async (url, init) => {
+    matched.push({ method: (init && init.method) || 'GET', url: String(url) });
+    const body = (init && init.method) === 'PATCH' ? '{"trashed":true}' : matchBody;
+    return { ok: true, status: 200, text: async () => body };
+  };
+  const driveGone = await askUndo('googleDriveSave', driveRef);
+  check('a matching Drive snapshot trashes the file', driveGone.ok === true && matched.some((c) => c.method === 'PATCH') && matched[0].method === 'GET', driveGone);
+
+  const versionCalls = [];
+  sandbox.fetch = async (url, init) => {
+    versionCalls.push((init && init.method) || 'GET');
+    const live = Object.assign({ id: 'file1', trashed: false }, SNAP, { version: '2' });
+    return { ok: true, status: 200, text: async () => JSON.stringify(live) };
+  };
+  const versionRefused = await askUndo('googleDriveSave', driveRef);
+  check('a version mismatch says the file was edited and does not trash', versionRefused.ok === false && versionRefused.reason === 'user-edited' && versionRefused.error === EDITED && versionCalls.length === 1 && versionCalls[0] === 'GET', versionRefused);
+
+  const timeCalls = [];
+  sandbox.fetch = async (url, init) => {
+    timeCalls.push((init && init.method) || 'GET');
+    const live = { id: 'file1', trashed: false, headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime };
+    return { ok: true, status: 200, text: async () => JSON.stringify(live) };
+  };
+  const timeRef = Object.assign({}, driveRef, { snapshot: { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } });
+  const timeRefused = await askUndo('googleDriveSave', timeRef);
+  check('a modifiedTime match with no version says undo could not confirm and does not trash', timeRefused.ok === false && timeRefused.reason === 'unconfirmed' && timeRefused.error === CONFIRM && timeCalls.length === 1, timeRefused);
+
+  const savedTimer = sandbox.setTimeout;
+  const savedClear = sandbox.clearTimeout;
+  const pendingTimers = [];
+  sandbox.setTimeout = (fn, ms) => {
+    if (ms >= 8000) {
+      pendingTimers.push(fn);
+      return pendingTimers.length;
+    }
+    return savedTimer(fn, ms);
+  };
+  sandbox.clearTimeout = (id) => {
+    if (typeof id === 'number' && id > 0 && id <= pendingTimers.length) {
+      pendingTimers[id - 1] = null;
+      return;
+    }
+    return savedClear(id);
+  };
+
+  async function hungUndo(connectorId, ref) {
+    const calls = [];
+    let late = null;
+    let signal = null;
+    sandbox.fetch = (url, init) => {
+      const method = (init && init.method) || 'GET';
+      calls.push(method);
+      if (method !== 'GET') {
+        return Promise.resolve({ ok: true, status: 200, text: async () => '{"trashed":true}' });
+      }
+      signal = init && init.signal;
+      return new Promise((resolve) => {
+        late = () => resolve({ ok: true, status: 200, text: async () => matchBody });
+      });
+    };
+    const pending = askUndo(connectorId, ref);
+    await flush();
+    const timer = pendingTimers.shift();
+    check(connectorId + ' arms an 8s verify timer', typeof timer === 'function', pendingTimers.length);
+    if (typeof timer === 'function') timer();
+    const result = await Promise.race([
+      pending,
+      new Promise((resolve) => savedTimer(() => resolve({ hung: true }), 500))
+    ]);
+    if (typeof late === 'function') late();
+    await flush();
+    return { result: result, calls: calls, signal: signal };
+  }
+
+  const driveHung = await hungUndo('googleDriveSave', driveRef);
+  check('an 8s Drive verify timeout refuses and does not trash', driveHung.result && driveHung.result.ok === false && driveHung.result.reason === 'unconfirmed' && driveHung.result.error === CONFIRM && driveHung.result.hung !== true && driveHung.calls.indexOf('PATCH') < 0 && driveHung.calls.indexOf('DELETE') < 0, driveHung);
+  check('a late Drive response after the timeout does not trash', driveHung.signal && driveHung.signal.aborted === true && driveHung.calls.filter((m) => m !== 'GET').length === 0, driveHung.calls);
+
+  const docHung = await hungUndo('googleDoc', { documentId: 'doc1', externalId: 'doc1', created: true, snapshot: SNAP });
+  check('an 8s Doc verify timeout refuses and a late response does not trash', docHung.result && docHung.result.reason === 'unconfirmed' && docHung.result.error === CONFIRM && docHung.calls.indexOf('PATCH') < 0 && docHung.signal && docHung.signal.aborted === true, docHung);
+
+  const sheetHung = await hungUndo('googleSheetAppend', {
+    spreadsheetId: 'sheet1',
+    externalId: 'sheet1!Sheet1!A1:B1',
+    updatedRange: 'Sheet1!A1:B1',
+    created: true,
+    row: ['Ada', '100'],
+    snapshot: SNAP
+  });
+  check('an 8s Sheet verify timeout refuses and a late response does not trash', sheetHung.result && sheetHung.result.reason === 'unconfirmed' && sheetHung.result.error === CONFIRM && sheetHung.calls.indexOf('PATCH') < 0 && sheetHung.calls.indexOf('POST') < 0 && sheetHung.signal && sheetHung.signal.aborted === true, sheetHung);
+
+  sandbox.setTimeout = savedTimer;
+  sandbox.clearTimeout = savedClear;
 
   if (failures) {
     console.log('\n' + failures + ' failed');

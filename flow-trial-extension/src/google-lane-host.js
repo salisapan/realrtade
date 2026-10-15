@@ -43,22 +43,111 @@ function laneUrl(url) {
   }
 }
 
+// One undo generation. A verify GET that does not answer in 8 seconds marks
+// the generation dead and aborts the read. Trash and delete run only when
+// that same generation is still the live one and the read confirmed it.
+const VERIFY_MS = 8000;
+let undoGate = null;
+
+function beginUndo() {
+  undoGate = { id: (undoGate ? undoGate.id : 0) + 1, dead: false, confirmed: false };
+  return undoGate;
+}
+
+function endUndo(gate) {
+  if (!gate) return;
+  gate.dead = true;
+  gate.confirmed = false;
+  if (undoGate === gate) undoGate = null;
+}
+
+function bodyText(body) {
+  return typeof body === 'string' ? body : '';
+}
+
+function isTrashOrDelete(method, url, body) {
+  const raw = bodyText(body);
+  if (method === 'DELETE') return true;
+  if (method === 'PATCH' && raw.indexOf('"trashed":true') >= 0) return true;
+  if (method === 'POST' && (url.indexOf(':clear') >= 0 || url.indexOf(':batchUpdate') >= 0)) return true;
+  return false;
+}
+
+function trashBlocked(gate) {
+  return !gate || gate.dead || !gate.confirmed || undoGate !== gate;
+}
+
+function readBody(res) {
+  return res.text().then((text) => {
+    let json = null;
+    if (text) {
+      try { json = JSON.parse(text); } catch (e) { json = null; }
+    }
+    return { status: res.status, ok: res.ok, json: json };
+  });
+}
+
+// The confirming GET for Drive, Docs, and Sheets Undo. The timer and the
+// abort settle the read. A body that arrives after that must not arm trash.
+function verifyGet(gate, exec) {
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let settled = false;
+  let timer = null;
+  return new Promise((resolve) => {
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timer != null) clearTimeout(timer);
+      resolve(result);
+    };
+    Promise.resolve()
+      .then(() => exec(ctl ? ctl.signal : null))
+      .then((result) => {
+        if (settled || gate.dead || undoGate !== gate) {
+          finish({ status: 0, ok: false, json: null });
+          return;
+        }
+        gate.confirmed = !!(result && result.ok);
+        finish(result);
+      })
+      .catch(() => {
+        finish({ status: 0, ok: false, json: null });
+      });
+    timer = setTimeout(() => {
+      gate.dead = true;
+      gate.confirmed = false;
+      if (ctl) {
+        try { ctl.abort(); } catch (e) { /* already aborted */ }
+      }
+      finish({ status: 0, ok: false, json: null });
+    }, VERIFY_MS);
+  });
+}
+
 function laneHttp(req) {
   const request = req || {};
+  const method = request.method || 'GET';
+  const url = laneUrl(request.url);
+  const gate = undoGate;
   return Promise.resolve()
     .then(() => laneToken())
     .then((token) => {
       if (!token) return { status: 401, ok: false, json: null };
+      if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate)) {
+        return { status: 0, ok: false, json: null };
+      }
       const headers = Object.assign({}, request.headers || {}, { Authorization: 'Bearer ' + token });
-      const init = { method: request.method || 'GET', headers: headers };
-      if (request.body != null) init.body = request.body;
-      return fetch(laneUrl(request.url), init).then((res) => res.text().then((text) => {
-        let json = null;
-        if (text) {
-          try { json = JSON.parse(text); } catch (e) { json = null; }
+      const send = (signal) => {
+        if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate)) {
+          return Promise.resolve({ status: 0, ok: false, json: null });
         }
-        return { status: res.status, ok: res.ok, json: json };
-      }));
+        const init = { method: method, headers: headers };
+        if (request.body != null) init.body = request.body;
+        if (signal) init.signal = signal;
+        return fetch(url, init).then(readBody);
+      };
+      if (gate && method === 'GET') return verifyGet(gate, send);
+      return send(null);
     })
     .catch(() => ({ status: 0, ok: false, json: null }));
 }
@@ -159,9 +248,11 @@ function onLaneMessage(msg, sender, sendResponse) {
     return true;
   }
   if (msg.type === 'flow:google-undo') {
+    const gate = beginUndo();
     Promise.resolve(prepareUndo(msg.connectorId, msg.ref))
       .then((ref) => Lane.undo(msg.connectorId, ref))
-      .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+      .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }))
+      .finally(() => endUndo(gate));
     return true;
   }
   if (msg.type === 'flow:google-contacts') {

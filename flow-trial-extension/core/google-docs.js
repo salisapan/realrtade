@@ -57,19 +57,27 @@ const FlowGoogleDocs = (() => {
     return Object.keys(snap).length ? snap : null;
   }
 
+  function present(obj, key) {
+    return !!(obj && obj[key] != null && String(obj[key]) !== '');
+  }
+
+  // Version and modifiedTime both have to be present and equal.
+  // headRevisionId has to match when either side has it.
+  // A modifiedTime match with no version cannot confirm the file.
   function unchanged(snapshot, live) {
     if (!snapshot || typeof snapshot !== 'object') return 'missing';
-    const keys = ['headRevisionId', 'version', 'modifiedTime'];
-    let saw = false;
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      if (snapshot[key] == null || snapshot[key] === '') continue;
-      saw = true;
-      const got = live && live[key];
-      if (got == null || got === '') return 'unconfirmed';
-      if (String(got) !== String(snapshot[key])) return 'edited';
+    const got = live && typeof live === 'object' ? live : {};
+    if (!present(snapshot, 'version') || !present(snapshot, 'modifiedTime')) return 'unconfirmed';
+    if (!present(got, 'version') || !present(got, 'modifiedTime')) return 'unconfirmed';
+    if (String(snapshot.version) !== String(got.version)) return 'edited';
+    if (String(snapshot.modifiedTime) !== String(got.modifiedTime)) return 'edited';
+    const snapRev = present(snapshot, 'headRevisionId');
+    const liveRev = present(got, 'headRevisionId');
+    if (snapRev || liveRev) {
+      if (!snapRev || !liveRev) return 'unconfirmed';
+      if (String(snapshot.headRevisionId) !== String(got.headRevisionId)) return 'edited';
     }
-    return saw ? 'match' : 'missing';
+    return 'match';
   }
 
   function editedResult() {
@@ -262,6 +270,7 @@ const FlowGoogleDocs = (() => {
     for (let attempt = 0; attempt < 2; attempt++) {
       const got = await call(http, { method: 'GET', url: url });
       if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+      if (got.status === 0) return unconfirmedResult();
       if (!got.ok) return { ok: false, reason: 'http-' + got.status };
       const span = namedSpan(got.json, mark);
       if (!span) {
