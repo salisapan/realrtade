@@ -6,12 +6,16 @@
 //
 // The page is not a public interface. If the open chat cannot be read, Glance says so once and stays silent.
 (() => {
+  if (window.__glanceLaneChat) return;
   if (typeof FlowMessengerParse === 'undefined') return;
+  window.__glanceLaneChat = { observers: 0 };
   const P = FlowMessengerParse;
   const DEBOUNCE_MS = 1200;
   const RETRY_MS = 1000;
   const RETRY_LIMIT = 8;
   const MAX_ROWS = 40;
+  const STALE_MS = 14 * 24 * 60 * 60 * 1000;
+  const DRAFT_STORE = 'glanceLaneDrafts';
   let timer = null;
   let tries = 0;
   let lastReportedHealth = null;
@@ -88,6 +92,38 @@
     return null;
   }
 
+  function boxText(el) {
+    if (!el) return '';
+    const tag = String(el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return String(el.value || '');
+    return String(el.innerText || el.textContent || '');
+  }
+
+  function draftStore() {
+    return typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+  }
+
+  async function remembered(key) {
+    const area = draftStore();
+    if (!area || typeof area.get !== 'function') return null;
+    try {
+      const bag = await area.get(DRAFT_STORE);
+      const all = bag && bag[DRAFT_STORE];
+      return all && all[key] ? all[key] : null;
+    } catch (e) { return null; }
+  }
+
+  async function remember(key, row) {
+    const area = draftStore();
+    if (!area || typeof area.get !== 'function' || typeof area.set !== 'function') return;
+    try {
+      const bag = await area.get(DRAFT_STORE);
+      const all = (bag && bag[DRAFT_STORE]) || {};
+      all[key] = row;
+      await area.set({ [DRAFT_STORE]: all });
+    } catch (e) { /* a missed save can draft once more; the next save closes it */ }
+  }
+
   function report(ok, reason) {
     const key = ok ? 'ok' : 'bad:' + reason;
     if (key === lastReportedHealth) return;
@@ -95,7 +131,7 @@
     try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'messenger', ok: ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* the page may be closing */ }
   }
 
-  function maybeDraft(main, list, party, direct) {
+  function maybeDraft(main, list, party, direct, threadId) {
     if (typeof FlowChatLane === 'undefined' || !direct) {
       if (!direct) whyNot('not-one-to-one', location.href);
       else whyNot('missing-lane', location.href);
@@ -106,25 +142,41 @@
     const who = author(last);
     const text = textOf(last);
     const id = last.getAttribute('data-message-id') || text.slice(0, 80);
-    const key = (party.name || '') + '\n' + id + '\n' + text;
+    const key = String(threadId || party.name || '') + '\n' + id + '\n' + text;
     if (who !== 'them') { whyNot(who === 'me' ? 'from-me' : 'sender-not-identified', key); return; }
-    if (!text || drafted.has(key) || inflight.has(key)) return;
+    if (!text || inflight.has(key)) return;
+    const when = sentAt(last);
+    if (when != null && Date.now() - when > STALE_MS) { whyNot('stale', key); return; }
     inflight.add(key);
     const box = composerBox(main);
-    const when = sentAt(last);
-    FlowChatLane.draftInto(box, {
-      text: text,
-      fromMe: false,
-      oneToOne: true,
-      group: false,
-      quoted: forwarded(last),
-      channel: 'messenger',
-      now: when == null ? Date.now() : when,
-      sender: { name: party.name }
-    }).then((r) => {
-      if (r && r.reason === 'no-box') whyNot('no-box', key);
-      if (!r || r.reason !== 'no-box') drafted.add(key);
-    }).catch(() => { whyNot('draft-failed', key); drafted.add(key); }).finally(() => { inflight.delete(key); });
+    const finish = (async () => {
+      const saved = await remembered(key);
+      const shown = boxText(box).trim();
+      if (saved && saved.closed) { whyNot('closed', key); return; }
+      if (saved && saved.draft && shown !== String(saved.draft).trim()) {
+        await remember(key, { draft: saved.draft, closed: true });
+        whyNot('closed', key);
+        return;
+      }
+      if (saved && saved.draft) return;
+      if (drafted.has(key)) return;
+      const r = await FlowChatLane.draftInto(box, {
+        text: text,
+        fromMe: false,
+        oneToOne: true,
+        group: false,
+        quoted: forwarded(last),
+        channel: 'messenger',
+        now: when == null ? Date.now() : when,
+        sender: { name: party.name }
+      });
+      if (r && r.reason === 'no-box') { whyNot('no-box', key); return; }
+      if (r && r.ok && r.judged && r.judged.draft) {
+        await remember(key, { draft: r.judged.draft, closed: false });
+      }
+      drafted.add(key);
+    })();
+    finish.catch(() => { whyNot('draft-failed', key); drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
 
   function scan() {
@@ -166,12 +218,15 @@
       attachmentsOf: () => []
     };
     if (typeof FlowFollow !== 'undefined') FlowFollow.consider(ctx).catch((e) => console.error('[Glance] Messenger follow-up check failed', e));
-    maybeDraft(main, list, party, direct);
+    maybeDraft(main, list, party, direct, threadId);
   }
 
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
   const watch = document.documentElement || document.body;
-  if (watch) new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
+  if (watch) {
+    new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
+    window.__glanceLaneChat.observers += 1;
+  }
   schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.messenger = { scan: scan };

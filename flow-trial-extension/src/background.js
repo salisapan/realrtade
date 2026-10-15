@@ -539,6 +539,15 @@ async function restoreLaneChats() {
     try { tabs = await chrome.tabs.query({ url: lane.origins }); } catch (e) { tabs = []; }
     for (const tab of tabs || []) {
       if (!tab || typeof tab.id !== 'number') continue;
+      let alive = false;
+      try {
+        const reply = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => Boolean(window.__glanceLaneChat)
+        });
+        alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
+      } catch (e) { alive = false; }
+      if (alive) continue;
       try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: lane.js }); }
       catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
     }

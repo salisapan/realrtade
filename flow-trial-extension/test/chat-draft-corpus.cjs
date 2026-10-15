@@ -85,6 +85,7 @@ check('background.js hands the static Google helpers to the worker', /globalThis
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
 check('the service worker re-registers Business Suite when it is already allowed', /glance-lane-messenger/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc) && /whyNotShown: messenger-not-granted/.test(backgroundSrc));
+check('the service worker pings a tab before injecting the lane', /window\.__glanceLaneChat/.test(backgroundSrc));
 const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
 check('Messenger logs a quiet reason and retries an empty thread', /whyNotShown/.test(messengerSrc) && /RETRY_LIMIT/.test(messengerSrc) && /time\[datetime\]/.test(messengerSrc));
 check('Messenger off is said on the options page', /Messenger is off, so Business Suite stays quiet/.test(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8')));
@@ -143,6 +144,18 @@ const oct8 = decide(HE_PLACE, { now: sentToday, evidence: placeEvidence([one({ l
 check('8/10 is 8 October and sits in last week of a message sent 15 October 09:01', oct8.show === true && oct8.sends === false && oct8.draft.indexOf('דיזנגוף 99 - ' + MAPS) === 0 && oct8.draft.indexOf(encodeURIComponent('דיזנגוף 99')) > 0, oct8);
 const openedLater = decide(HE_PLACE, { now: new Date(2026, 9, 22, 12), evidence: placeEvidence([one({ location: 'דיזנגוף 99', startIso: '2026-10-08T10:00:00' })]) });
 check('the same 8 October event is outside last week of 22 October', openedLater.show === false && openedLater.sends === false && openedLater.reason === 'no-venue', openedLater);
+const weekAsk = { now: sentToday };
+function weekAt(iso) {
+  return decide(ASK, Object.assign({ evidence: placeEvidence([one({ startIso: iso })]) }, weekAsk));
+}
+check('Israel last week runs from Sunday 4 October', weekAt('2026-10-03T22:00:00.000Z').show === true && weekAt('2026-10-03T20:00:00.000Z').show === false);
+check('Israel last week ends before Sunday 11 October', weekAt('2026-10-10T20:00:00.000Z').show === true && weekAt('2026-10-10T22:00:00.000Z').reason === 'no-venue');
+const sundayAfternoon = new Date('2026-10-11T15:00:00+03:00');
+const laterTonight = decide('send me the location of the restaurant you were at on sunday', {
+  now: sundayAfternoon,
+  evidence: placeEvidence([one({ startIso: '2026-10-11T19:00:00+03:00' })])
+});
+check('a future date stays quiet', laterTonight.show === false && laterTonight.sends === false && laterTonight.reason === 'future', laterTonight);
 const friday = decide('איך קוראים לבית הקפה שישבת בו ביום שישי?', { evidence: placeEvidence([one({ location: 'Cafe Xoho, 7 King George, Tel Aviv', startIso: '2026-10-09T09:00:00' })]) });
 check('Hebrew Friday drafts that day only', friday.show === true && friday.draft.indexOf('Cafe Xoho - ') === 0, friday);
 check('a holding line is not a chat draft', decide("I'll send it by Friday.").draft == null);
@@ -265,6 +278,21 @@ const suiteExisting = FlowMessengerParse.classify(liveRoot('live/business-suite-
 check('an open Business Suite thread is a Page one-to-one', suiteExisting.kind === 'one-to-one' && suiteExisting.via === 'inbox' && suiteExisting.name === 'Dana Levi' && FlowMessengerParse.isOneToOne(liveRoot('live/business-suite-existing.html'), 'https://business.facebook.com/latest/inbox/all/') === true, suiteExisting);
 const inboxGroup = FlowMessengerParse.classify(liveRoot('fallback/messenger-inbox-group.html'));
 check('Business Suite inbox with a group word is a group', inboxGroup.kind === 'group' && inboxGroup.via === 'inbox' && FlowMessengerParse.isOneToOne(liveRoot('fallback/messenger-inbox-group.html')) === false, inboxGroup);
+function suiteKind(file) {
+  return FlowMessengerParse.classify(liveRoot(file), 'https://business.facebook.com/latest/inbox/all/');
+}
+const twoPeople = suiteKind('fallback/business-suite-two.html');
+check('a second participant line is a group', twoPeople.kind === 'group' && FlowMessengerParse.isOneToOne(liveRoot('fallback/business-suite-two.html'), 'https://business.facebook.com/latest/inbox/all/') === false, twoPeople);
+const groupChip = suiteKind('fallback/business-suite-group-chip.html');
+check('a Group chip is a group', groupChip.kind === 'group' && FlowMessengerParse.isOneToOne(liveRoot('fallback/business-suite-group-chip.html'), 'https://business.facebook.com/latest/inbox/all/') === false, groupChip);
+const labeled = suiteKind('fallback/business-suite-label.html');
+check('a VIP label is not the person', labeled.kind === 'one-to-one' && labeled.name === 'Dana Levi', labeled);
+const assigned = suiteKind('fallback/business-suite-assigned.html');
+check('Assigned to is not the person', assigned.kind === 'one-to-one' && assigned.name === 'Dana Levi', assigned);
+const agent = suiteKind('fallback/business-suite-agent.html');
+check('the agent name is not the person', agent.kind === 'one-to-one' && agent.name === 'Dana Levi', agent);
+const pageName = suiteKind('fallback/business-suite-page.html');
+check('the Page name is not the person', pageName.kind === 'one-to-one' && pageName.name === 'Dana Levi', pageName);
 const advDir = path.join(__dirname, 'fixtures/chat/adv');
 const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html')).sort();
 check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
@@ -667,7 +695,8 @@ console.log('\n--- calendar evidence ---\n');
     };
   }
 
-  async function open(name, url, surface) {
+  async function open(name, url, surface, opts) {
+    const o = opts || {};
     const html = fs.readFileSync(path.join(__dirname, 'fixtures/chat', name), 'utf8');
     const dom = new JSDOM(html, { url: url, runScripts: 'outside-only', pretendToBeVisual: true });
     const w = dom.window;
@@ -684,8 +713,10 @@ console.log('\n--- calendar evidence ---\n');
           }
           if (cb) setTimeout(() => cb(reply), 0);
         }
-      }
+      },
+      storage: o.storage
     };
+    if (o.logs) w.console.info = function () { o.logs.push(Array.from(arguments).join(' ')); };
     const lane = lanes.find((item) => item.js[item.js.length - 1] === surface);
     const list = lane;
     const ctx = dom.getInternalVMContext();
@@ -693,7 +724,8 @@ console.log('\n--- calendar evidence ---\n');
       new vm.Script(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel }).runInContext(ctx);
     });
     const key = surface.indexOf('whatsapp') >= 0 ? 'whatsapp' : (surface.indexOf('messenger') >= 0 ? 'messenger' : 'instagram');
-    vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
+    if (o.beforeScan) o.beforeScan(w);
+    if (!o.skipScan) vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
     await new Promise((r) => setTimeout(r, 30));
     const composer = w.document.querySelector('[data-glance-composer="1"]');
     const send = w.document.querySelector('[aria-label="Send"]');
@@ -707,7 +739,24 @@ console.log('\n--- calendar evidence ---\n');
       name: partyName,
       sent: sent,
       sendClicks: sendClicks,
-      close() { w.close(); }
+      close() { w.close(); },
+      window: w,
+      scan() { vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx); }
+    };
+  }
+
+  function memoryStorage(bag) {
+    return {
+      local: {
+        get(name) {
+          if (typeof name === 'string') return Promise.resolve({ [name]: bag[name] });
+          return Promise.resolve(Object.assign({}, bag));
+        },
+        set(obj) {
+          Object.keys(obj || {}).forEach((k) => { bag[k] = obj[k]; });
+          return Promise.resolve();
+        }
+      }
     };
   }
 
@@ -740,6 +789,13 @@ console.log('\n--- calendar evidence ---\n');
     ['live/business-suite-existing.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
     ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', true],
     ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
+    ['fallback/business-suite-two.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', false],
+    ['fallback/business-suite-group-chip.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', false],
+    ['fallback/business-suite-label.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['fallback/business-suite-assigned.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['fallback/business-suite-agent.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['fallback/business-suite-page.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', true],
+    ['fallback/business-suite-stale.html', 'https://business.facebook.com/latest/inbox/all/', 'src/content-messenger.js', false],
     ['fallback/messenger-one-avatar-group.html', 'https://www.messenger.com/t/one-avatar-group', 'src/content-messenger.js', false]
   ];
   fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
@@ -792,6 +848,53 @@ console.log('\n--- calendar evidence ---\n');
     clicks.length = 0;
     keys.length = 0;
   }
+
+  const suiteUrl = 'https://business.facebook.com/latest/inbox/all/';
+  const deletedStore = memoryStorage({});
+  const deleted = await open('live/business-suite-existing.html', suiteUrl, 'src/content-messenger.js', { storage: deletedStore });
+  await new Promise((r) => setTimeout(r, 40));
+  check('the open thread drafts before the draft is deleted', deleted.text.indexOf('Taizu - ') === 0, deleted.text);
+  deleted.window.document.querySelector('[data-glance-composer="1"]').textContent = '';
+  deleted.scan();
+  await new Promise((r) => setTimeout(r, 40));
+  const deletedAgain = await open('live/business-suite-existing.html', suiteUrl, 'src/content-messenger.js', { storage: deletedStore });
+  await new Promise((r) => setTimeout(r, 40));
+  check('a deleted draft stays gone after reload', deletedAgain.text.trim() === '', deletedAgain.text);
+  deleted.close();
+  deletedAgain.close();
+
+  const editedStore = memoryStorage({});
+  const edited = await open('live/business-suite-existing.html', suiteUrl, 'src/content-messenger.js', { storage: editedStore });
+  await new Promise((r) => setTimeout(r, 40));
+  edited.window.document.querySelector('[data-glance-composer="1"]').textContent = 'my edit';
+  edited.scan();
+  await new Promise((r) => setTimeout(r, 40));
+  const editedText = edited.window.document.querySelector('[data-glance-composer="1"]').textContent;
+  check('an edited draft is left untouched', editedText === 'my edit', editedText);
+  const editedAgain = await open('live/business-suite-existing.html', suiteUrl, 'src/content-messenger.js', { storage: editedStore });
+  await new Promise((r) => setTimeout(r, 40));
+  check('an edited draft is not written again after reload', editedAgain.text.trim() === '', editedAgain.text);
+  edited.close();
+  editedAgain.close();
+
+  const staleLogs = [];
+  const stale = await open('fallback/business-suite-stale.html', suiteUrl, 'src/content-messenger.js', { logs: staleLogs });
+  check('a message older than 14 days stays quiet', stale.text.trim() === '' && staleLogs.some((line) => line.indexOf('[Glance] whyNotShown: stale') >= 0), { text: stale.text, logs: staleLogs });
+  stale.close();
+
+  const guardDom = new JSDOM('<div role="main"></div>', { url: suiteUrl, runScripts: 'outside-only', pretendToBeVisual: true });
+  pin(guardDom.window);
+  guardDom.window.chrome = { runtime: { lastError: null, sendMessage() {} } };
+  const guardCtx = guardDom.getInternalVMContext();
+  const guardLane = lanes.find((item) => item.js[item.js.length - 1] === 'src/content-messenger.js');
+  guardLane.js.slice(0, -1).forEach((rel) => {
+    new vm.Script(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel }).runInContext(guardCtx);
+  });
+  const guardSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
+  for (let n = 0; n < 3; n++) new vm.Script(guardSrc, { filename: 'src/content-messenger.js' }).runInContext(guardCtx);
+  const observers = vm.runInContext('(window.__glanceLaneChat && window.__glanceLaneChat.observers) || 0', guardCtx);
+  check('three injections leave one observer', observers === 1, observers);
+  guardDom.window.close();
 
   const enable = new JSDOM(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8'), { runScripts: 'outside-only', url: 'chrome-extension://glance/lane-chat/enable.html' });
   const ew = enable.window;

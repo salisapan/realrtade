@@ -46,9 +46,9 @@ const FlowMessengerParse = (() => {
   // 4. [data-surface$="inbox:detail_view_header"]
   //    Business Suite inbox, business.facebook.com/latest/inbox.
   //    Fixture: test/fixtures/chat/live/messenger-page-inbox.html.
-  //    The name is the first text that is not inside [role="button"].
-  //    A Page-to-person thread is one-to-one: one name, and no group marker.
-  //    A group word, a member count, or a group-looking title stays quiet.
+  //    One participant line is the person. A second participant line, a Group
+  //    chip, or a group word stays quiet. A label (VIP), "Assigned to",
+  //    the agent's name, and the Page's name are not the person.
   //
   // Inside the chosen region, a draft needs one header profile link that
   // names the same person as the header title. The title's own text does not
@@ -131,9 +131,57 @@ const FlowMessengerParse = (() => {
     return walk(region);
   }
 
+  const INBOX_SKIP = /\/lib:(label|assignee|agent|page_name)(?:\/|$)/;
+  const INBOX_GROUP = /\/lib:group_chip(?:\/|$)/;
+  const LABEL_LINE = /^(?:\(?\s*vip\s*\)?|labels?)$/i;
+  const ASSIGNED_LINE = /^(?:assigned to|הוקצה(?:\s+ל)?)\b/i;
+  const GROUP_CHIP = /^(?:group|קבוצה)$/i;
+
+  // Participant lines in a Page inbox. The first text node is not the person.
+  function inboxFacts(region) {
+    const names = [];
+    let group = false;
+    function consider(text) {
+      const t = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!t) return;
+      if (GROUP_CHIP.test(t) || GROUP_WORD.test(t) || countSaysGroup(t)) { group = true; return; }
+      if (ASSIGNED_LINE.test(t) || LABEL_LINE.test(t)) return;
+      if (!/\p{L}/u.test(t)) return;
+      names.push(t);
+    }
+    function walk(node) {
+      if (!node || node.nodeType !== 1) return;
+      const role = node.getAttribute && node.getAttribute('role');
+      if (role === 'button' || role === 'row') return;
+      const surface = (node.getAttribute && node.getAttribute('data-surface')) || '';
+      if (INBOX_GROUP.test(surface)) { group = true; return; }
+      if (INBOX_SKIP.test(surface)) return;
+      const kids = Array.from(node.childNodes || []);
+      let nested = false;
+      for (let i = 0; i < kids.length; i++) {
+        const kid = kids[i];
+        if (kid.nodeType === 1 && !(kid.getAttribute && kid.getAttribute('role') === 'button')) nested = true;
+      }
+      if (!nested) {
+        consider(kids.filter((kid) => kid.nodeType === 3).map((kid) => kid.textContent).join(' '));
+        return;
+      }
+      for (let i = 0; i < kids.length; i++) {
+        const kid = kids[i];
+        if (kid.nodeType === 3) consider(kid.textContent);
+        else if (kid.nodeType === 1) walk(kid);
+      }
+    }
+    walk(region);
+    return { names: names, group: group };
+  }
+
   function nameIn(region, via) {
     if (!region || typeof region.querySelector !== 'function') return '';
-    if (via === 'inbox') return looseName(region);
+    if (via === 'inbox') {
+      const facts = inboxFacts(region);
+      return facts.names.length === 1 ? facts.names[0] : '';
+    }
     const h3 = region.querySelector('h3');
     if (!h3 || inRow(h3)) return '';
     const text = plainText(h3);
@@ -260,6 +308,10 @@ const FlowMessengerParse = (() => {
 
   // A group stays quiet even when a profile link matches the title.
   function isGroup(scope, via) {
+    if (via === 'inbox') {
+      const facts = inboxFacts(scope);
+      if (facts.group || facts.names.length > 1) return true;
+    }
     if (groupTitle(regionTitle(scope, via))) return true;
     if (headerSaysGroup(scope)) return true;
     if (imgsIn(scope).length >= 2) return true;
@@ -579,8 +631,15 @@ const FlowMessengerParse = (() => {
     const raw = regionTitle(scope, via);
     const whole = root || scope;
     if (isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole)) return { kind: 'group', via: via, name: name, active: active };
-    // Business Suite names the person in the detail header. That is the Page thread.
-    if (via === 'inbox' && name && !groupTitle(name)) return { kind: 'one-to-one', via: via, name: name, active: active };
+    if (via === 'inbox') {
+      const facts = inboxFacts(scope);
+      const person = facts.names.length === 1 ? facts.names[0] : '';
+      if (facts.group || facts.names.length > 1 || (person && groupTitle(person))) {
+        return { kind: 'group', via: via, name: person, active: active };
+      }
+      if (person) return { kind: 'one-to-one', via: via, name: person, active: active };
+      return { kind: 'unknown', via: via, name: '', active: false };
+    }
     const proved = matchingProfile(scope, via) || threadMatches(scope, href, via) || singlePersonPanel(whole, raw);
     if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw) && !threadMatches(scope, href, via) && !singlePersonPanel(whole, raw)) {
       return { kind: 'unknown', via: via, name: name, active: active };

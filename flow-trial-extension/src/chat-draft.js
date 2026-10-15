@@ -48,13 +48,56 @@ const FlowChatDraft = (() => {
     return { startMs: start.getTime(), endMs: end.getTime(), startIso: start.toISOString(), endIso: end.toISOString() };
   }
 
+  // Previous Sunday 00:00 through this Sunday 00:00, Israel time. Saturday is the last day.
   function lastWeek(now) {
-    const day = atMidnight(now);
-    const mondayOffset = day.getDay() === 0 ? 6 : day.getDay() - 1;
-    const thisMonday = addDays(day, -mondayOffset);
-    const start = addDays(thisMonday, -7);
-    const end = thisMonday;
-    return { startMs: start.getTime(), endMs: end.getTime(), startIso: start.toISOString(), endIso: end.toISOString() };
+    const clock = now instanceof Date ? now : new Date(typeof now === 'number' ? now : Date.now());
+    const civil = jerusalemCivil(clock);
+    const sunday = addCivil(civil.y, civil.m, civil.d, -civil.dow);
+    const start = addCivil(sunday.y, sunday.m, sunday.d, -7);
+    const startMs = jerusalemWall(start.y, start.m, start.d);
+    const endMs = jerusalemWall(sunday.y, sunday.m, sunday.d);
+    return { startMs: startMs, endMs: endMs, startIso: new Date(startMs).toISOString(), endIso: new Date(endMs).toISOString() };
+  }
+
+  function jerusalemCivil(date) {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Jerusalem',
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const bag = {};
+    fmt.formatToParts(date).forEach((part) => { bag[part.type] = part.value; });
+    const week = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return { y: +bag.year, m: +bag.month, d: +bag.day, dow: week[bag.weekday] };
+  }
+
+  function addCivil(y, m, d, n) {
+    const utc = new Date(Date.UTC(y, m - 1, d + n));
+    return { y: utc.getUTCFullYear(), m: utc.getUTCMonth() + 1, d: utc.getUTCDate() };
+  }
+
+  function jerusalemWall(y, m, d) {
+    const want = Date.UTC(y, m - 1, d, 0, 0, 0);
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Jerusalem',
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    function asUtc(ms) {
+      const bag = {};
+      fmt.formatToParts(new Date(ms)).forEach((part) => { bag[part.type] = part.value; });
+      return Date.UTC(+bag.year, +bag.month - 1, +bag.day, +bag.hour, +bag.minute, +bag.second);
+    }
+    let guess = want;
+    for (let i = 0; i < 3; i++) guess += want - asUtc(guess);
+    return guess;
   }
 
   function pastWeekday(now, target) {
@@ -63,7 +106,7 @@ const FlowChatDraft = (() => {
     return addDays(day, -delta);
   }
 
-  // clock is the message time when the host could read one. "Last week" is that week.
+  // clock is the message time when the host could read one. "Last week" is the previous Sunday-to-Saturday week in Israel.
   function windowFor(body, now) {
     const clock = now instanceof Date ? now : new Date(typeof now === 'number' ? now : Date.now());
     // שבוע שעבר only at a word edge. מהשבוע שעבר is one word and stays quiet.
@@ -190,14 +233,17 @@ const FlowChatDraft = (() => {
     return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
   }
 
-  function pickVenue(evidence, window) {
+  function pickVenue(evidence, window, now) {
     if (!evidence || evidence.events == null) return { reason: 'not-checked' };
     if (!window) return { reason: 'no-window' };
+    const clock = now instanceof Date ? now.getTime() : (typeof now === 'number' ? now : Date.now());
     const hits = [];
+    let future = false;
     for (const ev of evidence.events) {
       if (!ev || ev.status === 'cancelled') continue;
       const t = eventTime(ev);
       if (!(t >= window.startMs && t < window.endMs)) continue;
+      if (Number.isFinite(clock) && t > clock) { future = true; continue; }
       const loc = String(ev.location || '').replace(/[\r\n]+/g, ' ').trim();
       // A name alone is not a place we can hand someone. A street, a number, or a comma is.
       if (!loc || MEETING.test(loc) || HOME.test(loc) || !(/,/.test(loc) || /\d/.test(loc))) continue;
@@ -209,6 +255,7 @@ const FlowChatDraft = (() => {
     }
     if (unique.length === 1) return { hit: unique[0] };
     if (unique.length > 1) return { reason: 'conflict' };
+    if (future) return { reason: 'future' };
     return { reason: 'no-venue' };
   }
 
@@ -235,7 +282,7 @@ const FlowChatDraft = (() => {
     if (!detected || detected.veto) return silence(detected && detected.veto ? detected.veto : 'no-ask', chain, incoming);
     if (detected.kind === 'place') {
       if (detected.weak) return silence('weak-window', chain, incoming);
-      const picked = pickVenue(i.evidence, detected.window);
+      const picked = pickVenue(i.evidence, detected.window, i.now);
       if (!picked.hit) return silence(picked.reason || 'no-venue', chain, incoming);
       const line = picked.hit.name + ' - ' + mapsUrl(picked.hit.query);
       if (!line || /[\r\n]/.test(line)) return silence('no-venue', chain, incoming);

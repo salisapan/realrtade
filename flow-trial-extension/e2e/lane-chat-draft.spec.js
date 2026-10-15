@@ -136,4 +136,31 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
   expect(calls.some((call) => /\/(send|reply|sendMail)\b/i.test(String(call.url)))).toBe(false);
   const flows = await glance.flows();
   expect(flows.length).toBe(0);
+
+  const reinjected = await glance.evaluateWorker(async (files) => {
+    const tabs = await chrome.tabs.query({ url: ['https://business.facebook.com/*'] });
+    const tab = (tabs || [])[0];
+    if (!tab) return { error: 'no-tab' };
+    const actions = [];
+    for (let n = 0; n < 3; n++) {
+      let alive = false;
+      try {
+        const reply = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => Boolean(window.__glanceLaneChat)
+        });
+        alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
+      } catch (e) { alive = false; }
+      if (alive) { actions.push('skip'); continue; }
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: files });
+      actions.push('injected');
+    }
+    const counted = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => (window.__glanceLaneChat && window.__glanceLaneChat.observers) || 0
+    });
+    return { actions: actions, observers: counted && counted[0] && counted[0].result };
+  }, LANE_JS);
+  expect(reinjected.actions).toEqual(['skip', 'skip', 'skip']);
+  expect(reinjected.observers).toBe(1);
 });
