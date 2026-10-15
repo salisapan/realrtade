@@ -660,6 +660,31 @@ const FlowProofOfClose = (() => {
         }
       }
     }
+    return legacyCaseProof(store, keys);
+  }
+
+  // An old row stored the id in lowercase and never stored a message id.
+  // Case-insensitive match is only that fallback. The receipt can show.
+  // Undo cannot delete it.
+  function legacyCaseProof(store, keys) {
+    if (!store || !store.records || !keys.length) return null;
+    const want = {};
+    keys.forEach((k) => { if (k) want[String(k).toLowerCase()] = true; });
+    const mids = Object.keys(store.records);
+    for (let i = 0; i < mids.length; i++) {
+      const rec = store.records[mids[i]];
+      if (!rec || rec.undone === true || rec.kind === 'undone') continue;
+      if (rec.messageId) continue;
+      const stored = [].concat(rec.ids || [], [rec.itemId, rec.pathId, rec.threadId, rec.outlookConversationId]);
+      for (let j = 0; j < stored.length; j++) {
+        const aliases = idAliases(stored[j]);
+        for (let k = 0; k < aliases.length; k++) {
+          if (want[String(aliases[k]).toLowerCase()]) {
+            return Object.assign({}, rec, { legacyCase: true });
+          }
+        }
+      }
+    }
     return null;
   }
 
@@ -744,7 +769,8 @@ const FlowProofOfClose = (() => {
       glanceDeleted: deleted,
       deletedLine: deleted ? line : null,
       verifyNote: deleted ? null : (record.verifyNote || null),
-      objectName: record.objectName || 'To Do'
+      objectName: record.objectName || 'To Do',
+      legacyCase: record.legacyCase === true
     };
   }
 

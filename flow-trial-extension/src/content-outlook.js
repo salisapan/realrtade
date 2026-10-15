@@ -793,10 +793,11 @@
   }
 
   async function onDoIt(host, chip, ctx, liveSteps) {
+    const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
     doItInFlight = true;
     try {
-    FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
     let resolvedId = null;
     try {
@@ -818,24 +819,24 @@
       resolvedId = null;
     }
     if (!resolvedId) {
-      FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message');
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message'); });
       return;
     }
     const fromList = Array.isArray(liveSteps);
     const steps = fromList ? liveSteps : ((ctx.process && ctx.process.steps) || []);
     if (fromList && !steps.length) {
-      if (host) host.remove();
+      paintIfCurrent(token, function () { paintRemove(host); });
       return;
     }
     const fileStep = steps.find((s) => s && s.kind === 'onedriveFile');
     if (fileStep) {
-      await onOnedriveDoIt(host, chip, ctx, fileStep);
+      await onOnedriveDoIt(host, chip, ctx, fileStep, token);
       return;
     }
     const hasDraft = steps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
     const taskStep = steps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     if (taskStep && !hasDraft) {
-      await onOutlookTodoDoIt(host, chip, ctx, taskStep);
+      await onOutlookTodoDoIt(host, chip, ctx, taskStep, token);
       return;
     }
     const askText = ctx.bodyText || ctx.text || '';
@@ -881,7 +882,9 @@
           senderEmail: ctx.sender && ctx.sender.email
         });
       }
-      FlowChipHost.setChipState(chip, 'flow-chip-error', (r && !r.ok && (r.reason || r.error)) || (file ? 'Could not attach that file.' : 'Could not create draft'));
+      paintIfCurrent(token, function () {
+        FlowChipHost.setChipState(chip, 'flow-chip-error', (r && !r.ok && (r.reason || r.error)) || (file ? 'Could not attach that file.' : 'Could not create draft'));
+      });
       return;
     }
     const unverified = r.fetchedBack === false || r.reason === 'unverified';
@@ -917,11 +920,12 @@
       await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
       await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
     }
-    FlowChipHost.showDraftReceipt(host, {
+    paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
       status: draftUnverifiedStatus(written),
       written: written,
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
+        const undoToken = captureMailToken();
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created, outlookImmutableId: ctx.outlookImmutableId === true });
         if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
@@ -934,12 +938,12 @@
         // re-inject Do It (same eligibility as the popup Still Open list).
         lastKey = '';
         lastSig = '';
-        try { host.remove(); } catch (e) { /* already gone */ }
+        paintIfCurrent(undoToken, function () { paintRemove(host); });
         schedule();
         if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
         return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
       })
-    });
+    }); });
     } finally {
       doItInFlight = false;
     }
@@ -978,6 +982,7 @@
   // One Handled receipt for this message. A second copy, in the header or
   // in the body, is removed. A different message's host is not this receipt.
   function stripDuplicateUndoHosts(mount) {
+    if (paintDepth <= 0) return null;
     const scope = readingScope(mount);
     if (!scope || !scope.querySelectorAll) return null;
     const hosts = [];
@@ -1130,6 +1135,57 @@
     return gen.conv === token + '|' + pane;
   }
 
+  // The open mail, read now from the address and the reading pane.
+  // renderEpoch and scanMessageId are not read: the next scan writes those.
+  function readLiveMail() {
+    let href = '';
+    try { href = location.href || ''; } catch (e) { href = ''; }
+    const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? (FlowOwaParse.urlIds(href) || {}) : {};
+    let messageId = (ids.kind === 'message' && ids.itemId) ? String(ids.itemId) : '';
+    let convId = ids.conversationId ? String(ids.conversationId) : '';
+    if (!convId) {
+      try {
+        const node = document.querySelector('#ReadingPaneContainerId [id^="CONV_"][id$="_SUBJECT"]')
+          || document.querySelector('[role="main"] [id^="CONV_"][id$="_SUBJECT"]');
+        convId = node && node.id ? String(node.id) : '';
+      } catch (e) { convId = ''; }
+    }
+    let doc = '';
+    try {
+      const root = openMailRoot();
+      const body = root && root.querySelector ? (root.querySelector('div[role="document"]') || root.querySelector('[role="document"]')) : null;
+      doc = body ? hashText(readingText(body).replace(/\s+/g, ' ').trim().slice(0, 240)) : '';
+    } catch (e) { doc = ''; }
+    if (!messageId && ids.raw && ids.kind !== 'conversation') messageId = String(ids.raw);
+    return { epoch: mailEpoch, convId: convId + '|' + doc, messageId: messageId };
+  }
+
+  function captureMailToken() {
+    const live = readLiveMail();
+    return { epoch: live.epoch, convId: live.convId, messageId: live.messageId };
+  }
+
+  function mailTokenLive(token) {
+    if (!token) return false;
+    const live = readLiveMail();
+    return token.epoch === live.epoch && token.convId === live.convId && token.messageId === live.messageId;
+  }
+
+  // One door for every card mutation. The token is the mail this scan,
+  // mail-open, or click started on. The check reads the pane and the URL again.
+  let paintDepth = 0;
+  function paintIfCurrent(token, fn) {
+    if (!mailTokenLive(token) || typeof fn !== 'function') return null;
+    paintDepth += 1;
+    try { return fn(); }
+    finally { paintDepth -= 1; }
+  }
+
+  function bindMailToken(pane, token) {
+    if (pane) pane.__mailToken = token;
+    return token;
+  }
+
   // The card records the open mail it was painted for. No token on the
   // card, or no open mail now, never executes. A different token is a
   // click meant for a mail that is no longer open.
@@ -1187,9 +1243,9 @@
   }
 
   function injectCard(mount, ctx, handlers) {
+    if (paintDepth <= 0) return null;
     noteOpenMail();
     if (ctx && typeof ctx.__epoch === 'number' && ctx.__epoch !== mailEpoch) return null;
-    if (!renderLive()) return null;
     const src = handlers || {};
     const host = FlowChipHost.inject(mount, ctx, {
       onDoIt: src.onDoIt,
@@ -1220,8 +1276,8 @@
   }
 
   function paintOutlookTodoReceipt(mount, row) {
+    if (paintDepth <= 0) return null;
     noteOpenMail();
-    if (!renderLive()) return null;
     const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
       ? FlowProofOfClose.remountCopy(row)
       : null;
@@ -1305,6 +1361,12 @@
     }, 'page:receipt-mounted');
     undo.addEventListener('click', () => {
       if (ignoreStaleClick(host)) return;
+      if (row.legacyCase === true) {
+        hint.hidden = false;
+        hint.textContent = "Couldn't confirm";
+        hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+        return;
+      }
       undo.textContent = 'Undoing…';
       undo.disabled = true;
       readBackOrTimeout(send({
@@ -1404,8 +1466,8 @@
   }
 
   function paintUndoneStatus(mount, pane, line) {
+    if (paintDepth <= 0) return null;
     noteOpenMail();
-    if (!renderLive()) return null;
     const ids = messageIdsOf(pane);
     const existing = stripDuplicateUndoHosts(mount);
     if (existing && existing.getAttribute('data-glance-undone') === '1' && hostMatches(existing, ids)) {
@@ -1469,21 +1531,23 @@
       lastOutcome = 'card';
       return true;
     }
+    const token = pane.__mailToken;
     const old = mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
-    const host = injectCard(mount, stampEpoch({
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
+    const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch({
       process: { name: 'Reply', steps: [] },
       intent: { label: draft.label || 'Reply draft ready' },
       messageId: draft.messageId
-    }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
+    }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; const clickToken = captureMailToken(); paintIfCurrent(clickToken, function () { paintRemove(h); }); } }); });
     if (!host) return false;
     lastOutcome = 'card';
     const draftWritten = draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.';
-    FlowChipHost.showDraftReceipt(host, {
+    paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
       status: draftUnverifiedStatus(draftWritten),
       written: draftWritten,
       url: draft.url || draft.where,
       onUndo: guardedUndo(host, async () => {
+        const undoToken = captureMailToken();
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref, created: draft.created });
         if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
@@ -1493,11 +1557,11 @@
         if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
         lastKey = '';
         lastSig = '';
-        try { host.remove(); } catch (e) { /* already gone */ }
+        paintIfCurrent(undoToken, function () { paintRemove(host); });
         schedule();
         return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
       })
-    });
+    }); });
     return true;
   }
 
@@ -1535,15 +1599,13 @@
     return next || record;
   }
 
-  async function paintSharedProof(mount, record, stamp) {
-    const gen = stamp || mailGeneration();
+  async function paintSharedProof(mount, record, token) {
     const live = await reconcileProofRecord(record);
-    if (!mailStill(gen)) return false;
     const row = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.proofAsLogRow)
       ? FlowProofOfClose.proofAsLogRow(live)
       : live;
-    if (!row || !mailStill(gen)) return false;
-    return Boolean(paintOutlookTodoReceipt(mount, row));
+    if (!row) return false;
+    return Boolean(paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, row); }));
   }
 
   // Handled after a reload or a return to this thread. The match is the
@@ -1551,15 +1613,15 @@
   // pane text is not an id. The record is the same one Loops reads.
   async function remountProvedTodoReceipt(pane) {
     if (!pane || typeof FlowProofOfClose === 'undefined' || typeof FlowProofOfClose.taskReceiptFromLog !== 'function') return false;
-    const stamp = mailGeneration();
+    const token = pane.__mailToken || null;
     const mount = mountPoint();
-    if (!mount) return false;
+    if (!mount || !mailTokenLive(token)) return false;
     let bag = null;
     try { bag = await FlowStorage.get(); } catch (e) { return false; }
-    if (!mailStill(stamp)) return false;
+    if (!mailTokenLive(token)) return false;
     if (typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.proofForIds === 'function') {
       const shared = FlowProofOfClose.proofForIds(bag && bag.glanceProofs, proofIdsForPane(pane));
-      if (shared && await paintSharedProof(mount, shared, stamp)) {
+      if (shared && await paintSharedProof(mount, shared, token)) {
         lastOutcome = 'card';
         lastKey = (shared.messageId || 'open') + '|task-proof';
         return true;
@@ -1574,7 +1636,7 @@
         fileNames: fileNames,
         subject: pane.subject || ''
       });
-      if (mailStill(stamp) && provedFile && paintOutlookTodoReceipt(mount, provedFile)) {
+      if (provedFile && paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, provedFile); })) {
         lastOutcome = 'card';
         lastKey = (provedFile.messageId || 'open') + '|task-proof';
         return true;
@@ -1598,7 +1660,7 @@
     if (graphId) rowQuery.messageIds.push(graphId);
     if (graphId && typeof FlowProofOfClose.proofForIds === 'function') {
       const later = FlowProofOfClose.proofForIds(bag && bag.glanceProofs, proofIdsForPane(pane, [graphId]));
-      if (later && await paintSharedProof(mount, later, stamp)) {
+      if (later && await paintSharedProof(mount, later, token)) {
         lastOutcome = 'card';
         lastKey = (later.messageId || 'open') + '|task-proof';
         return true;
@@ -1610,18 +1672,18 @@
     }
     if (outlookProofRow(row)) {
       row = await reconcileMountedRow(row);
-      if (!mailStill(stamp)) return false;
+      if (!mailTokenLive(token)) return false;
     }
-    if (!mailStill(stamp)) return false;
-    const existing = stripDuplicateUndoHosts(mount);
+    if (!mailTokenLive(token)) return false;
+    const existing = paintIfCurrent(token, function () { return stripDuplicateUndoHosts(mount); });
     // An Undo line is not a close. data-glance-undone stays on the click,
     // then this scan drops it so exactly one Do It can return, including
     // after reload and for a banner stored by an earlier version.
     if (existing && existing.getAttribute('data-glance-undone') === '1') {
-      existing.remove();
+      paintIfCurrent(token, function () { paintRemove(existing); });
     }
     if (!outlookProofRow(row)) {
-      if (existing && existing.isConnected) existing.remove();
+      if (existing && existing.isConnected) paintIfCurrent(token, function () { paintRemove(existing); });
       return false;
     }
     if (existing && existing.classList.contains('flow-chip-settled') && row && row.deleted !== true && !row.verifyNote && !row.undoLine) {
@@ -1629,7 +1691,7 @@
       lastKey = (row.messageId || 'open') + '|task-proof';
       return true;
     }
-    return Boolean(paintOutlookTodoReceipt(mount, row));
+    return Boolean(paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, row); }));
   }
 
   // A log row is the same proof. Reconcile it on open, including when the
@@ -1727,7 +1789,7 @@
     return (r && (r.error || r.reason)) || 'Could not confirm the task';
   }
 
-  async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
+  async function onOutlookTodoDoIt(host, chip, ctx, taskStep, token) {
     const params = (taskStep && taskStep.params) || {};
     const live = await livePromiseProof(promiseItem(ctx));
     if (ignoreStaleClick(host)) return;
@@ -1757,18 +1819,18 @@
       : false;
     if (!proved) {
       if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
-        await commitProvedTodo(host, ctx, r, taskStep, false);
+        await commitProvedTodo(host, ctx, r, taskStep, false, token);
         return;
       }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = todoWriteFailureLine(r);
-      FlowChipHost.setChipState(chip, 'flow-chip-error', why);
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', why); });
       return;
     }
-    await commitProvedTodo(host, ctx, r, taskStep, true);
+    await commitProvedTodo(host, ctx, r, taskStep, true, token);
   }
 
-  async function commitProvedTodo(host, ctx, r, taskStep, proved) {
+  async function commitProvedTodo(host, ctx, r, taskStep, proved, token) {
     const params = (taskStep && taskStep.params) || {};
     const he = ctx && ctx.intent && ctx.intent.lang === 'he';
     if (!proved) {
@@ -1797,7 +1859,7 @@
         subject: ctx && ctx.subject,
         text: ctx && ctx.bodyText
       });
-      FlowChipHost.showDraftReceipt(host, {
+      paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
         status: status,
         written: status,
         url: r.url || null,
@@ -1808,7 +1870,7 @@
           ref: r.ref,
           created: (r.ref && r.ref.created) || null
         })
-      });
+      }); });
       return;
     }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
@@ -1880,10 +1942,10 @@
       subject: ctx && ctx.subject,
       app: 'outlook'
     }, fields || {});
-    if (mount) paintOutlookTodoReceipt(mount, row);
+    if (mount) paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, row); });
   }
 
-  async function onOnedriveDoIt(host, chip, ctx, fileStep) {
+  async function onOnedriveDoIt(host, chip, ctx, fileStep, token) {
     const params = (fileStep && fileStep.params) || {};
     const he = ctx.intent && ctx.intent.lang === 'he';
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
@@ -1912,7 +1974,7 @@
       const why = (r && r.reason === 'files-not-granted')
         ? 'Reconnect Outlook to allow OneDrive'
         : ((r && (r.error || r.reason)) || 'Could not confirm the file');
-      FlowChipHost.setChipState(chip, 'flow-chip-error', why);
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', why); });
       return;
     }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
@@ -1973,7 +2035,7 @@
       closedLine: ctx.process && ctx.process.closedLine,
       receiptStatus: status
     }, fields || {});
-    if (mount) paintOutlookTodoReceipt(mount, row);
+    if (mount) paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, row); });
   }
 
   function holdingLabel(chain) {
@@ -2052,10 +2114,11 @@
   // A silence replaces whatever card was already floating. The schedule card
   // from an older judgment used to stay up after the check had moved on.
   function dropStuckCard(pane) {
-    if (!paneCurrent(pane)) return;
+    const token = pane && pane.__mailToken;
+    if (!mailTokenLive(token)) return;
     const mount = mountPoint();
     const old = mount && mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
     lastKey = '';
   }
 
@@ -2111,14 +2174,15 @@
   }
 
   async function onHoldingDoIt(host, chip, ctx) {
+    const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
     const chain = ctx.chain || {};
     const holding = chain.holding && chain.holding.text;
     if (!holding || !ctx.sender || !ctx.sender.email) {
-      FlowChipHost.setChipState(chip, 'flow-chip-error', 'Needs an address');
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', 'Needs an address'); });
       return;
     }
-    FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Working…');
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Working…'); });
     let fromAddress = null;
     try {
       const st = await FlowStorage.get();
@@ -2140,7 +2204,7 @@
       }
     });
     if (!r || !r.ok) {
-      FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.reason || r.error)) || 'Could not create draft');
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.reason || r.error)) || 'Could not create draft'); });
       return;
     }
     if (typeof FlowFollowUp !== 'undefined' && chain.promise && chain.promise.ask && ctx.threadId) {
@@ -2157,11 +2221,12 @@
       await FlowStorage.upsertWatch(watch);
     }
     const he = chain.requirement && chain.requirement.lang === 'he';
-    FlowChipHost.showDraftReceipt(host, {
+    paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
       status: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
       written: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
+        const undoToken = captureMailToken();
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created });
         if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
@@ -2170,11 +2235,11 @@
         if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
         lastKey = '';
         lastSig = '';
-        try { host.remove(); } catch (e) { /* already gone */ }
+        paintIfCurrent(undoToken, function () { paintRemove(host); });
         schedule();
         return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
       })
-    });
+    }); });
   }
 
   // A Drive hit is a card. The address often has only a conversation id; a missing
@@ -2228,13 +2293,14 @@
         }]
       }
     };
-    if (!paneCurrent(pane)) return { shown: false, why: 'stale' };
+    const token = pane && pane.__mailToken;
+    if (!mailTokenLive(token)) return { shown: false, why: 'stale' };
     const old = mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
-    const host = injectCard(mount, stampEpoch(ctx, pane), {
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
+    const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch(ctx, pane), {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
-    });
+    }); });
     if (!host) return { shown: false, why: 'inject-failed' };
     host.setAttribute('data-glance-chain', 'prepare');
     host.setAttribute('data-glance-message', messageId || '');
@@ -2276,13 +2342,14 @@
       hydrateHow: pane && pane.hydrateHow,
       priorConversationId: pane && pane.priorConversationId
     };
-    if (!paneCurrent(pane)) return false;
+    const token = pane && pane.__mailToken;
+    if (!mailTokenLive(token)) return false;
     const old = mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
-    const host = injectCard(mount, stampEpoch(ctx, pane), {
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
+    const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch(ctx, pane), {
       onDoIt: (h, chip, c) => { onHoldingDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
-    });
+    }); });
     if (!host) return false;
     host.setAttribute('data-glance-chain', 'needs-you');
     lastOutcome = 'card';
@@ -2295,8 +2362,9 @@
   }
 
   async function onDismiss(host, ctx) {
+    const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
-    host.remove();
+    paintIfCurrent(token, function () { paintRemove(host); });
     if (!ctx || !ctx.messageId) return;
     if (ignoreStaleClick(host)) return;
     await FlowStorage.appendLog({
@@ -2388,6 +2456,7 @@
 
   function calendarUndoHandler(host, messageId, ref) {
     return guardedUndo(host, async () => {
+      const undoToken = captureMailToken();
       const u = await send({ type: 'flow:undo-action', connectorId: 'outlookCalendar', ref: ref, created: ref && ref.created });
       if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'verify-timeout')) {
         return { ok: false, reason: u.reason, written: u.written };
@@ -2408,7 +2477,7 @@
       if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
       lastKey = '';
       lastSig = '';
-      try { host.remove(); } catch (e) { /* already gone */ }
+      paintIfCurrent(undoToken, function () { paintRemove(host); });
       schedule();
       return { ok: true, written: (u && u.written) || 'Calendar event removed.', reopen: true };
     });
@@ -2495,7 +2564,38 @@
     }
   }
 
+  function calendarReasonLine(result) {
+    const code = String((result && (result.reason || result.error)) || '');
+    const lines = {
+      'calendar-write-not-granted': 'צריך הרשאה ליומן',
+      'token-expired': 'צריך להתחבר מחדש',
+      'needs-sign-in': 'צריך להתחבר מחדש',
+      'not-connected': 'צריך להתחבר מחדש',
+      'user-edited': 'ערכת את זה',
+      'unconfirmed': 'לא הצלחתי לאשר',
+      'verify-timeout': 'לא הצלחתי לאשר'
+    };
+    return lines[code] || 'לא הצלחתי לסיים, נסה שוב';
+  }
+
+  function paintHint(host, text) {
+    if (paintDepth <= 0 || !host || !text) return;
+    if (host.querySelector('.flow-chip-undo-hint')) return;
+    host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', text));
+  }
+
+  function paintCalendarFailure(host, chip, result) {
+    if (paintDepth <= 0) return '';
+    const why = calendarReasonLine(result);
+    if (chip) FlowChipHost.setChipState(chip, 'flow-chip-error', why);
+    else if (host && !host.querySelector('.flow-chip-undo-hint')) {
+      host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
+    }
+    return why;
+  }
+
   function paintCalendarConsent(host, ctx) {
+    if (paintDepth <= 0) return;
     if (!host || host.querySelector('[data-glance-consent="calendar"]')) return;
     const row = FlowChipHost.el('div', 'flow-chip-consent');
     row.setAttribute('data-glance-consent', 'calendar');
@@ -2521,11 +2621,8 @@
     }
     const granted = await send({ type: 'flow:outlook-consent-scope', scope: CALENDAR_SCOPE, policy: choice });
     if (!granted || granted.ok !== true) {
-      if (!host.querySelector('.flow-chip-undo-hint')) {
-        const raw = (granted && (granted.error || granted.reason)) || '';
-        const why = raw === 'calendar-write-not-granted' ? 'צריך הרשאה ליומן' : (raw || 'Calendar permission was not granted.');
-        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
-      }
+      const token = captureMailToken();
+      paintIfCurrent(token, function () { paintCalendarFailure(host, null, granted); });
       return;
     }
     await storeCalendarPolicy(choice);
@@ -2535,6 +2632,7 @@
   }
 
   async function holdAsTodo(host, ctx) {
+    const token = captureMailToken();
     if (!host || ignoreStaleClick(host)) return;
     const clock = meetingClock(ctx);
     const title = (clock && clock.title) || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Hold';
@@ -2556,37 +2654,36 @@
     if (ignoreStaleClick(host)) return;
     const taskStep = { params: params };
     if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
-      await commitProvedTodo(host, ctx, r, taskStep, false);
+      await commitProvedTodo(host, ctx, r, taskStep, false, token);
       return;
     }
     const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
-      const why = todoWriteFailureLine(r);
-      if (!host.querySelector('.flow-chip-undo-hint')) {
-        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
-      }
+      paintIfCurrent(token, function () { paintHint(host, todoWriteFailureLine(r)); });
       return;
     }
-    await commitProvedTodo(host, ctx, r, taskStep, true);
+    await commitProvedTodo(host, ctx, r, taskStep, true, token);
   }
 
   // Hold It on a meeting mail writes one calendar event and leaves the card
   // on Handled, with Undo. Without calendar scope the card asks once, in one
   // line. Declining holds the same loop as a To Do task.
   async function onMeetingHold(host, ctx) {
+    const token = captureMailToken();
     if (!host || ignoreStaleClick(host)) return;
     let st = null;
     try { st = await FlowStorage.get(); } catch (e) { st = null; }
     if (calendarAsk(st)) {
-      paintCalendarConsent(host, ctx);
+      paintIfCurrent(token, function () { paintCalendarConsent(host, ctx); });
       return;
     }
-    await finishMeetingHold(host, ctx);
+    await finishMeetingHold(host, ctx, token);
   }
 
-  async function finishMeetingHold(host, ctx) {
+  async function finishMeetingHold(host, ctx, token) {
+    if (!token) token = captureMailToken();
     if (!host || ignoreStaleClick(host)) return;
     let st = null;
     try { st = await FlowStorage.get(); } catch (e) { st = null; }
@@ -2596,7 +2693,7 @@
       ? FlowOutlookCalendar.hasWriteScope(calendarScopes(st))
       : false;
     if (!grantedNow) {
-      paintCalendarConsent(host, ctx);
+      paintIfCurrent(token, function () { paintCalendarConsent(host, ctx); });
       return;
     }
     const params = meetingClock(ctx);
@@ -2615,14 +2712,11 @@
     });
     if (ignoreStaleClick(host)) return;
     if (r && r.reason === 'calendar-write-not-granted') {
-      paintCalendarConsent(host, ctx);
+      paintIfCurrent(token, function () { paintCalendarConsent(host, ctx); });
       return;
     }
     if (!r || !r.ok || !r.ref || !r.ref.eventId) {
-      const why = (r && (r.error || r.reason)) || 'Could not add the event';
-      if (!host.querySelector('.flow-chip-undo-hint')) {
-        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
-      }
+      paintIfCurrent(token, function () { paintCalendarFailure(host, null, r); });
       return;
     }
     const verified = r.fetchedBack === true;
@@ -2658,13 +2752,13 @@
     host.classList.add('flow-chip-settled');
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-hold';
-    FlowChipHost.showDraftReceipt(host, {
+    paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
       status: status,
       written: written,
       url: r.url || null,
       linkLabel: 'Open event',
       onUndo: calendarUndoHandler(host, messageId, r.ref)
-    });
+    }); });
   }
 
   // Handled stays on the open message. A settled card from this click is left
@@ -2687,9 +2781,10 @@
   async function mountCalendarReceipt(pane, row, messageId) {
     const mount = mountPoint();
     if (!mount) return;
+    const token = pane && pane.__mailToken;
     const old = mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
-    const host = injectCard(mount, {
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
+    const host = paintIfCurrent(token, function () { return injectCard(mount, {
       app: 'outlook',
       doLabel: 'Do It',
       messageId: messageId,
@@ -2701,20 +2796,20 @@
       intent: { label: row.label || 'On your calendar' },
       glanceChain: 'calendar-hold',
       decisionReason: 'calendar-hold'
-    }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
+    }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; const clickToken = captureMailToken(); paintIfCurrent(clickToken, function () { paintRemove(h); }); } }); });
     if (!host) return;
     host.setAttribute('data-glance-chain', 'calendar-hold');
     host.setAttribute('data-glance-message', messageId || '');
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-hold';
     const status = (row && row.receiptStatus) || (row && row.fetchedBack === false ? "Created, couldn't verify" : 'Handled.');
-    FlowChipHost.showDraftReceipt(host, {
+    paintIfCurrent(pane && pane.__mailToken, function () { FlowChipHost.showDraftReceipt(host, {
       status: status,
       written: row.label || status,
       url: row.url || null,
       linkLabel: 'Open event',
       onUndo: calendarUndoHandler(host, messageId, row.ref)
-    });
+    }); });
     await clearReason(pane, 'calendar-hold');
   }
 
@@ -2791,21 +2886,24 @@
   // Missing Calendars.ReadWrite is a card, not a silent drop. One line names
   // the scope and the Setup checkbox. Do It does not write.
   async function showCalendarScopeCard(pane, messageId) {
+    const token = pane && pane.__mailToken;
     const mount = mountPoint();
-    if (!mount) return;
+    if (!mount || !mailTokenLive(token)) return;
     const old = mount.querySelector('.flow-chip-host');
     if (old && old.getAttribute('data-glance-chain') === 'calendar-connect') {
       lastOutcome = 'card';
       lastKey = (messageId || 'open') + '|calendar-connect';
       return;
     }
-    if (old) old.remove();
-    const host = FlowChipHost.el('div', 'flow-chip-host');
-    host.setAttribute('dir', 'ltr');
-    host.setAttribute('data-glance-chain', 'calendar-connect');
-    host.setAttribute('data-glance-message', messageId || '');
-    host.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite. In Setup, Connect Microsoft and check Calendar.'));
-    mount.appendChild(host);
+    paintIfCurrent(token, function () {
+      if (old) paintRemove(old);
+      const host = FlowChipHost.el('div', 'flow-chip-host');
+      host.setAttribute('dir', 'ltr');
+      host.setAttribute('data-glance-chain', 'calendar-connect');
+      host.setAttribute('data-glance-message', messageId || '');
+      host.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Calendar needs Calendars.ReadWrite. In Setup, Connect Microsoft and check Calendar.'));
+      mount.appendChild(host);
+    });
     lastOutcome = 'card';
     lastKey = (messageId || 'open') + '|calendar-connect';
   }
@@ -2864,11 +2962,12 @@
       lastOutcome = 'card';
       return;
     }
-    if (old) old.remove();
-    const host = injectCard(mount, ctx, {
+    const token = pane && pane.__mailToken;
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
+    const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onCalendarDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
-    });
+    }); });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
     host.setAttribute('data-glance-chain', 'calendar-hold');
     host.setAttribute('data-glance-message', messageId || '');
@@ -2899,9 +2998,10 @@
   }
 
   async function onCalendarDoIt(host, chip, ctx) {
+    const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
     doItInFlight = true;
-    FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
     let wrote = null;
     try {
       const hold = (ctx && ctx.calendarHold) || {};
@@ -2911,7 +3011,7 @@
         payload: { connectorId: 'outlookCalendar', params: hold.params || {}, messageId: ctx.messageId }
       });
       if (!r || !r.ok || !r.ref || !r.ref.eventId) {
-        FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.error || r.reason)) || 'Could not add the event');
+        paintIfCurrent(token, function () { paintCalendarFailure(host, chip, r); });
         return;
       }
       const verified = r.fetchedBack === true;
@@ -2943,24 +3043,24 @@
         await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
         await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
       }
-      FlowChipHost.showDraftReceipt(host, {
+      paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
         status: status,
         written: written,
         url: r.url || null,
         linkLabel: 'Open event',
         onUndo: calendarUndoHandler(host, ctx.messageId, r.ref)
-      });
+      }); });
     } catch (e) {
       glanceError('calendar receipt', e);
       if (wrote && host && host.isConnected) {
         try {
-          FlowChipHost.showDraftReceipt(host, {
+          paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
             status: wrote.status || 'Handled.',
             written: wrote.written,
             url: wrote.url,
             linkLabel: 'Open event',
             onUndo: calendarUndoHandler(host, ctx.messageId, wrote.ref)
-          });
+          }); });
         } catch (e2) { glanceError('calendar receipt', e2); }
       }
     } finally {
@@ -2969,12 +3069,14 @@
   }
 
   async function scan() {
+    const token = captureMailToken();
     armRender();
     const st = await FlowStorage.get();
-    if (!renderLive()) return;
+    if (!mailTokenLive(token)) return;
     const own = ownAddressesOf(st);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
     if (pane) pane.__epoch = mailEpoch;
+    bindMailToken(pane, token);
     const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
     const fileSig = pane && Array.isArray(pane.attachments)
@@ -3033,6 +3135,7 @@
       const filled = await hydratePane(pane);
       if (filled) {
         pane = filled;
+        bindMailToken(pane, token);
         if (suggestNote) suggestNote = pane;
       }
     } catch (e) { glanceError('pane hydrate', e); }
@@ -3054,9 +3157,10 @@
         threadId: pane.conversationId || '',
         outlookConversationId: pane.conversationId || ''
       });
+      if (!mailTokenLive(token)) return;
       if (earlyProof) {
         const earlyMount = mountPoint();
-        if (earlyMount && paintOutlookTodoReceipt(earlyMount, earlyProof)) {
+        if (earlyMount && paintIfCurrent(token, function () { return paintOutlookTodoReceipt(earlyMount, earlyProof); })) {
           dbg('decision', { shown: true, reason: 'page:promise-proof', subject: pane.subject });
           await clearReason(pane, 'page:promise-proof');
           return;
@@ -3304,8 +3408,8 @@
         await clearReason(pane, 'page:receipt-mounted');
         return;
       }
-      if (!paneCurrent(pane)) return;
-      const host = injectCard(mount, stampEpoch({
+      if (!mailTokenLive(token)) return;
+      const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch({
         process: { name: 'Reply', id: 'reply', steps: [{ kind: 'outlookDraft', id: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
         messageId: entry.messageId,
@@ -3314,16 +3418,17 @@
         hydrateHow: pane.hydrateHow,
         priorConversationId: pane.priorConversationId,
         decisionReason: 'page:receipt-mounted'
-      }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; h.remove(); } });
+      }, pane), { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; const clickToken = captureMailToken(); paintIfCurrent(clickToken, function () { paintRemove(h); }); } }); });
       if (host) {
         lastOutcome = 'card';
         dbg('rendered', { receipt: true, messageId: entry.messageId });
         const draftWritten = entry.label || 'Reply draft ready in Outlook Drafts. Not sent.';
-        FlowChipHost.showDraftReceipt(host, {
+        paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
           status: draftUnverifiedStatus(draftWritten),
           written: draftWritten,
           url: entry.url || entry.where,
           onUndo: guardedUndo(host, async () => {
+            const undoToken = captureMailToken();
             const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: entry.ref, created: entry.created });
             if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
             if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
@@ -3332,11 +3437,11 @@
             if (u && u.ok) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
             if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the draft.' };
             lastKey = '';
-            try { host.remove(); } catch (e) { /* already gone */ }
+            paintIfCurrent(undoToken, function () { paintRemove(host); });
             schedule();
             return { ok: true, written: u.written || 'Reply draft removed. Not sent.', reopen: true };
           })
-        });
+        }); });
       }
       await clearReason(pane, 'page:receipt-mounted');
       return;
@@ -3357,17 +3462,20 @@
     if (!hasReceipt && typeof FlowStorage.verifyGateFrom === 'function') {
       const gate = FlowStorage.verifyGateFrom(await FlowStorage.get(), ctx.messageId);
       if (gate === 'verifying') {
-        if (verifyMount && !verifyMount.querySelector('[data-glance-verifying]')) {
-          const host = document.createElement('div');
-          host.className = 'flow-chip-host';
-          host.setAttribute('data-glance-verifying', '1');
-          const label = document.createElement('span');
-          label.className = 'flow-chip-label';
-          label.textContent = 'Verifying…';
-          host.appendChild(label);
-          if (verifyMount.firstChild) verifyMount.insertBefore(host, verifyMount.firstChild);
-          else verifyMount.appendChild(host);
-        }
+        if (!mailTokenLive(token)) return;
+        paintIfCurrent(token, function () {
+          if (verifyMount && !verifyMount.querySelector('[data-glance-verifying]')) {
+            const host = document.createElement('div');
+            host.className = 'flow-chip-host';
+            host.setAttribute('data-glance-verifying', '1');
+            const label = document.createElement('span');
+            label.className = 'flow-chip-label';
+            label.textContent = 'Verifying…';
+            host.appendChild(label);
+            if (verifyMount.firstChild) verifyMount.insertBefore(host, verifyMount.firstChild);
+            else verifyMount.appendChild(host);
+          }
+        });
         lastOutcome = 'card';
         const held = verifyMount && verifyMount.querySelector('[data-glance-verifying]');
         if (held) {
@@ -3387,14 +3495,15 @@
         return;
       }
       const verifying = verifyMount && verifyMount.querySelector('.flow-chip-host[data-glance-verifying]');
-      if (verifying) verifying.remove();
+      if (verifying) paintIfCurrent(token, function () { paintRemove(verifying); });
     }
     // Same still-open rule as the popup: draft-only undo (outlookReopen) is NOT
     // terminal, so Do It must be eligible again after Undo.
     if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
     const livePromise = await livePromiseProof(promiseItem(ctx, pane));
     if (livePromise) {
-      if (mountPoint() && paintOutlookTodoReceipt(mountPoint(), livePromise)) {
+      if (!mailTokenLive(token)) return;
+      if (mountPoint() && paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mountPoint(), livePromise); })) {
         dbg('decision', { shown: true, reason: 'page:promise-proof', subject: pane.subject });
         await clearReason(pane, 'page:promise-proof');
         return;
@@ -3414,7 +3523,7 @@
     // pane is open): tear down so Do It can return. A draft or a meeting hold
     // that storage still has stays, including when the scan's key moved.
     if (existing && existing.classList.contains('flow-chip-settled') && !hasReceipt && !draftStill && !settledCalendar) {
-      existing.remove();
+      paintIfCurrent(token, function () { paintRemove(existing); });
       lastKey = '';
     }
     if ((settledUndo && (hasReceipt || draftStill)) || settledCalendar) {
@@ -3422,15 +3531,15 @@
       return;
     }
     if (mount.querySelector('.flow-chip-host') && key === lastKey) { lastOutcome = 'card'; return; }
-    if (!paneCurrent(pane)) return;
+    if (!mailTokenLive(token)) return;
     const old = mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
     lastKey = key;
 
-    const host = injectCard(mount, ctx, {
+    const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
-    });
+    }); });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
     const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
     if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
@@ -3989,6 +4098,7 @@
   }
 
   function paintSuggestCard(pane, decision, rawFiles) {
+    if (paintDepth <= 0) return null;
     const mount = mountPoint();
     const step = decision && decision.step;
     if (!mount || !step || typeof FlowChipHost === 'undefined') return null;
@@ -4026,12 +4136,13 @@
     return injectCard(mount, ctx, {
       onDoIt: (host, chip, c) => onSuggestDoIt(host, chip, c),
       onDismiss: async (host) => {
+        const clickToken = captureMailToken();
         if (ignoreStaleClick(host)) return;
         const id = ctx.messageId;
         if (!id || typeof FlowStorage === 'undefined') return;
         const bag = await FlowStorage.get();
         if (ignoreStaleClick(host)) return;
-        try { host.remove(); } catch (e) { /* already gone */ }
+        paintIfCurrent(clickToken, function () { paintRemove(host); });
         const map = Object.assign({}, bag.suggestDismissals || {});
         map[id] = { at: Date.now() };
         await FlowStorage.set({ suggestDismissals: map });
@@ -4050,10 +4161,11 @@
   }
 
   async function onSuggestDoIt(host, chip, ctx) {
+    const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
     doItInFlight = true;
     try {
-      FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…'); });
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
       const step = (ctx.process.steps || [])[0] || {};
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
@@ -4080,11 +4192,11 @@
         if (why === 'not-connected' || why === 'files-not-granted') {
           const line = why === 'files-not-granted' ? 'Reconnect Outlook to allow OneDrive' : 'Outlook is not connected';
           if (host && host.__glanceSteps) host.__glanceSteps.setAll('offline', line);
-          FlowChipHost.setChipState(chip, 'flow-chip-error', line);
+          paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', line); });
           return;
         }
         if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
-        FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.line || r.written)) || "Couldn't confirm");
+        paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.line || r.written)) || "Couldn't confirm"); });
         return;
       }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
@@ -4123,7 +4235,7 @@
       }, fields || {}));
       const mount = host.parentElement || mountPoint();
       if (mount) {
-        paintOutlookTodoReceipt(mount, Object.assign({
+        paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, Object.assign({
           kind: 'written',
           messageId: ctx.messageId,
           itemId: graphId || ctx.itemId || null,
@@ -4139,7 +4251,7 @@
           writtenLine: r.written || title,
           processName: 'Save the file?',
           receiptStatus: 'Handled.'
-        }, fields || {}));
+        }, fields || {})); });
       }
     } finally {
       doItInFlight = false;
@@ -4173,7 +4285,7 @@
         subject: pane.subject || ''
       });
       const mountNow = mountPoint();
-      if (provedNow && mountNow && paintOutlookTodoReceipt(mountNow, provedNow)) {
+      if (provedNow && mountNow && paintIfCurrent(pane.__mailToken, function () { return paintOutlookTodoReceipt(mountNow, provedNow); })) {
         lastOutcome = 'card';
         await clearReason(pane);
         return;
@@ -4200,7 +4312,7 @@
             fileNames: files.map((a) => a && (a.name || a.filename)).filter(Boolean)
           });
           const mountNow = mountPoint();
-          if (proved && mountNow && paintOutlookTodoReceipt(mountNow, proved)) {
+          if (proved && mountNow && paintIfCurrent(pane.__mailToken, function () { return paintOutlookTodoReceipt(mountNow, proved); })) {
             lastOutcome = 'card';
             await clearReason(pane);
             return;
@@ -4269,7 +4381,7 @@
       fileCount: decision.fileCount, target: decision.target
     });
     if (decision.step && decision.eligible) {
-      const host = paintSuggestCard(Object.assign({}, pane, { graphMessageId: graphMessageId }), decision, files);
+      const host = paintIfCurrent(pane.__mailToken, function () { return paintSuggestCard(Object.assign({}, pane, { graphMessageId: graphMessageId }), decision, files); });
       if (host) {
         lastOutcome = 'card';
         await clearReason(pane);
@@ -4277,7 +4389,7 @@
       }
     }
     const skipped = decision.skipped || [];
-    if (!decision.eligible && skipped.length && paintSkippedOnly(pane, skipped)) {
+    if (!decision.eligible && skipped.length && paintIfCurrent(pane.__mailToken, function () { return paintSkippedOnly(pane, skipped); })) {
       lastOutcome = 'card';
       await clearReason(pane);
       return;
@@ -4285,7 +4397,13 @@
     if (!pageAlreadyDecided(pane)) await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
   }
 
+  function paintRemove(el) {
+    if (paintDepth <= 0 || !el) return;
+    try { el.remove(); } catch (e) { /* already gone */ }
+  }
+
   function paintSkippedOnly(pane, skipped) {
+    if (paintDepth <= 0) return null;
     const mount = mountPoint();
     if (!mount || !skipped || !skipped.length) return null;
     const host = document.createElement('div');
@@ -4378,18 +4496,19 @@
   }
 
   async function showOpenLoopCard(pane, loop) {
-    if (!paneCurrent(pane)) return false;
+    const token = pane && pane.__mailToken;
+    if (!mailTokenLive(token)) return false;
     const mount = mountPoint();
     if (!mount || !loop || !loop.process) return false;
     const existing = mount.querySelector('.flow-chip-host');
     if (existing && existing.getAttribute('data-glance-undone') !== '1' && existing.getAttribute('data-glance-verifying') !== '1') return true;
-    if (existing) existing.remove();
+    if (existing) paintIfCurrent(token, function () { paintRemove(existing); });
     const ctx = buildCtx(loop, pane, { intent: loop.intent, process: loop.process });
     if (!ctx || !ctx.messageId) return false;
-    const host = injectCard(mount, ctx, {
+    const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
-    });
+    }); });
     if (!host) return false;
     const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
     if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
@@ -4402,17 +4521,21 @@
   // A stored Undo line stays only when this mail has no card and no open loop.
   // A promise mail gets its Do It; a silent mail keeps the confirmation.
   async function paintStoredUndoneIfQuiet() {
+    const token = captureMailToken();
     armRender();
     let pane = null;
     try {
       const st = await FlowStorage.get();
+      if (!mailTokenLive(token)) return;
       pane = FlowOwaParse.readPane(document, location.href, { own: ownAddressesOf(st), userName: userNameOf(st) });
     } catch (e) { pane = null; }
+    if (pane) bindMailToken(pane, token);
+    if (!mailTokenLive(token)) return;
     if (pane) {
       const loop = await openLoopForPane(pane);
       if (loop) {
         const host = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
-        if (host && host.getAttribute('data-glance-undone') === '1') host.remove();
+        if (host && host.getAttribute('data-glance-undone') === '1') paintIfCurrent(token, function () { paintRemove(host); });
         if (!document.querySelector('#ReadingPaneContainerId .flow-chip-host')) await showOpenLoopCard(pane, loop);
         return;
       }
@@ -4424,7 +4547,7 @@
     const mount = mountPoint();
     if (!mount) return;
     if (document.querySelector('#ReadingPaneContainerId .flow-chip-host')) return;
-    paintUndoneStatus(mount, pane, banner.line);
+    paintIfCurrent(token, function () { return paintUndoneStatus(mount, pane, banner.line); });
   }
 
   let scanForEpoch = null;
@@ -4486,7 +4609,9 @@
     rescan: () => { lastKey = ''; lastSig = ''; schedule(); },
     openMailToken: () => openMailTokenNow(),
     hydratePane: (pane) => hydratePane(pane),
-    bumpMailEpoch: (why) => bumpMailEpoch(why)
+    bumpMailEpoch: (why) => bumpMailEpoch(why),
+    captureMailToken: () => captureMailToken(),
+    paintCalendarFailure: (host, chip, result) => paintIfCurrent(captureMailToken(), function () { return paintCalendarFailure(host, chip, result); })
   };
   // A check from the panel (or another Outlook tab) lands here at once.
   try {

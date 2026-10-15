@@ -492,6 +492,25 @@ console.log('\n--- Microsoft To Do ---\n');
     FlowProofOfClose.canonId(graphId) === FlowProofOfClose.canonId(urlId) &&
     FlowProofOfClose.canonId(graphId) !== FlowProofOfClose.canonId(otherCase) &&
     !FlowProofOfClose.proofForIds(exchanged, [otherCase]));
+  const legacyStore = {
+    records: {
+      'legacy-row': {
+        ids: ['aqmkag-ab_cd'], itemId: 'aqmkag-ab_cd', messageId: '',
+        kind: 'written', connectorId: 'outlookTask', system: 'microsoft/todo',
+        externalId: 'task-legacy', fetchedBack: true, writtenLine: 'LEGACY-LINE',
+        receiptStatus: 'Handled.', label: 'LEGACY-LINE', objectName: 'To Do',
+        ref: { taskId: 'task-legacy', externalId: 'task-legacy', created: { title: 'Legacy', importance: 'normal' } }
+      }
+    },
+    byId: {}
+  };
+  const legacyHit = FlowProofOfClose.proofForIds(legacyStore, ['AQMkAG-ab_cd']);
+  const legacyRow = FlowProofOfClose.proofAsLogRow(legacyHit);
+  check('a lowercase id with no message id matches only as a legacy fallback',
+    legacyHit && legacyHit.legacyCase === true && legacyHit.writtenLine === 'LEGACY-LINE' &&
+    legacyRow && legacyRow.legacyCase === true &&
+    !FlowProofOfClose.proofForIds(exchanged, [otherCase]),
+    legacyHit);
   const gone = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 404 });
   check('a 404 marks the record deleted in To Do',
     gone.deleted === true && gone.deletedLine === 'Deleted in To Do' && gone.verifyNote == null, gone);
@@ -509,7 +528,10 @@ console.log('\n--- Microsoft To Do ---\n');
     outlook.indexOf('function armReadingPaneWatch') > 0 && outlook.indexOf('function glancePaneNode') > 0 &&
     outlook.indexOf('function reconcileMountedRow') > 0 &&
     outlook.indexOf('function mailStill') > 0 &&
-    outlook.indexOf("raw === 'calendar-write-not-granted' ? 'צריך הרשאה ליומן'") > 0);
+    outlook.indexOf('function paintIfCurrent') > 0 &&
+    outlook.indexOf('function calendarReasonLine') > 0 &&
+    outlook.indexOf("'לא הצלחתי לסיים, נסה שוב'") > 0 &&
+    outlook.indexOf('צריך הרשאה ליומן') > 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

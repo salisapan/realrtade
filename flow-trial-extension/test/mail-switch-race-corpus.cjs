@@ -32,6 +32,200 @@ function check(name, cond, detail) {
   }
 }
 
+// Every card paint is a call inside paintIfCurrent, or a call inside the
+// body of a paint function that itself refuses to draw unless that gate
+// is open. A nested callback is not that body.
+function lintPaintGate(src) {
+  const ENTRY = {
+    paintOutlookTodoReceipt: 1, paintUndoneStatus: 1, paintCalendarConsent: 1,
+    paintSuggestCard: 1, paintSkippedOnly: 1, injectCard: 1, paintRemove: 1,
+    paintCalendarFailure: 1, paintHint: 1, stripDuplicateUndoHosts: 1
+  };
+  const TARGET = Object.assign({
+    'FlowChipHost.showDraftReceipt': 1,
+    'FlowChipHost.setChipState': 1,
+    'FlowChipHost.inject': 1
+  }, ENTRY);
+  const violations = [];
+  const n = src.length;
+  let i = 0;
+  let line = 1;
+  let brace = 0;
+  let paren = 0;
+  let bracket = 0;
+  let last = '';
+  const scopes = [];
+  let expectGate = 0;
+  let sawFunction = false;
+  let fnAwaitingBody = false;
+  let fnName = '';
+  let fnGated = false;
+
+  function cur() {
+    return scopes.length ? scopes[scopes.length - 1] : null;
+  }
+  function popTo() {
+    while (scopes.length) {
+      const sc = scopes[scopes.length - 1];
+      if (sc.expr) {
+        if (paren < sc.paren || brace < sc.brace || bracket < sc.bracket) scopes.pop();
+        else break;
+      } else if (brace < sc.brace) scopes.pop();
+      else break;
+    }
+  }
+  function startFn(gated, name, expr) {
+    scopes.push({ brace: brace, paren: paren, bracket: bracket, gated: gated, entry: name && ENTRY[name] ? name : '', expr: expr });
+  }
+  function callHere(name) {
+    if (!TARGET[name]) return;
+    const sc = cur();
+    if (sc && (sc.gated || sc.entry)) return;
+    violations.push(line + ':' + name);
+  }
+  function skipLine() {
+    while (i < n && src[i] !== '\n') i++;
+  }
+  function skipBlock() {
+    i += 2;
+    while (i < n && !(src[i] === '*' && src[i + 1] === '/')) {
+      if (src[i] === '\n') line++;
+      i++;
+    }
+    i += 2;
+  }
+  function skipQuote(q) {
+    i++;
+    while (i < n) {
+      if (src[i] === '\\') { i += 2; continue; }
+      if (src[i] === '\n') line++;
+      if (src[i] === q) { i++; return; }
+      i++;
+    }
+  }
+  function skipRegex() {
+    i++;
+    let cls = false;
+    while (i < n) {
+      if (src[i] === '\\') { i += 2; continue; }
+      if (src[i] === '\n') break;
+      if (src[i] === '[') cls = true;
+      else if (src[i] === ']') cls = false;
+      else if (src[i] === '/' && !cls) { i++; while (i < n && /[a-z]/i.test(src[i])) i++; return; }
+      i++;
+    }
+  }
+
+  while (i < n) {
+    const c = src[i];
+    if (c === '\n') { line++; i++; continue; }
+    if (c === ' ' || c === '\t' || c === '\r') { i++; continue; }
+    if (c === '/' && src[i + 1] === '/') { skipLine(); continue; }
+    if (c === '/' && src[i + 1] === '*') { skipBlock(); continue; }
+    if (c === "'" || c === '"' || c === '`') { skipQuote(c); last = 'str'; continue; }
+    if (c === '/' && last !== 'ident' && last !== 'num' && last !== ')' && last !== ']') { skipRegex(); last = 'regex'; continue; }
+    if (c === '{') {
+      brace++;
+      if (fnAwaitingBody) {
+        startFn(fnGated, fnName, false);
+        fnAwaitingBody = false;
+        fnName = '';
+        fnGated = false;
+      }
+      i++;
+      last = '{';
+      continue;
+    }
+    if (c === '}') {
+      brace--;
+      popTo();
+      i++;
+      last = '}';
+      continue;
+    }
+    if (c === '(') { paren++; i++; last = '('; if (sawFunction) sawFunction = false; continue; }
+    if (c === ')') {
+      paren--;
+      const expr = cur();
+      i++;
+      last = ')';
+      if (expr && expr.expr && paren < expr.paren) popTo();
+      continue;
+    }
+    if (c === '[') { bracket++; i++; last = '['; continue; }
+    if (c === ']') { bracket--; popTo(); i++; last = ']'; continue; }
+    if (c === ',' || c === ';') {
+      const expr = cur();
+      if (expr && expr.expr && paren === expr.paren && brace === expr.brace && bracket === expr.bracket) scopes.pop();
+      i++;
+      last = c;
+      continue;
+    }
+    if (c === '=' && src[i + 1] === '>') {
+      i += 2;
+      const gated = expectGate > 0;
+      if (gated) expectGate--;
+      while (i < n && (src[i] === ' ' || src[i] === '\t' || src[i] === '\n' || src[i] === '\r')) {
+        if (src[i] === '\n') line++;
+        i++;
+      }
+      if (src[i] === '{') {
+        brace++;
+        i++;
+        startFn(gated, '', false);
+        last = '{';
+      } else {
+        startFn(gated, '', true);
+        last = '=>';
+      }
+      continue;
+    }
+    if (/[A-Za-z_$]/.test(c)) {
+      const start = i;
+      const at = line;
+      i++;
+      while (i < n && /[A-Za-z0-9_$.]/.test(src[i])) i++;
+      const name = src.slice(start, i);
+      if (name === 'function') {
+        sawFunction = true;
+        fnAwaitingBody = true;
+        fnGated = expectGate > 0;
+        if (fnGated) expectGate--;
+        fnName = '';
+        last = 'function';
+        continue;
+      }
+      if (sawFunction) {
+        sawFunction = false;
+        fnName = name;
+        last = 'ident';
+        continue;
+      }
+      let j = i;
+      while (j < n && (src[j] === ' ' || src[j] === '\t' || src[j] === '\n' || src[j] === '\r')) j++;
+      if (src[j] === '(') {
+        if (name === 'paintIfCurrent') expectGate++;
+        else {
+          const saved = line;
+          line = at;
+          callHere(name);
+          line = saved;
+        }
+      }
+      last = 'ident';
+      continue;
+    }
+    if (/[0-9]/.test(c)) {
+      while (i < n && /[0-9]/.test(src[i])) i++;
+      last = 'num';
+      continue;
+    }
+    i++;
+    last = c;
+  }
+  return violations;
+}
+
 function registeredFiles() {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   const bg = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
@@ -85,6 +279,14 @@ const MAIL_B = {
   toHtml: 'אל: <span>' + FLOW + '</span>',
   ccHtml: 'עותק: <span>' + ME + '</span>',
   bodyHtml: lines(BODY_B)
+};
+const ID_C = 'MSG-HANDOFF-333';
+const MAIL_C = {
+  id: ID_C,
+  subject: 'Handoff confirm the third mail',
+  toHtml: 'אל: <span>' + ME + '</span>',
+  ccHtml: '',
+  bodyHtml: lines('Hi,\nCan you reply and confirm the handoff for the third mail?\nThanks,\nFlow')
 };
 
 function boundTo(host, id) {
@@ -140,11 +342,32 @@ function proofForA() {
   };
 }
 
+function logOnly(id) {
+  return {
+    log: [{
+      kind: 'written',
+      messageId: id,
+      itemId: id,
+      connectorId: 'outlookTask',
+      system: 'microsoft/todo',
+      externalId: 'task-' + id,
+      ref: { taskId: 'task-' + id, externalId: 'task-' + id, created: { title: 'Log ' + id, importance: 'normal' } },
+      fetchedBack: true,
+      writtenLine: 'RECEIPT-' + id,
+      receiptStatus: 'Handled.',
+      label: 'RECEIPT-' + id,
+      objectName: 'To Do',
+      app: 'outlook'
+    }]
+  };
+}
+
 async function boot(opts) {
   const o = opts || {};
+  const startMail = o.mail || MAIL_A;
   const files = registeredFiles();
   let html = fs.readFileSync(path.join(__dirname, 'fixtures/owa-reading-pane-he.html'), 'utf8');
-  const dom = new JSDOM(html, { url: urlFor(ID_A), runScripts: 'outside-only', pretendToBeVisual: true });
+  const dom = new JSDOM(html, { url: urlFor(startMail.id), runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   Object.defineProperty(w.HTMLElement.prototype, 'innerText', {
     get() {
@@ -255,7 +478,7 @@ async function boot(opts) {
     })();
   `, ctx);
   w.__onRead = () => { if (o.holdAfterRead && !released) armed = true; };
-  showMail(w.document, w, MAIL_A);
+  showMail(w.document, w, startMail);
   return {
     w, doc: w.document, logs, sent, queued, store, heldReconcile,
     release() { released = true; const pending = queued.splice(0); pending.forEach((fn) => fn()); },
@@ -266,6 +489,14 @@ async function boot(opts) {
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 (async () => {
+  const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
+  const gateViolations = lintPaintGate(outlookSrc);
+  check('every paint goes through paintIfCurrent', gateViolations.length === 0, gateViolations.slice(0, 12));
+  const planted = lintPaintGate('function sneak() { paintOutlookTodoReceipt(mount, row); FlowChipHost.inject(mount, ctx, {}); }\n');
+  check('the paint gate lint catches a direct paint', planted.length === 2, planted);
+  const allowed = lintPaintGate('function paintHint(host, text) {}\npaintIfCurrent(token, function () { paintOutlookTodoReceipt(mount, row); });\n');
+  check('the paint gate lint allows a gated paint', allowed.length === 0, allowed);
+
   const race = await boot({ holdAfterRead: true });
   const waitHold = Date.now() + 4000;
   while (Date.now() < waitHold && race.queued.length === 0) await sleep(20);
@@ -571,6 +802,176 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
       page.w.close();
     }
   }
+
+  function switchMail(page, mode, mail) {
+    if (mode === 'url') showMail(page.doc, page.w, mail);
+    else swapPane(page.doc, page.w, mail);
+  }
+
+  async function waitHeld(page) {
+    const holdUntil = Date.now() + 4000;
+    while (Date.now() < holdUntil && page.heldReconcile.length === 0) await sleep(20);
+    return page.heldReconcile.length > 0;
+  }
+
+  async function waitFetchGrowth(page, before) {
+    const armUntil = Date.now() + 2000;
+    while (Date.now() < armUntil && page.sent.filter((m) => m.type === 'flow:outlook-fetch').length <= before) await sleep(20);
+  }
+
+  function leakedOnto(doc, previousIds, previousLines) {
+    const host = doc.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    const text = chipText(doc);
+    const raw = host ? String(host.getAttribute('data-glance-message') || '') : '';
+    const ids = raw.split('|').filter(Boolean);
+    const badId = previousIds.some((id) => ids.indexOf(id) >= 0);
+    const badLine = previousLines.some((line) => line && text.indexOf(line) >= 0);
+    const badState = text.indexOf('Deleted in To Do') >= 0 || text.indexOf("couldn't verify") >= 0;
+    return badId || badLine || badState ? { text: text, raw: raw } : null;
+  }
+
+  const logStatuses = [404, 410, 500, 200];
+  const logModes = ['url', 'pane'];
+  const logDirs = [
+    { from: MAIL_A, to: MAIL_B, name: 'A->B' },
+    { from: MAIL_B, to: MAIL_A, name: 'B->A' }
+  ];
+  for (let si = 0; si < logStatuses.length; si++) {
+    for (let mi = 0; mi < logModes.length; mi++) {
+      for (let di = 0; di < logDirs.length; di++) {
+        const status = logStatuses[si];
+        const mode = logModes[mi];
+        const dir = logDirs[di];
+        const page = await boot({
+          mail: dir.from,
+          holdReconcile: true,
+          reconcileStatus: status,
+          store: logOnly(dir.from.id)
+        });
+        const held = await waitHeld(page);
+        const fetchesBefore = page.sent.filter((m) => m.type === 'flow:outlook-fetch').length;
+        check('a log-only ' + status + ' reconcile on ' + dir.name + ' is in flight before the ' + mode + ' switch', held, { held: page.heldReconcile.length });
+        switchMail(page, mode, dir.to);
+        await waitFetchGrowth(page, fetchesBefore);
+        page.releaseReconcile();
+        await sleep(400);
+        const leak = leakedOnto(page.doc, [dir.from.id], ['RECEIPT-' + dir.from.id]);
+        check('a log-only ' + status + ' reconcile does not paint ' + dir.from.id + ' onto ' + dir.to.id + ' after a ' + mode + ' switch',
+          !leak, leak);
+        page.w.close();
+      }
+    }
+  }
+
+  for (let si = 0; si < logStatuses.length; si++) {
+    for (let mi = 0; mi < logModes.length; mi++) {
+      const status = logStatuses[si];
+      const mode = logModes[mi];
+      const page = await boot({
+        mail: MAIL_A,
+        holdReconcile: true,
+        reconcileStatus: status,
+        store: logOnly(ID_A)
+      });
+      const held = await waitHeld(page);
+      check('a log-only ' + status + ' reconcile is in flight before A->B->C ' + mode, held, { held: page.heldReconcile.length });
+      const beforeB = page.sent.filter((m) => m.type === 'flow:outlook-fetch').length;
+      switchMail(page, mode, MAIL_B);
+      await waitFetchGrowth(page, beforeB);
+      const beforeC = page.sent.filter((m) => m.type === 'flow:outlook-fetch').length;
+      switchMail(page, mode, MAIL_C);
+      await waitFetchGrowth(page, beforeC);
+      page.releaseReconcile();
+      await sleep(400);
+      const leak = leakedOnto(page.doc, [ID_A, ID_B], ['RECEIPT-' + ID_A, 'RECEIPT-' + ID_B]);
+      check('a log-only ' + status + ' reconcile does not paint an earlier mail after A->B->C ' + mode, !leak, leak);
+      page.w.close();
+    }
+  }
+
+  const reasonPage = await boot({ holdAfterRead: false });
+  const reasonHost = reasonPage.doc.createElement('div');
+  reasonPage.doc.body.appendChild(reasonHost);
+  const reasonLines = {
+    'calendar-write-not-granted': 'צריך הרשאה ליומן',
+    'token-expired': 'צריך להתחבר מחדש',
+    'needs-sign-in': 'צריך להתחבר מחדש',
+    'not-connected': 'צריך להתחבר מחדש',
+    'user-edited': 'ערכת את זה',
+    'unconfirmed': 'לא הצלחתי לאשר',
+    'verify-timeout': 'לא הצלחתי לאשר',
+    'some-raw-code': 'לא הצלחתי לסיים, נסה שוב',
+    'graph-error-42': 'לא הצלחתי לסיים, נסה שוב'
+  };
+  const reasonCodes = Object.keys(reasonLines);
+  let reasonBad = '';
+  for (let ri = 0; ri < reasonCodes.length; ri++) {
+    const code = reasonCodes[ri];
+    reasonHost.textContent = '';
+    const payload = code === 'graph-error-42' ? { error: code } : { reason: code };
+    reasonPage.w.__glanceOutlookPage.paintCalendarFailure(reasonHost, null, payload);
+    const shown = String(reasonHost.textContent || '');
+    if (shown.indexOf(code) >= 0 || shown.indexOf(reasonLines[code]) < 0) reasonBad = code + ':' + shown;
+  }
+  check('a calendar failure shows Hebrew, never the reason code', !reasonBad, { reasonBad: reasonBad });
+  await sleep(250);
+  reasonPage.w.close();
+
+  const legacyId = 'AQMkAGlegacyCD';
+  const legacyLower = 'aqmkaglegacycd';
+  const legacyPage = await boot({
+    mail: {
+      id: legacyId,
+      subject: 'Legacy case confirm the old record',
+      toHtml: 'אל: <span>' + ME + '</span>',
+      ccHtml: '',
+      bodyHtml: lines('Hi,\nCan you reply and confirm the legacy record?\nThanks,\nFlow')
+    },
+    store: {
+      glanceProofs: {
+        records: {
+          'legacy-row': {
+            ids: [legacyLower],
+            itemId: legacyLower,
+            messageId: '',
+            kind: 'written',
+            connectorId: 'outlookTask',
+            system: 'microsoft/todo',
+            externalId: 'task-legacy',
+            ref: { taskId: 'task-legacy', externalId: 'task-legacy', created: { title: 'Legacy', importance: 'normal' } },
+            fetchedBack: true,
+            writtenLine: 'LEGACY-LINE',
+            receiptStatus: 'Handled.',
+            label: 'LEGACY-LINE',
+            objectName: 'To Do',
+            app: 'outlook'
+          }
+        },
+        byId: {}
+      }
+    }
+  });
+  let legacyHost = null;
+  const legacyUntil = Date.now() + 4000;
+  while (Date.now() < legacyUntil && !legacyHost) {
+    const host = legacyPage.doc.querySelector('.flow-chip-host');
+    if (host && String(host.textContent || '').indexOf('LEGACY-LINE') >= 0) legacyHost = host;
+    else await sleep(30);
+  }
+  check('an old lowercase id with no message id still shows the receipt', Boolean(legacyHost), { text: chipText(legacyPage.doc) });
+  const legacyUndo = legacyHost && legacyHost.querySelector('.flow-chip-undo');
+  const legacyUndosBefore = legacyPage.sent.filter((m) => m.type === 'flow:undo-action').length;
+  if (legacyUndo) legacyUndo.click();
+  await sleep(200);
+  const legacyText = legacyHost ? String(legacyHost.textContent || '') : '';
+  const stillThere = legacyPage.store.glanceProofs && legacyPage.store.glanceProofs.records && legacyPage.store.glanceProofs.records['legacy-row'];
+  check("Undo on a legacy case match says Couldn't confirm and deletes nothing",
+    Boolean(legacyUndo) && legacyText.indexOf("Couldn't confirm") >= 0 &&
+    legacyPage.sent.filter((m) => m.type === 'flow:undo-action').length === legacyUndosBefore &&
+    stillThere && stillThere.undone !== true,
+    { text: legacyText, undos: legacyPage.sent.filter((m) => m.type === 'flow:undo-action').length, still: Boolean(stillThere) });
+  await sleep(250);
+  legacyPage.w.close();
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
