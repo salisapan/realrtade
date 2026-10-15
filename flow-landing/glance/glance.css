@@ -106,7 +106,12 @@ h1{
   line-height:1.15;
   letter-spacing:-.02em;
 }
-.lede{margin:0 0 28px; color:var(--muted); font-size:1.05rem}
+h1 em{font-style:italic; font-weight:560}
+.lede{margin:0 0 20px; color:var(--muted); font-size:1.05rem}
+.points{margin:0 0 28px; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px}
+.points li{color:var(--ink); font-size:.98rem}
+.points li::before{content:''; display:inline-block; width:6px; height:6px; margin-inline-end:10px; border-radius:50%; background:var(--accent); vertical-align:0.1em}
+.field{display:flex; flex-direction:column; gap:6px}
 .gate{display:flex; flex-direction:column; gap:12px}
 .step-row{
   display:flex;
@@ -163,15 +168,31 @@ h1{
   color:var(--muted);
   font-size:.92rem;
 }
-.gate-error[hidden],.gate-success[hidden],.gate-mail[hidden]{display:none}
+.gate-error[hidden],.gate-success[hidden],.gate-mail[hidden],.gate-hint[hidden],.spin[hidden]{display:none}
+.gate-hint{margin:0; color:var(--muted); font-size:.92rem}
 .gate-error svg{flex:none; color:#d70015}
+.retry{
+  margin-inline-start:auto;
+  min-height:36px;
+  padding:6px 14px;
+  border-radius:980px;
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--ink);
+  font-family:var(--ui);
+  font-weight:600;
+  cursor:pointer;
+}
+.retry:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
 .gate-actions{display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin-top:4px}
 /* Placeholder until Dana supplies a glossy button image without a halo. */
 .doit{
+  position:relative;
   appearance:none;
   border:0;
   border-radius:980px;
   min-height:48px;
+  min-width:220px;
   padding:12px 28px;
   background:var(--accent);
   color:#fff;
@@ -181,6 +202,16 @@ h1{
   cursor:pointer;
   box-shadow:0 8px 18px rgba(0,0,0,.12);
 }
+.spin{
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.35);
+  border-top-color:#fff;
+  animation:glance-spin .7s linear infinite;
+}
+.doit.is-loading{display:inline-flex; align-items:center; justify-content:center}
+@keyframes glance-spin{to{transform:rotate(360deg)}}
 .doit:hover:not(:disabled){background:var(--accent-h)}
 .doit:focus{outline:none}
 .doit:focus-visible{box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--ink)}
@@ -189,7 +220,16 @@ h1{
   box-shadow:none;
   cursor:default;
 }
+.doit.is-loading,
+.doit.is-loading:disabled{
+  background:var(--accent);
+  box-shadow:0 8px 18px rgba(0,0,0,.12);
+  cursor:progress;
+}
 .soon{margin:0; color:var(--faint); font-size:.92rem}
+.ecos{list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:10px}
+.ecos .check-copy,.ecos .step-row span{display:flex; flex-direction:column; gap:2px}
+.scope{color:var(--muted); font-size:.9rem; font-weight:400}
 .gate-success,.gate-mail{margin:0; color:var(--ink); font-size:.98rem}
 .gate-mail{color:var(--muted)}
 .banner{

@@ -4,11 +4,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Get Glance. You intend, it closes the loop. A personal layer in your browser that never sends without your approval.">
+<meta name="description" content="Open loops. Closed. Leave your email. Glance for Chrome opens next.">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="canonical" href="https://theflow-ai.com/glance/">
-<title>Get Glance</title>
+<title>Open loops. Closed.</title>
 <link rel="stylesheet" href="/assets/fonts/corner/fonts.css">
 <link rel="stylesheet" href="/glance/glance.css">
 <script>
@@ -53,64 +53,84 @@
 <main id="main">
   <div class="wrap">
     <p class="eyebrow" data-i18n="eye">Glance</p>
-    <h1 data-i18n="h1">Get <bdi>Glance</bdi>. You intend, it closes the loop.</h1>
-    <p class="lede" data-i18n="lede"><bdi>Glance</bdi> is a personal layer in your browser. It notices what you meant to do across your apps — <bdi>Gmail</bdi>, <bdi>Outlook</bdi>, calendar, chats, and more — and closes it for you, with a receipt and Undo on every action. It never sends without your approval.</p>
+    <h1><span data-i18n="title">Open loops.</span> <em data-i18n="titleEm">Closed.</em></h1>
+    <p class="lede" data-i18n="lede">Leave your email. <bdi>Glance</bdi> for <bdi>Chrome</bdi> opens next.</p>
+    <ul class="points">
+      <li data-i18n="p1"><bdi>Chrome</bdi>, on the page you already have open</li>
+      <li data-i18n="p2">You approve every close</li>
+      <li data-i18n="p3">Undo on every close</li>
+    </ul>
     <form id="glanceGate" class="gate" novalidate>
-      <label class="step-row" for="gateEmail">
-        <span class="step-k" id="emailLabel" data-i18n="emailLabel">Email</span>
-        <input id="gateEmail" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" required aria-labelledby="emailLabel" aria-describedby="gateError" placeholder="you@example.com">
-      </label>
-      <p class="gate-error" id="gateError" role="alert" hidden>
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 3.6v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="10" r=".7" fill="currentColor"/></svg>
-        <span id="gateErrorText"></span>
-      </p>
-      <label class="step-row check-row">
-        <input id="gateTerms" name="terms" type="checkbox" required>
-        <span class="check-copy" data-i18n="terms">I agree to the <a href="/glance/terms.html">Terms of Service</a> and <a href="/glance/privacy.html">Privacy Policy</a>.</span>
-      </label>
+      <div class="field">
+        <label class="step-row" for="gateEmail">
+          <span class="step-k" id="emailLabel" data-i18n="emailLabel">Email</span>
+          <input id="gateEmail" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" required aria-labelledby="emailLabel" aria-describedby="gateHint" placeholder="you@company.com">
+        </label>
+        <p class="gate-hint" id="gateHint" hidden></p>
+      </div>
+      <div class="field">
+        <label class="step-row check-row">
+          <input id="gateTerms" name="terms" type="checkbox" aria-describedby="gateTermsHint">
+          <span class="check-copy" data-i18n="terms">I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.</span>
+        </label>
+        <p class="gate-hint" id="gateTermsHint" hidden></p>
+      </div>
       <label class="step-row check-row">
         <input id="gateMarketing" name="marketing" type="checkbox">
-        <span class="check-copy" data-i18n="marketing">Send me product updates and tips (optional)</span>
+        <span class="check-copy" data-i18n="marketing">Email me product notes. Optional, and off unless you tick it.</span>
       </label>
       <div class="gate-actions">
         <!-- .doit placeholder: do-it-inline.png already says Do It, so it is not used here. -->
-        <button class="doit" id="gateSubmit" type="submit" disabled data-i18n="submit">Get Glance</button>
+        <button class="doit" id="gateSubmit" type="submit" disabled>
+          <span class="doit-label" data-i18n="submit">Get Glance for Chrome</span>
+          <span class="spin" hidden aria-hidden="true"></span>
+        </button>
         <p class="soon" data-i18n="soon"><bdi>iPhone</bdi>: coming soon</p>
       </div>
-      <p class="gate-success" id="gateSuccess" role="status" hidden data-i18n="success">✓ Closed · You’re in. Opening the Chrome Web Store…</p>
-      <p class="gate-mail" id="gateMail" hidden data-i18n="mail">Check your email to confirm the mailing list.</p>
+      <p class="gate-error" id="gateError" role="alert" hidden>
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 3.6v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="10" r=".7" fill="currentColor"/></svg>
+        <span id="gateErrorText"></span>
+        <button class="retry" id="gateRetry" type="button" data-i18n="retry">Retry</button>
+      </p>
+      <p class="gate-success" id="gateSuccess" role="status" hidden data-i18n="success">Opening the <bdi>Chrome</bdi> Web Store…</p>
+      <p class="gate-mail" id="gateMail" hidden data-i18n="mailLine">Check your email to confirm the mailing list.</p>
     </form>
   </div>
 </main>
 <script>
 window.FLOW_PAGE_I18N = {
   eye: { en: 'Glance', he: 'Glance' },
-  h1: {
-    en: 'Get <bdi>Glance</bdi>. You intend, it closes the loop.',
-    he: 'קבלו את <bdi>Glance</bdi>. אתם מתכוונים, זה סוגר את הלולאה.'
-  },
+  title: { en: 'Open loops.', he: 'לולאות פתוחות.' },
+  titleEm: { en: 'Closed.', he: 'סגור.' },
   lede: {
-    en: '<bdi>Glance</bdi> is a personal layer in your browser. It notices what you meant to do across your apps — <bdi>Gmail</bdi>, <bdi>Outlook</bdi>, calendar, chats, and more — and closes it for you, with a receipt and Undo on every action. It never sends without your approval.',
-    he: '<bdi>Glance</bdi> היא שכבה אישית בדפדפן. היא שמה לב למה שהתכוונתם לעשות באפליקציות שלכם — <bdi>Gmail</bdi>, <bdi>Outlook</bdi>, יומן, צ׳אטים ועוד — וסוגרת את זה בשבילכם, עם קבלה וביטול בכל פעולה. היא אף פעם לא שולחת בלי האישור שלכם.'
+    en: 'Leave your email. <bdi>Glance</bdi> for <bdi>Chrome</bdi> opens next.',
+    he: 'השאירו אימייל. <bdi>Glance</bdi> ל-<bdi>Chrome</bdi> נפתח אחר כך.'
   },
+  p1: {
+    en: '<bdi>Chrome</bdi>, on the page you already have open',
+    he: '<bdi>Chrome</bdi>, על העמוד שכבר פתוח'
+  },
+  p2: { en: 'You approve every close', he: 'אתם מאשרים כל סגירה' },
+  p3: { en: 'Undo on every close', he: 'אפשר לבטל כל סגירה' },
   emailLabel: { en: 'Email', he: 'אימייל' },
   terms: {
-    en: 'I agree to the <a href="/glance/terms.html">Terms of Service</a> and <a href="/glance/privacy.html">Privacy Policy</a>.',
-    he: 'אני מסכים/ה ל<a href="/glance/terms.html">תנאי השימוש</a> ול<a href="/glance/privacy.html">מדיניות הפרטיות</a>.'
+    en: 'I agree to the <a href="/glance/terms.html">Terms</a> and <a href="/glance/privacy.html">Privacy Policy</a>.',
+    he: 'אני מסכים/ה ל<a href="/glance/terms.html">תנאים</a> ול<a href="/glance/privacy.html">מדיניות הפרטיות</a>.'
   },
   marketing: {
-    en: 'Send me product updates and tips (optional)',
-    he: 'שלחו לי עדכונים וטיפים על המוצר (לא חובה)'
+    en: 'Email me product notes. Optional, and off unless you tick it.',
+    he: 'שלחו לי עדכונים על המוצר. לא חובה, וכבוי עד שמסמנים.'
   },
-  submit: { en: 'Get Glance', he: 'קבלו את <bdi>Glance</bdi>' },
+  submit: { en: 'Get Glance for Chrome', he: 'קבלו את <bdi>Glance</bdi> ל-<bdi>Chrome</bdi>' },
+  retry: { en: 'Retry', he: 'נסו שוב' },
   soon: { en: '<bdi>iPhone</bdi>: coming soon', he: '<bdi>iPhone</bdi>: בקרוב' },
   success: {
-    en: '✓ Closed · You’re in. Opening the <bdi>Chrome</bdi> Web Store…',
-    he: '✓ נסגר · אתם בפנים. פותחים את חנות <bdi>Chrome</bdi>…'
+    en: 'Opening the <bdi>Chrome</bdi> Web Store…',
+    he: 'פותחים את חנות <bdi>Chrome</bdi>…'
   },
-  mail: {
+  mailLine: {
     en: 'Check your email to confirm the mailing list.',
-    he: 'בדקו את האימייל כדי לאשר את רשימת העדכונים.'
+    he: 'בדקו את האימייל כדי לאשר את רשימת הדיוור.'
   }
 };
 </script>

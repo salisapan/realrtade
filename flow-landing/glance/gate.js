@@ -1,23 +1,24 @@
 /* Signup gate for /glance only.
    TODO(cto): glanceSignupMock in site-config.js is true because
    glance-signup-consent is not deployed. Set it false when the function
-   returns 200 {signup_token, store_url}. Do not record consent in the browser. */
+   returns 200 {signup_token, store_url}. Do not record consent in the browser.
+   On http the page always uses the mock and logs the token: the cookie is Secure. */
 (function () {
   var TERMS_VERSION = '2026-10-15';
   var PRIVACY_VERSION = '2026-10-15';
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var COPY = {
     invalid: {
-      en: 'Enter a valid email address.',
-      he: 'הזינו כתובת אימייל תקינה.'
+      en: 'Enter a valid email.',
+      he: 'הזינו אימייל תקין.'
     },
     terms: {
-      en: 'Agree to the Terms of Service and Privacy Policy to continue.',
-      he: 'כדי להמשיך, אשרו את תנאי השימוש ואת מדיניות הפרטיות.'
+      en: 'Agree to the Terms and Privacy Policy to continue.',
+      he: 'כדי להמשיך, אשרו את התנאים ואת מדיניות הפרטיות.'
     },
     fail: {
-      en: 'Something went wrong. Your consent was not recorded.',
-      he: 'משהו השתבש. ההסכמה לא נרשמה.'
+      en: 'Something went wrong. Nothing was saved.',
+      he: 'משהו השתבש. לא נשמר דבר.'
     }
   };
 
@@ -34,16 +35,21 @@
     return row[lang()] || row.en;
   }
 
+  function onHttp() {
+    return location.protocol !== 'https:';
+  }
+
   function sourceValue() {
     var q = new URLSearchParams(location.search);
-    var parts = ['glance'];
+    var place = q.get('source');
+    if (place !== 'home' && place !== 'nav' && place !== 'glance') place = 'glance';
+    var parts = [place];
+    var utm = [];
     ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(function (key) {
       var value = q.get(key);
-      if (value) parts.push(key + '=' + value.slice(0, 80));
+      if (value) utm.push(key + '=' + value.slice(0, 80));
     });
-    if (document.referrer) {
-      try { parts.push('ref=' + new URL(document.referrer).host); } catch (e) {}
-    }
+    if (utm.length) parts.push('utm', utm.join(' '));
     return parts.join(' ').slice(0, 500);
   }
 
@@ -62,66 +68,98 @@
       + '; Max-Age=2592000; Path=/; SameSite=Lax; Secure';
   }
 
-  function showError(el, textEl, message) {
-    textEl.textContent = message;
-    el.hidden = false;
-  }
-
   function bind(form) {
     var email = form.querySelector('#gateEmail');
     var terms = form.querySelector('#gateTerms');
     var marketing = form.querySelector('#gateMarketing');
     var button = form.querySelector('#gateSubmit');
+    var label = button.querySelector('.doit-label');
+    var spin = button.querySelector('.spin');
+    var hint = form.querySelector('#gateHint');
+    var termsHint = form.querySelector('#gateTermsHint');
     var error = form.querySelector('#gateError');
     var errorText = form.querySelector('#gateErrorText');
+    var retry = form.querySelector('#gateRetry');
     var success = form.querySelector('#gateSuccess');
     var mail = form.querySelector('#gateMail');
-    var errorCode = '';
+    var loading = false;
+    var serverError = false;
 
-    function refresh() {
-      var ok = EMAIL_RE.test((email.value || '').trim()) && terms.checked;
-      button.disabled = !ok;
-      email.setAttribute('aria-invalid', email.value && !EMAIL_RE.test(email.value.trim()) ? 'true' : 'false');
-      if (errorCode) showError(error, errorText, text(errorCode));
+    function paintHints() {
+      var value = (email.value || '').trim();
+      var valid = EMAIL_RE.test(value);
+      var showInvalid = value.length > 0 && !valid;
+      hint.hidden = !showInvalid;
+      if (showInvalid) hint.textContent = text('invalid');
+      email.setAttribute('aria-invalid', showInvalid ? 'true' : 'false');
+      if (!termsHint.hidden) termsHint.textContent = text('terms');
+      if (serverError) errorText.textContent = text('fail');
+      if (!loading) button.disabled = !valid;
     }
 
-    function fail(code) {
-      errorCode = code || 'fail';
+    function lock(on) {
+      loading = on;
+      email.disabled = on;
+      terms.disabled = on;
+      marketing.disabled = on;
+      button.disabled = on;
+      button.classList.toggle('is-loading', on);
+      button.setAttribute('aria-busy', on ? 'true' : 'false');
+      if (label) label.hidden = on;
+      if (spin) spin.hidden = !on;
+    }
+
+    function showServerError() {
+      serverError = true;
       success.hidden = true;
       if (mail) mail.hidden = true;
-      showError(error, errorText, text(errorCode));
-      button.disabled = false;
-      refresh();
+      errorText.textContent = text('fail');
+      error.hidden = false;
+      lock(false);
+      paintHints();
+      if (retry) retry.focus();
     }
 
     email.addEventListener('input', function () {
-      if (errorCode === 'invalid') errorCode = '';
-      if (!errorCode) error.hidden = true;
-      refresh();
-    });
-    email.addEventListener('blur', function () {
-      if (email.value && !EMAIL_RE.test(email.value.trim())) {
-        errorCode = 'invalid';
-        showError(error, errorText, text('invalid'));
-      }
+      serverError = false;
+      error.hidden = true;
+      paintHints();
     });
     terms.addEventListener('change', function () {
-      if (errorCode === 'terms') errorCode = '';
-      if (!errorCode) error.hidden = true;
-      refresh();
+      if (terms.checked) termsHint.hidden = true;
+      paintHints();
     });
-    new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
-    refresh();
+    new MutationObserver(paintHints).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+    paintHints();
+
+    if (retry) {
+      retry.addEventListener('click', function () {
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { cancelable: true }));
+      });
+    }
 
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
+      if (loading) return;
       var address = (email.value || '').trim();
-      if (!EMAIL_RE.test(address)) { fail('invalid'); email.focus(); return; }
-      if (!terms.checked) { fail('terms'); terms.focus(); return; }
-      errorCode = '';
+      if (!EMAIL_RE.test(address)) {
+        paintHints();
+        email.focus();
+        return;
+      }
+      if (!terms.checked) {
+        termsHint.hidden = false;
+        termsHint.textContent = text('terms');
+        terms.focus();
+        return;
+      }
+      termsHint.hidden = true;
+      serverError = false;
       error.hidden = true;
-      button.disabled = true;
-      button.setAttribute('aria-busy', 'true');
+      success.hidden = true;
+      if (mail) mail.hidden = true;
+      lock(true);
 
       var body = {
         email: address,
@@ -137,9 +175,13 @@
 
       var q = new URLSearchParams(location.search);
       var config = cfg();
-      var pending = config.glanceSignupMock
-        ? Promise.resolve(q.get('fail') === '1'
-          ? { ok: false, status: 400, payload: { error: '' } }
+      var useMock = onHttp() || !!config.glanceSignupMock;
+      var failAddress = address.toLowerCase() === 'fail@flow.dev' || q.get('fail') === '1';
+      if (q.get('load') === '1') return;
+
+      var pending = useMock
+        ? Promise.resolve(failAddress
+          ? { ok: false, status: 400, payload: {} }
           : { ok: true, status: 200, payload: { signup_token: 'mock-' + Date.now().toString(36), store_url: config.glanceStoreUrl || config.chromeStoreUrl || '' } })
         : fetch(config.glanceSignupConsentUrl, {
           method: 'POST',
@@ -154,22 +196,20 @@
         });
 
       pending.then(function (result) {
-        button.removeAttribute('aria-busy');
         if (!result.ok) {
-          var message = result.payload && (result.payload.error || result.payload.message);
-          if (message) {
-            errorCode = '';
-            showError(error, errorText, String(message));
-            refresh();
-            return;
-          }
-          fail('fail');
+          showServerError();
           return;
         }
         var token = result.payload && result.payload.signup_token;
         var store = httpsUrl(result.payload && result.payload.store_url) || httpsUrl(config.glanceStoreUrl) || httpsUrl(config.chromeStoreUrl);
-        if (!token || !store) { fail('fail'); return; }
+        if (!token || !store) {
+          showServerError();
+          return;
+        }
         setCookie(token);
+        if (onHttp()) console.log(token);
+        lock(false);
+        button.disabled = true;
         success.hidden = false;
         if (mail) mail.hidden = !marketing.checked;
         if (q.get('hold') === '1') return;
@@ -200,7 +240,7 @@
     var form = document.getElementById('glanceGate');
     if (form) bind(form);
     themeToggle();
-    document.querySelectorAll('[data-lang-panel]').forEach(function () {
+    if (document.querySelector('[data-lang-panel]')) {
       function show() {
         var current = lang();
         document.querySelectorAll('[data-lang-panel]').forEach(function (panel) {
@@ -209,7 +249,9 @@
       }
       new MutationObserver(show).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
       show();
-    });
+    }
+    var welcome = document.getElementById('welcome');
+    if (welcome && window.GlanceWelcome) window.GlanceWelcome(welcome);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

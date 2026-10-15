@@ -746,6 +746,9 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .path-card.glance-card{border-color:color-mix(in srgb, #5B8CFF 35%, var(--line))}
 .path-card .who{font-family:var(--mono); font-size:.68rem; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-2)}
 .path-card.glance-card .who{color:#5B8CFF}
+.glance-card h3 em{font-style:italic; font-weight:500}
+.glance-ecos{display:flex; flex-wrap:wrap; gap:8px 16px; margin:0 0 14px; font-weight:650; letter-spacing:.01em}
+.open-glance{font-weight:650; text-decoration:none}
 .path-card h3{font-family:var(--disp); font-weight:700; font-size:1.45rem; color:var(--txt-hi); margin:0; letter-spacing:-.02em}
 .path-card p{color:var(--txt); font-size:1rem; line-height:1.6; margin:0; flex:1}
 .path-card .cta-row{margin-top:8px}

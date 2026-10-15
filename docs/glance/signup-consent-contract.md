@@ -1,6 +1,6 @@
 # Glance signup consent
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. It runs across Microsoft, Google, and Meta.
 
 This is the contract for the website gate at `/glance`. The edge function is not deployed. The page uses a mock until the CTO turns it off. Terms and privacy at `/glance/terms.html` and `/glance/privacy.html` are drafts, version `2026-10-15`, pending legal review.
 
@@ -33,11 +33,11 @@ The browser sends only this JSON:
 | `locale` | `en` or `he` |
 | `ua` | `navigator.userAgent`, cut at 400 characters |
 | `referrer` | `document.referrer`, cut at 500 characters |
-| `source` | `glance`, plus any `utm_*` query values and `ref=` plus the referrer host |
+| `source` | Text. Placement is `home`, `nav`, or `glance`. When a `utm_*` query is present, the same value also includes `utm` and those pairs. The home Open Glance link sends `home`. A Glance nav link sends `nav`. A direct visit sends `glance`. |
 
 The client does not send `ts` or `ip`. The server sets `created_at` and `ip_hash`.
 
-`source` is sent because the placement is the gate. The table columns below do not include `source`. The CTO either stores it in a new column or drops it. This draft does not add the column.
+`source` is kept. It is a text column on `glance_signups`, stored next to `referrer`.
 
 ## Response
 
@@ -64,6 +64,7 @@ Inserts go through the edge function only. There is no public read.
 | `ip_hash` | server |
 | `ua` | client |
 | `referrer` | client |
+| `source` | client. Text: `home`, `nav`, `glance`, and `utm` when a campaign query is present. Stored next to `referrer`. |
 | `signup_token` | server, returned to the browser |
 | `created_at` | server |
 
@@ -79,6 +80,6 @@ The Glance edge function owns insert, the marketing confirm (sets `marketing_con
 
 ## Mock
 
-`glanceSignupMock` is `true`. While it is true the page does not call the network. A success payload is `{ signup_token, store_url }` using `glanceStoreUrl`. `?fail=1` behaves as HTTP 400. `?hold=1` shows the success lines and skips the redirect so the state can be screenshotted. The CTO sets `glanceSignupMock` to `false` when the function returns 200.
+`glanceSignupMock` is `true`. While it is true the page does not call the network. A success payload is `{ signup_token, store_url }` using `glanceStoreUrl`. The address `fail@flow.dev` behaves as HTTP 400, and so does `?fail=1`. `?hold=1` shows the success lines and skips the redirect. `?load=1` stays on the spinner so that state can be screenshotted. The CTO sets `glanceSignupMock` to `false` when the function returns 200.
 
-The cookie is `Secure`, so a local `http` server will not store it. `welcome.html` on `http` correctly reports that no signup is on the browser.
+The cookie stays `Secure`. On `http` the page uses the mock even if the flag is later turned off, and it `console.log`s the token, because a Secure cookie will not stick.
