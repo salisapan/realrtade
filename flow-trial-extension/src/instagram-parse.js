@@ -472,20 +472,11 @@ const FlowInstagramParse = (() => {
     return '';
   }
 
-  function classifyKind(facts) {
-    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
-    return rule && rule.verdict ? rule.verdict(facts) : 'unknown';
-  }
-
   function decide(scope, via, href, root) {
-    const active = headerActive(scope);
-    const raw = regionTitle(scope);
     const whole = root || scope;
-    const title = raw || firstHeading(whole);
-    const structural = isGroup(scope) || groupTitle(firstHeading(whole)) || membersListed(whole);
-    const proved = !structural && (matchingProfile(scope) || threadMatches(scope, href) || singlePersonPanel(whole, raw));
-    const kind = classifyKind({ title: title, structural: structural, proved: proved });
-    return { kind: kind, via: via, active: Boolean(active) };
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    const judged = rule && rule.pipeline ? rule.pipeline(whole, href) : { kind: 'unknown', name: '', active: false };
+    return { kind: judged.kind, via: via, active: Boolean(judged.active || headerActive(scope)) };
   }
 
   // First matching region wins. No positive one-to-one or group signal there

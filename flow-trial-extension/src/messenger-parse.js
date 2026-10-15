@@ -603,37 +603,14 @@ const FlowMessengerParse = (() => {
     return '';
   }
 
-  // A Page inbox drafts only when the open thread has an id and one person.
-  function inboxThreadProof(scope, href, root) {
-    const facts = inboxFacts(scope);
-    if (facts.group || facts.names.length !== 1) return false;
-    const id = threadIdFor(href, facts.names[0], root);
-    return Boolean(id);
-  }
-
-  function classifyKind(facts) {
-    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
-    return rule && rule.verdict ? rule.verdict(facts) : 'unknown';
-  }
-
-  // Person-shaped cancels a group-word veto inside FlowGroupWord.verdict.
-  // It is not allowed to return before the proof checks.
+  // Kind comes only from FlowGroupWord.pipeline. selected_item_id is proof
+  // inside that function, after structural signals and the title verdict.
   function decide(scope, via, href, root) {
-    const name = nameIn(scope, via);
-    const active = headerActive(scope);
-    const raw = regionTitle(scope, via);
     const whole = root || scope;
-    const title = raw || firstHeading(whole);
-    const structural = isGroup(scope, via) || groupTitle(firstHeading(whole)) || membersListed(whole);
-    const proved = !structural && (
-      matchingProfile(scope, via) ||
-      threadMatches(scope, href, via) ||
-      singlePersonPanel(whole, raw) ||
-      (via === 'inbox' && inboxThreadProof(scope, href, whole))
-    );
-    const kind = classifyKind({ title: title, structural: structural, proved: proved });
-    const shown = name || (kind === 'one-to-one' ? title : '');
-    return { kind: kind, via: via, name: shown, active: Boolean(active) };
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    const judged = rule && rule.pipeline ? rule.pipeline(whole, href) : { kind: 'unknown', name: '', active: false };
+    const name = nameIn(scope, via) || judged.name || '';
+    return { kind: judged.kind, via: via, name: name, active: Boolean(judged.active || headerActive(scope)) };
   }
 
   // First matching region wins. No positive one-to-one or group signal there
@@ -704,5 +681,20 @@ const FlowMessengerParse = (() => {
   return { page, isOneToOne, classify, authorOf, joinText, threadIdFor };
 })();
 
-if (typeof module !== 'undefined') module.exports = { FlowMessengerParse };
-else if (typeof globalThis !== 'undefined') globalThis.FlowMessengerParse = FlowMessengerParse;
+// Business Suite uses the same pipeline as Messenger and Instagram.
+const FlowBusinessParse = {
+  classify: function (root, href) {
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    const judged = rule && rule.pipeline ? rule.pipeline(root, href) : { kind: 'unknown', name: '', active: false };
+    return { kind: judged.kind, via: 'inbox', name: judged.name || '', active: Boolean(judged.active) };
+  },
+  isOneToOne: function (root, href) {
+    return FlowBusinessParse.classify(root, href).kind === 'one-to-one';
+  }
+};
+
+if (typeof module !== 'undefined') module.exports = { FlowMessengerParse, FlowBusinessParse };
+else if (typeof globalThis !== 'undefined') {
+  globalThis.FlowMessengerParse = FlowMessengerParse;
+  globalThis.FlowBusinessParse = FlowBusinessParse;
+}

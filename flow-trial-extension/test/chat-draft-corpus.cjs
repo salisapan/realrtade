@@ -99,7 +99,7 @@ const { FlowChatCompose } = require('../src/chat-compose.js');
 const { FlowChatLane } = require('../src/chat-lane.js');
 const { FlowFactReply } = require('../core/fact-reply.js');
 const { FlowGroupWord } = require('../src/group-word.js');
-const { FlowMessengerParse } = require('../src/messenger-parse.js');
+const { FlowMessengerParse, FlowBusinessParse } = require('../src/messenger-parse.js');
 const { FlowInstagramParse } = require('../src/instagram-parse.js');
 const { FlowLaneDraftStore } = require('../src/lane-draft-store.js');
 
@@ -350,7 +350,38 @@ function provedName(title, slug) {
   const bare = surfaceKinds(title, '');
   check(title + ' stays quiet without proof on every surface', bare[0] !== 'one-to-one' && bare[1] !== 'one-to-one' && bare[2] !== 'one-to-one' && bare[0] === bare[1] && bare[1] === bare[2], bare);
 });
-check('a person-shaped title cancels a group-word veto only when proof is present', FlowGroupWord.verdict({ title: 'Mary Members', wordVeto: true, proved: true }) === 'one-to-one' && FlowGroupWord.verdict({ title: 'Mary Members', wordVeto: true, proved: false }) === 'unknown' && FlowGroupWord.verdict({ title: 'Team', proved: true }) === 'group');
+check('the pipeline keeps digits and emoji quiet even with proof', FlowGroupWord.pipeline({ title: 'Team 🔥', profileLink: true, threadMatch: true, selectedItem: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Squad 7', profileLink: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: '4 friends', threadMatch: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana 🎉', onePersonPanel: true }).kind === 'unknown' && FlowGroupWord.pipeline({ title: 'Dana', profileLink: true }).kind === 'one-to-one' && FlowGroupWord.pipeline({ title: 'Team', profileLink: true }).kind === 'group' && FlowGroupWord.pipeline({ title: 'Dana', memberLine: true, profileLink: true, selectedItem: true }).kind === 'group');
+function threeKinds(html, href) {
+  const root = chatEl(html);
+  return [
+    FlowMessengerParse.classify(root, href).kind,
+    FlowInstagramParse.classify(root, href).kind,
+    FlowBusinessParse.classify(root, href).kind
+  ];
+}
+function sameKind(html, href) {
+  const kinds = threeKinds(html, href);
+  return kinds[0] === kinds[1] && kinds[1] === kinds[2] ? kinds[0] : kinds;
+}
+const profileStill = '<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a href="/dana/" role="link">Dana</a><a aria-label="Conversation information">Conversation information</a><button type="button" aria-label="Chat details">Chat details</button></header></div>';
+check('a profile link still drafts through the pipeline', sameKind(profileStill, '') === 'one-to-one' && FlowMessengerParse.isOneToOne(chatEl(profileStill)) === true && FlowInstagramParse.isOneToOne(chatEl(profileStill)) === true);
+const numericProfile = '<div role="main"><header><h2>Dana</h2><a href="/profile.php?id=100012345678" role="link">Dana</a><a aria-label="Conversation information">Conversation information</a></header></div>';
+check('a numeric profile.php id drafts through the pipeline when the thread matches', sameKind(numericProfile, msHref) === 'one-to-one');
+const fireProof = '<div role="main"><header><h2>Team 🔥</h2><a href="/team/" role="link">Team</a><a aria-label="Conversation information">Conversation information</a></header><span data-surface="/bizweb/lib:inbox:detail_view_header"><div><div>Team 🔥</div></div></span></div>';
+check('Team 🔥 is the same quiet verdict on Messenger, Instagram, and Business Suite', sameKind(fireProof, 'https://business.facebook.com/latest/inbox/all/?selected_item_id=fire') === 'unknown');
+const quietCases = {
+  'q-group-block': '<div role="main"><header><h2>Dana Levi</h2><a href="/danalevi/" role="link">danalevi</a><button type="button">Block group</button><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-group-mute-person': '<div role="main"><header><h2>Dana</h2><a href="/dana/" role="link">Dana</a><button type="button">Mute person</button><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-group-viewprofile': '<div role="main"><header><h2>Book club</h2><a href="/100012345678/" role="link">Book club</a><a href="/100012345678/">View profile</a><span aria-label="Group conversation">Group</span><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-nested-numeric-group': '<div role="main"><header><a href="/100012345678/" role="link"><h2>Dana</h2><span>Group</span></a><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'q-vav-noa-numeric': '<div role="main"><header><h2>דנה ו נועה</h2><a href="/100012345678/" role="link">דנה ו נועה</a><a aria-label="Conversation information">Conversation information</a></header></div>',
+  'a-two-keys': '<div role="main"><header><h2>Dana</h2><a href="/dana/" role="link">Dana</a><a href="/noa/" role="link">Noa</a><a aria-label="Conversation information">Conversation information</a></header></div>'
+};
+Object.keys(quietCases).forEach((name) => {
+  const href = name === 'q-nested-numeric-group' || name === 'q-vav-noa-numeric' || name === 'q-group-viewprofile' ? msHref : '';
+  const kind = sameKind(quietCases[name], href);
+  check(name + ' stays quiet', kind === 'group' || kind === 'unknown', kind);
+});
 check('selected_item_id is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?selected_item_id=abc', 'Dana Levi', statusHeader) === 'ms:abc');
 check('a thread query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/all/?thread=xyz', '', null) === 'ms:xyz');
 check('a thread_id query is the Business Suite thread', FlowMessengerParse.threadIdFor('https://business.facebook.com/latest/inbox/?thread_id=tid', '', null) === 'ms:tid');
@@ -416,7 +447,7 @@ const staffName = 'Dana Levi (Staff)';
 const staffRoot = chatEl(personHtml(staffName, '100012345678'));
 const staffHref = 'https://www.messenger.com/t/100012345678';
 check('a parenthetical staff note is still Dana Levi', FlowGroupWord.counts(staffName) === false && FlowMessengerParse.classify(staffRoot, staffHref).kind === 'one-to-one' && FlowInstagramParse.classify(staffRoot, staffHref).kind === 'one-to-one', { messenger: FlowMessengerParse.classify(staffRoot, staffHref), instagram: FlowInstagramParse.classify(staffRoot, staffHref) });
-check('both parsers call the shared classifier', /globalThis\.FlowGroupWord/.test(messengerParse) && /FlowGroupWord\.verdict|rule\.verdict/.test(messengerParse) && /rule\.verdict/.test(instagramParse));
+check('both parsers call the shared pipeline', /rule\.pipeline/.test(messengerParse) && /rule\.pipeline/.test(instagramParse));
 const advDir = path.join(__dirname, 'fixtures/chat/adv');
 const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html')).sort();
 check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
@@ -964,6 +995,11 @@ console.log('\n--- calendar evidence ---\n');
     const href = name === 'd-link.html' ? 'https://www.messenger.com/t/100012345678' : 'https://www.messenger.com/t/' + name.replace(/\.html$/, '');
     pages.push(['adv/' + name, href, 'src/content-messenger.js', name === 'd-link.html']);
   });
+  Object.keys(quietCases).forEach((name) => {
+    const href = name === 'q-nested-numeric-group' || name === 'q-vav-noa-numeric' || name === 'q-group-viewprofile' ? msHref : 'https://www.messenger.com/t/' + name;
+    const html = quietCases[name].replace('</header>', '</header><div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + incoming + '</span></div><div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div><button type="button" aria-label="Send"></button>');
+    pages.push(['messenger-place.html', href, 'src/content-messenger.js', false, html, name]);
+  });
   function identityUrl(name) {
     if (name === 'id-duplicate.html' || name === 'id-weiss.html' || name === 'id-nested-group.html' || name === 'id-group-viewprofile.html') return 'https://www.messenger.com/t/100012345678';
     if (name === 'id-thread-mismatch.html') return 'https://www.messenger.com/t/555111222333';
@@ -988,23 +1024,29 @@ console.log('\n--- calendar evidence ---\n');
       });
     });
   });
-  for (const [name, url, surface, expect] of pages) {
-    const page = await open(name, url, surface);
+  for (const row of pages) {
+    const name = row[0];
+    const url = row[1];
+    const surface = row[2];
+    const expect = row[3];
+    const html = row[4];
+    const label = row[5] || name;
+    const page = await open(name, url, surface, html ? { html: html } : undefined);
     const keyboard = keys.filter((e) => e.type === 'keydown' || e.type === 'keypress' || e.type === 'keyup' || e.key === 'Enter');
-    check(name + ' never clicks and never presses Enter', clicks.length === 0 && keyboard.length === 0 && page.sendClicks === 0, { clicks: clicks.length, keyboard: keyboard });
+    check(label + ' never clicks and never presses Enter', clicks.length === 0 && keyboard.length === 0 && page.sendClicks === 0, { clicks: clicks.length, keyboard: keyboard });
     if (expect === true || expect === 'live-flow') {
-      check(name + ' drafts the maps link', page.text.indexOf('Taizu - ' + MAPS) === 0, page.text);
-      check(name + ' leaves the search box alone', page.search === '');
-      if (expect === 'live-flow') check(name + ' names Flow AI', page.name === 'Flow AI', page.name);
+      check(label + ' drafts the maps link', page.text.indexOf('Taizu - ' + MAPS) === 0, page.text);
+      check(label + ' leaves the search box alone', page.search === '');
+      if (expect === 'live-flow') check(label + ' names Flow AI', page.name === 'Flow AI', page.name);
     } else if (expect === 'live-quiet') {
-      check(name + ' stays empty', page.text.trim() === '', page.text);
-      check(name + ' names Flow AI', page.name === 'Flow AI', page.name);
+      check(label + ' stays empty', page.text.trim() === '', page.text);
+      check(label + ' names Flow AI', page.name === 'Flow AI', page.name);
     } else if (expect === 'fact') {
-      check(name + ' drafts the one cell', page.text === '1840', page.text);
+      check(label + ' drafts the one cell', page.text === '1840', page.text);
     } else if (name === 'whatsapp-filled.html') {
-      check(name + ' does not overwrite the box', page.text === 'thanks', page.text);
+      check(label + ' does not overwrite the box', page.text === 'thanks', page.text);
     } else {
-      check(name + ' stays empty', page.text.trim() === '', page.text);
+      check(label + ' stays empty', page.text.trim() === '', page.text);
     }
     page.close();
     clicks.length = 0;
