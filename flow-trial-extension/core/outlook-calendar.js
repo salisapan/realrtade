@@ -136,6 +136,31 @@ const FlowOutlookCalendar = (() => {
   // The exact delegated scope, after the real Microsoft spellings are folded.
   // Calendars.Read and Calendars.ReadWrite.Shared are not this permission.
   // A missing list and the word "unknown" are not this permission.
+  // One reading of a stored Microsoft sign-in. The panel and Setup both use it.
+  // valid is the only state that may say connected. expired and missing-scope
+  // ask for a reconnect. missing has no token.
+  function microsoftConnection(auth, sync, now) {
+    const Auth = typeof FlowOutlookAuth !== 'undefined' ? FlowOutlookAuth : null;
+    if (Auth && typeof Auth.microsoftConnection === 'function' && Auth.microsoftConnection !== microsoftConnection) {
+      return Auth.microsoftConnection(auth, sync, now);
+    }
+    const token = auth && auth.token;
+    if (!token || !token.accessToken) return 'missing';
+    const state = sync || {};
+    if (state.needsSignIn) return 'expired';
+    const exp = Number(token.expiresAt);
+    const clock = Number(now) || 0;
+    if (exp && clock && exp <= clock) return 'expired';
+    const scopes = scopesFromToken(token);
+    if (!scopes) return 'missing-scope';
+    const mail = scopes.some((s) => {
+      const name = String(s || '').toLowerCase();
+      return name === 'mail.read' || name === 'mail.readwrite';
+    });
+    if (!mail) return 'missing-scope';
+    return 'valid';
+  }
+
   function hasWriteScope(scopes) {
     const list = normalizeDelegatedScopes(scopes);
     if (!list) return false;
@@ -277,6 +302,7 @@ const FlowOutlookCalendar = (() => {
     holdConsentAsk: holdConsentAsk,
     normalizeDelegatedScopes: normalizeDelegatedScopes,
     scopesFromToken: scopesFromToken,
+    microsoftConnection: microsoftConnection,
     grantedScopesFromResponse: grantedScopesFromResponse,
     namesCalendar: namesCalendar,
     fileLink: fileLink,

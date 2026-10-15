@@ -196,5 +196,13 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
     page.indexOf("['Once', 'once']") < 0 && page.indexOf("['Not now', 'not-now']") < 0);
 }
 
+const now = Date.now();
+const mailToken = { accessToken: 'AT', expiresAt: now + 3600e3, grantedScopes: ['Mail.ReadWrite', 'Tasks.ReadWrite'] };
+check('a live mail token is valid', Cal.microsoftConnection({ token: mailToken }, {}, now) === 'valid');
+check('a past expiry is expired', Cal.microsoftConnection({ token: Object.assign({}, mailToken, { expiresAt: now - 1 }) }, {}, now) === 'expired');
+check('needsSignIn is expired', Cal.microsoftConnection({ token: mailToken }, { needsSignIn: true }, now) === 'expired');
+check('mail missing from the token is missing-scope', Cal.microsoftConnection({ token: { accessToken: 'AT', expiresAt: now + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, now) === 'missing-scope');
+check('no token is missing', Cal.microsoftConnection(null, {}, now) === 'missing');
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

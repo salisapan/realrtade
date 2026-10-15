@@ -135,6 +135,9 @@ const FlowOutlook = (() => {
         lastIncoming: st.lastIncoming || 0, lastOffers: st.lastOffers || 0,
         error: st.error || null, errorDetail: st.errorDetail || null, aadsts: st.aadsts || null,
         redirectUri: deps.redirectUri(),
+        tokenStatus: (typeof FlowOutlookAuth !== 'undefined' && typeof FlowOutlookAuth.microsoftConnection === 'function')
+          ? FlowOutlookAuth.microsoftConnection(auth, st, Date.now())
+          : (auth && auth.token ? 'valid' : 'missing'),
         offers: (pending.offers || []).length, asks: (pending.asks || []).length,
         incoming: (pending.incoming || []).length,
         diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],

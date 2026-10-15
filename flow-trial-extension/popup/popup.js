@@ -277,15 +277,15 @@
       pill.className = 'ver on';
       return;
     }
-    let outlookOn = false;
-    try {
-      const o = outlook();
-      const st = o && typeof o.status === 'function' ? await o.status() : null;
-      outlookOn = Boolean(st && st.connected && !st.needsSignIn);
-    } catch (e) { outlookOn = false; }
-    if (outlookOn) {
+    const microsoft = microsoftTokenStatus();
+    if (microsoft === 'valid') {
       pill.textContent = 'Outlook connected';
       pill.className = 'ver on';
+      return;
+    }
+    if (microsoft === 'expired' || microsoft === 'missing-scope') {
+      pill.textContent = 'Reconnect Microsoft';
+      pill.className = 'ver';
       return;
     }
     pill.textContent = 'Not connected';
@@ -319,6 +319,12 @@
       const url = (tabs && tabs[0] && tabs[0].url) || '';
       return /https:\/\/outlook\.(live|office|office365)\.com\//i.test(url);
     } catch (e) { return false; }
+  }
+
+  function microsoftTokenStatus() {
+    const Auth = typeof FlowOutlookAuth !== 'undefined' ? FlowOutlookAuth : null;
+    if (!Auth || typeof Auth.microsoftConnection !== 'function') return 'missing';
+    return Auth.microsoftConnection(state && state.outlookAuth, state && state.outlookSync, Date.now());
   }
 
   function grantedOutlookScopes() {
@@ -371,15 +377,22 @@
 
   function microsoftConnectCard() {
     const o = outlook();
+    const tokenStatus = microsoftTokenStatus();
     const card = el('div', 'conn');
     card.setAttribute('data-glance-connect', 'microsoft');
+    card.setAttribute('data-glance-microsoft', tokenStatus);
     const head = el('div', 'conn-head');
     const name = el('div', 'conn-name');
     name.appendChild(el('b', null, 'Microsoft'));
     name.appendChild(el('i', null, 'Mail, To Do & Calendar'));
     head.appendChild(name);
-    head.appendChild(el('span', 'badge live', 'Works now'));
+    if (tokenStatus === 'valid') head.appendChild(el('span', 'badge on', 'Connected'));
+    else if (tokenStatus === 'expired' || tokenStatus === 'missing-scope') head.appendChild(el('span', 'badge', 'Reconnect'));
+    else head.appendChild(el('span', 'badge live', 'Works now'));
     card.appendChild(head);
+    if (tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
+      card.appendChild(el('p', 'conn-note', 'Reconnect Microsoft'));
+    }
     card.appendChild(el('p', 'conn-note', 'One Microsoft sign-in. Check Calendar to place a named file on the calendar. Glance never sends.'));
     const screen = el('div', 'ms-connect');
     const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
@@ -419,7 +432,9 @@
     btn.appendChild(el('span', 'shell'));
     btn.appendChild(el('span', 'ring'));
     btn.appendChild(el('span', 'shine'));
-    btn.appendChild(el('span', 'btn-label', 'Connect Microsoft'));
+    const connectLabel = (tokenStatus === 'expired' || tokenStatus === 'missing-scope') ? 'Reconnect' : (tokenStatus === 'valid' ? 'Connected' : 'Connect Microsoft');
+    btn.appendChild(el('span', 'btn-label', connectLabel));
+    if (tokenStatus === 'valid') btn.disabled = true;
     btn.addEventListener('click', async () => {
       if (!o) return;
       btn.disabled = true; setBtnLabel(btn, 'Connecting…'); err.hidden = true;

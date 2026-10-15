@@ -1154,6 +1154,46 @@ async function run() {
       scopeLines);
   }
 
+  console.log('\n--- popup.js: the panel and Setup share one Microsoft state ---\n');
+  async function microsoftFace(store) {
+    const panel = load(store, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const pill = panel.document.getElementById('statusPill');
+    const list = panel.document.getElementById('connector-list');
+    const cards = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-connect') === 'microsoft') cards.push(n);
+      (n.children || []).forEach(walk);
+    })(list);
+    const card = cards[0] || null;
+    let connectedBadge = false;
+    (function walk(n) {
+      const classes = String((n && n.className) || '').split(/\s+/);
+      if (classes.indexOf('badge') >= 0 && classes.indexOf('on') >= 0) connectedBadge = true;
+      (n.children || []).forEach(walk);
+    })(card || { children: [] });
+    return {
+      pill: pill ? pill.textContent : '',
+      status: card ? card.getAttribute('data-glance-microsoft') : '',
+      connectedBadge: connectedBadge
+    };
+  }
+  const expiredFace = await microsoftFace({
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() - 1000, grantedScopes: ['Mail.ReadWrite'] } },
+    outlookSync: {}
+  });
+  check('an expired token is Reconnect in the panel and in Setup, never Connected',
+    expiredFace.pill === 'Reconnect Microsoft' && expiredFace.status === 'expired' && !expiredFace.connectedBadge,
+    expiredFace);
+  const scopeFace = await microsoftFace({
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } },
+    outlookSync: {}
+  });
+  check('a missing mail scope is Reconnect in the panel and in Setup, never Connected',
+    scopeFace.pill === 'Reconnect Microsoft' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
+    scopeFace);
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

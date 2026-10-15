@@ -725,6 +725,48 @@ function listsRoute() {
     { text: chipText(paneOpen.doc), before: reconBefore, after: reconAfter });
   paneOpen.w.close();
 
+  console.log('\n--- a hand delete reconciles on the next open, without a reload ---\n');
+  let handGone = false;
+  const hand = await boot({
+    id: 'MSG-PARK',
+    subject: 'Parking permit - please renew by Sunday',
+    body: 'Please renew the parking permit by Sunday.\nThanks',
+    store: parkProofStore(),
+    reconcile: () => handGone ? { ok: false, status: 404 } : { ok: true, status: 200 }
+  });
+  const handUndo = await waitFor(hand.doc, '.flow-chip-undo', 4000);
+  check('the created task shows Handled and Undo before the delete',
+    Boolean(handUndo) && /Handled/i.test(chipText(hand.doc)),
+    { text: chipText(hand.doc) });
+  handGone = true;
+  const reconAtCreate = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  showSpaMail(hand, 'MSG-OTHER', 'Vendor contract', 'Can you send me the signed vendor contract by Thursday?\nThanks');
+  const leftPark = await waitForGone(hand.doc, 'Renew the parking permit', 4000);
+  check('switching mail leaves the parking receipt', leftPark, { text: chipText(hand.doc) });
+  showSpaMail(hand, 'MSG-PARK', 'Parking permit - please renew by Sunday', 'Please renew the parking permit by Sunday.\nThanks');
+  const handDeleted = await waitForText(hand.doc, 'Deleted in To Do', 4000);
+  const reconAfterBack = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  const handRec = hand.store.glanceProofs && hand.store.glanceProofs.records['MSG-PARK'];
+  const handCopy = hand.w.FlowProofOfClose.remountCopy(hand.w.FlowProofOfClose.proofAsLogRow(handRec));
+  check('switching back with no reload says Deleted in To Do and drops Undo',
+    handDeleted && !hand.doc.querySelector('.flow-chip-undo') && reconAfterBack > reconAtCreate &&
+    handRec && handRec.deleted === true && handRec.deletedLine === 'Deleted in To Do' &&
+    handCopy && handCopy.deleted === true && handCopy.deletedLine === 'Deleted in To Do',
+    { text: chipText(hand.doc), before: reconAtCreate, after: reconAfterBack, record: handRec, copy: handCopy });
+  const beforeSame = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  showSpaMail(hand, 'MSG-PARK', 'Parking permit - please renew by Sunday', 'Please renew the parking permit by Sunday.\nThanks');
+  await sleep(600);
+  const afterSame = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  showSpaMail(hand, 'MSG-OTHER', 'Vendor contract', 'Can you send me the signed vendor contract by Thursday?\nThanks');
+  await waitForGone(hand.doc, 'Deleted in To Do', 4000);
+  showSpaMail(hand, 'MSG-PARK', 'Parking permit - please renew by Sunday', 'Please renew the parking permit by Sunday.\nThanks');
+  const secondOpen = await waitForText(hand.doc, 'Deleted in To Do', 4000);
+  const afterSecond = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
+  check('the same mail reopened twice reconciles each time and stays Deleted in To Do',
+    secondOpen && !hand.doc.querySelector('.flow-chip-undo') && afterSame > beforeSame && afterSecond > afterSame,
+    { before: beforeSame, same: afterSame, second: afterSecond, text: chipText(hand.doc) });
+  hand.w.close();
+
   const graphId = 'AQMkAG+ab/cd=';
   const urlId = 'AQMkAG-ab_cd';
   const graphStore = {
@@ -795,6 +837,47 @@ function listsRoute() {
     { closeQuality: missPage.store.closeQuality, stillOpen: missPage.store.stillOpenMetrics });
   missPage.w.close();
 
+  console.log('\n--- a dead extension context does not leave the mail blank ---\n');
+  const quiet = await boot({
+    id: 'MSG-QUIET',
+    subject: 'Gym renewal',
+    body: 'Please renew the gym membership by Friday.\nThanks',
+    store: { outlookAuth: null }
+  });
+  const quietLine = await waitFor(quiet.doc, '.flow-why-not', 4000);
+  check('a mail with no token shows a quiet why line and no card',
+    Boolean(quietLine) && /Connect Microsoft/.test(quietLine.textContent) && !quiet.doc.querySelector('.flow-chip-host'),
+    { text: quietLine && quietLine.textContent });
+  quiet.w.chrome.runtime.id = '';
+  try { if (quiet.w.__glanceOutlookPage) quiet.w.__glanceOutlookPage.rescan(); } catch (e) { check('rescan after the context dies does not throw', false, String(e)); }
+  await sleep(80);
+  const deadLine = quiet.doc.querySelector('.flow-why-not');
+  check('a dead context stops quietly and leaves whyNotShown on the mail',
+    Boolean(deadLine) && deadLine.getAttribute('data-glance-why') === 'context-dead' && !quiet.doc.querySelector('.flow-chip-host'),
+    { text: deadLine && deadLine.textContent, why: deadLine && deadLine.getAttribute('data-glance-why') });
+  quiet.w.close();
+  const recovered = await boot({
+    id: 'MSG-GYM',
+    subject: 'Gym renewal',
+    body: 'Please renew the gym membership by Friday.\nThanks'
+  });
+  const recoveredCard = await waitFor(recovered.doc, '.flow-chip-host', 4000);
+  const recoveredWhy = recovered.doc.querySelector('.flow-why-not');
+  check('a recovered tab shows a card or a why line without a manual reload',
+    Boolean(recoveredCard) || Boolean(recoveredWhy),
+    { card: Boolean(recoveredCard), why: recoveredWhy && recoveredWhy.textContent });
+  recovered.w.close();
+
+  const recoverBg = background();
+  check('a live Outlook tab is rescanned and not injected again',
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: true, hasPage: true }) === 'rescan');
+  check('a dead Outlook tab is reloaded instead of staying blank',
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: true }) === 'reload');
+  check('an empty Outlook tab is injected',
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'normal', pingOk: false, hasPage: false }) === 'inject');
+  check('a window that is not a browser window is left alone',
+    recoverBg.fn('recoverOutlookTab')({ windowType: 'popup', pingOk: false, hasPage: false }) === 'skip');
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })().catch((err) => {
@@ -814,6 +897,21 @@ function registeredFiles() {
 
 function lines(text) {
   return String(text || '').split('\n').map((line) => '<div>' + line + '</div>').join('');
+}
+
+function showSpaMail(page, id, subject, bodyText) {
+  const href = 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(id);
+  page.w.history.pushState({}, '', href);
+  const heading = page.doc.querySelector('#ReadingPaneContainerId [role="heading"] span');
+  if (heading) {
+    heading.textContent = subject;
+    heading.setAttribute('title', subject);
+  }
+  const docNode = page.doc.querySelector('#ReadingPaneContainerId [role="document"]');
+  if (!docNode || !docNode.parentNode) return;
+  const next = docNode.cloneNode(false);
+  next.innerHTML = lines(bodyText);
+  docNode.parentNode.replaceChild(next, docNode);
 }
 
 function chipText(doc) {
