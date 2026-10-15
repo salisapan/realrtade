@@ -201,7 +201,7 @@ function liveRoot(file) {
   return new JSDOM(html).window.document.querySelector('[role="main"]');
 }
 const liveDirect = FlowMessengerParse.classify(liveRoot('live/messenger-1to1.html'));
-check('live messenger 1:1 is a direct chat named Flow AI', liveDirect.kind === 'one-to-one' && liveDirect.via === 'aria' && liveDirect.name === 'Flow AI' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html')) === true, liveDirect);
+check('live messenger numeric id with the title nested stays quiet and still names Flow AI', liveDirect.kind === 'unknown' && liveDirect.via === 'aria' && liveDirect.name === 'Flow AI' && FlowMessengerParse.isOneToOne(liveRoot('live/messenger-1to1.html')) === false, liveDirect);
 const oneAvatarGroup = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana, Noa</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
 const oneAvatarDirect = chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Conversation information">Conversation information</a></header></div>');
 check('a group with one avatar stays quiet', FlowMessengerParse.classify(oneAvatarGroup).kind === 'group' && FlowMessengerParse.isOneToOne(oneAvatarGroup) === false);
@@ -257,12 +257,30 @@ advFiles.forEach((name) => {
   const verdict = wantDraft ? 'drafts' : 'stays quiet';
   check('adv ' + name + ' ' + verdict, msDraft === wantDraft && igDraft === wantDraft && ms.active === wantActive && ig.active === wantActive, { messenger: ms, instagram: ig });
 });
-['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-duplicate.html', 'id-weiss.html'].forEach((name) => {
+// id-nested.html drafts because the URL is /danalevi_88/, an independent
+// username. The h2 text inside that link is not a signal. It did not rely
+// on the title matching itself.
+const identityDraft = ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-duplicate.html', 'id-weiss.html'];
+const identityQuiet = ['id-numeric-nested.html', 'id-bookclub.html', 'id-weekendcrew.html', 'id-team.html', 'id-team7.html', 'id-emoji.html', 'id-vav-noa.html', 'id-vered.html'];
+identityDraft.forEach((name) => {
   const root = liveRoot('identity/' + name);
   const ms = FlowMessengerParse.classify(root);
   const ig = FlowInstagramParse.classify(root);
   check(name + ' drafts', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true, { messenger: ms, instagram: ig });
 });
+identityQuiet.forEach((name) => {
+  const root = liveRoot('identity/' + name);
+  const ms = FlowMessengerParse.classify(root);
+  const ig = FlowInstagramParse.classify(root);
+  check(name + ' stays quiet', ms.kind !== 'one-to-one' && ig.kind !== 'one-to-one' && FlowMessengerParse.isOneToOne(root) === false && FlowInstagramParse.isOneToOne(root) === false, { messenger: ms, instagram: ig });
+});
+const team7 = liveRoot('identity/id-team7.html');
+const emoji = liveRoot('identity/id-emoji.html');
+const vavNoa = liveRoot('identity/id-vav-noa.html');
+check('Team 7 is a group before the digit is stripped', FlowMessengerParse.classify(team7).kind === 'group' && FlowInstagramParse.classify(team7).kind === 'group');
+check('Dana with a people emoji is a group before the emoji is stripped', FlowMessengerParse.classify(emoji).kind === 'group' && FlowInstagramParse.classify(emoji).kind === 'group');
+check('attached vav plus a Hebrew first name is a group', FlowMessengerParse.classify(vavNoa).kind === 'group' && FlowInstagramParse.classify(vavNoa).kind === 'group');
+check('Weiss stays one person', FlowMessengerParse.classify(liveRoot('identity/id-weiss.html')).kind === 'one-to-one');
 const standaloneVav = chatEl('<div role="main"><header><h2>דנה ו נועה</h2><a href="/100012345678/" role="link">דנה ו נועה</a><a aria-label="Conversation information">Conversation information</a></header></div>');
 check('a standalone vav between two names stays quiet', FlowMessengerParse.isOneToOne(standaloneVav) === false && FlowInstagramParse.isOneToOne(standaloneVav) === false);
 
@@ -439,7 +457,7 @@ console.log('\n--- calendar evidence ---\n');
     ['messenger-members.html', 'https://www.messenger.com/t/members', 'src/content-messenger.js', false],
     ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false],
     ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false],
-    ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-flow'],
+    ['live/messenger-1to1.html', 'https://www.facebook.com/messages/t/1358224314037055', 'src/content-messenger.js', 'live-quiet'],
     ['live/messenger-page-inbox.html', 'https://business.facebook.com/latest/inbox/', 'src/content-messenger.js', false],
     ['fallback/messenger-inbox-unknown.html', 'https://business.facebook.com/latest/inbox/t/unknown', 'src/content-messenger.js', false],
     ['fallback/messenger-inbox-group.html', 'https://business.facebook.com/latest/inbox/t/group', 'src/content-messenger.js', false],
@@ -448,8 +466,11 @@ console.log('\n--- calendar evidence ---\n');
   fs.readdirSync(path.join(__dirname, 'fixtures/chat/adv')).filter((name) => name.endsWith('.html')).sort().forEach((name) => {
     pages.push(['adv/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', name === 'd-link.html']);
   });
-  ['id-username.html', 'id-vanity.html', 'id-nested.html', 'id-duplicate.html', 'id-weiss.html'].forEach((name) => {
+  identityDraft.forEach((name) => {
     pages.push(['identity/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', true]);
+  });
+  identityQuiet.forEach((name) => {
+    pages.push(['identity/' + name, 'https://www.messenger.com/t/' + name.replace(/\.html$/, ''), 'src/content-messenger.js', false]);
   });
   ['messenger', 'instagram'].forEach((app) => {
     ['aria', 'banner', 'heading'].forEach((level) => {
@@ -471,6 +492,9 @@ console.log('\n--- calendar evidence ---\n');
       check(name + ' drafts the maps link', page.text.indexOf('Taizu - ' + MAPS) === 0, page.text);
       check(name + ' leaves the search box alone', page.search === '');
       if (expect === 'live-flow') check(name + ' names Flow AI', page.name === 'Flow AI', page.name);
+    } else if (expect === 'live-quiet') {
+      check(name + ' stays empty', page.text.trim() === '', page.text);
+      check(name + ' names Flow AI', page.name === 'Flow AI', page.name);
     } else if (expect === 'fact') {
       check(name + ' drafts the one cell', page.text === '1840', page.text);
     } else if (name === 'whatsapp-filled.html') {

@@ -31,9 +31,14 @@ const FlowInstagramParse = (() => {
   //    TODO-LIVE-DOM.
   //
   // Inside the chosen region, a draft needs one header profile link that
-  // names the same person as the header title. Link text, aria-label, and a
-  // name slug in the href each have to agree with that title when present.
-  // A numeric id carries no name. "Active now", "Active 5m ago",
+  // names the same person as the header title. The title's own text does not
+  // count when that title sits inside the link. A draft then needs a username
+  // in the URL that matches the name. A numeric id with no other signal stays
+  // quiet. A username that is one plain word (bookclub, weekendcrew, team) is
+  // not a first-and-last name and stays quiet. Link text and aria-label still
+  // count when the title is not nested in that link, and a name slug has to
+  // agree with the title. Group checks read the raw title before digits and
+  // emoji are stripped. "Active now", "Active 5m ago",
   // "פעיל/ה עכשיו", "פעיל עכשיו", "פעילה עכשיו", and "פעיל/ה לפני X" are
   // secondary and never draft a chat on their own. A message-row profile
   // link is not the header link. A group stays quiet even when the link
@@ -108,18 +113,54 @@ const FlowInstagramParse = (() => {
     return '';
   }
 
+  // Checked on the raw title, before identityTokens drops digits and emoji.
+  const EMOJI = /\p{Extended_Pictographic}/u;
+  // A word after an attached ו is a second person when it is a first name
+  // (ונועה). וייס is a surname. ורד is itself a first name, so it is unclear.
+  const HE_FIRST = new Set([
+    'נועה', 'דנה', 'מיכל', 'תמר', 'רוני', 'מאיה', 'עומר', 'דניאל', 'יוסי', 'אבי', 'יונתן',
+    'יעל', 'שירה', 'עדי', 'הדר', 'ליאור', 'אורי', 'דוד', 'משה', 'רועי', 'עידו', 'גל', 'תום',
+    'נעמה', 'רחל', 'לאה', 'שרה', 'מרים', 'אסתר', 'חנה', 'רבקה', 'דינה', 'נועם', 'איתי',
+    'יובל', 'שחר', 'ליאם', 'אריאל', 'מאור', 'טל', 'עדן', 'מיה', 'אגם', 'הילה', 'קרן', 'סיון',
+    'מור', 'נטע', 'איתן', 'אלון', 'ניר', 'אסף', 'גיא', 'עמית', 'ירון', 'אביגיל', 'ליאת', 'ענבר',
+    'נוי', 'שני', 'אברהם', 'יצחק', 'יעקב', 'אהרן', 'שלמה', 'חיים', 'רות', 'חן', 'אביב', 'סתיו',
+    'איתמר', 'יואב', 'נדב', 'תומר', 'גיל', 'רון', 'דני', 'ורד'
+  ]);
+  // One plain word is not a first-and-last name. danalevi_88 and dana.levi.5 are.
+  const PLAIN_USER = new Set([
+    'bookclub', 'weekendcrew', 'team', 'book', 'club', 'weekend', 'crew',
+    'family', 'group', 'chat', 'friends', 'squad'
+  ]);
+
   function groupTitle(title) {
     const t = String(title || '').replace(/\s+/g, ' ').trim();
     if (!t) return false;
+    if (EMOJI.test(t)) return true;
+    if (/\d/.test(t)) return true;
     if (/[,，、]/.test(t)) return true;
     if (/\s(?:&|and)\s/i.test(t)) return true;
     if (/\band\s+\d{1,4}\s+others\b/i.test(t)) return true;
     if (/ועוד\s*\d|\d\s*אחרים/.test(t)) return true;
     // A standalone ו between two names ("דנה ו נועה"). ו inside "דנה וייס" is not one.
     if (/\S\s+ו\s+\S/.test(t)) return true;
-    if (/🏠|👥/.test(t)) return true;
+    if (attachedVav(t) === 'group') return true;
     if (GROUP_WORD.test(t)) return true;
     return false;
+  }
+
+  // 'group' when ו is followed by a first name. 'unclear' when the whole word
+  // is a first name (ורד). null when ו belongs to the word (וייס).
+  function attachedVav(title) {
+    const words = String(title || '').trim().split(/\s+/);
+    let unclear = false;
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      if (!/^ו[\u0590-\u05FF]{2,}$/.test(word)) continue;
+      const rest = word.slice(1);
+      if (HE_FIRST.has(rest)) return 'group';
+      if (HE_FIRST.has(word)) unclear = true;
+    }
+    return unclear ? 'unclear' : null;
   }
 
   function headerSaysGroup(node) {
@@ -154,7 +195,8 @@ const FlowInstagramParse = (() => {
   }
 
   // Lowercase, then drop digits, underscores, and dots. "danalevi_88" and
-  // "Dana Levi" share the token identity danalevi.
+  // "Dana Levi" share the token identity danalevi. Group checks have already
+  // read the raw title, so "Team 7" and "Dana 👯" never reach this strip.
   function identityTokens(value) {
     const cleaned = String(value || '')
       .normalize('NFKC')
@@ -198,21 +240,82 @@ const FlowInstagramParse = (() => {
     return tokens.length ? 'name:' + tokens.join('') : '';
   }
 
-  function nameSignals(el) {
-    const signals = [];
-    const text = plainText(el);
-    const aria = el.getAttribute('aria-label') || '';
-    const parsed = parsedProfile(el.getAttribute('href'));
-    if (text) signals.push(identityTokens(text));
-    if (aria) signals.push(identityTokens(aria));
-    if (parsed && parsed.slug) signals.push(identityTokens(parsed.slug));
-    return signals.filter((tokens) => tokens.length);
+  function letterParts(slug) {
+    return String(slug || '').split(/[._]+/)
+      .map((part) => part.replace(/\d+/g, ''))
+      .filter((part) => part.length >= 2);
   }
 
-  function groupMatchesTitle(links, title) {
+  function titleIsFirstLast(raw) {
+    const words = String(raw || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length < 2) return false;
+    return words.every((word) => {
+      if (PLAIN_USER.has(word.toLowerCase())) return false;
+      if (/^[\u0590-\u05FF]/.test(word)) return true;
+      return /^\p{Lu}/u.test(word);
+    });
+  }
+
+  // dana.levi and Dana Levi + danalevi_88 are a person. bookclub is not.
+  function slugProvesPerson(slug, rawTitle) {
+    const parts = letterParts(slug);
+    if (!parts.length) return false;
+    const lowers = parts.map((part) => part.toLowerCase());
+    if (lowers.length >= 2) {
+      if (lowers.every((part) => PLAIN_USER.has(part))) return false;
+      if (PLAIN_USER.has(lowers.join(''))) return false;
+      return true;
+    }
+    if (PLAIN_USER.has(lowers[0])) return false;
+    const words = String(rawTitle || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 2) return titleIsFirstLast(rawTitle);
+    return true;
+  }
+
+  function headingInside(el) {
+    return Boolean(el && el.querySelector && el.querySelector('h1, h2, h3'));
+  }
+
+  function textOutsideHeading(el) {
+    function walk(node) {
+      if (!node) return '';
+      if (node.nodeType === 1) {
+        const tag = String(node.tagName || '').toUpperCase();
+        if (tag === 'H1' || tag === 'H2' || tag === 'H3') return '';
+        return Array.from(node.childNodes || []).map(walk).join(' ');
+      }
+      if (node.nodeType === 3) return node.textContent || '';
+      return '';
+    }
+    return walk(el).replace(/\s+/g, ' ').trim();
+  }
+
+  // null: the username is a plain word, so the link cannot prove a person.
+  function nameSignals(el, rawTitle) {
+    const signals = [];
+    const title = identityTokens(rawTitle);
+    const nested = headingInside(el);
+    const text = nested ? textOutsideHeading(el) : plainText(el);
+    const aria = el.getAttribute('aria-label') || '';
+    const parsed = parsedProfile(el.getAttribute('href'));
+    if (parsed && parsed.slug && !slugProvesPerson(parsed.slug, rawTitle)) return null;
+    function push(value, fromSlug) {
+      const tokens = identityTokens(value);
+      if (!tokens.length) return;
+      if (!fromSlug && nested && sameIdentity(tokens, title)) return;
+      signals.push(tokens);
+    }
+    if (text) push(text, false);
+    if (aria) push(aria, false);
+    if (parsed && parsed.slug) push(parsed.slug, true);
+    return signals;
+  }
+
+  function groupMatchesTitle(links, title, rawTitle) {
     let saw = false;
     for (let i = 0; i < links.length; i++) {
-      const signals = nameSignals(links[i]);
+      const signals = nameSignals(links[i], rawTitle);
+      if (signals === null) return false;
       for (let j = 0; j < signals.length; j++) {
         if (!sameIdentity(signals[j], title)) return false;
         saw = true;
@@ -221,9 +324,7 @@ const FlowInstagramParse = (() => {
     return saw;
   }
 
-  function matchingProfile(scope) {
-    const title = identityTokens(regionTitle(scope));
-    if (!title.length) return false;
+  function profileGroups(scope) {
     const groups = new Map();
     const order = [];
     profileLinks(scope).forEach((el) => {
@@ -232,8 +333,27 @@ const FlowInstagramParse = (() => {
       if (!groups.has(key)) { groups.set(key, []); order.push(key); }
       groups.get(key).push(el);
     });
-    if (order.length !== 1) return false;
-    return groupMatchesTitle(groups.get(order[0]), title);
+    return { groups: groups, order: order };
+  }
+
+  function matchingProfile(scope) {
+    const raw = regionTitle(scope);
+    const title = identityTokens(raw);
+    if (!title.length) return false;
+    const found = profileGroups(scope);
+    if (found.order.length !== 1) return false;
+    return groupMatchesTitle(found.groups.get(found.order[0]), title, raw);
+  }
+
+  // An unclear ו drafts only when the URL username is that one person.
+  function slugConfirmsPerson(scope, raw) {
+    const title = identityTokens(raw);
+    const found = profileGroups(scope);
+    if (found.order.length !== 1) return false;
+    const el = found.groups.get(found.order[0])[0];
+    const parsed = parsedProfile(el.getAttribute('href'));
+    if (!parsed || !parsed.slug || !slugProvesPerson(parsed.slug, raw)) return false;
+    return sameIdentity(identityTokens(parsed.slug), title);
   }
 
   function profileHref(href) {
@@ -298,7 +418,11 @@ const FlowInstagramParse = (() => {
 
   function decide(scope, via) {
     const active = headerActive(scope);
+    const raw = regionTitle(scope);
     if (isGroup(scope)) return { kind: 'group', via: via, active: active };
+    if (attachedVav(raw) === 'unclear' && !slugConfirmsPerson(scope, raw)) {
+      return { kind: 'unknown', via: via, active: active };
+    }
     if (active && !matchingProfile(scope)) return { kind: 'unknown', via: via, active: true };
     if (matchingProfile(scope)) return { kind: 'one-to-one', via: via, active: active };
     return { kind: 'unknown', via: via, active: false };
