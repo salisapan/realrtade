@@ -73,6 +73,24 @@ function load(opts) {
       // GET to fail registers its own route; anything else confirms the id.
       const taskRead = method === 'GET' && String(url).match(/\/lists\/[^/]+\/tasks\/([^/?]+)(?:\?.*)?$/);
       if (taskRead) return res(200, { id: decodeURIComponent(taskRead[1]), status: 'needsAction' });
+      // googleCalendarWrite reads the event back by id. A routed GET wins
+      // above. A delete already issued for this id reads back as gone.
+      // Anything else echoes the start from the write that just landed.
+      const calRead = method === 'GET' && String(url).match(/\/calendars\/primary\/events\/([^/?]+)$/);
+      if (calRead) {
+        const id = decodeURIComponent(calRead[1]);
+        if (calls.some((c) => c.indexOf('DELETE /calendars/primary/events/' + id) === 0)) return res(404, {});
+        let start = null;
+        let end = null;
+        for (let i = bodies.length - 1; i >= 0; i--) {
+          const b = bodies[i];
+          if (b && typeof b === 'object' && b.start) { start = b.start; end = b.end || null; break; }
+        }
+        const event = { id: id, status: 'confirmed' };
+        if (start) event.start = start;
+        if (end) event.end = end;
+        return res(200, event);
+      }
       return res(500, { error: { message: 'unrouted: ' + method + ' ' + url } });
     },
     chrome: {
@@ -498,6 +516,10 @@ async function run() {
       params: { title: 'Kickoff', dateIso: '2026-09-21', hour: 15, minute: 0 }
     }));
     check('the write succeeds rather than throwing', out.ok === true, out);
+    check('the create is Handled only after a GET of that event id',
+      out.proof && out.proof.fetchedBack === true && out.proof.system === 'google/calendar' && out.proof.externalId === 'ev_9' &&
+      env.calls.some((c) => c === 'GET /calendars/primary/events/ev_9'),
+      { proof: out.proof, calls: env.calls });
     check('the request actually reached the Calendar API', env.calls.some((c) => c.includes('POST') && c.includes('/calendars/primary/events')), env.calls);
     const bare = env.bodies.find((b) => b && b.summary === 'Kickoff');
     check('a calendar event with no quote does not invent a sentence',
@@ -1059,7 +1081,9 @@ async function run() {
     check('the receipt names Calendar, the title, and the time that was written',
       out.written === 'Calendar · I will send you the signed contract by Friday, September 18 at 3pm. · Sep 18 15:00',
       out.written);
-    check('one request', env.calls.length === 1, env.calls);
+    check('the hold is one POST and one read-back of that event',
+      env.calls.length === 2 && env.calls[0] === 'POST /calendars/primary/events' && env.calls[1] === 'GET /calendars/primary/events/ev_hold',
+      env.calls);
   }
 
   console.log('\n--- background.js: an invalid date or time is not written, and does not look like success ---\n');
@@ -1141,6 +1165,142 @@ async function run() {
     check('a Calendar API error is not a success', apiFail.ok === false && !apiFail.written, apiFail);
   }
 
+  console.log('\n--- background.js: a Calendar close is the read-back, not the write body ---\n');
+  {
+    const posted = { dateTime: '2026-09-21T15:00:00', timeZone: 'UTC' };
+    const missed = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events$/, { method: 'POST', reply: res(200, { id: 'ev_miss', htmlLink: 'https://calendar.google.com/event?eid=miss' }) }],
+        [/\/calendars\/primary\/events\/ev_miss$/, { method: 'GET', reply: res(500, {}) }]
+      ]
+    });
+    const miss = await attempt(missed.fn('googleCalendarWrite')({
+      params: { title: 'Kickoff', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('a create whose read-back fails is verify_failed',
+      miss.ok === false && miss.reason === 'verify_failed' && !miss.proof && miss.ref && miss.ref.eventId === 'ev_miss',
+      miss);
+    const otherId = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events$/, { method: 'POST', reply: res(200, { id: 'ev_other', htmlLink: 'https://calendar.google.com/event?eid=other' }) }],
+        [/\/calendars\/primary\/events\/ev_other$/, { method: 'GET', reply: res(200, { id: 'ev_swapped', status: 'confirmed', start: posted }) }]
+      ]
+    });
+    const swapped = await attempt(otherId.fn('googleCalendarWrite')({
+      params: { title: 'Kickoff', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('a read-back of a different event id is not Handled',
+      swapped.ok === false && swapped.reason === 'verify_failed' && !swapped.proof, swapped);
+    const cancelled = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events$/, { method: 'POST', reply: res(200, { id: 'ev_gone', htmlLink: 'https://calendar.google.com/event?eid=gone' }) }],
+        [/\/calendars\/primary\/events\/ev_gone$/, { method: 'GET', reply: res(200, { id: 'ev_gone', status: 'cancelled', start: posted }) }]
+      ]
+    });
+    const dead = await attempt(cancelled.fn('googleCalendarWrite')({
+      params: { title: 'Kickoff', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('a cancelled event is not a close', dead.ok === false && dead.reason === 'verify_failed' && !dead.proof, dead);
+    const shifted = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events$/, { method: 'POST', reply: res(200, { id: 'ev_shift', htmlLink: 'https://calendar.google.com/event?eid=shift' }) }],
+        [/\/calendars\/primary\/events\/ev_shift$/, { method: 'GET', reply: res(200, { id: 'ev_shift', status: 'confirmed', start: { dateTime: '2026-09-21T16:00:00' } }) }]
+      ]
+    });
+    const wrongHour = await attempt(shifted.fn('googleCalendarWrite')({
+      params: { title: 'Kickoff', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('a read-back at a different hour is not the event that was written',
+      wrongHour.ok === false && wrongHour.reason === 'verify_failed' && !wrongHour.proof, wrongHour);
+
+    const start = { dateTime: '2026-09-18T15:00:00+00:00', timeZone: 'UTC' };
+    const end = { dateTime: '2026-09-18T15:30:00+00:00', timeZone: 'UTC' };
+    const stillThere = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events\?/, { reply: res(200, { items: [{ id: 'ev_stay', summary: 'Friday sync', status: 'confirmed', start: start, end: end }] }) }],
+        [/\/calendars\/primary\/events\/ev_stay$/, { method: 'DELETE', reply: res(204, {}) }],
+        [/\/calendars\/primary\/events\/ev_stay$/, { method: 'GET', reply: res(200, { id: 'ev_stay', status: 'confirmed', start: start, end: end }) }]
+      ]
+    });
+    const kept = await attempt(stillThere.fn('googleCalendarWrite')({
+      params: { calendarOp: 'delete', title: 'Hold', dateIso: '2026-09-18', hour: 15, minute: 0, requireTime: true }
+    }));
+    check('a cancel whose event is still on the calendar is not Handled',
+      kept.ok === false && kept.reason === 'verify_failed' && !kept.proof, kept);
+
+    const oldStart = { dateTime: '2026-09-18T15:00:00+00:00', timeZone: 'UTC' };
+    const oldEnd = { dateTime: '2026-09-18T15:30:00+00:00', timeZone: 'UTC' };
+    const unmoved = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events\?/, { reply: res(200, { items: [{ id: 'ev_old', summary: 'Friday sync', status: 'confirmed', start: oldStart, end: oldEnd }] }) }],
+        [/\/calendars\/primary\/events\/ev_old$/, { method: 'PATCH', reply: res(200, { id: 'ev_old' }) }],
+        [/\/calendars\/primary\/events\/ev_old$/, { method: 'GET', reply: res(200, { id: 'ev_old', status: 'confirmed', start: oldStart, end: oldEnd }) }]
+      ]
+    });
+    const stayed = await attempt(unmoved.fn('googleCalendarWrite')({
+      params: {
+        calendarOp: 'update', title: 'Hold',
+        dateIso: '2026-09-24', hour: 16, minute: 0,
+        fromDateIso: '2026-09-18', fromHour: 15, fromMinute: 0,
+        requireTime: true
+      }
+    }));
+    check('a move whose read-back is still the old clock is not Handled',
+      stayed.ok === false && stayed.reason === 'verify_failed' && !stayed.proof, stayed);
+  }
+
+  console.log('\n--- background.js: a Drive file is Handled only after it is read back ---\n');
+  {
+    const html = '<p>Kickoff notes for the signed contract.</p>';
+    const created = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/upload\/drive\/v3\/files/, { method: 'POST', reply: res(200, { id: 'doc_1', name: 'Kickoff notes', mimeType: 'application/vnd.google-apps.document', webViewLink: 'https://docs.google.com/document/d/doc_1/edit' }) }],
+        [/\/drive\/v3\/files\/doc_1/, { method: 'GET', reply: res(200, { id: 'doc_1', name: 'Kickoff notes', trashed: false, mimeType: 'application/vnd.google-apps.document', webViewLink: 'https://docs.google.com/document/d/doc_1/edit' }) }]
+      ]
+    });
+    const out = await attempt(created.fn('googleDriveCreateDoc')({ params: { title: 'Kickoff notes', html: html } }));
+    check('a doc that is read back is a close',
+      out.ok === true && out.proof && out.proof.fetchedBack === true && out.proof.system === 'google/drive' && out.proof.externalId === 'doc_1' &&
+      created.calls.some((c) => c.indexOf('GET ') === 0 && c.indexOf('/drive/v3/files/doc_1') !== -1),
+      { out: out, calls: created.calls });
+    const trashed = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/upload\/drive\/v3\/files/, { method: 'POST', reply: res(200, { id: 'doc_trash', name: 'Kickoff notes', mimeType: 'application/vnd.google-apps.document' }) }],
+        [/\/drive\/v3\/files\/doc_trash/, { method: 'GET', reply: res(200, { id: 'doc_trash', trashed: true }) }]
+      ]
+    });
+    const gone = await attempt(trashed.fn('googleDriveCreateDoc')({ params: { title: 'Kickoff notes', html: html } }));
+    check('a trashed Drive file is not Handled', gone.ok === false && gone.reason === 'verify_failed' && !gone.proof, gone);
+    const mismatch = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/upload\/drive\/v3\/files/, { method: 'POST', reply: res(200, { id: 'doc_a', name: 'Kickoff notes', mimeType: 'application/vnd.google-apps.document' }) }],
+        [/\/drive\/v3\/files\/doc_a/, { method: 'GET', reply: res(200, { id: 'doc_b', trashed: false }) }]
+      ]
+    });
+    const other = await attempt(mismatch.fn('googleDriveCreateDoc')({ params: { title: 'Kickoff notes', html: html } }));
+    check('a Drive read-back of a different file id is not Handled',
+      other.ok === false && other.reason === 'verify_failed' && !other.proof, other);
+    const unread = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/upload\/drive\/v3\/files/, { method: 'POST', reply: res(200, { id: 'doc_unread', name: 'Kickoff notes', mimeType: 'application/vnd.google-apps.document' }) }],
+        [/\/drive\/v3\/files\/doc_unread/, { method: 'GET', reply: res(404, {}) }]
+      ]
+    });
+    const missing = await attempt(unread.fn('googleDriveCreateDoc')({ params: { title: 'Kickoff notes', html: html } }));
+    check('a Drive upload that cannot be read back is not Handled',
+      missing.ok === false && missing.reason === 'verify_failed' && !missing.proof, missing);
+  }
+
   console.log('\n--- background.js: file-on-hold puts the one Drive file on the event ---\n');
   {
     const file = { id: 'pdf1', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' };
@@ -1210,7 +1370,7 @@ async function run() {
       stored: CONNECTED,
       routes: [
         [/\/calendars\/primary\/events\?/, { reply: res(200, { items: [{ id: 'ev_sync', summary: 'Friday sync', status: 'confirmed', start: start, end: end }] }) }],
-        [/\/calendars\/primary\/events\/ev_sync$/, { reply: res(204, {}) }]
+        [/\/calendars\/primary\/events\/ev_sync$/, { method: 'DELETE', reply: res(204, {}) }]
       ]
     });
     const out = await attempt(env.fn('googleCalendarWrite')({
@@ -1240,7 +1400,7 @@ async function run() {
       stored: CONNECTED,
       routes: [
         [/\/calendars\/primary\/events\?/, { reply: res(200, { items: [{ id: 'ev_move', summary: 'Friday sync', status: 'confirmed', htmlLink: 'https://calendar.google.com/event?eid=move', start: previousStart, end: previousEnd }] }) }],
-        [/\/calendars\/primary\/events\/ev_move$/, { reply: res(200, { id: 'ev_move' }) }]
+        [/\/calendars\/primary\/events\/ev_move$/, { method: 'PATCH', reply: res(200, { id: 'ev_move' }) }]
       ]
     });
     const out = await attempt(env.fn('googleCalendarWrite')({

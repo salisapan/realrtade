@@ -1885,6 +1885,73 @@ function eventsStartingAt(items, dateIso, hour, minute) {
   });
 }
 
+// The POST, PATCH, or DELETE body is not the close. fetchedBack is a later
+// GET of that event id. A create or a move agrees when the read-back id is
+// the same id and the start is the start that was written, and the event
+// is not cancelled. A cancel agrees when that GET is 404, 410, or cancelled.
+function calendarStartAgrees(event, expected) {
+  if (!event || event.status === 'cancelled' || !event.start || !expected) return false;
+  if (expected.date) return String(event.start.date || '') === expected.date;
+  if (expected.dateTime) {
+    const got = String(event.start.dateTime || '');
+    const want = String(expected.dateTime);
+    return got.slice(0, 16).length === 16 && got.slice(0, 16) === want.slice(0, 16);
+  }
+  return false;
+}
+
+function calendarReadUrl(event, fallback) {
+  const link = event && typeof event.htmlLink === 'string' ? event.htmlLink : '';
+  if (link.slice(0, 8) === 'https://') return link;
+  if (typeof fallback === 'string' && fallback.slice(0, 8) === 'https://') return fallback;
+  return fallback || null;
+}
+
+async function googleCalendarRead(eventId) {
+  if (!eventId) return { ok: false, status: 0, event: null };
+  let res;
+  try {
+    res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(eventId), { method: 'GET' });
+  } catch (e) {
+    return { ok: false, status: 0, event: null };
+  }
+  if (!res) return { ok: false, status: 0, event: null };
+  if (res.status === 404 || res.status === 410) return { ok: false, status: res.status, event: null };
+  if (!res.ok) return { ok: false, status: res.status || 0, event: null };
+  let event = null;
+  try { event = await res.json(); } catch (e) { return { ok: false, status: res.status, event: null }; }
+  if (!event || event.id !== eventId) return { ok: false, status: res.status, event: event };
+  return { ok: true, status: res.status, event: event };
+}
+
+function calendarProofResult(base, eventId, proved, url) {
+  const Proof = globalThis.FlowProofOfClose;
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  const ref = Object.assign({}, base.ref || {});
+  if (eventId) {
+    ref.eventId = eventId;
+    ref.externalId = eventId;
+  }
+  const shell = {
+    where: 'Google Calendar',
+    target: 'your calendar',
+    written: base.written,
+    url: url || null
+  };
+  if (!eventId) return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, shell);
+  if (!proved) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, shell);
+  const proof = Proof && Proof.buildProof({
+    system: (Proof && Proof.SYSTEM_GOOGLE_CALENDAR) || 'google/calendar',
+    externalId: eventId,
+    url: url || undefined,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, shell);
+  return Object.assign({ ok: true, ref: ref, proof: proof }, shell);
+}
+
 // Update or delete one event that already starts at the named clock.
 // Zero matches, or more than one, is not a write: the receipt must not
 // claim a calendar change that did not happen. A new event is never inserted
@@ -1923,13 +1990,12 @@ async function googleCalendarChange(p, op) {
     const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(ev.id), { method: 'DELETE' });
     if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
     if (!res.ok && res.status !== 404 && res.status !== 410) return { ok: false, reason: 'not-found' };
-    return {
-      ok: true,
-      where: 'Google Calendar',
-      target: 'your calendar',
+    const read = await googleCalendarRead(ev.id);
+    const gone = read.status === 404 || read.status === 410 || !!(read.event && read.event.status === 'cancelled');
+    return calendarProofResult({
       written: 'Calendar · ' + summary + ' · off ' + calendarWhenLabel(lookupDate, lookupClock),
-      ref: { eventId: ev.id, restore: restore }
-    };
+      ref: { restore: restore }
+    }, ev.id, gone, null);
   }
   const timeZone = localTimeZone();
   const next = {
@@ -1942,14 +2008,12 @@ async function googleCalendarChange(p, op) {
   });
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
   if (!res.ok) return { ok: false, reason: 'not-found' };
-  return {
-    ok: true,
-    where: 'Google Calendar',
-    target: 'your calendar',
+  const read = await googleCalendarRead(ev.id);
+  const agrees = read.ok && calendarStartAgrees(read.event, { dateTime: next.start.dateTime });
+  return calendarProofResult({
     written: 'Calendar · ' + summary + ' · ' + calendarWhenLabel(targetDate, targetClock),
-    ref: { eventId: ev.id, previousStart: ev.start, previousEnd: ev.end },
-    url: (ev.htmlLink || null)
-  };
+    ref: { previousStart: ev.start, previousEnd: ev.end }
+  }, ev.id, agrees, calendarReadUrl(read.event, ev.htmlLink || null));
 }
 
 async function googleCalendarWrite(p) {
@@ -2028,19 +2092,14 @@ async function googleCalendarWrite(p) {
   if (!event || typeof event.id !== 'string' || !event.id) {
     return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
   }
-  return {
-    ok: true,
-    where: 'Google Calendar',
-    target: 'your calendar',
+  const expected = clock.absent ? { date: body.start.date } : { dateTime: body.start.dateTime };
+  const read = await googleCalendarRead(event.id);
+  const agrees = read.ok && calendarStartAgrees(read.event, expected);
+  return calendarProofResult({
     // Built from the summary and the start that were posted, so the
     // receipt cannot name a title or a time the event does not have.
-    written: 'Calendar · ' + summary + ' · ' + whenLabel,
-    ref: { eventId: event.id },
-    // htmlLink is a real field the Calendar API documents and always
-    // returns on a created event — unlike the Gmail draft link below, this
-    // one is safe to hand straight to the user.
-    url: event.htmlLink || null
-  };
+    written: 'Calendar · ' + summary + ' · ' + whenLabel
+  }, event.id, agrees, calendarReadUrl(read.event, event.htmlLink || null));
 }
 
 async function googleCalendarUndo(ref) {
@@ -2659,18 +2718,50 @@ function decodeBase64(b64) {
   return bytes;
 }
 
-function driveFileResult(file, where, written) {
+// The upload response is not the close. fetchedBack is a later GET of that
+// file id, and the file is still there (same id, not trashed).
+async function googleDriveReadBack(fileId) {
+  if (!fileId) return { ok: false };
+  let res;
+  try {
+    res = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(fileId) + '?fields=' + encodeURIComponent('id,name,trashed,mimeType,webViewLink'), { method: 'GET' });
+  } catch (e) {
+    return { ok: false };
+  }
+  if (!res || !res.ok) return { ok: false };
+  let body = null;
+  try { body = await res.json(); } catch (e) { return { ok: false }; }
+  if (!body || body.id !== fileId || body.trashed === true) return { ok: false };
+  return { ok: true, file: body };
+}
+
+async function driveFileResult(file, where, written) {
+  const Proof = globalThis.FlowProofOfClose;
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
   if (!file || typeof file.id !== 'string' || !file.id) {
     return { ok: false, reason: 'error', error: 'Drive did not confirm the file.' };
   }
-  return {
-    ok: true,
+  const uploadedUrl = file.webViewLink || driveFileUrl(file);
+  const base = {
     where: where,
     target: file.name || 'a file',
     written: written,
-    ref: { fileId: file.id },
-    url: file.webViewLink || driveFileUrl(file)
+    url: uploadedUrl
   };
+  const ref = { fileId: file.id, externalId: file.id };
+  const read = await googleDriveReadBack(file.id);
+  if (!read.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  const link = (read.file && read.file.webViewLink) || uploadedUrl;
+  const proof = Proof && Proof.buildProof({
+    system: (Proof && Proof.SYSTEM_GOOGLE_DRIVE) || 'google/drive',
+    externalId: file.id,
+    url: link || undefined,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  return Object.assign({ ok: true, ref: ref, proof: proof, url: link || uploadedUrl }, base);
 }
 
 function safeDriveTitle(value) {
