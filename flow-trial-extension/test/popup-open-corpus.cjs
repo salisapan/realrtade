@@ -164,6 +164,7 @@ function load(stored, opts) {
     [CORE, 'close-quality-metrics.js'],
     [CORE, 'quiet-metrics.js'],
     [CORE, 'still-open.js'],
+    [CORE, 'first-close.js'],
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],

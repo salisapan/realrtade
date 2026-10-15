@@ -39,7 +39,11 @@ one thing a demo, a screenshot, or marketing copy can never substitute for.
 
 The shortest real path is: connect a tool in the popup -> open a real email
 that already asked for or decided something concrete -> see the chip ->
-click Do It -> see the receipt. Nothing in this product should add a step
+click Do It -> see the receipt. When the inbox already shows one safe task
+— high confidence, one step, nothing to send or draft — the same panel that
+just connected offers that single Do It, so the thread does not have to be
+opened first. Handled still waits for a read-back, and Undo removes that
+task. A hedge or a second step stays off the card. Nothing in this product should add a step
 between "Glance noticed something real" and "the user can act on it" —
 every friction point removed from this path is removed in service of
 reaching this moment sooner, ideally within the first session, not the
