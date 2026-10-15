@@ -268,21 +268,68 @@ console.log('\n--- bundle ---');
   check('bundle still calls the repo classifier', classified && classified.type === 'decision', classified && classified.type);
 }
 
+// A manifest flag that makes Google demand a scope. The declared
+// oauthScopes must be exactly that set: missing fails the card at open,
+// and an extra scope is a wider grant than this host uses.
+function scopeUrl(id) {
+  return 'https://www.googleapis.com/auth/' + id;
+}
+
+function scopesRequiredByManifest(manifest, hostSource) {
+  const required = [];
+  function add(id) {
+    const url = scopeUrl(id);
+    if (required.indexOf(url) === -1) required.push(url);
+  }
+  const common = (manifest.addOns && manifest.addOns.common) || {};
+  const gmail = (manifest.addOns && manifest.addOns.gmail) || {};
+  const services = (manifest.dependencies && manifest.dependencies.enabledAdvancedServices) || [];
+
+  if (common.useLocaleFromApp === true) add('script.locale');
+  if (common.homepageTrigger || gmail.homepageTrigger || (gmail.contextualTriggers && gmail.contextualTriggers.length) || gmail.composeTrigger) {
+    add('gmail.addons.execute');
+  }
+  if (gmail.contextualTriggers && gmail.contextualTriggers.length) {
+    if (gmail.currentMessageAccess === 'metadata') add('gmail.addons.current.message.metadata');
+    else add('gmail.addons.current.message.readonly');
+  }
+  if (gmail.composeTrigger) add('gmail.addons.current.action.compose');
+  services.forEach((service) => {
+    if (service.serviceId === 'tasks' || service.userSymbol === 'Tasks') add('tasks');
+    if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
+  });
+  if (hostSource && /UrlFetchApp/.test(hostSource)) add('script.external_request');
+  return required.sort();
+}
+
 console.log('\n--- host boundaries ---');
 {
   const manifest = JSON.parse(fs.readFileSync(path.join(addon, 'appsscript.json'), 'utf8'));
+  const host = fs.readFileSync(path.join(addon, 'Code.js'), 'utf8');
   const scopes = manifest.oauthScopes.slice().sort();
-  const expected = [
-    'https://www.googleapis.com/auth/gmail.addons.current.message.readonly',
-    'https://www.googleapis.com/auth/gmail.addons.execute',
-    'https://www.googleapis.com/auth/script.external_request',
-    'https://www.googleapis.com/auth/tasks'
-  ];
-  check('scopes are the four allowed ones', JSON.stringify(scopes) === JSON.stringify(expected), scopes);
+  const expected = scopesRequiredByManifest(manifest, host);
+  check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
+  check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
+  check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
+  check('there is no compose scope', !manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) === -1);
+
+  const withCompose = JSON.parse(JSON.stringify(manifest));
+  withCompose.addOns.gmail.composeTrigger = { draftAccess: 'NONE' };
+  withCompose.oauthScopes = scopes.slice();
+  const composeNeed = scopesRequiredByManifest(withCompose, host);
+  check('a compose trigger would require the compose scope', composeNeed.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
+
+  const metadataOnly = JSON.parse(JSON.stringify(manifest));
+  metadataOnly.addOns.gmail.currentMessageAccess = 'metadata';
+  const metadataNeed = scopesRequiredByManifest(metadataOnly, host);
+  check('metadata access would require the metadata scope and not the body scope', metadataNeed.indexOf(scopeUrl('gmail.addons.current.message.metadata')) !== -1 && metadataNeed.indexOf(scopeUrl('gmail.addons.current.message.readonly')) === -1);
+
+  const localeOff = JSON.parse(JSON.stringify(manifest));
+  localeOff.addOns.common.useLocaleFromApp = false;
+  check('locale off drops script.locale', scopesRequiredByManifest(localeOff, host).indexOf(scopeUrl('script.locale')) === -1);
   check('no calendar service', !JSON.stringify(manifest).match(/calendar/i));
   check('contextual trigger is message open', manifest.addOns.gmail.contextualTriggers[0].onTriggerFunction === 'onGmailMessageOpen');
   check('locale comes from the app', manifest.addOns.common.useLocaleFromApp === true);
-  const host = fs.readFileSync(path.join(addon, 'Code.js'), 'utf8');
   check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(host));
   check('host does not patch a task', !/Tasks\.Tasks\.patch|Tasks\.Tasks\.update/.test(host));
   check('host reads the task back through performCreate', host.indexOf('performCreate') !== -1 && host.indexOf('performUndo') !== -1);

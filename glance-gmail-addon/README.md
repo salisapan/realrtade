@@ -39,6 +39,7 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 - `https://www.googleapis.com/auth/gmail.addons.execute`
 - `https://www.googleapis.com/auth/tasks`
 - `https://www.googleapis.com/auth/script.external_request` (only if a script property URL is set)
+- `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
 
 No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`.
 
@@ -56,7 +57,7 @@ Re-run the bundle script after changing `src/` or the classifier. `CoreBundle.js
 Do not publish to the Workspace Marketplace. A test deployment can be installed by up to 100 test users of an unverified OAuth app. Those people see Google's unverified-app warning.
 
 1. In Google Cloud Console, use the GCP project this account already uses for Glance (the October host used `oceanic-spider-509610-c1`). Enable the Gmail API, the Google Tasks API, and the Apps Script API.
-2. OAuth consent screen: **External**, and leave it in **Testing**. Do not submit it for verification in this pass. Add the Google accounts that will install the card, up to 100. Add only the four scopes above.
+2. OAuth consent screen: **External**, and leave it in **Testing**. Do not submit it for verification in this pass. Add the Google accounts that will install the card, up to 100. Add only the scopes listed above.
 3. On the machine that will push, turn on the Apps Script API for that Google account at [script.google.com/home/usersettings](https://script.google.com/home/usersettings). Then `npm install -g @google/clasp` (or use `npx @google/clasp`) and `clasp login`.
 4. From this folder:
 
