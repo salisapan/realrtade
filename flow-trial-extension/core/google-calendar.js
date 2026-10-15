@@ -213,18 +213,21 @@ const FlowGoogleCalendar = (() => {
     return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
+  function unconfirmedUndo() {
+    return { ok: false, reason: 'unconfirmed', error: "Couldn't confirm it's unchanged. Undo left it alone." };
+  }
+
   async function undo(ref, http) {
     const id = ref && typeof ref === 'object' ? (ref.externalId || ref.eventId) : ref;
     const req = undoRequest(id);
     if (!req) return { ok: false };
-    if (ref && typeof ref === 'object' && ref.contentHash) {
-      const got = await call(http, { method: 'GET', url: eventUrl(id) });
-      if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
-      if (got.status === 404 || got.status === 410) return { ok: true, written: 'Calendar event removed.' };
-      if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
-      if (contentHash(got.json) !== ref.contentHash) {
-        return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the event, so it was left as you left it.' };
-      }
+    if (!ref || typeof ref !== 'object' || !ref.contentHash) return unconfirmedUndo();
+    const got = await call(http, { method: 'GET', url: eventUrl(id) });
+    if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+    if (got.status === 404 || got.status === 410) return { ok: true, written: 'Calendar event removed.' };
+    if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
+    if (contentHash(got.json) !== ref.contentHash) {
+      return { ok: false, reason: 'user-edited', error: 'Undo stopped. You changed the event, so it was left as you left it.' };
     }
     const del = await call(http, req);
     if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };

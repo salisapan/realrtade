@@ -138,6 +138,11 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const editedCal = scripted([{ status: 200, ok: true, json: { id: 'ev1', summary: 'Changed', status: 'confirmed' } }]);
   const refusedCal = await Cal.undo(wrote.ref, editedCal.http);
   check('calendar undo refuses a changed event and does not delete it', refusedCal.ok === false && refusedCal.reason === 'user-edited' && editedCal.calls.length === 1 && editedCal.calls[0].method === 'GET', refusedCal);
+  const bareCal = scripted([]);
+  const bareEvent = Object.assign({}, wrote.ref);
+  delete bareEvent.contentHash;
+  const bareCalUndo = await Cal.undo(bareEvent, bareCal.http);
+  check('calendar undo with no snapshot refuses and does not delete', bareCalUndo.ok === false && bareCalUndo.reason === 'unconfirmed' && bareCalUndo.error === "Couldn't confirm it's unchanged. Undo left it alone." && bareCal.calls.length === 0 && !bareCal.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'), bareCalUndo);
   const blocked = scripted([]);
   const denied = await Cal.write({ scopes: ['https://www.googleapis.com/auth/gmail.compose'], dateIso: '2026-10-08', hour: 10, minute: 0, fileName: 'a.pdf', fileUrl: FILE_URL }, blocked.http, CLOCK);
   check('a gmail scope does not create an event', denied.ok === false && denied.reason === 'gmail-scope' && blocked.calls.length === 0, denied);
@@ -159,6 +164,11 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const taskEdited = scripted([{ status: 200, ok: true, json: { id: 't1', title: 'Changed by you' } }]);
   const taskRefused = await Tasks.undo(task.ref, taskEdited.http);
   check('task undo refuses a changed task and does not delete it', taskRefused.ok === false && taskRefused.reason === 'user-edited' && taskEdited.calls.length === 1 && taskEdited.calls[0].method === 'GET', taskRefused);
+  const bareTaskHttp = scripted([]);
+  const bareTask = Object.assign({}, task.ref);
+  delete bareTask.contentHash;
+  const bareTaskUndo = await Tasks.undo(bareTask, bareTaskHttp.http);
+  check('task undo with no snapshot refuses and does not delete', bareTaskUndo.ok === false && bareTaskUndo.reason === 'unconfirmed' && bareTaskUndo.error === "Couldn't confirm it's unchanged. Undo left it alone." && bareTaskHttp.calls.length === 0 && !bareTaskHttp.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'), bareTaskUndo);
 
   console.log('\n--- one Drive file is read back, then undo trashes it ---\n');
   const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z' };
