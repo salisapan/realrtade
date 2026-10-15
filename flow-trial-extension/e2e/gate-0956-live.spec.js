@@ -132,16 +132,17 @@ test('Hebrew UI chrome on an English mail keeps the English title', async ({ gla
   await expect(title).toBeVisible();
   await expect(title).toHaveText(/[A-Za-z]/);
   const card = await host.innerText();
-  expect(card).not.toMatch(/\bSuggested\b/);
-  expect(card).not.toMatch(/\bAdded\b/);
-  expect(card).not.toMatch(/\bDismiss\b/);
-  expect(card).not.toMatch(/\bDo It\b/);
-  expect(card).not.toMatch(/\bUndo\b/);
-  expect(card).not.toMatch(/\bView\b/);
-  expect(card).not.toMatch(/\bQueued\b/);
-  expect(card).not.toMatch(/\bHandled\b/);
-  expect(card).not.toMatch(/Couldn't confirm/);
-  expect(card).not.toMatch(/Deleted in To Do/);
+  expect(card).toMatch(/מוצע/);
+  expect(card).not.toMatch(/\bSuggested\b/i);
+  expect(card).not.toMatch(/\bAdded\b/i);
+  expect(card).not.toMatch(/\bDismiss\b/i);
+  expect(card).not.toMatch(/\bDo It\b/i);
+  expect(card).not.toMatch(/\bUndo\b/i);
+  expect(card).not.toMatch(/\bView\b/i);
+  expect(card).not.toMatch(/\bQueued\b/i);
+  expect(card).not.toMatch(/\bHandled\b/i);
+  expect(card).not.toMatch(/Couldn't confirm/i);
+  expect(card).not.toMatch(/Deleted in To Do/i);
 
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="open"]').click();
@@ -150,11 +151,11 @@ test('Hebrew UI chrome on an English mail keeps the English title', async ({ gla
   await expect(list.getByRole('button', { name: 'הסתר' }).first()).toBeVisible();
   await expect(list.locator('.log-label, .gs-intent, .flow-chip-process-name').first()).toContainText(/[A-Za-z]/);
   const loops = await list.innerText();
-  expect(loops).not.toMatch(/\bSuggested\b/);
-  expect(loops).not.toMatch(/\bDismiss\b/);
-  expect(loops).not.toMatch(/\bUndo\b/);
-  expect(loops).not.toMatch(/\bHandled\b/);
-  expect(loops).not.toMatch(/Deleted in To Do/);
+  expect(loops).not.toMatch(/\bSuggested\b/i);
+  expect(loops).not.toMatch(/\bDismiss\b/i);
+  expect(loops).not.toMatch(/\bUndo\b/i);
+  expect(loops).not.toMatch(/\bHandled\b/i);
+  expect(loops).not.toMatch(/Deleted in To Do/i);
 });
 
 test('English UI chrome on an English mail stays English', async ({ glance }) => {
@@ -175,7 +176,9 @@ test('English UI chrome on an English mail stays English', async ({ glance }) =>
   await expect(title).toBeVisible();
   await expect(title).toHaveText(/[A-Za-z]/);
   const card = await host.innerText();
-  expect(card).toMatch(/\bSuggested\b/);
+  expect(card).toMatch(/\bSuggested\b/i);
+  expect(card).toMatch(/\bQueued\b/i);
+  expect(card).toMatch(/Hold It/i);
   expect(card).not.toMatch(/בצע/);
   expect(card).not.toMatch(/הסתר/);
   expect(card).not.toMatch(/מוצע/);
