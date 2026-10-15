@@ -3595,7 +3595,18 @@ function outlookUnconfirmedLine() {
 }
 
 function outlookHasSnap(snapshot) {
-  return Boolean(snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length);
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  const content = ['title', 'body', 'dueDateTime', 'status', 'subject', 'start', 'end', 'location', 'to', 'name'];
+  return content.some((key) => snapshot[key] != null && snapshot[key] !== '');
+}
+
+function outlookMergeSnap(base, extra) {
+  const out = Object.assign({}, base || {});
+  const add = extra || {};
+  Object.keys(add).forEach((key) => {
+    if (add[key] != null && add[key] !== '') out[key] = add[key];
+  });
+  return out;
 }
 
 function outlookUnconfirmed() {
@@ -3743,7 +3754,13 @@ async function outlookDraftWrite(p) {
   const keys = Object.keys(saved.map);
   if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
   await outlookSaveDraftMap(saved.st, saved.map);
-  const created = await outlookObjectSnap(patchUrl + '?$select=id,changeKey,lastModifiedDateTime,body', prefer);
+  const posted = outlookCreationSnap({
+    subject: draft.subject,
+    body: { contentType: 'Text', content: comment },
+    toRecipients: draft.toRecipients
+  });
+  const settled = await outlookObjectSnap(patchUrl + '?$select=id,subject,body,toRecipients', prefer);
+  const created = outlookHasSnap(outlookMergeSnap(posted, settled)) ? outlookMergeSnap(posted, settled) : null;
   return {
     ok: true,
     ref: draft.id,
@@ -3786,7 +3803,70 @@ async function outlookDeleteDraft(draftId, prefer) {
 // One calendar event for a Family B file-on-hold. The Calendar checkbox asks
 // for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
 // The body never includes attendees, so the write does not invite anyone.
+// A meeting Hold It names a clock. It is one event on the person's calendar.
+// attendees stays empty, so the write does not invite anyone.
+async function outlookMeetingWrite(p) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  if (!Cal || !Cal.hasWriteScope(session.token.grantedScopes)) {
+    return { ok: false, reason: 'calendar-write-not-granted' };
+  }
+  const params = (p && p.params) || {};
+  const dateIso = calendarIsoDate(params.dateIso);
+  const clock = calendarClock(params.hour, params.minute);
+  if (!dateIso || !clock || clock.invalid || clock.absent) {
+    return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
+  }
+  const title = String(params.title || 'Meeting').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting';
+  const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
+  const zone = localTimeZone();
+  const lines = [];
+  if (quote) lines.push(quote);
+  if (p && p.threadUrl) lines.push(String(p.threadUrl));
+  const body = {
+    subject: title,
+    body: { contentType: 'Text', content: lines.join('\n') },
+    start: { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute), timeZone: zone },
+    end: { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone: zone },
+    showAs: 'busy',
+    attendees: []
+  };
+  if ((Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) {
+    return { ok: false, reason: 'refused' };
+  }
+  const url = OUTLOOK_GRAPH + '/me/events';
+  outlookAssertNotSend(url);
+  const res = await outlookFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 403) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  let event = null;
+  try { event = await res.json(); } catch (e) { event = null; }
+  if (!event || typeof event.id !== 'string' || !event.id) {
+    return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
+  }
+  const posted = outlookCreationSnap(body);
+  const eventSnap = outlookMergeSnap(posted, outlookCreationSnap(event));
+  const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
+  return {
+    ok: true,
+    where: 'Outlook Calendar',
+    target: 'your calendar',
+    written: 'Calendar · ' + title + (when ? ' · ' + when : ''),
+    ref: { eventId: event.id, created: eventSnap },
+    url: event.webLink || null
+  };
+}
+
 async function outlookCalendarWrite(p) {
+  const params = (p && p.params) || {};
+  if (params.meeting === true) return outlookMeetingWrite(p);
   const Cal = globalThis.FlowOutlookCalendar;
   if (!Cal || typeof Cal.eventBody !== 'function') return { ok: false, reason: 'not-configured' };
   const session = await outlookSession({});
@@ -3794,7 +3874,6 @@ async function outlookCalendarWrite(p) {
   if (!Cal.hasWriteScope(session.token.grantedScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
-  const params = (p && p.params) || {};
   const body = Cal.eventBody({
     dateIso: params.dateIso,
     hour: params.hour,
@@ -3829,10 +3908,10 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  const eventSnap = outlookCreationSnap(event);
-  if (!eventSnap.changeKey && !eventSnap.lastModifiedDateTime) {
-    const settled = await outlookObjectSnap(OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id) + '?$select=id,changeKey,lastModifiedDateTime,subject,body');
-    if (settled) Object.assign(eventSnap, settled);
+  let eventSnap = outlookCreationSnap(event);
+  if (!outlookHasSnap(eventSnap)) {
+    const settled = await outlookObjectSnap(OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id) + '?$select=id,subject,body,start,end,location');
+    if (settled) eventSnap = outlookMergeSnap(eventSnap, settled);
   }
   return {
     ok: true,
@@ -3939,9 +4018,16 @@ async function outlookTaskWrite(p) {
   if (!task || typeof task.id !== 'string' || !task.id) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
-  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: outlookCreationSnap(task) };
+  const posted = outlookCreationSnap({
+    title: title,
+    body: body.body,
+    dueDateTime: body.dueDateTime,
+    status: (task && task.status) || 'notStarted'
+  });
+  let created = outlookMergeSnap(posted, outlookCreationSnap(task));
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: created };
   const fetched = await outlookTaskFetchBack(taskListId, task.id);
-  if (fetched && fetched.task) ref.created = outlookCreationSnap(fetched.task);
+  if (fetched && fetched.task) ref.created = outlookMergeSnap(ref.created, outlookCreationSnap(fetched.task));
   if (!fetched.ok) {
     return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
   }
@@ -4048,7 +4134,7 @@ async function outlookDraftUndo(ref, hint) {
   // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
   if (!outlookHasSnap(snapshot)) return outlookUnconfirmed();
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,changeKey,lastModifiedDateTime,body';
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,subject,body,toRecipients';
   outlookAssertNotSend(getUrl);
   let got;
   try { got = await outlookUndoConfirm(getUrl, prefer); }

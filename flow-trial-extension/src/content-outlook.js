@@ -887,6 +887,10 @@
       kind: 'written',
       label: written,
       messageId: ctx.messageId,
+      itemId: ctx.itemId || null,
+      pathId: ctx.pathId || null,
+      threadId: ctx.threadId || ctx.conversationId || null,
+      outlookConversationId: ctx.conversationId || null,
       app: 'outlook',
       connectorId: 'outlookDraft',
       ref: r.ref,
@@ -1160,7 +1164,11 @@
     const host = FlowChipHost.inject(mount, ctx, {
       onDoIt: src.onDoIt,
       onDismiss: src.onDismiss,
-      onHold: function (held) { return !ignoreStaleClick(held); }
+      onHold: function (held) {
+        if (ignoreStaleClick(held)) return false;
+        onMeetingHold(held, ctx);
+        return true;
+      }
     });
     if (host) stampCard(host, ctx, (ctx && ctx.decisionReason) || 'shown');
     return host;
@@ -1188,6 +1196,8 @@
       ? FlowProofOfClose.remountCopy(row)
       : null;
     if (!mount || !copy) return null;
+    const keptSnap = (row.ref && typeof row.ref === 'object' && row.ref.created) || row.created || null;
+    if (keptSnap && typeof keptSnap === 'object' && copy.ref) copy.ref.created = keptSnap;
     const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
     const scope = (typeof readingScope === 'function' && readingScope(mount)) || mount;
     const hosts = scope.querySelectorAll ? Array.prototype.slice.call(scope.querySelectorAll('.flow-chip-host')) : [];
@@ -1251,7 +1261,12 @@
       if (ignoreStaleClick(host)) return;
       undo.textContent = 'Undoing…';
       undo.disabled = true;
-      readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref })).then(async (result) => {
+      readBackOrTimeout(send({
+        type: 'flow:undo-action',
+        connectorId: copy.connectorId,
+        ref: copy.ref,
+        created: (copy.ref && copy.ref.created) || null
+      })).then(async (result) => {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
         if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited' || result.reason === 'unconfirmed')) {
           undo.textContent = 'Undo';
@@ -1383,8 +1398,8 @@
   function draftMatchesPane(row, pane) {
     if (!row || row.connectorId !== 'outlookDraft') return false;
     const want = paneIdList(pane);
-    const ids = [row.messageId, row.outlookIncomingId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
-    return want.some((id) => ids.indexOf(id) !== -1);
+    const ids = [row.messageId, row.outlookIncomingId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
+    return want.some((id) => idListed(id, ids));
   }
 
   // The open page already showed Draft ready. Keep that receipt, with Undo,
@@ -1627,6 +1642,7 @@
       app: 'outlook',
       connectorId: 'outlookTask',
       ref: r.ref,
+      created: (r.ref && r.ref.created) || null,
       where: r.where,
       url: r.url || null,
       intent: ctx.intent,
@@ -1647,6 +1663,7 @@
       outlookConversationId: ctx.conversationId || null,
       connectorId: 'outlookTask',
       ref: r.ref,
+      created: (r.ref && r.ref.created) || null,
       url: r.url || null,
       system: 'microsoft/todo',
       externalId: r.proof && r.proof.externalId,
@@ -2166,8 +2183,11 @@
 
   function calendarUndoHandler(host, messageId, ref) {
     return guardedUndo(host, async () => {
-      const u = await send({ type: 'flow:undo-action', connectorId: 'outlookCalendar', ref: ref });
-      if (!(u && u.ok)) return { ok: false };
+      const u = await send({ type: 'flow:undo-action', connectorId: 'outlookCalendar', ref: ref, created: ref && ref.created });
+      if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'verify-timeout')) {
+        return { ok: false, reason: u.reason, written: u.written };
+      }
+      if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the event.' };
       if (typeof FlowStorage.markOutlookCalendarUndone === 'function') {
         await FlowStorage.markOutlookCalendarUndone(messageId, ref);
       } else {
@@ -2186,6 +2206,114 @@
       try { host.remove(); } catch (e) { /* already gone */ }
       schedule();
       return { ok: true, written: (u && u.written) || 'Calendar event removed.', reopen: true };
+    });
+  }
+
+  function clockFrom(bag) {
+    if (!bag) return null;
+    const time = bag.time || null;
+    const date = bag.date || null;
+    const dateIso = bag.dateIso || (date && date.iso) || null;
+    const hour = bag.hour != null ? bag.hour : (time && time.hour);
+    const minute = bag.minute != null ? bag.minute : (time && time.minute);
+    if (dateIso == null || hour == null || minute == null) return null;
+    return { dateIso: dateIso, hour: hour, minute: minute, what: bag.what || bag.title || bag.quote || null };
+  }
+
+  function meetingClock(ctx) {
+    const bags = [];
+    const steps = (ctx && ctx.process && ctx.process.steps) || [];
+    steps.forEach((step) => { if (step && step.params) bags.push(step.params); });
+    if (ctx && ctx.intent) bags.push(ctx.intent.entities, ctx.intent.facts, ctx.intent);
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.classify === 'function' && ctx) {
+      const text = String(ctx.bodyText || ctx.text || '').trim();
+      if (text) {
+        try {
+          const again = FlowIntent.classify(text, { subject: ctx.subject || '', now: new Date() });
+          if (again) bags.push(again.entities, again.facts, again);
+        } catch (e) { /* the card's own clock is enough */ }
+      }
+    }
+    for (let i = 0; i < bags.length; i++) {
+      const found = clockFrom(bags[i]);
+      if (!found) continue;
+      const title = found.what || (ctx.intent && ctx.intent.label) || ctx.subject || 'Meeting';
+      return {
+        meeting: true,
+        dateIso: found.dateIso,
+        hour: found.hour,
+        minute: found.minute,
+        title: String(title).replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting',
+        quote: found.what || null,
+        threadUrl: ctx.threadUrl || null
+      };
+    }
+    return null;
+  }
+
+  // Hold It on a meeting mail writes one calendar event and leaves the card
+  // on Handled, with Undo. A mail with no clock stays on the card and says so.
+  async function onMeetingHold(host, ctx) {
+    if (!host || ignoreStaleClick(host)) return;
+    const params = meetingClock(ctx);
+    if (!params) {
+      if (!host.querySelector('.flow-chip-undo-hint')) {
+        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', 'Needs a time on the calendar.'));
+      }
+      return;
+    }
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookCalendar',
+        params: params,
+        messageId: ctx && ctx.messageId,
+        threadUrl: (ctx && ctx.threadUrl) || params.threadUrl || null
+      }
+    });
+    if (ignoreStaleClick(host)) return;
+    if (!r || !r.ok || !r.ref || !r.ref.eventId) {
+      const why = (r && (r.error || r.reason)) || 'Could not add the event';
+      if (!host.querySelector('.flow-chip-undo-hint')) {
+        host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', why));
+      }
+      return;
+    }
+    const written = r.written || 'On your calendar.';
+    const messageId = (ctx && ctx.messageId) || null;
+    await FlowStorage.appendLog({
+      kind: 'written',
+      label: written,
+      messageId: messageId,
+      app: 'outlook',
+      connectorId: 'outlookCalendar',
+      ref: r.ref,
+      created: r.ref.created || null,
+      where: r.where,
+      url: r.url || null,
+      intent: ctx && ctx.intent,
+      process: ctx && ctx.process,
+      sender: ctx && ctx.sender,
+      subject: ctx && ctx.subject,
+      text: ctx && ctx.bodyText,
+      outlookConversationId: (ctx && (ctx.outlookConversationId || ctx.conversationId)) || null,
+      pathId: (ctx && ctx.pathId) || null,
+      itemId: (ctx && ctx.itemId) || null
+    });
+    if (messageId) {
+      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: messageId });
+      await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: messageId });
+    }
+    host.setAttribute('data-glance-chain', 'calendar-hold');
+    host.classList.add('flow-chip-settled');
+    lastOutcome = 'card';
+    lastKey = (messageId || 'open') + '|calendar-hold';
+    FlowChipHost.showDraftReceipt(host, {
+      status: 'Handled.',
+      written: written,
+      url: r.url || null,
+      linkLabel: 'Open event',
+      onUndo: calendarUndoHandler(host, messageId, r.ref)
     });
   }
 
@@ -2598,6 +2726,16 @@
       glanceError('draft receipt', e);
     }
 
+    try {
+      const heldRow = await findWrittenCalendar(pane, '');
+      if (heldRow && await keepCalendarReceipt(pane, heldRow)) {
+        dbg('decision', { shown: true, reason: 'calendar-hold', subject: pane.subject });
+        return;
+      }
+    } catch (e) {
+      glanceError('calendar receipt', e);
+    }
+
     // The mail and Loops read the same still-open list. An older undone row
     // stays one Do It here, matched by id or by the promise key, and the
     // stored Undone line does not take the card's place.
@@ -2912,11 +3050,19 @@
     const mount = mountPoint();
     if (!mount) { await pageReason('page:no-mount', pane); return; }
     const existing = mount.querySelector('.flow-chip-host');
+    const settledUndo = existing && existing.classList.contains('flow-chip-settled') && existing.querySelector('.flow-chip-undo');
+    const settledCalendar = existing && existing.classList.contains('flow-chip-settled') && existing.getAttribute('data-glance-chain') === 'calendar-hold';
+    const draftStill = (receipts || []).some((row) => draftMatchesPane(row, pane));
     // Settled receipt with no active draft (e.g. Undo from the popup while this
-    // pane is open): tear down so Do It can return.
-    if (existing && existing.classList.contains('flow-chip-settled') && !hasReceipt) {
+    // pane is open): tear down so Do It can return. A draft or a meeting hold
+    // that storage still has stays, including when the scan's key moved.
+    if (existing && existing.classList.contains('flow-chip-settled') && !hasReceipt && !draftStill && !settledCalendar) {
       existing.remove();
       lastKey = '';
+    }
+    if ((settledUndo && (hasReceipt || draftStill)) || settledCalendar) {
+      lastOutcome = 'card';
+      return;
     }
     if (mount.querySelector('.flow-chip-host') && key === lastKey) { lastOutcome = 'card'; return; }
     if (!paneCurrent(pane)) return;

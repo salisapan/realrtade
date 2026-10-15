@@ -18,35 +18,94 @@ const FlowNativeEdit = (() => {
     return '';
   }
 
+  // Graph stores the same sentence as text or as HTML. Tags and whitespace
+  // are not an edit. The words are.
+  function normText(value) {
+    return textOf(value)
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&quot;/gi, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // dateTime only. timeZone, fractional seconds, and the wrapper object are
+  // how Graph spells the same clock.
+  function clockOf(value) {
+    if (value == null || value === '') return '';
+    const raw = typeof value === 'object' ? (value.dateTime || value.date || '') : value;
+    const s = String(raw || '').trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/);
+    return m ? m[1] : s;
+  }
+
+  function addressesOf(value) {
+    const list = [];
+    const push = (addr) => {
+      const e = String(addr || '').trim().toLowerCase();
+      if (e && list.indexOf(e) < 0) list.push(e);
+    };
+    const rows = Array.isArray(value) ? value : (value ? [value] : []);
+    rows.forEach((row) => {
+      if (!row) return;
+      if (typeof row === 'string') {
+        row.split(/[,;]/).forEach(push);
+        return;
+      }
+      const box = row.emailAddress || row;
+      push(box.address || box.email || '');
+    });
+    list.sort();
+    return list.join(',');
+  }
+
+  function locationOf(value) {
+    if (value == null) return '';
+    if (typeof value === 'string') return value.replace(/\s+/g, ' ').trim();
+    if (typeof value === 'object') return String(value.displayName || '').replace(/\s+/g, ' ').trim();
+    return '';
+  }
+
+  function put(snap, key, value) {
+    if (value == null || value === '') return;
+    snap[key] = value;
+  }
+
+  // Content the person can change. Server fields (lastModifiedDateTime,
+  // @odata.etag, changeKey, cTag) are not content and are not stored.
   function snapshotOf(obj) {
     const o = obj || {};
     const snap = {};
-    if (o.changeKey) snap.changeKey = String(o.changeKey);
-    if (o.lastModifiedDateTime) snap.lastModifiedDateTime = String(o.lastModifiedDateTime);
-    if (o.eTag) snap.eTag = String(o.eTag);
-    if (o.cTag) snap.cTag = String(o.cTag);
-    const body = textOf(o.body);
-    if (body) snap.body = body;
-    if (o.title) snap.title = String(o.title);
-    if (o.subject) snap.subject = String(o.subject);
-    if (o.name) snap.name = String(o.name);
+    put(snap, 'title', o.title != null ? String(o.title).replace(/\s+/g, ' ').trim() : '');
+    put(snap, 'subject', o.subject != null ? String(o.subject).replace(/\s+/g, ' ').trim() : '');
+    put(snap, 'name', o.name != null ? String(o.name).replace(/\s+/g, ' ').trim() : '');
+    put(snap, 'body', normText(o.body));
+    put(snap, 'dueDateTime', clockOf(o.dueDateTime));
+    put(snap, 'status', o.status != null ? String(o.status).trim() : '');
+    put(snap, 'start', clockOf(o.start));
+    put(snap, 'end', clockOf(o.end));
+    put(snap, 'location', locationOf(o.location));
+    put(snap, 'to', addressesOf(o.toRecipients || o.to));
     return snap;
   }
 
-  // A stored field that the live object also has, and that no longer matches,
-  // is an edit. A field the live read omitted is not an edit.
+  const CONTENT_KEYS = ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to'];
+
+  // A stored content field that the live object also has, and that no longer
+  // matches, is an edit. A field the live read omitted is not an edit.
+  // A new etag, changeKey, or lastModifiedDateTime is not an edit.
   function userEdited(snapshot, live) {
     if (!snapshot || !live) return false;
-    const keys = ['changeKey', 'lastModifiedDateTime', 'eTag', 'cTag', 'title', 'subject', 'name'];
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
+    const liveSnap = snapshotOf(live);
+    for (let i = 0; i < CONTENT_KEYS.length; i++) {
+      const key = CONTENT_KEYS[i];
       if (snapshot[key] == null || snapshot[key] === '') continue;
-      if (live[key] == null || live[key] === '') continue;
-      if (String(live[key]) !== String(snapshot[key])) return true;
-    }
-    if (snapshot.body) {
-      const liveBody = textOf(live.body);
-      if (liveBody && liveBody !== String(snapshot.body)) return true;
+      if (liveSnap[key] == null || liveSnap[key] === '') continue;
+      if (String(liveSnap[key]) !== String(snapshot[key])) return true;
     }
     return false;
   }
@@ -79,7 +138,7 @@ const FlowNativeEdit = (() => {
     return { wrote: true };
   }
 
-  return { userEditedLine, unconfirmedLine, snapshotOf, userEdited, fillOnce, textOf };
+  return { userEditedLine, unconfirmedLine, snapshotOf, userEdited, fillOnce, textOf, normText, clockOf };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.FlowNativeEdit = FlowNativeEdit;

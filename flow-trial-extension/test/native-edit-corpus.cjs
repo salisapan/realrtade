@@ -45,11 +45,31 @@ console.log('\n--- a compose box is written once ---\n');
 
 console.log('\n--- a changed snapshot is an edit ---\n');
 {
-  const snap = N.snapshotOf({ changeKey: 'ck1', lastModifiedDateTime: '2026-10-14T09:00:00.000Z', body: { content: 'Thanks' }, title: 'File it' });
-  check('the same changeKey and body is still Glance\'s object', N.userEdited(snap, { changeKey: 'ck1', lastModifiedDateTime: '2026-10-14T09:00:00.000Z', body: { content: 'Thanks' }, title: 'File it' }) === false);
-  check('a new changeKey is an edit', N.userEdited(snap, { changeKey: 'ck2', body: { content: 'Thanks' } }) === true);
-  check('a new lastModifiedDateTime is an edit', N.userEdited(snap, { changeKey: 'ck1', lastModifiedDateTime: '2026-10-14T12:00:00.000Z', body: { content: 'Thanks' } }) === true);
-  check('a new body is an edit', N.userEdited(snap, { changeKey: 'ck1', body: { content: 'I rewrote this' } }) === true);
+  const snap = N.snapshotOf({
+    '@odata.etag': 'W/"abc"',
+    changeKey: 'ck1',
+    lastModifiedDateTime: '2026-10-14T09:00:00.000Z',
+    body: { contentType: 'html', content: '<html><body>Thanks</body></html>' },
+    title: 'File it',
+    dueDateTime: { dateTime: '2026-10-20T00:00:00.0000000', timeZone: 'UTC' },
+    status: 'notStarted'
+  });
+  check('a snapshot keeps content and drops server fields',
+    snap.changeKey == null && snap.lastModifiedDateTime == null && snap.eTag == null &&
+    snap.title === 'File it' && snap.body === 'Thanks' && snap.dueDateTime === '2026-10-20T00:00:00' && snap.status === 'notStarted',
+    snap);
+  const same = {
+    '@odata.etag': 'W/"zzz"',
+    changeKey: 'ck2',
+    lastModifiedDateTime: '2026-10-15T01:00:00.000Z',
+    body: { contentType: 'html', content: '<p>Thanks</p>' },
+    title: 'File it',
+    dueDateTime: { dateTime: '2026-10-20T00:00:00', timeZone: 'Eastern Standard Time' },
+    status: 'notStarted'
+  };
+  check('a new etag and lastModifiedDateTime is not an edit', N.userEdited(snap, same) === false);
+  check('a new title is an edit', N.userEdited(snap, Object.assign({}, same, { title: 'File it RENAMED' })) === true);
+  check('a new body is an edit', N.userEdited(snap, Object.assign({}, same, { body: { contentType: 'html', content: '<p>I rewrote this</p>' } })) === true);
   check('the refusal is one line', N.userEditedLine() === 'You edited this. Undo left it alone.');
 }
 

@@ -889,7 +889,7 @@ const FlowOutlook = (() => {
       await rememberDraft(incomingId, draft.id);
       let created = null;
       try {
-        const settled = await graphGet(token, draftUrl + '?$select=id,changeKey,lastModifiedDateTime,body');
+        const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients');
         if (globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf) created = FlowNativeEdit.snapshotOf(settled);
       } catch (e) { created = null; }
       return {
@@ -974,7 +974,7 @@ const FlowOutlook = (() => {
       const sess = await ensureSession({});
       if (!sess.ok) return { ok: false, error: sess.error };
       const token = holderFor(sess.token);
-      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,changeKey,lastModifiedDateTime,body';
+      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,subject,body,toRecipients';
       let msg;
       try { msg = await graphGet(token, getUrl); }
       catch (e) {
