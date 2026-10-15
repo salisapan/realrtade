@@ -846,7 +846,7 @@ function listsRoute() {
   });
   const quietLine = await waitFor(quiet.doc, '.flow-why-not', 4000);
   check('a mail with no token shows a quiet why line and no card',
-    Boolean(quietLine) && /Connect Microsoft/.test(quietLine.textContent) && !quiet.doc.querySelector('.flow-chip-host'),
+    Boolean(quietLine) && /לא מחובר/.test(quietLine.textContent) && !quiet.doc.querySelector('.flow-chip-host'),
     { text: quietLine && quietLine.textContent });
   quiet.w.chrome.runtime.id = '';
   try { if (quiet.w.__glanceOutlookPage) quiet.w.__glanceOutlookPage.rescan(); } catch (e) { check('rescan after the context dies does not throw', false, String(e)); }

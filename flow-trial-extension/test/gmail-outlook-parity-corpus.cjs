@@ -208,11 +208,19 @@ const CASES = [
     const gDraft = gShown && g.process.steps.some((s) => s.kind === 'gmailDraft');
     if (g.show === 'drive' || (gShown && !gDraft)) {
       // The planner has no Drive list. Until the mailbox check searches, a file ask is file-chain-not-run.
-      // A calendar close with no reply stays quiet. A task-only close is a To Do task, not a draft.
+      // A calendar hold is the same card, with no reply draft. A task-only close is a To Do task, not a draft.
       const steps = (gShown && g.process && g.process.steps) || [];
       const taskOnly = steps.length > 0 && steps.every((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
       if (taskOnly && oShown) {
         check(m.name + ': Outlook writes a To Do task, not a draft', entry.process.steps.every((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => /draft|send/i.test(s.kind)), entry.process.steps.map((s) => s.kind));
+        continue;
+      }
+      const calendarOnly = steps.length > 0 && steps.every((s) => s.kind === 'calendar');
+      if (calendarOnly && oShown) {
+        const oSteps = (entry.process && entry.process.steps) || [];
+        check(m.name + ': Outlook offers the same calendar hold and does not invent a reply',
+          oSteps.length > 0 && oSteps.every((s) => s.kind === 'calendar') && !oSteps.some((s) => /draft|send/i.test(s.kind)),
+          { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind) });
         continue;
       }
       const why = (r.diagnostics || []).map((d) => d.reason);
