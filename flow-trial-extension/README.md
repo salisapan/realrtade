@@ -6,7 +6,7 @@
 
 **Implementation status (code reality, this commit; not the product definition).** The entry surface is a Chrome extension that watches Gmail passively. It stays on what you are waiting on until the
 other side really answers, and when an email decides something it puts one `Do It` button next to it that writes the record for you (a Google Calendar event, a Google Task, a Gmail draft; Drive for
-files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. The judgment engine itself knows nothing about Gmail: it scores plain
+files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. A chat draft whose message timestamp is more than two minutes ahead of this device stays quiet (`whyNotShown: future`). Those two minutes are an intentional clock-skew margin, in `src/content-messenger.js`. The judgment engine itself knows nothing about Gmail: it scores plain
 text, so Gmail is the first surface, not the architecture's ceiling (see "What is still deliberately narrow" below).
 
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow

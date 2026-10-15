@@ -11,6 +11,7 @@ const LANE_JS = [
   'src/chat-compose.js',
   'src/chat-lane.js',
   'src/lane-draft-store.js',
+  'src/group-word.js',
   'src/messenger-parse.js',
   'src/content-messenger.js'
 ];

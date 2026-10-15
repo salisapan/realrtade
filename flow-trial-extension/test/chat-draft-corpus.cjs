@@ -98,6 +98,7 @@ const { FlowChatDraft } = require('../src/chat-draft.js');
 const { FlowChatCompose } = require('../src/chat-compose.js');
 const { FlowChatLane } = require('../src/chat-lane.js');
 const { FlowFactReply } = require('../core/fact-reply.js');
+const { FlowGroupWord } = require('../src/group-word.js');
 const { FlowMessengerParse } = require('../src/messenger-parse.js');
 const { FlowInstagramParse } = require('../src/instagram-parse.js');
 const { FlowLaneDraftStore } = require('../src/lane-draft-store.js');
@@ -297,7 +298,7 @@ check('the Page name is not the person', pageName.kind === 'one-to-one' && pageN
 const statusHeader = liveRoot('fallback/business-suite-status.html');
 const statusKind = FlowMessengerParse.classify(statusHeader, 'https://business.facebook.com/latest/inbox/all/');
 check('a status line is not a second participant', statusKind.kind === 'one-to-one' && statusKind.name === 'Dana Levi', statusKind);
-['Sales Team', 'Marketing Team', 'Team Alpha', 'צוות מכירות', 'Support Group', 'הצוות', 'וקבוצה', 'והצוות', 'מחלקת מכירות'].forEach((title) => {
+['Sales Team', 'Marketing Team', 'Team Alpha', 'צוות מכירות', 'קבוצת ריצה', 'Support Group', 'הצוות', 'וקבוצה', 'והצוות', 'בקבוצת ריצה', 'לצוות', 'מחלקת מכירות'].forEach((title) => {
   const html = '<div role="main"><header><img alt="" src="data:,"><h2>' + title + '</h2><a aria-label="Conversation information">Conversation information</a></header></div>';
   const root = chatEl(html);
   const ms = FlowMessengerParse.classify(root);
@@ -324,18 +325,57 @@ const hashA = FlowLaneDraftStore.hashKey('ms:a', 'm1', incoming);
 const hashB = FlowLaneDraftStore.hashKey('ms:b', 'm1', incoming);
 check('the draft key is a hash and hides the message', hashA !== hashB && hashA.indexOf(incoming) < 0 && hashA.indexOf('restaurant') < 0 && /^[0-9a-f]+$/.test(hashA), hashA);
 check('the same thread, id, and text hash the same', hashA === FlowLaneDraftStore.hashKey('ms:a', 'm1', incoming));
+const draftHash = FlowLaneDraftStore.hashKey('draft', 'k', 'Taizu - https://maps.example');
 let draftBag = {};
 const draftNow = 1_700_000_000_000;
-for (let i = 0; i < 501; i++) draftBag = FlowLaneDraftStore.put(draftBag, 'k' + i, { draft: 'Taizu - https://maps.example', closed: false }, draftNow + i);
-check('501 puts leave 500 and drop the oldest', Object.keys(draftBag).length === 500 && !draftBag.k0 && draftBag.k500, Object.keys(draftBag).length);
+const day = 24 * 60 * 60 * 1000;
+for (let i = 0; i < 501; i++) draftBag = FlowLaneDraftStore.put(draftBag, 'k' + i, { hash: draftHash, state: 'open' }, draftNow + i);
+check('501 open puts leave 500 and drop the oldest', Object.keys(draftBag).length === 500 && !draftBag.k0 && draftBag.k500, Object.keys(draftBag).length);
 const touched = FlowLaneDraftStore.get(draftBag, 'k1', draftNow + 1000);
-draftBag = FlowLaneDraftStore.put(touched.all, 'knew', { draft: 'Taizu - https://maps.example', closed: false }, draftNow + 1001);
+draftBag = FlowLaneDraftStore.put(touched.all, 'knew', { hash: draftHash, state: 'open' }, draftNow + 1001);
 check('touching the oldest keeps it when a new row arrives', draftBag.k1 && !draftBag.k2 && draftBag.knew && Object.keys(draftBag).length === 500);
-const expired = FlowLaneDraftStore.put({}, 'old', { draft: 'Taizu - https://maps.example', closed: true }, draftNow - FlowLaneDraftStore.TTL_MS - 1);
+const expired = FlowLaneDraftStore.put({}, 'old', { hash: draftHash, state: 'closed' }, draftNow - FlowLaneDraftStore.TTL_MS - 1);
 const dropped = FlowLaneDraftStore.get(expired, 'old', draftNow);
-check('a row older than 30 days is dropped', dropped.row == null && !dropped.all.old && FlowLaneDraftStore.MAX === 500);
+check('a row older than 30 days is dropped', dropped.row == null && !dropped.all.old && FlowLaneDraftStore.MAX === 500 && FlowLaneDraftStore.CLOSED_KEEP_MS === 14 * day);
+let youngClosed = {};
+const youngAt = draftNow - 2 * day;
+for (let i = 0; i < 501; i++) youngClosed = FlowLaneDraftStore.put(youngClosed, 'y' + i, { hash: draftHash, state: 'closed' }, youngAt + i);
+check('a closed row younger than 14 days is not evicted', Object.keys(youngClosed).length === 501 && youngClosed.y0 && youngClosed.y500);
+let mixed = {};
+const agedAt = draftNow - 20 * day;
+for (let i = 0; i < 499; i++) mixed = FlowLaneDraftStore.put(mixed, 'ac' + i, { hash: draftHash, state: 'closed' }, agedAt + i);
+mixed = FlowLaneDraftStore.put(mixed, 'op-old', { hash: draftHash, state: 'open' }, draftNow - 5000);
+mixed = FlowLaneDraftStore.put(mixed, 'op-new', { hash: draftHash, state: 'open' }, draftNow);
+check('open rows are evicted before a closed row', mixed['op-old'] == null && mixed['op-new'] && mixed.ac0 && Object.keys(mixed).length === 500);
+let agedClosed = {};
+for (let i = 0; i < 500; i++) agedClosed['a' + i] = { hash: draftHash, state: 'closed', ts: agedAt + i };
+agedClosed = FlowLaneDraftStore.put(agedClosed, 'fresh', { hash: draftHash, state: 'closed' }, draftNow);
+check('a closed row older than 14 days can be evicted', Object.keys(agedClosed).length === 500 && !agedClosed.a0 && agedClosed.fresh && agedClosed.a499);
 const storedJson = JSON.stringify(draftBag);
-check('stored rows keep the composed draft and omit the incoming text', storedJson.indexOf(incoming) < 0 && storedJson.indexOf('restaurant') < 0 && storedJson.indexOf('Taizu - ') >= 0);
+check('a stored row is hash, state, and time', storedJson.indexOf(incoming) < 0 && storedJson.indexOf('Taizu') < 0 && storedJson.indexOf('restaurant') < 0 && draftBag.knew.hash === draftHash && draftBag.knew.state === 'open' && typeof draftBag.knew.ts === 'number' && !Object.prototype.hasOwnProperty.call(draftBag.knew, 'draft'));
+const surnamePeople = [
+  'Russell Crew', 'John Staff', 'Anna Team', 'Dana Group', 'Dept Smith', 'Maria Squad', 'James Family',
+  'Olivia Department', 'Noah Crew', 'Emma Staff', 'Liam Team', 'Sophia Group', 'Mason Squad', 'Isabella Family',
+  'Ethan Department', 'Mia Crew', 'Lucas Staff', 'Charlotte Team', 'Benjamin Group', 'Amelia Squad',
+  'Henry Family', 'Harper Department', 'Jack Crew', 'Evelyn Staff', 'Alexander Team', 'Abigail Group',
+  'Daniel Squad', 'Ella Family', 'Matthew Department', 'Scarlett Crew', 'David Staff'
+];
+function personHtml(title, slug) {
+  return '<div role="main"><header><img alt="" src="data:,"><h2>' + title + '</h2><a href="/' + slug + '/" role="link">' + slug + '</a><a aria-label="Conversation information">Conversation information</a></header><div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + incoming + '</span></div><div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div><button type="button" aria-label="Send"></button></div>';
+}
+check('at least 30 people with a group-word surname are listed', surnamePeople.length >= 30, surnamePeople.length);
+surnamePeople.forEach((title) => {
+  const slug = title.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
+  const root = chatEl(personHtml(title, slug));
+  const ms = FlowMessengerParse.classify(root);
+  const ig = FlowInstagramParse.classify(root);
+  check(title + ' is a person on Messenger and Instagram', ms.kind === 'one-to-one' && ig.kind === 'one-to-one' && FlowMessengerParse.isOneToOne(root) === true && FlowInstagramParse.isOneToOne(root) === true && FlowGroupWord.counts(title) === false, { messenger: ms, instagram: ig });
+});
+const staffName = 'Dana Levi (Staff)';
+const staffRoot = chatEl(personHtml(staffName, '100012345678'));
+const staffHref = 'https://www.messenger.com/t/100012345678';
+check('a parenthetical staff note is still Dana Levi', FlowGroupWord.counts(staffName) === false && FlowMessengerParse.classify(staffRoot, staffHref).kind === 'one-to-one' && FlowInstagramParse.classify(staffRoot, staffHref).kind === 'one-to-one', { messenger: FlowMessengerParse.classify(staffRoot, staffHref), instagram: FlowInstagramParse.classify(staffRoot, staffHref) });
+check('both parsers call the shared group-word function', /globalThis\.FlowGroupWord/.test(messengerParse) && /globalThis\.FlowGroupWord/.test(instagramParse));
 const advDir = path.join(__dirname, 'fixtures/chat/adv');
 const advFiles = fs.readdirSync(advDir).filter((name) => name.endsWith('.html')).sort();
 check('the adversarial set has 20 fixtures', advFiles.length === 20, advFiles.length);
@@ -740,7 +780,7 @@ console.log('\n--- calendar evidence ---\n');
 
   async function open(name, url, surface, opts) {
     const o = opts || {};
-    const html = fs.readFileSync(path.join(__dirname, 'fixtures/chat', name), 'utf8');
+    const html = o.html || fs.readFileSync(path.join(__dirname, 'fixtures/chat', name), 'utf8');
     const dom = new JSDOM(html, { url: url, runScripts: 'outside-only', pretendToBeVisual: true });
     const w = dom.window;
     pin(w);
@@ -962,10 +1002,31 @@ console.log('\n--- calendar evidence ---\n');
   await new Promise((r) => setTimeout(r, 40));
   check('the closed thread stays closed', threadAAgain.text.trim() === '', threadAAgain.text);
   const stored = JSON.stringify(threadStore.local && threadStore.bag ? threadStore.bag : '');
-  check('the saved draft key does not keep the incoming text', stored.indexOf('איפה המסעדה') < 0 && stored.indexOf('שבוע שעבר') < 0);
+  check('the saved draft key does not keep the incoming text or the draft', stored.indexOf('איפה המסעדה') < 0 && stored.indexOf('שבוע שעבר') < 0 && stored.indexOf('Taizu') < 0);
   threadA.close();
   threadB.close();
   threadAAgain.close();
+
+  for (const title of surnamePeople) {
+    const slug = title.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
+    const draftedPerson = await open('messenger-place.html', 'https://www.messenger.com/t/' + slug, 'src/content-messenger.js', { html: personHtml(title, slug) });
+    check(title + ' drafts', draftedPerson.text.indexOf('Taizu - ') === 0 && draftedPerson.sendClicks === 0, draftedPerson.text);
+    draftedPerson.close();
+  }
+  const staffDraft = await open('messenger-place.html', staffHref, 'src/content-messenger.js', { html: personHtml(staffName, '100012345678') });
+  check('Dana Levi (Staff) drafts', staffDraft.text.indexOf('Taizu - ') === 0 && staffDraft.sendClicks === 0, staffDraft.text);
+  staffDraft.close();
+
+  function skewHtml(stamp) {
+    return personHtml('Dana Levi', 'danalevi').replace('data-message-id="m1">', 'data-message-id="m1"><time datetime="' + stamp + '"></time>');
+  }
+  const skewDraft = await open('messenger-place.html', 'https://www.messenger.com/t/skew-ok', 'src/content-messenger.js', { html: skewHtml('2026-10-14T12:01:30') });
+  check('ninety seconds of clock skew still drafts', skewDraft.text.indexOf('Taizu - ') === 0, skewDraft.text);
+  skewDraft.close();
+  const skewLogs = [];
+  const skewQuiet = await open('messenger-place.html', 'https://www.messenger.com/t/skew-future', 'src/content-messenger.js', { html: skewHtml('2026-10-14T12:03:00'), logs: skewLogs });
+  check('three minutes ahead stays quiet', skewQuiet.text.trim() === '' && skewLogs.some((line) => line.indexOf('[Glance] whyNotShown: future') >= 0), { text: skewQuiet.text, logs: skewLogs });
+  skewQuiet.close();
 
   const guardDom = new JSDOM('<div role="main"></div>', { url: suiteUrl, runScripts: 'outside-only', pretendToBeVisual: true });
   pin(guardDom.window);

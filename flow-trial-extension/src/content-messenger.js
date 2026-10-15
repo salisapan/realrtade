@@ -15,7 +15,9 @@
   const RETRY_LIMIT = 8;
   const MAX_ROWS = 40;
   const STALE_MS = 14 * 24 * 60 * 60 * 1000;
-  const FUTURE_MS = 5 * 60 * 1000;
+  // Two minutes of clock skew is intentional. A timestamp further ahead than
+  // that is in the future, and the thread stays quiet (whyNotShown: future).
+  const FUTURE_SKEW_MS = 2 * 60 * 1000;
   const DRAFT_STORE = 'glanceLaneDrafts';
   let timer = null;
   let tries = 0;
@@ -153,20 +155,21 @@
     if (who !== 'them') { whyNot(who === 'me' ? 'from-me' : 'sender-not-identified', key); return; }
     if (!text || inflight.has(key)) return;
     const when = sentAt(last);
-    if (when != null && when - Date.now() > FUTURE_MS) { whyNot('future', key); return; }
+    if (when != null && when - Date.now() > FUTURE_SKEW_MS) { whyNot('future', key); return; }
     if (when != null && Date.now() - when > STALE_MS) { whyNot('stale', key); return; }
     inflight.add(key);
     const box = composerBox(main);
     const finish = (async () => {
       const saved = await remembered(key);
       const shown = boxText(box).trim();
-      if (saved && saved.closed) { whyNot('closed', key); return; }
-      if (saved && saved.draft && shown !== String(saved.draft).trim()) {
-        await remember(key, { draft: saved.draft, closed: true });
+      const shownHash = FlowLaneDraftStore.hashKey('draft', key, shown);
+      if (saved && saved.state === 'closed') { whyNot('closed', key); return; }
+      if (saved && saved.hash && shownHash !== saved.hash) {
+        await remember(key, { hash: saved.hash, state: 'closed' });
         whyNot('closed', key);
         return;
       }
-      if (saved && saved.draft) return;
+      if (saved && saved.hash) return;
       if (drafted.has(key)) return;
       const r = await FlowChatLane.draftInto(box, {
         text: text,
@@ -180,7 +183,7 @@
       });
       if (r && r.reason === 'no-box') { whyNot('no-box', key); return; }
       if (r && r.ok && r.judged && r.judged.draft) {
-        await remember(key, { draft: r.judged.draft, closed: false });
+        await remember(key, { hash: FlowLaneDraftStore.hashKey('draft', key, r.judged.draft), state: 'open' });
       }
       drafted.add(key);
     })();

@@ -31,7 +31,7 @@ const LANES = [
       'https://www.business.facebook.com/latest/inbox',
       'https://www.business.facebook.com/latest/inbox/*'
     ],
-    js: SCRIPTS.concat(['src/lane-draft-store.js', 'src/messenger-parse.js', 'src/content-messenger.js'])
+    js: SCRIPTS.concat(['src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js'])
   },
   {
     id: 'instagram',
@@ -42,7 +42,7 @@ const LANES = [
       'https://instagram.com/direct',
       'https://instagram.com/direct/*'
     ],
-    js: SCRIPTS.concat(['src/instagram-parse.js', 'src/content-instagram.js'])
+    js: SCRIPTS.concat(['src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js'])
   }
 ];
 globalThis.__glanceLaneChat = LANES;

@@ -54,8 +54,11 @@ const FlowInstagramParse = (() => {
   // list. The exact live string is TODO-LIVE-DOM.
   // Unknown and group both refuse a draft.
 
-  // Word edge, including a Hebrew ה/ו prefix. \b does not see Hebrew letters.
-  const GROUP_WORD = /(?:^|[^\p{L}\p{N}])(?:members|participants|group chat|group conversation|family|department|dept|team|group|squad|crew|staff)(?![\p{L}\p{N}])|(?:^|[^\p{L}\p{N}])ו?ה?(?:מחלקת|מחלקה|משתתפים|משפחה|קבוצתי|קבוצה|צוות)(?![\p{L}\p{N}])/iu;
+  // FlowGroupWord.counts is the one group-word rule, shared with Messenger.
+  function groupWord(text) {
+    const rule = typeof globalThis !== 'undefined' ? globalThis.FlowGroupWord : null;
+    return Boolean(rule && rule.counts(text));
+  }
   const SKIP_HEADING = /^(conversation information|messages|chat details)$/i;
 
   function inRow(el) {
@@ -147,7 +150,7 @@ const FlowInstagramParse = (() => {
     // A standalone ו between two names ("דנה ו נועה"). ו inside "דנה וייס" is not one.
     if (/\S\s+ו\s+\S/.test(t)) return true;
     if (attachedVav(t) === 'group') return true;
-    if (GROUP_WORD.test(t)) return true;
+    if (groupWord(t)) return true;
     if (groupLooking(t)) return true;
     return false;
   }
@@ -176,12 +179,12 @@ const FlowInstagramParse = (() => {
     if (!node || node.nodeType !== 1) return false;
     if (node.getAttribute && node.getAttribute('role') === 'row') return false;
     const label = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
-    if (GROUP_WORD.test(label) || countSaysGroup(label)) return true;
+    if (groupWord(label) || countSaysGroup(label)) return true;
     const kids = node.childNodes ? Array.from(node.childNodes) : [];
     for (let i = 0; i < kids.length; i++) {
       const kid = kids[i];
       if (kid.nodeType === 3) {
-        if (GROUP_WORD.test(kid.textContent || '') || countSaysGroup(kid.textContent || '')) return true;
+        if (groupWord(kid.textContent || '') || countSaysGroup(kid.textContent || '')) return true;
       } else if (kid.nodeType === 1 && headerSaysGroup(kid)) return true;
     }
     return false;
