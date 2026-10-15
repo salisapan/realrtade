@@ -77,34 +77,36 @@ function laneToken() {
   });
 }
 
+function statusLanguage() {
+  const code = String(uiLanguage() || '').trim().toLowerCase().replace(/_/g, '-');
+  return (code === 'he' || code.indexOf('he-') === 0) ? 'he' : 'en';
+}
+
+function reconnectWords() {
+  return statusLanguage() === 'he' ? RECONNECT_LABEL : 'Reconnect Google';
+}
+
 function laneGoogleStatus(auth, reconnect, token) {
   const had = Boolean(auth);
   const usable = typeof token === 'string' && token.length > 0;
-  const needs = had && Boolean(reconnect && reconnect.needed);
+  const needs = Boolean(reconnect && reconnect.needed);
   const connected = had && usable && !needs;
+  const label = reconnectWords();
   return {
     connected: connected,
     needsReconnect: needs,
-    reconnectLabel: needs ? RECONNECT_LABEL : '',
-    label: connected ? 'Connected' : (needs ? RECONNECT_LABEL : '')
+    reconnectLabel: needs ? label : '',
+    label: connected ? 'Connected' : (needs ? label : '')
   };
 }
 
-function hadGoogleGrant() {
-  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve(false);
-  return Promise.resolve()
-    .then(() => chrome.storage.local.get('googleTasksAuth'))
-    .then((bag) => Boolean(bag && bag.googleTasksAuth))
-    .catch(() => false);
-}
-
 function noteGoogleAuthFailure(reason) {
-  return hadGoogleGrant().then((had) => {
-    if (!had || typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
-    return chrome.storage.local.set({
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve();
+  return Promise.resolve()
+    .then(() => chrome.storage.local.set({
       [RECONNECT_KEY]: { needed: true, reason: String(reason || 'auth') }
-    });
-  }).catch(() => {});
+    }))
+    .catch(() => {});
 }
 
 function noteGoogleAuthOk() {
@@ -307,14 +309,20 @@ async function prepareWrite(connectorId, input) {
     };
   }
   if (connectorId === 'googleHold') {
+    let zone = params.timeZone || i.timeZone || '';
+    if (!zone) {
+      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { zone = 'UTC'; }
+    }
     return {
       dateIso: params.dateIso || i.dateIso,
       hour: params.hour != null ? params.hour : i.hour,
       minute: params.minute != null ? params.minute : i.minute,
       fileName: params.fileName || params.fileTerm || i.fileName || '',
       fileUrl: params.fileUrl || params.shareUrl || i.fileUrl || '',
+      fileTerm: params.fileTerm || i.fileTerm || '',
+      title: params.title || i.title || i.label || '',
       quote: params.quote || i.quote || '',
-      timeZone: params.timeZone || i.timeZone
+      timeZone: zone
     };
   }
   if (connectorId === 'googleDriveSave') return i;
@@ -373,10 +381,33 @@ function uiLanguage() {
   return 'en';
 }
 
+function calendarRefusal(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (code === 'he' || code.indexOf('he-') === 0) return 'אין מועד אחד לאירוע הזה.';
+  return 'No single time for this event.';
+}
+
+function editedRefusal(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (code === 'he' || code.indexOf('he-') === 0) return 'שינית את זה. Undo השאיר אותו כמו שהוא.';
+  return '';
+}
+
 function localizeUndo(result) {
-  if (!result || result.reason !== 'unconfirmed') return result;
-  const line = unconfirmedRefusal(uiLanguage());
-  return Object.assign({}, result, { error: line, written: line });
+  if (!result || result.ok !== false) return result;
+  if (result.reason === 'unconfirmed') {
+    const line = unconfirmedRefusal(uiLanguage());
+    return Object.assign({}, result, { error: line, written: line });
+  }
+  if (result.reason === 'user-edited' || result.reason === 'range-edited') {
+    const line = editedRefusal(uiLanguage());
+    if (line) return Object.assign({}, result, { error: line, written: line });
+  }
+  if (result.reason === 'unclear' && /time for this event|file and time/i.test(result.error || '')) {
+    const line = calendarRefusal(uiLanguage());
+    return Object.assign({}, result, { error: line });
+  }
+  return result;
 }
 
 function decorate(result) {
@@ -388,7 +419,7 @@ function decorate(result) {
     .then((bag) => {
       const flag = bag && bag[RECONNECT_KEY];
       if (!flag || flag.needed !== true) return value;
-      return Object.assign({}, value, { needsReconnect: true, reconnectLabel: RECONNECT_LABEL });
+      return Object.assign({}, value, { needsReconnect: true, reconnectLabel: reconnectWords() });
     })
     .catch(() => value);
 }

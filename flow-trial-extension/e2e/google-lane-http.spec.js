@@ -432,3 +432,71 @@ test('Task Undo refuses after the title is edited and leaves it', async ({ glanc
   expect(server.calls.slice(before).every((c) => c.method === 'GET')).toBe(true);
   expect(server.task(id).title).toBe('Changed by the person');
 });
+
+const HEBREW_HOLD = 'פגישה ביום חמישי 22/10 בשעה 14:00';
+
+test('Hebrew weekday date and hour posts a Jerusalem-wall-clock hold', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-he-hold',
+      threadId: 't-he-hold',
+      subject: 'פגישה',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: HEBREW_HOLD
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const post = server.calls.find((c) => c.method === 'POST' && c.path.indexOf('/calendar/v3/calendars/primary/events') >= 0);
+  expect(post && post.body && post.body.start).toBeTruthy();
+  expect(post.body.start.dateTime).toBe('2026-10-22T14:00:00');
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  expect(post.body.start.timeZone).toBe(zone);
+  if (process.env.TZ === 'Asia/Jerusalem') expect(post.body.start.timeZone).toBe('Asia/Jerusalem');
+  expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/events/' + server.last.event) >= 0)).toBe(true);
+});
+
+test('Undo after a Gmail reload deletes the task', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-task-reload',
+      threadId: 't-task-reload',
+      subject: 'Contract',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: S.HEBREW_TASK
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = server.last.task;
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('div[role="main"] button.flow-chip-undo')).toBeVisible({ timeout: 20000 });
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/tasks/' + id) >= 0)).toBe(true);
+});
+
+test('Undo after a reload refuses an edited task', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-task-reload-edit',
+      threadId: 't-task-reload-edit',
+      subject: 'Contract',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: S.HEBREW_TASK
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = server.last.task;
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('div[role="main"] button.flow-chip-undo')).toBeVisible({ timeout: 20000 });
+  server.editTask(id, { title: 'Changed by the person' });
+  const before = server.calls.length;
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  expect(server.calls.slice(before).every((c) => c.method === 'GET')).toBe(true);
+  expect(server.task(id).title).toBe('Changed by the person');
+});

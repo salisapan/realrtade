@@ -104,6 +104,12 @@
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || (!ch.googleReconnect && !ch.googleLaneWarning)) return;
+      refresh().catch(() => {});
+    });
+  } catch (e) { /* the pill refreshes the next time the popup opens */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local' || !ch.log) return;
       const panel = document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
@@ -385,18 +391,25 @@
       pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
       return;
     }
-    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     const reconnecting = Object.keys(status || {}).filter((k) => status[k] && status[k].needsReconnect);
+    const warning = Object.keys(status || {}).filter((k) => status[k] && status[k].warning);
+    if (reconnecting.length) {
+      pill.textContent = status[reconnecting[0]].headerLabel || status[reconnecting[0]].reconnectLabel;
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
+      return;
+    }
+    if (warning.length) {
+      pill.textContent = status[warning[0]].headerLabel || status[warning[0]].warningLabel;
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
+      return;
+    }
+    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
       pill.textContent = (conn ? conn.label : live[0]) + ' connected';
       pill.className = 'ver on';
-      return;
-    }
-    if (reconnecting.length) {
-      pill.textContent = status[reconnecting[0]].reconnectLabel;
-      pill.className = 'ver';
-      pill.setAttribute('dir', 'auto');
       return;
     }
     pill.textContent = 'לא מחובר';
@@ -680,7 +693,11 @@
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
     else if (st.needsReconnect) {
-      const badge = el('span', 'badge', st.reconnectLabel || 'התחבר מחדש');
+      const badge = el('span', 'badge', st.headerLabel || st.reconnectLabel || 'התחבר מחדש');
+      badge.setAttribute('dir', 'auto');
+      head.appendChild(badge);
+    } else if (st.warning) {
+      const badge = el('span', 'badge', st.headerLabel || st.warningLabel);
       badge.setAttribute('dir', 'auto');
       head.appendChild(badge);
     } else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));

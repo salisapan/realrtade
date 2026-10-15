@@ -13,7 +13,43 @@
 // a wrong write, because judgment only ever reads text and the write path
 // only ever adds a record.
 
+// Chip and header lines follow the browser UI language. A stored Hebrew
+// label must not appear in an English UI, and the reverse is the same rule.
+function glanceUiLanguage() {
+  try {
+    const i18n = typeof chrome !== 'undefined' && chrome.i18n;
+    if (i18n && typeof i18n.getUILanguage === 'function') {
+      const lang = i18n.getUILanguage();
+      if (lang) return String(lang);
+    }
+  } catch (e) { /* the browser locale is next */ }
+  try {
+    if (typeof navigator !== 'undefined' && navigator.language) return String(navigator.language);
+  } catch (e) { /* English */ }
+  return 'en';
+}
+
+function glanceUiHebrew() {
+  const code = glanceUiLanguage().trim().toLowerCase().replace(/_/g, '-');
+  return code === 'he' || code.indexOf('he-') === 0;
+}
+
+function glanceUiCopy(kind) {
+  const he = glanceUiHebrew();
+  if (kind === 'reconnect') return he ? 'התחבר מחדש ל-Google' : 'Reconnect Google';
+  if (kind === 'connect') return he ? 'התחבר ל-Google בחלון Glance קודם.' : 'Connect Google in the Glance popup first.';
+  if (kind === 'edited') return he ? 'שינית את זה. Undo השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
+  if (kind === 'still') return he ? 'עדיין שם — משימת Google לא הוסרה.' : 'Still there — the Google Task was not removed.';
+  if (kind === 'calendar') return he ? 'אין מועד אחד לאירוע הזה.' : 'No single time for this event.';
+  return '';
+}
+
 (function flowGmailWatcher() {
+  // A second injection in this same world must not start another watcher.
+  // After an update the old world is gone, so this guard is false and the
+  // new files run. The service worker removes leftover chips first.
+  if (typeof globalThis !== 'undefined' && globalThis.__glanceGmailGuard === true) return;
+  if (typeof globalThis !== 'undefined') globalThis.__glanceGmailGuard = true;
   // Every FlowStorage.appendLog() call this file makes is tagged with this
   // one constant — see core/README.md's "Adding a new inbox host" section.
   // A future content-outlook.js defines its own SOURCE_APP ('outlook') and
@@ -2050,12 +2086,13 @@
   function reasonMessage(response, ctx) {
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
-    if (response.reason === 'not-connected') return response.reconnectLabel || 'Connect Google in the Glance popup first.';
+    if (response.reason === 'not-connected') return response.needsReconnect ? glanceUiCopy('reconnect') : glanceUiCopy('connect');
+    if (response.reason === 'unclear' && /file and time|time for this event/i.test(response.error || '')) return glanceUiCopy('calendar');
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
-    if (response.reason === 'user-edited') return response.error || 'You edited this. Undo left it alone.';
+    if (response.reason === 'user-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || glanceUiCopy('edited'));
     if (response.reason === 'unconfirmed') return response.error || response.written || "Couldn't confirm it's unchanged. Undo left it alone.";
-    if (response.reason === 'range-edited') return response.error || 'Undo stopped. That text was edited, so nothing was deleted.';
+    if (response.reason === 'range-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || 'Undo stopped. That text was edited, so nothing was deleted.');
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
     if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
@@ -2387,6 +2424,102 @@
     return page || { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
   }
 
+  // Undo after a content-script reload has no in-memory receipt. The ids,
+  // list and calendar ids, and contentHash live here, keyed by the Gmail
+  // message id, until the expiry. A changed hash refuses. A match deletes.
+  const LANE_UNDO_KEY = 'glanceLaneUndo';
+  const LANE_UNDO_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+  const LANE_UNDO_FIELDS = ['taskId', 'externalId', 'taskListId', 'listId', 'contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'spreadsheetId', 'snapshot', 'created', 'inserted', 'rangeName'];
+
+  function laneUndoSnapshot(connectorId, ref) {
+    if (!ref || typeof ref !== 'object') return null;
+    const snap = {};
+    LANE_UNDO_FIELDS.forEach((key) => {
+      if (ref[key] != null && ref[key] !== '') snap[key] = ref[key];
+    });
+    if (connectorId === 'googleHold' && !snap.calendarId) snap.calendarId = 'primary';
+    return Object.keys(snap).length ? snap : null;
+  }
+
+  function laneUndoStepsOf(succeeded) {
+    return (succeeded || []).map((r) => {
+      const kind = r && r.action && r.action.kind;
+      const connectorId = laneConnectorId(kind) || kind;
+      const ref = laneUndoSnapshot(connectorId, r && r.response && r.response.ref);
+      if (!connectorId || !ref) return null;
+      return { connectorId: connectorId, ref: ref };
+    }).filter(Boolean);
+  }
+
+  function rememberLaneUndo(messageId, steps) {
+    if (!messageId || !steps || !steps.length) return Promise.resolve();
+    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
+    return Promise.resolve()
+      .then(() => store.get(LANE_UNDO_KEY))
+      .then((bag) => {
+        const all = bag && bag[LANE_UNDO_KEY] && typeof bag[LANE_UNDO_KEY] === 'object' ? bag[LANE_UNDO_KEY] : {};
+        const now = Date.now();
+        Object.keys(all).forEach((key) => {
+          if (!all[key] || !all[key].expires || all[key].expires < now) delete all[key];
+        });
+        all[messageId] = { expires: now + LANE_UNDO_TTL_MS, steps: steps };
+        return store.set({ [LANE_UNDO_KEY]: all });
+      })
+      .catch(() => {});
+  }
+
+  function readLaneUndo(messageId) {
+    if (!messageId) return Promise.resolve(null);
+    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function') return Promise.resolve(null);
+    return Promise.resolve()
+      .then(() => store.get(LANE_UNDO_KEY))
+      .then((bag) => {
+        const all = bag && bag[LANE_UNDO_KEY];
+        const row = all && all[messageId];
+        if (!row || !row.expires || row.expires < Date.now() || !Array.isArray(row.steps) || !row.steps.length) return null;
+        return row;
+      })
+      .catch(() => null);
+  }
+
+  // Stored steps are undone last-written first, so a task that landed after
+  // the calendar hold is the first delete. A hash miss stops the chain.
+  function undoStoredLane(messageId, fallback) {
+    return readLaneUndo(messageId).then((record) => {
+      const steps = record
+        ? record.steps.slice().reverse()
+        : (fallback && fallback.connectorId ? [{ connectorId: fallback.connectorId, ref: fallback.ref }] : []);
+      let chain = Promise.resolve({ ok: true });
+      let last = null;
+      steps.forEach((step) => {
+        chain = chain.then((prev) => {
+          if (!prev || !prev.ok) return prev;
+          return sendLaneUndo(step.connectorId, step.ref).then((result) => {
+            last = result;
+            return result;
+          });
+        });
+      });
+      return chain.then((result) => result || last || { ok: false });
+    });
+  }
+
+  function noteLaneOutcome(results) {
+    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+    if (!store) return;
+    const lane = (results || []).filter((r) => r && r.action && laneConnectorId(r.action.kind));
+    if (!lane.length) return;
+    const ok = lane.some((r) => r.response && r.response.ok);
+    const failed = lane.some((r) => !(r.response && r.response.ok));
+    if (ok && failed && typeof store.set === 'function') {
+      store.set({ googleLaneWarning: { needed: true } }).catch(() => {});
+    } else if (ok && !failed && typeof store.remove === 'function') {
+      store.remove('googleLaneWarning').catch(() => {});
+    }
+  }
+
   function sendLaneUndo(kind, ref) {
     const lane = laneConnectorId(kind);
     if (!lane) return sendRuntime({ type: 'flow:undo-action', connectorId: kind, ref: ref });
@@ -2660,12 +2793,13 @@
       }
       undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
-      sendLaneUndo(copy.connectorId, copy.ref).then((result) => {
+      undoStoredLane(row.messageId, copy).then((result) => {
         if (!(result && result.ok)) {
           undo.textContent = copy.undoHint;
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = 'Still there — the Google Task was not removed.';
+          const edited = result && (result.reason === 'user-edited' || result.reason === 'range-edited') && glanceUiHebrew();
+          hint.textContent = edited ? glanceUiCopy('edited') : ((result && (result.error || result.written)) || glanceUiCopy('still'));
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           return;
         }
@@ -2792,6 +2926,7 @@
     if (!copy.status) {
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
       setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
+      noteLaneOutcome(results);
       return;
     }
 
@@ -2985,6 +3120,8 @@
         .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e));
     });
     if (meetingNote) bookkeeping.push(meetingNote);
+    noteLaneOutcome(results);
+    bookkeeping.push(rememberLaneUndo(ctx.messageId, laneUndoStepsOf(succeeded)));
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a

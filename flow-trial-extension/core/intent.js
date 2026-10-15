@@ -776,6 +776,11 @@ const FlowIntent = (() => {
       if (slot && slot.time && !facts.time) facts.time = slot.time;
       if (slot && slot.date && slot.date.iso && !(facts.date && facts.date.iso)) facts.date = slot.date;
     }
+    // A weekday that names a different day than the written date is not a
+    // meeting. Staying quiet beats filing Thursday's words on Sunday.
+    if (facts.date && facts.date.contradictsWeekday) {
+      return { type: null, signals: {}, facts: facts, quiet: 'date' };
+    }
     const s = FlowJudgment.score(text, domain, facts);
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
     // dateText is what neutralTitle() uses to name a dated close ("Log

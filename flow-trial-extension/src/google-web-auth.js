@@ -141,16 +141,30 @@ export function unconfirmedRefusal(lang) {
 
 // had a Connect record, and a later write was rejected: Connected is false
 // and every surface reads this same object.
+function statusEnglish(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  return code === 'en' || code.indexOf('en-') === 0;
+}
+
 export function googleConnectionState(auth, reconnect, extras) {
   const had = Boolean(auth);
-  const needs = had && Boolean(reconnect && reconnect.needed);
   const extra = extras || {};
+  // A 401 is reconnect even when the grant record is already gone.
+  const needs = Boolean(reconnect && reconnect.needed);
+  const warn = !needs && Boolean(extra.warning && extra.warning.needed);
+  const english = statusEnglish(extra.lang);
+  const reconnectLabel = english ? 'Reconnect Google' : GOOGLE_RECONNECT_LABEL;
+  const warningLabel = english ? 'A step did not finish' : 'שלב אחד לא הושלם';
+  const connected = had && !needs && !warn;
   return {
-    connected: had && !needs,
+    connected: connected,
     needsReconnect: needs,
-    reconnectLabel: GOOGLE_RECONNECT_LABEL,
+    warning: warn,
+    reconnectLabel: needs ? reconnectLabel : GOOGLE_RECONNECT_LABEL,
+    warningLabel: warn ? warningLabel : '',
+    headerLabel: needs ? reconnectLabel : (warn ? warningLabel : (connected ? 'Connected' : '')),
     configured: extra.configured != null ? Boolean(extra.configured) : had,
-    detail: had && !needs ? (extra.detail || null) : null
+    detail: connected ? (extra.detail || null) : null
   };
 }
 

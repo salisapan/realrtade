@@ -278,10 +278,35 @@ async function main() {
     }, {}, resolve);
   });
   const view = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
-  check('a 401 write switches Google to reconnect and Connected is gone', denied && denied.ok === false && denied.needsReconnect === true && denied.reconnectLabel === 'התחבר מחדש ל-Google' && view.connected === false && view.needsReconnect === true && view.label === 'התחבר מחדש ל-Google' && view.label !== 'Connected', { denied, view, flag: stored.googleReconnect });
+  check('a 401 write switches Google to reconnect and Connected is gone', denied && denied.ok === false && denied.needsReconnect === true && denied.reconnectLabel === 'Reconnect Google' && view.connected === false && view.needsReconnect === true && view.label === 'Reconnect Google' && view.label !== 'Connected', { denied, view, flag: stored.googleReconnect });
+
+  sandbox.chrome.i18n.getUILanguage = () => 'he';
+  const hebrewDenied = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      input: { label: 'Pay the invoice' }
+    }, {}, resolve);
+  });
+  const hebrewView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
+  check('a 401 reconnect label follows a Hebrew UI', hebrewDenied && hebrewDenied.reconnectLabel === 'התחבר מחדש ל-Google' && hebrewView.label === 'התחבר מחדש ל-Google' && hebrewView.connected === false, { hebrewDenied, hebrewView });
+  sandbox.chrome.i18n.getUILanguage = () => 'en';
+
+  delete stored.googleTasksAuth;
+  delete stored.googleReconnect;
+  const noGrant = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      input: { label: 'Pay the invoice', taskListId: 'glance-list' }
+    }, {}, resolve);
+  });
+  const noGrantView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
+  check('a 401 with no grant is reconnect, not Connect', noGrant && noGrant.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && noGrant.needsReconnect === true && noGrantView.connected === false && noGrantView.needsReconnect === true && noGrantView.label === 'Reconnect Google', { noGrant, noGrantView, flag: stored.googleReconnect });
 
   const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
   check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && popup.indexOf('needsReconnect') < popup.indexOf("badge on', 'Connected'"));
+  check('a lane warning is not the Connected header', popup.indexOf('status[k].warning') > 0 && popup.indexOf('warningLabel') > 0 && popup.indexOf('googleLaneWarning') > 0);
 
   if (failures) {
     console.log('\n' + failures + ' failed');

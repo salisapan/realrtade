@@ -249,6 +249,16 @@ async function run() {
     const on = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { configured: true, detail: 'Glance list' });
     const off = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { configured: true, detail: 'Glance list' });
     check('a reconnect flag is not Connected', on.connected === true && off.connected === false && off.needsReconnect === true && off.reconnectLabel === api.GOOGLE_RECONNECT_LABEL && off.detail == null, off);
+    const english = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { lang: 'en' });
+    const hebrew = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { lang: 'he' });
+    const warned = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { lang: 'en', warning: { needed: true } });
+    const warnedHe = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { lang: 'he', warning: { needed: true } });
+    const noGrant = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'en' });
+    check('English UI reconnect is not the Hebrew label', english.connected === false && english.needsReconnect === true && english.headerLabel === 'Reconnect Google' && english.reconnectLabel === 'Reconnect Google', english);
+    check('Hebrew UI reconnect stays Hebrew', hebrew.connected === false && hebrew.headerLabel === api.GOOGLE_RECONNECT_LABEL, hebrew);
+    check('a partial lane warning is not Connected', warned.connected === false && warned.warning === true && warned.headerLabel === 'A step did not finish' && warned.headerLabel !== 'Connected', warned);
+    check('a Hebrew partial warning follows the UI', warnedHe.connected === false && warnedHe.headerLabel === 'שלב אחד לא הושלם', warnedHe);
+    check('a 401 with no grant is still reconnect', noGrant.connected === false && noGrant.needsReconnect === true && noGrant.headerLabel === 'Reconnect Google', noGrant);
   }
 
   console.log('\n--- redirect URI and authorize URL ---\n');

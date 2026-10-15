@@ -25,8 +25,92 @@ function resetFetches() {
 }
 
 function jsonResponse(status, body) {
-  const text = JSON.stringify(body);
+  const text = body == null ? '' : JSON.stringify(body);
   return { ok: status >= 200 && status < 300, status: status, text: async () => text };
+}
+
+const laneState = { task: null, event: null, file: null, doc: null };
+
+function storedBearer() {
+  const record = stored.googleWebAuth;
+  const token = record && record.accessToken;
+  return token ? 'Bearer ' + token : '';
+}
+
+function parseInit(init) {
+  const raw = init && init.body;
+  if (typeof raw !== 'string' || !raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// 401 unless Authorization is exactly the stored Connect token.
+async function laneFetch(url, init) {
+  const method = (init && init.method) || 'GET';
+  const headers = (init && init.headers) || {};
+  const auth = headers.Authorization || '';
+  fetches.push({ url: String(url), method: method, auth: auth });
+  const expect = storedBearer();
+  if (!expect || auth !== expect) return jsonResponse(401, { error: { code: 401 } });
+  const u = String(url);
+  const body = parseInit(init);
+  if (u.indexOf('/tasks/v1/lists/') >= 0 && method === 'POST') {
+    laneState.task = { id: 'task-1', title: (body && body.title) || '', notes: (body && body.notes) || '', due: (body && body.due) || '', status: 'needsAction' };
+    return jsonResponse(200, laneState.task);
+  }
+  if (u.indexOf('/tasks/v1/lists/') >= 0 && method === 'GET') return jsonResponse(200, laneState.task || { id: 'task-1', title: 'Pay the invoice', status: 'needsAction' });
+  if (u.indexOf('/tasks/v1/lists/') >= 0 && method === 'DELETE') {
+    laneState.task = null;
+    return jsonResponse(204, null);
+  }
+  if (u.indexOf('/calendar/v3/') >= 0 && method === 'POST') {
+    laneState.event = Object.assign({ id: 'evt-1', status: 'confirmed', htmlLink: 'https://calendar.google.com/calendar/event?eid=evt-1' }, body || {});
+    return jsonResponse(200, laneState.event);
+  }
+  if (u.indexOf('/calendar/v3/') >= 0 && method === 'GET') return jsonResponse(200, laneState.event || { id: 'evt-1', status: 'confirmed' });
+  if (u.indexOf('/calendar/v3/') >= 0 && method === 'DELETE') {
+    laneState.event = null;
+    return jsonResponse(204, null);
+  }
+  if (u.indexOf('/upload/drive/v3/files') >= 0 && method === 'POST') {
+    laneState.file = { id: 'file-1', name: 'note.txt', mimeType: 'text/plain', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1', contentHash: 'abc' };
+    return jsonResponse(200, laneState.file);
+  }
+  if (u.indexOf('www.googleapis.com/drive') >= 0 && u.indexOf('/files') >= 0 && method === 'POST') {
+    const mime = body && body.mimeType;
+    const id = mime === 'application/vnd.google-apps.document' ? 'doc-1' : 'file-1';
+    const file = { id: id, name: (body && body.name) || 'Note', mimeType: mime || '', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1' };
+    if (id === 'doc-1') laneState.doc = { file: file, text: '', rangeName: '', namedRangeId: 'nr-1' };
+    else laneState.file = file;
+    return jsonResponse(200, file);
+  }
+  if (u.indexOf('www.googleapis.com/drive') >= 0 && method === 'GET') {
+    const id = (u.match(/\/files\/([^/?]+)/) || [])[1];
+    const file = [laneState.doc && laneState.doc.file, laneState.file].find((item) => item && item.id === id);
+    return jsonResponse(200, file || { id: id || 'doc-1', name: 'Note', mimeType: 'application/vnd.google-apps.document', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1' });
+  }
+  if (u.indexOf('www.googleapis.com/drive') >= 0 && method === 'PATCH') return jsonResponse(200, { trashed: true });
+  if (u.indexOf(':batchUpdate') >= 0 && method === 'POST') {
+    const requests = body && body.requests;
+    const insert = requests && requests[0] && requests[0].insertText;
+    const named = requests && requests[1] && requests[1].createNamedRange;
+    if (laneState.doc && insert && named) {
+      laneState.doc.text = insert.text || '';
+      laneState.doc.rangeName = named.name || '';
+    }
+    return jsonResponse(200, {});
+  }
+  if (u.indexOf('docs.googleapis.com') >= 0 && method === 'GET') {
+    const doc = laneState.doc || { text: '', rangeName: '', namedRangeId: 'nr-1' };
+    const text = doc.text || '';
+    const end = 1 + text.length;
+    return jsonResponse(200, {
+      body: { content: [{ paragraph: { elements: [{ startIndex: 1, endIndex: end, textRun: { content: text } }] } }] },
+      namedRanges: doc.rangeName ? {
+        [doc.rangeName]: { namedRanges: [{ namedRangeId: doc.namedRangeId, ranges: [{ startIndex: 1, endIndex: end }] }] }
+      } : {}
+    });
+  }
+  return jsonResponse(200, { id: 'ok-1' });
 }
 
 const sandbox = {
@@ -41,28 +125,7 @@ const sandbox = {
   TextEncoder: TextEncoder,
   Uint8Array: Uint8Array,
   atob: (s) => Buffer.from(s, 'base64').toString('binary'),
-  fetch: async (url, init) => {
-    const method = (init && init.method) || 'GET';
-    const headers = (init && init.headers) || {};
-    fetches.push({ url: String(url), method: method, auth: headers.Authorization || '' });
-    const u = String(url);
-    if (u.indexOf('/tasks/v1/lists/') >= 0 && method === 'POST') {
-      return jsonResponse(200, { id: 'task-1', title: 'Pay the invoice', status: 'needsAction' });
-    }
-    if (u.indexOf('/tasks/v1/lists/') >= 0 && method === 'GET') {
-      return jsonResponse(200, { id: 'task-1', title: 'Pay the invoice', status: 'needsAction' });
-    }
-    if (u.indexOf('/calendar/v3/') >= 0 && method === 'POST') {
-      return jsonResponse(200, { id: 'evt-1', status: 'confirmed', summary: 'quote.pdf' });
-    }
-    if (u.indexOf('/calendar/v3/') >= 0 && method === 'GET') {
-      return jsonResponse(200, { id: 'evt-1', status: 'confirmed', summary: 'quote.pdf' });
-    }
-    if (u.indexOf('docs.googleapis.com') >= 0 || u.indexOf('www.googleapis.com/drive') >= 0 || u.indexOf('www.googleapis.com/upload') >= 0) {
-      return jsonResponse(200, { id: 'doc-1', name: 'Note', mimeType: 'application/vnd.google-apps.document', trashed: false, revisionId: 'rev-1' });
-    }
-    return jsonResponse(200, { id: 'ok-1' });
-  },
+  fetch: laneFetch,
   chrome: {
     identity: {
       getAuthToken: (details, cb) => {
@@ -174,7 +237,39 @@ async function main() {
   });
   const docCalls = fetches.filter((c) => c.url.indexOf('drive') >= 0 || c.url.indexOf('docs.googleapis') >= 0);
   check('identity is asked again for the doc', authCalls > docBefore);
-  check('Docs uses the stored Bearer and is not not-connected', doc && doc.reason !== 'not-connected' && docCalls.length > 0 && docCalls.every((c) => c.auth === 'Bearer ' + STORED), { doc: doc && { ok: doc.ok, reason: doc.reason }, docCalls: docCalls.map((c) => c.method + ' ' + c.auth) });
+  const docGets = docCalls.filter((c) => c.method === 'GET');
+  check('Docs writes ok with proof and a read-back on the stored Bearer', doc && doc.ok === true && doc.proof && doc.proof.fetchedBack === true && docCalls.length > 0 && docGets.length > 0 && docCalls.every((c) => c.auth === 'Bearer ' + STORED), { doc: doc && { ok: doc.ok, reason: doc.reason, proof: doc.proof }, docCalls: docCalls.map((c) => c.method + ' ' + c.url) });
+
+  resetFetches();
+  const drive = await dispatch('googleDriveSave', {
+    fileName: 'note.txt',
+    mimeType: 'text/plain',
+    base64: Buffer.from('a').toString('base64'),
+    scopes: scopes
+  });
+  const driveCalls = fetches.filter((c) => c.url.indexOf('drive') >= 0 || c.url.indexOf('upload') >= 0);
+  check('Drive writes ok with proof and a read-back on the stored Bearer', drive && drive.ok === true && drive.proof && drive.proof.fetchedBack === true && driveCalls.some((c) => c.method === 'POST') && driveCalls.some((c) => c.method === 'GET') && driveCalls.every((c) => c.auth === 'Bearer ' + STORED), { drive: drive && { ok: drive.ok, reason: drive.reason }, driveCalls: driveCalls.map((c) => c.method) });
+
+  const listener = sandbox.chrome.runtime.listeners[0];
+  resetFetches();
+  const taskUndo = await new Promise((resolve) => {
+    listener({ type: 'flow:google-undo', connectorId: 'googleLaneTask', ref: task.ref }, {}, resolve);
+  });
+  const undoCalls = fetches.slice();
+  check('Undo GET and DELETE carry the stored Bearer', taskUndo && taskUndo.ok === true && undoCalls.some((c) => c.method === 'GET') && undoCalls.some((c) => c.method === 'DELETE') && undoCalls.every((c) => c.auth === 'Bearer ' + STORED), { taskUndo, undoCalls });
+
+  const signedOut = sandbox.chrome.identity.getAuthToken;
+  sandbox.chrome.identity.getAuthToken = (details, cb) => {
+    authCalls += 1;
+    lastDetails = details || null;
+    sandbox.chrome.runtime.lastError = null;
+    if (typeof cb === 'function') cb('ya29.not-the-stored-token');
+  };
+  resetFetches();
+  const wrong = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
+  check('a bearer that is not the stored token is a 401 reconnect', wrong && wrong.ok === false && fetches.some((c) => c.auth === 'Bearer ya29.not-the-stored-token') && stored.googleReconnect && stored.googleReconnect.needed === true, { wrong, fetches });
+  delete stored.googleReconnect;
+  sandbox.chrome.identity.getAuthToken = signedOut;
 
   const signedIn = laneView(stored.googleTasksAuth, null, STORED);
   check('Connected requires the grant and a usable token', signedIn.connected === true && signedIn.label === 'Connected', signedIn);
@@ -202,13 +297,19 @@ async function main() {
   resetFetches();
   const rejected = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
   const after = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED);
-  check('a 401 shows reconnect and Connected is gone', rejected && rejected.ok === false && rejected.reason === 'not-connected' && stored.googleReconnect && stored.googleReconnect.needed === true && after.connected === false && after.needsReconnect === true && after.label === 'התחבר מחדש ל-Google', { rejected, flag: stored.googleReconnect, after });
+  check('a 401 shows reconnect and Connected is gone', rejected && rejected.ok === false && rejected.reason === 'not-connected' && stored.googleReconnect && stored.googleReconnect.needed === true && after.connected === false && after.needsReconnect === true && after.label === 'Reconnect Google', { rejected, flag: stored.googleReconnect, after });
+
+  delete stored.googleTasksAuth;
+  delete stored.googleReconnect;
+  resetFetches();
+  const noGrant = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
+  const noGrantView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED);
+  check('a 401 with no grant is reconnect and not Connected', noGrant && noGrant.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && noGrantView.connected === false && noGrantView.needsReconnect === true && noGrantView.label === 'Reconnect Google', { noGrant, noGrantView });
 
   console.log('\n--- Hebrew refusal ---\n');
   sandbox.fetch = async () => jsonResponse(200, { id: 'file-he', modifiedTime: '2026-10-15T00:00:00.000Z' });
   sandbox.chrome.i18n.getUILanguage = () => 'he';
   const HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
-  const listener = sandbox.chrome.runtime.listeners[0];
   const hebrew = await new Promise((resolve) => {
     listener({
       type: 'flow:google-undo',

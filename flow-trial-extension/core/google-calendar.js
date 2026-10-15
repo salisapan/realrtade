@@ -1,8 +1,8 @@
-// Google Calendar Hold It. One named file, one clock, one event.
-// Portable: no chrome.*, no DOM, no network. The host posts the body,
-// reads the event back, and deletes it on Undo. calendar.events is the
-// scope. Attendees stay empty, so the write does not invite anyone.
-// A meeting with no file is not this close.
+// Google Calendar Hold It. One clock, one event. A named file is included
+// when the hold has one. Portable: no chrome.*, no DOM, no network. The
+// host posts the body, reads the event back, and deletes it on Undo.
+// calendar.events is the scope. Attendees stay empty, so the write does
+// not invite anyone.
 const FlowGoogleCalendar = (() => {
   const SYSTEM = 'google/calendar';
   const CONNECTOR = 'googleHold';
@@ -60,17 +60,25 @@ const FlowGoogleCalendar = (() => {
     const date = isoDate(i.dateIso);
     const hour = clockPart(i.hour, 23);
     const minute = clockPart(i.minute, 59);
+    if (!date || hour == null || minute == null) return null;
     const link = fileLink(i.fileUrl);
     const name = String(i.fileName || i.fileTerm || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
-    if (!date || hour == null || minute == null || !link || !name) return null;
+    const wantsFile = Boolean(String(i.fileUrl || i.fileName || i.fileTerm || '').trim());
+    if (wantsFile && (!link || !name)) return null;
+    const title = String(i.title || i.quote || name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
+    if (!title) return null;
     const zone = String(i.timeZone || 'UTC').trim().slice(0, 80) || 'UTC';
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     const lines = [];
-    if (quote) lines.push(quote);
-    lines.push('File: ' + name);
-    lines.push(link);
+    if (quote && quote !== title) lines.push(quote);
+    if (link && name) {
+      lines.push('File: ' + name);
+      lines.push(link);
+    } else if (quote) {
+      lines.push(quote);
+    }
     return {
-      summary: name,
+      summary: name || title,
       description: lines.join('\n'),
       start: { dateTime: dateTime(date, hour, minute, 0), timeZone: zone },
       end: { dateTime: dateTime(date, hour, minute, DURATION_MIN), timeZone: zone },
@@ -185,7 +193,7 @@ const FlowGoogleCalendar = (() => {
     if (blocked) return blocked;
     const body = eventBody(i);
     const req = createRequest(body);
-    if (!req) return { ok: false, reason: 'unclear', error: 'No single file and time for this event.' };
+    if (!req) return { ok: false, reason: 'unclear', error: 'No single time for this event.' };
     const posted = await call(http, Object.assign({ body: JSON.stringify(req.json), headers: { 'Content-Type': 'application/json' } }, req));
     const denied = authFail(posted.status);
     if (denied) return denied;

@@ -57,6 +57,7 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import { LADDER } from '../config/ladder.public.js';
 import './google-lane-host.js';
+import './gmail-reinject.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -192,6 +193,14 @@ try {
   });
 } catch (e) { console.error('[Glance] right-click menu unavailable', e); }
 chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
+chrome.runtime.onInstalled.addListener(() => {
+  const fn = globalThis.reinjectGmailTabs;
+  if (typeof fn === 'function') fn();
+});
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
+  const fn = globalThis.reinjectGmailTabs;
+  if (typeof fn === 'function') fn();
+});
 
 /* ---------------------------------------------------- other apps (opt-in) */
 // Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
@@ -1452,8 +1461,6 @@ function googleAuthUnavailableResponse() {
 // first fetch and the 401 retry are silent — interactive:true is reserved
 // for an explicit Connect click.
 async function markGoogleReconnect(reason) {
-  const gt = await getGoogleTasksAuth();
-  if (!gt) return;
   await chrome.storage.local.set({
     [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: String(reason || 'auth') }
   });
@@ -4814,10 +4821,14 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, 'googleLaneWarning']);
+  let uiLang = '';
+  try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
-    detail: GLANCE_TASK_LIST_TITLE + ' list'
+    detail: GLANCE_TASK_LIST_TITLE + ' list',
+    warning: reconnectBag.googleLaneWarning || null,
+    lang: uiLang
   });
   return {
     googleTasks: googleTasks,

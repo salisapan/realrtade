@@ -116,7 +116,14 @@ function startGoogleLaneServer() {
       }
       const path = decodeURIComponent(url.pathname);
       const method = String(req.method || 'GET').toUpperCase();
-      state.calls.push({ method: method, path: path, search: url.search, at: Date.now() });
+      const parsed = (method === 'POST' || method === 'PATCH' || method === 'PUT') ? readJson(raw) : null;
+      state.calls.push({
+        method: method,
+        path: path,
+        search: url.search,
+        at: Date.now(),
+        body: parsed && Object.keys(parsed).length ? parsed : null
+      });
 
       if (method === 'GET' && path === '/drive/v3/files') {
         const q = url.searchParams.get('q') || '';
