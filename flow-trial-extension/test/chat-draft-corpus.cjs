@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { execFileSync } = require('child_process');
 const { JSDOM } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..');
@@ -62,6 +63,8 @@ check('the calendar read does not ask for titles', /fields: 'items\(id,status,lo
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 check('the version line stays 0.9.56', manifest.version === '0.9.56');
 check('Gmail is still the first content script', manifest.content_scripts[0].js[manifest.content_scripts[0].js.length - 1] === 'src/content-gmail.js');
+const gmailJs = manifest.content_scripts[0].js;
+check('#144 native-edit.js stays ahead of follow.js', gmailJs.indexOf('src/native-edit.js') > 0 && gmailJs.indexOf('src/follow.js') > gmailJs.indexOf('src/native-edit.js'));
 check('chat drafts are not extra static content scripts', manifest.content_scripts.length === 1);
 const scriptBlob = JSON.stringify(manifest.content_scripts);
 check('business.facebook.com is not a static content script match', scriptBlob.indexOf('business.facebook.com') < 0);
@@ -77,6 +80,12 @@ const workerNote = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.js'), '
 const workerPatch = fs.readFileSync(path.join(ROOT, 'src/lane-chat-worker.import.patch'), 'utf8');
 const patchAdded = workerPatch.split('\n').filter((line) => line.startsWith('+') && !line.startsWith('+++'));
 check('the chat worker patch is one static import after #144', patchAdded.length === 1 && patchAdded[0] === "+import './lane-chat-worker.js';");
+let patchApplies = false;
+try {
+  execFileSync('git', ['apply', '--check', path.join(ROOT, 'src/lane-chat-worker.import.patch')], { cwd: path.join(ROOT, '..'), stdio: 'pipe' });
+  patchApplies = true;
+} catch (e) { patchApplies = false; }
+check('the chat worker patch applies beside native-edit.js and does not remove it', patchApplies && /import '\.\/native-edit\.js'/.test(workerPatch) && !/^-import '\.\/native-edit\.js'/m.test(workerPatch));
 check('the patch does not use importScripts', !/importScripts/.test(workerPatch) && !/importScripts/.test(workerNote));
 check('the worker points at that patch', /lane-chat-worker\.import\.patch/.test(workerNote));
 const backgroundSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');

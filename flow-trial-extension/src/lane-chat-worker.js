@@ -1,7 +1,8 @@
 // Calendar locations for a chat draft. This file is not loaded by the service
 // worker yet. The service worker is an ES module. After #144 merges, apply
-// src/lane-chat-worker.import.patch. That patch adds one line to
-// src/background.js:
+// src/lane-chat-worker.import.patch. That patch adds one line after
+// #144's native-edit.js import in src/background.js, and leaves that import
+// in place:
 // import './lane-chat-worker.js';
 //
 // It answers only flow:chat-evidence.
