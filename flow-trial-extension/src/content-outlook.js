@@ -3867,6 +3867,20 @@
       const row = open[j];
       if (row && FlowStillOpen.sameSubjectPromise(row, paneRow)) return row;
     }
+    // Same promise, another subject or another id (an older undone mail).
+    // The due lives on the judgment, so the key is classified here. A miss
+    // stays quiet below; this match is the one Do It, not a second card.
+    let judged = null;
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.classify === 'function') {
+      try { judged = FlowIntent.classify(paneRow.text || '', { subject: pane.subject || '', now: new Date() }); }
+      catch (e) { judged = null; }
+    }
+    const key = FlowStillOpen.promiseKey(Object.assign({}, paneRow, { intent: judged || null }));
+    if (!key) return null;
+    for (let k = 0; k < open.length; k++) {
+      const row = open[k];
+      if (row && row.process && FlowStillOpen.promiseKey(row) === key) return row;
+    }
     return null;
   }
 

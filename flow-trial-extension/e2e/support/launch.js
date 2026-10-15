@@ -481,6 +481,18 @@ async function boot() {
 
   harness.reset = async function reset() {
     harness.keepPopup = false;
+    // Close the mail and the panel before wiping storage. A page that is
+    // still scanning writes its log back after a clear, and the next mail
+    // then inherits that promise.
+    const closing = [];
+    for (const p of context.pages()) {
+      const url = p.url();
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0) {
+        closing.push(p.close().catch(() => {}));
+      }
+    }
+    await Promise.all(closing);
+    harness.page = null;
     await evalWorker(installE2EHooks);
     await evalWorker(async () => {
       await chrome.storage.local.clear();
@@ -497,13 +509,6 @@ async function boot() {
       e.driveByName = {};
       e.seq = 1;
     });
-    for (const p of context.pages()) {
-      const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0) {
-        await p.close().catch(() => {});
-      }
-    }
-    harness.page = null;
   };
 
   async function openDocument(url, html) {
