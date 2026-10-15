@@ -468,7 +468,6 @@ const FlowOutlook = (() => {
           silence.push({ conversationId: d.conversationId, reason: (chain && chain.reason) || 'file-chain-not-run' });
           continue;
         }
-        const he = chain.requirement && chain.requirement.lang === 'he';
         const from = (msg.from && msg.from.emailAddress) || {};
         const card = chain.card || {};
         const line = [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ');
@@ -486,7 +485,7 @@ const FlowOutlook = (() => {
           card: chain.card,
           requirement: chain.requirement,
           promise: chain.promise,
-          doLabel: he ? 'טיוטת תשובת ביניים' : 'Draft a holding reply',
+          doLabel: 'Draft a holding reply',
           intent: { type: 'request', label: line },
           process: {
             id: 'reply-track',

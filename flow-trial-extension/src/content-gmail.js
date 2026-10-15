@@ -40,7 +40,12 @@
 
   function glanceChrome() {
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(glanceUiLang());
-    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…' };
+    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…', holdingReply: 'Draft a holding reply', draftReadyNotSent: 'Draft ready. Not sent.' };
+  }
+
+  function glanceShow(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(glanceUiLang(), text);
+    return text == null ? '' : String(text);
   }
   let watching = false;
   let observer = null;
@@ -1618,7 +1623,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', he ? 'טיוטת תשובת ביניים' : 'Draft a holding reply'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().holdingReply));
     mainRow.appendChild(chip);
     host.appendChild(mainRow);
 
@@ -1658,7 +1663,7 @@
       }
       const done = el('div', 'flow-chip flow-chip-done');
       done.setAttribute('role', 'status');
-      done.appendChild(el('span', 'flow-chip-label', he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.'));
+      done.appendChild(el('span', 'flow-chip-label', glanceChrome().draftReadyNotSent));
       const undo = el('button', 'flow-chip-undo', glanceChrome().undo);
       undo.type = 'button';
       undo.addEventListener('click', async (e) => {
@@ -2027,13 +2032,14 @@
   }
 
   function setChipState(chip, cls, text) {
+    const shown = glanceShow(text);
     if (chip && chip.classList && (chip.classList.contains('do-halo') || (chip.closest && chip.closest('.flow-step-card')))) {
       chip.setAttribute('data-glance-chip-state', cls || '');
-      if (text) chip.setAttribute('data-glance-chip-label', text);
+      if (shown) chip.setAttribute('data-glance-chip-label', shown);
       return;
     }
     chip.className = 'flow-chip ' + cls;
-    chip.replaceChildren(el('span', 'flow-chip-label', text));
+    chip.replaceChildren(el('span', 'flow-chip-label', shown));
   }
 
   function reasonMessage(response, ctx) {
@@ -2475,7 +2481,7 @@
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', copy.status));
+    done.appendChild(el('span', 'flow-chip-handled', glanceShow(copy.status)));
     if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
@@ -2484,7 +2490,7 @@
       done.appendChild(detail);
     }
 
-    const undo = el('button', 'flow-chip-undo', copy.undoHint);
+    const undo = el('button', 'flow-chip-undo', glanceShow(copy.undoHint));
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
@@ -2604,15 +2610,12 @@
     // close cannot say "Handled." and the first three closes cannot
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
-    const he = /[\u0590-\u05FF]/.test(
-      ((ctx && ctx.subject) || '') + ((ctx && ctx.bodyText) || '') + ((ctx && ctx.intent && ctx.intent.label) || '')
-    );
     const taskSteps = results.filter(taskKind);
     const copy = FlowReceipt.confirmation({
       succeeded: succeeded.length,
       total: results.length,
       priorCloses,
-      lang: he ? 'he' : 'en',
+      lang: glanceUiLang(),
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
         ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
@@ -2632,9 +2635,9 @@
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
 
-    const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), copy.status);
+    const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), glanceShow(copy.status));
     done.appendChild(status);
-    if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', copy.earlyLine));
+    if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', glanceShow(copy.earlyLine)));
 
     // What landed, before the process badge. The written line is the
     // record ("Google Task · due Sep 21") — the same record Undo removes.
@@ -2654,7 +2657,7 @@
     const sole = succeeded.length === 1 ? succeeded[0].response : null;
     const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres);
     // The sentence is the control. A filled pill would be a second Do It.
-    const undo = el('button', 'flow-chip-undo', undoHint);
+    const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
@@ -2700,7 +2703,7 @@
         }
         if (result.ok) {
           const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
-          done.replaceChildren(el('span', 'flow-chip-label', undone));
+          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(undone)));
           const taskSteps = succeeded.filter(taskKind);
           const markTask = taskSteps.length && typeof FlowStorage.markGoogleTaskUndone === 'function'
             ? Promise.all(taskSteps.map((r) => FlowStorage.markGoogleTaskUndone(ctx.messageId, r.response && r.response.ref, ctx.threadId)))
@@ -2729,10 +2732,10 @@
             remaining: succeeded.length - result.undoneIds.length,
             keptWhere: result.keptWhere
           });
-          undo.textContent = copy.undoLabel;
+          undo.textContent = glanceShow(copy.undoLabel);
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = note;
+          hint.textContent = glanceShow(note);
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         }
       });

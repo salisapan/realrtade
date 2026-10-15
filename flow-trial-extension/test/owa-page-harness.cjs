@@ -369,7 +369,7 @@ async function runPage(opts) {
     const missing = await runPage({ htmlPatch: invoice, emptyInbox: true, urlId: MSG, driveFiles: [], store: { glanceDebug: true }, waitMs: 5000 });
     check('the open invoice ask searches Drive', missing.sent.some((m) => m.type === 'flow:search-drive'), missing.sent.map((m) => m.type));
     check('nothing in Drive or this thread: a holding card', missing.chip && missing.chip.getAttribute('data-glance-chain') === 'needs-you', missing.logs.filter((l) => /^Glance:/.test(l)));
-    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /Draft a holding reply/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
+    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /טיוטת תשובת ביניים/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
     check('the page did not send', !missing.sent.some((m) => /send/i.test(String(m.type)) && m.type !== 'flow:search-drive'));
     const found = await runPage({
       htmlPatch: invoice, emptyInbox: true, urlId: MSG, waitMs: 4000,
@@ -407,7 +407,7 @@ async function runPage(opts) {
     check('one Drive file: Why not shown drops the file stall', !stalled(oneWhy), oneWhy);
 
     const none = await runPage({ htmlPatch: q4html, mailBody: Q4, driveFiles: [], waitMs: 6000 });
-    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /Draft a holding reply/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
+    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /טיוטת תשובת ביניים/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
 
     const failed = await runPage({
       htmlPatch: q4html, mailBody: Q4, waitMs: 5000,

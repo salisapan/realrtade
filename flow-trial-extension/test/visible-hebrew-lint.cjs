@@ -67,7 +67,7 @@ check('an empty locale stays English', D.uiLangFrom({}) === 'en' && D.uiLangFrom
 const heChrome = D.chrome('he');
 const heBad = [];
 Object.keys(heChrome).forEach((key) => {
-  const bad = offenders(heChrome[key]);
+  const bad = offenders(String(heChrome[key]).replace(/\{(\w+)\}/g, ' '));
   if (bad.length) heBad.push(key + ':' + bad.join(','));
 });
 check('Hebrew chrome has no English besides brand names', heBad.length === 0, heBad);
@@ -97,8 +97,28 @@ const tagged = sandbox.FlowStepKit.stageHTML({
 });
 const taggedText = String(tagged).replace(/Reply and Track/g, ' ').replace(/Draft reply/g, ' ').replace(/<[^>]+>/g, ' ');
 check('a step tagged Suggested follows the UI language', /מוצע/.test(tagged) && offenders(taggedText).length === 0, offenders(taggedText));
+const added = sandbox.FlowStepKit.stageHTML({
+  uiLang: 'he', he: true, intent: 'Reply and Track', state: 'propose',
+  rows: [
+    { id: '1', text: 'Draft reply', tag: 'Added', added: true, app: 'Outlook', tool: 'outlook', checked: true, out: 'בתור' },
+    { id: '2', kind: 'manual', text: 'Call the client', tag: 'Manual', app: 'You', tool: 'manual' },
+    { id: '3', kind: 'close', text: 'Saved', tag: 'after Approve', st: '' }
+  ]
+});
+const addedText = String(added).replace(/Reply and Track/g, ' ').replace(/Draft reply/g, ' ').replace(/Call the client/g, ' ').replace(/Saved/g, ' ').replace(/<[^>]+>/g, ' ');
+check('Added, Manual, and after Approve follow the UI language', /נוסף/.test(added) && /ידני/.test(added) && offenders(addedText).length === 0, offenders(addedText));
+const phrases = Object.keys(D.chrome('en')).map((key) => D.chrome('en')[key]).filter((line) => typeof line === 'string' && line.indexOf('{') < 0);
+phrases.push('Deleted in To Do');
+const shown = phrases.map((line) => D.showChrome('he', line)).join('\n');
+check('a Hebrew receipt and panel show no English chrome', offenders(shown).length === 0 && /טופל/.test(shown) && /נמחק ב-To Do/.test(shown) && /לא אומת/.test(shown) && /מוצע/.test(shown) && /הסתר/.test(shown) && /בצע/.test(shown) && /בטל/.test(shown), offenders(shown));
+check('English UI keeps the English receipt chrome', D.showChrome('en', 'Handled.') === 'Handled.' && D.showChrome('en', "Couldn't confirm") === "Couldn't confirm" && D.showChrome('en', 'Deleted in To Do') === 'Deleted in To Do' && D.showChrome('en', 'Do It') === 'Do It' && D.showChrome('en', 'Suggested') === 'Suggested');
+check('Hebrew chrome shown on an English UI stays the English sentence', D.showChrome('en', 'טופל.') === 'Handled.' && D.showChrome('en', 'בצע') === 'Do It' && D.showChrome('en', 'נמחק ב-To Do') === 'Deleted in To Do');
+check('a mail-language title is not chrome', D.showChrome('he', 'Confirm the transfer') === 'Confirm the transfer');
 check('the popup asks the shared table for Loops chrome', popupJs.indexOf('function words()') >= 0 && popupJs.indexOf('Lw.suggested') >= 0 && popupJs.indexOf('L.dismiss') >= 0 && popupJs.indexOf('L.doIt') >= 0);
-check('the mail page sets card chrome from the UI language', page.indexOf('ctx.uiLang = pageUiLang()') >= 0 && page.indexOf('pageChrome().undo') >= 0 && page.indexOf('pageChrome().handled') >= 0);
+check('the mail page sets card chrome from the UI language', page.indexOf('ctx.uiLang = pageUiLang()') >= 0 && page.indexOf('pageChrome().undo') >= 0 && page.indexOf('pageChrome().handled') >= 0 && page.indexOf('pageShow(') >= 0 && page.indexOf('pageChrome().couldntPlain') >= 0 && page.indexOf('pageChrome().verifyingNow') >= 0);
+check('the popup shows a deleted To Do in the UI language', popupJs.indexOf('showWords(entry.deletedLine') >= 0 && popupJs.indexOf('function showWords(') >= 0);
+const host = fs.readFileSync(path.join(ROOT, 'src', 'chip-host.js'), 'utf8');
+check('a receipt status goes through the UI-language table', host.indexOf('FlowDisplay.showChrome') >= 0);
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

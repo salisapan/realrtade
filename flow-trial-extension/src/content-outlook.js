@@ -194,7 +194,12 @@
   function pageChrome() {
     pageUiLang();
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(pageUiLang());
-    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…', handled: 'Handled.', openEvent: 'Open event', openDraft: 'Open draft', closing: 'Closing…', show: 'View' };
+    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…', handled: 'Handled.', openEvent: 'Open event', openDraft: 'Open draft', closing: 'Closing…', show: 'View', couldntPlain: "Couldn't confirm", couldntUnchanged: "Couldn't confirm it's unchanged. Undo left it alone.", couldntVerify: "Couldn't verify, try again", youEdited: 'You edited this. Undo left it alone.', stillThere: 'Still there — the To Do task was not removed.', verifyingNow: 'Verifying…', createdUnverified: "Created, couldn't verify" };
+  }
+
+  function pageShow(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(pageUiLang(), text);
+    return text == null ? '' : String(text);
   }
 
   function wrapStorageMethod(name, fn) {
@@ -1529,7 +1534,7 @@
     let host = hosts.filter((h) => h.getAttribute('data-glance-undone') !== '1').pop() || null;
     if (host && host.classList.contains('flow-chip-settled') && host.getAttribute('data-glance-chain') === 'task-proof' && (!ids.length || hostMatches(host, ids))) {
       const shown = String(host.textContent || '');
-      const sameDeleted = deleted && deletedLine && shown.indexOf(deletedLine) >= 0 && !host.querySelector('.flow-chip-undo');
+      const sameDeleted = deleted && deletedLine && shown.indexOf(pageShow(deletedLine)) >= 0 && !host.querySelector('.flow-chip-undo');
       const sameRefusal = !deleted && undoLine && shown.indexOf(undoLine) >= 0;
       const sameVerify = !verifyNote || shown.indexOf(verifyNote) >= 0;
       if (!deleted && !undoLine && !verifyNote && shown.indexOf('You edited this') < 0 && shown.indexOf("couldn't verify") < 0 && shown.indexOf('Deleted in ') < 0) {
@@ -1561,9 +1566,9 @@
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', deleted ? deletedLine : copy.status));
+    done.appendChild(el('span', 'flow-chip-handled', pageShow(deleted ? deletedLine : copy.status)));
     if (!deleted && copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
-    if (verifyNote) done.appendChild(el('span', 'flow-chip-label', verifyNote));
+    if (verifyNote) done.appendChild(el('span', 'flow-chip-label', pageShow(verifyNote)));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
       if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
@@ -1571,11 +1576,11 @@
       done.appendChild(detail);
     }
     const chromeWords = pageChrome();
-    const undo = el('button', 'flow-chip-undo', undoLine ? chromeWords.undo : (copy.undoHint || chromeWords.undo));
+    const undo = el('button', 'flow-chip-undo', undoLine ? chromeWords.undo : (pageShow(copy.undoHint) || chromeWords.undo));
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = !undoLine;
-    if (undoLine) hint.textContent = undoLine;
+    if (undoLine) hint.textContent = pageShow(undoLine);
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
@@ -1599,7 +1604,7 @@
     undo.addEventListener('click', () => {
       if (row.legacyCase === true) {
         hint.hidden = false;
-        hint.textContent = "Couldn't confirm";
+        hint.textContent = pageChrome().couldntPlain;
         hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         return;
       }
@@ -1617,7 +1622,7 @@
           undo.textContent = pageChrome().undo;
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = result.written || (result.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : (result.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : "Couldn't verify, try again"));
+          hint.textContent = pageShow(result.written) || (result.reason === 'user-edited' ? pageChrome().youEdited : (result.reason === 'unconfirmed' ? pageChrome().couldntUnchanged : pageChrome().couldntVerify));
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           if (result.reason === 'user-edited' && row.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
             const refused = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.noteUndoRefused)
@@ -1628,10 +1633,10 @@
           return;
         }
         if (!(result && result.ok) || (todoUndo && result.fetchedBack !== true)) {
-          undo.textContent = copy.undoHint;
+          undo.textContent = pageShow(copy.undoHint) || pageChrome().undo;
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = copy.undoFailed || 'Still there — the To Do task was not removed.';
+          hint.textContent = pageShow(copy.undoFailed) || pageChrome().stillThere;
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           return;
         }
@@ -1656,7 +1661,7 @@
         const undoneIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
         host.setAttribute('data-glance-undone', '1');
         if (undoneIds.length) host.setAttribute('data-glance-message', undoneIds.join('|'));
-        done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
+        done.replaceChildren(el('span', 'flow-chip-label', pageShow(copy.undoneLine)));
         rememberUndone(undoneIds, copy.undoneLine);
         lastOutcome = 'card';
         lastKey = (row.messageId || 'open') + '|undone';
@@ -1665,7 +1670,13 @@
     });
     if (!deleted) done.appendChild(actionsRow);
     done.appendChild(hint);
-    if (manuals) done.appendChild(el('span', 'flow-chip-label', manuals + (manuals === 1 ? ' manual step left for you' : ' manual steps left for you')));
+    if (manuals) {
+      const tpl = manuals === 1 ? (chromeWords.manualOne || '{n} manual step left for you') : (chromeWords.manualMany || '{n} manual steps left for you');
+      const left = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.fillChrome === 'function')
+        ? FlowDisplay.fillChrome(tpl, { n: manuals })
+        : (manuals + (manuals === 1 ? ' manual step left for you' : ' manual steps left for you'));
+      done.appendChild(el('span', 'flow-chip-label', left));
+    }
     host.__glanceSteps = null;
     host.replaceChildren(done);
     if (stateTrail) host.setAttribute('data-glance-states', stateTrail);
@@ -1723,7 +1734,7 @@
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     done.setAttribute('role', 'status');
-    done.appendChild(el('span', 'flow-chip-label', line));
+    done.appendChild(el('span', 'flow-chip-label', pageShow(line)));
     host.appendChild(done);
     if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
     else mount.appendChild(host);
@@ -2278,8 +2289,8 @@
     if (mount) paintIfCurrent(token, function () { return paintOutlookTodoReceipt(mount, row); });
   }
 
-  function holdingLabel(chain) {
-    return chain && chain.requirement && chain.requirement.lang === 'he' ? 'טיוטת תשובת ביניים' : 'Draft a holding reply';
+  function holdingLabel() {
+    return pageChrome().holdingReply || 'Draft a holding reply';
   }
 
   function chainLine(chain) {
@@ -2460,10 +2471,9 @@
       watch.requirement = chain.requirement;
       await FlowStorage.upsertWatch(watch);
     }
-    const he = chain.requirement && chain.requirement.lang === 'he';
     paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
-      status: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
-      written: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
+      status: 'Draft ready. Not sent.',
+      written: 'Draft ready. Not sent.',
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
         const undoToken = captureMailToken();
@@ -3886,7 +3896,7 @@
             host.setAttribute('data-glance-verifying', '1');
             const label = document.createElement('span');
             label.className = 'flow-chip-label';
-            label.textContent = 'Verifying…';
+            label.textContent = pageChrome().verifyingNow;
             host.appendChild(label);
             if (verifyMount.firstChild) verifyMount.insertBefore(host, verifyMount.firstChild);
             else verifyMount.appendChild(host);

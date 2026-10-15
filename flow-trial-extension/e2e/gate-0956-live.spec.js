@@ -133,9 +133,15 @@ test('Hebrew UI chrome on an English mail keeps the English title', async ({ gla
   await expect(title).toHaveText(/[A-Za-z]/);
   const card = await host.innerText();
   expect(card).not.toMatch(/\bSuggested\b/);
+  expect(card).not.toMatch(/\bAdded\b/);
   expect(card).not.toMatch(/\bDismiss\b/);
   expect(card).not.toMatch(/\bDo It\b/);
+  expect(card).not.toMatch(/\bUndo\b/);
+  expect(card).not.toMatch(/\bView\b/);
   expect(card).not.toMatch(/\bQueued\b/);
+  expect(card).not.toMatch(/\bHandled\b/);
+  expect(card).not.toMatch(/Couldn't confirm/);
+  expect(card).not.toMatch(/Deleted in To Do/);
 
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="open"]').click();
@@ -146,4 +152,31 @@ test('Hebrew UI chrome on an English mail keeps the English title', async ({ gla
   const loops = await list.innerText();
   expect(loops).not.toMatch(/\bSuggested\b/);
   expect(loops).not.toMatch(/\bDismiss\b/);
+  expect(loops).not.toMatch(/\bUndo\b/);
+  expect(loops).not.toMatch(/\bHandled\b/);
+  expect(loops).not.toMatch(/Deleted in To Do/);
+});
+
+test('English UI chrome on an English mail stays English', async ({ glance }) => {
+  test.setTimeout(60000);
+  await glance.seedOutlook({ glanceUiLanguage: 'en' });
+  const page = await glance.openOutlook({
+    id: 'AQMkGlanceUiEnEn',
+    subject: 'Transfer',
+    senderEmail: S.SENDER,
+    senderName: 'flow',
+    body: S.SHOW
+  });
+  const host = page.locator('#ReadingPaneContainerId .flow-chip-host');
+  await expect(host).toHaveCount(1);
+  await expect(host.getByRole('button', { name: 'Do It' })).toBeVisible();
+  await expect(host.getByRole('button', { name: 'Dismiss' })).toBeVisible();
+  const title = host.locator('.gs-intent, .flow-chip-process-name').first();
+  await expect(title).toBeVisible();
+  await expect(title).toHaveText(/[A-Za-z]/);
+  const card = await host.innerText();
+  expect(card).toMatch(/\bSuggested\b/);
+  expect(card).not.toMatch(/בצע/);
+  expect(card).not.toMatch(/הסתר/);
+  expect(card).not.toMatch(/מוצע/);
 });

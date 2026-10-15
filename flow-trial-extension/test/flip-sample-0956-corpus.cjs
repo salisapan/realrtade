@@ -119,6 +119,10 @@ const ROWS = [
   { id: 'v2syn-8743', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'אבי בירנבאום', email: 'avi@cyber.co.il' }, to: [OWN.gmail], subject: 'המצגת מצורף',
     body: 'הי סאלי,\nמצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.\nתודה רבה,\nאבי' },
+  // v2syn-6393 and v2syn-14708 are not in this tree. The bodies below are
+  // synthesized from the parity report: a hold or ask addressed to someone
+  // else after the opening line. The AI Engineer should check them against
+  // the real rows on the box.
   { id: 'v2syn-6393', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
     from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.outlook], subject: 'Thursday',
     body: "Hi,\nFollowing the thread.\nNoa, can we meet Thursday at 14:30?\nThanks,\nDana" },

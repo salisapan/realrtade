@@ -341,7 +341,8 @@ console.log('\n--- To Do Do It rechecks the open mail after the proof read ---\n
   check('an undo that does not answer shows try again instead of staying on Undoing',
     undoClick.indexOf('readBackOrTimeout') > 0 &&
     undoClick.indexOf("reason === 'verify-timeout'") > 0 &&
-    undoClick.indexOf("Couldn't verify, try again") > 0 &&
+    undoClick.indexOf('pageChrome().couldntVerify') > 0 &&
+    fs.readFileSync(path.join(__dirname, '..', 'core', 'display-copy.js'), 'utf8').indexOf("Couldn't verify, try again") > 0 &&
     page.indexOf("undoing: 'Undoing…'") > 0 &&
     popup.indexOf('readBackOrTimeout') > 0 &&
     popup.indexOf("r.reason === 'verify-timeout'") > 0);

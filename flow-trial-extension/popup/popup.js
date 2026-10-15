@@ -59,6 +59,10 @@
   function words() {
     return FlowDisplay.chrome(uiLang());
   }
+  function showWords(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(uiLang(), text);
+    return text == null ? '' : String(text);
+  }
   function fillWords(template, map) {
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.fillChrome === 'function') return FlowDisplay.fillChrome(template, map);
     return String(template || '').replace(/\{(\w+)\}/g, function (_, key) { return map && map[key] != null ? String(map[key]) : ''; });
@@ -2330,7 +2334,7 @@
 
     const mineLoop = FlowFollowUp.isMine(w);
     const clockLoop = FlowFollowUp.isClock(w);
-    const done = el('button', 'ghost sm', clockLoop ? 'Handled' : mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done');
+    const done = el('button', 'ghost sm', showWords(clockLoop ? 'Handled' : mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done'));
     done.type = 'button';
     done.addEventListener('click', async () => {
       await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: clockLoop ? 'manual' : mineLoop ? 'kept' : isPay ? 'paid' : 'manual' });
@@ -2340,7 +2344,7 @@
     });
     acts.appendChild(done);
 
-    const stop = el('button', 'ghost sm', 'Stop tracking');
+    const stop = el('button', 'ghost sm', showWords('Stop tracking'));
     stop.type = 'button';
     stop.addEventListener('click', async () => {
       await FlowStorage.updateWatch(w.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'manual' });
@@ -2537,9 +2541,9 @@
     const title = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
       ? FlowDisplay.activityTitle(entry)
       : (entry.actionTitle || entry.label || (proof ? 'Handled.' : 'Reply draft ready in Outlook Drafts. Not sent.'));
-    top.appendChild(el('span', 'log-label', proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.')));
+    top.appendChild(el('span', 'log-label', showWords(proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.'))));
     const deleted = entry.glanceDeleted === true || entry.deleted === true;
-    top.appendChild(el('span', 'log-kind written', deleted ? (entry.deletedLine || 'Deleted in To Do') : (proof ? L.kindHandled : L.kindDraft)));
+    top.appendChild(el('span', 'log-kind written', deleted ? showWords(entry.deletedLine || 'Deleted in To Do') : (proof ? L.kindHandled : L.kindDraft)));
     item.appendChild(top);
     item.appendChild(el('span', 'log-where', L.fromOutlook));
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
@@ -2572,7 +2576,7 @@
       if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
         u.disabled = false;
         u.textContent = L.undo;
-        note.textContent = r.written || (r.reason === 'unconfirmed' ? "Couldn't confirm it's unchanged. Undo left it alone." : 'You edited this. Undo left it alone.');
+        note.textContent = showWords(r.written) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
         note.hidden = false;
         if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
           await FlowStorage.patchGlanceProof(entry.messageId, { undoRefused: 'user-edited', undoLine: note.textContent });
@@ -2583,7 +2587,7 @@
       if (todoUndo && !(r && r.ok && r.fetchedBack === true)) {
         u.disabled = false;
         u.textContent = L.undo;
-        note.textContent = (r && r.written) || 'Still there — the To Do task was not removed.';
+        note.textContent = showWords((r && r.written) || 'Still there — the To Do task was not removed.');
         note.hidden = false;
         return;
       }

@@ -28,13 +28,16 @@ const FlowChipHost = (() => {
   }
 
   function setChipState(chip, cls, text) {
+    const shown = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function')
+      ? FlowDisplay.showChrome(uiLang, text)
+      : text;
     if (chip && chip.classList && (chip.classList.contains('do-halo') || (chip.closest && chip.closest('.flow-step-card')))) {
       chip.setAttribute('data-glance-chip-state', cls || '');
-      if (text) chip.setAttribute('data-glance-chip-label', text);
+      if (shown) chip.setAttribute('data-glance-chip-label', shown);
       return;
     }
     chip.className = 'flow-chip ' + cls;
-    chip.replaceChildren(el('span', 'flow-chip-label', text));
+    chip.replaceChildren(el('span', 'flow-chip-label', shown));
   }
 
   function bagClock(bag) {
@@ -190,7 +193,8 @@ const FlowChipHost = (() => {
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    const doText = (ctx.doLabel && ctx.doLabel !== 'Do It') ? ctx.doLabel : (uiWords.doIt || ctx.doLabel || 'Do It');
+    let doText = (ctx.doLabel && ctx.doLabel !== 'Do It') ? ctx.doLabel : (uiWords.doIt || ctx.doLabel || 'Do It');
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') doText = FlowDisplay.showChrome(ctx.uiLang || uiLang, doText);
     chip.appendChild(el('span', 'flow-chip-do-label', doText));
     chip.addEventListener('click', () => {
       if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
@@ -239,8 +243,12 @@ const FlowChipHost = (() => {
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', o.status || 'Draft ready.'));
-    done.appendChild(el('span', 'flow-chip-written', o.written || 'Reply draft ready in Outlook Drafts. Not sent.'));
+    function shown(text) {
+      if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(uiLang, text);
+      return text == null ? '' : String(text);
+    }
+    done.appendChild(el('span', 'flow-chip-handled', shown(o.status || L.draftReady || 'Draft ready.')));
+    done.appendChild(el('span', 'flow-chip-written', shown(o.written || L.draftReadyLong || 'Reply draft ready in Outlook Drafts. Not sent.')));
 
     const actions = el('span', 'flow-chip-actions');
     if (o.url) {
@@ -257,15 +265,15 @@ const FlowChipHost = (() => {
           if (r && r.ok) {
             // Caller may remove the host to re-inject Do It (outlookReopen).
             if (r.reopen || !host.isConnected) return;
-            done.replaceChildren(el('span', 'flow-chip-label', r.written || 'Reply draft removed. Not sent.'));
+            done.replaceChildren(el('span', 'flow-chip-label', (typeof FlowDisplay !== 'undefined' && FlowDisplay.showChrome) ? FlowDisplay.showChrome(uiLang, r.written || L.draftRemoved || 'Reply draft removed. Not sent.') : (r.written || 'Reply draft removed. Not sent.')));
           } else {
             undo.disabled = false; undo.textContent = L.undo;
             if (r && r.written) {
               let hint = done.querySelector('.flow-chip-undo-hint');
               if (!hint) {
-                hint = el('span', 'flow-chip-undo-hint flow-chip-undo-failed', r.written);
+                hint = el('span', 'flow-chip-undo-hint flow-chip-undo-failed', (typeof FlowDisplay !== 'undefined' && FlowDisplay.showChrome) ? FlowDisplay.showChrome(uiLang, r.written) : r.written);
                 done.appendChild(hint);
-              } else hint.textContent = r.written;
+              } else hint.textContent = (typeof FlowDisplay !== 'undefined' && FlowDisplay.showChrome) ? FlowDisplay.showChrome(uiLang, r.written) : r.written;
             }
           }
         });
