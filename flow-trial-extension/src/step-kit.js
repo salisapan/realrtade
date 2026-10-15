@@ -47,7 +47,7 @@ const FlowStepKit = (() => {
   }
 
   function doItHTML() {
-    return '<button type="button" class="do-halo flow-chip" aria-label="Do It"><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>';
+    return '<button type="button" class="do-halo flow-chip" aria-label="בצע"><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt=""><span class="doit-dark" role="img" aria-label="בצע">בצע</span></button>';
   }
 
   function appB(app) { return '<b class="act-app"><bdi>' + esc(app) + '</bdi></b>'; }

@@ -59,13 +59,13 @@ test('a handled promise hides Do It, and Undo offers it once in both places', as
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="open"]').click();
   await expect(popup.locator('#open-list .log-kind').filter({ hasText: 'Handled' })).toHaveCount(1);
-  await expect(popup.locator('#open-list').getByRole('button', { name: 'Do It' })).toHaveCount(0);
+  await expect(popup.locator('#open-list').getByRole('button', { name: 'בצע' })).toHaveCount(0);
   await popup.locator('button[data-tab="log"]').click();
   await expect(popup.locator('#stillOpenQuality')).toContainText('Do It 1');
 
   await popup.locator('button[data-tab="open"]').click();
   await popup.locator('#open-list').getByRole('button', { name: 'Undo' }).click();
-  await expect(popup.locator('#open-list').getByRole('button', { name: 'Do It' })).toHaveCount(1);
+  await expect(popup.locator('#open-list').getByRole('button', { name: 'בצע' })).toHaveCount(1);
   await popup.locator('button[data-tab="log"]').click();
   await expect(popup.locator('#stillOpenQuality')).toContainText('undo 1');
 

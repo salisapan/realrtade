@@ -44,6 +44,8 @@ check('a missing Tasks scope paints the consent card, not a write', page.indexOf
 check('paintIfCurrent clears the why line', /function paintIfCurrent\(token, fn\) \{[\s\S]*?clearWhyNot\(mountPoint\(\)\)/.test(page));
 check('a mail switch clears the current why', page.indexOf('glanceWhyCurrent: null') >= 0);
 check('consent buttons stay אפשר פעם אחת / אפשר תמיד / לא עכשיו', page.indexOf("['אפשר פעם אחת', 'once']") >= 0 && page.indexOf('אין הרשאת To Do') >= 0);
+const kit = fs.readFileSync(path.join(ROOT, 'src', 'step-kit.js'), 'utf8');
+check('the step-kit button is בצע', kit.indexOf('aria-label="בצע"') >= 0 && kit.indexOf('aria-label="Do It"') < 0 && kit.indexOf('[Do It]') < 0);
 
 const sandbox = { console: console, globalThis: {} };
 sandbox.globalThis = sandbox;

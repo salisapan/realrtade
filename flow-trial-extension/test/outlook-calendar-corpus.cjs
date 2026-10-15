@@ -159,7 +159,7 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
   check('Activity undo does not treat every Outlook row as a draft',
     popup.indexOf("e.connectorId === 'outlookDraft' || e.app === 'outlook'") < 0 &&
     /markOutlookCalendarUndone/.test(popup) &&
-    /Open event/.test(popup));
+    /פתח אירוע/.test(popup));
   check('Connect is still one screen with Select all',
     /data-glance-connect', 'microsoft'/.test(popup) && /data-glance-select-all/.test(popup));
   check('Settings names Always and Revoke in Hebrew',

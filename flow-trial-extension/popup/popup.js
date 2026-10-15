@@ -42,8 +42,6 @@
   let proOffer = { enabled: false, trialDays: 0 };
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
-  let whyNotShownAll = false;
-  let whyDetailsOpen = false;
   const tabScroll = { setup: 0, open: 0, log: 0 };
   let scrollLock = false;
   let renderDepth = 0;
