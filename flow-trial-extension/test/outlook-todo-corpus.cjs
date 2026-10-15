@@ -247,15 +247,25 @@ console.log('\n--- Undo says Undone only after GET confirms the task is gone ---
     order.indexOf('DELETE') >= 0 && order.indexOf('DELETE') < order.lastIndexOf('GET') &&
     /two minutes/.test(undone.written || ''),
     { undone, order });
+  let presentReads = 0;
   const present = background({ routes: [
     { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
-    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', status: 'notStarted' }), text: async () => '' }) }
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => {
+      presentReads += 1;
+      if (presentReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment' }), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment', status: 'notStarted' }), text: async () => '' };
+    } }
   ] });
   const still = await present.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
   check('a live task after DELETE is not Undone', still.ok === false && still.reason === 'still-present' && still.fetchedBack === true, still);
+  let flaggedReads = 0;
   const flagged = background({ routes: [
     { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
-    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', status: 'deleted', isDeleted: true, '@removed': { reason: 'deleted' } }), text: async () => '' }) }
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => {
+      flaggedReads += 1;
+      if (flaggedReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment' }), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment', status: 'deleted', isDeleted: true, '@removed': { reason: 'deleted' } }), text: async () => '' };
+    } }
   ] });
   const marked = await flagged.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
   check('a 200 with a deleted flag is not Undone',
