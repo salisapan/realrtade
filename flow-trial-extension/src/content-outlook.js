@@ -1609,22 +1609,6 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
-      if (r && r.ref && (r.ref.taskId || r.ref.externalId) && r.written === "Created, couldn't verify") {
-        if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
-        FlowChipHost.showDraftReceipt(host, {
-          status: r.written,
-          written: r.written,
-          url: r.url || null,
-          linkLabel: 'View',
-          onUndo: () => send({
-            type: 'flow:undo-action',
-            connectorId: 'outlookTask',
-            ref: r.ref,
-            created: (r.ref && r.ref.created) || null
-          })
-        });
-        return;
-      }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = todoWriteFailureLine(r);
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
@@ -1725,26 +1709,10 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
-      if (r && r.ref && (r.ref.fileId || r.ref.itemId) && r.written === "Created, couldn't verify") {
-        if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
-        FlowChipHost.showDraftReceipt(host, {
-          status: r.written,
-          written: r.written,
-          url: r.url || null,
-          linkLabel: 'View',
-          onUndo: () => send({
-            type: 'flow:undo-action',
-            connectorId: 'onedriveFile',
-            ref: r.ref,
-            created: (r.ref && r.ref.editSnap) || null
-          })
-        });
-        return;
-      }
       if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = (r && r.reason === 'files-not-granted')
         ? 'Reconnect Outlook to allow OneDrive'
-        : ((r && r.written === "Created, couldn't verify") ? r.written : ((r && (r.error || r.reason)) || 'Could not confirm the file'));
+        : ((r && (r.error || r.reason)) || 'Could not confirm the file');
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
       return;
     }

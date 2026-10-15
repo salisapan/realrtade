@@ -198,7 +198,15 @@ function installE2EHooks() {
       const createdReply = path.match(/\/me\/messages\/([^/]+)\/createReply$/);
       if (createdReply && method === 'POST') {
         const id = 'e2e-draft-' + (e2e.seq++);
-        e2e.drafts[id] = { id: id, isDraft: true };
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        e2e.drafts[id] = {
+          id: id,
+          isDraft: true,
+          subject: 'RE: e2e',
+          body: { contentType: 'Text', content: posted.comment || '' },
+          toRecipients: []
+        };
         return Promise.resolve(json(201, e2e.drafts[id]));
       }
       const todoOne = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks\/([^/]+)$/);
@@ -289,7 +297,13 @@ function installE2EHooks() {
             delete e2e.drafts[id];
             return Promise.resolve(empty(204));
           }
-          if (method === 'PATCH') return Promise.resolve(json(200, e2e.drafts[id]));
+          if (method === 'PATCH') {
+            let patch = {};
+            try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
+            if (patch.body) e2e.drafts[id].body = patch.body;
+            if (patch.subject) e2e.drafts[id].subject = patch.subject;
+            return Promise.resolve(json(200, e2e.drafts[id]));
+          }
           return Promise.resolve(json(200, e2e.drafts[id]));
         }
         const row = scenario.messages && Object.prototype.hasOwnProperty.call(scenario.messages, id) ? scenario.messages[id] : null;
