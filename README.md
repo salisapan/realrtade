@@ -26,6 +26,12 @@ flow-trial-extension/   Glance's current implementation (Flow Trial's Free/Pro
                          See its own README for setup, architecture, and how to
                          load it locally.
 
+glance-gmail-addon/     Workspace card host inside Gmail (web and the Gmail
+                         apps). v1 writes one Google Task after Do it, reads
+                         it back, and undoes it only if it is unchanged.
+                         Never sends. See its README to install a test
+                         deployment.
+
 flow-landing/            The marketing site (theflow-ai.com) — homepage,
                          pricing, solutions pages, blog, and the Netlify
                          functions backing signup/waitlist/analytics.

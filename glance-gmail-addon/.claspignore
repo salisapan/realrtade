@@ -1,0 +1,7 @@
+src/**
+scripts/**
+test/**
+README.md
+.clasp.json.example
+**/*.cjs
+**/*.md
