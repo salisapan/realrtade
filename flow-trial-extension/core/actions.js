@@ -514,14 +514,12 @@ const FlowActions = (() => {
     return null;
   }
 
-  // The only hold-versus-schedule decision. It runs only for a meeting
-  // that has both a date and a clock, and for a meeting whose weekday
-  // contradicts the calendar day even when no clock was written. Every
-  // other mail keeps processFor, the plan from before this override.
-  // A weekday contradiction is a hold with both dates and no chosen one.
-  // meetingPlanVeto removes the meeting plan. The Outlook judge calls
-  // that same function. A written day number (22/10) plus a clock is the
-  // hold. A weekday alone stays the schedule process.
+  // The only hold-versus-schedule decision. It runs only after the judge
+  // has already decided to offer, and only for a meeting noun plus an
+  // explicit date and a clock. A weekday alone stays the schedule process.
+  // A commitment or a task that merely mentions a meeting word keeps a
+  // task plan. meetingPlanVeto removes the meeting plan. The judge calls
+  // that same function before this one runs.
   function meetingClock(intent) {
     const e = intent && intent.entities;
     return Boolean(e && Number.isInteger(e.hour) && Number.isInteger(e.minute));
@@ -536,19 +534,9 @@ const FlowActions = (() => {
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
     const sig = intent.signals || {};
     const e = intent.entities || {};
-    const choices = dateChoicesOf(intent);
-    const hasDate = Boolean(e.dateIso) || Boolean(choices);
-    if (!hasDate || !meetingClock(intent)) return false;
-    if (close !== 'calendar-hold' && !choices && !writtenDayNumber(intent)) return false;
-    return Boolean(sig.hasMeetingNoun || close === 'calendar-hold' || choices);
-  }
-  function meetingConflictNoTime(intent) {
-    if (!intent || intent.type !== 'event' || intent.googleClose) return false;
-    const sig = intent.signals || {};
-    if (!sig.hasMeetingNoun || meetingClock(intent)) return false;
-    const e = intent.entities || {};
-    const choices = dateChoicesOf(intent);
-    return Boolean(choices && !e.dateIso);
+    if (!e.dateIso || !meetingClock(intent)) return false;
+    if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return false;
+    return Boolean(sig.hasMeetingNoun || close === 'calendar-hold');
   }
   function meetingPlan(intent, proc) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
@@ -582,6 +570,21 @@ const FlowActions = (() => {
     return true;
   }
 
+  // A task ask or a commitment that only borrowed a meeting word
+  // ("call the accountant", "book the venue", "אתה מעביר את ה-deck")
+  // is not a Meeting. A Meeting needs a noun, an explicit date, and a clock.
+  function taskNotMeeting(intent, text) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    const close = intent.personalClose;
+    if (close === 'calendar-hold' || close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
+    const src = String(text || '');
+    if (/\b(?:please\s+)?create a task\b|\badd this to my tasks\b|\bremember to\b/i.test(src)) return true;
+    if (/\bi(?:'|’)ll call\b|\bi will call\b/i.test(src)) return true;
+    if (/\byou(?:'|’)ll\s+(?:book|update|call|send)\b|\byou will\s+(?:book|update|call|send)\b/i.test(src)) return true;
+    if (/אתה\s*מעב[יר]+/.test(src)) return true;
+    return false;
+  }
+
   function planFor(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
@@ -595,8 +598,17 @@ const FlowActions = (() => {
 
     const e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
-    const useMeeting = meetingNarrow(intent) || meetingConflictNoTime(intent);
-    const proc = useMeeting ? meetingPlan(intent, processFor(intent)) : processFor(intent);
+    // baseOnly is the plan the base judge would build. The show decision
+    // uses it. A hedge ("perhaps", "possibly") stays that plan. A Meeting
+    // hold needs a noun, an explicit date, and a clock. A task keeps a task.
+    const hedged = /\b(?:perhaps|possibly|not sure|maybe|might)\b/i.test(String(vetoText || ''));
+    const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent);
+    const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
+    const proc = useMeeting
+      ? meetingPlan(intent, processFor(intent))
+      : taskInstead
+        ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
+        : processFor(intent);
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 

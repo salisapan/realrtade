@@ -61,9 +61,7 @@ const FlowIntent = (() => {
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
-  // One lexicon. ישיבה / ישיבת / פגישת are the construct forms a team
-  // meeting actually uses. meeting, call, and sync are the English list above.
-  const MEETING_NOUN_HE = /(ישיבת|ישיבה|פגישת|פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
 
   // An explicit ask to meet, narrower than HANDOFF. "Could you please
   // confirm you can make it" is a confirm ask on a meeting that is already
@@ -996,8 +994,7 @@ const FlowIntent = (() => {
         const held = familyBox.hit;
         const fileHold = Boolean(held && held.fileTarget);
         const familyMeet = Boolean(held && held.family === 'D' && held.type === 'event' && held.personalClose === 'calendar-hold');
-        const statedDay = Boolean(facts.date && facts.date.statedWeekday);
-        if (!fileHold && (familyMeet || statedDay || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
+        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
           intent.explicitHold = true;
         }
       }
@@ -1220,7 +1217,10 @@ const FlowIntent = (() => {
       facts.time.hour >= 0 && facts.time.hour <= 23 && facts.time.minute >= 0 && facts.time.minute <= 59
       ? facts.time : null;
     const pendingChoices = Boolean(facts.date && Array.isArray(facts.date.choices) && facts.date.choices.length >= 2 && !facts.date.iso);
-    const eventEvidence = ((hasMeetingNoun && facts.date && facts.date.iso) || (pendingChoices && (clock || hasMeetingNoun))) && !calledOff && !isRecap && !isPast;
+    // A meeting noun plus a resolved day is the event. Two unread dates
+    // are an event only when a meeting noun and a clock are both written.
+    // A bare weekday and a slash, with no meeting noun, stays quiet.
+    const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast;
     // "if you're free" / "maybe" is not a time the sender has actually
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
@@ -1294,30 +1294,6 @@ const FlowIntent = (() => {
       };
     }
     if (!blocked && !replyMisaddressed && eventEvidence) {
-      // Two readings of one weekday and one calendar day. Neither is chosen.
-      // planFor turns this into a hold whose Do it stays off until a tap.
-      if (pendingChoices && clock) {
-        return finish(TYPES.SCHEDULED_EVENT, 'high', {
-          who, amount,
-          what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
-          when: null,
-          dateIso: null,
-          dateChoices: facts.date.choices,
-          hour: clock.hour,
-          minute: clock.minute
-        });
-      }
-      if (pendingChoices && hasMeetingNoun) {
-        return finish(TYPES.SCHEDULED_EVENT, 'high', {
-          who, amount,
-          what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
-          when: null,
-          dateIso: null,
-          dateChoices: facts.date.choices,
-          hour: null,
-          minute: null
-        });
-      }
       // A meeting that is also a timed commitment, or an explicit ask to
       // meet at that clock time, is the calendar-hold personal close: one
       // event, not the schedule process's extra reminder task. A bare
@@ -1325,10 +1301,9 @@ const FlowIntent = (() => {
       // an already-stated meeting stay the schedule processes.
       // A hold here is an explicit ask to meet at that clock. A sender's
       // promise plus a time ("I'll send it at 9am") is not a hold.
-      // Weekday + day-first date + בשעה HH:MM, with a meeting noun and no
-      // file, is one hold. A bare "let's do a call Friday at 3" stays schedule.
-      const statedMeet = Boolean(facts.date && facts.date.statedWeekday && hasMeetingNoun);
-      const meetingHold = explicitMeetingAsk || statedMeet;
+      // A stated weekday alone does not make the hold. planFor may still
+      // choose a Meeting when a noun, an explicit date, and a clock are present.
+      const meetingHold = explicitMeetingAsk;
       if (meetingHold) {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
@@ -1452,14 +1427,20 @@ const FlowIntent = (() => {
       // An explicit meet at this clock is the hold. A sender's own promise
       // plus a clock ("I'll send the form tomorrow at 9am", "אחזור אליך ב-11")
       // is quiet. "We agreed … at 3pm" stays a task, not a new event.
-      // ב-HH:MM is the meeting clock. It does not silence a dated promise.
       if (clock && explicitMeetingAsk) {
         committed.hour = facts.time.hour;
         committed.minute = facts.time.minute;
         return finish(TYPES.SCHEDULED_EVENT, 'high', committed, 'calendar-hold');
       }
-      const meetingPrefixClock = /ב-\s*\d{1,2}:\d{2}/.test(String(clock && clock.raw || ''));
-      if (clock && s.flags.senderPromise && !meetingPrefixClock) return stayQuiet('hedge');
+      // ב-HH:MM is invisible to the base clock parser unless בשעה, "at",
+      // or a meeting noun would have read the same hour. Only that
+      // invisible clock keeps a dated promise (v2syn-8473). Every other
+      // sender-promise clock stays quiet, the same as the base judge.
+      const rawClock = String(clock && clock.raw || '');
+      const baseSeesClock = /(?:בשעה|בשעות)|\bat\s+\d/i.test(text) ||
+        (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text) && /(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(text));
+      const laneOnlyBet = /ב-\s*\d{1,2}:\d{2}/.test(rawClock) && !baseSeesClock;
+      if (clock && s.flags.senderPromise && !laneOnlyBet) return stayQuiet('hedge');
       return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {

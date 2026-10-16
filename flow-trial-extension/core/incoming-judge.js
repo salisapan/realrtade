@@ -139,31 +139,31 @@ const FlowIncomingJudge = (() => {
       if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-chain-not-run', intent };
     }
     const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
-    const process = actionsApi.planFor(intent, {
+    // Same classifier as planFor. A meeting that was cancelled, postponed,
+    // already held, or an out-of-office note does not show. A marketing
+    // webinar with no personal ask does not show. A second event that is
+    // still on, together with an ask, does show. These gates run before
+    // any plan, so a plan cannot create an offer they withhold.
+    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+      return { show: false, reason: 'meeting-veto', intent };
+    }
+    const planCtx = {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
       text: vetoText
-    });
-    // Same classifier as planFor. A meeting that was cancelled, postponed,
-    // already held, or an out-of-office note does not show. A marketing
-    // webinar with no personal ask does not show. A second event that is
-    // still on, together with an ask, does show.
-    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
-      return { show: false, reason: 'meeting-veto', intent };
-    }
-    if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
+    };
+    // The show decision uses the unrewritten plan. A later Meeting or task
+    // rewrite must not open a surface this plan leaves quiet.
+    const baseProcess = actionsApi.planFor(intent, Object.assign({ baseOnly: true }, planCtx));
+    if (!baseProcess || !baseProcess.steps || !baseProcess.steps.length) return { show: false, reason: 'no-process', intent };
     // Outlook's Do It writes a reply draft when the process has one. A task-only
     // close writes Microsoft To Do. A calendar event with no draft and no task
     // stays quiet rather than offering a reply in its place.
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
-    // The plan is the decision. Hold, schedule, clear, and move are the same
-    // process on Gmail and on Outlook. A calendar event that is none of
-    // those, and has no draft and no task, stays quiet.
-    const taskStep = (process && process.steps || []).some((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask' || s.kind === 'task'));
-    const samePlan = process && (process.id === 'hold' || process.id === 'clear-it' || process.id === 'move-it' || (process.id === 'schedule' && taskStep));
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !samePlan) {
+    const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
@@ -171,6 +171,11 @@ const FlowIncomingJudge = (() => {
     if ((i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
       return { show: false, reason: 'onedrive-target-on-gmail', intent };
     }
+    // The judge has already said offer. planFor may change the kind:
+    // a Meeting only with a noun, an explicit date, and a clock; a
+    // commitment or a task keeps that kind.
+    const process = actionsApi.planFor(intent, planCtx);
+    if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 

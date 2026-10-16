@@ -261,16 +261,14 @@ const heHold = vm.runInContext(`
 check('weekday and 22/10 and בשעה 14:00 is Thu 22 Oct 2026 at 14:00',
   heHold.date && heHold.date.iso === '2026-10-22' && heHold.date.statedWeekday === true &&
   heHold.time && heHold.time.hour === 14 && heHold.time.minute === 0, heHold.date);
-check('the meeting is an explicit calendar hold with no file step',
-  heHold.type === 'event' && heHold.personalClose === 'calendar-hold' && heHold.explicitHold === true &&
+check('the meeting plan is a hold with no file step, and it is not an explicit hold',
+  heHold.type === 'event' && heHold.personalClose !== 'calendar-hold' && heHold.explicitHold !== true &&
   heHold.planId === 'hold' && heHold.steps && heHold.steps.length === 1 && heHold.steps[0] === 'calendar', heHold);
-check('Outlook shows the hold instead of staying quiet',
-  heHold.show === true && heHold.judgedId === 'hold', heHold);
-check('a weekday that contradicts 22/10 offers both dates and does not book one',
-  heHold.quietType === 'event' && heHold.quietPlan === 'hold' && heHold.quietNeeds === true &&
-  heHold.quietIso == null && Array.isArray(heHold.quietChoices) && heHold.quietChoices.length === 2 &&
-  heHold.quietChoices.some((c) => c.iso === '2026-10-22' && c.label === 'חמישי 22/10') &&
-  heHold.quietChoices.some((c) => c.iso === '2026-10-25' && c.label === 'ראשון 25/10'), heHold);
+check('Outlook stays quiet: the base judge does not offer this hold',
+  heHold.show === false && heHold.reason === 'no-draft-close', heHold);
+check('a weekday that contradicts 22/10 stays a schedule and does not book one day',
+  heHold.quietType === 'event' && heHold.quietPlan === 'schedule' && heHold.quietNeeds !== true &&
+  heHold.quietIso == null, heHold);
 check('14:00 Asia/Jerusalem is local 14:00 with no Z, no attendees, and no file',
   heHold.body && heHold.body.start.dateTime === '2026-10-22T14:00:00' &&
   heHold.body.end.dateTime === '2026-10-22T14:30:00' &&

@@ -259,17 +259,15 @@ const FlowExtract = (() => {
   }
   // Weekday + a day-first date is one statement. 22/10 and 22.10 are 22
   // October. When the weekday is that calendar day and a clock was written,
-  // the date stands. When it is not, neither reading is chosen: both dates
-  // come back as choices and iso stays empty, including when no clock was
-  // written on a meeting. A later weekday-only match must not book the
-  // weekday by itself. A deadline with no clock keeps the older read.
+  // the date stands. When it is not, and a clock was written, neither
+  // reading is chosen: both dates come back as choices and iso stays empty.
+  // No clock keeps the older read, so a conflict does not become a new event.
   function weekdayDayFirst(text, now) {
     const src = String(text || '');
     const dayName = namedWeekday(src);
     const num = numericDayMonth(src);
     if (!dayName || !num || !now) return null;
     const clock = hasStatedClock(src);
-    const meetingish = /(?:פגישה|ישיבה|שיחה|ראיון|\b(?:meeting|call|sync|demo|check-?in|interview)\b)/i.test(src);
     const raw = dayName.raw + ' ' + num.token;
     if (dayName.index < 0 || num.month < 1 || num.month > 12 || num.day < 1 || num.day > 31) {
       if (!clock) return null;
@@ -296,7 +294,9 @@ const FlowExtract = (() => {
       if (!clock) return null;
       return { raw: raw, iso: iso(written), statedWeekday: true };
     }
-    if (!clock && !meetingish) return null;
+    // No clock: leave the day to the older parser. A conflict with no
+    // clock must not become a new event the base judge does not make.
+    if (!clock) return null;
     const other = nearestWeekday(written, dayName.index);
     if (!other) return { raw: raw, iso: null, contradictsWeekday: true };
     return {
