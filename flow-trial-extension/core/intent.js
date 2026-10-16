@@ -428,19 +428,21 @@ const FlowIntent = (() => {
   // A meeting plan is refused when an event noun in the same clause was
   // cancelled or postponed, when that meeting already happened, when the
   // mail is out of office, or when a marketing webinar has no personal ask.
-  // Every cancel word is checked. A second event that is still on, together
-  // with an ask, is the close: "the contract was cancelled, so let's meet"
-  // and "the kickoff is cancelled, can we sync Thursday instead" both keep
-  // the new slot. "was on my list" is not a recap, because list is not an
-  // event noun. Hebrew forms are exact: בולה is not בוטל. An ask to cancel
-  // still clears that slot. planFor and the judge both call this.
+  // Every cancel word is checked, including ביטלנו and תידחה. A second event
+  // that is still on, together with an ask, is the close: "the contract was
+  // cancelled, so let's meet" and "the kickoff is cancelled, can we sync
+  // Thursday instead" both keep the new slot. "was on my list" is not a
+  // recap, because list is not an event noun. Hebrew forms are exact: בולה
+  // is not בוטל. An ask to cancel still clears that slot. "אני לא במשרד"
+  // is out of office for this veto only. "no lnoger needed" and מוטלת are
+  // the same cancel, including the typo. planFor and the judge both call this.
   const VETO_EVENT = '(?:meetings?|calls?|demos?|interviews?|check-ins?|kick-?offs?|syncs?|webinars?|reviews?|stand-?ups?)';
-  const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed)';
+  const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed|no lnoger needed)';
   const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
   const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
   const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
   const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
-  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|לא\\s+תתקיים|נדחה|לבטל|תבטל|בטל)';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל|מוטלת)';
   const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
   const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
   const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
@@ -499,7 +501,7 @@ const FlowIntent = (() => {
     const clauses = vetoClauses(raw);
     if (liveWithAsk(clauses)) return false;
     if (marketingWebinar(raw)) return true;
-    if (AUTO_REPLY_TEXT.test(raw)) return true;
+    if (AUTO_REPLY_TEXT.test(raw) || /(?:אני|אנחנו)\s+לא\s+במשרד/.test(raw)) return true;
     if (clauses.some(clausePast)) return true;
     if (clauses.some(clauseCancelled)) return true;
     return false;
@@ -1186,7 +1188,11 @@ const FlowIntent = (() => {
     // A clear family D hold or dated promise is that write. The meeting
     // gate would otherwise file "let's sync Tuesday at 3pm" as a calendar
     // event plus a reminder task.
-    if (!replyMisaddressed && !calledOff && !isRecap && !isPast && familyBox.hit && familyBox.hit.family === 'D' &&
+    // "לצרף … לזימון" asks to put a file on an invite that already exists.
+    // The meeting noun is that invite, not a new event to schedule.
+    const attachToInvite = /לצרר?ף[\s\S]{0,160}?לזימון/.test(String(text || ''))
+      || /\battach\b[\s\S]{0,120}?\bto\s+the\s+(?:sync|invite|invitation)\b/i.test(String(text || ''));
+    if (!replyMisaddressed && !attachToInvite && !calledOff && !isRecap && !isPast && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);
       if (viaHold) return viaHold;
@@ -1220,12 +1226,12 @@ const FlowIntent = (() => {
     // A meeting noun plus a resolved day is the event. Two unread dates
     // are an event only when a meeting noun and a clock are both written.
     // A bare weekday and a slash, with no meeting noun, stays quiet.
-    const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast;
+    const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast && !attachToInvite;
     // "if you're free" / "maybe" is not a time the sender has actually
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
     const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי/i.test(text);
-    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge &&
+    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:

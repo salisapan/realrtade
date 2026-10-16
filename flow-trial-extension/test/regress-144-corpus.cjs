@@ -1,11 +1,12 @@
-// Permanent #144 regression list. 470 rows, sha256
-// b91615694160a21b638ccf20eda4d8978973ee66070ff86d094c72bfed1045e0.
+// Permanent #144 regression list. 479 rows, sha256
+// c844d7324771b2717166de1d9de64a3e32b87beb154af1ce2b367ce2126aabbe.
 // Each row goes through the real judge on the Gmail
 // path and the Outlook path. offer and quiet are asserted. either is
 // skipped. expectKind is the intent type, except task, which is a
-// task-only close, and task/dated-commitment, which is that task on the
-// dated-commitment track with expectDate. expectOutlook quiet means
-// Outlook must stay hidden: the plan must not create that offer.
+// task-only close, task/dated-commitment, which is that task on the
+// dated-commitment track with expectDate, and quiet, which is no type.
+// expectOutlook quiet means Outlook must stay hidden: the plan must not
+// create that offer.
 // v2syn-10902 and overprobe 11, 12, 17, 54, and 55 are allowed fails.
 // Each one is judged, logged with its reason, and not asserted.
 // Any other miss fails the corpus.
@@ -17,7 +18,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'b91615694160a21b638ccf20eda4d8978973ee66070ff86d094c72bfed1045e0';
+const FIXTURE_SHA = 'c844d7324771b2717166de1d9de64a3e32b87beb154af1ce2b367ce2126aabbe';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js']) {
@@ -102,6 +103,7 @@ function kindOk(out, row) {
   if (!expectKind) return true;
   const intent = out && out.intent;
   if (!intent) return false;
+  if (expectKind === 'quiet') return !intent.type;
   if (expectKind === 'task') return taskOnly(out) || intent.noReplyDraft === true;
   if (expectKind === 'task/dated-commitment') {
     const iso = intent.entities && intent.entities.dateIso;
@@ -139,7 +141,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 470) {
+if (rows.length !== 479) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
