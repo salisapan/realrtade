@@ -1192,6 +1192,9 @@ const FlowIntent = (() => {
     // The meeting noun is that invite, not a new event to schedule.
     const attachToInvite = /לצרר?ף[\s\S]{0,160}?לזימון/.test(String(text || ''))
       || /\battach\b[\s\S]{0,120}?\bto\s+the\s+(?:sync|invite|invitation)\b/i.test(String(text || ''));
+    // Before the reply-request check. The invite already exists. A reply
+    // draft is not the file, and a new Meeting is not the file.
+    if (attachToInvite) return stayQuiet('file');
     if (!replyMisaddressed && !attachToInvite && !calledOff && !isRecap && !isPast && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);

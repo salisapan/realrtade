@@ -1,5 +1,5 @@
-// Permanent #144 regression list. 479 rows, sha256
-// c844d7324771b2717166de1d9de64a3e32b87beb154af1ce2b367ce2126aabbe.
+// Permanent #144 regression list. 482 rows, sha256
+// 1adb3b600332ab851ba3c24299c170404262cad74604d34612b561b5a86c8507.
 // Each row goes through the real judge on the Gmail
 // path and the Outlook path. offer and quiet are asserted. either is
 // skipped. expectKind is the intent type, except task, which is a
@@ -7,6 +7,8 @@
 // dated-commitment track with expectDate, and quiet, which is no type.
 // expectOutlook quiet means Outlook must stay hidden: the plan must not
 // create that offer.
+// A shown task-only plan and a shown calendar-only plan use a card
+// label of that same kind. A task step title is a task label.
 // v2syn-10902 and overprobe 11, 12, 17, 54, and 55 are allowed fails.
 // Each one is judged, logged with its reason, and not asserted.
 // Any other miss fails the corpus.
@@ -18,13 +20,14 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'c844d7324771b2717166de1d9de64a3e32b87beb154af1ce2b367ce2126aabbe';
+const FIXTURE_SHA = '1adb3b600332ab851ba3c24299c170404262cad74604d34612b561b5a86c8507';
 const engine = { module: undefined, console };
 vm.createContext(engine);
-for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js']) {
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), engine, { filename: f });
 }
 const J = vm.runInContext('FlowIncomingJudge', engine);
+const Display = vm.runInContext('FlowDisplay', engine);
 
 const OWN_GMAIL = 'ai.local.flow@gmail.com';
 const OWN_OUTLOOK = 'glance.salisapan@outlook.com';
@@ -44,6 +47,8 @@ const OUTBOUND_REASON = 'outbound to someone else (CTO 2026-10-16)';
 const OUTBOUND_QUIET = ['v2syn-3888', 'v2syn-3898', 'v2syn-3912', 'v2syn-3919'];
 const DATED_ID = 'v2syn-8473';
 const DATED_REASON = 'task/dated-commitment on 2026-10-19 (CTO 2026-10-16, same track as #148)';
+const ATTACH_QUIET = ['v2syn-3412', 'v2syn-9373', 'v2syn-9377', 'v2syn-9382', 'v2syn-9389', 'v2syn-9396'];
+const ATTACH_REASON = 'Attaching a file to an existing invite is quiet/file before the reply-request check (CTO 2026-10-16)';
 
 function parseFrom(raw) {
   const text = String(raw || '');
@@ -141,7 +146,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 479) {
+if (rows.length !== 482) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -170,6 +175,49 @@ const dated = byId[DATED_ID];
 if (!dated || dated.expected !== 'offer' || dated.expectKind !== 'task/dated-commitment' || dated.expectDate !== '2026-10-19' || dated.reason !== DATED_REASON) {
   console.log('FAIL: dated label ' + DATED_ID);
   process.exit(1);
+}
+for (const id of ATTACH_QUIET) {
+  const row = byId[id];
+  if (!row || row.expected !== 'quiet' || row.expectKind !== 'quiet' || row.reason !== ATTACH_REASON) {
+    console.log('FAIL: attach quiet label ' + id);
+    process.exit(1);
+  }
+}
+
+function planKind(out) {
+  const steps = (out && out.process && out.process.steps) || [];
+  if (!steps.length) return null;
+  if (steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'))) return 'task';
+  if (steps.every((s) => s && s.kind === 'calendar')) return 'event';
+  return null;
+}
+
+function labelKind(title) {
+  const t = String(title || '').trim();
+  if (/^Meeting\b/.test(t) || /^(Hold It|Schedule It|Schedule & Confirm|Clear It|Move It)$/.test(t)) return 'event';
+  if (/^Reply requested\b/.test(t) || /^(Reply & Track|Reply with it)$/.test(t)) return 'request';
+  if (t === 'Save the file?' || t === 'Follow Through') return 'file';
+  if (!t) return '';
+  return 'task';
+}
+
+// The card the person reads, and the title a task step writes, follow the
+// plan that will run. A Meeting label on a task-only plan is the copy bug.
+function labelMismatch(out, row) {
+  if (!shown(out)) return '';
+  const kind = planKind(out);
+  if (!kind) return '';
+  const face = Display.cardFace(out.process, out.intent, { bodyText: row.body }).title;
+  if (labelKind(face) !== kind) return 'card ' + face + ' is ' + labelKind(face) + ' plan ' + kind;
+  if (kind === 'task') {
+    if (labelKind(out.intent && out.intent.label) !== 'task') return 'intent label ' + (out.intent && out.intent.label);
+    const steps = (out.process && out.process.steps) || [];
+    for (let i = 0; i < steps.length; i++) {
+      const title = steps[i].params && steps[i].params.title;
+      if (labelKind(title) !== 'task') return 'step title ' + title;
+    }
+  }
+  return '';
 }
 for (const id of Object.keys(ALLOWED_FAIL)) {
   if (id === 'v2syn-10902') continue;
@@ -205,10 +253,12 @@ for (const row of rows) {
     const oOk = row.expectOutlook === 'quiet' ? !shown(o) : (shown(o) || connectorQuiet('outlook', o));
     const oneShows = shown(g) || shown(o);
     const kind = (!row.expectKind) || (( !shown(g) || kindOk(g, row)) && (!shown(o) || kindOk(o, row)) && oneShows);
-    ok = gOk && oOk && oneShows && kind;
+    const labelWhy = labelMismatch(g, row) || labelMismatch(o, row);
+    ok = gOk && oOk && oneShows && kind && !labelWhy;
     if (!ok) {
       why = 'gmail ' + describe(g) + ' outlook ' + describe(o);
       if (row.expectKind && !kind) why += ' expectKind ' + row.expectKind + (row.expectDate ? ' ' + row.expectDate : '');
+      if (labelWhy) why += ' label ' + labelWhy;
     }
   } else {
     ok = !shown(g) && !shown(o);
@@ -217,6 +267,13 @@ for (const row of rows) {
       if (!kindOk(kindSource, row)) {
         ok = false;
         why = 'quiet but kind ' + ((kindSource.intent && kindSource.intent.type) || 'none') + ' expectKind ' + row.expectKind;
+      }
+    }
+    if (ok && ATTACH_QUIET.indexOf(row.id) >= 0) {
+      const fileQuiet = g.reason === 'quiet:file' && o.reason === 'quiet:file' && g.intent && g.intent.quiet === 'file' && o.intent && o.intent.quiet === 'file';
+      if (!fileQuiet) {
+        ok = false;
+        why = 'quiet/file expected — gmail ' + describe(g) + ' outlook ' + describe(o);
       }
     }
     if (!ok && !why) why = 'gmail ' + describe(g) + ' outlook ' + describe(o);

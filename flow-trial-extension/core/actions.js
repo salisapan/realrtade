@@ -618,6 +618,16 @@ const FlowActions = (() => {
     const hedged = /\b(?:perhaps|possibly|not sure|maybe|might)\b/i.test(String(vetoText || ''));
     const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent, vetoText);
     const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
+    // The card and the task title follow the plan that will actually run.
+    // A Meeting label on a task-only plan is the copy bug: the date was
+    // copied off the event classifier after the calendar step was dropped.
+    if (taskInstead && /^Meeting\b/.test(String(intent.label || ''))) {
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      const dateText = when || null;
+      intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
+        ? FlowJudgment.neutralTitle({ dateText: dateText })
+        : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
+    }
     const proc = useMeeting
       ? meetingPlan(intent, processFor(intent))
       : taskInstead
