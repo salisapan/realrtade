@@ -311,7 +311,9 @@ function installE2EHooks() {
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
       }
       if (path === '/v1.0/me' || path.endsWith('/me')) {
-        return Promise.resolve(json(200, { mail: 'glance.salisapan@outlook.com', userPrincipalName: 'glance.salisapan@outlook.com', displayName: 'Glance' }));
+        if (scenario.meFail) return Promise.resolve(json(500, { error: { message: 'me-failed' } }));
+        const me = scenario.me || { mail: 'glance.salisapan@outlook.com', userPrincipalName: 'glance.salisapan@outlook.com', displayName: 'Glance' };
+        return Promise.resolve(json(200, me));
       }
       return Promise.resolve(json(404, { error: { message: 'e2e-unmocked', path: path } }));
     }

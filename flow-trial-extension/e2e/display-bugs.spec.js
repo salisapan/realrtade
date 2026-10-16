@@ -103,4 +103,24 @@ test('Why-not-shown drops the message once its card is showing', async ({ glance
   const list = popup.locator('#surface-list');
   await expect(list.getByText('Show me')).toHaveCount(0);
   await expect(list.locator('[data-glance-why-line]')).toHaveCount(0);
+
+  const quiet = await glance.openOutlook({
+    id: S.MSG_B,
+    subject: 'Stay quiet',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(quiet.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const cur = bag.glanceWhyCurrent;
+    return Boolean(cur && cur.subject === 'Stay quiet' && cur.reason);
+  }).toBe(true);
+  const quietPopup = await glance.openPopup();
+  const quietList = quietPopup.locator('#surface-list');
+  const why = quietList.locator('[data-glance-why-line]');
+  await expect(why).toHaveCount(1);
+  await expect(quietList.getByText('Stay quiet')).toBeVisible();
+  await expect(why).toContainText('לא זוהתה בקשה');
+  await expect(quietList.getByText('Show me')).toHaveCount(0);
 });

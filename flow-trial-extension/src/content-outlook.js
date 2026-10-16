@@ -682,19 +682,83 @@
     return String((msg && msg.from && msg.from.emailAddress && msg.from.emailAddress.address) || '').toLowerCase();
   }
 
-  function newestOther(list, own) {
+  function newestOther(list, own, openSender, userSet) {
+    const open = String(openSender || '').trim().toLowerCase();
     const rows = (list || []).filter((m) => {
       const a = fromAddress(m);
-      return a && (own || []).indexOf(a) < 0;
+      if (!a) return false;
+      if ((own || []).indexOf(a) < 0) return true;
+      if (open && open === a) return true;
+      return Boolean(userSet && open && userSet.has(a) && userSet.has(open));
     });
     rows.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
     return rows[0] || null;
   }
 
-  function sameOpenSender(from, openEmail) {
-    const a = String(from || '').toLowerCase();
-    const b = String(openEmail || '').toLowerCase();
-    return Boolean(a) && a === b;
+  function senderAddress(msg) {
+    return String((msg && msg.sender && msg.sender.emailAddress && msg.sender.emailAddress.address) || '').trim().toLowerCase();
+  }
+
+  function plainAddress(raw) {
+    const s = String(raw || '').trim().replace(/^smtp:/i, '').toLowerCase();
+    if (!s || s.indexOf('@') < 0 || /\s/.test(s)) return '';
+    return s;
+  }
+
+  // undefined: not loaded. null: /me failed, so compare the two addresses
+  // exactly. A Set is the user's mail, userPrincipalName, smtp: proxies, and otherMails.
+  let userAddressCache;
+  let userAddressFlight = null;
+
+  function profileAddressSet(body) {
+    const set = new Set();
+    function add(raw) {
+      const e = plainAddress(raw);
+      if (e) set.add(e);
+    }
+    const p = body || {};
+    add(p.mail);
+    add(p.userPrincipalName);
+    (Array.isArray(p.otherMails) ? p.otherMails : []).forEach(add);
+    (Array.isArray(p.proxyAddresses) ? p.proxyAddresses : []).forEach((raw) => {
+      const m = String(raw || '').match(/^smtp:(.+)$/i);
+      if (m) add(m[1]);
+    });
+    return set;
+  }
+
+  async function loadUserAddresses() {
+    if (userAddressCache !== undefined) return userAddressCache;
+    if (userAddressFlight) return userAddressFlight;
+    userAddressFlight = (async () => {
+      try {
+        const body = await graphJson('/me?$select=mail,userPrincipalName,proxyAddresses,otherMails', 'own-addresses', null);
+        userAddressCache = body ? profileAddressSet(body) : null;
+      } catch (e) {
+        userAddressCache = null;
+      }
+      userAddressFlight = null;
+      return userAddressCache;
+    })();
+    return userAddressFlight;
+  }
+
+  function behalfSplit(from, sender) {
+    const a = String(from || '').trim().toLowerCase();
+    const b = String(sender || '').trim().toLowerCase();
+    return Boolean(a && b && a !== b);
+  }
+
+  // Equal ignoring case, or both addresses are the user's own. A delegate
+  // (Graph sender is not Graph from) is a different person either way.
+  async function sameOpenSender(from, openEmail, graphSender) {
+    if (behalfSplit(from, graphSender)) return false;
+    const a = String(from || '').trim().toLowerCase();
+    const b = String(openEmail || '').trim().toLowerCase();
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const known = await loadUserAddresses();
+    return Boolean(known && known.has(a) && known.has(b));
   }
 
   // Same session the mailbox check uses. The open-page reads used to send headers: {}
@@ -766,11 +830,11 @@
   async function messageIdFromPathRest(pathId) {
     const spells = idSpellings(pathId);
     const prefers = [null, GRAPH_IMMUTABLE];
-    const select = '?$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+    const select = '?$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId';
     for (let p = 0; p < prefers.length; p++) {
       for (let i = 0; i < spells.length; i++) {
         const msg = await graphJson('/me/messages/' + encodeURIComponent(spells[i]) + select, 'path-rest-id', prefers[p]);
-        if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id', immutable: Boolean(prefers[p]), from: fromAddress(msg) };
+        if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id', immutable: Boolean(prefers[p]), from: fromAddress(msg), sender: senderAddress(msg) };
       }
     }
     return null;
@@ -785,22 +849,23 @@
     return (Array.isArray(list) ? list : []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
   }
 
-  async function messageIdForConversation(convId, own) {
+  async function messageIdForConversation(convId, own, openSender) {
     const raw = String(convId || '');
     const want = FlowOwaParse.canonId(raw);
     if (!want) return null;
     try {
+      const known = await loadUserAddresses();
       const spells = idSpellings(raw);
       const prefers = [null, GRAPH_IMMUTABLE];
       for (let p = 0; p < prefers.length; p++) {
         for (let i = 0; i < spells.length; i++) {
-          const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
-          const fromFilter = newestOther(await graphValues(q, 'conversation-filter', prefers[p]), own);
-          if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]), from: fromAddress(fromFilter) };
+          const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId&$top=25';
+          const fromFilter = newestOther(await graphValues(q, 'conversation-filter', prefers[p]), own, openSender, known);
+          if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]), from: fromAddress(fromFilter), sender: senderAddress(fromFilter) };
         }
       }
       const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-      const select = '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+      const select = '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId';
       const order = '$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc');
       const filteredPath = '/me/mailFolders/inbox/messages?' + order + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + select;
       const plainPath = '/me/mailFolders/inbox/messages?' + order + select;
@@ -812,8 +877,8 @@
           how = 'inbox-list-plain';
         }
         const hits = openInboxRows(list, want);
-        const fromList = newestOther(hits, own);
-        if (fromList && fromList.id) return { id: fromList.id, how: how, immutable: Boolean(prefers[p]), from: fromAddress(fromList) };
+        const fromList = newestOther(hits, own, openSender, known);
+        if (fromList && fromList.id) return { id: fromList.id, how: how, immutable: Boolean(prefers[p]), from: fromAddress(fromList), sender: senderAddress(fromList) };
       }
       return null;
     } catch (e) { return null; }
@@ -823,14 +888,25 @@
   // A conversation resolves to one message. The newest message from someone
   // else is not the open message. Return its from-address; on a mismatch the
   // result is unread and is never used as the open message.
+  function senderMismatch(found, openSender) {
+    dbg('sender-mismatch', { how: found.how, from: found.from || null, sender: found.sender || null, open: String(openSender || '').toLowerCase() || null });
+    return { unread: true, reason: 'page:sender-mismatch', from: found.from || null };
+  }
+
   async function resolveOutlookMessageId(pathId, convId, own, openSender) {
     const direct = await messageIdFromPathRest(pathId || convId);
-    if (direct && direct.id) return direct;
-    const found = await messageIdForConversation(convId || pathId, own);
+    if (direct && direct.id) {
+      const open = String(openSender || '').trim().toLowerCase();
+      const from = String(direct.from || '').trim().toLowerCase();
+      if (behalfSplit(direct.from, direct.sender) || (open && from && !(await sameOpenSender(from, open, direct.sender)))) {
+        return senderMismatch(direct, openSender);
+      }
+      return direct;
+    }
+    const found = await messageIdForConversation(convId || pathId, own, openSender);
     if (!found || !found.id) return null;
-    if (!sameOpenSender(found.from, openSender)) {
-      dbg('sender-mismatch', { how: found.how, from: found.from || null, open: String(openSender || '').toLowerCase() || null });
-      return { unread: true, reason: 'page:sender-mismatch', from: found.from || null };
+    if (!(await sameOpenSender(found.from, openSender, found.sender))) {
+      return senderMismatch(found, openSender);
     }
     return found;
   }
@@ -4310,7 +4386,7 @@
     if (!conv && !item) return pane;
     const key = String(mailEpoch) + '|' + item + '|' + conv + '|' + (pane.receivedDateTime || '') + '|' + (pane.subject || '');
     if (hydrateCache[key]) return Object.assign(pane, hydrateCache[key]);
-    const select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,conversationId';
+    const select = 'id,subject,from,sender,toRecipients,ccRecipients,receivedDateTime,conversationId';
     let rows = [];
     if (item) {
       const one = await graphJson('/me/messages/' + encodeURIComponent(item) + '?$select=' + encodeURIComponent(select), 'pane-hydrate', null);
@@ -4371,11 +4447,16 @@
     }
     if (picked) {
       const one = graphAddress(picked.from);
+      const graphSender = graphAddress(picked.sender);
       const pageFrom = String(pane.senderEmail || '').trim().toLowerCase();
       // The open pane already names a person. A Graph row from someone else
-      // is not this message. Copying that address used to hide the mismatch
-      // and paint their card on this mail.
-      const senderAgrees = !pageFrom || !one || pageFrom === one;
+      // is not this message. The user's own alias is the same person. A
+      // forward, or a delegate whose sender is not the from, is not.
+      let senderAgrees = !behalfSplit(one, graphSender) && (!pageFrom || !one || pageFrom === one);
+      if (!senderAgrees && pageFrom && one && !behalfSplit(one, graphSender)) {
+        const known = await loadUserAddresses();
+        senderAgrees = Boolean(known && known.has(pageFrom) && known.has(one));
+      }
       if (senderAgrees) {
         if (hydrateHow === 'subject-fallback' && picked.id && !isConversationId(picked.id)) {
           const pickedConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
@@ -4391,7 +4472,7 @@
             patch.cc = gcc;
           }
         }
-        if (one) {
+        if (one && (!pageFrom || pageFrom === one)) {
           patch.senderEmail = one;
           const name = picked.from && picked.from.emailAddress && picked.from.emailAddress.name;
           if (name) patch.senderName = String(name).slice(0, 80);

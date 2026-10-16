@@ -1494,8 +1494,10 @@
         ? FlowDisplay.whyNotShownLine(currentWhy.reason)
         : '';
       if (line) {
-        const item = el('div', 'wait-note', line);
+        const subject = String(currentWhy.subject || '').trim();
+        const item = el('div', 'wait-note', subject ? (subject + ' — ' + line) : line);
         item.setAttribute('data-glance-why-line', line);
+        if (subject) item.setAttribute('data-glance-why-subject', subject);
         item.setAttribute('data-glance-why', String(currentWhy.reason));
         row.appendChild(item);
       }

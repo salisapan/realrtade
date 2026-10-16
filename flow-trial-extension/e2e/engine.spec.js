@@ -100,6 +100,122 @@ test('resolver refuses a Graph sender that is not the open pane', async ({ glanc
   }).toEqual({ chips: 0, mismatch: true });
 });
 
+function conversationScenario(convId, messageId, from, sender) {
+  const row = {
+    id: messageId,
+    conversationId: convId,
+    receivedDateTime: new Date().toISOString(),
+    subject: 'Transfer',
+    from: { emailAddress: { name: 'From', address: from } }
+  };
+  if (sender) row.sender = { emailAddress: { name: 'Sender', address: sender } };
+  return {
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: {},
+    conversation: [row]
+  };
+}
+
+test('a case-only sender difference still shows the card', async ({ glance }) => {
+  await glance.seedOutlook();
+  await glance.setScenario(conversationScenario('AQQkGlanceE2ECaseConv', 'AQMkGlanceE2ECaseHit', 'dana@acme.com'));
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2ECaseConv',
+    subject: 'Transfer',
+    senderEmail: 'Dana@Acme.com',
+    senderName: 'Dana',
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+});
+
+test('the user alias agrees with Graph and shows the card', async ({ glance }) => {
+  await glance.seedOutlook();
+  const scenario = conversationScenario('AQQkGlanceE2EAliasConv', 'AQMkGlanceE2EAliasHit', S.ME);
+  scenario.me = {
+    mail: S.ME,
+    userPrincipalName: S.ME,
+    proxyAddresses: ['SMTP:' + S.ME, 'smtp:sali.alias@glance.test'],
+    otherMails: ['sali.alias@glance.test']
+  };
+  await glance.setScenario(scenario);
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EAliasConv',
+    subject: 'Transfer',
+    senderEmail: 'sali.alias@glance.test',
+    senderName: 'Sali',
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+});
+
+test('a forwarded mail stays a sender mismatch', async ({ glance }) => {
+  await glance.seedOutlook();
+  await glance.setScenario(conversationScenario('AQQkGlanceE2EForwardConv', 'AQMkGlanceE2EForwardHit', 'original@acme.com'));
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EForwardConv',
+    subject: 'Transfer',
+    senderEmail: 'forwarder@elsewhere.com',
+    senderName: 'Forwarder',
+    body: S.SHOW
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+    return {
+      chips,
+      mismatch: diags.some((d) => d && d.reason === 'page:sender-mismatch')
+    };
+  }).toEqual({ chips: 0, mismatch: true });
+});
+
+test('a delegate send stays a sender mismatch', async ({ glance }) => {
+  await glance.seedOutlook();
+  await glance.setScenario(conversationScenario('AQQkGlanceE2EDelegateConv', 'AQMkGlanceE2EDelegateHit', 'boss@acme.com', 'delegate@acme.com'));
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EDelegateConv',
+    subject: 'Transfer',
+    senderEmail: 'boss@acme.com',
+    senderName: 'Boss',
+    body: S.SHOW
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+    return {
+      chips,
+      mismatch: diags.some((d) => d && d.reason === 'page:sender-mismatch')
+    };
+  }).toEqual({ chips: 0, mismatch: true });
+});
+
+test('a failed profile read keeps the exact sender comparison', async ({ glance }) => {
+  await glance.seedOutlook();
+  const scenario = conversationScenario('AQQkGlanceE2EMeFailConv', 'AQMkGlanceE2EMeFailHit', 'sali.other@glance.test');
+  scenario.meFail = true;
+  await glance.setScenario(scenario);
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EMeFailConv',
+    subject: 'Transfer',
+    senderEmail: 'sali.alias@glance.test',
+    senderName: 'Sali',
+    body: S.SHOW
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+    return {
+      chips,
+      mismatch: diags.some((d) => d && d.reason === 'page:sender-mismatch')
+    };
+  }).toEqual({ chips: 0, mismatch: true });
+});
+
 test('a truncated bodyPreview is outlook:body-preview-only and not a card', async ({ glance }) => {
   const preview = ('Could you confirm the transfer by Friday? ').repeat(12);
   expect(preview.length).toBeGreaterThanOrEqual(255);

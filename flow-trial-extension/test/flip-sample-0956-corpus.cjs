@@ -58,6 +58,12 @@ const TASK = 'task';
 const OFFER = 'offer';
 const FILE = 'file';
 
+function labeled(expect, json) {
+  const row = JSON.parse(json);
+  row.expect = expect;
+  return row;
+}
+
 const ROWS = [
   { id: 'v2syn-14731', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
     from: { name: 'Michael Ross', email: 'michael@northwind.com' }, to: ['noa@northwind.com', OWN.outlook], subject: 'Meeting request',
@@ -119,19 +125,13 @@ const ROWS = [
   { id: 'v2syn-8743', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'אבי בירנבאום', email: 'avi@cyber.co.il' }, to: [OWN.gmail], subject: 'המצגת מצורף',
     body: 'הי סאלי,\nמצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.\nתודה רבה,\nאבי' },
-  // v2syn-6393 and v2syn-14708 are not in this tree. The bodies below are
-  // synthesized from the parity report: a hold or ask addressed to someone
-  // else after the opening line. The AI Engineer should check them against
-  // the real rows on the box.
-  { id: 'v2syn-6393', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
-    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.outlook], subject: 'Thursday',
-    body: "Hi,\nFollowing the thread.\nNoa, can we meet Thursday at 14:30?\nThanks,\nDana" },
-  { id: 'v2syn-14708', expect: QUIET, surface: 'outlook', direction: 'inbound', attachmentCount: 0,
-    from: { name: 'הילה שמש', email: 'hila@acme.co.il' }, to: [OWN.outlook], subject: 'שיחת זום',
-    body: 'היי,\nבהמשך לשרשור.\nעומר, נוכל לעשות שיחה קצרה ביום ראשון ב-11:15?\nיום נעים,\nהילה' },
+  labeled(QUIET, '{"id":"v2syn-6393","lang":"en","surface":"outlook","from":{"name":"Dana Levi","email":"dana@acme.io"},"to":["colleague@acme.io","glance.salisapan@outlook.com"],"cc":[],"subject":"Re: the Q4 plan","body":"Hi there,\\n\\nHappy Monday!\\n\\nDana, can you schedule the call with Umbrella Ltd on Tuesday at 4:30pm?\\n\\nThank you,\\nDana","attachmentCount":0}'),
+  labeled(QUIET, '{"id":"v2syn-14708","lang":"en","surface":"outlook","from":{"name":"Rachel Green","email":"rachel@umbrella.io"},"to":["omer@umbrella.io","glance.salisapan@outlook.com"],"cc":[],"subject":"Re: the pilot","body":" \\nHappy Monday!\\nOmer, let\'s hop on a demo Thursday at 9am\\n \\nThanks,\\nRachel\\n\\n[image: logo]\\nRachel Green\\nHead of Ops | Acme Ltd\\n+972-54-1095028\\n\\nCONFIDENTIALITY NOTICE: This e-mail and any attachments are confidential and intended solely for the addressee. If you have received it in error, please notify the sender and delete it.","attachmentCount":0}'),
   { id: 'v2syn-8733', expect: FILE, surface: 'outlook', direction: 'inbound', attachmentCount: 1,
     from: { name: 'יוסי אברהם', email: 'yossi@initech.co.il' }, to: [OWN.outlook], subject: 'השב: הצעת המחיר מצורף',
     body: 'בוקר טוב, מצורף גיליון התמחור. נא לשמור אותו ל-Drive עד 20/10. המשך יום טוב' },
+  labeled(QUIET, '{"id":"v2syn-15670","lang":"en","surface":"gmail","from":{"name":"Billing","email":"billing@initech.com"},"to":["ai.local.flow@gmail.com"],"cc":[],"subject":"Hold off","body":"You don\'t ned to save the attachmment to Drive.\\r\\n\\r\\nSent from my iPhone","attachmentCount":1}'),
+  labeled(QUIET, '{"id":"v2syn-24499","lang":"he","surface":"outlook","from":{"name":"דנה לוי","email":"dana@acme.co.il"},"to":["glance.salisapan@outlook.com"],"cc":[],"subject":"Re: לא לשמור","body":"\u200fהיי לכולם,\\n\\n\u200fלא צרכי לשמור את הקובץ המצורף ל-Drive\\n\\n\u200fתודה,\\n\u200fדנה\\n\\n\u200f--\\n\u200fדנה לוי\\n\u200fיועצת משפטית | גלובקס\\n\u200f054-1055433\\n\u200fwww.acme.co.il","attachmentCount":1}'),
   { id: 'v2syn-7321', expect: QUIET, surface: 'gmail', direction: 'outbound', attachmentCount: 0,
     from: { name: 'Sali Sapan', email: OWN.gmail }, to: ['sarah@northwind.co.il'], subject: 'חשבונית ₪450',
     body: 'נא להסדיר את היתרה של ₪450 עד 20/10. תודה רבה' },

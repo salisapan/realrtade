@@ -61,9 +61,11 @@ const FlowGoogleCloses = (() => {
   // this write lands in the person's own OneDrive, not a shared library.
   const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
   const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
-  // A refusal of that save is silence. The negation has to govern the verb,
-  // so a different "no need to" in the same mail does not hide a real save.
-  const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צריך\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  // A refusal of that save is silence. The negation has to govern the verb
+  // in the same clause, so a different "no need to" does not hide a real save.
+  // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
+  // is not a refusal: forget sits where need would.
+  const SAVE_NO = /\b(?:(?:do not|don't|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)|no\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צ(?:ריך|רכי)\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
 
   // Save-shaped only. The open Outlook page counts file attachments for
   // this sentence and for no other, so the rest of show and silence stay put.
@@ -72,8 +74,20 @@ const FlowGoogleCloses = (() => {
     return SAVE_EN.test(t) || SAVE_HE.test(t);
   }
 
+  function saveClauses(text) {
+    return String(text || '').split(/[.!?\n\r]+/);
+  }
+
+  function clauseSaves(clause) {
+    return SAVE_EN.test(clause) || SAVE_HE.test(clause);
+  }
+
+  // Quiet only when every save clause in the mail is itself negated.
+  // A clean save in another clause still files.
   function refusesSave(text) {
-    return SAVE_NO.test(String(text || ''));
+    const clauses = saveClauses(text).filter(clauseSaves);
+    if (!clauses.length) return SAVE_NO.test(String(text || '')) && (SAVE_EN.test(String(text || '')) || SAVE_HE.test(String(text || '')));
+    return clauses.every((clause) => SAVE_NO.test(clause));
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
@@ -310,7 +324,7 @@ const FlowGoogleCloses = (() => {
     }
 
     if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
-      if (SAVE_NO.test(text) || input.attachmentCount !== 1) return { silence: true };
+      if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {
