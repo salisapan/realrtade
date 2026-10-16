@@ -183,7 +183,18 @@ sandbox.reinjectGmailTabs().then((first) => {
       getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
       appendChild(child) { child.parent = this; this.children.push(child); return child; },
       insertBefore(child) { return this.appendChild(child); },
-      addEventListener() {},
+      replaceChildren() {
+        this.children = [];
+        for (let i = 0; i < arguments.length; i++) this.appendChild(arguments[i]);
+      },
+      addEventListener(type, fn) {
+        this.listeners = this.listeners || {};
+        (this.listeners[type] = this.listeners[type] || []).push(fn);
+      },
+      click() {
+        const fns = (this.listeners && this.listeners.click) || [];
+        fns.forEach((fn) => fn({}));
+      },
       remove() {
         this.removed = true;
         if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
@@ -216,8 +227,10 @@ sandbox.reinjectGmailTabs().then((first) => {
     main.setAttribute('role', 'main');
     body.appendChild(main);
     const message = makeNode('div');
-    message.setAttribute('role', 'listitem');
-    message.setAttribute('data-legacy-message-id', 'm-live');
+    if (opts.shape === 'adn') message.className = 'adn';
+    else message.setAttribute('role', 'listitem');
+    message.setAttribute('data-legacy-message-id', opts.messageId || 'm-live');
+    if (opts.threadId) message.setAttribute('data-legacy-thread-id', opts.threadId);
     const who = makeNode('span');
     who.textContent = 'me';
     who.setAttribute('email', 'me@example.com');
@@ -251,6 +264,7 @@ sandbox.reinjectGmailTabs().then((first) => {
         page.observers.push(this);
       },
       observers: [],
+      sent: [],
       setTimeout(fn, ms) {
         const id = timerSeq++;
         timers.push({ id: id, fn: fn, at: now + (ms || 0) });
@@ -269,7 +283,10 @@ sandbox.reinjectGmailTabs().then((first) => {
       FlowStorage: {
         get() { return Promise.resolve({ onboarded: false, log: [] }); },
         hasTerminalOutcome() { return Promise.resolve(false); },
-        hasTerminalOutcomeFrom() { return false; },
+        hasTerminalOutcomeFrom(_settled, id) {
+          if (typeof opts.terminal === 'function') return !!opts.terminal(id);
+          return opts.terminal === true;
+        },
         verifyGateFrom() { return ''; },
         markSeen() { return Promise.resolve(); },
         forgetStillOpenScan() { return Promise.resolve(); },
@@ -282,7 +299,10 @@ sandbox.reinjectGmailTabs().then((first) => {
             return 'ext';
           },
           lastError: null,
-          sendMessage(msg, cb) { if (typeof cb === 'function') cb({ ok: true }); },
+          sendMessage(msg, cb) {
+            page.sent.push(msg);
+            if (typeof cb === 'function') cb({ ok: true });
+          },
           onMessage: { addListener() {} }
         },
         storage: {
@@ -366,9 +386,17 @@ sandbox.reinjectGmailTabs().then((first) => {
       return new Promise((resolve) => setImmediate(resolve));
     }).then(() => {
       const written = live.page.document.querySelectorAll('.flow-chip-written').map((n) => n.textContent);
+      const reloadHandled = live.page.document.querySelector('.flow-chip-handled');
+      const reloadUndo = live.page.document.querySelector('.flow-chip-undo');
       check('the new copy drops the previous card and paints the open mail',
         live.page.stale.removed === true && written.indexOf('Calendar · Thursday') >= 0 && written.indexOf('Google Task · Prepare') >= 0 && rejections.length === 0,
         { removed: live.page.stale.removed, written, rejections });
+      check('a reload of a handled mail shows the English Handled receipt and Undo',
+        reloadHandled && reloadHandled.textContent === 'Handled.' && reloadUndo && reloadUndo.textContent === 'Undo all' &&
+        written.indexOf('Calendar · Thursday') >= 0 &&
+        live.page.document.querySelector('.flow-chip-written').getAttribute('data-glance-undo-line') === 'Calendar event removed.' &&
+        !live.page.document.querySelector('.flow-chip-process-name'),
+        { handled: reloadHandled && reloadHandled.textContent, undo: reloadUndo && reloadUndo.textContent, written });
       const he = bootPage({
         lang: 'he',
         lane: {
@@ -412,7 +440,174 @@ sandbox.reinjectGmailTabs().then((first) => {
         try { he.page.glanceUiCopy('handled'); } catch (e) { caught += 1; }
         return new Promise((resolve) => setImmediate(resolve)).then(() => {
           check('a dead context plus an i18n call throws nothing', caught === 0 && rejections.length === before && he.page.chrome.i18n.getUILanguage() === '', { caught, rejections: rejections.slice(before) });
-          process.off('unhandledRejection', onRejection);
+          function twoSteps() {
+            return [
+              { connectorId: 'googleHold', ref: { eventId: 'e1', contentHash: 'h', calendarId: 'primary' }, line: 'Calendar · Thursday', undoLine: 'Calendar event removed.' },
+              { connectorId: 'googleLaneTask', ref: { taskId: 't1', taskListId: 'glance-list', contentHash: 'h2' }, line: 'Google Task · Prepare', undoLine: 'Google Task removed.' }
+            ];
+          }
+          function laneRow(extra) {
+            return Object.assign({ expires: Date.now() + 86400000, steps: twoSteps() }, extra || {});
+          }
+          function receipt(page) {
+            const handled = page.document.querySelector('.flow-chip-handled');
+            const undo = page.document.querySelector('.flow-chip-undo');
+            const lines = page.document.querySelectorAll('.flow-chip-written');
+            return {
+              handled: handled && handled.textContent,
+              undo: undo && undo.textContent,
+              written: lines.map((n) => n.textContent),
+              undoLines: lines.map((n) => n.getAttribute('data-glance-undo-line')),
+              doIt: !!page.document.querySelector('.flow-chip-process-name'),
+              undoButton: undo
+            };
+          }
+          function settle(booted) {
+            return new Promise((resolve) => setImmediate(resolve)).then(() => {
+              booted.flush(500);
+              return new Promise((resolve) => setImmediate(resolve));
+            });
+          }
+          function showMail(page, id, shape) {
+            const main = page.document.querySelector('div[role="main"]');
+            main.querySelectorAll('[data-legacy-message-id]').forEach((node) => {
+              if (node.parent === main) node.remove();
+            });
+            const message = makeNode('div');
+            if (shape === 'adn') message.className = 'adn';
+            else message.setAttribute('role', 'listitem');
+            message.setAttribute('data-legacy-message-id', id);
+            const who = makeNode('span');
+            who.setAttribute('email', 'me@example.com');
+            who.textContent = 'me';
+            message.appendChild(who);
+            main.appendChild(message);
+            page.observers.forEach((observer) => { if (observer.connected) observer.cb([]); });
+          }
+          function ticks(n) {
+            let pending = Promise.resolve();
+            for (let i = 0; i < n; i++) pending = pending.then(() => new Promise((resolve) => setImmediate(resolve)));
+            return pending;
+          }
+          const navigated = bootPage({
+            messageId: 'm-other',
+            lane: { 'm-live': laneRow() }
+          });
+          return settle(navigated).then(() => {
+            const beforeNav = receipt(navigated.page);
+            check('a mail with no stored record shows no Handled receipt',
+              !beforeNav.handled && !beforeNav.undo && beforeNav.written.length === 0,
+              beforeNav);
+            showMail(navigated.page, 'm-live', 'adn');
+            return settle(navigated);
+          }).then(() => {
+            const en = receipt(navigated.page);
+            check('opening a handled mail after navigation shows the English Handled receipt and Undo',
+              en.handled === 'Handled.' && en.undo === 'Undo all' && !en.doIt &&
+              en.written.indexOf('Calendar · Thursday') >= 0 && en.written.indexOf('Google Task · Prepare') >= 0 &&
+              en.undoLines.indexOf('Calendar event removed.') >= 0 && en.undoLines.indexOf('Google Task removed.') >= 0,
+              en);
+            const heNav = bootPage({
+              lang: 'he',
+              messageId: 'm-other',
+              lane: { 'm-live': laneRow() }
+            });
+            return settle(heNav).then(() => {
+              showMail(heNav.page, 'm-live', 'adn');
+              return settle(heNav);
+            }).then(() => {
+              const heOpen = receipt(heNav.page);
+              check('opening a handled mail after navigation shows the Hebrew Handled receipt and Undo',
+                heOpen.handled === 'טופל.' && heOpen.undo === 'בטל הכל' && !heOpen.doIt &&
+                heOpen.written.indexOf('Calendar · Thursday') >= 0 && heOpen.undoLines.indexOf('אירוע היומן הוסר.') < 0 &&
+                heOpen.undoLines.indexOf('Calendar event removed.') >= 0,
+                heOpen);
+              if (en.undoButton) en.undoButton.click();
+              return ticks(8).then(() => {
+                const undos = navigated.page.sent.filter((msg) => msg && msg.type === 'flow:google-undo');
+                const label = navigated.page.document.querySelector('.flow-chip-label');
+                check('Undo from a reopened handled mail deletes the stored steps',
+                  undos.length === 2 && undos[0].connectorId === 'googleLaneTask' && undos[0].ref && undos[0].ref.taskId === 't1' &&
+                  undos[1].connectorId === 'googleHold' && undos[1].ref && undos[1].ref.eventId === 'e1' &&
+                  label && label.textContent.indexOf('Google Task removed.') >= 0 && label.textContent.indexOf('Calendar event removed.') >= 0,
+                  { undos, label: label && label.textContent });
+                const joined = bootPage({
+                  terminal: true,
+                  lane: { 'h-old': laneRow({ ids: ['h-old', 'm-live'] }) }
+                });
+                return settle(joined).then(() => joined);
+              }).then((joined) => {
+                const alias = receipt(joined.page);
+                check('a handled mail found by its other id shows the receipt and no Do It card',
+                  alias.handled === 'Handled.' && alias.undo === 'Undo all' && !alias.doIt &&
+                  alias.written.indexOf('Calendar · Thursday') >= 0 && alias.undoLines.indexOf('Google Task removed.') >= 0,
+                  alias);
+                if (alias.undoButton) alias.undoButton.click();
+                return ticks(8).then(() => {
+                  const undos = joined.page.sent.filter((msg) => msg && msg.type === 'flow:google-undo');
+                  check('Undo from a mail opened under its other id still deletes the stored steps',
+                    undos.length === 2 && undos[0].connectorId === 'googleLaneTask' && undos[1].connectorId === 'googleHold',
+                    undos.map((msg) => msg && msg.connectorId));
+                  const folded = bootPage({
+                    messageId: '18f3_ABC',
+                    shape: 'adn',
+                    lane: {
+                      '18f3/ABC': {
+                        expires: Date.now() + 86400000,
+                        steps: [{ connectorId: 'googleHold', ref: { eventId: 'e9', contentHash: 'h', calendarId: 'primary' }, line: 'Calendar · Thursday', undoLine: 'Calendar event removed.' }]
+                      }
+                    }
+                  });
+                  return settle(folded).then(() => folded);
+                });
+              }).then((folded) => {
+                const canon = receipt(folded.page);
+                check('a canon-folded message id still shows the stored receipt',
+                  canon.handled === 'Handled.' && canon.undo === 'Undo' && !canon.doIt &&
+                  canon.written.indexOf('Calendar · Thursday') >= 0 && canon.undoLines[0] === 'Calendar event removed.',
+                  canon);
+                const both = bootPage({
+                  messageId: 'm-one',
+                  lane: { 'm-one': laneRow(), 'm-two': laneRow() }
+                });
+                const main = both.page.document.querySelector('div[role="main"]');
+                const second = makeNode('div');
+                second.setAttribute('role', 'listitem');
+                second.setAttribute('data-legacy-message-id', 'm-two');
+                const who = makeNode('span');
+                who.setAttribute('email', 'me@example.com');
+                who.textContent = 'me';
+                second.appendChild(who);
+                main.appendChild(second);
+                return settle(both).then(() => both);
+              }).then((both) => {
+                const one = both.page.document.querySelector('[data-legacy-message-id="m-one"]');
+                const two = both.page.document.querySelector('[data-legacy-message-id="m-two"]');
+                check('each handled message in the thread shows its own receipt',
+                  one && one.querySelector('.flow-chip-handled') && two && two.querySelector('.flow-chip-handled') &&
+                  one.querySelector('.flow-chip-undo') && two.querySelector('.flow-chip-undo'),
+                  { one: !!(one && one.querySelector('.flow-chip-handled')), two: !!(two && two.querySelector('.flow-chip-handled')) });
+                const sibling = bootPage({
+                  messageId: 'm-empty',
+                  threadId: 'thread-9',
+                  lane: { 'm-other': laneRow({ ids: ['m-other', 'scan:thread-9'] }) }
+                });
+                const expired = bootPage({
+                  messageId: 'm-live',
+                  lane: { 'm-live': laneRow({ expires: Date.now() - 1000 }) }
+                });
+                return Promise.all([settle(sibling), settle(expired)]).then(() => ({ sibling, expired }));
+              }).then((pages) => {
+                const quiet = receipt(pages.sibling.page);
+                const old = receipt(pages.expired.page);
+                check('a mail that only shares a thread id shows no receipt',
+                  !quiet.handled && !quiet.undo && quiet.written.length === 0, quiet);
+                check('an expired handled record shows no receipt',
+                  !old.handled && !old.undo, old);
+                process.off('unhandledRejection', onRejection);
+              });
+            });
+          });
         });
       });
     });

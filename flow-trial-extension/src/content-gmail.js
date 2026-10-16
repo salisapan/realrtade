@@ -996,12 +996,11 @@ function glanceUiCopy(kind) {
       const ids = stableMessageKey(message);
       if (!ids.messageId) continue;
       let lane = null;
-      try { lane = await readLaneUndo(ids.messageId); }
+      try { lane = await readLaneUndo(ids.messageId, ids.messageIds); }
       catch (e) { lane = null; }
       if (!chromeLive()) return false;
       if (lane && lane.steps && lane.steps.length) {
-        mountLaneReceipt(message, lane, ids.messageId);
-        return true;
+        mountLaneReceipt(message, lane, ids.messageId || (ids.messageIds && ids.messageIds[0]));
       }
     }
     if (typeof FlowProofOfClose === 'undefined' || !FlowProofOfClose.taskReceiptFromLog) return false;
@@ -1042,6 +1041,15 @@ function glanceUiCopy(kind) {
     return false;
   }
 
+  // A thread is usually a list of listitems. An opened message can also be
+  // only the .adn row, with the legacy id and no listitem. That row is
+  // still the mail the receipt was stored against.
+  function openMailNodes(main) {
+    const listed = main.querySelectorAll('div[role="listitem"]');
+    if (listed && listed.length) return listed;
+    return main.querySelectorAll('[data-legacy-message-id]');
+  }
+
   async function scanReadingPane() {
     if (!watching || !chromeLive()) return;
     dropStaleCards();
@@ -1049,7 +1057,7 @@ function glanceUiCopy(kind) {
     const main = document.querySelector('div[role="main"]');
     if (!main) return;
 
-    const messages = main.querySelectorAll('div[role="listitem"]');
+    const messages = openMailNodes(main);
     if (!messages.length) return;
 
     try {
@@ -1185,7 +1193,7 @@ function glanceUiCopy(kind) {
     // The open mail's own Do It, every step. A task row from another
     // message in this thread is not this mail, and a card left in the DOM
     // by the previous content-script world was already removed.
-    const laneRecord = await readLaneUndo(messageId);
+    const laneRecord = await readLaneUndo(messageId, stable.messageIds);
     if (!chromeLive()) return;
     if (laneRecord && laneRecord.steps && laneRecord.steps.length && message.isConnected && !message.querySelector('.flow-chip-host')) {
       mountLaneReceipt(message, laneRecord, messageId);
@@ -1254,6 +1262,10 @@ function glanceUiCopy(kind) {
     if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) {
       const verifying = message.querySelector('.flow-chip-host[data-glance-verifying]');
       if (verifying) verifying.remove();
+      if (message.isConnected && !message.querySelector('.flow-chip-host')) {
+        const late = await readLaneUndo(messageId, stable.messageIds);
+        if (late && late.steps && late.steps.length) mountLaneReceipt(message, late, messageId);
+      }
       return;
     }
     const verifyingHost = message.querySelector('.flow-chip-host[data-glance-verifying]');
@@ -1532,7 +1544,7 @@ function glanceUiCopy(kind) {
     if (!process) { void flushSuggest(false); return; }
 
     injectChip(message, {
-      messageId, legacyMessageId: legacyId || null, intent, process, sender, subject, attachment: chosenAttachment, attachments,
+      messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, intent, process, sender, subject, attachment: chosenAttachment, attachments,
       threadUrl: threadUrl(legacyId),
       threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
@@ -2701,8 +2713,84 @@ function glanceUiCopy(kind) {
     }).filter(Boolean);
   }
 
-  function rememberLaneUndo(messageId, steps) {
-    if (!messageId || !steps || !steps.length) return Promise.resolve();
+  // Graph-style ids fold +/ to -_. A text hash (h plus digits) is not a
+  // join key: two messages can share the first 120 characters. scan: is the
+  // inbox snapshot, not this message.
+  function laneCanon(id) {
+    if (typeof id !== 'string' && typeof id !== 'number') return '';
+    return String(id).trim().replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function laneTextHash(id) {
+    return /^h-?\d+$/.test(String(id || ''));
+  }
+
+  function laneStoreIds(messageId, extraIds) {
+    const out = [];
+    const seen = {};
+    function add(id) {
+      if (id == null) return;
+      const text = String(id).trim();
+      if (!text || text.indexOf('scan:') === 0 || text === 'h0') return;
+      if (seen[text]) return;
+      seen[text] = true;
+      out.push(text);
+    }
+    add(messageId);
+    (extraIds || []).forEach(add);
+    return out;
+  }
+
+  function laneRowLive(row, now) {
+    return !!(row && row.expires && row.expires >= now && Array.isArray(row.steps) && row.steps.length);
+  }
+
+  function findLaneRow(all, wanted) {
+    if (!all || typeof all !== 'object') return null;
+    const now = Date.now();
+    const raw = [];
+    (wanted || []).forEach((id) => {
+      if (id == null) return;
+      const text = String(id).trim();
+      if (!text || text.indexOf('scan:') === 0) return;
+      raw.push(text);
+    });
+    if (!raw.length) return null;
+    const primary = raw[0];
+    const direct = [primary].concat(raw.filter((id) => id !== primary && !laneTextHash(id)));
+    for (let i = 0; i < direct.length; i++) {
+      const id = direct[i];
+      if (laneRowLive(all[id], now)) return all[id];
+      const folded = laneCanon(id);
+      if (folded && folded !== id && laneRowLive(all[folded], now)) return all[folded];
+    }
+    const needles = {};
+    raw.forEach((id) => {
+      if (laneTextHash(id) && id !== primary) return;
+      const folded = laneCanon(id);
+      if (folded) needles[folded] = true;
+    });
+    const keys = Object.keys(all);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (key.indexOf('scan:') === 0) continue;
+      const row = all[key];
+      if (!laneRowLive(row, now)) continue;
+      const keyFold = laneCanon(key);
+      if (needles[keyFold] && !(laneTextHash(key) && key !== primary)) return row;
+      const ids = Array.isArray(row.ids) ? row.ids : [];
+      for (let j = 0; j < ids.length; j++) {
+        const id = ids[j] == null ? '' : String(ids[j]);
+        if (!id || id.indexOf('scan:') === 0 || laneTextHash(id)) continue;
+        if (needles[laneCanon(id)]) return row;
+      }
+    }
+    return null;
+  }
+
+  function rememberLaneUndo(messageId, steps, extraIds) {
+    const keys = laneStoreIds(messageId, extraIds);
+    if (!keys.length || !steps || !steps.length) return Promise.resolve();
     if (!chromeLive()) return Promise.resolve();
     const store = chrome.storage && chrome.storage.local;
     if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
@@ -2714,25 +2802,26 @@ function glanceUiCopy(kind) {
         Object.keys(all).forEach((key) => {
           if (!all[key] || !all[key].expires || all[key].expires < now) delete all[key];
         });
-        all[messageId] = { expires: now + LANE_UNDO_TTL_MS, steps: steps };
+        const row = { expires: now + LANE_UNDO_TTL_MS, steps: steps, ids: keys };
+        keys.forEach((id) => { all[id] = row; });
         return store.set({ [LANE_UNDO_KEY]: all });
       })
       .catch(() => {});
   }
 
-  function readLaneUndo(messageId) {
-    if (!messageId) return Promise.resolve(null);
+  function readLaneUndo(messageId, extraIds) {
+    const wanted = [];
+    if (messageId) wanted.push(messageId);
+    (extraIds || []).forEach((id) => {
+      if (wanted.indexOf(id) < 0) wanted.push(id);
+    });
+    if (!wanted.length) return Promise.resolve(null);
     if (!chromeLive()) return Promise.resolve(null);
     const store = chrome.storage && chrome.storage.local;
     if (!store || typeof store.get !== 'function') return Promise.resolve(null);
     return Promise.resolve()
       .then(() => store.get(LANE_UNDO_KEY))
-      .then((bag) => {
-        const all = bag && bag[LANE_UNDO_KEY];
-        const row = all && all[messageId];
-        if (!row || !row.expires || row.expires < Date.now() || !Array.isArray(row.steps) || !row.steps.length) return null;
-        return row;
-      })
+      .then((bag) => findLaneRow(bag && bag[LANE_UNDO_KEY], wanted))
       .catch(() => null);
   }
 
@@ -2760,10 +2849,17 @@ function glanceUiCopy(kind) {
       .then(() => store.get(LANE_UNDO_KEY))
       .then((bag) => {
         const all = bag && bag[LANE_UNDO_KEY] && typeof bag[LANE_UNDO_KEY] === 'object' ? bag[LANE_UNDO_KEY] : {};
-        if (!steps || !steps.length) delete all[messageId];
-        else {
-          const prev = all[messageId] || {};
-          all[messageId] = { expires: prev.expires || (Date.now() + LANE_UNDO_TTL_MS), steps: steps };
+        const row = findLaneRow(all, [messageId]);
+        const keys = laneStoreIds(messageId, row && row.ids);
+        const drop = {};
+        keys.forEach((id) => { drop[id] = true; const folded = laneCanon(id); if (folded) drop[folded] = true; });
+        Object.keys(all).forEach((key) => {
+          if (drop[key] || drop[laneCanon(key)]) drop[key] = true;
+        });
+        Object.keys(drop).forEach((key) => { delete all[key]; });
+        if (steps && steps.length && keys.length) {
+          all[keys[0]] = { expires: (row && row.expires) || (Date.now() + LANE_UNDO_TTL_MS), steps: steps, ids: keys };
+          keys.forEach((id) => { all[id] = all[keys[0]]; });
         }
         return store.set({ [LANE_UNDO_KEY]: all });
       })
@@ -3053,7 +3149,11 @@ function glanceUiCopy(kind) {
     done.appendChild(icon);
     done.appendChild(el('span', 'flow-chip-handled', glanceUiCopy('handled')));
     steps.forEach((step) => {
-      if (step && step.line) done.appendChild(el('span', 'flow-chip-written', step.line));
+      const text = step && (step.line || step.undoLine);
+      if (!text) return;
+      const span = el('span', 'flow-chip-written', text);
+      if (step.undoLine) span.setAttribute('data-glance-undo-line', step.undoLine);
+      done.appendChild(span);
     });
     const undoLabel = steps.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo');
     const undo = el('button', 'flow-chip-undo', undoLabel);
@@ -3537,7 +3637,7 @@ function glanceUiCopy(kind) {
     });
     if (meetingNote) bookkeeping.push(meetingNote);
     noteLaneOutcome(results);
-    bookkeeping.push(rememberLaneUndo(ctx.messageId, laneUndoStepsOf(succeeded)));
+    bookkeeping.push(rememberLaneUndo(ctx.messageId, laneUndoStepsOf(succeeded), ctx.messageIds));
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
