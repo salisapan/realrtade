@@ -128,6 +128,7 @@
         if (rev !== whyRev) return;
         return Promise.all([
           renderSurfaces().catch(() => {}),
+          renderMetaChats().catch(() => {}),
           renderOutlookCards().catch(() => {}),
           renderWaiting().catch(() => {}),
           renderOpen().catch(() => {}),
@@ -154,6 +155,7 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderMetaChats().catch(() => {});
   renderOutlookCards().catch(() => {});
   outlookAutoSync().catch(() => {});
   renderBuildStamp().catch(() => {});
@@ -2042,6 +2044,22 @@
     slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
   };
+  async function renderMetaChats() {
+    const block = document.getElementById('metaChatsBlock');
+    const host = document.getElementById('meta-chats');
+    if (!block || !host || typeof FlowMetaConsent === 'undefined' || typeof FlowMetaConsent.paintLink !== 'function') return;
+    let on = false;
+    try {
+      if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
+    } catch (e) { on = false; }
+    let href = '../lane-chat/enable.html';
+    try {
+      if (chrome.runtime && typeof chrome.runtime.getURL === 'function') href = chrome.runtime.getURL(FlowMetaConsent.PAGE);
+    } catch (e) { href = '../lane-chat/enable.html'; }
+    FlowMetaConsent.paintLink(host, { granted: on, lang: uiLang(), href: href });
+    block.hidden = Boolean(on);
+  }
+
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
     if (!host) return;

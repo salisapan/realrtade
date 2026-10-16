@@ -44,7 +44,8 @@ const LANE_FILES = [
   'src/content-messenger.js',
   'src/content-instagram.js',
   'src/lane-chat-worker.js',
-  'lane-chat/enable.js'
+  'lane-chat/enable.js',
+  'lane-chat/meta-consent.js'
 ];
 
 console.log('\n--- the draft cannot send ---\n');
@@ -103,6 +104,8 @@ check('facebook.com/messages/e2ee is already covered by messages/*', e2eePages.e
 const backgroundLines = backgroundSrc.split('\n');
 const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
+check('background.js loads the Meta consent on the line after the chat worker', /import '\.\.\/lane-chat\/meta-consent\.js'/.test(backgroundLines[nativeAt + 2] || ''));
+check('signup can open the Meta consent page', /msg\.type === 'flow:open-meta-chats'[\s\S]{0,700}openOptionsPage/.test(backgroundSrc));
 check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
@@ -110,7 +113,16 @@ check('the service worker re-registers Business Suite when it is already allowed
 check('the service worker pings a tab before injecting the lane', /window\.__glanceLaneChat/.test(backgroundSrc));
 const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
 check('Messenger logs a quiet reason and retries an empty thread', /whyNotShown/.test(messengerSrc) && /RETRY_LIMIT/.test(messengerSrc) && /time\[datetime\]/.test(messengerSrc));
-check('Messenger off is said on the options page', /Messenger is off, so Business Suite stays quiet/.test(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8')));
+const metaSrc = fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8');
+const enableHtml = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8');
+const popupHtml = fs.readFileSync(path.join(ROOT, 'popup/popup.html'), 'utf8');
+const popupJs = fs.readFileSync(path.join(ROOT, 'popup/popup.js'), 'utf8');
+check('one Meta consent replaces the per-app off line', enableSrc.indexOf('Messenger is off, so Business Suite stays quiet') < 0 && enableSrc.split('permissions.request(').length === 2);
+check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web on together/.test(enableHtml));
+check('Hebrew and English name the one Meta button', metaSrc.indexOf('Turn on Meta chats') >= 0 && metaSrc.indexOf("הפעל צ'אטים של Meta") >= 0);
+check('the popup page has a Meta row', popupHtml.indexOf('id="meta-chats"') >= 0 && popupHtml.indexOf('meta-consent.js') >= 0);
+check('the popup opens the enable page through the shared consent', popupJs.indexOf('FlowMetaConsent.paintLink') >= 0 && popupJs.indexOf('renderMetaChats') >= 0 && popupJs.indexOf('lane-chat/enable.html') >= 0);
+check('Meta consent does not ask for every url', !/<all_urls>/.test(enableSrc) && !/<all_urls>/.test(metaSrc) && (manifest.host_permissions || []).indexOf('<all_urls>') < 0 && (manifest.optional_host_permissions || []).indexOf('<all_urls>') < 0);
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
 check('content-whatsapp.js is not hooked by this lane', fs.readFileSync(path.join(ROOT, 'src/content-whatsapp.js'), 'utf8').indexOf('FlowChatLane') < 0);
@@ -1001,6 +1013,7 @@ console.log('\n--- calendar evidence ---\n');
 
   const laneDom = new JSDOM(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8'), { runScripts: 'outside-only', url: 'chrome-extension://glance/lane-chat/enable.html' });
   laneDom.window.chrome = { permissions: { contains: async () => false, request: async () => false }, scripting: { registerContentScripts: async () => {}, unregisterContentScripts: async () => {} }, runtime: { id: 'glance-test', sendMessage() {} } };
+  new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8'), { filename: 'meta-consent.js' }).runInContext(laneDom.getInternalVMContext());
   new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8'), { filename: 'enable.js' }).runInContext(laneDom.getInternalVMContext());
   const lanes = laneDom.window.__glanceLaneChat;
   check('runtime registration lists three chats and skips Gmail', Array.isArray(lanes) && lanes.length === 3 && lanes.every((lane) => lane.js.indexOf('src/content-gmail.js') < 0 && lane.js.indexOf('src/content-outlook.js') < 0));
@@ -1217,30 +1230,100 @@ console.log('\n--- calendar evidence ---\n');
   check('three injections leave one observer', observers === 1, observers);
   guardDom.window.close();
 
-  const enable = new JSDOM(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8'), { runScripts: 'outside-only', url: 'chrome-extension://glance/lane-chat/enable.html' });
-  const ew = enable.window;
-  const asked = [];
-  const registered = [];
-  ew.chrome = {
-    permissions: {
-      contains: async () => false,
-      request: async (spec) => { asked.push(spec.origins.slice()); return true; }
-    },
-    scripting: {
-      unregisterContentScripts: async () => {},
-      registerContentScripts: async (scripts) => { registered.push(scripts); }
-    },
-    runtime: { id: 'glance-test', sendMessage() { throw new Error('the enable page must not message'); } }
-  };
-  new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8'), { filename: 'enable.js' }).runInContext(enable.getInternalVMContext());
-  const buttons = ew.document.querySelectorAll('button');
-  check('the enable page offers one switch per app', buttons.length === 3);
-  buttons[1].click();
-  await new Promise((r) => setTimeout(r, 20));
-  check('Messenger is requested as an optional origin and nothing is sent', asked.length === 1 && asked[0].some((o) => /messenger\.com/.test(o)) && asked[0].some((o) => /business\.facebook\.com\/latest\/inbox/.test(o)) && asked[0].every((o) => /messages|messenger|business\.facebook\.com\/latest\/inbox/.test(o)));
-  const registeredMatches = JSON.stringify(registered);
-  check('Business Suite is registered at runtime, not from the manifest', /business\.facebook\.com/.test(registeredMatches) && JSON.stringify(manifest.content_scripts).indexOf('business.facebook.com') < 0);
-  enable.window.close();
+  const META_ORIGINS = [
+    'https://web.whatsapp.com/*',
+    'https://www.messenger.com/*',
+    'https://messenger.com/*',
+    'https://www.facebook.com/messages',
+    'https://www.facebook.com/messages/*',
+    'https://facebook.com/messages',
+    'https://facebook.com/messages/*',
+    'https://business.facebook.com/latest/inbox',
+    'https://business.facebook.com/latest/inbox/*',
+    'https://www.business.facebook.com/latest/inbox',
+    'https://www.business.facebook.com/latest/inbox/*',
+    'https://www.instagram.com/direct',
+    'https://www.instagram.com/direct/*',
+    'https://instagram.com/direct',
+    'https://instagram.com/direct/*'
+  ];
+  function bootEnable(opts) {
+    const enable = new JSDOM(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8'), { runScripts: 'outside-only', url: 'chrome-extension://glance/lane-chat/enable.html' });
+    const asked = [];
+    const registered = [];
+    enable.window.chrome = {
+      permissions: {
+        contains: async () => Boolean(opts && opts.granted),
+        request: async (spec) => { asked.push(spec.origins.slice()); return !opts || opts.allow !== false; }
+      },
+      scripting: {
+        unregisterContentScripts: async () => {},
+        registerContentScripts: async (scripts) => { registered.push(scripts); }
+      },
+      storage: { local: { get: async () => ({ glanceUiLanguage: (opts && opts.lang) || 'en' }) } },
+      i18n: { getUILanguage: () => 'en' },
+      runtime: { id: 'glance-test', sendMessage() { throw new Error('the enable page must not message'); } }
+    };
+    const ctx = enable.getInternalVMContext();
+    new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8'), { filename: 'meta-consent.js' }).runInContext(ctx);
+    new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8'), { filename: 'enable.js' }).runInContext(ctx);
+    return { enable, asked, registered };
+  }
+  const en = bootEnable({ lang: 'en', allow: true });
+  await new Promise((r) => setTimeout(r, 40));
+  const enButtons = en.enable.window.document.querySelectorAll('button');
+  const enLabel = enButtons[0] && enButtons[0].querySelector('.btn-label');
+  check('the prompt waits for the one Meta button', en.asked.length === 0 && en.registered.length === 0 && enButtons.length === 1 && enLabel && enLabel.textContent === 'Turn on Meta chats' && enButtons[0].querySelector('.shell') && enButtons[0].querySelector('.ring') && enButtons[0].querySelector('.shine'));
+  enButtons[0].click();
+  await new Promise((r) => setTimeout(r, 40));
+  check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => optional.indexOf(origin) >= 0) && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
+  const scripts = en.registered[0] || [];
+  const scriptIds = scripts.map((row) => row.id).slice().sort().join(',');
+  check('the grant registers every Meta lane once', en.registered.length === 1 && scripts.length === 3 && scriptIds === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp');
+  const byId = {};
+  scripts.forEach((row) => { byId[row.id] = row.matches.join('\n'); });
+  check('each lane stays on its own hosts', byId['glance-lane-whatsapp'] === 'https://web.whatsapp.com/*' && /business\.facebook\.com\/latest\/inbox/.test(byId['glance-lane-messenger']) && /facebook\.com\/messages/.test(byId['glance-lane-messenger']) && byId['glance-lane-messenger'].indexOf('web.whatsapp.com') < 0 && /instagram\.com\/direct/.test(byId['glance-lane-instagram']) && byId['glance-lane-instagram'].indexOf('messenger.com') < 0);
+  check('Business Suite is registered at runtime, not from the manifest', /business\.facebook\.com/.test(JSON.stringify(en.registered)) && JSON.stringify(manifest.content_scripts).indexOf('business.facebook.com') < 0);
+  check('a granted page has no off switch', en.enable.window.document.querySelectorAll('button').length === 0);
+  en.enable.window.close();
+
+  const denied = bootEnable({ lang: 'en', allow: false });
+  await new Promise((r) => setTimeout(r, 40));
+  denied.enable.window.document.querySelector('button').click();
+  await new Promise((r) => setTimeout(r, 40));
+  check('a refused consent registers nothing', denied.asked.length === 1 && denied.registered.length === 0 && denied.enable.window.document.querySelectorAll('button').length === 1);
+  denied.enable.window.close();
+
+  const he = bootEnable({ lang: 'he' });
+  await new Promise((r) => setTimeout(r, 40));
+  const heLabel = he.enable.window.document.querySelector('.btn-label');
+  check('Hebrew UI names the one Meta button', he.asked.length === 0 && heLabel && heLabel.textContent === "הפעל צ'אטים של Meta" && he.enable.window.document.documentElement.lang === 'he');
+  he.enable.window.close();
+
+  const already = bootEnable({ lang: 'en', granted: true });
+  await new Promise((r) => setTimeout(r, 40));
+  check('an existing grant registers every lane without a second prompt', already.asked.length === 0 && already.registered.length === 1 && (already.registered[0] || []).length === 3 && already.enable.window.document.querySelectorAll('button').length === 0);
+  already.enable.window.close();
+
+  const pop = new JSDOM('<div id="metaChatsBlock"><div id="meta-chats"></div></div>', { runScripts: 'outside-only', url: 'chrome-extension://glance/popup/popup.html' });
+  new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8'), { filename: 'meta-consent.js' }).runInContext(pop.getInternalVMContext());
+  const host = pop.window.document.getElementById('meta-chats');
+  const link = pop.window.FlowMetaConsent.paintLink(host, { granted: false, lang: 'en', href: '../lane-chat/enable.html' });
+  check('the popup link is present in English', link && link.tagName === 'A' && link.getAttribute('href').indexOf('lane-chat/enable.html') >= 0 && link.querySelector('.btn-label').textContent === 'Turn on Meta chats' && host.hidden === false);
+  const heHost = pop.window.document.createElement('div');
+  const heLink = pop.window.FlowMetaConsent.paintLink(heHost, { granted: false, lang: 'he', href: '../lane-chat/enable.html' });
+  check('the popup link is present in Hebrew', heLink && heLink.querySelector('.btn-label').textContent === "הפעל צ'אטים של Meta" && heLink.getAttribute('href').indexOf('lane-chat/enable.html') >= 0);
+  const gone = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'en', href: '../lane-chat/enable.html' });
+  check('a granted Meta consent hides the popup row', gone == null && host.hidden === true && host.querySelector('a') == null);
+  let sent = null;
+  const opened = await pop.window.FlowMetaConsent.open({
+    runtime: {
+      lastError: null,
+      sendMessage(msg, cb) { sent = msg; cb({ ok: true, page: 'lane-chat/enable.html' }); }
+    }
+  });
+  check('signup can call the Meta consent opener', sent && sent.type === 'flow:open-meta-chats' && opened.ok === true && opened.page === 'lane-chat/enable.html' && pop.window.FlowMetaConsent.ORIGINS.join('\n') === META_ORIGINS.join('\n'));
+  pop.window.close();
 
   const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
   const fixtureClock = fs.readFileSync(path.join(ROOT, 'dev/fixture-clock.js'), 'utf8');

@@ -1,7 +1,7 @@
-// Turns on one chat host at a time. The browser asks for optional hosts.
-// Nothing here is a static content script. After the grant, this page
-// registers the reader. business.facebook.com is only an optional host.
-// This page does not send.
+// One consent for Meta chats. The browser asks once, for every Meta host.
+// Nothing here is a static content script. After the grant, every lane is on.
+// There is no per-feature switch to turn one of them off.
+// business.facebook.com stays an optional host. This page does not send.
 const SCRIPTS = [
   'core/fact-reply.js',
   'core/close-chains.js',
@@ -47,14 +47,65 @@ const LANES = [
 ];
 globalThis.__glanceLaneChat = LANES;
 
-const list = document.getElementById('lanes');
-const note = document.getElementById('note');
+const doc = document;
+const list = doc.getElementById('lanes');
+const note = doc.getElementById('note');
 
 function say(text) { if (note) note.textContent = text; }
 
-function mark(button, on) {
-  button.setAttribute('aria-pressed', on ? 'true' : 'false');
-  button.textContent = on ? 'On' : 'Turn on';
+function isHe(code) {
+  const raw = String(code || '').toLowerCase();
+  return raw.indexOf('he') === 0 || raw.indexOf('iw') === 0;
+}
+
+function buttonLabel(code) {
+  if (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent && typeof FlowMetaConsent.label === 'function') return FlowMetaConsent.label(code);
+  return 'Turn on Meta chats';
+}
+
+function metaOrigins() {
+  if (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent && Array.isArray(FlowMetaConsent.ORIGINS) && FlowMetaConsent.ORIGINS.length) {
+    return FlowMetaConsent.ORIGINS.slice();
+  }
+  const out = [];
+  LANES.forEach((lane) => {
+    lane.origins.forEach((origin) => { if (out.indexOf(origin) < 0) out.push(origin); });
+  });
+  return out;
+}
+
+function nowOn(code) {
+  return isHe(code)
+    ? "צ'אטים של Meta פעילים. פתח את הצ'אט שוב כדי שטיוטה תוכל להופיע."
+    : 'Meta chats are on. Open the chat again so a draft can appear.';
+}
+function staysOff(code) {
+  return isHe(code) ? "צ'אטים של Meta נשארים כבויים." : 'Meta chats stay off.';
+}
+function readerFailed(code) {
+  return isHe(code)
+    ? "צ'אטים של Meta מותרים, אבל הקורא לא עלה. פתח את הדף שוב."
+    : 'Meta chats are allowed, but the reader did not start. Open this page again.';
+}
+function cannotAsk(code) {
+  return isHe(code) ? 'הדף הזה לא יכול לבקש את זה מכאן.' : 'This page cannot ask for that here.';
+}
+
+async function preferredLang() {
+  let setting = '';
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && chrome.storage.local.get) {
+      const bag = await chrome.storage.local.get('glanceUiLanguage');
+      setting = bag && bag.glanceUiLanguage ? String(bag.glanceUiLanguage) : '';
+    }
+  } catch (e) { setting = ''; }
+  let ui = '';
+  try {
+    if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || '';
+  } catch (e) { ui = ''; }
+  let nav = '';
+  try { nav = (navigator && navigator.language) || ''; } catch (e) { nav = ''; }
+  return setting || ui || nav || 'en';
 }
 
 async function granted(origins) {
@@ -63,48 +114,68 @@ async function granted(origins) {
   catch (e) { return false; }
 }
 
-async function register(lane) {
+async function registerAll() {
   const scripting = typeof chrome !== 'undefined' && chrome.scripting;
   if (!scripting || !scripting.registerContentScripts) return;
-  const id = 'glance-lane-' + lane.id;
-  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* not registered yet */ }
-  await scripting.registerContentScripts([{
-    id: id,
+  const ids = LANES.map((lane) => 'glance-lane-' + lane.id);
+  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* not registered yet */ }
+  await scripting.registerContentScripts(LANES.map((lane) => ({
+    id: 'glance-lane-' + lane.id,
     matches: lane.origins,
     js: lane.js,
     runAt: 'document_idle',
     persistAcrossSessions: true
-  }]);
+  })));
 }
 
-function row(lane) {
-  const item = document.createElement('li');
-  const name = document.createElement('span');
-  name.textContent = lane.title;
-  const button = document.createElement('button');
+function showButton(code) {
+  if (!list) return;
+  list.replaceChildren();
+  const button = doc.createElement('button');
   button.type = 'button';
-  button.addEventListener('click', async () => {
-    if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) { say('This page cannot ask for that here.'); return; }
-    let ok = false;
-    try { ok = await chrome.permissions.request({ origins: lane.origins }); }
-    catch (e) { ok = false; }
-    if (ok) { try { await register(lane); } catch (e) { ok = false; } }
-    mark(button, ok);
-    say(ok ? (lane.title + ' is on. Open that chat again so a draft can appear.') : (lane.title + ' stays off.'));
+  button.className = 'primary';
+  button.id = 'meta-turn-on';
+  ['shell', 'ring', 'shine'].forEach((name) => {
+    const span = doc.createElement('span');
+    span.className = name;
+    button.appendChild(span);
   });
-  item.append(name, button);
-  list.append(item);
-  granted(lane.origins).then((on) => {
-    mark(button, on);
-    if (on) {
-      register(lane).catch(() => {
-        mark(button, false);
-        say(lane.title + ' is allowed, but the reader did not start. Open this page again.');
-      });
-      return;
-    }
-    if (lane.id === 'messenger') say('Messenger is off, so Business Suite stays quiet. Turn Messenger on.');
-  });
+  const label = doc.createElement('span');
+  label.className = 'btn-label';
+  label.textContent = buttonLabel(code);
+  button.appendChild(label);
+  button.addEventListener('click', () => { turnOn(code); });
+  list.append(button);
+  try {
+    doc.documentElement.lang = isHe(code) ? 'he' : 'en';
+    doc.documentElement.dir = isHe(code) ? 'rtl' : 'ltr';
+  } catch (e) { /* the page still shows the label */ }
 }
 
-LANES.forEach(row);
+async function turnOn(code) {
+  if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) { say(cannotAsk(code)); return; }
+  let ok = false;
+  try { ok = await chrome.permissions.request({ origins: metaOrigins() }); }
+  catch (e) { ok = false; }
+  if (!ok) { say(staysOff(code)); return; }
+  try { await registerAll(); }
+  catch (e) { say(readerFailed(code)); return; }
+  if (list) list.replaceChildren();
+  say(nowOn(code));
+}
+
+async function start() {
+  const code = await preferredLang();
+  const on = await granted(metaOrigins());
+  if (!on) { showButton(code); return; }
+  try {
+    await registerAll();
+    if (list) list.replaceChildren();
+    say(nowOn(code));
+  } catch (e) {
+    showButton(code);
+    say(readerFailed(code));
+  }
+}
+
+start();

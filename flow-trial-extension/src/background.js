@@ -56,6 +56,7 @@ import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
@@ -4876,6 +4877,23 @@ function reply(sendResponse, promise) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  // Signup, later, opens the one Meta consent page. The prompt stays on that page.
+  if (msg.type === 'flow:open-meta-chats') {
+    const page = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.PAGE) || 'lane-chat/enable.html';
+    const fallback = () => {
+      try {
+        if (chrome.tabs && typeof chrome.tabs.create === 'function') chrome.tabs.create({ url: chrome.runtime.getURL(page) });
+      } catch (e) { /* the signup page can open the link itself */ }
+    };
+    try {
+      if (chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
+        const pending = chrome.runtime.openOptionsPage();
+        if (pending && typeof pending.then === 'function') pending.catch(() => fallback());
+      } else fallback();
+    } catch (e) { fallback(); }
+    try { sendResponse({ ok: true, page: page }); } catch (e) { /* the caller closed */ }
+    return true;
+  }
   // The person pressed רענן. Recovery never reloads a tab on its own.
   if (msg.type === 'flow:outlook-refresh-tab') {
     const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
