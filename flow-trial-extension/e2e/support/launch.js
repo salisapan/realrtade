@@ -26,7 +26,9 @@ function copyExtension() {
     'https://outlook.office.com/*',
     'https://outlook.office365.com/*',
     'https://graph.microsoft.com/*',
-    'https://login.microsoftonline.com/*'
+    'https://login.microsoftonline.com/*',
+    'http://127.0.0.1/*',
+    'http://localhost/*'
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
@@ -538,6 +540,7 @@ async function boot() {
       e.driveItems = {};
       e.driveByName = {};
       e.seq = 1;
+      delete e.httpOrigin;
     });
   };
 
@@ -575,7 +578,10 @@ async function boot() {
     await harness.seed(Object.assign({
       onboarded: true,
       connectorId: 'googleTasks',
-      googleTasksAuth: { taskListId: 'glance-list' }
+      googleTasksAuth: { taskListId: 'glance-list' },
+      // Headless Chrome has no browser sign-in. The lane asks identity first,
+      // then this stored Connect token. Production never reads an e2e hook for it.
+      googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 }
     }, extra || {}));
   };
 

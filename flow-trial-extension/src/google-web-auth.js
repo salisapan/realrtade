@@ -15,6 +15,16 @@
 
 export const GOOGLE_WEB_AUTH_STORAGE_KEY = 'googleWebAuth';
 
+// One status for the panel, Setup, and the popup. A stored Google grant
+// that cannot write is not "Connected".
+export const GOOGLE_RECONNECT_STORAGE_KEY = 'googleReconnect';
+export const GOOGLE_EVER_CONNECTED_STORAGE_KEY = 'googleEverConnected';
+export const GOOGLE_RECONNECT_LABEL = 'התחבר מחדש ל-Google';
+export const GOOGLE_CONNECT_LABEL = 'התחבר ל-Google';
+
+const UNCONFIRMED_EN = "Couldn't confirm it's unchanged. Undo left it alone.";
+const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+
 // Used only when manifest oauth2.scopes is missing. Keep this list identical
 // to manifest.json so a fallback grant covers the same APIs as getAuthToken.
 export const GOOGLE_OAUTH_SCOPES = [
@@ -121,6 +131,112 @@ export function parseGoogleImplicitRedirect(redirectUrl, expectedState) {
     accessToken: accessToken.trim(),
     expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null
   };
+}
+
+// Browser UI language. he and he-IL use the Hebrew refusal. Anything else
+// stays English. Glance has no separate language setting.
+export function unconfirmedRefusal(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (code === 'he' || code.indexOf('he-') === 0) return UNCONFIRMED_HE;
+  return UNCONFIRMED_EN;
+}
+
+// had a Connect record, and a later write was rejected: Connected is false
+// and every surface reads this same object.
+function statusEnglish(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  return code === 'en' || code.indexOf('en-') === 0;
+}
+
+function everConnectedRecord(value) {
+  return value === true || !!(value && value.connected);
+}
+
+function priorGoogleBag(bag) {
+  const b = bag || {};
+  if (b.googleTasksAuth || b.tasksAuth) return true;
+  const web = b.googleWebAuth || b.webAuth;
+  if (web && (web.accessToken || web.refreshToken)) return true;
+  const undo = b.glanceLaneUndo || b.laneUndo;
+  if (undo && typeof undo === 'object') {
+    const keys = Object.keys(undo);
+    for (let i = 0; i < keys.length; i++) {
+      const row = undo[keys[i]];
+      if (row && Array.isArray(row.steps) && row.steps.length) return true;
+    }
+  }
+  return false;
+}
+
+// One write, the first time an older profile is opened. A marker already
+// stored is left alone. An empty profile stays unmarked.
+export function googleEverConnectedPatch(bag) {
+  const b = bag || {};
+  const marker = b[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || b.googleEverConnected;
+  if (everConnectedRecord(marker)) return null;
+  if (!priorGoogleBag(b)) return null;
+  return { [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true } };
+}
+
+export function googleConnectionState(auth, reconnect, extras) {
+  const had = Boolean(auth);
+  const extra = extras || {};
+  // Reconnect after any earlier connection: the marker, a stored token,
+  // a Tasks grant, or a Do It that already landed. A person who never
+  // connected sees Connect, even if a stale flag is set.
+  const previous = had || everConnectedRecord(extra.everConnected) || priorGoogleBag(extra);
+  const flagged = Boolean(reconnect && reconnect.needed);
+  const warnOn = Boolean(extra.warning && extra.warning.needed);
+  const needs = (previous && flagged) || (previous && !had && !warnOn);
+  const warn = !needs && warnOn;
+  const english = statusEnglish(extra.lang);
+  const reconnectLabel = english ? 'Reconnect Google' : GOOGLE_RECONNECT_LABEL;
+  const connectLabel = english ? 'Connect Google' : GOOGLE_CONNECT_LABEL;
+  const warningLabel = english ? 'A step did not finish' : 'שלב אחד לא הושלם';
+  const connected = had && !needs && !warn;
+  return {
+    connected: connected,
+    needsReconnect: needs,
+    warning: warn,
+    reconnectLabel: needs ? reconnectLabel : GOOGLE_RECONNECT_LABEL,
+    warningLabel: warn ? warningLabel : '',
+    headerLabel: needs ? reconnectLabel : (warn ? warningLabel : (connected ? 'Connected' : connectLabel)),
+    configured: extra.configured != null ? Boolean(extra.configured) : had,
+    detail: connected ? (extra.detail || null) : null
+  };
+}
+
+// Identity first (interactive false). A signed-out getAuthToken falls back
+// to the stored Connect token. A lapsed stored token may refresh silently.
+// This function never opens a consent window.
+export function laneCredential(deps) {
+  const d = deps || {};
+  const identity = typeof d.getAuthToken === 'function'
+    ? Promise.resolve().then(() => d.getAuthToken(false)).catch(() => '')
+    : Promise.resolve('');
+  return identity.then((chromeToken) => {
+    if (chromeToken) return { token: chromeToken, source: 'chrome' };
+    const read = typeof d.readWebAuth === 'function' ? d.readWebAuth() : Promise.resolve(null);
+    return Promise.resolve(read).then((existing) => {
+      if (webTokenUsable(existing, d.now)) {
+        return { token: existing.accessToken, source: 'web' };
+      }
+      const expired = Boolean(existing && existing.accessToken);
+      if (!expired || typeof d.refreshSilent !== 'function') {
+        throw new Error('The user is not signed in.');
+      }
+      return Promise.resolve().then(() => d.refreshSilent()).then((next) => {
+        if (next && typeof next === 'object' && next.token) {
+          return { token: next.token, source: next.source || 'web' };
+        }
+        if (typeof next === 'string' && next) return { token: next, source: 'web' };
+        throw new Error('The user is not signed in.');
+      }).catch((err) => {
+        if (err && /not signed in/i.test(err.message || '')) throw err;
+        throw new Error('The user is not signed in.');
+      });
+    });
+  });
 }
 
 export function webTokenUsable(record, now, skewMs) {

@@ -117,6 +117,7 @@ const FlowDraftReply = (() => {
   // follow-up + fill-in placeholder.
   function draftBodyText(p, attachment, attachmentSource, shareUrl) {
     const params = (p && p.params) || {};
+    if (params.inviteFile) return params.body || (params.lang === 'he' ? 'מצורף.' : 'Attached.');
     const greet = draftGreeting(p && p.senderName, p && p.senderEmail);
     if (params.replyFact && !params.shareLink) {
       const factLine = cleanLine(params.factLine);

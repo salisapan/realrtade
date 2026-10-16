@@ -112,6 +112,28 @@ const FlowActions = (() => {
     // already see is the other honest case. Anything else stays a plain
     // reply draft — promising "+ file" before that match exists is how a
     // wrong file gets onto a sendable draft.
+    if (intent.inviteFile) {
+      const plan = (typeof FlowIntent !== 'undefined' && FlowIntent.attachToInvitePlan)
+        ? FlowIntent.attachToInvitePlan(intent.label)
+        : null;
+      const he = /[\u0590-\u05FF]/.test(String((plan && plan.label) || intent.label || ''));
+      return {
+        id: 'draft',
+        kind: 'gmailDraft',
+        label: 'Draft',
+        hint: 'Short note that the file is attached',
+        params: {
+          intentType: intent.type,
+          what: (plan && plan.label) || intent.label || null,
+          inviteFile: true,
+          body: (plan && plan.draft) || intent.inviteDraft || null,
+          lang: he ? 'he' : 'en',
+          threadUrl: ctx.threadUrl,
+          includeAttachment: false,
+          requestedObjectTerm: null
+        }
+      };
+    }
     const found = ctx.attachFile && ctx.attachFile.id ? ctx.attachFile : null;
     const mayFindFile = hasAttachment || Boolean(found);
     return {
@@ -245,6 +267,15 @@ const FlowActions = (() => {
       anchor: 'draft',
       stepKinds: ['draft', 'task']
     },
+    // A file asked onto an invite that already exists. The task is the
+    // work. The draft is the short "attached" line, not a reply.
+    'attach-invite': {
+      name: 'Attach it',
+      closingLine: 'Tracking the file on the invite, with a short draft.',
+      closedLine: 'Drafted and tracked.',
+      anchor: 'task',
+      stepKinds: ['task', 'draft']
+    },
     'follow-through': {
       name: 'Follow Through',
       closingLine: 'Setting a reminder to follow through, with a reply ready.',
@@ -322,7 +353,8 @@ const FlowActions = (() => {
       id = sig.handoff ? 'schedule-confirm' : 'schedule';
     } else if (intent.type === FlowIntent.TYPES.REQUEST) {
       // "No need to reply" is the task, not Reply & Track.
-      id = intent.noReplyDraft ? 'log-it' : 'reply-track';
+      // A file onto an existing invite is the task plus the short draft.
+      id = intent.inviteFile ? 'attach-invite' : (intent.noReplyDraft ? 'log-it' : 'reply-track');
     } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
       id = 'follow-through';
     } else {

@@ -629,21 +629,21 @@ const FlowGoogleCloses = (() => {
   }
 
   // Which message the reading pane should judge. emailLists[i] is the
-  // [email] values on that message, sender first. Newest non-own message
-  // wins. When every message is the account's own mail, a note addressed
-  // only to yourself is still the ask. A message to someone else stays
-  // quiet. -1 means stay quiet.
+  // [email] values on that message, sender first. A newest note addressed
+  // only to yourself is the ask, even when an older message in the thread
+  // came from someone else. Otherwise the newest non-own message wins.
+  // A message you sent to someone else stays quiet. -1 means stay quiet.
   function messageToJudge(emailLists, ownEmail) {
     const own = String(ownEmail || '').trim().toLowerCase();
     if (!own || !Array.isArray(emailLists) || !emailLists.length) return -1;
-    for (let i = emailLists.length - 1; i >= 0; i--) {
+    const newest = emailLists.length - 1;
+    if (noteToSelf(emailLists[newest], own)) return newest;
+    for (let i = newest; i >= 0; i--) {
       const list = Array.isArray(emailLists[i]) ? emailLists[i] : [];
       const sender = String(list[0] || '').trim().toLowerCase();
       if (sender && sender === own) continue;
       return i;
     }
-    const newest = emailLists.length - 1;
-    if (noteToSelf(emailLists[newest], own)) return newest;
     return -1;
   }
 

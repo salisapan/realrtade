@@ -42,7 +42,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -56,6 +56,8 @@ import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import { LADDER } from '../config/ladder.public.js';
+import './google-lane-host.js';
+import './gmail-reinject.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -191,6 +193,28 @@ try {
   });
 } catch (e) { console.error('[Glance] right-click menu unavailable', e); }
 chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
+async function migrateGoogleEverConnected() {
+  try {
+    const bag = await chrome.storage.local.get([
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      'glanceLaneUndo'
+    ]);
+    const patch = googleEverConnectedPatch(bag);
+    if (patch) await chrome.storage.local.set(patch);
+  } catch (e) { /* storage can close during a restart */ }
+}
+chrome.runtime.onInstalled.addListener((details) => {
+  const reason = details && details.reason;
+  if (reason !== 'install' && reason !== 'update') return;
+  migrateGoogleEverConnected();
+  injectOpenGmailTabs();
+});
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
+  migrateGoogleEverConnected();
+  injectOpenGmailTabs();
+});
 
 /* ---------------------------------------------------- other apps (opt-in) */
 // Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
@@ -210,7 +234,7 @@ const SURFACES = {
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
-const GMAIL_ONLY_SCRIPTS = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
+const GMAIL_ONLY_SCRIPTS = ['core/draft-reply.js', 'core/google-config.js', 'core/google-compose.js', 'src/google-compose-page.js', 'src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
 
 function surfaceScripts(id) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
@@ -306,8 +330,30 @@ async function clearOutlookNeedsRefresh(tabId) {
   } catch (e) { /* the number badge can return */ }
 }
 
+function gmailSurfaceScript() {
+  let blocks = [];
+  try { blocks = chrome.runtime.getManifest().content_scripts || []; } catch (e) { blocks = []; }
+  const block = blocks.find((s) => (s.matches || []).some((m) => String(m).indexOf('mail.google.com') >= 0));
+  if (!block || !block.js || !block.js.length) return null;
+  return { matches: block.matches, js: block.js, css: block.css || [] };
+}
+
+// Already-open Gmail tabs on install, update, and browser start. No reload.
+async function injectOpenGmailTabs() {
+  const script = gmailSurfaceScript();
+  if (!script) return 0;
+  const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+  return injectSurfaceIntoOpenTabs('gmail', script, stamp, { reload: false });
+}
+
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
-async function injectSurfaceIntoOpenTabs(id, script, stamp) {
+async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
+  const gmail = id === 'gmail' || (script && Array.isArray(script.matches) && script.matches.some((m) => String(m).indexOf('mail.google.com') >= 0));
+  if (gmail) {
+    const fn = globalThis.reinjectGmailTabs;
+    if (typeof fn === 'function') return fn();
+    return 0;
+  }
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
   const want = stamp || ((typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '');
   let tabs = [];
@@ -1187,10 +1233,16 @@ function invalidateGoogleWebAuthFlight() {
   googleWebAuthInteractiveFlight = null;
 }
 
-// A Gmail content-script flow:connect is ensureGoogleAutoConnect. The
-// popup Connect button has no tab. Only the latter may open a window.
+// A Gmail content-script flow:connect is ensureGoogleAutoConnect and must
+// not open a window. The side panel and the popup have no tab. The popup
+// opened as a normal tab does have one, and it is still our page, so Connect
+// may open a window. A web page, or a sender from another extension, may not.
 function googleConnectWantsInteractive(sender) {
-  return !(sender && sender.tab);
+  if (!sender || !sender.tab) return true;
+  const runtimeId = chrome.runtime && chrome.runtime.id;
+  const url = typeof sender.url === 'string' ? sender.url : '';
+  if (!runtimeId || sender.id !== runtimeId) return false;
+  return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
 }
 
 function googleTasksConfigured() {
@@ -1208,6 +1260,21 @@ function glanceE2eGoogleAuth(interactive) {
   const e2e = globalThis.__glanceE2e;
   if (!e2e || typeof e2e.googleAuthToken !== 'function') return null;
   return e2e.googleAuthToken(Boolean(interactive));
+}
+
+// Headless regression only. A local mock server sets httpOrigin. Production
+// never sets __glanceE2e, so the URL below is unchanged.
+function glanceE2eRewrite(url) {
+  const e2e = globalThis.__glanceE2e;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
 }
 
 function getGoogleAuthToken(interactive) {
@@ -1404,7 +1471,12 @@ async function disconnectConnector(connectorId) {
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY]));
+    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
+      key,
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      GOOGLE_RECONNECT_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY
+    ]));
     return { ok: true };
   }
   await chrome.storage.local.remove(key);
@@ -1429,18 +1501,63 @@ function googleAuthUnavailableResponse() {
 // Chrome can mint one, and the stored web-flow token otherwise. Both the
 // first fetch and the 401 retry are silent — interactive:true is reserved
 // for an explicit Connect click.
+async function markGoogleReconnect(reason) {
+  await chrome.storage.local.set({
+    [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: String(reason || 'auth') }
+  });
+}
+
+async function clearGoogleReconnect() {
+  await chrome.storage.local.remove(GOOGLE_RECONNECT_STORAGE_KEY);
+}
+
+// One silent refresh after a 401. Web tokens use prompt=none. Chrome tokens
+// use getAuthToken({ interactive: false }). Neither opens a consent window.
+async function refreshLaneCredential(cred) {
+  await invalidateGoogleCredential(cred);
+  if (cred && cred.source === 'web') {
+    try {
+      const saved = await runGoogleWebAuth(false);
+      return { token: saved.accessToken, source: 'web' };
+    } catch (e) { /* fall through to the non-interactive Chrome token */ }
+  }
+  const token = await getGoogleAuthToken(false);
+  return { token: token, source: 'chrome' };
+}
+
+// The lane host calls these. refreshSilent is getGoogleWebAccessToken(false):
+// expiry and prompt=none live in that function, not a second copy.
+globalThis.FlowGoogleAccess = {
+  refreshSilent() {
+    return getGoogleWebAccessToken(false);
+  },
+  retry(cred) {
+    return refreshLaneCredential(cred);
+  }
+};
+
+async function rememberGoogleAuthResult(res) {
+  if (!res) return res;
+  if (res.status === 401) await markGoogleReconnect('401');
+  else if (res.status === 403) await markGoogleReconnect('missing scope');
+  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
+  // after Connect stores a new token.
+  return res;
+}
+
 async function googleAuthedFetch(baseUrl, path, options) {
   let cred;
   try {
     cred = await getGoogleAccessToken(false);
   } catch (e) {
+    await markGoogleReconnect('not signed in');
     return googleAuthUnavailableResponse();
   }
-  const doFetch = (t) => fetch(baseUrl + path, Object.assign({}, options, {
+  const doFetch = (t) => fetch(glanceE2eRewrite(baseUrl + path), Object.assign({}, options, {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
   const res = await doFetch(cred.token);
-  if (res.status !== 401) return res;
+  if (res.status !== 401) return rememberGoogleAuthResult(res);
   // A cached token can go stale (revoked access from the Google Account
   // permissions page, expired) without Chrome knowing yet — evict it and
   // request a fresh one once before surfacing the failure, the same
@@ -1456,9 +1573,10 @@ async function googleAuthedFetch(baseUrl, path, options) {
       cred = await getGoogleAccessToken(false);
     }
   } catch (e) {
+    await markGoogleReconnect('not signed in');
     return googleAuthUnavailableResponse();
   }
-  return doFetch(cred.token);
+  return rememberGoogleAuthResult(await doFetch(cred.token));
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -1511,7 +1629,11 @@ async function connectGoogleTasks(interactive) {
   // web-flow consent window. Later API calls stay silent.
   await getGoogleAccessToken(interactive !== false);
   const taskListId = await findOrCreateGlanceTaskList();
-  await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
+  await chrome.storage.local.set({
+    googleTasksAuth: { taskListId },
+    [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
+  });
+  await clearGoogleReconnect();
   return true;
 }
 
@@ -4744,12 +4866,20 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, 'googleLaneWarning', 'glanceLaneUndo']);
+  let uiLang = '';
+  try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
+  const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
+    configured: googleTasksConfigured(),
+    detail: GLANCE_TASK_LIST_TITLE + ' list',
+    warning: reconnectBag.googleLaneWarning || null,
+    lang: uiLang,
+    everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
+    webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
+    laneUndo: reconnectBag.glanceLaneUndo || null
+  });
   return {
-    googleTasks: {
-      connected: Boolean(gt),
-      configured: googleTasksConfigured(),
-      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
-    },
+    googleTasks: googleTasks,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
@@ -4781,6 +4911,40 @@ function reply(sendResponse, promise) {
     .then((r) => sendResponse(r))
     .catch((err) => sendResponse({ ok: false, reason: 'error', code: (err && err.code) || undefined, error: String((err && err.message) || err) }));
   return true;
+}
+
+// One grant at a time for log read-modify-write. Two open mails each run
+// storage.js, and chrome.storage.local.set keeps whichever log lands last.
+// The port is the hold: the page disconnects when the write finishes, and
+// a closed page disconnects on its own so the next Do It is not stuck.
+const glanceLogLockState = { held: null, waiters: [] };
+
+function glanceLogLockRelease(port) {
+  if (glanceLogLockState.held === port) glanceLogLockState.held = null;
+  glanceLogLockState.waiters = glanceLogLockState.waiters.filter((p) => p !== port);
+  glanceLogLockGrant();
+}
+
+function glanceLogLockGrant() {
+  if (glanceLogLockState.held || !glanceLogLockState.waiters.length) return;
+  const next = glanceLogLockState.waiters.shift();
+  glanceLogLockState.held = next;
+  // connect() returns before the page attaches onMessage. Deliver on the
+  // next turn so that listener is in place.
+  setTimeout(() => {
+    if (glanceLogLockState.held !== next) return;
+    try { next.postMessage({ ok: true }); }
+    catch (e) { glanceLogLockRelease(next); }
+  }, 0);
+}
+
+if (chrome.runtime.onConnect && typeof chrome.runtime.onConnect.addListener === 'function') {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (!port || port.name !== 'glance-log-lock') return;
+    glanceLogLockState.waiters.push(port);
+    port.onDisconnect.addListener(() => glanceLogLockRelease(port));
+    glanceLogLockGrant();
+  });
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

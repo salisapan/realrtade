@@ -61,7 +61,11 @@ const FlowIntent = (() => {
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
-  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+  // פגישת is the construct (פגישת תכנון = a planning meeting). It is not
+  // the absolute פגישה, so a note that only uses the construct used to
+  // stay silent. The artifact lookahead still refuses "the recording of
+  // the meeting" and the same continuations as the absolute noun.
+  const MEETING_NOUN_HE = /(פגישת|פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
 
   // An explicit ask to meet, narrower than HANDOFF. "Could you please
   // confirm you can make it" is a confirm ask on a meeting that is already
@@ -425,19 +429,20 @@ const FlowIntent = (() => {
   // A meeting plan is refused when an event noun in the same clause was
   // cancelled or postponed, when that meeting already happened, when the
   // mail is out of office, or when a marketing webinar has no personal ask.
-  // Every cancel word is checked. A second event that is still on, together
-  // with an ask, is the close: "the contract was cancelled, so let's meet"
-  // and "the kickoff is cancelled, can we sync Thursday instead" both keep
-  // the new slot. "was on my list" is not a recap, because list is not an
-  // event noun. Hebrew forms are exact: בולה is not בוטל. An ask to cancel
-  // still clears that slot. planFor and the judge both call this.
+  // Every cancel word is checked, including ביטלנו and תידחה. A second event
+  // that is still on, together with an ask, is the close: "the contract was
+  // cancelled, so let's meet" and "the kickoff is cancelled, can we sync
+  // Thursday instead" both keep the new slot. "was on my list" is not a
+  // recap, because list is not an event noun. Hebrew forms are exact: בולה
+  // is not בוטל. An ask to cancel still clears that slot. "אני לא במשרד"
+  // is out of office for this veto only. planFor and the judge both call this.
   const VETO_EVENT = '(?:meetings?|calls?|demos?|interviews?|check-ins?|kick-?offs?|syncs?|webinars?|reviews?|stand-?ups?)';
   const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed)';
   const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
   const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
   const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
   const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
-  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|לא\\s+תתקיים|נדחה|לבטל|תבטל|בטל)';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל)';
   const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
   const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
   const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
@@ -487,6 +492,9 @@ const FlowIntent = (() => {
   function marketingWebinar(raw) {
     if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
     if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open)\b/i.test(raw)) return true;
+    // A mass launch invite ("הזמנה … הירשמו", virtual, limited seats) is not
+    // a meeting this person asked to put on the calendar.
+    if (/הזמנה/.test(raw) && /הירשמו/.test(raw) && /(?:וירטואלית|השקה|לכל הלקוחות|מקומות מוגבלים)/.test(raw)) return true;
     return false;
   }
   function meetingPlanVeto(text) {
@@ -496,7 +504,7 @@ const FlowIntent = (() => {
     const clauses = vetoClauses(raw);
     if (liveWithAsk(clauses)) return false;
     if (marketingWebinar(raw)) return true;
-    if (AUTO_REPLY_TEXT.test(raw)) return true;
+    if (AUTO_REPLY_TEXT.test(raw) || /(?:אני|אנחנו)\s+לא\s+במשרד/.test(raw)) return true;
     if (clauses.some(clausePast)) return true;
     if (clauses.some(clauseCancelled)) return true;
     return false;
@@ -614,8 +622,9 @@ const FlowIntent = (() => {
   // that only when the token is a person's name and the rest is an ask.
   // "Agreed — Globex" and "Dana - Head of Ops" are not that. Also and
   // Separately open the sentence; they are not names.
-  function vocativeAt(chunk) {
+  function vocativeAt(chunk, askText) {
     let raw = String(chunk || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    const askFrom = askText == null ? chunk : askText;
     const greet = raw.match(OPEN_GREET);
     if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
     let guard = 0;
@@ -650,6 +659,11 @@ const FlowIntent = (() => {
         if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
         return name;
       }
+      // "אבי שלום," is the same vocative as "שלום אבי,". שלום is already the
+      // greeting in OPEN_GREET; the name comes first, then the greeting,
+      // then the comma. The rest of the mail has to be an ask, the same
+      // restIsAsk a dash or a colon already uses. A signature is not an ask.
+      if (/^\s+שלום\s*(?:,|،)/.test(after) && personToken(name) && restIsAsk(askFrom)) return name;
       return '';
     }
     return '';
@@ -666,7 +680,7 @@ const FlowIntent = (() => {
     const hebrew = /[\u0590-\u05FF]/;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     for (let i = 0; i < chunks.length; i++) {
-      const who = vocativeAt(chunks[i]);
+      const who = vocativeAt(chunks[i], text);
       if (!who) continue;
       const named = who.toLowerCase();
       if (names.indexOf(named) !== -1) continue;
@@ -775,6 +789,11 @@ const FlowIntent = (() => {
       const slot = FlowCloseFamilies.readSlot(text, ctx.now);
       if (slot && slot.time && !facts.time) facts.time = slot.time;
       if (slot && slot.date && slot.date.iso && !(facts.date && facts.date.iso)) facts.date = slot.date;
+    }
+    // A weekday that names a different day than the written date is not a
+    // meeting. Staying quiet beats filing Thursday's words on Sunday.
+    if (facts.date && facts.date.contradictsWeekday) {
+      return { type: null, signals: {}, facts: facts, quiet: 'date' };
     }
     const s = FlowJudgment.score(text, domain, facts);
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
@@ -967,8 +986,15 @@ const FlowIntent = (() => {
           }
         }
       }
+      // "לצרף … לזימון" is the file track even when a family returned the request.
+      const invitePlan = attachToInvitePlan(text);
+      if (invitePlan && type === TYPES.REQUEST) {
+        intent.inviteFile = true;
+        intent.label = invitePlan.label;
+        intent.inviteDraft = invitePlan.draft;
+      }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft) {
+      if (intent.noReplyDraft && !intent.inviteFile) {
         const what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
         const iso = intent.entities && intent.entities.dateIso;
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
@@ -1138,8 +1164,8 @@ const FlowIntent = (() => {
     const replyMisaddressed = replyAsk && replyAimedElsewhere(text, ctx);
     if (replyMisaddressed && !quietHint) quietHint = 'hedge';
     // Own outbound, a note to self, or a vocative that names someone else
-    // is not this person's Do It. A hold does not get past that by not
-    // being a reply ask.
+    // is not this person's Do It. "אבי שלום," plus an ask is that vocative.
+    // A hold does not get past that by not being a reply ask.
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
@@ -1170,7 +1196,20 @@ const FlowIntent = (() => {
     // A clear family D hold or dated promise is that write. The meeting
     // gate would otherwise file "let's sync Tuesday at 3pm" as a calendar
     // event plus a reminder task.
-    if (!replyMisaddressed && familyBox.hit && familyBox.hit.family === 'D' &&
+    // "לצרף … לזימון" asks to put a file on an invite that already exists.
+    // The meeting noun is that invite, not a new event to schedule.
+    const attachToInvite = /לצרר?ף[\s\S]{0,160}?לזימון/.test(String(text || ''));
+    // The file track does not wait for a family to name the object. "בבקשה
+    // לצרף את טופס 101 לזימון" is that request. A missing file stays the card.
+    if (!blocked && !replyMisaddressed && attachToInvite) {
+      return finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+    }
+    if (!replyMisaddressed && !attachToInvite && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);
       if (viaHold) return viaHold;
@@ -1194,7 +1233,12 @@ const FlowIntent = (() => {
     // deadline of the request, not evidence of a meeting to schedule. A
     // schedule close still needs an explicit proposal to meet, or a time
     // offered for choice (family D / the explicit-ask gate below).
-    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
+    // "Call Tom October 19 at 10:00" phones a person. It is a task, not a
+    // meeting. A weekday ("Call Maya Tuesday") is still the meeting.
+    // "a call" / "the call" / "schedule a call" still is.
+    const phoneSomeone = /(?:^|[\n\r])\s*Call\s+[A-Z][a-zA-Z'’-]{1,40}\b/.test(String(text || ''))
+      && !/\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/.test(String(text || ''));
+    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone;
     // A clock time the extractor actually resolved. Missing either field is
     // not a time we may invent — date-only meetings stay all-day events on
     // the existing schedule process, and date-only commitments stay tasks.
@@ -1205,7 +1249,7 @@ const FlowIntent = (() => {
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
     const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי/i.test(text);
-    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge &&
+    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
@@ -1273,6 +1317,19 @@ const FlowIntent = (() => {
         minute: facts.time.minute
       };
     }
+    // Phoning a named person at a clock is the task. The meeting noun
+    // "call" is that verb, not an event to schedule.
+    if (!blocked && !replyMisaddressed && phoneSomeone && hasResolvedDate && clock && !isPast && !calledOff) {
+      return finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: String(text || '').split(/\n/)[0].replace(/\s+/g, ' ').trim(),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso,
+        hour: clock.hour,
+        minute: clock.minute
+      }, 'dated-commitment');
+    }
+
     if (!blocked && !replyMisaddressed && eventEvidence) {
       // A meeting that is also a timed commitment, or an explicit ask to
       // meet at that clock time, is the calendar-hold personal close: one
@@ -1364,6 +1421,8 @@ const FlowIntent = (() => {
     } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyOk) {
+      // "בבקשה לצרף … לזימון" stays a request. The card is the file track,
+      // not "Reply requested by …". The meeting path already stood down.
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
@@ -1501,7 +1560,24 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto };
+  // A file asked onto an invite that already exists. One plan, reused by
+  // both lanes: a task, then a short attached draft. The title replaces
+  // "Reply requested". A missing file is still this card, never a banner.
+  function attachToInvitePlan(text) {
+    const raw = String(text || '');
+    if (!/לצרר?ף[\s\S]{0,160}?לזימון/.test(raw)) return null;
+    const he = /[\u0590-\u05FF]/.test(raw);
+    return {
+      inviteFile: true,
+      label: he ? 'לצרף קובץ לזימון' : 'Attach file to invite',
+      processId: 'attach-invite',
+      stepKinds: ['task', 'draft'],
+      draft: he ? 'מצורף.' : 'Attached.',
+      banner: false
+    };
+  }
+
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

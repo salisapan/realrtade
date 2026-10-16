@@ -1366,6 +1366,28 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   });
   check('Hebrew Cc-only reply addressed to Avi stays quiet:hedge', !heCc.type && heCc.quiet === 'hedge', { type: heCc.type, quiet: heCc.quiet });
   check('שלום אבי names אבי', FlowIntent.openingAddressee(heBody) === 'אבי');
+  const aviMeet = 'אבי שלום, רוצה לעשות פגישת סטטוס קצרה ביום ראשון ב-11:15? תודה, הילה';
+  const aviCc = classify(aviMeet, {
+    to: ['avi.mizrahi@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    ownNames: ['Dana Cohen', 'דנה'],
+    userName: 'Dana Cohen',
+    senderEmail: 'hila@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('אבי שלום plus an ask on Cc only stays quiet:hedge', !aviCc.type && aviCc.quiet === 'hedge', { type: aviCc.type, quiet: aviCc.quiet });
+  const saliMeet = classify('סאלי שלום, רוצה לעשות פגישת סטטוס קצרה ביום ראשון ב-11:15?', {
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    ownNames: ['Sali', 'סאלי'],
+    userName: 'Sali',
+    senderEmail: 'hila@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('סאלי שלום plus a status meeting still offers', saliMeet.type === FlowIntent.TYPES.SCHEDULED_EVENT && saliMeet.quiet !== 'hedge', { type: saliMeet.type, quiet: saliMeet.quiet });
   const heSend = classify('תוכל לשלוח לי את החוזה עד יום חמישי?', {
     to: ['dana.cohen@northwind.example'],
     ownAddresses: ['dana.cohen@northwind.example'],

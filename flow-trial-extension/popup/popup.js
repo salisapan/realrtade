@@ -127,6 +127,12 @@
   } catch (e) { /* the open panel keeps the language it painted */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || (!ch.googleReconnect && !ch.googleLaneWarning)) return;
+      refresh().catch(() => {});
+    });
+  } catch (e) { /* the pill refreshes the next time the popup opens */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local' || !ch.log) return;
       const panel = document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
@@ -281,6 +287,30 @@
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
   }
 
+  // Activity Undo for a lane write. Card kinds map onto the lane connector.
+  // Outlook and the other writers stay on flow:undo-action.
+  function laneUndoMessage(connectorId, ref, created) {
+    const map = {
+      calendar: 'googleHold',
+      googleTask: 'googleLaneTask',
+      googleTasks: 'googleLaneTask',
+      driveFile: 'googleDriveSave',
+      attachmentSave: 'googleDriveSave',
+      driveDoc: 'googleDoc',
+      driveSheet: 'googleSheetAppend',
+      gmailDraft: 'gmailCompose',
+      googleHold: 'googleHold',
+      googleLaneTask: 'googleLaneTask',
+      googleDriveSave: 'googleDriveSave',
+      googleDoc: 'googleDoc',
+      googleSheetAppend: 'googleSheetAppend',
+      gmailCompose: 'gmailCompose'
+    };
+    const lane = map[connectorId];
+    if (!lane) return null;
+    return { type: 'flow:google-undo', connectorId: lane, ref: ref, created: created };
+  }
+
   // The popup loads this package's stamp. The worker answers with the stamp
   // of the registration that is actually running. They differ when that
   // registration is still the previous build.
@@ -382,6 +412,20 @@
       stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
       pill.textContent = microsoftFaceLabel(microsoft);
       pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+      return;
+    }
+    const reconnecting = Object.keys(status || {}).filter((k) => status[k] && status[k].needsReconnect);
+    const warning = Object.keys(status || {}).filter((k) => status[k] && status[k].warning);
+    if (reconnecting.length) {
+      pill.textContent = status[reconnecting[0]].headerLabel || status[reconnecting[0]].reconnectLabel;
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
+      return;
+    }
+    if (warning.length) {
+      pill.textContent = status[warning[0]].headerLabel || status[warning[0]].warningLabel;
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
       return;
     }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
@@ -673,7 +717,15 @@
     head.appendChild(name);
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
-    else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
+    else if (st.needsReconnect) {
+      const badge = el('span', 'badge', st.headerLabel || st.reconnectLabel || 'התחבר מחדש');
+      badge.setAttribute('dir', 'auto');
+      head.appendChild(badge);
+    } else if (st.warning) {
+      const badge = el('span', 'badge', st.headerLabel || st.warningLabel);
+      badge.setAttribute('dir', 'auto');
+      head.appendChild(badge);
+    } else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
     else if (c.status === 'live' || st.configured === true) head.appendChild(el('span', 'badge live', 'עובד'));
     else head.appendChild(el('span', 'badge', 'צריך הגדרה'));
     card.appendChild(head);
@@ -723,6 +775,7 @@
     }
 
     const ready = st.configured !== false;
+    const connectLabel = st.needsReconnect && st.reconnectLabel ? st.reconnectLabel : ('התחבר ל-' + c.label);
     // Only the ready (primary/.doit-style) button gets the shell/ring/shine
     // spans — .ghost.wide (missing OAuth config, MVP-inert) stays a plain
     // outlined pill, same distinction the marketing site draws between its
@@ -732,9 +785,11 @@
       btn.appendChild(el('span', 'shell'));
       btn.appendChild(el('span', 'ring'));
       btn.appendChild(el('span', 'shine'));
-      btn.appendChild(el('span', 'btn-label', 'התחבר ל-' + c.label));
+      const label = el('span', 'btn-label', connectLabel);
+      if (st.needsReconnect) label.setAttribute('dir', 'auto');
+      btn.appendChild(label);
     } else {
-      btn.textContent = 'התחבר ל-' + c.label;
+      btn.textContent = connectLabel;
     }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
@@ -749,7 +804,7 @@
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
-        btn.disabled = false; setBtnLabel(btn, 'התחבר ל-' + c.label);
+        btn.disabled = false; setBtnLabel(btn, connectLabel);
         err.textContent = (res && res.error) || 'Connection failed.';
         err.hidden = false;
       }
@@ -2709,7 +2764,7 @@
       if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
         u.disabled = false;
         u.textContent = L.undo;
-        note.textContent = showWords(r.written) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
+        note.textContent = showWords(r.written) || showWords(r.error) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
         note.hidden = false;
         if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
           await FlowStorage.patchGlanceProof(entry.messageId, { undoRefused: 'user-edited', undoLine: note.textContent });
@@ -3406,7 +3461,10 @@
           }
           u.textContent = Lw.undoing;
           u.disabled = true;
-          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
+          // Keep both: a computer-use row returns above via markComputerUndone.
+          // A Google lane row uses flow:google-undo. Every other writer stays
+          // on flow:undo-action, including the creation snapshot #144 reads.
+          const r = await readBackOrTimeout(send(laneUndoMessage(e.connectorId, e.ref, e.created) || { type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
           const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
           if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
@@ -3440,8 +3498,9 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
-              ? r.written
+            const refusal = r && (r.written || r.error);
+            const line = (refusal && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
+              ? refusal
               : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = Lw.undo;
             u.disabled = false;

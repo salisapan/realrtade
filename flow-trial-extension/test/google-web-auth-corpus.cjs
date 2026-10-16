@@ -33,7 +33,7 @@ function loadPure() {
   const src = stripModuleSyntax(fs.readFileSync(path.join(__dirname, '..', 'src', 'google-web-auth.js'), 'utf8'));
   const sandbox = { URL, URLSearchParams, decodeURIComponent, Date };
   vm.createContext(sandbox);
-  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY };', sandbox, { filename: 'google-web-auth.js' });
+  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_CONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, googleEverConnectedPatch, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
   return sandbox.__api;
 }
 
@@ -214,6 +214,69 @@ async function run() {
   check('interaction required may fall back when interactive', api.shouldFallbackFromGetAuthToken('User interaction required.', { interactive: true }) === true);
   check('access_denied is a cancel', api.isUserCancelMessage('access_denied') === true);
   check('signin-off is not a cancel', api.isUserCancelMessage(SIGNIN_OFF) === false);
+
+  console.log('\n--- lane token order and reconnect status ---\n');
+  const HE_UNDO = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+  check('Hebrew UI refusal', api.unconfirmedRefusal('he') === HE_UNDO && api.unconfirmedRefusal('he-IL') === HE_UNDO);
+  check('English UI refusal', api.unconfirmedRefusal('en') === "Couldn't confirm it's unchanged. Undo left it alone." && api.unconfirmedRefusal('en-US') === "Couldn't confirm it's unchanged. Undo left it alone.");
+  {
+    let chromeCalls = 0;
+    const cred = await api.laneCredential({
+      readWebAuth: async () => ({ accessToken: 'ya29.stored', expiresAt: Date.now() + 3600e3 }),
+      refreshSilent: async () => { throw new Error('should not refresh a valid token'); },
+      getAuthToken: () => { chromeCalls += 1; return ''; }
+    });
+    check('identity runs first and a signed-out call uses the stored Connect token', cred.token === 'ya29.stored' && cred.source === 'web' && chromeCalls === 1, cred);
+  }
+  {
+    let interactive = null;
+    const cred = await api.laneCredential({
+      readWebAuth: async () => null,
+      getAuthToken: (flag) => { interactive = flag; return 'ya29.chrome'; }
+    });
+    check('no stored token uses getAuthToken non-interactive', cred.token === 'ya29.chrome' && cred.source === 'chrome' && interactive === false, { cred, interactive });
+  }
+  {
+    let chromeCalls = 0;
+    const cred = await api.laneCredential({
+      readWebAuth: async () => ({ accessToken: 'ya29.old', expiresAt: Date.now() - 5000 }),
+      refreshSilent: async () => ({ token: 'ya29.fresh', source: 'web' }),
+      getAuthToken: () => { chromeCalls += 1; return ''; }
+    });
+    check('a signed-out identity refreshes an expired stored token silently', cred.token === 'ya29.fresh' && cred.source === 'web' && chromeCalls === 1, cred);
+  }
+  {
+    const on = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { configured: true, detail: 'Glance list' });
+    const off = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { configured: true, detail: 'Glance list' });
+    check('a reconnect flag is not Connected', on.connected === true && off.connected === false && off.needsReconnect === true && off.reconnectLabel === api.GOOGLE_RECONNECT_LABEL && off.detail == null, off);
+    const english = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { lang: 'en' });
+    const hebrew = api.googleConnectionState({ taskListId: 'LIST_A' }, { needed: true, reason: '401' }, { lang: 'he' });
+    const warned = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { lang: 'en', warning: { needed: true } });
+    const warnedHe = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { lang: 'he', warning: { needed: true } });
+    const noGrant = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'en' });
+    const afterConnect = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'en', everConnected: { connected: true } });
+    const afterConnectHe = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'he', everConnected: { connected: true } });
+    const neverHe = api.googleConnectionState(null, null, { lang: 'he' });
+    check('English UI reconnect is not the Hebrew label', english.connected === false && english.needsReconnect === true && english.headerLabel === 'Reconnect Google' && english.reconnectLabel === 'Reconnect Google', english);
+    check('Hebrew UI reconnect stays Hebrew', hebrew.connected === false && hebrew.headerLabel === api.GOOGLE_RECONNECT_LABEL, hebrew);
+    check('a partial lane warning is not Connected', warned.connected === false && warned.warning === true && warned.headerLabel === 'A step did not finish' && warned.headerLabel !== 'Connected', warned);
+    check('a Hebrew partial warning follows the UI', warnedHe.connected === false && warnedHe.headerLabel === 'שלב אחד לא הושלם', warnedHe);
+    check('never connected shows Connect', noGrant.connected === false && noGrant.needsReconnect === false && noGrant.headerLabel === 'Connect Google', noGrant);
+    check('a previous Connect shows Reconnect', afterConnect.connected === false && afterConnect.needsReconnect === true && afterConnect.headerLabel === 'Reconnect Google', afterConnect);
+    check('Hebrew Connect and Reconnect follow the UI', neverHe.headerLabel === api.GOOGLE_CONNECT_LABEL && afterConnectHe.headerLabel === api.GOOGLE_RECONNECT_LABEL, { neverHe, afterConnectHe });
+    const oldWeb = api.googleConnectionState(null, null, { lang: 'en', webAuth: { accessToken: 'ya29.old' } });
+    const oldTasks = api.googleConnectionState(null, null, { lang: 'en', tasksAuth: { taskListId: 'glance-list' } });
+    const oldSuccess = api.googleConnectionState(null, null, { lang: 'en', laneUndo: { m1: { steps: [{ connectorId: 'googleHold' }] } } });
+    const clean = api.googleConnectionState(null, null, { lang: 'en' });
+    check('an old web token with no marker shows Reconnect', oldWeb.connected === false && oldWeb.needsReconnect === true && oldWeb.headerLabel === 'Reconnect Google', oldWeb);
+    check('an old Tasks grant with no marker shows Reconnect', oldTasks.connected === false && oldTasks.needsReconnect === true && oldTasks.headerLabel === 'Reconnect Google', oldTasks);
+    check('a past success with no marker shows Reconnect', oldSuccess.connected === false && oldSuccess.needsReconnect === true && oldSuccess.headerLabel === 'Reconnect Google', oldSuccess);
+    check('a clean state shows Connect', clean.connected === false && clean.needsReconnect === false && clean.headerLabel === 'Connect Google', clean);
+    const patch = api.googleEverConnectedPatch({ googleWebAuth: { accessToken: 'ya29.old' } });
+    const againPatch = api.googleEverConnectedPatch({ googleEverConnected: { connected: true }, googleWebAuth: { accessToken: 'ya29.old' } });
+    const cleanPatch = api.googleEverConnectedPatch({});
+    check('migration writes the marker once for an old token', patch && patch[api.GOOGLE_EVER_CONNECTED_STORAGE_KEY] && patch[api.GOOGLE_EVER_CONNECTED_STORAGE_KEY].connected === true && againPatch == null && cleanPatch == null, { patch, againPatch, cleanPatch });
+  }
 
   console.log('\n--- redirect URI and authorize URL ---\n');
   check('unpacked redirect', api.googleRedirectUriForExtension(EXTENSION_ID) === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/');
@@ -428,13 +491,15 @@ async function run() {
       chromeToken: 'cached-chrome',
       stored: {
         googleTasksAuth: { taskListId: 'LIST_A' },
-        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 }
+        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 },
+        googleEverConnected: { connected: true }
       }
     });
     const out = await attempt(env.fn('disconnectConnector')('googleTasks'));
     check('disconnect succeeds', out.ok && out.value && out.value.ok === true, out);
     check('googleTasksAuth is gone', env.stored.googleTasksAuth == null, env.stored);
     check('the web-flow token is gone', env.stored.googleWebAuth == null, env.stored);
+    check('disconnect clears the ever-connected marker', env.stored.googleEverConnected == null, env.stored);
     check('the cached chrome token was evicted', env.calls.indexOf('EVICT cached-chrome') !== -1, env.calls);
     check('clearAllCachedAuthTokens ran', env.calls.indexOf('CLEAR_ALL') !== -1, env.calls);
     check('disconnect did not open the web flow', !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
@@ -460,6 +525,34 @@ async function run() {
     check('a content-script sender is not an explicit Connect', env.fn('googleConnectWantsInteractive')({ tab: { id: 3 } }) === false);
     check('the popup sender is an explicit Connect', env.fn('googleConnectWantsInteractive')({ url: 'chrome-extension://id/popup/popup.html' }) === true);
     check('a missing sender stays an explicit Connect', env.fn('googleConnectWantsInteractive')(null) === true);
+    const wants = env.fn('googleConnectWantsInteractive');
+    const own = 'chrome-extension://' + EXTENSION_ID + '/';
+    check('the side panel is an explicit Connect', wants({ id: EXTENSION_ID, url: own + 'sidepanel.html' }) === true);
+    check('the popup opened as a tab is an explicit Connect', wants({
+      id: EXTENSION_ID,
+      url: own + 'popup.html',
+      tab: { id: 7, url: own + 'popup.html' }
+    }) === true);
+    check('a foreign extension id is not an explicit Connect', wants({
+      id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      url: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/popup.html',
+      tab: { id: 8, url: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/popup.html' }
+    }) === false);
+    check('a foreign id claiming our popup url is not an explicit Connect', wants({
+      id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      url: own + 'popup.html',
+      tab: { id: 10, url: own + 'popup.html' }
+    }) === false);
+    check('a content script on an https page is not an explicit Connect', wants({
+      id: EXTENSION_ID,
+      url: 'https://mail.google.com/mail/u/0/',
+      tab: { id: 9, url: 'https://mail.google.com/mail/u/0/' }
+    }) === false);
+    check('a content script on an http page is not an explicit Connect', wants({
+      id: EXTENSION_ID,
+      url: 'http://example.com/inbox',
+      tab: { id: 11, url: 'http://example.com/inbox' }
+    }) === false);
   }
   {
     const env = load({
@@ -559,6 +652,20 @@ async function run() {
     await new Promise((r) => setImmediate(r));
     check('the late approval is not a saved token', out.ok === false, out);
     check('the late approval does not restore googleWebAuth', env.stored.googleWebAuth == null, env.stored);
+  }
+
+  console.log('\n--- connector status shares the reconnect flag ---\n');
+  {
+    const env = load({
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleReconnect: { needed: true, reason: '401' }
+      }
+    });
+    const status = await env.fn('connectorStatus')();
+    check('connector status hides Connected while a write needs reconnect',
+      status && status.googleTasks && status.googleTasks.connected === false && status.googleTasks.needsReconnect === true && status.googleTasks.reconnectLabel === 'התחבר מחדש ל-Google',
+      status && status.googleTasks);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

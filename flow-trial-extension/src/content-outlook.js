@@ -3951,7 +3951,9 @@
       // A stored schedule process used to skip this and leave the old card up
       // while Why not shown already said drive-search-failed.
       const fileNow = (decided && (filePendingReason(decided.reason) || fileSilenceReason(decided.reason))) || (planned && fileSilenceReason(planned.reason));
-      if (fileNow) {
+      const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
+        ? FlowIntent.attachToInvitePlan(pane.text || '') : null;
+      if (fileNow && !invitePlan) {
           const tracing = traceArmed || localFileTrace();
           graphTrace = { attempts: [] };
           const askPrepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)

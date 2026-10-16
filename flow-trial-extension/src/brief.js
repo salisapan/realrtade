@@ -47,8 +47,12 @@ const FlowBrief = (() => {
     return count === 1 ? '1 thing still open' : count + ' things still open';
   }
 
+  // The same helper as the card (glanceUiCopy). English Gmail reads
+  // "Still open". Hebrew Gmail reads the Hebrew line. Never both.
   function panelHeadLabel() {
-    return 'מה עדיין פתוח · Still open';
+    if (typeof glanceUiCopy === 'function') return glanceUiCopy('panelHead');
+    const code = (typeof navigator !== 'undefined' && navigator.language) || '';
+    return /^he(-|$)/i.test(String(code)) ? 'מה עדיין פתוח' : 'Still open';
   }
 
   // Ensures the indicator exists and reflects `count`, wiring onToggle to
