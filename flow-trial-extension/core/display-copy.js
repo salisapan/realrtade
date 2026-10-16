@@ -96,7 +96,29 @@ const FlowDisplay = (() => {
   }
 
   // One entry, one title. A shared chip label is not this entry's action.
-  function activityTitle(entry) {
+  function localizeHeading(lang, title) {
+    const raw = String(title == null ? '' : title);
+    if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
+    let matched = raw.match(/^Log (.+) agreed$/);
+    if (matched) return 'רשום ' + matched[1] + ' שסוכם';
+    if (raw === 'Log this decision') return 'רשום את ההחלטה';
+    if (raw === 'Log that this is not going ahead') return 'רשום שזה לא מתקדם';
+    if (raw === 'Log agreement executed') return 'רשום שההסכם נחתם';
+    if (raw === 'Log discrepancy raised') return 'רשום שהועלתה אי התאמה';
+    matched = raw.match(/^Log commitment for (.+)$/);
+    if (matched) return 'רשום התחייבות ל-' + matched[1];
+    matched = raw.match(/^Log (.+), (.+)$/);
+    if (matched) return 'רשום ' + matched[1] + ', ' + matched[2];
+    if (/^log it$/i.test(raw)) return 'רשום';
+    if (raw === 'Save the file?') return 'לשמור את הקובץ?';
+    return raw;
+  }
+
+  function activityTitle(entry, lang) {
+    return localizeHeading(lang, activityTitleRaw(entry));
+  }
+
+  function activityTitleRaw(entry) {
     if (!entry) return 'Untitled message';
     if (entry.actionTitle && String(entry.actionTitle).trim() && !genericLabel(entry.actionTitle)) {
       return String(entry.actionTitle).trim();
@@ -322,6 +344,8 @@ const FlowDisplay = (() => {
       manualMany: '{n} manual steps left for you',
       saveFiles: 'Save {on} of {all} attachments', attachments: 'Attachments', less: 'Less', newStep: 'New step', afterApprove: 'after Approve',
       calendarApp: 'Calendar', youApp: 'You', undoUnavailable: 'Undo unavailable.',
+      stepCalendar: 'Calendar', stepTask: 'Task', stepDraft: 'Draft', stepFile: 'File',
+      todoApp: 'To Do', outlookApp: 'Outlook', gmailApp: 'Gmail', onedriveApp: 'OneDrive', driveApp: 'Drive',
       justNow: 'just now', minsAgo: '{n}m ago', hrsAgo: '{n}h ago', writtenTo: 'Written to ',
       queued: 'Queued', preparing: 'Preparing', verifying: 'Verifying', verified: 'Verified',
       seeOpen: 'See what’s open',
@@ -361,28 +385,28 @@ const FlowDisplay = (() => {
       suggested: 'מוצע', added: 'נוסף', manual: 'ידני · בשבילך',
       dismiss: 'הסתר', dismissing: 'מסתיר…', doIt: 'בצע', view: 'הצג',
       undo: 'בטל', undoAll: 'בטל הכל', undoing: 'מבטל…', closing: 'סוגר…',
-      fromOutlook: 'מ-Outlook', expired: 'פג תוקף', openDraft: 'פתח טיוטה', openEvent: 'פתח אירוע', show: 'הצג',
+      fromOutlook: 'מהדואר', expired: 'פג תוקף', openDraft: 'פתח טיוטה', openEvent: 'פתח אירוע', show: 'הצג',
       handled: 'טופל.', approve: 'אשר סגירה',
       kindHandled: 'טופל', kindUndone: 'בוטל', kindClicked: 'נלחץ', kindDismissed: 'הוסתר', kindDraft: 'טיוטה',
-      couldnt: 'לא אומת', couldntPlain: 'לא אומת', retry: 'נסה שוב', outlookOff: 'Outlook לא מחובר',
+      couldnt: 'לא אומת', couldntPlain: 'לא אומת', retry: 'נסה שוב', outlookOff: 'הדואר לא מחובר',
       couldntUnchanged: 'לא אומת שהרשומה לא השתנתה. הביטול השאיר אותה.',
       couldntVerify: 'לא הצלחתי לאשר, נסה שוב',
       createdUnverified: 'נוצר, לא אומת',
       youEdited: 'ערכת את זה. הביטול השאיר את זה.',
-      stillThere: 'המשימה עדיין ב-To Do.',
+      stillThere: 'המשימה עדיין שם.',
       verifyNote: 'לא אומת',
       verifyingNow: 'מאמת…',
       draftReady: 'טיוטה מוכנה.',
-      draftReadyLong: 'טיוטת תשובה מוכנה ב-Outlook. לא נשלח.',
+      draftReadyLong: 'טיוטת תשובה מוכנה. לא נשלח.',
       draftReadyNotSent: 'הטיוטה מוכנה. לא נשלח.',
-      draftWithFile: 'טיוטת תשובה מוכנה ב-Outlook, עם הקובץ המצורף. לא נשלח.',
+      draftWithFile: 'טיוטת תשובה מוכנה, עם הקובץ. לא נשלח.',
       draftRemoved: 'טיוטת התשובה הוסרה. לא נשלח.',
       draftGone: 'הטיוטה כבר לא שם. אין מה לבטל.',
       couldntRemove: 'לא הצלחתי להסיר את הטיוטה.',
       partlyHandled: 'טופל חלקית.',
-      undoGoogle: 'הביטול מסיר את המשימה ב-Google.',
-      undoTodo: 'הביטול מסיר את המשימה ב-To Do.',
-      undoFile: 'הביטול מסיר את הקובץ ב-OneDrive.',
+      undoGoogle: 'הביטול מסיר את המשימה.',
+      undoTodo: 'הביטול מסיר את המשימה.',
+      undoFile: 'הביטול מסיר את הקובץ.',
       undoRestore: 'הביטול משחזר את הקובץ הקודם ב-OneDrive.',
       undoneGoogle: 'בוטל — המשימה ב-Google הוסרה.',
       undoneTodo: 'בוטל — המשימה ב-To Do הוסרה.',
@@ -410,10 +434,10 @@ const FlowDisplay = (() => {
       stopTracking: 'הפסק מעקב',
       earlyLine: 'אין עוד מה לפתוח ואין עוד מה לבדוק — זה טופל.',
       undoCalendar: 'הביטול מסיר את האירוע ביומן.',
-      undoGmail: 'הביטול מסיר את הטיוטה ב-Gmail.',
+      undoGmail: 'הביטול מסיר את הטיוטה.',
       undoDoc: 'הביטול מסיר את המסמך.',
       undoSheet: 'הביטול מסיר את הגיליון.',
-      undoDrive: 'הביטול מסיר את הקובץ ב-Drive.',
+      undoDrive: 'הביטול מסיר את הקובץ.',
       undoWritten: 'הביטול מסיר את מה שנכתב עכשיו.',
       undoAllWritten: 'ביטול הכל מסיר את מה שנכתב עכשיו.',
       undoneCalendar: 'בוטל — האירוע ביומן הוסר.',
@@ -435,6 +459,8 @@ const FlowDisplay = (() => {
       manualMany: '{n} צעדים ידניים נשארו לך',
       saveFiles: 'שמור {on} מתוך {all} קבצים', attachments: 'קבצים', less: 'פחות', newStep: 'צעד חדש', afterApprove: 'אחרי אישור',
       calendarApp: 'יומן', youApp: 'אתה', undoUnavailable: 'אין ביטול.',
+      stepCalendar: 'יומן', stepTask: 'משימה', stepDraft: 'טיוטה', stepFile: 'קובץ',
+      todoApp: 'משימות', outlookApp: 'אאוטלוק', gmailApp: 'ג׳ימייל', onedriveApp: 'וואן־דרייב', driveApp: 'דרייב',
       justNow: 'עכשיו', minsAgo: 'לפני {n} דק׳', hrsAgo: 'לפני {n} שע׳', writtenTo: 'נכתב אל ',
       queued: 'בתור', preparing: 'מכין', verifying: 'מאמת', verified: 'אומת',
       seeOpen: 'מה פתוח',
@@ -455,7 +481,7 @@ const FlowDisplay = (() => {
       ledgerTitle: 'מה Glance למד ממך',
       ledgerHint: 'על המכשיר הזה בלבד. איפוס שוכח כל התאמה, איך נפתחים ונסגרים מיילים, הקשרים בין אנשים, ואת הרשימה הזו.',
       ledgerReset: 'אפס את מה ש-Glance למד',
-      closeMemHint: 'זיכרון הסגירה וכרטיסי Outlook נשארים על המכשיר. ניקוי נותן ל-Glance לדבר שוב על מה שכבר נסגר, ומוריד קבלות טיוטה שנשארו.',
+      closeMemHint: 'זיכרון הסגירה וכרטיסי הדואר נשארים על המכשיר. ניקוי נותן ל-Glance לדבר שוב על מה שכבר נסגר, ומוריד קבלות טיוטה שנשארו.',
       closeMem: 'נקה זיכרון סגירה',
       clearMemConfirm: 'לנקות את זיכרון הסגירה ואת כרטיסי Outlook במכשיר הזה? קבלות טיוטה והצעות מ-Outlook יוסרו. אי אפשר לבטל.',
       referralTxt: 'מישהו נוסף בצוות כנראה עם אותה לולאה פתוחה.',
@@ -573,7 +599,7 @@ const FlowDisplay = (() => {
       const line = clock ? holdCardText(lang, clock.dateIso, clock.hour, clock.minute) : '';
       if (line) return line;
     }
-    return fallback == null ? '' : String(fallback);
+    return localizeHeading(lang, fallback == null ? '' : String(fallback));
   }
 
   function activityMetric(lang, text) {
@@ -650,6 +676,7 @@ const FlowDisplay = (() => {
     holdCardText: holdCardText,
     holdClockFrom: holdClockFrom,
     cardTitle: cardTitle,
+    localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,
     chrome: chrome,

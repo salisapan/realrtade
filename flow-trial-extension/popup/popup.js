@@ -57,7 +57,12 @@
     let nav = '';
     try { nav = (navigator && navigator.language) || ''; } catch (e) {}
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
-      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+      return FlowDisplay.uiLangFrom({
+        setting: state && state.glanceUiLanguage,
+        hostLanguage: state && state.glanceHostLanguage,
+        uiLanguage: ui,
+        navigatorLanguage: nav
+      });
     }
     return 'en';
   }
@@ -108,6 +113,16 @@
   }
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || (!ch.glanceHostLanguage && !ch.glanceUiLanguage)) return;
+      if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
+      if (ch.glanceUiLanguage) state.glanceUiLanguage = ch.glanceUiLanguage.newValue;
+      const panel = document.querySelector && document.querySelector('.panel[data-panel="log"]');
+      if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
+      else paintActivityShell();
+    });
+  } catch (e) { /* the open panel keeps the language it painted */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local' || !ch.log) return;
@@ -3311,11 +3326,28 @@
     return false;
   }
 
+  function undoNoteFor(e) {
+    const Lw = words();
+    const id = e && e.connectorId;
+    if (id === 'outlookCalendar' || id === 'calendar') return Lw.undoCalendar;
+    if (id === 'outlookTask' || id === 'microsoftTodo' || id === 'googleTask' || id === 'googleTasks') return Lw.undoTodo;
+    if (id === 'onedriveFile' || id === 'attachmentSave' || id === 'driveFile' || id === 'googleDriveFile') return Lw.undoFile;
+    if (id === 'gmailDraft') return Lw.undoGmail;
+    if (id === 'outlookDraft') return Lw.undoWritten;
+    if (uiLang() === 'he') return Lw.undoWritten;
+    if (typeof FlowReceipt !== 'undefined' && FlowReceipt.undoHint) return FlowReceipt.undoHint(e && e.where ? [e.where] : []);
+    return Lw.undoWritten;
+  }
+
   function logRow(e) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    const rowTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle) ? FlowDisplay.activityTitle(e) : (e.actionTitle || e.label || '-');
-    top.appendChild(el('span', 'log-label', rowTitle));
+    const rowTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle) ? FlowDisplay.activityTitle(e, uiLang()) : (e.actionTitle || e.label || '-');
+    const titleNode = el('span', 'log-label', rowTitle);
+    const generated = typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.localizeHeading === 'function'
+      && FlowDisplay.localizeHeading('he', e.label || e.actionTitle || '') !== String(e.label || e.actionTitle || '');
+    if (!generated && /[A-Za-z]/.test(rowTitle)) titleNode.setAttribute('data-glance-user', '1');
+    top.appendChild(titleNode);
     // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
     const Lw = words();
@@ -3340,7 +3372,7 @@
         acts.appendChild(a);
       }
       if (e.ref) {
-        const hintLine = FlowReceipt.undoHint(e.where ? [e.where] : []);
+        const hintLine = undoNoteFor(e);
         const u = el('button', 'ghost sm', Lw.undo);
         u.type = 'button';
         u.setAttribute('aria-label', hintLine);

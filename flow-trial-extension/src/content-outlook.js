@@ -190,7 +190,21 @@
       ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav })
       : 'en';
     if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.setUiLang === 'function') FlowChipHost.setUiLang(lang);
+    rememberHostLanguage(host);
     return lang;
+  }
+
+  function rememberHostLanguage(host) {
+    const raw = String(host || '').trim();
+    if (!raw) return;
+    const key = raw.toLowerCase();
+    if (rememberHostLanguage.last === key) return;
+    rememberHostLanguage.last = key;
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.get().then(function (st) {
+      if (st && st.glanceHostLanguage === raw) return null;
+      return FlowStorage.set({ glanceHostLanguage: raw });
+    }).catch(function () {});
   }
 
   function pageChrome() {
@@ -1002,9 +1016,9 @@
     // In-page Do It writes the Outlook draft only (same as popup). Drop non-draft steps from the chip.
     // A OneDrive file step is the close. The draft beside it is the share-link step, and dropping the file
     // would turn that Do It into a reply draft.
-    const hasOnedrive = (process.steps || []).some((s) => s && s.kind === 'onedriveFile');
+    const hasFile = (process.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
     const draftSteps = (process.steps || []).filter((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft');
-    if (draftSteps.length && !hasOnedrive) {
+    if (draftSteps.length && !hasFile) {
       process = Object.assign({}, process, {
         steps: draftSteps.map((s) => s.kind === 'gmailDraft'
           ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
@@ -1122,15 +1136,31 @@
       paintIfCurrent(token, function () { paintRemove(host); });
       return;
     }
-    const fileStep = steps.find((s) => s && s.kind === 'onedriveFile');
+    const fileStep = steps.find((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
     if (fileStep) {
       await onOnedriveDoIt(host, chip, ctx, fileStep, token);
       return;
     }
     const hasDraft = steps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
+    const calendarStep = steps.find((s) => s && s.kind === 'calendar');
     const taskStep = steps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    // The card already rendered this plan. Do It writes those steps. It does
+    // not classify the mail again, and it does not invent a reply draft.
+    if (calendarStep && !hasDraft) {
+      const preset = calendarParamsFromStep(calendarStep, ctx);
+      if (!preset) {
+        paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', pageChrome().couldntFind); });
+        return;
+      }
+      await finishMeetingHold(host, ctx, token, preset);
+      return;
+    }
     if (taskStep && !hasDraft) {
       await onOutlookTodoDoIt(host, chip, ctx, taskStep, token);
+      return;
+    }
+    if (!hasDraft) {
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', pageChrome().somethingWrong); });
       return;
     }
     const askText = ctx.bodyText || ctx.text || '';
@@ -2721,7 +2751,7 @@
     const old = mount.querySelector('.flow-chip-host');
     if (old) paintIfCurrent(token, function () { paintRemove(old); });
     const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch(ctx, pane), {
-      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+      onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     }); });
     if (!host) return { shown: false, why: 'inject-failed' };
@@ -2922,15 +2952,6 @@
     const steps = (ctx && ctx.process && ctx.process.steps) || [];
     steps.forEach((step) => { if (step && step.params) bags.push(step.params); });
     if (ctx && ctx.intent) bags.push(ctx.intent.entities, ctx.intent.facts, ctx.intent);
-    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.classify === 'function' && ctx) {
-      const text = String(ctx.bodyText || ctx.text || '').trim();
-      if (text) {
-        try {
-          const again = FlowIntent.classify(text, { subject: ctx.subject || '', now: new Date() });
-          if (again) bags.push(again.entities, again.facts, again);
-        } catch (e) { /* the card's own clock is enough */ }
-      }
-    }
     for (let i = 0; i < bags.length; i++) {
       const found = clockFrom(bags[i]);
       if (!found) continue;
@@ -3248,7 +3269,33 @@
     await finishMeetingHold(host, ctx, token);
   }
 
-  async function finishMeetingHold(host, ctx, token) {
+  function calendarParamsFromStep(step, ctx) {
+    const p = (step && step.params) || {};
+    const dateIso = p.dateIso || null;
+    const hour = p.hour != null ? p.hour : null;
+    const minute = p.minute != null ? p.minute : null;
+    if (dateIso == null || hour == null || minute == null) return null;
+    const params = {
+      dateIso: dateIso,
+      hour: hour,
+      minute: minute,
+      title: p.title || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Meeting',
+      quote: p.quote || null,
+      threadUrl: p.threadUrl || (ctx && ctx.threadUrl) || null,
+      requireTime: p.requireTime === true
+    };
+    if (p.calendarOp) params.calendarOp = p.calendarOp;
+    if (p.fileTerm || p.fileName || p.fileUrl) {
+      if (p.fileTerm) params.fileTerm = p.fileTerm;
+      if (p.fileName) params.fileName = p.fileName;
+      if (p.fileUrl) params.fileUrl = p.fileUrl;
+    } else if (!p.calendarOp) {
+      params.meeting = true;
+    }
+    return params;
+  }
+
+  async function finishMeetingHold(host, ctx, token, preset) {
     if (!token) token = captureMailToken();
     if (!host || ignoreStaleClick(host)) return;
     let st = null;
@@ -3262,7 +3309,7 @@
       paintIfCurrent(token, function () { paintCalendarConsent(host, ctx); });
       return;
     }
-    const params = meetingClock(ctx);
+    const params = preset || meetingClock(ctx);
     if (!params) {
       await holdAsTodo(host, ctx);
       return;
@@ -4174,7 +4221,7 @@
 
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
-        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
       if (painted) paintMissingScope(painted, ctx, st);
@@ -5213,7 +5260,7 @@
     }
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
-        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
       if (painted) paintMissingScope(painted, ctx, loopSt);
@@ -5320,6 +5367,19 @@
   } catch (e) { /* history is sealed */ }
   globalThis.__glanceOutlookPage = {
     rescan: () => { lastKey = ''; lastSig = ''; schedule(); },
+    paintShownPlan: (ctx) => {
+      const mount = mountPoint();
+      if (!mount || !ctx || !ctx.process) return null;
+      const token = captureMailToken();
+      return paintIfCurrent(token, function () {
+        const old = mount.querySelector('.flow-chip-host');
+        if (old) paintRemove(old);
+        return injectCard(mount, ctx, {
+          onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
+          onDismiss: (h, c) => { onDismiss(h, c); }
+        });
+      });
+    },
     openMailToken: () => openMailTokenNow(),
     hydratePane: (pane) => hydratePane(pane),
     bumpMailEpoch: (why) => bumpMailEpoch(why),

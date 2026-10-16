@@ -119,7 +119,7 @@ const FlowStepKit = (() => {
       '<span class="act-box" aria-hidden="true"></span>' +
       '<span class="act-glyph" data-glyph="' + esc(a.tool || '') + '">' + glyph(a.tool) + '</span>' +
       '<span class="act-body">' +
-        (text ? '<span class="act-text">' + text + '</span>' : '') +
+        (text ? '<span class="act-text"' + (a.user ? ' data-glance-user="1"' : '') + '>' + text + '</span>' : '') +
         (a.out ? '<span class="act-out">' + appB(a.app) + ' · ' + a.out + '</span>' : '') +
         (res ? '<span class="act-res">' + appB(a.app) + ' · <span class="act-res-txt">' + res + '</span></span>' : '') +
       '</span>' +

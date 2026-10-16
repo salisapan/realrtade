@@ -35,9 +35,24 @@
     let host = '';
     try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      rememberHostLanguage(host);
       return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
     }
+    rememberHostLanguage(host);
     return 'en';
+  }
+
+  function rememberHostLanguage(host) {
+    const raw = String(host || '').trim();
+    if (!raw) return;
+    const key = raw.toLowerCase();
+    if (rememberHostLanguage.last === key) return;
+    rememberHostLanguage.last = key;
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.get().then(function (st) {
+      if (st && st.glanceHostLanguage === raw) return null;
+      return FlowStorage.set({ glanceHostLanguage: raw });
+    }).catch(function () {});
   }
 
   function glanceChrome() {
@@ -3445,6 +3460,15 @@
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
     else if (changes.proLicense) applyProState();
   });
+
+  globalThis.__glanceGmailPage = {
+    paintPlan: (ctx) => {
+      const mount = document.createElement('div');
+      document.body.appendChild(mount);
+      injectChip(mount, ctx);
+      return mount.querySelector('.flow-chip-host');
+    }
+  };
 
   init();
 })();
