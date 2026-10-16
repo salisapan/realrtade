@@ -60,7 +60,22 @@ const FlowIntent = (() => {
   // these reads as "the [artifact] of X", not "let's have X" — narrow and
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
-  const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion|quick chat)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
+  // One event-noun list. The calendar gate, meetingPlanVeto, and
+  // attach-to-invite all read EVENT_NOUN_ALT. "quick chat" is the same
+  // noun as "chat", including when a non-breaking space splits the pair.
+  // Longer phrases come first so "quick chat" is that noun, not a bare chat.
+  const EVENT_NOUN_ALT = [
+    'quick chat', 'strategy session', 'planning session', 'panel discussion',
+    'town hall', 'office hours', 'one-on-one',
+    'meeting', 'call', 'sync', 'check-?in', 'appointment', 'session',
+    'interview', 'demo', 'walkthrough', 'consultation', 'stand-?up',
+    'retro(?:spective)?', 'workshop', 'webinar', 'huddle', 'kick-?off',
+    'deposition', 'hearing', 'mediation', 'chat'
+  ].join('|');
+  const MEETING_NOUN = new RegExp('\\b(?:' + EVENT_NOUN_ALT + ')\\b(?!\\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))', 'i');
+  // Attach names the invite that already exists. invite and invitation
+  // are that target, and they are not a new event to book.
+  const ATTACH_TARGET = '(?:' + EVENT_NOUN_ALT + '|invite|invitation)';
   // פגישת is the construct (פגישת תכנון = a planning meeting). It is not
   // the absolute פגישה, so a note that only uses the construct used to
   // stay silent. The artifact lookahead still refuses "the recording of
@@ -440,7 +455,9 @@ const FlowIntent = (() => {
   // is not בוטל. An ask to cancel still clears that slot. "אני לא במשרד"
   // is out of office for this veto only. "no lnoger needed" and מוטלת are
   // the same cancel, including the typo. planFor and the judge both call this.
-  const VETO_EVENT = '(?:meetings?|calls?|demos?|interviews?|check-ins?|kick-?offs?|syncs?|webinars?|reviews?|stand-?ups?)';
+  // Same nouns as the calendar, plus a plural s. A cancelled review stays
+  // here and is not a meeting to book.
+  const VETO_EVENT = '(?:(?:' + EVENT_NOUN_ALT + ')s?|reviews?)';
   const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed|no lnoger needed)';
   const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
   const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
@@ -1745,7 +1762,7 @@ const FlowIntent = (() => {
   function inviteFileName(raw) {
     const he = String(raw || '').match(/לצרר?ף\s+את\s+([\s\S]{1,80}?)\s+לזימון/);
     if (he) return cleanInviteFile(he[1]);
-    const en = String(raw || '').match(/\battach\s+(?:the\s+|a\s+|an\s+)?([\s\S]{1,80}?)\s+to\s+the\s+(?:sync|invite|invitation|meeting|call)\b/i);
+    const en = String(raw || '').match(new RegExp('\\battach\\s+(?:the\\s+|a\\s+|an\\s+)?([\\s\\S]{1,80}?)\\s+to\\s+the\\s+' + ATTACH_TARGET + '\\b', 'i'));
     if (en) return cleanInviteFile(en[1]);
     return '';
   }
@@ -1758,7 +1775,7 @@ const FlowIntent = (() => {
   function attachToInvitePlan(text, opts) {
     const raw = String(text || '');
     const heAttach = /לצרר?ף[\s\S]{0,160}?לזימון/.test(raw);
-    const enAttach = /\battach\b[\s\S]{0,160}?\bto\s+the\s+(?:sync|invite|invitation|meeting|call)\b/i.test(raw);
+    const enAttach = new RegExp('\\battach\\b[\\s\\S]{0,160}?\\bto\\s+the\\s+' + ATTACH_TARGET + '\\b', 'i').test(raw);
     if (!heAttach && !enAttach) return null;
     const he = /[\u0590-\u05FF]/.test(raw);
     const named = inviteFileName(raw);

@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'a55bf90ea78c4d861e4e5e32eec9fd9e0bb7f6a47a58c88d72236ee7764b92d7';
+const FIXTURE_SHA = '30e742f50fa40f7eafeae6699e71f25a6986bff36163c39b3fe3edd3e5063ea6';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -161,7 +161,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 565) {
+if (rows.length !== 572) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -464,6 +464,29 @@ for (const id of ['v2syn-2019', 'v2syn-2024', 'v2syn-14861', 'v2syn-13337', 'v2s
     const label = out.intent && out.intent.label;
     if (!shown(out) || !taskOnly(out) || draft || cal || !label || !/^Log commitment\b/.test(label) || /^Reply requested\b/.test(label)) {
       console.log('FAIL: log task ' + id + ' ' + surface + ' ' + describe(out) + ' ' + (label || ''));
+      process.exit(1);
+    }
+  }
+}
+for (const id of ['v2syn-5754', 'v2syn-5755', 'v2syn-5772', 'v2syn-5774']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  const g = judge(row, 'gmail', ctx);
+  const o = judge(row, 'outlook', ctx);
+  if (!row || row.expected !== 'quiet' || shown(g) || shown(o)) {
+    console.log('FAIL: cancelled chat ' + id + ' gmail ' + describe(g) + ' outlook ' + describe(o));
+    process.exit(1);
+  }
+}
+for (const id of ['v2syn-3400', 'v2syn-3401', 'v2syn-3406']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const cal = steps.some((s) => s && s.kind === 'calendar');
+    if (!row || row.expected !== 'offer' || row.expectTrack !== 'file' || !shown(out) || !out.process || out.process.id !== 'attach-invite' || cal || !out.intent || out.intent.label !== row.expectLabel) {
+      console.log('FAIL: chat file ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.intent && out.intent.label) || ''));
       process.exit(1);
     }
   }
