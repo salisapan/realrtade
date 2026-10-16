@@ -3328,14 +3328,15 @@
 
   function undoNoteFor(e) {
     const Lw = words();
+    if (uiLang() !== 'he') {
+      if (typeof FlowReceipt !== 'undefined' && FlowReceipt.undoHint) return FlowReceipt.undoHint(e && e.where ? [e.where] : []);
+      return Lw.undoWritten;
+    }
     const id = e && e.connectorId;
     if (id === 'outlookCalendar' || id === 'calendar') return Lw.undoCalendar;
     if (id === 'outlookTask' || id === 'microsoftTodo' || id === 'googleTask' || id === 'googleTasks') return Lw.undoTodo;
     if (id === 'onedriveFile' || id === 'attachmentSave' || id === 'driveFile' || id === 'googleDriveFile') return Lw.undoFile;
     if (id === 'gmailDraft') return Lw.undoGmail;
-    if (id === 'outlookDraft') return Lw.undoWritten;
-    if (uiLang() === 'he') return Lw.undoWritten;
-    if (typeof FlowReceipt !== 'undefined' && FlowReceipt.undoHint) return FlowReceipt.undoHint(e && e.where ? [e.where] : []);
     return Lw.undoWritten;
   }
 

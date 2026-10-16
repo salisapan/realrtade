@@ -194,6 +194,16 @@
     return lang;
   }
 
+  // Two Outlook pages can Undo at once. Each mark reads the whole log and
+  // writes it back, so the later write would drop the earlier Undo. The
+  // lock is held across that read and write. Same-origin pages share it.
+  function withActivityLogLock(fn) {
+    const locks = (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function')
+      ? navigator.locks : null;
+    if (!locks) return Promise.resolve().then(fn);
+    return locks.request('glance-activity-log', fn);
+  }
+
   function rememberHostLanguage(host) {
     const raw = String(host || '').trim();
     if (!raw) return;
@@ -1014,11 +1024,11 @@
     let process = (decided && decided.process) || entry.process;
     if (!intent || !process) return null;
     // In-page Do It writes the Outlook draft only (same as popup). Drop non-draft steps from the chip.
-    // A OneDrive file step is the close. The draft beside it is the share-link step, and dropping the file
-    // would turn that Do It into a reply draft.
-    const hasFile = (process.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
+    // A file step is the close (OneDrive, Drive, or a saved attachment). The draft beside it is the
+    // share-link step, and dropping the file would turn that Do It into a reply draft.
+    const hasOnedrive = (process.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
     const draftSteps = (process.steps || []).filter((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft');
-    if (draftSteps.length && !hasFile) {
+    if (draftSteps.length && !hasOnedrive) {
       process = Object.assign({}, process, {
         steps: draftSteps.map((s) => s.kind === 'gmailDraft'
           ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
@@ -1846,9 +1856,9 @@
         const messageId = row.messageId;
         const threadKey = row.threadId || row.outlookConversationId;
         if ((copy.connectorId === 'onedriveFile' || copy.connectorId === 'attachmentSave') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
-          await FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey);
+          await withActivityLogLock(() => FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey));
         } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
-          await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
+          await withActivityLogLock(() => FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey));
           await reopenTaskScan(row);
           if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
           try { host.remove(); } catch (e) { /* already gone */ }
