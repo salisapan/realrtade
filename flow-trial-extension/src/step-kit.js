@@ -119,7 +119,7 @@ const FlowStepKit = (() => {
       '<span class="act-box" aria-hidden="true"></span>' +
       '<span class="act-glyph" data-glyph="' + esc(a.tool || '') + '">' + glyph(a.tool) + '</span>' +
       '<span class="act-body">' +
-        (text ? '<span class="act-text">' + text + '</span>' : '') +
+        (text ? '<span class="act-text"' + (a.user ? ' data-glance-user="1"' : '') + '>' + text + '</span>' : '') +
         (a.out ? '<span class="act-out">' + appB(a.app) + ' · ' + a.out + '</span>' : '') +
         (res ? '<span class="act-res">' + appB(a.app) + ' · <span class="act-res-txt">' + res + '</span></span>' : '') +
       '</span>' +
@@ -201,7 +201,7 @@ const FlowStepKit = (() => {
 
   function syncChip(stage, cfg) {
     if (!stage || !cfg || !cfg.chip) return;
-    const L = langOf(cfg.he);
+    const L = labelsFor(cfg);
     const txt = stage.querySelector('.chip-txt');
     if (!txt) return;
     if (cfg.chip.mode === 'count') {
@@ -228,8 +228,10 @@ const FlowStepKit = (() => {
       const target = cfg.chip.target || 'Drive';
       stage.classList.toggle('no-actions', !(on > 0 && cb && cb.checked));
       txt.innerHTML = on
-        ? 'Save <b class="file">' + on + ' of ' + files.length + '</b> attachments to ' + esc(target) + '?'
-        : 'Pick at least one file';
+        ? ((typeof FlowDisplay !== 'undefined' && FlowDisplay.fillChrome)
+          ? FlowDisplay.fillChrome(L.saveAsk || 'Save {on} of {all} attachments to {target}?', { on: '<b class="file">' + on + '</b>', all: files.length, target: esc(target) })
+          : ('Save <b class="file">' + on + ' of ' + files.length + '</b> attachments to ' + esc(target) + '?'))
+        : (L.pickFile || 'Pick at least one file');
     } else {
       txt.innerHTML = cfg.chip.q || '';
     }

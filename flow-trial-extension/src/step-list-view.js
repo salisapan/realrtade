@@ -94,10 +94,31 @@ const FlowStepListView = (() => {
     return tag || '';
   }
 
+  function stepCopy(row, L) {
+    const copy = String((row && row.copy) || '');
+    const kind = String((row && row.kind) || '');
+    const words = L || {};
+    if (row && row.added) return copy;
+    if (/calendar/i.test(kind) && /^(Calendar|Hold the time)$/.test(copy)) return words.stepCalendar || words.calendarApp || copy;
+    if (/task|todo/i.test(kind) && /^(Task|To Do)$/.test(copy)) return words.stepTask || copy;
+    if (/draft/i.test(kind) && /^(Draft reply|Reply draft|Draft reply \+ file|Draft link|Draft)$/.test(copy)) return words.stepDraft || copy;
+    if (/file|drive|onedrive|attachment/i.test(kind) && /^(OneDrive|Drive|File|Save)$/.test(copy)) return words.stepFile || copy;
+    return copy;
+  }
+
   function paintModel(row, surface, labels) {
     const L = labels || { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };
     const tool = toolOf(row, surface);
-    const app = tool.app === 'Calendar' ? (L.calendarApp || tool.app) : (tool.app === 'You' ? (L.youApp || tool.app) : tool.app);
+    const appNames = {
+      Calendar: L.calendarApp,
+      'To Do': L.todoApp,
+      Outlook: L.outlookApp,
+      Gmail: L.gmailApp,
+      OneDrive: L.onedriveApp,
+      Drive: L.driveApp,
+      You: L.youApp
+    };
+    const app = appNames[tool.app] || tool.app;
     if (row.manual || row.role === 'manual') {
       return { kind: 'manual', id: row.id, text: row.copy, tag: L.manual || 'Manual · for you' };
     }
@@ -118,7 +139,8 @@ const FlowStepListView = (() => {
       st: stateClass(row.state),
       kind: row.suggested ? 'suggested' : ''
     };
-    base.text = row.copy || '';
+    base.text = stepCopy(row, L);
+    base.user = row.added === true;
     if (files.length > 1) {
       base.kind = 'multi';
       base.files = files;
@@ -197,7 +219,9 @@ const FlowStepListView = (() => {
 
     function cfg() {
       const surface = o.surface || 'outlook';
-      const ui = o.uiLang === 'he' ? 'he' : 'en';
+      const ui = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+        ? FlowDisplay.uiLangFrom({ setting: o.uiLang })
+        : (o.uiLang === 'he' ? 'he' : 'en');
       const labels = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
         ? FlowDisplay.chrome(ui)
         : { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };

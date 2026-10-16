@@ -4344,6 +4344,24 @@
    Here everything is in em so smaller contexts keep the exact proportions.
    --------------------------------------------------------------- */
 .flow-step-card .doit-dark{display:none}
+/* Hebrew has no English raster. The same shell, ring, and shine, with the word. */
+.flow-chip-host[lang="he"] img.chip-do,.flow-chip-host[lang="he"] img.doit-inline{display:none !important}
+.flow-chip-host[lang="he"] .doit-dark{
+  --fs:10.5px;
+  display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none;
+  font-family:'Rubik',system-ui,sans-serif;font-weight:700;font-size:var(--fs);
+  line-height:1.7em;padding:.574em 1.53em;letter-spacing:0;white-space:nowrap;
+  color:#e6efff;border-radius:999px;
+  background:linear-gradient(180deg,rgba(228,236,250,.2),rgba(9,13,24,.34));
+  border:1px solid rgba(228,236,250,.3);
+  box-shadow:0 0 22px -4px rgba(59,116,255,.5);
+  -webkit-font-smoothing:antialiased;
+}
+.flow-chip-host[lang="he"] .doit-dark::after{
+  content:"";position:absolute;inset:-.32em;border-radius:999px;pointer-events:none;
+  border:1.5px solid #3B74FF;
+}
+.flow-chip-host[lang="he"] .do-halo{animation:none !important;box-shadow:none !important;background:transparent !important;border-radius:999px;padding:5px !important;margin:-5px}
 .flow-step-card[data-theme="dark"] img.chip-do,.flow-step-card[data-theme="dark"] img.doit-inline{display:none !important}
 .flow-step-card[data-theme="dark"] .doit-dark{
   --fs:10.5px;

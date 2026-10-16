@@ -17,6 +17,12 @@ catch (e) {
 }
 
 const ROOT = path.join(__dirname, '..');
+const { FlowDisplay } = require(path.join(ROOT, 'core/display-copy.js'));
+function heLine(text) { return FlowDisplay.showChrome('he', text); }
+function chipShows(doc, parts) {
+  const text = chipText(doc);
+  return parts.some((part) => text.indexOf(part) >= 0 || text.indexOf(heLine(part)) >= 0);
+}
 const ME = 'glance.salisapan@outlook.com';
 let failures = 0;
 function check(name, cond, detail) {
@@ -370,7 +376,7 @@ function listsRoute() {
   if (go) go.click();
   const undo = await waitFor(draftPage.doc, '.flow-chip-undo', 4000);
   check('Do It leaves the card on done, with Undo',
-    Boolean(undo) && /Draft ready|Reply draft ready|Not sent/i.test(chipText(draftPage.doc)) && !draftPage.doc.querySelector('.do-halo'),
+    Boolean(undo) && chipShows(draftPage.doc, ['Draft ready.', 'Reply draft ready in Outlook Drafts. Not sent.', 'Draft ready. Not sent.']) && !draftPage.doc.querySelector('.do-halo'),
     { text: chipText(draftPage.doc) });
   const reloaded = await boot({
     id: 'MSG-Q3-RELOAD',
@@ -380,7 +386,7 @@ function listsRoute() {
   });
   const undoAgain = await waitFor(reloaded.doc, '.flow-chip-undo', 4000);
   check('a reload restores done and Undo from the receipt',
-    Boolean(undoAgain) && /Draft ready|Reply draft ready|Not sent/i.test(chipText(reloaded.doc)) && !reloaded.doc.querySelector('.do-halo'),
+    Boolean(undoAgain) && chipShows(reloaded.doc, ['Draft ready.', 'Reply draft ready in Outlook Drafts. Not sent.', 'Draft ready. Not sent.']) && !reloaded.doc.querySelector('.do-halo'),
     { text: chipText(reloaded.doc), log: (reloaded.store.log || []).map((e) => e && e.kind + ':' + e.connectorId) });
   draftPage.w.close();
   reloaded.w.close();
@@ -413,7 +419,7 @@ function listsRoute() {
   });
   const parkUndo = await waitFor(park.doc, '.flow-chip-undo', 4000);
   check('a reload shows Handled, the receipt, and Undo',
-    Boolean(parkUndo) && /Handled/i.test(chipText(park.doc)) && !park.doc.querySelector('.do-halo'),
+    Boolean(parkUndo) && chipShows(park.doc, ['Handled.']) && !park.doc.querySelector('.do-halo'),
     { text: chipText(park.doc) });
   const away = park.w.location.href.replace('MSG-PARK', 'MSG-OTHER');
   park.w.history.pushState({}, '', away);
@@ -422,7 +428,7 @@ function listsRoute() {
   park.w.history.pushState({}, '', park.w.location.href.replace('MSG-OTHER', 'MSG-PARK'));
   const backUndo = await waitFor(park.doc, '.flow-chip-undo', 4000);
   check('switching back restores Handled and Undo from the same record',
-    Boolean(backUndo) && /Handled/i.test(chipText(park.doc)) && !park.doc.querySelector('.do-halo'),
+    Boolean(backUndo) && chipShows(park.doc, ['Handled.']) && !park.doc.querySelector('.do-halo'),
     { text: chipText(park.doc) });
   park.w.close();
 
@@ -436,7 +442,7 @@ function listsRoute() {
   });
   const editedBtn = await waitFor(edited.doc, '.flow-chip-undo', 4000);
   if (editedBtn) editedBtn.click();
-  const editedLine = await waitForText(edited.doc, 'You edited this', 4000);
+  const editedLine = await waitForText(edited.doc, heLine('You edited this. Undo left it alone.'), 4000);
   check('a refused Undo says You edited this', editedLine, { text: chipText(edited.doc) });
   const editedAgain = await boot({
     id: 'MSG-PARK',
@@ -445,10 +451,11 @@ function listsRoute() {
     store: JSON.parse(JSON.stringify(edited.store)),
     undo: () => ({ ok: false, reason: 'user-edited', written: 'You edited this. Undo left it alone.' })
   });
-  const editedKept = await waitForText(editedAgain.doc, 'You edited this', 4000);
+  const editedKept = await waitForText(editedAgain.doc, heLine('You edited this. Undo left it alone.'), 4000);
   check('a refused Undo is still shown after reopen',
     editedKept && Boolean(editedAgain.doc.querySelector('.flow-chip-undo')) &&
-    chipText(editedAgain.doc).indexOf('Undo removes the To Do task.') < 0,
+    chipText(editedAgain.doc).indexOf('Undo removes the To Do task.') < 0 &&
+    chipText(editedAgain.doc).indexOf(heLine('Undo removes the To Do task.')) < 0,
     { text: chipText(editedAgain.doc), record: editedAgain.store.glanceProofs && editedAgain.store.glanceProofs.records['MSG-PARK'] });
   edited.w.close();
   editedAgain.w.close();
@@ -460,7 +467,7 @@ function listsRoute() {
     store: parkProofStore(),
     reconcile: () => ({ ok: false, status: 404 })
   });
-  const deletedLine = await waitForText(deleted.doc, 'Deleted in To Do', 4000);
+  const deletedLine = await waitForText(deleted.doc, heLine('Deleted in To Do'), 4000);
   check('a manual delete on reopen says Deleted in To Do and drops Undo',
     deletedLine && !deleted.doc.querySelector('.flow-chip-undo'),
     { text: chipText(deleted.doc) });
@@ -475,10 +482,10 @@ function listsRoute() {
     store: parkProofStore(),
     reconcile: () => ({ ok: false, status: 500 })
   });
-  const shakyLine = await waitForText(shaky.doc, "couldn't verify", 4000);
+  const shakyLine = await waitForText(shaky.doc, heLine("couldn't verify"), 4000);
   const shakyRec = shaky.store.glanceProofs && shaky.store.glanceProofs.records['MSG-PARK'];
   check('a Graph error keeps Handled and Undo and says couldn\'t verify',
-    shakyLine && /Handled/i.test(chipText(shaky.doc)) && Boolean(shaky.doc.querySelector('.flow-chip-undo')) &&
+    shakyLine && chipShows(shaky.doc, ['Handled.']) && Boolean(shaky.doc.querySelector('.flow-chip-undo')) &&
     shakyRec && shakyRec.deleted !== true,
     { text: chipText(shaky.doc), record: shakyRec });
   shaky.w.close();
@@ -718,7 +725,7 @@ function listsRoute() {
   const conv = paneOpen.doc.createElement('span');
   conv.id = 'CONV_PARKTAIL_SUBJECT';
   paneOpen.doc.querySelector('#ReadingPaneContainerId').appendChild(conv);
-  const paneDeleted = await waitForText(paneOpen.doc, 'Deleted in To Do', 4000);
+  const paneDeleted = await waitForText(paneOpen.doc, heLine('Deleted in To Do'), 4000);
   const reconAfter = paneOpen.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
   check('opening the mail through the reading pane reconciles a deleted task',
     Boolean(paneUndo) && paneDeleted && reconAfter > reconBefore && !paneOpen.doc.querySelector('.flow-chip-undo'),
@@ -736,7 +743,7 @@ function listsRoute() {
   });
   const handUndo = await waitFor(hand.doc, '.flow-chip-undo', 4000);
   check('the created task shows Handled and Undo before the delete',
-    Boolean(handUndo) && /Handled/i.test(chipText(hand.doc)),
+    Boolean(handUndo) && chipShows(hand.doc, ['Handled.']),
     { text: chipText(hand.doc) });
   handGone = true;
   const reconAtCreate = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
@@ -744,7 +751,7 @@ function listsRoute() {
   const leftPark = await waitForGone(hand.doc, 'Renew the parking permit', 4000);
   check('switching mail leaves the parking receipt', leftPark, { text: chipText(hand.doc) });
   showSpaMail(hand, 'MSG-PARK', 'Parking permit - please renew by Sunday', 'Please renew the parking permit by Sunday.\nThanks');
-  const handDeleted = await waitForText(hand.doc, 'Deleted in To Do', 4000);
+  const handDeleted = await waitForText(hand.doc, heLine('Deleted in To Do'), 4000);
   const reconAfterBack = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
   const handRec = hand.store.glanceProofs && hand.store.glanceProofs.records['MSG-PARK'];
   const handCopy = hand.w.FlowProofOfClose.remountCopy(hand.w.FlowProofOfClose.proofAsLogRow(handRec));
@@ -758,9 +765,9 @@ function listsRoute() {
   await sleep(600);
   const afterSame = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
   showSpaMail(hand, 'MSG-OTHER', 'Vendor contract', 'Can you send me the signed vendor contract by Thursday?\nThanks');
-  await waitForGone(hand.doc, 'Deleted in To Do', 4000);
+  await waitForGone(hand.doc, heLine('Deleted in To Do'), 4000);
   showSpaMail(hand, 'MSG-PARK', 'Parking permit - please renew by Sunday', 'Please renew the parking permit by Sunday.\nThanks');
-  const secondOpen = await waitForText(hand.doc, 'Deleted in To Do', 4000);
+  const secondOpen = await waitForText(hand.doc, heLine('Deleted in To Do'), 4000);
   const afterSecond = hand.sent.filter((m) => m.type === 'flow:reconcile-proof').length;
   check('the same mail reopened twice reconciles each time and stays Deleted in To Do',
     secondOpen && !hand.doc.querySelector('.flow-chip-undo') && afterSame > beforeSame && afterSecond > afterSame,
@@ -800,7 +807,7 @@ function listsRoute() {
     store: graphStore,
     reconcile: () => ({ ok: false, status: 404 })
   });
-  const graphGone = await waitForText(graphPage.doc, 'Deleted in To Do', 4000);
+  const graphGone = await waitForText(graphPage.doc, heLine('Deleted in To Do'), 4000);
   check('an OWA address id reconciles the Graph proof',
     graphGone && !graphPage.doc.querySelector('.flow-chip-undo'),
     { text: chipText(graphPage.doc) });
@@ -829,7 +836,7 @@ function listsRoute() {
   const handled = missPage.doc.querySelector('.flow-chip-handled');
   await sleep(80);
   check('a missed draft read-back says Created, couldn\'t verify, with Undo',
-    Boolean(missUndo) && handled && handled.textContent === "Created, couldn't verify" &&
+    Boolean(missUndo) && handled && handled.textContent === heLine("Created, couldn't verify") &&
     !/Draft ready/i.test(handled.textContent || ''),
     { text: chipText(missPage.doc) });
   check('a missed draft read-back does not record a close',

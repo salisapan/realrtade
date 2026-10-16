@@ -96,7 +96,29 @@ const FlowDisplay = (() => {
   }
 
   // One entry, one title. A shared chip label is not this entry's action.
-  function activityTitle(entry) {
+  function localizeHeading(lang, title) {
+    const raw = String(title == null ? '' : title);
+    if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
+    let matched = raw.match(/^Log (.+) agreed$/);
+    if (matched) return 'רשום ' + matched[1] + ' שסוכם';
+    if (raw === 'Log this decision') return 'רשום את ההחלטה';
+    if (raw === 'Log that this is not going ahead') return 'רשום שזה לא מתקדם';
+    if (raw === 'Log agreement executed') return 'רשום שההסכם נחתם';
+    if (raw === 'Log discrepancy raised') return 'רשום שהועלתה אי התאמה';
+    matched = raw.match(/^Log commitment for (.+)$/);
+    if (matched) return 'רשום התחייבות ל-' + matched[1];
+    matched = raw.match(/^Log (.+), (.+)$/);
+    if (matched) return 'רשום ' + matched[1] + ', ' + matched[2];
+    if (/^log it$/i.test(raw)) return 'רשום';
+    if (raw === 'Save the file?') return 'לשמור את הקובץ?';
+    return raw;
+  }
+
+  function activityTitle(entry, lang) {
+    return localizeHeading(lang, activityTitleRaw(entry));
+  }
+
+  function activityTitleRaw(entry) {
     if (!entry) return 'Untitled message';
     if (entry.actionTitle && String(entry.actionTitle).trim() && !genericLabel(entry.actionTitle)) {
       return String(entry.actionTitle).trim();
@@ -202,15 +224,45 @@ const FlowDisplay = (() => {
     return d + ' ב' + HE_MON[mo - 1];
   }
 
-  function cardDateLine(iso) {
+  const EN_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const EN_WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const HE_WD = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+
+  function ymd(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const y = +m[1];
+    const mo = +m[2];
+    const d = +m[3];
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return { y: y, mo: mo, d: d, wd: dt.getDay() };
+  }
+
+  function clockPad(hour, minute) {
+    if (hour == null || minute == null || hour === '' || minute === '') return '';
+    const h = Number(hour);
+    const min = Number(minute);
+    if (!Number.isInteger(h) || h < 0 || h > 23) return '';
+    if (!Number.isInteger(min) || min < 0 || min > 59) return '';
+    return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  }
+
+  function cardDateLine(iso, lang) {
+    if (arguments.length >= 2 && uiLangFrom({ setting: lang }) === 'en') {
+      const day = ymd(iso);
+      if (!day) return '';
+      return 'until ' + EN_MON[day.mo - 1] + ' ' + day.d;
+    }
     const day = hebrewDay(iso);
     return day ? ('עד ' + day) : '';
   }
 
   // Chrome (buttons, headings, receipts) follows the UI language. The action
   // title stays in the mail's language. A stored setting wins, then
-  // chrome.i18n.getUILanguage, then navigator.language. The host passes
-  // those three strings; this file does not read chrome or the DOM.
+  // the host page language, then chrome.i18n.getUILanguage, then
+  // navigator.language. The host passes those strings; this file does not
+  // read chrome or the DOM.
   const CHROME = {
     en: {
       brand: 'Glance', intentLabel: 'Detected intent', will: 'Glance will', prepared: 'Prepared · nothing sent', done: 'Done',
@@ -292,9 +344,40 @@ const FlowDisplay = (() => {
       manualMany: '{n} manual steps left for you',
       saveFiles: 'Save {on} of {all} attachments', attachments: 'Attachments', less: 'Less', newStep: 'New step', afterApprove: 'after Approve',
       calendarApp: 'Calendar', youApp: 'You', undoUnavailable: 'Undo unavailable.',
+      stepCalendar: 'Calendar', stepTask: 'Task', stepDraft: 'Draft', stepFile: 'File',
+      todoApp: 'To Do', outlookApp: 'Outlook', gmailApp: 'Gmail', onedriveApp: 'OneDrive', driveApp: 'Drive',
       justNow: 'just now', minsAgo: '{n}m ago', hrsAgo: '{n}h ago', writtenTo: 'Written to ',
       queued: 'Queued', preparing: 'Preparing', verifying: 'Verifying', verified: 'Verified',
-      seeOpen: 'See what’s open'
+      seeOpen: 'See what’s open',
+      holdAt: 'Hold',
+      steps: '{n} steps', hideSteps: 'Hide steps',
+      saveAsk: 'Save {on} of {all} attachments to {target}?', pickFile: 'Pick at least one file',
+      weekLogged: ' logged this week', weekAll: '{n} all-time',
+      logEmpty: 'Nothing yet. Glance stays quiet until a loop really closes.',
+      senseLabel: 'Sensitivity',
+      senseMore: 'Speaking up more — you keep clicking',
+      senseLess: 'Holding back — you keep dismissing',
+      senseEven: 'Balanced',
+      learned: 'Glance has adjusted {n} {noun} about how it works for you.',
+      learnedOne: 'thing', learnedMany: 'things',
+      insight: 'Glance noticed you usually remove {step} in {process} processes — keep it that way?',
+      insightYes: 'Yes, keep it', insightNo: 'No, suggest again',
+      activityTab: 'Activity',
+      ledgerTitle: 'What Glance learned from you',
+      ledgerHint: 'On this device only. Reset forgets every match, how mail opens and closes, links between people, and this list.',
+      ledgerReset: 'Reset what Glance learned',
+      closeMemHint: 'Close memory and Outlook cards stay on this device. Clearing lets Glance speak again about what already closed, and drops draft receipts that remained.',
+      closeMem: 'Clear close memory',
+      clearMemConfirm: 'Clear personal close memory and Outlook loop cards on this device? Draft receipts and From Outlook offers will be removed. This cannot be undone.',
+      referralTxt: 'Someone else on the team probably has the same open loop.',
+      referralCopy: 'Copy a Glance link', referralExport: 'Export the setup',
+      copied: 'Copied', exported: 'Exported',
+      closeQualityTitle: 'On this device only. A full close, a return, a refusal, and a false close.',
+      quietTitle: 'On this device only. Trusted closes this week, and silence is a reason code.',
+      stillTitle: 'On this device only. Open cards, closes, and undos.',
+      lmOn: 'The model built into this browser also reads wording nothing else recognises, for {langs} (it passed a precision check on this device). It only suggests; you decide.',
+      lmOff: 'The model built into this browser did not pass the precision check on this device, so it stays off.',
+      lmAnd: ' and ', langEn: 'English', langHe: 'Hebrew'
     },
     he: {
       brand: 'Glance', intentLabel: 'כוונה שזוהתה', will: 'Glance יבצע', prepared: 'מוכן · שום דבר לא נשלח', done: 'בוצע',
@@ -302,28 +385,28 @@ const FlowDisplay = (() => {
       suggested: 'מוצע', added: 'נוסף', manual: 'ידני · בשבילך',
       dismiss: 'הסתר', dismissing: 'מסתיר…', doIt: 'בצע', view: 'הצג',
       undo: 'בטל', undoAll: 'בטל הכל', undoing: 'מבטל…', closing: 'סוגר…',
-      fromOutlook: 'מ-Outlook', expired: 'פג תוקף', openDraft: 'פתח טיוטה', openEvent: 'פתח אירוע', show: 'הצג',
+      fromOutlook: 'מהדואר', expired: 'פג תוקף', openDraft: 'פתח טיוטה', openEvent: 'פתח אירוע', show: 'הצג',
       handled: 'טופל.', approve: 'אשר סגירה',
       kindHandled: 'טופל', kindUndone: 'בוטל', kindClicked: 'נלחץ', kindDismissed: 'הוסתר', kindDraft: 'טיוטה',
-      couldnt: 'לא אומת', couldntPlain: 'לא אומת', retry: 'נסה שוב', outlookOff: 'Outlook לא מחובר',
+      couldnt: 'לא אומת', couldntPlain: 'לא אומת', retry: 'נסה שוב', outlookOff: 'הדואר לא מחובר',
       couldntUnchanged: 'לא אומת שהרשומה לא השתנתה. הביטול השאיר אותה.',
       couldntVerify: 'לא הצלחתי לאשר, נסה שוב',
       createdUnverified: 'נוצר, לא אומת',
       youEdited: 'ערכת את זה. הביטול השאיר את זה.',
-      stillThere: 'המשימה עדיין ב-To Do.',
+      stillThere: 'המשימה עדיין שם.',
       verifyNote: 'לא אומת',
       verifyingNow: 'מאמת…',
       draftReady: 'טיוטה מוכנה.',
-      draftReadyLong: 'טיוטת תשובה מוכנה ב-Outlook. לא נשלח.',
+      draftReadyLong: 'טיוטת תשובה מוכנה. לא נשלח.',
       draftReadyNotSent: 'הטיוטה מוכנה. לא נשלח.',
-      draftWithFile: 'טיוטת תשובה מוכנה ב-Outlook, עם הקובץ המצורף. לא נשלח.',
+      draftWithFile: 'טיוטת תשובה מוכנה, עם הקובץ. לא נשלח.',
       draftRemoved: 'טיוטת התשובה הוסרה. לא נשלח.',
       draftGone: 'הטיוטה כבר לא שם. אין מה לבטל.',
       couldntRemove: 'לא הצלחתי להסיר את הטיוטה.',
       partlyHandled: 'טופל חלקית.',
-      undoGoogle: 'הביטול מסיר את המשימה ב-Google.',
-      undoTodo: 'הביטול מסיר את המשימה ב-To Do.',
-      undoFile: 'הביטול מסיר את הקובץ ב-OneDrive.',
+      undoGoogle: 'הביטול מסיר את המשימה.',
+      undoTodo: 'הביטול מסיר את המשימה.',
+      undoFile: 'הביטול מסיר את הקובץ.',
       undoRestore: 'הביטול משחזר את הקובץ הקודם ב-OneDrive.',
       undoneGoogle: 'בוטל — המשימה ב-Google הוסרה.',
       undoneTodo: 'בוטל — המשימה ב-To Do הוסרה.',
@@ -351,10 +434,10 @@ const FlowDisplay = (() => {
       stopTracking: 'הפסק מעקב',
       earlyLine: 'אין עוד מה לפתוח ואין עוד מה לבדוק — זה טופל.',
       undoCalendar: 'הביטול מסיר את האירוע ביומן.',
-      undoGmail: 'הביטול מסיר את הטיוטה ב-Gmail.',
+      undoGmail: 'הביטול מסיר את הטיוטה.',
       undoDoc: 'הביטול מסיר את המסמך.',
       undoSheet: 'הביטול מסיר את הגיליון.',
-      undoDrive: 'הביטול מסיר את הקובץ ב-Drive.',
+      undoDrive: 'הביטול מסיר את הקובץ.',
       undoWritten: 'הביטול מסיר את מה שנכתב עכשיו.',
       undoAllWritten: 'ביטול הכל מסיר את מה שנכתב עכשיו.',
       undoneCalendar: 'בוטל — האירוע ביומן הוסר.',
@@ -376,9 +459,40 @@ const FlowDisplay = (() => {
       manualMany: '{n} צעדים ידניים נשארו לך',
       saveFiles: 'שמור {on} מתוך {all} קבצים', attachments: 'קבצים', less: 'פחות', newStep: 'צעד חדש', afterApprove: 'אחרי אישור',
       calendarApp: 'יומן', youApp: 'אתה', undoUnavailable: 'אין ביטול.',
+      stepCalendar: 'יומן', stepTask: 'משימה', stepDraft: 'טיוטה', stepFile: 'קובץ',
+      todoApp: 'משימות', outlookApp: 'אאוטלוק', gmailApp: 'ג׳ימייל', onedriveApp: 'וואן־דרייב', driveApp: 'דרייב',
       justNow: 'עכשיו', minsAgo: 'לפני {n} דק׳', hrsAgo: 'לפני {n} שע׳', writtenTo: 'נכתב אל ',
       queued: 'בתור', preparing: 'מכין', verifying: 'מאמת', verified: 'אומת',
-      seeOpen: 'מה פתוח'
+      seeOpen: 'מה פתוח',
+      holdAt: 'שריין',
+      steps: '{n} צעדים', hideSteps: 'הסתר צעדים',
+      saveAsk: 'לשמור {on} מתוך {all} קבצים ב-{target}?', pickFile: 'בחר לפחות קובץ אחד',
+      weekLogged: ' נרשמו השבוע', weekAll: '{n} בסך הכל',
+      logEmpty: 'עדיין אין. Glance שותק עד שלולאה באמת נסגרת.',
+      senseLabel: 'רגישות',
+      senseMore: 'מדבר יותר — אתה ממשיך ללחוץ',
+      senseLess: 'ממתין — אתה ממשיך להסתיר',
+      senseEven: 'מאוזן',
+      learned: 'Glance התאים {n} {noun} באופן שבו הוא עובד בשבילך.',
+      learnedOne: 'דבר', learnedMany: 'דברים',
+      insight: 'Glance שם לב שאתה בדרך כלל מסיר {step} בתהליכי {process} — להשאיר כך?',
+      insightYes: 'כן, כך', insightNo: 'לא, הצע שוב',
+      activityTab: 'פעילות',
+      ledgerTitle: 'מה Glance למד ממך',
+      ledgerHint: 'על המכשיר הזה בלבד. איפוס שוכח כל התאמה, איך נפתחים ונסגרים מיילים, הקשרים בין אנשים, ואת הרשימה הזו.',
+      ledgerReset: 'אפס את מה ש-Glance למד',
+      closeMemHint: 'זיכרון הסגירה וכרטיסי הדואר נשארים על המכשיר. ניקוי נותן ל-Glance לדבר שוב על מה שכבר נסגר, ומוריד קבלות טיוטה שנשארו.',
+      closeMem: 'נקה זיכרון סגירה',
+      clearMemConfirm: 'לנקות את זיכרון הסגירה ואת כרטיסי Outlook במכשיר הזה? קבלות טיוטה והצעות מ-Outlook יוסרו. אי אפשר לבטל.',
+      referralTxt: 'מישהו נוסף בצוות כנראה עם אותה לולאה פתוחה.',
+      referralCopy: 'העתק קישור ל-Glance', referralExport: 'ייצא את ההגדרה',
+      copied: 'הועתק', exported: 'יוצא',
+      closeQualityTitle: 'על המכשיר בלבד. סגירה מלאה, חזרה, סירוב, וסגירה שגויה.',
+      quietTitle: 'על המכשיר בלבד. סגירות מהימנות השבוע, והשקט הוא קוד סיבה.',
+      stillTitle: 'על המכשיר בלבד. כרטיסים פתוחים, סגירות, וביטולים.',
+      lmOn: 'המודל שבדפדפן הזה גם קורא ניסוח ששום דבר אחר לא מזהה, עבור {langs} (הוא עבר בדיקת דיוק במכשיר הזה). הוא רק מציע; אתה מחליט.',
+      lmOff: 'המודל שבדפדפן הזה לא עבר את בדיקת הדיוק במכשיר הזה, אז הוא נשאר כבוי.',
+      lmAnd: ' ו-', langEn: 'אנגלית', langHe: 'עברית'
     }
   };
 
@@ -391,9 +505,10 @@ const FlowDisplay = (() => {
   function uiLangFrom(sources) {
     const s = sources || {};
     const setting = s.setting == null ? '' : String(s.setting).trim();
+    const host = s.hostLanguage == null ? '' : String(s.hostLanguage).trim();
     const ui = s.uiLanguage == null ? '' : String(s.uiLanguage).trim();
     const nav = s.navigatorLanguage == null ? '' : String(s.navigatorLanguage).trim();
-    const raw = (setting || ui || nav).toLowerCase();
+    const raw = (setting || host || ui || nav).toLowerCase();
     if (raw === 'he' || raw.indexOf('he-') === 0 || raw === 'iw' || raw.indexOf('iw-') === 0) return 'he';
     return 'en';
   }
@@ -422,16 +537,102 @@ const FlowDisplay = (() => {
     return raw;
   }
 
-  function holdWhenLine(iso, hour, minute) {
+  function holdWhenLine(iso, hour, minute, lang) {
+    const clock = clockPad(hour, minute);
+    if (!clock) return '';
+    const which = arguments.length >= 4 ? uiLangFrom({ setting: lang }) : 'he';
+    if (which === 'en') {
+      const day = ymd(iso);
+      if (!day) return '';
+      return EN_MON[day.mo - 1] + ' ' + day.d + ' ' + clock;
+    }
     const day = hebrewDay(iso);
     if (!day) return '';
-    if (hour == null || minute == null || hour === '' || minute === '') return '';
-    const h = Number(hour);
-    const min = Number(minute);
-    if (!Number.isInteger(h) || h < 0 || h > 23) return '';
-    if (!Number.isInteger(min) || min < 0 || min > 59) return '';
-    const pad = (n) => String(n).padStart(2, '0');
-    return day + ' ' + pad(h) + ':' + pad(min);
+    return day + ' ' + clock;
+  }
+
+  // The card text itself: "Hold Mon 10:00", or "שריין ב׳ 10:00".
+  // השהה is the Hold It button only. A missing day or clock is empty.
+  function holdCardText(lang, iso, hour, minute) {
+    const day = ymd(iso);
+    const clock = clockPad(hour, minute);
+    if (!day || !clock) return '';
+    const which = uiLangFrom({ setting: lang });
+    const word = (chrome(which).holdAt) || (which === 'he' ? 'שריין' : 'Hold');
+    const wd = which === 'he' ? HE_WD[day.wd] : EN_WD[day.wd];
+    return word + ' ' + wd + ' ' + clock;
+  }
+
+  function readClock(bag) {
+    if (!bag) return null;
+    const dateIso = bag.dateIso || (bag.date && bag.date.iso) || null;
+    const hour = bag.hour != null ? bag.hour : (bag.time && bag.time.hour);
+    const minute = bag.minute != null ? bag.minute : (bag.time && bag.time.minute);
+    if (!dateIso) return null;
+    return { dateIso: dateIso, hour: hour, minute: minute };
+  }
+
+  function holdClockFrom(ctx) {
+    if (!ctx) return null;
+    const bags = [];
+    if (ctx.holdClock) bags.push(ctx.holdClock);
+    if (ctx.calendarHold && ctx.calendarHold.params) bags.push(ctx.calendarHold.params);
+    ((ctx.process && ctx.process.steps) || []).forEach(function (step) { if (step && step.params) bags.push(step.params); });
+    if (ctx.intent) {
+      bags.push(ctx.intent);
+      if (ctx.intent.entities) bags.push(ctx.intent.entities);
+      if (ctx.intent.facts) bags.push(ctx.intent.facts);
+      const rem = ctx.intent.entities && ctx.intent.entities.reminder;
+      if (rem) bags.push(rem);
+    }
+    for (let i = 0; i < bags.length; i++) {
+      const found = readClock(bags[i]);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function cardTitle(lang, ctx, fallback) {
+    const hold = ctx && (ctx.glanceChain === 'calendar-hold' || (ctx.process && ctx.process.id === 'hold'));
+    if (hold) {
+      const clock = holdClockFrom(ctx);
+      const line = clock ? holdCardText(lang, clock.dateIso, clock.hour, clock.minute) : '';
+      if (line) return line;
+    }
+    return localizeHeading(lang, fallback == null ? '' : String(fallback));
+  }
+
+  function activityMetric(lang, text) {
+    const raw = String(text == null ? '' : text);
+    if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
+    let line = raw;
+    line = line.replace(/Full closes (\d+) · Returns (\d+) · Turned down (\d+)( · False-close (\d+)%)?/, function (_m, a, b, c, _tail, d) {
+      let out = 'סגירות מלאות ' + a + ' · חזרות ' + b + ' · סירובים ' + c;
+      if (d != null && d !== '') out += ' · סגירה שגויה ' + d + '%';
+      return out;
+    });
+    line = line.replace(/Trusted closes (\d+) this week · Undo (\d+)/g, 'סגירות מהימנות $1 השבוע · ביטולים $2');
+    line = line.replace(/Silence this week /g, 'שקט השבוע ');
+    line = line.replace(/Silence /g, 'שקט ');
+    line = line.replace(/Still open — shown (\d+) · Do It (\d+) · undo (\d+) · false-close (\d+)/g, 'עדיין פתוח — הוצגו $1 · בצע $2 · ביטול $3 · סגירה שגויה $4');
+    const reasons = [
+      ['outlook-file-found-no-attach', 'קובץ בלי צירוף'],
+      ['third-party', 'צד שלישי'],
+      ['calibrated', 'מכויל'],
+      ['memory', 'זיכרון'],
+      ['noise', 'רעש'],
+      ['hedge', 'גידור'],
+      ['family', 'משפחה'],
+      ['google', 'גוגל'],
+      ['file', 'קובץ'],
+      ['fact', 'עובדה'],
+      ['low', 'נמוך']
+    ];
+    reasons.forEach(function (pair) {
+      const code = pair[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      line = line.replace(new RegExp('(^| · )' + code + ' (?=\\d)', 'g'), '$1' + pair[1] + ' ');
+    });
+    return line;
   }
 
   function whyNotShownRows(pageDiagnostics, diagnostics) {
@@ -472,6 +673,11 @@ const FlowDisplay = (() => {
     hebrewDay: hebrewDay,
     cardDateLine: cardDateLine,
     holdWhenLine: holdWhenLine,
+    holdCardText: holdCardText,
+    holdClockFrom: holdClockFrom,
+    cardTitle: cardTitle,
+    localizeHeading: localizeHeading,
+    activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,
     chrome: chrome,
     fillChrome: fillChrome,
