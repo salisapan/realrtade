@@ -61,7 +61,11 @@ const FlowIntent = (() => {
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
-  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+  // פגישת is the construct (פגישת תכנון = a planning meeting). It is not
+  // the absolute פגישה, so a note that only uses the construct used to
+  // stay silent. The artifact lookahead still refuses "the recording of
+  // the meeting" and the same continuations as the absolute noun.
+  const MEETING_NOUN_HE = /(פגישת|פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
 
   // An explicit ask to meet, narrower than HANDOFF. "Could you please
   // confirm you can make it" is a confirm ask on a meeting that is already

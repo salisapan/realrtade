@@ -419,7 +419,7 @@ sandbox.reinjectGmailTabs().then((first) => {
           handled && handled.textContent === 'טופל.' && undo && undo.textContent === 'בטל הכל',
           { handled: handled && handled.textContent, undo: undo && undo.textContent });
         const ALLOW = new Set(['glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo']);
-        const kinds = ['handled', 'undo', 'undoAll', 'undoing', 'tryAgain', 'calendarFailed'];
+        const kinds = ['handled', 'undo', 'undoAll', 'undoing', 'tryAgain', 'calendarFailed', 'panelHead'];
         const bad = [];
         kinds.forEach((kind) => {
           const line = he.page.glanceUiCopy(kind);
@@ -533,22 +533,21 @@ sandbox.reinjectGmailTabs().then((first) => {
                   { undos, label: label && label.textContent });
                 const joined = bootPage({
                   terminal: true,
-                  lane: { 'h-old': laneRow({ ids: ['h-old', 'm-live'] }) }
+                  messageId: 'm-live',
+                  threadId: 'thread-9',
+                  lane: {
+                    'h-old': laneRow({ ids: ['h-old', 'm-live', 'scan:thread-9', 'Planning meeting'] }),
+                    'thread-9': laneRow(),
+                    'Planning meeting': laneRow()
+                  }
                 });
                 return settle(joined).then(() => joined);
               }).then((joined) => {
                 const alias = receipt(joined.page);
-                check('a handled mail found by its other id shows the receipt and no Do It card',
-                  alias.handled === 'Handled.' && alias.undo === 'Undo all' && !alias.doIt &&
-                  alias.written.indexOf('Calendar · Thursday') >= 0 && alias.undoLines.indexOf('Google Task removed.') >= 0,
+                check('a new message id does not inherit a record by alias, thread, or subject',
+                  !alias.handled && !alias.undo && alias.written.length === 0 && !alias.doIt,
                   alias);
-                if (alias.undoButton) alias.undoButton.click();
-                return ticks(8).then(() => {
-                  const undos = joined.page.sent.filter((msg) => msg && msg.type === 'flow:google-undo');
-                  check('Undo from a mail opened under its other id still deletes the stored steps',
-                    undos.length === 2 && undos[0].connectorId === 'googleLaneTask' && undos[1].connectorId === 'googleHold',
-                    undos.map((msg) => msg && msg.connectorId));
-                  const folded = bootPage({
+                const folded = bootPage({
                     messageId: '18f3_ABC',
                     shape: 'adn',
                     lane: {
@@ -558,8 +557,7 @@ sandbox.reinjectGmailTabs().then((first) => {
                       }
                     }
                   });
-                  return settle(folded).then(() => folded);
-                });
+                return settle(folded).then(() => folded);
               }).then((folded) => {
                 const canon = receipt(folded.page);
                 check('a canon-folded message id still shows the stored receipt',

@@ -56,6 +56,7 @@ function glanceUiCopy(kind) {
   if (kind === 'undoAll') return he ? 'בטל הכל' : 'Undo all';
   if (kind === 'undoing') return he ? 'מבטל…' : 'Undoing…';
   if (kind === 'tryAgain') return he ? 'נסה שוב' : 'Try again';
+  if (kind === 'panelHead') return he ? 'מה עדיין פתוח' : 'Still open';
   return '';
 }
 
@@ -344,7 +345,7 @@ function glanceUiCopy(kind) {
       onOpenList: async () => {
         // Re-read at click time. This opens the same Still Open list the
         // morning brief uses, not every unresolved chip.
-        const open = await FlowStorage.getStillOpen();
+        const open = await dropHandledMails(await FlowStorage.getStillOpen());
         if (open.length) openBriefPanel(open);
       }
     });
@@ -945,7 +946,7 @@ function glanceUiCopy(kind) {
   // (.adn), which is inside the listitem, not always on the listitem
   // itself. The hash of the row text changes when Gmail rewrites
   // "0 minutes ago". The legacy id and the thread id do not.
-  function gmailAttr(node, name) {
+  function gmailAttr(node, name, ownOnly) {
     if (!node || !node.getAttribute) return '';
     const own = node.getAttribute(name);
     if (own) return own;
@@ -956,6 +957,9 @@ function glanceUiCopy(kind) {
         if (fromChild) return fromChild;
       } catch (e) { /* attribute selector is a fixed name */ }
     }
+    // A message id on an ancestor belongs to a different message. Thread
+    // id is the exception: Gmail stamps it on the thread, not the row.
+    if (ownOnly) return '';
     let parent = node.parentElement;
     let hops = 0;
     while (parent && hops < 8) {
@@ -967,20 +971,34 @@ function glanceUiCopy(kind) {
     return '';
   }
 
+  // The ids that name THIS message. A text hash, the thread id, and the
+  // subject are not among them. legacy-message-id and an rfc Message-ID
+  // on this node (or the .adn inside it) are.
+  function laneMessageIds(message) {
+    const legacy = gmailAttr(message, 'data-legacy-message-id', true);
+    const rfc = gmailAttr(message, 'data-rfc822msgid', true);
+    const ids = [];
+    if (legacy) ids.push(legacy);
+    if (rfc && ids.indexOf(rfc) < 0) ids.push(rfc);
+    return ids;
+  }
+
   function stableMessageKey(message) {
-    const legacy = gmailAttr(message, 'data-legacy-message-id');
+    const laneIds = laneMessageIds(message);
+    const legacy = laneIds[0] || '';
     const threadId = gmailAttr(message, 'data-legacy-thread-id');
     let hash = '';
     try { hash = hashNode(message) || ''; } catch (e) { hash = ''; }
-    const messageIds = [];
-    if (legacy) messageIds.push(legacy);
+    const messageIds = laneIds.slice();
     if (hash) messageIds.push(hash);
     if (threadId) messageIds.push('scan:' + threadId);
     return {
       messageId: legacy || hash,
       legacy: legacy,
+      rfc: laneIds.length > 1 ? laneIds[1] : '',
       threadId: threadId,
       messageIds: messageIds,
+      laneIds: laneIds,
       threadIds: threadId ? [threadId] : []
     };
   }
@@ -996,7 +1014,7 @@ function glanceUiCopy(kind) {
       const ids = stableMessageKey(message);
       if (!ids.messageId) continue;
       let lane = null;
-      try { lane = await readLaneUndo(ids.messageId, ids.messageIds); }
+      try { lane = await readLaneUndo(ids.legacy || ids.messageId, ids.laneIds); }
       catch (e) { lane = null; }
       if (!chromeLive()) return false;
       if (lane && lane.steps && lane.steps.length) {
@@ -1193,7 +1211,7 @@ function glanceUiCopy(kind) {
     // The open mail's own Do It, every step. A task row from another
     // message in this thread is not this mail, and a card left in the DOM
     // by the previous content-script world was already removed.
-    const laneRecord = await readLaneUndo(messageId, stable.messageIds);
+    const laneRecord = await readLaneUndo(stable.legacy || messageId, stable.laneIds);
     if (!chromeLive()) return;
     if (laneRecord && laneRecord.steps && laneRecord.steps.length && message.isConnected && !message.querySelector('.flow-chip-host')) {
       mountLaneReceipt(message, laneRecord, messageId);
@@ -1210,8 +1228,11 @@ function glanceUiCopy(kind) {
     // as its id, because the inbox row does not carry the open message's
     // id. Once this thread is actually open, that decision covers the
     // message too — otherwise Do It here would write the same close again.
+    // An inbox snapshot is one thread id. It covers the single open message
+    // that snapshot was. A newer message in the same thread is a different
+    // mail and keeps its own card.
     const openedThreadId = threadIdFrom(message);
-    if (openedThreadId && await FlowStorage.hasTerminalOutcome('scan:' + openedThreadId)) {
+    if (messages.length === 1 && openedThreadId && await FlowStorage.hasTerminalOutcome('scan:' + openedThreadId)) {
       await FlowStorage.markAlreadyClosed(messageId);
     }
     // A proved Google Task stays on the thread after Gmail rebuilds this
@@ -1263,7 +1284,7 @@ function glanceUiCopy(kind) {
       const verifying = message.querySelector('.flow-chip-host[data-glance-verifying]');
       if (verifying) verifying.remove();
       if (message.isConnected && !message.querySelector('.flow-chip-host')) {
-        const late = await readLaneUndo(messageId, stable.messageIds);
+        const late = await readLaneUndo(stable.legacy || messageId, stable.laneIds);
         if (late && late.steps && late.steps.length) mountLaneReceipt(message, late, messageId);
       }
       return;
@@ -1544,7 +1565,7 @@ function glanceUiCopy(kind) {
     if (!process) { void flushSuggest(false); return; }
 
     injectChip(message, {
-      messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, intent, process, sender, subject, attachment: chosenAttachment, attachments,
+      messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, laneIds: stable.laneIds, intent, process, sender, subject, attachment: chosenAttachment, attachments,
       threadUrl: threadUrl(legacyId),
       threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
@@ -1765,6 +1786,7 @@ function glanceUiCopy(kind) {
     if (msg && msg.type === 'flow:still-open-show') {
       chrome.storage.local.remove('glanceStillOpenOpenBrief');
       FlowStorage.getStillOpen()
+        .then((open) => dropHandledMails(open))
         .then((open) => { if (open.length) openBriefPanel(open); })
         .catch((e) => console.error('[Glance] failed to open Still Open from the notification', e));
       return;
@@ -2725,16 +2747,23 @@ function glanceUiCopy(kind) {
     return /^h-?\d+$/.test(String(id || ''));
   }
 
+  // Only a legacy message id or an rfc Message-ID. A text hash, a
+  // scan: thread id, and a subject are not keys for this record.
   function laneStoreIds(messageId, extraIds) {
     const out = [];
     const seen = {};
     function add(id) {
       if (id == null) return;
       const text = String(id).trim();
-      if (!text || text.indexOf('scan:') === 0 || text === 'h0') return;
+      if (!text || text.indexOf('scan:') === 0 || text === 'h0' || laneTextHash(text)) return;
       if (seen[text]) return;
       seen[text] = true;
       out.push(text);
+      const folded = laneCanon(text);
+      if (folded && folded !== text && !seen[folded]) {
+        seen[folded] = true;
+        out.push(folded);
+      }
     }
     add(messageId);
     (extraIds || []).forEach(add);
@@ -2745,45 +2774,32 @@ function glanceUiCopy(kind) {
     return !!(row && row.expires && row.expires >= now && Array.isArray(row.steps) && row.steps.length);
   }
 
+  // A stored row matches only when its key IS this message's legacy id
+  // or rfc Message-ID (or the canon fold of that same id). row.ids, the
+  // thread id, and the subject never join a different mail.
   function findLaneRow(all, wanted) {
     if (!all || typeof all !== 'object') return null;
     const now = Date.now();
-    const raw = [];
+    const needles = {};
     (wanted || []).forEach((id) => {
       if (id == null) return;
       const text = String(id).trim();
-      if (!text || text.indexOf('scan:') === 0) return;
-      raw.push(text);
-    });
-    if (!raw.length) return null;
-    const primary = raw[0];
-    const direct = [primary].concat(raw.filter((id) => id !== primary && !laneTextHash(id)));
-    for (let i = 0; i < direct.length; i++) {
-      const id = direct[i];
-      if (laneRowLive(all[id], now)) return all[id];
-      const folded = laneCanon(id);
-      if (folded && folded !== id && laneRowLive(all[folded], now)) return all[folded];
-    }
-    const needles = {};
-    raw.forEach((id) => {
-      if (laneTextHash(id) && id !== primary) return;
-      const folded = laneCanon(id);
+      if (!text || text.indexOf('scan:') === 0 || laneTextHash(text)) return;
+      needles[text] = true;
+      const folded = laneCanon(text);
       if (folded) needles[folded] = true;
     });
+    const names = Object.keys(needles);
+    if (!names.length) return null;
+    for (let i = 0; i < names.length; i++) {
+      if (laneRowLive(all[names[i]], now)) return all[names[i]];
+    }
     const keys = Object.keys(all);
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
-      if (key.indexOf('scan:') === 0) continue;
-      const row = all[key];
-      if (!laneRowLive(row, now)) continue;
-      const keyFold = laneCanon(key);
-      if (needles[keyFold] && !(laneTextHash(key) && key !== primary)) return row;
-      const ids = Array.isArray(row.ids) ? row.ids : [];
-      for (let j = 0; j < ids.length; j++) {
-        const id = ids[j] == null ? '' : String(ids[j]);
-        if (!id || id.indexOf('scan:') === 0 || laneTextHash(id)) continue;
-        if (needles[laneCanon(id)]) return row;
-      }
+      if (key.indexOf('scan:') === 0 || laneTextHash(key)) continue;
+      if (!needles[key] && !needles[laneCanon(key)]) continue;
+      if (laneRowLive(all[key], now)) return all[key];
     }
     return null;
   }
@@ -2833,9 +2849,13 @@ function glanceUiCopy(kind) {
     return glanceUiCopy('stepFailed');
   }
 
+  function laneEditedReason(reason) {
+    return reason === 'user-edited' || reason === 'range-edited';
+  }
+
   function laneRefuseLine(result, connectorId) {
     const reason = result && result.reason;
-    if ((reason === 'user-edited' || reason === 'range-edited') && glanceUiHebrew()) return glanceUiCopy('edited');
+    if (laneEditedReason(reason)) return glanceUiCopy('edited');
     if (result && result.error) return String(result.error);
     if (result && result.written && result.ok !== false) return String(result.written);
     return laneFailLine(connectorId);
@@ -2850,7 +2870,7 @@ function glanceUiCopy(kind) {
       .then((bag) => {
         const all = bag && bag[LANE_UNDO_KEY] && typeof bag[LANE_UNDO_KEY] === 'object' ? bag[LANE_UNDO_KEY] : {};
         const row = findLaneRow(all, [messageId]);
-        const keys = laneStoreIds(messageId, row && row.ids);
+        const keys = laneStoreIds(messageId);
         const drop = {};
         keys.forEach((id) => { drop[id] = true; const folded = laneCanon(id); if (folded) drop[folded] = true; });
         Object.keys(all).forEach((key) => {
@@ -2909,7 +2929,9 @@ function glanceUiCopy(kind) {
         const firstFail = refused[0] || null;
         const reversed = record && record.steps ? record.steps.slice().reverse() : [];
         const kept = [];
-        list.forEach((row, i) => { if (!row.ok && reversed[i]) kept.push(reversed[i]); });
+        list.forEach((row, i) => {
+          if (!row.ok && reversed[i] && !laneEditedReason(row.reason)) kept.push(reversed[i]);
+        });
         const remaining = kept.slice().reverse();
         const result = {
           ok: list.length > 0 && refused.length === 0,
@@ -3165,9 +3187,12 @@ function glanceUiCopy(kind) {
     function paintLaneRetry(result) {
       if (done.replaceChildren) done.replaceChildren();
       else done.textContent = '';
-      (result && result.outcomes || []).forEach((row) => {
+      const outcomes = (result && result.outcomes) || [];
+      outcomes.forEach((row) => {
         if (row && row.written) done.appendChild(el('span', 'flow-chip-written', row.written));
       });
+      const retryable = outcomes.some((row) => row && row.ok === false && !laneEditedReason(row.reason));
+      if (!retryable) return;
       const again = el('button', 'flow-chip-undo', glanceUiCopy('tryAgain'));
       again.type = 'button';
       again.addEventListener('click', () => {
@@ -3637,7 +3662,7 @@ function glanceUiCopy(kind) {
     });
     if (meetingNote) bookkeeping.push(meetingNote);
     noteLaneOutcome(results);
-    bookkeeping.push(rememberLaneUndo(ctx.messageId, laneUndoStepsOf(succeeded), ctx.messageIds));
+    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded), ctx.laneIds));
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
@@ -3891,6 +3916,22 @@ function glanceUiCopy(kind) {
   // match on (see threadUrl's own comment on what a legacy message id can
   // and can't promise).
 
+  // The card and the side panel read one record. A mail that already has
+  // its Handled receipt is not still open, and it does not get a second Do It.
+  async function dropHandledMails(rows) {
+    const kept = [];
+    for (const row of rows || []) {
+      const id = row && row.messageId;
+      if (id) {
+        let lane = null;
+        try { lane = await readLaneUndo(id); } catch (e) { lane = null; }
+        if (lane && lane.steps && lane.steps.length) continue;
+      }
+      kept.push(row);
+    }
+    return kept;
+  }
+
   async function checkContextualResurface(threadMessages, excludeMessageId) {
     if (typeof FlowBrief === 'undefined') return;
 
@@ -3907,7 +3948,7 @@ function glanceUiCopy(kind) {
     }
     if (!threadIds.size) { FlowBrief.hideResurface(); return; }
 
-    const pending = await FlowStorage.getPending();
+    const pending = await dropHandledMails(await FlowStorage.getPending());
     // Oldest-still-open first (getPending's own order) — if more than one
     // other message in this thread is somehow still open, the same "oldest
     // first" bias the Brief panel uses applies here too.
@@ -4000,7 +4041,7 @@ function glanceUiCopy(kind) {
       return;
     }
 
-    const open = await FlowStorage.getStillOpen();
+    const open = await dropHandledMails(await FlowStorage.getStillOpen());
     reportPendingCount(open.length);
     publishStillOpenDigest(open.length);
     if (!open.length) {
@@ -4033,7 +4074,7 @@ function glanceUiCopy(kind) {
   }
 
   async function runStillOpenDoIt(messageId) {
-    const open = await FlowStorage.getStillOpen();
+    const open = await dropHandledMails(await FlowStorage.getStillOpen());
     const entry = open.find((row) => row.messageId === messageId);
     if (!entry) return;
     openBriefPanel(open);
@@ -4064,7 +4105,7 @@ function glanceUiCopy(kind) {
     }
     if (got.glanceStillOpenOpenBrief) {
       chrome.storage.local.remove('glanceStillOpenOpenBrief');
-      const open = await FlowStorage.getStillOpen();
+      const open = await dropHandledMails(await FlowStorage.getStillOpen());
       if (open.length) openBriefPanel(open);
     }
   }
