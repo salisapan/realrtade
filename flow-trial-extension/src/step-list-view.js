@@ -211,7 +211,7 @@ const FlowStepListView = (() => {
         const target = surface === 'gmail' ? 'Drive' : 'OneDrive';
         chip = { mode: 'files', noHold: true, target: target };
       } else {
-        chip = { mode: 'count' };
+        chip = { mode: 'count', noHold: o.noHold === true };
       }
       return {
         he: he,

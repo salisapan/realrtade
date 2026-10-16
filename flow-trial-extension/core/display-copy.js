@@ -402,6 +402,19 @@ const FlowDisplay = (() => {
     return CHROME[uiLangFrom({ setting: lang })] || CHROME.en;
   }
 
+  // The primary button follows the plan and the UI language. A To Do
+  // task says Do It. A calendar hold says Hold It.
+  function actionLabel(process, lang) {
+    const L = chrome(lang);
+    const steps = (process && process.steps) || [];
+    const taskOnly = steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'task'));
+    if (taskOnly) return L.doIt;
+    const id = process && process.id;
+    if (id === 'hold' || id === 'schedule' || id === 'schedule-confirm' || id === 'clear-it' || id === 'move-it') return L.hold;
+    if (steps.some((s) => s && s.kind === 'calendar')) return L.hold;
+    return L.doIt;
+  }
+
   // Stored receipts keep the English sentence. The paint reads it back in
   // the UI language. A mail-language title is not in the table, so it stays.
   function showChrome(lang, text) {
@@ -474,6 +487,7 @@ const FlowDisplay = (() => {
     holdWhenLine: holdWhenLine,
     uiLangFrom: uiLangFrom,
     chrome: chrome,
+    actionLabel: actionLabel,
     fillChrome: fillChrome,
     showChrome: showChrome
   };

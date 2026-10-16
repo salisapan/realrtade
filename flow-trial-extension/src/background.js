@@ -1928,6 +1928,20 @@ function localTimeZone() {
   }
 }
 
+// glanceTimeZone wins, then the host zone. A meeting hold does not
+// silently write UTC when the person is in another zone.
+async function outlookGlanceZone(explicit) {
+  const given = String(explicit || '').trim();
+  if (given) return given.slice(0, 80);
+  try {
+    const bag = await chrome.storage.local.get('glanceTimeZone');
+    const raw = bag && bag.glanceTimeZone;
+    if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 80);
+    if (raw && typeof raw.timeZone === 'string' && raw.timeZone.trim()) return raw.timeZone.trim().slice(0, 80);
+  } catch (e) { /* storage is optional */ }
+  return localTimeZone();
+}
+
 // No duration is ever stated in an email the way a date or time is, so
 // there is nothing to extract — 30 minutes is a plain, documented default
 // rather than a guess dressed up as a fact, and the event's own real time
@@ -3892,6 +3906,24 @@ async function outlookStoredEventSnap(eventId) {
   );
 }
 
+// The proof is a GET of the event just created, not the POST body.
+async function outlookEventRead(eventId) {
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT;
+  outlookAssertNotSend(url);
+  let last = { snap: null, raw: null };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try { res = await outlookFetch(url, { method: 'GET' }); }
+    catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    const snap = raw ? outlookCreationSnap(raw) : null;
+    last = { snap: snap, raw: raw };
+    if (outlookHasSnap(snap)) return last;
+  }
+  return last;
+}
+
 // Read the object Glance created. Undo deletes only after this GET succeeds
 // and still matches the creation snapshot. 404 means it is already gone.
 // A 5xx, a network error, a timeout, or a body that will not parse refuses
@@ -4094,26 +4126,32 @@ async function outlookMeetingWrite(p) {
   }
   const title = String(params.title || 'Meeting').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting';
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
-  const zone = localTimeZone();
+  const zone = await outlookGlanceZone(params.timeZone);
   const lines = [];
-  if (quote) lines.push(quote);
+  if (quote && quote !== title) lines.push(quote);
   if (p && p.threadUrl) lines.push(String(p.threadUrl));
-  const body = {
-    subject: title,
-    body: { contentType: 'Text', content: lines.join('\n') },
-    start: { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute), timeZone: zone },
-    end: { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone: zone },
-    showAs: 'busy',
-    attendees: []
-  };
+  const built = Cal.meetingBody({
+    dateIso: dateIso,
+    hour: clock.hour,
+    minute: clock.minute,
+    title: title,
+    quote: lines.length ? lines.join('\n') : title,
+    timeZone: zone
+  });
+  if (!built) return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
+  const body = built;
   if ((Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) {
     return { ok: false, reason: 'refused' };
   }
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
+  const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
   const res = await outlookFetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'outlook.timezone="' + zoneHeader + '"'
+    },
     body: JSON.stringify(body)
   });
   if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
@@ -4125,9 +4163,14 @@ async function outlookMeetingWrite(p) {
   if (!event || typeof event.id !== 'string' || !event.id) {
     return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
   }
-  const eventSnap = await outlookStoredEventSnap(event.id);
+  const proved = await outlookEventRead(event.id);
+  const eventSnap = proved && proved.snap;
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
-  const ref = { eventId: event.id, created: eventSnap };
+  const ref = {
+    eventId: event.id,
+    created: eventSnap,
+    contentHash: Cal.contentHash(proved && proved.raw)
+  };
   const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
@@ -4321,8 +4364,9 @@ async function outlookTaskWrite(p) {
   if (!task || typeof task.id !== 'string' || !task.id) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
-  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: null };
-  const fetched = await outlookTaskFetchBack(taskListId, task.id);
+  const wroteListId = (task && typeof task.listId === 'string' && task.listId) ? task.listId : taskListId;
+  const ref = { taskListId: wroteListId, taskId: task.id, externalId: task.id, created: null };
+  const fetched = await outlookTaskFetchBack(wroteListId, task.id, body);
   if (fetched && fetched.task) ref.created = outlookCreationSnap(fetched.task);
   if (!fetched.ok || !outlookHasSnap(ref.created)) {
     return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
@@ -4344,6 +4388,34 @@ async function outlookTaskWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
+function outlookZoneKey(zone) {
+  const s = String(zone || '').trim().toLowerCase();
+  if (!s) return '';
+  if (s === 'utc' || s === 'etc/utc' || s === 'tzone://microsoft/utc' || s === 'greenwich standard time') return 'utc';
+  return s;
+}
+
+function outlookClockKey(value) {
+  const clock = (globalThis.FlowNativeEdit && FlowNativeEdit.clockOf) ? FlowNativeEdit.clockOf(value) : '';
+  return clock || '';
+}
+
+// Title and dueDateTime, with timeZone. A missing field on the read is not
+// a disagreement. UTC and Etc/UTC are the same zone. A different title or
+// a different clock is not the task we wrote.
+function outlookTodoAgrees(sent, got) {
+  if (!got) return false;
+  const want = String((sent && sent.title) || '').trim();
+  const have = got.title == null ? '' : String(got.title).trim();
+  if (want && have && want !== have) return false;
+  if (!(sent && sent.dueDateTime) || !got.dueDateTime) return true;
+  if (outlookClockKey(sent.dueDateTime) !== outlookClockKey(got.dueDateTime)) return false;
+  const a = outlookZoneKey(sent.dueDateTime.timeZone);
+  const b = outlookZoneKey(got.dueDateTime.timeZone);
+  if (a && b && a !== b) return false;
+  return true;
+}
+
 async function outlookTaskFetchOnce(taskListId, taskId) {
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
@@ -4360,11 +4432,16 @@ async function outlookTaskFetchOnce(taskListId, taskId) {
   return { ok: true, task: body };
 }
 
-async function outlookTaskFetchBack(taskListId, taskId) {
+// Graph's To Do list is eventually consistent. A 404 in the first second
+// is not proof the task is missing. Retry with backoff, up to about 3s.
+async function outlookTaskFetchBack(taskListId, taskId, sent) {
+  const waits = [0, 250, 500, 1000, 1250];
   let last = { ok: false };
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < waits.length; attempt++) {
+    if (waits[attempt]) await new Promise((resolve) => setTimeout(resolve, waits[attempt]));
     last = await outlookTaskFetchOnce(taskListId, taskId);
-    if (last.ok) return last;
+    if (last.ok && outlookTodoAgrees(sent, last.task)) return last;
+    if (last.ok) last = { ok: false, mismatch: true, task: last.task };
   }
   return last;
 }

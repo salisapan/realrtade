@@ -125,6 +125,8 @@ const FlowChipHost = (() => {
     const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
       ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || ctx.text || '', fileCard: ctx.fileCard === true })
       : { title: ctx.process.name || 'Reply', sentence: null, fileCard: false };
+    const taskOnly = ((ctx.process && ctx.process.steps) || []).length > 0 &&
+      (ctx.process.steps || []).every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'task'));
     const kitReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && typeof FlowStepKit !== 'undefined' && (ctx.process.steps || []).length;
     if (kitReady) {
       const liveSteps = (ctx.process.steps || []).slice();
@@ -133,6 +135,7 @@ const FlowChipHost = (() => {
         intent: face.title || ctx.process.name || 'Reply',
         lang: ctx.intent && ctx.intent.lang,
         uiLang: ctx.uiLang || 'en',
+        noHold: taskOnly,
         fileCard: face.fileCard === true || ctx.fileCard === true,
         surface: ctx.app || 'outlook',
         onDoIt: function (button) { if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps); },
@@ -194,6 +197,9 @@ const FlowChipHost = (() => {
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
     let doText = (ctx.doLabel && ctx.doLabel !== 'Do It') ? ctx.doLabel : (uiWords.doIt || ctx.doLabel || 'Do It');
+    if (taskOnly && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.actionLabel === 'function') {
+      doText = FlowDisplay.actionLabel(ctx.process, ctx.uiLang || uiLang);
+    }
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') doText = FlowDisplay.showChrome(ctx.uiLang || uiLang, doText);
     chip.appendChild(el('span', 'flow-chip-do-label', doText));
     chip.addEventListener('click', () => {
@@ -206,6 +212,7 @@ const FlowChipHost = (() => {
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       const view = FlowStepListView.mount(host, rows, {
         uiLang: ctx.uiLang || uiLang,
+        noHold: taskOnly,
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;

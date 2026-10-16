@@ -777,6 +777,11 @@ const FlowIntent = (() => {
       if (slot && slot.time && !facts.time) facts.time = slot.time;
       if (slot && slot.date && slot.date.iso && !(facts.date && facts.date.iso)) facts.date = slot.date;
     }
+    // A weekday that names a different day than the written date is not a
+    // meeting. Staying quiet beats filing Thursday's words on Sunday.
+    if (facts.date && facts.date.contradictsWeekday) {
+      return { type: null, signals: {}, facts: facts, quiet: 'date' };
+    }
     const s = FlowJudgment.score(text, domain, facts);
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
     // dateText is what neutralTitle() uses to name a dated close ("Log
@@ -982,7 +987,8 @@ const FlowIntent = (() => {
         const held = familyBox.hit;
         const fileHold = Boolean(held && held.fileTarget);
         const familyMeet = Boolean(held && held.family === 'D' && held.type === 'event' && held.personalClose === 'calendar-hold');
-        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
+        const statedDay = Boolean(facts.date && facts.date.statedWeekday);
+        if (!fileHold && (familyMeet || statedDay || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
           intent.explicitHold = true;
         }
       }
@@ -1282,7 +1288,10 @@ const FlowIntent = (() => {
       // an already-stated meeting stay the schedule processes.
       // A hold here is an explicit ask to meet at that clock. A sender's
       // promise plus a time ("I'll send it at 9am") is not a hold.
-      const meetingHold = explicitMeetingAsk;
+      // Weekday + day-first date + בשעה HH:MM, with a meeting noun and no
+      // file, is one hold. A bare "let's do a call Friday at 3" stays schedule.
+      const statedMeet = Boolean(facts.date && facts.date.statedWeekday && hasMeetingNoun);
+      const meetingHold = explicitMeetingAsk || statedMeet;
       if (meetingHold) {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');

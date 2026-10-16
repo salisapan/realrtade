@@ -210,6 +210,40 @@ const FlowExtract = (() => {
     return ambiguous;
   }
 
+  // Weekday + a day-first date + בשעה HH:MM is one clock. 22/10 is 22 October,
+  // not October 22. The weekday has to be that calendar day. A mismatch is
+  // not a date: the caller stays quiet instead of picking one of the two.
+  function weekdayDayFirst(text, now) {
+    const src = String(text || '');
+    const dayName = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
+    const clock = src.match(/(?:בשעה|בשעות)\s*\d{1,2}:\d{2}(?!\d)/);
+    if (!dayName || !slash || !clock || !now) return null;
+    const weekday = DAYS_HE.indexOf(dayName[1]);
+    const day = +slash[1];
+    const month = +slash[2];
+    const raw = dayName[0] + ' ' + slash[1] + '/' + slash[2] + (slash[3] ? '/' + slash[3] : '');
+    if (weekday < 0 || month < 1 || month > 12 || day < 1 || day > 31) {
+      return { raw: raw, iso: null, contradictsWeekday: true };
+    }
+    let year = null;
+    if (slash[3]) {
+      year = +slash[3];
+      if (year < 100) year += 2000;
+    }
+    if (year) {
+      const dated = buildDate(year, month - 1, day);
+      if (!dated || dated.getDay() !== weekday) return { raw: raw, iso: null, contradictsWeekday: true };
+      return { raw: raw, iso: iso(dated), statedWeekday: true };
+    }
+    const y = now.getFullYear();
+    const candidates = [y - 1, y, y + 1]
+      .map((yy) => buildDate(yy, month - 1, day))
+      .filter((d) => d && d.getDay() === weekday && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+    if (candidates.length !== 1) return { raw: raw, iso: null, contradictsWeekday: true };
+    return { raw: raw, iso: iso(candidates[0]), statedWeekday: true };
+  }
+
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
   function parseDate(text, now) {
@@ -312,6 +346,9 @@ const FlowExtract = (() => {
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
+
+    const stated = weekdayDayFirst(text, now);
+    if (stated) return stated;
 
     // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
     // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
