@@ -46,6 +46,9 @@
   let scrollLock = false;
   let renderDepth = 0;
   let surfaceGen = 0;
+  // Bumps on every glanceWhyCurrent write. A refresh that started earlier
+  // must not paint over the value this listener already applied.
+  let whyRev = 0;
   function uiLang() {
     let ui = '';
     try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
@@ -110,14 +113,26 @@
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local') return;
+      if (ch.glanceWhyCurrent) {
+        whyRev += 1;
+        if (state) state.glanceWhyCurrent = ch.glanceWhyCurrent.newValue || null;
+        // The row already on screen updates now. A rebuild still in flight
+        // reads this same value when it appends, so a late snapshot cannot
+        // leave the line off after the write has landed.
+        syncWhyLine(whyRev).catch(() => {});
+      }
       if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceUiLanguage)) return;
-      refresh().then(() => Promise.all([
-        renderSurfaces().catch(() => {}),
-        renderOutlookCards().catch(() => {}),
-        renderWaiting().catch(() => {}),
-        renderOpen().catch(() => {}),
-        renderLog().catch(() => {})
-      ])).catch(() => {});
+      const rev = whyRev;
+      refresh().then(() => {
+        if (rev !== whyRev) return;
+        return Promise.all([
+          renderSurfaces().catch(() => {}),
+          renderOutlookCards().catch(() => {}),
+          renderWaiting().catch(() => {}),
+          renderOpen().catch(() => {}),
+          renderLog().catch(() => {})
+        ]);
+      }).catch(() => {});
     });
   } catch (e) { /* the open panel keeps the last status until the next open */ }
   const scroller = panelScroller();
@@ -278,8 +293,16 @@
   }
 
   async function refresh() {
+    const rev = whyRev;
     status = await send({ type: 'flow:connector-status' });
-    state = await FlowStorage.get();
+    const next = await FlowStorage.get();
+    if (rev !== whyRev && state) {
+      const latest = state.glanceWhyCurrent;
+      state = next;
+      state.glanceWhyCurrent = latest;
+    } else {
+      state = next;
+    }
     await renderConnectors();
     await renderStatusPill();
     renderSetupDone();
@@ -1433,6 +1456,75 @@
   const OUTLOOK_COPY = 'קורא 14 ימים אחרונים של דואר Outlook על המכשיר, כל עוד הלוח או Outlook באינטרנט פתוחים. בסגירה נכתבת טיוטת תשובה. לא שולח. שום דבר לא נשלח ל-Glance.';
   const OUTLOOK_ERRORS = { permission: 'The browser did not grant access, so it stays off.', cancelled: 'The sign-in window was closed.', profile: 'Signed in, but Microsoft did not say whose mailbox this is. Try again.', 'not-configured': 'Not set up yet.' };
 
+  function whyCopy(why) {
+    if (!why || !why.reason) return null;
+    const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function')
+      ? FlowDisplay.whyNotShownLine(why.reason)
+      : '';
+    if (!line) return null;
+    const subject = String(why.subject || '').trim();
+    return {
+      line: line,
+      subject: subject,
+      reason: String(why.reason),
+      text: subject ? (line + ' — ' + subject) : line
+    };
+  }
+
+  function dropWhyLine(row) {
+    if (!row || !row.children) return;
+    for (let i = row.children.length - 1; i >= 0; i--) {
+      const n = row.children[i];
+      if (!n || !n.getAttribute || n.getAttribute('data-glance-why-line') == null) continue;
+      if (typeof n.remove === 'function') n.remove();
+      else if (typeof row.removeChild === 'function') row.removeChild(n);
+    }
+  }
+
+  function mountWhyLine(row, why) {
+    if (!row) return;
+    dropWhyLine(row);
+    const copy = whyCopy(why);
+    if (!copy) return;
+    const item = el('div', 'wait-note', copy.text);
+    item.setAttribute('data-glance-why-line', copy.line);
+    if (copy.subject) item.setAttribute('data-glance-why-subject', copy.subject);
+    item.setAttribute('data-glance-why', copy.reason);
+    const kids = row.children || [];
+    let before = null;
+    for (let i = 0; i < kids.length; i++) {
+      const cls = String(kids[i].className || '');
+      if (cls.split(/\s+/).indexOf('wait-acts') >= 0) { before = kids[i]; break; }
+    }
+    if (before && typeof row.insertBefore === 'function') row.insertBefore(item, before);
+    else row.appendChild(item);
+  }
+
+  function outlookSurfaceRow() {
+    const host = document.getElementById('surface-list');
+    if (!host || !host.children) return null;
+    for (let i = 0; i < host.children.length; i++) {
+      const n = host.children[i];
+      if (n && n.getAttribute && n.getAttribute('data-glance-surface') === 'outlook') return n;
+    }
+    return null;
+  }
+
+  // Paint the current quiet mail onto the Outlook row already on screen.
+  // A newer glanceWhyCurrent write bumps whyRev and this read is dropped.
+  async function syncWhyLine(rev) {
+    const seen = rev == null ? whyRev : rev;
+    let why = state && state.glanceWhyCurrent;
+    try {
+      const fresh = await FlowStorage.get();
+      if (seen !== whyRev) return;
+      why = fresh && fresh.glanceWhyCurrent;
+      if (state) state.glanceWhyCurrent = why || null;
+    } catch (e) { /* the value the change applied still paints */ }
+    if (seen !== whyRev) return;
+    mountWhyLine(outlookSurfaceRow(), why);
+  }
+
   async function renderOutlookRow(host, gen) {
     const o = outlook();
     if (!o) return;
@@ -1487,20 +1579,6 @@
         ? FlowOutlookAuth.errorSentence(st.error, st.errorDetail, st.aadsts)
         : (OUTLOOK_ERRORS[st.error] || st.error);
       row.appendChild(el('div', 'wait-note', 'בדיקה אחרונה: ' + sentence));
-    }
-    const currentWhy = state && state.glanceWhyCurrent;
-    if (currentWhy && currentWhy.reason) {
-      const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function')
-        ? FlowDisplay.whyNotShownLine(currentWhy.reason)
-        : '';
-      if (line) {
-        const subject = String(currentWhy.subject || '').trim();
-        const item = el('div', 'wait-note', subject ? (line + ' — ' + subject) : line);
-        item.setAttribute('data-glance-why-line', line);
-        if (subject) item.setAttribute('data-glance-why-subject', subject);
-        item.setAttribute('data-glance-why', String(currentWhy.reason));
-        row.appendChild(item);
-      }
     }
     const note = el('p', 'wait-note');
     note.hidden = true;
@@ -1685,6 +1763,20 @@
     row.appendChild(acts);
     if (offRow) row.appendChild(offRow);
     row.appendChild(note);
+    // Read after the awaits above. The open snapshot can be from before
+    // glanceWhyCurrent landed, and a change while this row was building
+    // has to win over that snapshot.
+    let currentWhy = state && state.glanceWhyCurrent;
+    try {
+      const revAtRead = whyRev;
+      const fresh = await FlowStorage.get();
+      if (revAtRead !== whyRev && state) currentWhy = state.glanceWhyCurrent;
+      else {
+        currentWhy = fresh && fresh.glanceWhyCurrent;
+        if (state) state.glanceWhyCurrent = currentWhy || null;
+      }
+    } catch (e) { /* the snapshot from open still paints */ }
+    mountWhyLine(row, currentWhy);
     if (gen !== surfaceGen) return;
     host.appendChild(row);
   }

@@ -95,6 +95,10 @@ function load(stored, opts) {
         },
         set: (patch, cb) => { Object.assign(store, patch); if (cb) { cb(); return; } return Promise.resolve(); },
         remove: (k, cb) => { [].concat(k).forEach((x) => { delete store[x]; }); if (cb) { cb(); return; } return Promise.resolve(); }
+      },
+      onChanged: {
+        addListener(fn) { (opts.storageListeners = opts.storageListeners || []).push(fn); },
+        removeListener(fn) { opts.storageListeners = (opts.storageListeners || []).filter((f) => f !== fn); }
       }
     },
     identity: { getRedirectURL: () => 'https://testextensionidtestextensionid12.chromiumapp.org/' },
@@ -1274,6 +1278,37 @@ async function run() {
       pageUsesShared && expected === expectedPage && (shown ? (node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0) : !node),
       { expected, page: expectedPage, text: node && node.textContent });
   });
+
+  console.log('\n--- popup.js: a why line that arrives after open still paints ---\n');
+  const lateOpts = { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] };
+  const latePanel = load({
+    outlookAuth: whyStore.outlookAuth,
+    outlookSync: {},
+    glanceWhyCurrent: null
+  }, lateOpts);
+  vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), latePanel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+  function countWhy(root) {
+    const found = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) found.push(n);
+      (n.children || []).forEach(walk);
+    })(root);
+    return found;
+  }
+  const before = countWhy(latePanel.document.getElementById('surface-list'));
+  check('open before the quiet write paints no why line', before.length === 0, before.map((n) => n.textContent));
+  const arrived = { reason: 'page:intent-null', subject: 'Stay quiet', messageId: 'b' };
+  latePanel.sandbox.chrome.storage.local.set({ glanceWhyCurrent: arrived });
+  (lateOpts.storageListeners || []).forEach((fn) => {
+    fn({ glanceWhyCurrent: { newValue: arrived } }, 'local');
+  });
+  for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
+  const after = countWhy(latePanel.document.getElementById('surface-list'));
+  check('glanceWhyCurrent after open paints the why line',
+    after.length === 1 && after[0].getAttribute('data-glance-why-line') === 'לא זוהתה בקשה' && after[0].textContent.indexOf('לא זוהתה בקשה') === 0 && after[0].textContent.indexOf('Stay quiet') >= 0,
+    after.map((n) => n.textContent));
+
   const refreshPanel = load({ glanceOutlookRefresh: { '7': true } }, { activeTabs: [{ id: 7, url: 'https://outlook.live.com/mail/0/inbox' }] });
   vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), refreshPanel.sandbox, { filename: 'popup.js' });
   for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));

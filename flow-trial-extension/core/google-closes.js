@@ -82,13 +82,23 @@ const FlowGoogleCloses = (() => {
     return SAVE_EN.test(clause) || SAVE_HE.test(clause);
   }
 
+  // A later "don't save it" names the same save without saying Drive again.
+  const SAVE_BACK = /\b(?:it|this|that)\b|אותו|את\s+זה/;
+
   // Quiet when a save clause is itself negated. A "no need" that does not
   // govern save, in another clause, leaves a real save in place. A later
-  // "don't save" still refuses the whole mail.
+  // "don't save" still refuses the whole mail, including when that later
+  // clause only says "it" / "this" / "that" / אותו / את זה.
   function refusesSave(text) {
     const raw = String(text || '');
     const clauses = saveClauses(raw);
     if (clauses.some((clause) => clauseSaves(clause) && SAVE_NO.test(clause))) return true;
+    let seenSave = false;
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (seenSave && SAVE_NO.test(clause) && SAVE_BACK.test(clause)) return true;
+      if (clauseSaves(clause)) seenSave = true;
+    }
     if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return SAVE_NO.test(raw);
     return false;
   }

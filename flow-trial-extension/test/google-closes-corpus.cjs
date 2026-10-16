@@ -249,6 +249,26 @@ console.log('\n--- family C: create is the ask ---\n');
   const still = plan('No need to call. Please save the attached file to Drive.', { attachmentCount: 1 });
   check('a different no-need does not hide a real save',
     still.intent && still.intent.personalClose === 'drive-file', still.intent && still.intent.personalClose);
+  const laterIt = plan("Please save the attached contract to Drive. Actually, don't save it, I'll send a new version.", { attachmentCount: 1 });
+  check("a later don't-save-it refers back and stays quiet",
+    laterIt.intent && !laterIt.intent.type && laterIt.intent.googleSilence === true && laterIt.intent.personalClose !== 'drive-file' && !laterIt.process,
+    laterIt.intent && { type: laterIt.intent.type, personal: laterIt.intent.personalClose, process: laterIt.process && laterIt.process.id });
+  const readOnly = plan("don't save it yet, just read", { attachmentCount: 1 });
+  check("don't save it yet, just read stays quiet",
+    readOnly.intent && readOnly.intent.personalClose !== 'drive-file' && !(readOnly.process && readOnly.process.steps && readOnly.process.steps.some((s) => s.kind === 'driveFile' || s.kind === 'onedriveFile')),
+    readOnly.intent && readOnly.intent.personalClose);
+  const laterHe = plan('תשמור את הקובץ בדרייב. בעצם אל תשמור אותו', { attachmentCount: 1 });
+  check('a later Hebrew אל תשמור אותו refers back and stays quiet',
+    laterHe.intent && !laterHe.intent.type && laterHe.intent.googleSilence === true && !laterHe.process,
+    laterHe.intent && { type: laterHe.intent.type, personal: laterHe.intent.personalClose });
+  const laterThis = plan("Please save the attached file to Drive. Don't save this.", { attachmentCount: 1 });
+  const laterThat = plan("Please save the attached file to Drive. Don't save that.", { attachmentCount: 1 });
+  const laterZe = plan('תשמור את הקובץ בדרייב. אל תשמור את זה', { attachmentCount: 1 });
+  [laterThis, laterThat, laterZe].forEach((row, i) => {
+    check('a later anaphor still refuses the same save ' + i,
+      row.intent && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file' && !row.process,
+      row.intent && row.intent.personalClose);
+  });
   const typos = [
     "You don't ned to save the attachmment to Drive.",
     "You don't need to save the attachment to Drive.",
