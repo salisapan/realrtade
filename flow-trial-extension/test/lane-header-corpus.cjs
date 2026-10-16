@@ -35,7 +35,7 @@ function load(lang) {
 const en = load('en');
 const he = load('he');
 check('English UI reconnect is Reconnect Google', en('reconnect') === 'Reconnect Google' && en('calendar').indexOf('file') < 0 && en('calendar') === 'No single time for this event.');
-check('Hebrew UI reconnect and calendar refusal are Hebrew', he('reconnect') === 'התחבר מחדש ל-Google' && he('calendar') === 'אין מועד אחד לאירוע הזה.' && he('edited').indexOf('שינית') === 0, { reconnect: he('reconnect'), calendar: he('calendar'), edited: he('edited') });
+check('Hebrew UI reconnect and calendar refusal are Hebrew', he('reconnect') === 'חבר מחדש את Google' && he('calendar') === 'אין מועד אחד לאירוע הזה.' && he('edited').indexOf('שינית') === 0, { reconnect: he('reconnect'), calendar: he('calendar'), edited: he('edited') });
 
 const web = fs.readFileSync(path.join(EXT, 'src', 'google-web-auth.js'), 'utf8').replace(/^export /gm, '');
 const box = { console, URL, URLSearchParams };

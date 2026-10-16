@@ -256,6 +256,9 @@ const FlowStorage = (() => {
     // Side-panel line. names and source (profile, aria-label, or none).
     // The aria name is not copied into glanceOwnNames.
     glanceNamesDiag: null,
+    // Off in production. The Names line is console.info either way.
+    // The popup paints it only when a dev fixture turns this on.
+    glanceDevFixture: false,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

@@ -54,7 +54,7 @@ function glanceUiCopy(kind) {
     }
   } catch (e) { /* the lines below are the same table when the shared one is absent */ }
   const he = glanceUiHebrew();
-  if (kind === 'reconnect') return he ? 'התחבר מחדש ל-Google' : 'Reconnect Google';
+  if (kind === 'reconnect') return he ? 'חבר מחדש את Google' : 'Reconnect Google';
   if (kind === 'connect') return he ? 'התחבר ל-Google בחלון Glance קודם.' : 'Connect Google in the Glance popup first.';
   if (kind === 'edited') return he ? 'שינית את זה. Undo השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
   if (kind === 'still') return he ? 'עדיין שם — משימת Google לא הוסרה.' : 'Still there — the Google Task was not removed.';
@@ -765,6 +765,9 @@ function glanceUiCopy(kind) {
     if (gp.givenName && gp.surname) profile.push(String(gp.givenName) + ' ' + String(gp.surname));
     (Array.isArray(st.glanceOwnNames) ? st.glanceOwnNames : []).forEach(function (n) { profile.push(n); });
     const diag = FlowDisplay.namesDiagFrom(profile, gmailAccountName());
+    try {
+      console.info(FlowDisplay.namesDiagLine(diag));
+    } catch (e) { /* the record below is the same line */ }
     const key = diag.source + '\n' + diag.names.join('\n');
     if (publishNamesDiag.last === key) return;
     publishNamesDiag.last = key;

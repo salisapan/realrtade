@@ -289,7 +289,7 @@ async function main() {
     }, {}, resolve);
   });
   const hebrewView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
-  check('a 401 reconnect label follows a Hebrew UI', hebrewDenied && hebrewDenied.reconnectLabel === 'התחבר מחדש ל-Google' && hebrewView.label === 'התחבר מחדש ל-Google' && hebrewView.connected === false, { hebrewDenied, hebrewView });
+  check('a 401 reconnect label follows a Hebrew UI', hebrewDenied && hebrewDenied.reconnectLabel === 'חבר מחדש את Google' && hebrewView.label === 'חבר מחדש את Google' && hebrewView.connected === false, { hebrewDenied, hebrewView });
   sandbox.chrome.i18n.getUILanguage = () => 'en';
 
   delete stored.googleTasksAuth;

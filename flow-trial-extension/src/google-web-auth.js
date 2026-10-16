@@ -19,7 +19,7 @@ export const GOOGLE_WEB_AUTH_STORAGE_KEY = 'googleWebAuth';
 // that cannot write is not "Connected".
 export const GOOGLE_RECONNECT_STORAGE_KEY = 'googleReconnect';
 export const GOOGLE_EVER_CONNECTED_STORAGE_KEY = 'googleEverConnected';
-export const GOOGLE_RECONNECT_LABEL = 'התחבר מחדש ל-Google';
+export const GOOGLE_RECONNECT_LABEL = 'חבר מחדש את Google';
 export const GOOGLE_CONNECT_LABEL = 'התחבר ל-Google';
 
 const UNCONFIRMED_EN = "Couldn't confirm it's unchanged. Undo left it alone.";
@@ -210,8 +210,11 @@ export function googleEverConnectedPatch(bag) {
 }
 
 export function googleConnectionState(auth, reconnect, extras) {
-  const had = Boolean(auth);
   const extra = extras || {};
+  // A current grant plus the token from that chooser is a connection.
+  // An older scope version is not. A reconnect flag still wins.
+  const tokenHeld = Boolean(extra.webAuth && (extra.webAuth.accessToken || extra.webAuth.refreshToken));
+  const had = Boolean(auth) || (extra.scopesGranted === true && tokenHeld);
   // Reconnect after any earlier connection: the marker, a stored token,
   // a Tasks grant, or a Do It that already landed. A person who never
   // connected sees Connect, even if a stale flag is set.

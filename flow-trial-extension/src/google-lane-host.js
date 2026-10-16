@@ -15,7 +15,7 @@ import './google-lane.js';
 const Lane = typeof FlowGoogleLane !== 'undefined' ? FlowGoogleLane : globalThis.FlowGoogleLane;
 
 const RECONNECT_KEY = 'googleReconnect';
-const RECONNECT_LABEL = 'התחבר מחדש ל-Google';
+const RECONNECT_LABEL = 'חבר מחדש את Google';
 let laneSource = 'chrome';
 
 // Identity first, then the stored Connect token. Interactive stays false.

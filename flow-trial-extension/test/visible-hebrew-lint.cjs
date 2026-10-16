@@ -12,15 +12,21 @@ function check(name, cond, extra) {
 }
 
 const ALLOW = new Set([
-  'glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo'
+  'glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo',
+  'meta', 'slack', 'telegram'
 ]);
+const BRAND_PHRASES = ['glance pro', 'telegram web', 'google', 'meta', 'slack'];
 
 function latinWords(text) {
   return String(text || '').match(/[A-Za-z][A-Za-z'’]{3,}/g) || [];
 }
 
 function offenders(text) {
-  return latinWords(text).filter((word) => !ALLOW.has(word.toLowerCase().replace(/[’']/g, '')));
+  let raw = String(text || '');
+  BRAND_PHRASES.forEach((phrase) => {
+    raw = raw.replace(new RegExp(phrase.replace(/ /g, '\\s+'), 'ig'), ' ');
+  });
+  return latinWords(raw).filter((word) => !ALLOW.has(word.toLowerCase().replace(/[’']/g, '')));
 }
 
 const html = fs.readFileSync(path.join(ROOT, 'popup', 'popup.html'), 'utf8');
@@ -37,6 +43,8 @@ banned.forEach((phrase) => {
   check('popup.js does not paint ' + phrase, popupJs.indexOf(phrase) < 0);
 });
 check('the calendar row is שמירת זמן ביומן', popupJs.indexOf("svc.id === 'calendar') return 'שמירת זמן ביומן'") >= 0);
+check('Hebrew reconnect is חבר מחדש את Google', popupJs.indexOf('חבר מחדש את Google') >= 0 && popupJs.indexOf('התחבר מחדש ל-Google') < 0);
+check('a Hebrew connect click does not hard-code Connecting', popupJs.indexOf("setBtnLabel(btn, 'Connecting…')") < 0 && popupJs.indexOf("googleChromeLabel('busy')") >= 0);
 check('a connected sign-in can add a scope without turning off', popupJs.indexOf('flow:outlook-consent-scope') >= 0 && popupJs.indexOf('הוסף הרשאה') >= 0);
 
 const page = fs.readFileSync(path.join(ROOT, 'src', 'content-outlook.js'), 'utf8');

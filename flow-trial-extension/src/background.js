@@ -1664,6 +1664,12 @@ async function upgradeGoogleScopesOnce() {
       try {
         const token = await getGoogleAuthToken(true);
         await writeGoogleGrantedScopes('granted', 'chrome');
+        // The chooser token lives in Chrome's cache, which this function
+        // just cleared. A later silent getAuthToken does not see it, and
+        // the stored web token was deleted above. Keep this token and
+        // clear Reconnect now, before the task-list call.
+        const kept = await rememberUpgradedGoogleToken(token, 'chrome');
+        if (!kept) throw new Error('Google sign-in was closed or denied.');
         return { token: token, source: 'chrome' };
       } catch (err) {
         const message = err && err.message;
@@ -1674,6 +1680,7 @@ async function upgradeGoogleScopesOnce() {
         try {
           const saved = await runGoogleWebAuth(true);
           await writeGoogleGrantedScopes('granted', 'web');
+          await clearGoogleReconnect();
           return { token: saved.accessToken, source: 'web' };
         } catch (webErr) {
           await writeGoogleGrantedScopes('asked', 'web');
@@ -1794,6 +1801,19 @@ async function markGoogleReconnect(reason) {
 
 async function clearGoogleReconnect() {
   await chrome.storage.local.remove(GOOGLE_RECONNECT_STORAGE_KEY);
+}
+
+// The account chooser returns a token and does not write googleWebAuth.
+// Persist it on the same key the silent path already reads, and drop the
+// Reconnect flag in that same step. The panel reads this record.
+async function rememberUpgradedGoogleToken(token, source) {
+  const accessToken = String(token || '').trim();
+  if (!accessToken) return false;
+  const epoch = googleWebAuthEpoch;
+  const committed = await commitGoogleWebAuth({ accessToken: accessToken, source: source || null }, epoch);
+  if (!committed) return false;
+  await clearGoogleReconnect();
+  return true;
 }
 
 // One silent refresh after a 401. Web tokens use prompt=none. Chrome tokens
@@ -5250,9 +5270,13 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, 'googleLaneWarning', 'glanceLaneUndo']);
-  let uiLang = '';
-  try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage']);
+  let uiLang = reconnectBag.glanceUiLanguage || reconnectBag.glanceHostLanguage || '';
+  if (!uiLang) {
+    try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
+  }
+  const grantedRec = reconnectBag[GOOGLE_GRANTED_SCOPES_KEY] || null;
+  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(googleManifestScopes()));
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
     detail: GLANCE_TASK_LIST_TITLE + ' list',
@@ -5260,7 +5284,8 @@ async function connectorStatus() {
     lang: uiLang,
     everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
     webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
-    laneUndo: reconnectBag.glanceLaneUndo || null
+    laneUndo: reconnectBag.glanceLaneUndo || null,
+    scopesGranted: scopesGranted
   });
   return {
     googleTasks: googleTasks,

@@ -13,9 +13,13 @@ const BRANDS = new Set([
   'onedrive', 'whatsapp', 'glnc', 'teams', 'slack', 'telegram', 'web', 'notion',
   'ollama', 'lm', 'studio'
 ]);
+const BRAND_PHRASES = ['glance pro', 'telegram web', 'google', 'meta', 'slack'];
 
 function offenders(text) {
-  const raw = String(text || '');
+  let raw = String(text || '');
+  BRAND_PHRASES.forEach((phrase) => {
+    raw = raw.replace(new RegExp(phrase.replace(/ /g, '\\s+'), 'ig'), ' ');
+  });
   const months = raw.match(MONTHS) || [];
   const words = (raw.match(/[A-Za-z][A-Za-z'’]{1,}/g) || [])
     .filter((word) => !BRANDS.has(word.toLowerCase().replace(/[’']/g, '')));
@@ -35,10 +39,17 @@ async function visibleChrome(page, selector) {
     }
     function walk(el, out) {
       if (skip(el)) return;
+      const style = el.ownerDocument.defaultView.getComputedStyle(el);
+      function shown(text) {
+        const value = String(text || '');
+        if (style.textTransform === 'uppercase') return value.toLocaleUpperCase('en');
+        if (style.textTransform === 'lowercase') return value.toLocaleLowerCase('en');
+        return value;
+      }
       const aria = el.getAttribute('aria-label');
-      if (aria) out.push(aria);
+      if (aria) out.push(shown(aria));
       for (const child of el.childNodes) {
-        if (child.nodeType === 3) out.push(child.nodeValue || '');
+        if (child.nodeType === 3) out.push(shown(child.nodeValue || ''));
         else if (child.nodeType === 1) walk(child, out);
       }
     }
@@ -51,6 +62,8 @@ async function visibleChrome(page, selector) {
 test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
   await glance.seedGmail({
     glanceHostLanguage: 'he',
+    glanceDevFixture: false,
+    googleReconnect: { needed: true, reason: '401' },
     glanceOwnNames: [],
     googleProfile: null,
     stillOpenScan: [{
@@ -101,7 +114,20 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
   expect(gmailBad, gmailParts.join('\n')).toEqual([]);
 
   const popup = await glance.openPopup();
-  await expect(popup.locator('#namesDiag')).toHaveText('Names: Sali Sapan, source: aria-label', { timeout: 8000 });
+  await expect.poll(async () => popup.evaluate(() => new Promise((resolve) => {
+    chrome.storage.local.get('glanceNamesDiag', (bag) => resolve(bag && bag.glanceNamesDiag && bag.glanceNamesDiag.source));
+  }))).toBe('aria-label');
+  const namesLog = [];
+  popup.on('console', (msg) => {
+    if (msg.type() === 'info') namesLog.push(msg.text());
+  });
+  await popup.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => namesLog.join('\n')).toContain('Names: Sali Sapan, source: aria-label');
+  await expect(popup.locator('#namesDiag')).toBeHidden();
+  const google = popup.locator('.conn').filter({ has: popup.locator('b', { hasText: 'Google' }) }).first();
+  await expect(google.locator('.badge')).toHaveText('חבר מחדש את Google');
+  await expect(google.locator('.btn-label')).toHaveText('חבר מחדש את Google');
+  await expect(popup.locator('#statusPill')).toHaveText('חבר מחדש את Google');
   await expect(popup.locator('[data-glance-connect="meta"]')).toBeVisible();
   await expect(popup.locator('#meta-chats-link .btn-label')).toHaveText('הפעל צ׳אטים של Meta');
   const popupText = await visibleChrome(popup, 'body');

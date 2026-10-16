@@ -66,6 +66,14 @@
     }
     return 'en';
   }
+  function googleChromeLabel(kind) {
+    const he = uiLang() === 'he';
+    if (kind === 'reconnect') return he ? 'חבר מחדש את Google' : 'Reconnect Google';
+    if (kind === 'warning') return he ? 'שלב אחד לא הושלם' : 'A step did not finish';
+    if (kind === 'busy') return he ? 'מתחבר…' : 'Connecting…';
+    if (kind === 'failed') return he ? 'החיבור נכשל.' : 'Connection failed.';
+    return he ? 'התחבר ל-Google' : 'Connect Google';
+  }
   function metaLang() {
     let ui = '';
     try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
@@ -471,13 +479,13 @@
     const reconnecting = Object.keys(status || {}).filter((k) => status[k] && status[k].needsReconnect);
     const warning = Object.keys(status || {}).filter((k) => status[k] && status[k].warning);
     if (reconnecting.length) {
-      pill.textContent = status[reconnecting[0]].headerLabel || status[reconnecting[0]].reconnectLabel;
+      pill.textContent = googleChromeLabel('reconnect');
       pill.className = 'ver';
       pill.setAttribute('dir', 'auto');
       return;
     }
     if (warning.length) {
-      pill.textContent = status[warning[0]].headerLabel || status[warning[0]].warningLabel;
+      pill.textContent = googleChromeLabel('warning');
       pill.className = 'ver';
       pill.setAttribute('dir', 'auto');
       return;
@@ -774,11 +782,11 @@
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
     else if (st.needsReconnect) {
-      const badge = el('span', 'badge', st.headerLabel || st.reconnectLabel || 'התחבר מחדש');
+      const badge = el('span', 'badge', c.id === 'googleTasks' ? googleChromeLabel('reconnect') : (st.headerLabel || st.reconnectLabel || 'התחבר מחדש'));
       badge.setAttribute('dir', 'auto');
       head.appendChild(badge);
     } else if (st.warning) {
-      const badge = el('span', 'badge', st.headerLabel || st.warningLabel);
+      const badge = el('span', 'badge', c.id === 'googleTasks' ? googleChromeLabel('warning') : (st.headerLabel || st.warningLabel));
       badge.setAttribute('dir', 'auto');
       head.appendChild(badge);
     } else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
@@ -843,7 +851,9 @@
     }
 
     const ready = st.configured !== false;
-    const connectLabel = st.needsReconnect && st.reconnectLabel ? st.reconnectLabel : ('התחבר ל-' + c.label);
+    const connectLabel = (c.id === 'googleTasks' && st.needsReconnect)
+      ? googleChromeLabel('reconnect')
+      : (st.needsReconnect && st.reconnectLabel ? st.reconnectLabel : ('התחבר ל-' + c.label));
     // Only the ready (primary/.doit-style) button gets the shell/ring/shine
     // spans — .ghost.wide (missing OAuth config, MVP-inert) stays a plain
     // outlined pill, same distinction the marketing site draws between its
@@ -861,7 +871,7 @@
     }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
-      btn.disabled = true; setBtnLabel(btn, 'Connecting…'); err.hidden = true;
+      btn.disabled = true; setBtnLabel(btn, googleChromeLabel('busy')); err.hidden = true;
       const msg = { type: 'flow:connect', connectorId: c.id };
       Object.keys(inputs).forEach((k) => { msg[k] = inputs[k].value; });
       const res = await send(msg);
@@ -873,7 +883,7 @@
         await refresh();
       } else {
         btn.disabled = false; setBtnLabel(btn, connectLabel);
-        err.textContent = (res && res.error) || 'Connection failed.';
+        err.textContent = (res && res.error) || googleChromeLabel('failed');
         err.hidden = false;
       }
     });
@@ -2201,8 +2211,11 @@
     const node = document.getElementById('namesDiag');
     if (!node || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.namesDiagLine !== 'function') return;
     const diag = (state && state.glanceNamesDiag) || { names: [], source: 'none' };
-    node.hidden = false;
-    node.textContent = FlowDisplay.namesDiagLine(diag);
+    const line = FlowDisplay.namesDiagLine(diag);
+    const dev = !!(state && state.glanceDevFixture === true);
+    node.hidden = !dev;
+    node.textContent = dev ? line : '';
+    try { console.info(line); } catch (e) { /* the dev line is the same text */ }
   }
 
   async function renderMetaChats() {

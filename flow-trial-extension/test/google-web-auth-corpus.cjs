@@ -112,8 +112,9 @@ function load(opts) {
       identity: {
         getAuthToken: (o, cb) => {
           calls.push('GET_AUTH ' + Boolean(o && o.interactive));
-          if (opts.getAuthTokenError) {
-            failCallback(typeof opts.getAuthTokenError === 'function' ? opts.getAuthTokenError(o) : opts.getAuthTokenError, cb);
+          const message = typeof opts.getAuthTokenError === 'function' ? opts.getAuthTokenError(o) : opts.getAuthTokenError;
+          if (message) {
+            failCallback(message, cb);
             return;
           }
           cb(opts.chromeToken || ('chrome-tok-' + (++tokenSeq)));
@@ -286,7 +287,13 @@ async function run() {
     check('a Hebrew partial warning follows the UI', warnedHe.connected === false && warnedHe.headerLabel === 'שלב אחד לא הושלם', warnedHe);
     check('never connected shows Connect', noGrant.connected === false && noGrant.needsReconnect === false && noGrant.headerLabel === 'Connect Google', noGrant);
     check('a previous Connect shows Reconnect', afterConnect.connected === false && afterConnect.needsReconnect === true && afterConnect.headerLabel === 'Reconnect Google', afterConnect);
-    check('Hebrew Connect and Reconnect follow the UI', neverHe.headerLabel === api.GOOGLE_CONNECT_LABEL && afterConnectHe.headerLabel === api.GOOGLE_RECONNECT_LABEL, { neverHe, afterConnectHe });
+    check('Hebrew Connect and Reconnect follow the UI', neverHe.headerLabel === api.GOOGLE_CONNECT_LABEL && afterConnectHe.headerLabel === api.GOOGLE_RECONNECT_LABEL && api.GOOGLE_RECONNECT_LABEL === 'חבר מחדש את Google', { neverHe, afterConnectHe });
+    const held = api.googleConnectionState(null, null, { lang: 'he', webAuth: { accessToken: 'ya29.fresh' }, scopesGranted: true, everConnected: { connected: true } });
+    const flaggedGrant = api.googleConnectionState(null, { needed: true }, { lang: 'he', webAuth: { accessToken: 'ya29.fresh' }, scopesGranted: true, everConnected: { connected: true } });
+    const oldVersion = api.googleConnectionState(null, null, { lang: 'en', webAuth: { accessToken: 'ya29.old' }, scopesGranted: false, everConnected: { connected: true } });
+    check('a current grant plus a stored token is not Reconnect', held.needsReconnect === false && held.connected === true && held.headerLabel === 'Connected', held);
+    check('a reconnect flag still wins over a stored token', flaggedGrant.needsReconnect === true && flaggedGrant.connected === false && flaggedGrant.headerLabel === 'חבר מחדש את Google', flaggedGrant);
+    check('an old scope version with a token still needs Reconnect', oldVersion.needsReconnect === true && oldVersion.connected === false && oldVersion.headerLabel === 'Reconnect Google', oldVersion);
     const oldWeb = api.googleConnectionState(null, null, { lang: 'en', webAuth: { accessToken: 'ya29.old' } });
     const oldTasks = api.googleConnectionState(null, null, { lang: 'en', tasksAuth: { taskListId: 'glance-list' } });
     const oldSuccess = api.googleConnectionState(null, null, { lang: 'en', laneUndo: { m1: { steps: [{ connectorId: 'googleHold' }] } } });
@@ -734,7 +741,7 @@ async function run() {
     });
     const out = await attempt(env.fn('getGoogleAccessToken')(false));
     check('a stale scope version returns a fresh chrome token', out.ok && out.value && out.value.token === 'chrome-new' && out.value.source === 'chrome', out);
-    check('the stale web token is not reused', env.stored.googleWebAuth == null, env.stored.googleWebAuth);
+    check('the stale web token is replaced by the chrome token', env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'chrome-new' && env.stored.googleReconnect == null, env.stored.googleWebAuth);
     check('the cached token is removed', env.calls.some((c) => c.indexOf('EVICT ') === 0), env.calls);
     check('the ask is one interactive getAuthToken', env.calls.filter((c) => c === 'GET_AUTH true').length === 1, env.calls);
     check('the granted version is the required list', env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted' && env.stored.googleGrantedScopes.version === scopeVersionOf(SCOPES) && env.stored.googleGrantedScopes.source === 'chrome', env.stored.googleGrantedScopes);
@@ -763,6 +770,29 @@ async function run() {
     await attempt(cancel.fn('getGoogleAccessToken')(false));
     const quiet = cancel.calls.slice(mark);
     check('the next silent call after a cancel is getAuthToken false only', quiet.length === 1 && quiet[0] === 'GET_AUTH false', quiet);
+    function chooserEnv() {
+      return load({
+        chromeToken: 'ya29.fresh',
+        getAuthTokenError: (o) => (o && o.interactive ? '' : 'The user is not signed in.'),
+        routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_FRESH', title: 'Glance' }] }) }]],
+        stored: {
+          googleGrantedScopes: stale,
+          googleReconnect: { needed: true, reason: '401' },
+          googleEverConnected: { connected: true },
+          googleWebAuth: { accessToken: 'ya29.old', expiresAt: Date.now() + 3600e3 }
+        }
+      });
+    }
+    const chooser = chooserEnv();
+    const dropped = await attempt(chooser.fn('getGoogleAccessToken')(true));
+    const afterChooser = await chooser.fn('connectorStatus')();
+    check('the chooser returns a token without a consent window', dropped.ok && dropped.value && dropped.value.token === 'ya29.fresh' && dropped.value.source === 'chrome' && chooser.calls.filter((c) => c === 'GET_AUTH true').length === 1 && !chooser.calls.some((c) => c.indexOf('WEB ') === 0), { dropped, calls: chooser.calls });
+    check('that token is saved and the grant is current', chooser.stored.googleWebAuth && chooser.stored.googleWebAuth.accessToken === 'ya29.fresh' && chooser.stored.googleWebAuth.accessToken !== 'ya29.old' && chooser.stored.googleGrantedScopes && chooser.stored.googleGrantedScopes.status === 'granted' && chooser.stored.googleGrantedScopes.version === scopeVersionOf(SCOPES), chooser.stored);
+    check('the panel is not Reconnect after the chooser token', afterChooser && afterChooser.googleTasks && afterChooser.googleTasks.needsReconnect === false && afterChooser.googleTasks.connected === true && chooser.stored.googleReconnect == null, afterChooser && afterChooser.googleTasks);
+    const button = chooserEnv();
+    const connected = await attempt(button.fn('connectGoogleTasks')(true));
+    const panel = await button.fn('connectorStatus')();
+    check('Connect finishes on the saved token and the panel stays off Reconnect', connected.ok && connected.value === true && button.stored.googleTasksAuth && button.stored.googleTasksAuth.taskListId === 'LIST_FRESH' && button.stored.googleWebAuth && button.stored.googleWebAuth.accessToken === 'ya29.fresh' && button.stored.googleGrantedScopes.status === 'granted' && button.stored.googleReconnect == null && panel && panel.googleTasks && panel.googleTasks.needsReconnect === false && button.calls.filter((c) => c === 'GET_AUTH true').length === 1 && !button.calls.some((c) => c.indexOf('WEB ') === 0), { connected, panel: panel && panel.googleTasks, calls: button.calls, auth: button.stored.googleTasksAuth });
   }
 
   console.log('\n--- connector status shares the reconnect flag ---\n');
@@ -775,7 +805,7 @@ async function run() {
     });
     const status = await env.fn('connectorStatus')();
     check('connector status hides Connected while a write needs reconnect',
-      status && status.googleTasks && status.googleTasks.connected === false && status.googleTasks.needsReconnect === true && status.googleTasks.reconnectLabel === 'התחבר מחדש ל-Google',
+      status && status.googleTasks && status.googleTasks.connected === false && status.googleTasks.needsReconnect === true && status.googleTasks.reconnectLabel === 'חבר מחדש את Google',
       status && status.googleTasks);
   }
 
