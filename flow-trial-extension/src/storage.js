@@ -285,57 +285,52 @@ const FlowStorage = (() => {
   // Two open mails are two copies of this file. Each queue is local to its
   // page, so Undo on the task mail and Undo on the file mail can both read
   // the same log and the later set() puts the other row back to Handled.
-  // The service worker is the one shared queue: flow:log-lock is granted to
-  // one caller, and flow:log-unlock lets the next through. A page with no
-  // extension id (a corpus sandbox) keeps the in-page queue only.
+  // The service worker grants one glance-log-lock port at a time. Disconnect
+  // (the write finished, or the page closed) lets the next writer through.
+  // A page with no extension id keeps the in-page queue only.
   function logLockAvailable() {
     try {
-      return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && typeof chrome.runtime.sendMessage === 'function';
+      return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && typeof chrome.runtime.connect === 'function';
     } catch (e) {
       return false;
     }
   }
 
-  function releaseLogLock(token) {
-    return new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage({ type: 'flow:log-unlock', token: token }, () => {
-          try { if (chrome.runtime) void chrome.runtime.lastError; } catch (e) { /* the worker is gone */ }
-          resolve();
+  function withLogLock(fn) {
+    if (!logLockAvailable()) return Promise.resolve().then(fn);
+    return new Promise((resolve, reject) => {
+      let port = null;
+      let ran = false;
+      const run = () => {
+        if (ran) return;
+        ran = true;
+        clearTimeout(timer);
+        Promise.resolve().then(fn).then((value) => {
+          try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+          resolve(value);
+        }, (err) => {
+          try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+          reject(err);
         });
-      } catch (e) { resolve(); }
-    });
-  }
-
-  function acquireLogLock() {
-    if (!logLockAvailable()) return Promise.resolve(null);
-    let token = '';
-    try { token = crypto.randomUUID ? crypto.randomUUID() : ''; } catch (e) { token = ''; }
-    if (!token) token = String(Date.now()) + Math.random().toString(16).slice(2);
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (held) => {
-        if (settled) {
-          if (held) releaseLogLock(token);
-          return;
-        }
-        settled = true;
-        resolve(held ? token : null);
       };
       const timer = setTimeout(() => {
-        finish(false);
-        releaseLogLock(token);
-      }, 8000);
+        if (ran) return;
+        try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+        run();
+      }, 1500);
       try {
-        chrome.runtime.sendMessage({ type: 'flow:log-lock', token: token }, (res) => {
+        port = chrome.runtime.connect({ name: 'glance-log-lock' });
+        port.onDisconnect.addListener(() => {
+          try { if (chrome.runtime) void chrome.runtime.lastError; } catch (e) { /* worker gone */ }
+        });
+        port.onMessage.addListener((msg) => {
+          if (!msg || msg.ok !== true) return;
           clearTimeout(timer);
-          let err = null;
-          try { err = chrome.runtime && chrome.runtime.lastError; } catch (e) { err = e; }
-          finish(!err && res && res.ok === true);
+          run();
         });
       } catch (e) {
         clearTimeout(timer);
-        finish(false);
+        run();
       }
     });
   }
@@ -343,11 +338,7 @@ const FlowStorage = (() => {
   function serialize(fn) {
     let queue = Promise.resolve();
     return (...args) => {
-      const run = queue.then(async () => {
-        const token = await acquireLogLock();
-        try { return await fn(...args); }
-        finally { if (token) await releaseLogLock(token); }
-      });
+      const run = queue.then(() => withLogLock(() => fn(...args)));
       queue = run.catch(() => {}); // one failure must not wedge later calls
       return run;
     };

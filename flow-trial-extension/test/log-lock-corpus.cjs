@@ -16,32 +16,32 @@ function check(name, cond, detail) {
 const store = {};
 const lock = { held: null, waiters: [] };
 
+function release(port) {
+  if (lock.held === port) lock.held = null;
+  lock.waiters = lock.waiters.filter((p) => p !== port);
+  grant();
+}
+
 function grant() {
   if (lock.held || !lock.waiters.length) return;
   const next = lock.waiters.shift();
-  lock.held = next.token;
-  next.cb({ ok: true });
+  lock.held = next;
+  setTimeout(() => {
+    if (lock.held !== next) return;
+    next.listeners.forEach((fn) => fn({ ok: true }));
+  }, 0);
 }
 
-function onMessage(msg, cb) {
-  const token = msg && msg.token;
-  if (msg && msg.type === 'flow:log-lock') {
-    lock.waiters.push({ token: token, cb: cb });
+function connect(name) {
+  const port = { name: name, listeners: [], disconnectFns: [] };
+  port.onMessage = { addListener(fn) { port.listeners.push(fn); } };
+  port.onDisconnect = { addListener(fn) { port.disconnectFns.push(fn); } };
+  port.disconnect = () => release(port);
+  if (name === 'glance-log-lock') {
+    lock.waiters.push(port);
     grant();
-    return;
   }
-  if (msg && msg.type === 'flow:log-unlock') {
-    if (lock.held === token) {
-      lock.held = null;
-      if (cb) cb({ ok: true });
-      grant();
-      return;
-    }
-    lock.waiters = lock.waiters.filter((w) => w.token !== token);
-    if (cb) cb({ ok: true });
-    return;
-  }
-  if (cb) cb(undefined);
+  return port;
 }
 
 function chromeStub(prefix) {
@@ -66,7 +66,8 @@ function chromeStub(prefix) {
     },
     runtime: {
       id: 'ext',
-      sendMessage: (msg, cb) => onMessage(msg, cb)
+      connect: (info) => connect(info && info.name),
+      sendMessage: (msg, cb) => { if (cb) cb(undefined); }
     },
     crypto: { randomUUID: () => prefix + '-' + (++n) }
   };
@@ -89,10 +90,10 @@ function load(prefix) {
 
 async function main() {
   const background = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
-  check('the service worker grants one log lock at a time',
-    background.indexOf("msg.type === 'flow:log-lock'") > 0 &&
-    background.indexOf('function glanceLogLock') > 0 &&
-    background.indexOf('glanceLogLockGrant') > 0);
+  check('the service worker grants one log lock port at a time',
+    background.indexOf("port.name !== 'glance-log-lock'") > 0 &&
+    background.indexOf('function glanceLogLockGrant') > 0 &&
+    background.indexOf('onDisconnect') > 0);
 
   store.log = [
     { ts: 3, kind: 'written', messageId: 'reply', connectorId: 'outlookDraft', label: 'Draft', app: 'outlook' },
