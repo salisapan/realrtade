@@ -635,7 +635,7 @@ const FlowActions = (() => {
   function planFor(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
-    if (intent.googleClose) return planGoogle(intent, ctx);
+    if (intent.googleClose && !intent.selfTask) return planGoogle(intent, ctx);
     // The classifier lives on the intent, and planFor calls it again when
     // the mail text is in hand. Either one vetoes the meeting plan.
     const vetoText = ctx.text;
@@ -727,14 +727,13 @@ const FlowActions = (() => {
     // October 19 at 3pm" keep the base plan, calendar included.
     // A hold stays a hold. The other dated call stays schedule.
     const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
-    if (intent.selfTask && !(callNamesADate && intent.type === 'event')) proc = logIt;
-    else if (intent.selfTask && intent.personalClose !== 'calendar-hold') {
-      proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
-    }
+    // A note the user sent to themself is a task, including a dated call
+    // and a save that would otherwise write Drive plus a draft.
+    if (intent.selfTask) proc = logIt;
     // "I'll call you" is already the task. The untimed block would retitle
     // it Call when the subject says Reminder, and would return null when
     // the day has no clock ("I will call you on Friday.").
-    if (!senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
+    if (!intent.selfTask && !senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
       if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
         proc = logIt;
       } else if ((createTaskAsk || callReminder) && !readerSaid) {
@@ -777,7 +776,7 @@ const FlowActions = (() => {
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       // "call October 19" named the month as a person. A dated call with
       // no person keeps the meeting title, and the calendar step stays.
-      if (!callNamesADate) {
+      if (!callNamesADate || intent.selfTask) {
         const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
         const dateText = when || null;
         intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')

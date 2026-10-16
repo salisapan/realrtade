@@ -199,7 +199,13 @@ console.log('\n--- mail from an alias of the same account stays silent ---\n');
     messages: [graphMessage(Q4, { name: 'Sali', email: ALIAS }, 'alias1')],
     me: [ME, ALIAS], watches: [], graph: I.empty(), state: {}, now: NOW, deps
   });
-  check('Outlook planner: alias sender, no incoming and no offer', r.incoming.length === 0 && r.offers.length === 0, { incoming: r.incoming.length, offers: r.offers.length, diag: r.diagnostics });
+  const inc = r.incoming[0];
+  const kinds = ((inc && inc.process && inc.process.steps) || []).map((s) => s.kind);
+  const wantLabel = 'Send Q4 pricing sheet (glance-pricing-q4)';
+  const gotLabel = inc && inc.intent && inc.intent.label;
+  check('Outlook planner: alias to the same user is a task with no draft',
+    r.incoming.length === 1 && r.offers.length === 0 && kinds.join(',') === 'outlookTask' && gotLabel === wantLabel,
+    { incoming: r.incoming.length, offers: r.offers.length, kinds: kinds.join(','), same: gotLabel === wantLabel, got: gotLabel, want: wantLabel });
   const gmailSrc = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
   const G = E('FlowGoogleCloses');
   check('Gmail reading pane skips mail the account sent to someone else',

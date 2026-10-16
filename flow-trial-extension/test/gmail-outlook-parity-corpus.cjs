@@ -399,13 +399,13 @@ const CASES = [
       return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
     }
     const saveG = pair(GMAIL, GMAIL, SAVE, ownGmail, 1);
-    check('Gmail shape, save the report to Drive by 20/10, self-sent shows a Drive card',
-      saveG.g.show === true && steps(saveG.g).indexOf('driveFile') >= 0 && steps(saveG.g).indexOf('gmailDraft') >= 0 && !steps(saveG.g).some((k) => /send/i.test(k)),
-      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g) });
+    check('Gmail shape, save the report to Drive by 20/10, self-sent is a task with no draft',
+      saveG.g.show === true && steps(saveG.g).join(',') === 'googleTask' && saveG.g.intent && saveG.g.intent.label === 'Save the report',
+      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g), label: saveG.g.intent && saveG.g.intent.label });
     const saveO = pair(ME, ME, SAVE, ownOutlook, 1);
-    check('Outlook shape, save the report to Drive by 20/10, self-sent shows a OneDrive card',
-      saveO.o.show === true && steps(saveO.o).indexOf('onedriveFile') >= 0 && steps(saveO.o).indexOf('outlookDraft') >= 0 && !steps(saveO.o).some((k) => /send/i.test(k)),
-      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o) });
+    check('Outlook shape, save the report to Drive by 20/10, self-sent is a task with no draft',
+      saveO.o.show === true && steps(saveO.o).join(',') === 'outlookTask' && saveO.o.intent && saveO.o.intent.label === 'Save the report',
+      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o), label: saveO.o.intent && saveO.o.intent.label });
     const heG = pair(GMAIL, GMAIL, HE, ownGmail, 0);
     const heO = pair(ME, ME, HE, ownOutlook, 0);
     check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',

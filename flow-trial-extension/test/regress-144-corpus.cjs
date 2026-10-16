@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'd5826b21492059918243e833c6b4d7ce3bf1e4f04dd75b4d7c415d24e8863547';
+const FIXTURE_SHA = 'f406736fcb42e4765d71f69e5cb36e453e44e141b35168cbd51b73959d0e135e';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -164,7 +164,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 659) {
+if (rows.length !== 1931) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -546,7 +546,7 @@ const SELF_TITLE = [
   { subject: 'תזכורת תשלום', body: 'תוכל להעביר את התשלום של ₪89.90 עד סוף היום?', label: 'לשלם ₪89.90' },
   { subject: 'תזכורת תשלום', body: 'תוכל להעביר את התשלום של ₪89.90 עד סוף הום?', label: 'לשלם ₪89.90' },
   { subject: 'תזכורת תשלום', body: 'שבוע טוב! נשמח אם תוכלו להעביר את התשלום של ₪1,200 עד יום חמישי?', label: 'לשלם ₪1,200' },
-  { subject: 'Need the signed contract', body: 'Please reply with the tax form attached by Friday.', label: 'Reply about tax form' },
+  { subject: 'Need the signed contract', body: 'Please reply with the tax form attached by Friday.', label: 'Send the tax form' },
   { subject: 'בהמשך לה-onboarding', body: 'צריך sign-off שלך על ה-PO עד 20/10', label: 'Sign off on PO' },
   { subject: 'RE: W-9 form', body: "I'd appreciate it if you could fill out the lease tomorrow?", label: 'Fill out the lease' },
   { subject: 'Re: Re: Following up', body: 'Could you fill out the deck by end of week?', label: 'Fill out the deck' },
@@ -557,13 +557,8 @@ const SELF_TITLE = [
   { subject: 'RE: Re: the budget', body: 'Confirming €750 for the the Q4 plan work.', label: 'Log €750 agreed' },
   { subject: 'FW: Payment reminder', body: 'Could you process the ₪1,200 payment next Tuesday?', label: 'Pay ₪1,200' },
   { subject: 'Payment reminder', body: 'Please process the $4,850 payment for the pilot tomorrow.', label: 'Pay $4,850 for the pilot' },
-  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Meeting Oct 19 09:00', face: 'Schedule It', proc: 'schedule', steps: [
-    { kind: 'calendar', hour: 9, minute: 0, dateIso: '2026-10-19', title: 'Meeting Oct 19 09:00' },
-    { kind: 'googleTask', dateIso: '2026-10-19', title: 'Meeting Oct 19 09:00' }
-  ] },
-  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Meeting Oct 19 15:00', face: 'Meeting', proc: 'hold', steps: [
-    { kind: 'calendar', hour: 15, minute: 0, dateIso: '2026-10-19', title: 'Shall we hop on a call October 19 at 3pm' }
-  ] }
+  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Call about the campaign' },
+  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Call about the launch checklist' }
 ];
 for (const sample of SELF_TITLE) {
   const out = J.judge({

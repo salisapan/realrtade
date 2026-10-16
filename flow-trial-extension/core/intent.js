@@ -1178,6 +1178,13 @@ const FlowIntent = (() => {
       return false;
     }
     function finish(type, confidence, entities, personalClose, googleClose) {
+      // Negative, phishing, and marketing stay quiet even when the mail
+      // is the user's own. A matched gate does not turn that into a task.
+      if (addressedToSelf(ctx)) {
+        const blob = ((ctx && ctx.subject) ? String(ctx.subject) + '\n' : '') + String(text || '');
+        const held = selfContentStaysQuiet(blob);
+        if (held) return stayQuiet(held === 'phishing' ? 'family' : 'hedge');
+      }
       // A past day can still sit on facts — "the invoice that was due
       // March 3, 2024" — but it is not the deadline of this close. The
       // title, the "when" in the chip sentence, and the task's dateIso
@@ -1202,6 +1209,8 @@ const FlowIntent = (() => {
       if (addressedToSelf(ctx)) {
         intent.noReplyDraft = true;
         intent.selfTask = true;
+        // A note to self is the task. It is not a Drive save and not a draft.
+        delete intent.googleClose;
       }
       if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
@@ -1252,37 +1261,32 @@ const FlowIntent = (() => {
       if (intent.selfTask && !intent.inviteFile) {
         intent.noReplyDraft = true;
         const subject = ctx && ctx.subject;
-        if (weAgreedPromise(text)) {
+        const pay = payAsk(prepareAsk(text));
+        const promise = ownFirstPersonPromise(text) && !pay;
+        const agreed = weAgreedPromise(text);
+        const titled = (agreed || promise) ? '' : selfAskTitle(text, subject);
+        const words = titled ? titled.split(/\s+/).filter(Boolean).length : 0;
+        if (agreed) {
           intent.label = 'Log commitment';
-        } else if (type === TYPES.SCHEDULED_EVENT) {
-          if (!intent.googleClose) {
-            const monthCall = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(text);
-            const titled = monthCall ? '' : selfAskTitle(text, subject);
-            if (monthCall) {
-              // "call October 19" is a meeting. October is not a person,
-              // and the raw sentence is not the title.
-              intent.label = labelFor(TYPES.SCHEDULED_EVENT);
-            } else if (titled && (bareSelfTitle(intent.label) || /^Call\b/.test(titled) || titled.indexOf('להתקשר') === 0)) {
-              intent.label = titled;
-            }
-          }
-        } else {
-          const promise = ownFirstPersonPromise(text);
-          const ask = type === TYPES.REQUEST || type === TYPES.DECISION_TO_LOG;
-          const titled = (promise || intent.googleClose || !ask) ? '' : selfAskTitle(text, subject);
-          if (titled) intent.label = titled;
-          else if (!intent.googleClose && (type === TYPES.REQUEST || promise)) {
-            const iso = intent.entities && intent.entities.dateIso;
-            const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-            intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
-          } else if (!intent.googleClose && type === TYPES.DECISION_TO_LOG && facts && facts.moneyText) {
-            // "We agreed on $1,200 for the the migration work" is the amount
-            // that was agreed. The sentence is not the title.
-            const iso = intent.entities && intent.entities.dateIso;
-            const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-            intent.label = FlowJudgment.neutralTitle({ moneyText: facts.moneyText, dateText: dateText || null });
-          }
+        } else if (words >= 2) {
+          intent.label = titled;
+        } else if (promise || type === TYPES.REQUEST) {
+          const iso = intent.entities && intent.entities.dateIso;
+          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+          intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
+        } else if (type === TYPES.DECISION_TO_LOG && facts && facts.moneyText && !pay) {
+          // "We agreed on $1,200 for the the migration work" is the amount
+          // that was agreed. The sentence is not the title.
+          const iso = intent.entities && intent.entities.dateIso;
+          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+          intent.label = FlowJudgment.neutralTitle({ moneyText: facts.moneyText, dateText: dateText || null });
+        } else if (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה' || /^Reply requested\b/.test(String(intent.label || '')) || /^Saving\b/i.test(String(intent.label || ''))) {
+          const iso = intent.entities && intent.entities.dateIso;
+          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+          intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
         }
+        const labelWords = String(intent.label || '').split(/\s+/).filter(Boolean).length;
+        if (intent.confidence === 'low' && labelWords >= 2) intent.confidence = 'high';
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -1379,9 +1383,51 @@ const FlowIntent = (() => {
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.
     let quietHint = blocked ? 'noise' : (askIsSoft ? 'hedge' : null);
+    // A mail the user sent to their own address is a task. Negative,
+    // phishing, and marketing stay quiet. A title that is not verb plus
+    // object stays quiet too: one word is not a title.
+    function selfContentStaysQuiet(raw) {
+      const blob = String(raw || '');
+      if (phishingOrNegative(blob)) return 'phishing';
+      if (marketingWebinar(blob)) return 'marketing';
+      const families = typeof FlowCloseFamilies !== 'undefined' ? FlowCloseFamilies : null;
+      if (families && typeof families.commitmentHeldBack === 'function' && families.commitmentHeldBack(blob)) return 'negative';
+      if (families && typeof families.sentenceLiveAsk === 'function' && families.sentenceLiveAsk(blob)) return '';
+      // "אין צרך" is the same "no need" as "אין צורך".
+      if (/אין\s+צר[וו]?ך/.test(blob)) return 'negative';
+      if (EVENT_CALLED_OFF_HE.test(blob)) return 'negative';
+      if (/\b(?:postpon(?:e|ed|ing)|cancel(?:led|ed|ing)?|called off|won'?t happen|will not happen|isn'?t happening)\b/i.test(blob)) return 'negative';
+      return '';
+    }
+    function rescueSelfSent(code) {
+      if (code === 'calibrated') return null;
+      if (!addressedToSelf(ctx)) return null;
+      const blob = ((ctx && ctx.subject) ? String(ctx.subject) + '\n' : '') + String(text || '');
+      if (selfContentStaysQuiet(blob)) return null;
+      const subject = ctx && ctx.subject;
+      const pay = payAsk(prepareAsk(text));
+      let titled = '';
+      if (weAgreedPromise(text) || (ownFirstPersonPromise(text) && !pay)) titled = 'Log commitment';
+      else titled = selfAskTitle(text, subject);
+      if (!titled || titled.split(/\s+/).filter(Boolean).length < 2) return null;
+      const made = finish(TYPES.REQUEST, 'high', { what: titled });
+      if (!made || !made.type) return null;
+      made.label = titled;
+      made.selfTask = true;
+      made.noReplyDraft = true;
+      return made;
+    }
     function stayQuiet(code, extra) {
+      if (!(extra && extra.noRescue)) {
+        const rescued = rescueSelfSent(code);
+        if (rescued) return rescued;
+      }
       const row = { type: null, signals: signals, facts: facts, quiet: code };
-      if (extra) Object.assign(row, extra);
+      if (extra && extra.noRescue) {
+        const rest = Object.assign({}, extra);
+        delete rest.noRescue;
+        if (Object.keys(rest).length) Object.assign(row, rest);
+      } else if (extra) Object.assign(row, extra);
       return row;
     }
     // "once" / "hoping" only withdraw the commitment sentence they sit in.
@@ -1463,7 +1509,7 @@ const FlowIntent = (() => {
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
-    if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge');
+    if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge', { noRescue: true });
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     // A negated or conditional ask stays quiet. A sentence that still asks
@@ -1602,6 +1648,8 @@ const FlowIntent = (() => {
         attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount
       });
       if (google && google.wait) {
+        const rescued = rescueSelfSent('google-wait');
+        if (rescued) return rescued;
         return { type: null, signals: signals, facts: facts, googleWait: { fileTerm: google.wait } };
       }
       if (google && google.silence) {
@@ -1928,6 +1976,8 @@ const FlowIntent = (() => {
         if (via) return via;
       }
       if (quietHint) return stayQuiet(quietHint);
+      const rescued = rescueSelfSent('intent-null');
+      if (rescued) return rescued;
       return { type: null, signals, facts };
     }
     // "hoping" / "once" and an already-paid figure clear the bar without
@@ -2043,13 +2093,14 @@ const FlowIntent = (() => {
     return /\bwe\s+agreed\s+to\b/i.test(String(text || ''));
   }
   function bareSelfTitle(label) {
-    return /^(?:Pay|Send|Review|Call|Update|File|Approve|Confirm|Sign|Scan|Upload|Prepare|Resend|Reply|Fill out|Loop in|Sign off|Sign-off|לשלם|לשלוח|להעביר|להכין|למלא|לחזור|להעלות|לאשר|להגיש|לעדכן|להשלים|לסרוק|לבדוק|שיחה)$/.test(String(label || '').trim());
+    return /^(?:Pay|Send|Review|Call|Update|File|Approve|Confirm|Sign|Scan|Upload|Prepare|Resend|Reply|Save|Fill out|Loop in|Sign off|Sign-off|לשלם|לשלוח|להעביר|להכין|למלא|לחזור|להעלות|לאשר|להגיש|לעדכן|להשלים|לסרוק|לבדוק|לשמור|שיחה)$/.test(String(label || '').trim());
   }
   function payAsk(src) {
     if (/\b(?:pay|wire)\b/i.test(src)) return true;
     if (/\bprocess\b/i.test(src) && /\bpayment\b/i.test(src)) return true;
     if (/\bclear\b/i.test(src) && /\bbalance\b/i.test(src)) return true;
     if (/\btransfer\b/i.test(src) && /(?:\$|₪|€|£|\b(?:deposit|balance|vendor|payment|invoice)\b)/i.test(src)) return true;
+    if (/\bneeds to be paid\b/i.test(src)) return true;
     if (/לשלם|תשלם|תשלמי|לסגור את היתרה/.test(src)) return true;
     if (/להעביר את התשלום|תעביר(?:י|ו)? את התשלום/.test(src)) return true;
     return false;
@@ -2129,7 +2180,7 @@ const FlowIntent = (() => {
     s = s.replace(/\s+(?:and\s+get\s+back|and\s+send|so\s+(?:we|i)\s+can)\b[\s\S]*$/i, '');
     s = s.replace(/\s+as\s+an\s+attachment\b[\s\S]*$/i, '');
     s = s.split(/(?<!\d)[.!?](?!\d)/)[0];
-    s = s.replace(/\s+to\s+(?:my\s+)?(?:the\s+)?(?:portal|drive)\b[\s\S]*$/i, '');
+    s = s.replace(/\s+to\s+(?:my\s+)?(?:google\s+drive|one\s?drive|the\s+portal|the\s+drive|portal|drive)\b[\s\S]*$/i, '');
     s = s.replace(/\s+from\s+you\b[\s\S]*$/i, '');
     s = s.replace(/^(?:and\s+(?:send|email)\s+)/i, '');
     s = s.replace(/^(?:please|kindly|over|back|just)\s+/i, '');
@@ -2207,11 +2258,18 @@ const FlowIntent = (() => {
   }
   function titleAfter(verb, match, src, subject, opts) {
     const rest = src.slice(match.index + match[0].length);
-    const keepThe = Boolean(opts && opts.keepThe) || verb === 'Fill out' || verb === 'Confirm';
+    let useVerb = verb;
+    let keepThe = Boolean(opts && opts.keepThe) || verb === 'Fill out' || verb === 'Confirm' || verb === 'Save' || verb === 'לשמור' || verb === 'Book' || verb === 'Order' || verb === 'Renew' || verb === 'Notify' || verb === 'Create' || verb === 'Keep' || verb === 'Store' || verb === 'להזמין' || verb === 'להחזיר' || verb === 'לחדש';
+    // "Reply with the tax form" is the file. The title is Send, and the
+    // object keeps its article.
+    if (verb === 'Reply' && /^\s*with\b/i.test(rest)) {
+      useVerb = 'Send';
+      keepThe = true;
+    }
     let obj = takeObject(rest, keepThe);
     if (weakObject(obj)) obj = takeObject(earlierNoun(src, match.index), keepThe);
     if (opts && opts.pay && (weakObject(obj) || /^payment of\b/i.test(obj))) obj = moneyPhrase(src) || obj;
-    return joinTitle(verb, obj, subject, Object.assign({ src: src }, opts || {}));
+    return joinTitle(useVerb, obj, subject, Object.assign({ src: src }, opts || {}));
   }
   function firstOf(src, regs) {
     let best = null;
@@ -2252,7 +2310,9 @@ const FlowIntent = (() => {
     if (/\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(raw)) return '';
     if (/\bper our (?:call|chat)\b/i.test(raw)) return '';
     const bare = /\b(?:need to|have to|remember to|reminder to|please|gotta|time to|must)\s+call\b/i.test(raw)
-      || /^(?:please\s+)?call(?:\s+(?:tomorrow|today|tonight|back|soon|asap))?(?:[.!]|$)/i.test(raw.trim());
+      || /^(?:please\s+)?call(?:\s+(?:tomorrow|today|tonight|back|soon|asap))?(?:[.!]|$)/i.test(raw.trim())
+      || /\b(?:gimme|give me)\s+a\s+call\b/i.test(raw)
+      || /\bhop on a call\b/i.test(raw);
     if (!bare) return '';
     const sub = cleanSubject(subject);
     if (!sub || weakSubject(sub)) return '';
@@ -2276,6 +2336,14 @@ const FlowIntent = (() => {
     [/\bapprove\b/i, 'Approve'],
     [/\bupdate\b/i, 'Update'],
     [/\breply\b/i, 'Reply'],
+    [/\bsave\b/i, 'Save'],
+    [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+order\b/i, 'Order'],
+    [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+renew\b/i, 'Renew'],
+    [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+book\b/i, 'Book'],
+    [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+notify\b/i, 'Notify'],
+    [/\b(?:need to|have to|remember to|please)\s+create\b/i, 'Create'],
+    [/\b(?:need to|have to|remember to|please)\s+keep\b/i, 'Keep'],
+    [/\b(?:need to|have to|remember to|please)\s+store\b/i, 'Store'],
     [/\bsend\b/i, 'Send'],
     [/\bsign\b/i, 'Sign'],
     [/\bscan\b/i, 'Scan'],
@@ -2293,7 +2361,13 @@ const FlowIntent = (() => {
     [/להגיש|תגיש(?![\u0590-\u05FF])/, 'להגיש'],
     [/לעדכן|תעדכנ(?:י|ו)?(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להשלים|יש להשלים/, 'להשלים'],
-    [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק']
+    [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק'],
+    [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
+    [/להתקשר|תתקשר(?:י|ו)?(?![\u0590-\u05FF])/, 'להתקשר'],
+    [/להזמין|תזמינ(?:י|ו)?(?![\u0590-\u05FF])/, 'להזמין'],
+    [/להחזיר|תחזיר(?:י|ו)?(?![\u0590-\u05FF])/, 'להחזיר'],
+    [/לסגור|תסגור(?:י|ו)?(?![\u0590-\u05FF])/, 'לסגור'],
+    [/לחדש|תחדש(?:י|ו)?(?![\u0590-\u05FF])/, 'לחדש']
   ];
   function selfAskTitle(text, subject) {
     const raw = String(text || '');
@@ -2302,7 +2376,7 @@ const FlowIntent = (() => {
     const src = prepareAsk(raw);
     const he = /[\u0590-\u05FF]/.test(src);
     if (payAsk(src)) {
-      const m = firstOf(src, [/לשלם|תשלמ(?:י|ו)?/, /להעביר|תעביר(?:י|ו)?/, /לסגור/, /\bpay\b/i, /\bwire\b/i, /\bprocess\b/i, /\btransfer\b/i, /\bclear\b/i]);
+        const m = firstOf(src, [/לשלם|תשלמ(?:י|ו)?/, /להעביר|תעביר(?:י|ו)?/, /לסגור/, /\bpay\b/i, /\bneeds to be paid\b/i, /\bwire\b/i, /\bprocess\b/i, /\btransfer\b/i, /\bclear\b/i]);
       if (m) {
         const verb = /[\u0590-\u05FF]/.test(m[0]) ? 'לשלם' : 'Pay';
         const titled = titleAfter(verb, m, src, subject, { pay: true });

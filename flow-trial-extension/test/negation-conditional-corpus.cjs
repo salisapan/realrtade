@@ -3,7 +3,7 @@
 // but the reader is only in Cc: that locked rule stays quiet.
 // v2syn-1205, v2syn-1231, and v2syn-1237 are a past "we agreed to" the
 // user sent themself. The title is Log commitment.
-// v2syn-3328 stays Reply about tax form.
+// v2syn-3328 is self-sent. The title is Send the tax form, a task, no draft.
 // A call with no person uses the subject.
 // A receipt silence is only a payment attestation, through the shared judge.
 // With no profile, an aria-label name is the known name. names-pending is
@@ -126,8 +126,9 @@ const future = selfJudge({
   from: { name: 'Sali Sapan', email: OWN_GMAIL },
   to: [OWN_GMAIL]
 });
-if (!future || future.show !== true || !future.intent || future.intent.type !== 'event') {
-  fail('v2syn-1216 shape must stay an event, got ' + (future && future.intent && future.intent.type) + ' ' + (future && future.reason));
+const futureSteps = ((future && future.process && future.process.steps) || []).map((s) => s.kind);
+if (!future || future.show !== true || !future.intent || future.intent.label !== 'Log commitment' || futureSteps.join(',') !== 'googleTask') {
+  fail('v2syn-1216 self-sent we agreed is a task, got ' + (future && future.intent && future.intent.type) + ' ' + (future && future.intent && future.intent.label) + ' ' + futureSteps.join(','));
 }
 
 const tax = selfJudge({
@@ -136,8 +137,9 @@ const tax = selfJudge({
   from: { name: 'Sali Sapan', email: OWN_GMAIL },
   to: [OWN_GMAIL]
 });
-if (!tax || tax.show !== true || !tax.intent || tax.intent.label !== 'Reply about tax form') {
-  fail('3328 label ' + (tax && tax.intent && tax.intent.label));
+const taxSteps = ((tax && tax.process && tax.process.steps) || []).map((s) => s.kind);
+if (!tax || tax.show !== true || !tax.intent || tax.intent.label !== 'Send the tax form' || taxSteps.join(',') !== 'googleTask') {
+  fail('3328 label ' + (tax && tax.intent && tax.intent.label) + ' ' + taxSteps.join(','));
 }
 
 const call = selfJudge({
