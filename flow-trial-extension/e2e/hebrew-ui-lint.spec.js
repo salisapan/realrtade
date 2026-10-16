@@ -129,6 +129,12 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
   await expect(google.locator('.btn-label')).toHaveText('חבר מחדש את Google');
   await expect(popup.locator('#statusPill')).toHaveText('חבר מחדש את Google');
   await expect(popup.locator('[data-glance-connect="meta"]')).toBeVisible();
+  await expect(popup.locator('[data-provider="google"]')).toHaveCount(1);
+  await expect(popup.locator('[data-provider="meta"]')).toHaveCount(1);
+  const metaBadge = popup.locator('[data-provider="meta"] .badge');
+  await expect(metaBadge).toHaveText('כבוי');
+  await expect(metaBadge).toHaveAttribute('dir', 'auto');
+  expect(await metaBadge.evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
   await expect(popup.locator('#meta-chats-link .btn-label')).toHaveText('הפעל צ׳אטים של Meta');
   const popupText = await visibleChrome(popup, 'body');
   expect(offenders(popupText), popupText).toEqual([]);
@@ -163,4 +169,24 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
     if (paint.off) expect(paint.meta).toEqual(paint.off);
     await list.screenshot({ path: path.join(SHOTS, 'connections-' + theme + '.png') });
   }
+
+  // After the names read. A second Gmail tab with no account button writes
+  // glanceNamesDiag source none, and that must not land before the assertion.
+  const deck = await glance.openGmail({
+    lang: 'he',
+    messageId: 'm-he-deck',
+    threadId: 't-he-deck',
+    subject: 'deck',
+    body: 'can you send me the deck by Sunday?',
+    senderEmail: 'glance.salisapan@outlook.com',
+    senderName: 'Dana Levi',
+    ownEmail: 'ai.local.flow@gmail.com',
+    to: ['ai.local.flow@gmail.com']
+  });
+  const missing = deck.locator('[data-legacy-message-id="m-he-deck"] .flow-chip-host');
+  await expect(missing).toBeVisible({ timeout: 8000 });
+  await expect(missing).toContainText('לא מצאתי את');
+  await expect(missing).toContainText('לא מחובר, אז לא חיפשתי');
+  const deckBad = offenders(await visibleChrome(deck, '[data-legacy-message-id="m-he-deck"] .flow-chip-host'));
+  expect(deckBad, await missing.innerText()).toEqual([]);
 });

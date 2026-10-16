@@ -37,6 +37,24 @@ test('Disconnect does not silently reconnect until Connect is clicked', async ({
   await expect(page.locator('#statusPill')).toHaveText('Google connected');
   const again = await glance.storage();
   expect(again.googleTasksAuth && again.googleTasksAuth.taskListId).toBe('glance-list');
+  expect(again.googleWebAuth && again.googleWebAuth.accessToken).toBeTruthy();
+  await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
+  await expect(page.locator('[data-provider="meta"]')).toHaveCount(1);
+
+  await glance.seed({ googleReconnect: { needed: true, reason: '401' } });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Reconnect Google' }).click();
+  await expect(page.locator('#statusPill')).toHaveText('Google connected');
+  await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
+  await expect(page.locator('[data-provider="meta"]')).toHaveCount(1);
+  const kept = await glance.storage();
+  expect(kept.googleWebAuth && kept.googleWebAuth.accessToken).toBeTruthy();
+  expect(kept.googleReconnect || null).toBe(null);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#statusPill')).toHaveText('Google connected');
+  await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
+  await expect(page.locator('[data-provider="meta"]')).toHaveCount(1);
 });
 
 test('getAuthToken failure leaves Google disconnected and does not open a window', async ({ glance }) => {

@@ -122,6 +122,7 @@
     const card = doc.createElement('div');
     card.className = 'conn' + (granted ? ' on' : '');
     card.setAttribute('data-glance-connect', 'meta');
+    card.setAttribute('data-provider', 'meta');
     const head = doc.createElement('div');
     head.className = 'conn-head';
     const name = doc.createElement('div');
@@ -135,6 +136,7 @@
     head.appendChild(name);
     const badge = doc.createElement('span');
     badge.className = 'badge' + (granted ? ' on' : '');
+    badge.setAttribute('dir', 'auto');
     if (granted) {
       badge.id = 'meta-chats-on';
       badge.textContent = onLabel(lang);

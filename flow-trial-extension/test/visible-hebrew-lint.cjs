@@ -44,6 +44,7 @@ banned.forEach((phrase) => {
 });
 check('the calendar row is שמירת זמן ביומן', popupJs.indexOf("svc.id === 'calendar') return 'שמירת זמן ביומן'") >= 0);
 check('Hebrew reconnect is חבר מחדש את Google', popupJs.indexOf('חבר מחדש את Google') >= 0 && popupJs.indexOf('התחבר מחדש ל-Google') < 0);
+check('Connections dedupes providers before paint', popupJs.indexOf('connectionProviders(') >= 0);
 check('a Hebrew connect click does not hard-code Connecting', popupJs.indexOf("setBtnLabel(btn, 'Connecting…')") < 0 && popupJs.indexOf("googleChromeLabel('busy')") >= 0);
 check('a connected sign-in can add a scope without turning off', popupJs.indexOf('flow:outlook-consent-scope') >= 0 && popupJs.indexOf('הוסף הרשאה') >= 0);
 

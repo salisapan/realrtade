@@ -47,6 +47,7 @@
   let scrollLock = false;
   let renderDepth = 0;
   let openPaintGen = 0;
+  let connectorPaintGen = 0;
   let surfaceGen = 0;
   // Bumps on every glanceWhyCurrent write. A refresh that started earlier
   // must not paint over the value this listener already applied.
@@ -507,18 +508,34 @@
 
   function renderConnectors() {
     const host = document.getElementById('connector-list');
-    host.replaceChildren();
+    const gen = ++connectorPaintGen;
     return outlookHostOpen().then((onOutlook) => {
-      if (onOutlook) {
-        host.appendChild(microsoftConnectCard());
-        return renderOutlookRefresh(host);
-      }
-      // MVP surface is one connector, one decision: sign in, or don't. The rest
-      // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
-      // them wired) but showing four more cards here is exactly the setup
-      // friction the MVP is supposed to have zero of.
-      FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
-    }).then(() => renderMetaChats());
+      if (gen !== connectorPaintGen || !host) return;
+      const catalog = onOutlook
+        ? [{ id: 'microsoft' }]
+        : FLOW_CONNECTORS.filter((c) => c.mvp);
+      const extra = [];
+      Object.keys(status || {}).forEach((id) => {
+        if (id === 'googleTasks' || id === 'googleTask' || id === 'google') extra.push({ id: id });
+      });
+      const providers = (typeof connectionProviders === 'function')
+        ? connectionProviders(catalog.concat(extra))
+        : catalog;
+      host.replaceChildren();
+      providers.forEach((row) => {
+        const id = (typeof providerIdOf === 'function') ? providerIdOf(row) : row.id;
+        if (id === 'microsoft') {
+          host.appendChild(microsoftConnectCard());
+          return;
+        }
+        const full = FLOW_CONNECTORS.find((c) => c.id === row.id) || FLOW_CONNECTORS.find((c) => c.mvp && c.id === 'googleTasks');
+        if (full) host.appendChild(connectorCard(full));
+      });
+      if (onOutlook) return renderOutlookRefresh(host);
+    }).then(() => {
+      if (gen !== connectorPaintGen) return;
+      return renderMetaChats();
+    });
   }
 
   // The panel opened on an Outlook tab. Setup offers one Microsoft consent,
@@ -627,6 +644,7 @@
     const tokenStatus = microsoftTokenStatus();
     const card = el('div', 'conn');
     card.setAttribute('data-glance-connect', 'microsoft');
+    card.setAttribute('data-provider', 'microsoft');
     card.setAttribute('data-glance-microsoft', tokenStatus);
     const head = el('div', 'conn-head');
     const name = el('div', 'conn-name');
@@ -772,6 +790,9 @@
   function connectorCard(c) {
     const st = (status && status[c.id]) || {};
     const card = el('div', 'conn' + (c.status === 'planned' ? ' planned' : '') + (st.connected ? ' on' : ''));
+    const providerId = (typeof providerIdOf === 'function') ? providerIdOf(c) : c.id;
+    card.setAttribute('data-glance-connect', providerId);
+    card.setAttribute('data-provider', providerId);
 
     const head = el('div', 'conn-head');
     const heGoogle = uiLang() === 'he' && c.id === 'googleTasks';

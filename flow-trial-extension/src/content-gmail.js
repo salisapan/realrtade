@@ -1709,6 +1709,7 @@ function glanceUiCopy(kind) {
           text,
           origin: 'gmail',
           now: Date.now(),
+          lang: glanceUiLanguage(),
           watching,
           evidence: FlowCloseChains.fileEvidence({
             driveOk: Boolean(searched && searched.ok),
@@ -2069,7 +2070,7 @@ function glanceUiCopy(kind) {
     if (messageNode.querySelector('.flow-chip-host')) return;
     const chain = ctx.chain || {};
     const card = chain.card || {};
-    const he = chain.requirement && chain.requirement.lang === 'he';
+    const he = glanceUiHebrew();
     const host = el('div', 'flow-chip-host');
     host.setAttribute('data-glance-chain', 'needs-you');
     host.setAttribute('data-checked-at', String(Date.now()));
@@ -2077,7 +2078,17 @@ function glanceUiCopy(kind) {
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
-    textEl.appendChild(document.createTextNode(' ' + [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ')));
+    if (card.lead) {
+      textEl.appendChild(document.createTextNode(' ' + card.lead));
+      const object = el('span', null, card.object || '');
+      object.setAttribute('data-glance-user', 'object');
+      textEl.appendChild(object);
+      textEl.appendChild(document.createTextNode(card.tail || '.'));
+      const rest = [card.searched, card.why, card.skipped].filter(Boolean).join(' ');
+      if (rest) textEl.appendChild(document.createTextNode(' ' + rest));
+    } else {
+      textEl.appendChild(document.createTextNode(' ' + [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ')));
+    }
     if (he) textEl.setAttribute('dir', 'auto');
     host.appendChild(textEl);
 

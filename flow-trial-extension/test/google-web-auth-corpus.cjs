@@ -376,7 +376,7 @@ async function run() {
     const out = await attempt(env.fn('getGoogleAccessToken')(true));
     check('a successful getAuthToken is the token we use', out.ok && out.value.token === 'chrome-primary' && out.value.source === 'chrome', out);
     check('the web flow is not opened', !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
-    check('the stored web token is left in place', env.stored.googleWebAuth.accessToken === 'ya29.stored', env.stored);
+    check('a successful getAuthToken is stored in chrome.storage.local', env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'chrome-primary' && env.stored.googleWebAuth.source === 'chrome', env.stored);
   }
   {
     const env = load({
@@ -793,6 +793,33 @@ async function run() {
     const connected = await attempt(button.fn('connectGoogleTasks')(true));
     const panel = await button.fn('connectorStatus')();
     check('Connect finishes on the saved token and the panel stays off Reconnect', connected.ok && connected.value === true && button.stored.googleTasksAuth && button.stored.googleTasksAuth.taskListId === 'LIST_FRESH' && button.stored.googleWebAuth && button.stored.googleWebAuth.accessToken === 'ya29.fresh' && button.stored.googleGrantedScopes.status === 'granted' && button.stored.googleReconnect == null && panel && panel.googleTasks && panel.googleTasks.needsReconnect === false && button.calls.filter((c) => c === 'GET_AUTH true').length === 1 && !button.calls.some((c) => c.indexOf('WEB ') === 0), { connected, panel: panel && panel.googleTasks, calls: button.calls, auth: button.stored.googleTasksAuth });
+    const kept = load({
+      chromeToken: 'ya29.kept',
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_KEPT', title: 'Glance' }] }) }]]
+    });
+    const signedIn = await attempt(kept.fn('connectGoogleTasks')(true));
+    check('a Connect that does not upgrade still stores the chrome token in chrome.storage.local', signedIn.ok && kept.stored.googleWebAuth && kept.stored.googleWebAuth.accessToken === 'ya29.kept' && kept.stored.googleWebAuth.source === 'chrome', kept.stored.googleWebAuth);
+    const snapshot = JSON.parse(JSON.stringify(kept.stored));
+    snapshot.googleReconnect = { needed: true, reason: '401' };
+    const restarted = load({
+      getAuthTokenError: (o) => (o && o.interactive ? 'interactive ask' : 'The user is not signed in.'),
+      stored: snapshot
+    });
+    const session = await restarted.fn('refreshGoogleSession')();
+    const afterRestart = await restarted.fn('connectorStatus')();
+    check('a new service worker keeps the stored token when silent getAuthToken fails', session && session.ok === true && session.source === 'stored' && session.token === 'ya29.kept' && restarted.stored.googleWebAuth && restarted.stored.googleWebAuth.accessToken === 'ya29.kept', { session, auth: restarted.stored.googleWebAuth });
+    check('that restart does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB ') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length === 1 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
+    const gone = load({
+      getAuthTokenError: 'The user is not signed in.',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_KEPT' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: null
+      }
+    });
+    const failed = await gone.fn('refreshGoogleSession')();
+    const failedPanel = await gone.fn('connectorStatus')();
+    check('Reconnect is set only when the silent call and the stored token both fail', failed && failed.ok === false && gone.calls.filter((c) => c === 'GET_AUTH true').length === 0 && gone.stored.googleReconnect && gone.stored.googleReconnect.needed === true && failedPanel && failedPanel.googleTasks && failedPanel.googleTasks.needsReconnect === true, { failed, panel: failedPanel && failedPanel.googleTasks, calls: gone.calls });
   }
 
   console.log('\n--- connector status shares the reconnect flag ---\n');

@@ -159,24 +159,46 @@ const FlowCloseChains = (() => {
     };
   }
 
-  function cardFor(req, searched) {
-    const he = req && req.lang === 'he';
-    const looked = searched.filter((s) => s.status === 'empty').map((s) => s.label);
-    const skipped = searched.filter((s) => s.status === 'not-connected').map((s) => s.label);
+  function cardHebrew(req, lang) {
+    if (lang == null || lang === '') return Boolean(req && req.lang === 'he');
+    const code = String(lang).trim().toLowerCase().replace(/_/g, '-');
+    return code === 'he' || code.indexOf('he-') === 0 || code === 'iw' || code.indexOf('iw-') === 0;
+  }
+
+  // Place names on the card are chrome. The missing object stays the mail's word.
+  function placeChrome(label, he) {
+    if (!he) return label;
+    const map = {
+      'Google Drive': 'Google Drive',
+      'Google Drive (all folders)': 'Google Drive',
+      'other Drive folders': 'תיקיות אחרות ב-Drive',
+      'this thread': 'השרשור הזה',
+      'Gmail attachments': 'קבצים ב-Gmail',
+      'Outlook attachments': 'קבצים ב-Outlook',
+      'Google Docs': 'מסמכים ב-Google',
+      'Google Sheets': 'גיליונות ב-Google',
+      'Google Calendar': 'היומן ב-Google',
+      'Gmail': 'Gmail',
+      'Outlook': 'Outlook'
+    };
+    return Object.prototype.hasOwnProperty.call(map, label) ? map[label] : label;
+  }
+
+  function cardFor(req, searched, lang) {
+    const he = cardHebrew(req, lang);
+    const looked = searched.filter((s) => s.status === 'empty').map((s) => placeChrome(s.label, he));
+    const skipped = searched.filter((s) => s.status === 'not-connected').map((s) => placeChrome(s.label, he));
     const missing = (req && req.label) || (req && req.kind) || '';
-    if (he) {
-      return {
-        line: 'לא מצאתי את ' + missing + '.',
-        searched: looked.length ? ('חיפשתי ב: ' + looked.join(', ') + '.') : '',
-        why: 'אין שם משהו שמתאים, אז לא סגרתי את זה.',
-        skipped: skipped.length ? ('לא מחובר, אז לא חיפשתי: ' + skipped.join(', ') + '.') : ''
-      };
-    }
+    const lead = he ? 'לא מצאתי את ' : 'I could not find ';
+    const tail = '.';
     return {
-      line: 'I could not find ' + missing + '.',
-      searched: looked.length ? ('I looked in ' + looked.join(', ') + '.') : '',
-      why: 'Nothing there matches, so I did not close this.',
-      skipped: skipped.length ? ('Not connected, so not searched: ' + skipped.join(', ') + '.') : ''
+      line: lead + missing + tail,
+      lead: lead,
+      object: missing,
+      tail: tail,
+      searched: looked.length ? ((he ? 'חיפשתי ב: ' : 'I looked in ') + looked.join(', ') + '.') : '',
+      why: he ? 'אין שם משהו שמתאים, אז לא סגרתי את זה.' : 'Nothing there matches, so I did not close this.',
+      skipped: skipped.length ? ((he ? 'לא מחובר, אז לא חיפשתי: ' : 'Not connected, so not searched: ') + skipped.join(', ') + '.') : ''
     };
   }
 
@@ -404,7 +426,7 @@ const FlowCloseChains = (() => {
     result.show = true;
     result.move = i.watching ? 'watch' : 'needs-you';
     result.reason = 'not-found';
-    result.card = cardFor(req, found.searched);
+    result.card = cardFor(req, found.searched, i.lang);
     result.holding = holding;
     result.promise = promiseFor(req, holding);
     result.close = false;

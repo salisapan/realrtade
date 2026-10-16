@@ -16,6 +16,7 @@ function check(name, cond, detail) {
 }
 
 const NOW = Date.parse('2026-10-05T09:00:00Z');
+const { connectionProviders, providerIdOf } = require('../core/connectors.js');
 const ROOT = path.join(__dirname, '..');
 
 function ev(over) {
@@ -230,6 +231,25 @@ check('a finished search is not a silence', C.searchSilence({ ok: true, files: [
 check('Google not connected is drive-not-granted', C.searchSilence({ ok: false, reason: 'not-connected' }) === 'drive-not-granted' && C.searchSilence({ ok: false, reason: 'drive-not-granted', status: 403 }) === 'drive-not-granted');
 check('any other search failure is drive-search-failed', C.searchSilence({ ok: false, reason: 'error', status: 500 }) === 'drive-search-failed' && C.searchSilence({ ok: false }) === 'drive-search-failed');
 check('the old file-needs-drive spelling still counts as the chain not having run', C.isFileChainPending('file-needs-drive') && C.isFileChainPending('file-chain-not-run') && !C.isFileChainPending('drive-search-failed'));
+
+console.log('--- a Hebrew UI localizes the not-found card, including an English mail ---');
+const deck = C.resolve({
+  text: 'can you send me the deck by Sunday?',
+  origin: 'gmail',
+  now: NOW,
+  lang: 'he',
+  evidence: C.fileEvidence({ driveOk: true, driveFiles: [], threadFiles: [] })
+});
+check('an English deck ask on a Hebrew UI is the Hebrew not-found card', deck.move === 'needs-you' && deck.card && deck.card.line === 'לא מצאתי את deck.' && deck.card.lead === 'לא מצאתי את ' && deck.card.object === 'deck' && /השרשור הזה/.test(deck.card.searched) && deck.card.skipped.indexOf('לא מחובר, אז לא חיפשתי') === 0 && deck.card.skipped.indexOf('Not connected') < 0, deck.card);
+check('the same ask in English keeps the English card', C.resolve({ text: 'can you send me the deck by Sunday?', origin: 'gmail', now: NOW, lang: 'en', evidence: C.fileEvidence({ driveOk: true, driveFiles: [], threadFiles: [] }) }).card.line === 'I could not find deck.');
+const providers = connectionProviders([
+  { id: 'googleTasks', label: 'Google' },
+  { id: 'googleTask', label: 'Google again' },
+  { id: 'meta' },
+  { id: 'meta' },
+  { id: 'microsoft' }
+]);
+check('each provider id is one row at the source', providers.length === 3 && providerIdOf(providers[0]) === 'google' && providers[1].id === 'meta' && providers[2].id === 'microsoft', providers.map((row) => row.id));
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

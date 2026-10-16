@@ -217,7 +217,9 @@ async function migrateGoogleEverConnected() {
   } catch (e) { /* storage can close during a restart */ }
 }
 function refreshStoredGoogleNames() {
-  getGoogleAccessToken(false).then((cred) => rememberGoogleProfile(cred && cred.token)).catch(() => {});
+  refreshGoogleSession().then((session) => {
+    if (session && session.token) return rememberGoogleProfile(session.token);
+  }).catch(() => {});
 }
 chrome.runtime.onInstalled.addListener((details) => {
   const reason = details && details.reason;
@@ -1703,6 +1705,9 @@ async function getGoogleAccessToken(interactive) {
   }
   try {
     const token = await getGoogleAuthToken(wantUi);
+    // Chrome's identity cache dies with the service worker. The panel
+    // reads googleWebAuth from chrome.storage.local.
+    await persistGoogleAccessToken(token, 'chrome');
     return { token, source: 'chrome' };
   } catch (err) {
     const message = err && err.message;
@@ -1803,17 +1808,60 @@ async function clearGoogleReconnect() {
   await chrome.storage.local.remove(GOOGLE_RECONNECT_STORAGE_KEY);
 }
 
+// chrome.storage.local, never session storage and never a module variable.
+// A new service worker still sees this record.
+async function persistGoogleAccessToken(token, source) {
+  const accessToken = String(token || '').trim();
+  if (!accessToken) return false;
+  return commitGoogleWebAuth({ accessToken: accessToken, source: source || null }, googleWebAuthEpoch);
+}
+
 // The account chooser returns a token and does not write googleWebAuth.
 // Persist it on the same key the silent path already reads, and drop the
 // Reconnect flag in that same step. The panel reads this record.
 async function rememberUpgradedGoogleToken(token, source) {
-  const accessToken = String(token || '').trim();
-  if (!accessToken) return false;
-  const epoch = googleWebAuthEpoch;
-  const committed = await commitGoogleWebAuth({ accessToken: accessToken, source: source || null }, epoch);
+  const committed = await persistGoogleAccessToken(token, source);
   if (!committed) return false;
   await clearGoogleReconnect();
   return true;
+}
+
+function googleHadAccount(bag) {
+  const b = bag || {};
+  const ever = b[GOOGLE_EVER_CONNECTED_STORAGE_KEY];
+  if (ever === true || (ever && ever.connected)) return true;
+  if (b.googleTasksAuth) return true;
+  const web = b[GOOGLE_WEB_AUTH_STORAGE_KEY];
+  return Boolean(web && (web.accessToken || web.refreshToken));
+}
+
+// Service-worker start. getAuthToken is non-interactive. A valid stored
+// token counts. Reconnect is set only when both of those fail and this
+// account had already connected. Nothing here opens a consent window,
+// and nothing here deletes a stored token first.
+async function refreshGoogleSession() {
+  const before = await chrome.storage.local.get([
+    GOOGLE_WEB_AUTH_STORAGE_KEY,
+    GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+    'googleTasksAuth'
+  ]);
+  const hadAccount = googleHadAccount(before);
+  let chromeToken = '';
+  try { chromeToken = await getGoogleAuthToken(false); } catch (e) { chromeToken = ''; }
+  if (chromeToken) {
+    if (hadAccount) {
+      await persistGoogleAccessToken(chromeToken, 'chrome');
+      await clearGoogleReconnect();
+    }
+    return { ok: true, source: 'chrome', token: chromeToken };
+  }
+  const stored = await readGoogleWebAuth();
+  if (webTokenUsable(stored)) {
+    if (hadAccount) await clearGoogleReconnect();
+    return { ok: true, source: 'stored', token: stored.accessToken };
+  }
+  if (hadAccount) await markGoogleReconnect('not signed in');
+  return { ok: false, source: null, token: '' };
 }
 
 // One silent refresh after a 401. Web tokens use prompt=none. Chrome tokens

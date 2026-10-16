@@ -2664,6 +2664,7 @@
       text,
       origin: 'outlook',
       now: Date.now(),
+      lang: pageUiLang(),
       watching,
       evidence: FlowCloseChains.fileEvidence({
         driveOk: Boolean(searched && searched.ok),
