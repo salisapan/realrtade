@@ -683,15 +683,20 @@ const FlowActions = (() => {
       .replace(/\bper our call\b/ig, ' ');
     // The sender is the one calling. That promise is Log commitment.
     // "I'll join the call" at a clock stays a Meeting. "I will call the
-    // bank" stays the call reminder.
+    // bank" stays the call reminder. A subject line "Reminder" must not
+    // retitle either of those two sentences as Call.
     const senderCallYou = /\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(untimedSrc);
+    const senderJoinCall = /\b(?:i|we)(?:'|’)?ll\s+join\s+(?:the\s+)?call\b|\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(untimedSrc);
     const readerWill = /\byou(?:'|’)?ll\b|\byou will\b/i.test(untimedSrc) || /אתה\s*מעב/.test(untimedSrc);
     const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
     // Call is a reminder to phone someone. "I'll call you" is the sender's
     // own promise, and "you would call the bank" is the reader's commitment.
-    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
+    // "I'll join the call" names the meeting they are attending.
+    const callReminder = !senderCallYou && !senderJoinCall && (
+      (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
       || /^\s*call the day after tomorrow\b/i.test(callBody)
-      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody) && !senderCallYou);
+      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody))
+    );
     // "Let me know if you have any questions" offers help. It is not an ask.
     // "Let me know by Friday who will" still is.
     const helpOffer = /\blet me know if you (?:have|need|want)\b/i.test(untimedSrc)
@@ -712,12 +717,10 @@ const FlowActions = (() => {
     // A note the user sent is a task. An attach on that note keeps its
     // title and drops the draft. It is not the inbound file track.
     if (intent.selfTask) proc = logIt;
-    if (senderCallYou && !intent.inviteFile) {
-      proc = logIt;
-      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
-      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
-    }
-    if ((untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
+    // "I'll call you" is already the task. The untimed block would retitle
+    // it Call when the subject says Reminder, and would return null when
+    // the day has no clock ("I will call you on Friday.").
+    if (!senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
       if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
         proc = logIt;
       } else if ((createTaskAsk || callReminder) && !readerSaid) {
@@ -743,6 +746,11 @@ const FlowActions = (() => {
       } else if (untimedCalendar) {
         proc = logIt;
       }
+    }
+    if (senderCallYou && !intent.inviteFile) {
+      proc = logIt;
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
     }
     const taskPlan = taskInstead || senderCallYou || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
     // The card and the task title follow the plan that will actually run.

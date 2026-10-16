@@ -245,8 +245,12 @@ const FlowStorage = (() => {
     // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
     glanceUiLanguage: null,
     // Names this person is called, beside the account display name.
-    // Latin and Hebrew. Hosts pass them as ownNames. Empty until set.
+    // Filled from the Google userinfo and Graph profile already granted.
+    // No settings field. Empty until that profile read succeeds.
     glanceOwnNames: [],
+    // Google userinfo name, given_name, and family_name on the existing
+    // token. Hosts pass this as profile. Null until that read succeeds.
+    googleProfile: null,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

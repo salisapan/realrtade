@@ -213,15 +213,20 @@ async function migrateGoogleEverConnected() {
     if (patch) await chrome.storage.local.set(patch);
   } catch (e) { /* storage can close during a restart */ }
 }
+function refreshStoredGoogleNames() {
+  getGoogleAccessToken(false).then((cred) => rememberGoogleProfile(cred && cred.token)).catch(() => {});
+}
 chrome.runtime.onInstalled.addListener((details) => {
   const reason = details && details.reason;
   if (reason !== 'install' && reason !== 'update') return;
   migrateGoogleEverConnected();
   injectOpenGmailTabs();
+  refreshStoredGoogleNames();
 });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
   migrateGoogleEverConnected();
   injectOpenGmailTabs();
+  refreshStoredGoogleNames();
 });
 
 /* ---------------------------------------------------- other apps (opt-in) */
@@ -1556,6 +1561,58 @@ async function getGoogleWebAccessToken(interactive) {
 }
 
 // getAuthToken first. The web flow runs only after a non-cancel failure.
+// given_name, family_name, and name from the userinfo endpoint the existing
+// token can already call. No new scope. A refusal leaves the name list as it is.
+let googleNamesFilled = false;
+let googleProfileFlight = null;
+function namesFromGoogleUserinfo(info) {
+  const out = [];
+  function add(raw) {
+    const name = String(raw || '').trim();
+    if (!name || name.toLowerCase() === 'me') return;
+    if (out.some((n) => n.toLowerCase() === name.toLowerCase())) return;
+    out.push(name);
+  }
+  const src = info || {};
+  const given = String(src.given_name || src.givenName || '').trim();
+  const family = String(src.family_name || src.familyName || src.surname || '').trim();
+  add(src.name || src.displayName);
+  add(given);
+  add(family);
+  if (given && family) add(given + ' ' + family);
+  return out;
+}
+function rememberGoogleProfile(token) {
+  if (!token || googleNamesFilled) return Promise.resolve();
+  if (googleProfileFlight) return googleProfileFlight;
+  googleProfileFlight = (async () => {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (!res.ok) return;
+      const info = await res.json();
+      const names = namesFromGoogleUserinfo(info);
+      if (!names.length) return;
+      const profile = {
+        displayName: info.name || null,
+        givenName: info.given_name || null,
+        surname: info.family_name || null
+      };
+      const bag = await chrome.storage.local.get({ glanceOwnNames: [] });
+      const prev = Array.isArray(bag.glanceOwnNames) ? bag.glanceOwnNames : [];
+      const merged = prev.slice();
+      names.forEach((name) => {
+        if (!merged.some((n) => String(n).toLowerCase() === name.toLowerCase())) merged.push(name);
+      });
+      await chrome.storage.local.set({ googleProfile: profile, glanceOwnNames: merged });
+      googleNamesFilled = true;
+    } catch (e) { /* userinfo refused; the greeting stays on the names already stored */ }
+    finally { googleProfileFlight = null; }
+  })();
+  return googleProfileFlight;
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   try {
@@ -1620,8 +1677,11 @@ async function disconnectConnector(connectorId) {
       key,
       GOOGLE_WEB_AUTH_STORAGE_KEY,
       GOOGLE_RECONNECT_STORAGE_KEY,
-      GOOGLE_EVER_CONNECTED_STORAGE_KEY
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      'googleProfile',
+      'glanceOwnNames'
     ]));
+    googleNamesFilled = false;
     return { ok: true };
   }
   await chrome.storage.local.remove(key);
@@ -1772,7 +1832,8 @@ async function connectGoogleTasks(interactive) {
   // script). The popup Connect click passes true. That is the one moment
   // Chrome may show the account chooser or, if browser sign-in is off, the
   // web-flow consent window. Later API calls stay silent.
-  await getGoogleAccessToken(interactive !== false);
+  const cred = await getGoogleAccessToken(interactive !== false);
+  await rememberGoogleProfile(cred && cred.token);
   const taskListId = await findOrCreateGlanceTaskList();
   await chrome.storage.local.set({
     googleTasksAuth: { taskListId },

@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'f27b882627285849fe92617ebfd5d7f9cb5a0ec009df92c7047bd95f67902982';
+const FIXTURE_SHA = '4bd0c451973071010094b1d611c7a9b5368db36529c69ec6a28696774b36ffc6';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -164,7 +164,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 657) {
+if (rows.length !== 659) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -512,10 +512,53 @@ for (const id of ['v2syn-3398', 'v2syn-3411', 'v2syn-3415', 'v2syn-3434']) {
     const out = judge(row, surface, ctx);
     const steps = (out.process && out.process.steps) || [];
     const draft = steps.some((s) => s && (s.kind === 'gmailDraft' || s.kind === 'outlookDraft'));
-    if (!shown(out) || !taskOnly(out) || draft || (out.process && out.process.id) === 'attach-invite') {
-      console.log('FAIL: self attach ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.process && out.process.id) || ''));
+    const label = String((out.intent && out.intent.label) || '');
+    if (!shown(out) || !taskOnly(out) || draft || (out.process && out.process.id) === 'attach-invite' || /^Attach /.test(label)) {
+      console.log('FAIL: self attach ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.process && out.process.id) || '') + ' ' + label);
       process.exit(1);
     }
+  }
+}
+const CALL_YOU = ['v2syn-1969', 'v2syn-1972', 'v2syn-1975', 'v2syn-1977', 'v2syn-1980', 'v2syn-1981', 'v2syn-1982', 'v2syn-1985', 'v2syn-1991', 'v2syn-1994', 'v2syn-2000', 'v2syn-2003', 'v2syn-2005', 'v2syn-2006', 'v2syn-2008', 'v2rtest-file-path-corpus-604'];
+for (const id of CALL_YOU) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const label = String((out.intent && out.intent.label) || '');
+    const outlookQuiet = surface === 'outlook' && connectorQuiet('outlook', out);
+    if (outlookQuiet) continue;
+    if (!shown(out) || !taskOnly(out) || !/^Log commitment\b/.test(label) || label === 'Call') {
+      console.log('FAIL: call you ' + id + ' ' + surface + ' ' + describe(out) + ' ' + label);
+      process.exit(1);
+    }
+  }
+}
+for (const id of ['v2syn-2054', 'v2syn-2057', 'v2syn-2060', 'v2syn-2086', 'v2syn-2088']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  const g = judge(row, 'gmail', ctx);
+  const label = String((g.intent && g.intent.label) || '');
+  if (!shown(g) || !g.intent || g.intent.type !== 'event' || !/^Meeting\b/.test(label) || label === 'Call') {
+    console.log('FAIL: join call ' + id + ' ' + describe(g) + ' ' + label);
+    process.exit(1);
+  }
+}
+{
+  const Intent = vm.runInContext('FlowIntent', engine);
+  const glance = { userName: 'Glance', ownNames: ['Glance', 'Sali'] };
+  const latin = { userName: 'Sali Sapan', ownNames: ['Sali Sapan'] };
+  if (!Intent.nameIsReader('Sali', glance) || !Intent.nameIsReader('סאלי', glance)) {
+    console.log('FAIL: Glance + given name Sali does not match Sali and סאלי');
+    process.exit(1);
+  }
+  if (!Intent.nameIsReader('סאלי', latin) || !Intent.nameIsReader('Sali', latin)) {
+    console.log('FAIL: Sali Sapan does not match סאלי');
+    process.exit(1);
+  }
+  if (Intent.nameIsReader('Dana', glance) || Intent.nameIsReader('דנה', glance)) {
+    console.log('FAIL: a different name matched Sali');
+    process.exit(1);
   }
 }
 console.log('offer pass ' + counts.offerPass + ' fail ' + counts.offerFail);

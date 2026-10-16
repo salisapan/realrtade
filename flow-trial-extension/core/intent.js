@@ -602,8 +602,45 @@ const FlowIntent = (() => {
     if (who && readerNameList(c).length && !nameIsReader(who, c)) return true;
     return false;
   }
+  // A Latin given name and the Hebrew greeting of that same name.
+  // The map only expands a name the reader already has. Hi Dana stays
+  // quiet when the reader is Sali. Nothing here is a setting.
+  const NAME_SCRIPT = [
+    ['sali', 'סאלי'],
+    ['noa', 'נועה'],
+    ['dana', 'דנה'],
+    ['maya', 'מאיה'],
+    ['avi', 'אבי'],
+    ['michael', 'מיכאל'],
+    ['sarah', 'שרה'],
+    ['rachel', 'רחל'],
+    ['lior', 'ליאור'],
+    ['tomer', 'תומר'],
+    ['yael', 'יעל'],
+    ['david', 'דוד'],
+    ['yossi', 'יוסי'],
+    ['ron', 'רון'],
+    ['tal', 'טל'],
+    ['shir', 'שיר'],
+    ['oren', 'אורן'],
+    ['amit', 'עמית'],
+    ['noam', 'נועם'],
+    ['michal', 'מיכל']
+  ];
+  function scriptAliases(token) {
+    const t = String(token || '').trim().toLowerCase();
+    if (!t) return [];
+    const out = [];
+    for (let i = 0; i < NAME_SCRIPT.length; i++) {
+      const pair = NAME_SCRIPT[i];
+      if (pair[0] === t) out.push(pair[1]);
+      else if (pair[1] === t) out.push(pair[0]);
+    }
+    return out;
+  }
   // Names the reader may be called. The account display name, its first
-  // word, and any other names the host already knows (סאלי beside Sali).
+  // word, any other names the host already knows, and the other script
+  // of a first name on that list (סאלי when the profile says Sali).
   function readerNameList(ctx) {
     const c = ctx || {};
     const names = [];
@@ -611,8 +648,16 @@ const FlowIntent = (() => {
       const s = String(raw || '').trim().toLowerCase();
       if (!s) return;
       if (names.indexOf(s) === -1) names.push(s);
+      scriptAliases(s).forEach((alias) => {
+        if (names.indexOf(alias) === -1) names.push(alias);
+      });
       const first = s.split(/\s+/)[0];
-      if (first && names.indexOf(first) === -1) names.push(first);
+      if (first && first !== s) {
+        if (names.indexOf(first) === -1) names.push(first);
+        scriptAliases(first).forEach((alias) => {
+          if (names.indexOf(alias) === -1) names.push(alias);
+        });
+      }
     }
     add(c.userName);
     if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
@@ -642,8 +687,9 @@ const FlowIntent = (() => {
     add(s.userName);
     const profile = s.profile && typeof s.profile === 'object' ? s.profile : {};
     add(profile.displayName);
-    const given = String(profile.givenName || '').trim();
-    const surname = String(profile.surname || '').trim();
+    add(profile.name);
+    const given = String(profile.givenName || profile.given_name || '').trim();
+    const surname = String(profile.surname || profile.familyName || profile.family_name || '').trim();
     add(given);
     add(surname);
     if (given && surname) add(given + ' ' + surname);
@@ -1115,8 +1161,9 @@ const FlowIntent = (() => {
           }
         }
       }
-      // "לצרף … לזימון" is the file track even when a family returned the request.
-      const invitePlan = attachToInvitePlan(text);
+      // "לצרף … לזימון" is the inbound file track. A note the user sent
+      // to themselves is the task, decided before this plan runs.
+      const invitePlan = addressedToSelf(ctx) ? null : attachToInvitePlan(text);
       if (invitePlan && type === TYPES.REQUEST) {
         intent.inviteFile = true;
         intent.label = invitePlan.label;
@@ -1346,11 +1393,19 @@ const FlowIntent = (() => {
     // missing file stays the card, never a banner and never silence.
     const attachToInvite = Boolean(attachToInvitePlan(text));
     // The file track is an inbound ask aimed at this person. A mail they
-    // sent, including a note to their own address, is not that ask. The
-    // meeting noun in it is the existing invite, not a new event.
-    // A mail the user sent to someone else is not this attach. A note
-    // to their own address is the task, with no draft.
-    if (!blocked && attachToInvite && sentByReader(ctx) && !addressedToSelf(ctx)) return stayQuiet('hedge');
+    // sent to someone else is not that ask. A note to their own address
+    // is the task, with no draft, and it is decided before the file plan.
+    if (!blocked && attachToInvite && addressedToSelf(ctx)) {
+      const noted = finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+      if (noted) noted.selfAttachTask = true;
+      return noted;
+    }
+    if (!blocked && attachToInvite && sentByReader(ctx)) return stayQuiet('hedge');
     if (!blocked && !replyMisaddressed && attachToInvite) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,

@@ -57,9 +57,9 @@ async function runPage(opts) {
     debug: (...a) => logs.push(a.map(String).join(' ')), warn: (...a) => logs.push(a.map(String).join(' ')), error: (...a) => logs.push('ERROR ' + a.map(String).join(' '))
   });
   const store = Object.assign({
-    outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() }, account: { address: ME, name: 'Glance' }, ownAddresses: [ME], profile: { displayName: 'Glance' } },
+    outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() }, account: { address: ME, name: 'Glance' }, ownAddresses: [ME], profile: { displayName: 'Glance', givenName: 'Sali', surname: 'Sapan' } },
     outlookSync: { stateVersion: 3 },
-    glanceOwnNames: ['Sali', 'Sali Sapan', 'סאלי']
+    glanceOwnNames: []
   }, o.store || {});
   const sent = [];
   const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
@@ -923,29 +923,38 @@ async function runPage(opts) {
   {
     const greet = (text) => (h) => h.replace(/<div>Hi Sali,<\/div>[\s\S]*?<div>Flow team<\/div>/, '<div>' + text + '</div>');
     const glanceSali = await runPage({ waitMs: 2500 });
-    check('Glance display name plus known Sali still mounts Hi Sali', Boolean(glanceSali.chip), glanceSali.chip && glanceSali.chip.textContent);
+    check('Glance plus Graph givenName Sali mounts Hi Sali', Boolean(glanceSali.chip), glanceSali.chip && glanceSali.chip.textContent);
     const noNames = await runPage({
       waitMs: 2500,
-      store: { glanceOwnNames: [] }
+      store: {
+        glanceOwnNames: [],
+        outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() }, account: { address: ME, name: 'Glance' }, ownAddresses: [ME], profile: { displayName: 'Glance' } }
+      }
     });
-    check('Glance display name with no known names stays quiet on Hi Sali', !noNames.chip, noNames.chip && noNames.chip.textContent);
+    check('Glance with no given name stays quiet on Hi Sali', !noNames.chip, noNames.chip && noNames.chip.textContent);
     const hebrew = 'היי סאלי, בבקשה תעדכן אותי עד יום חמישי.';
-    const hebrewAuth = {
+    const givenAuth = {
+      token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
+      account: { address: ME, name: 'Glance' },
+      ownAddresses: [ME],
+      profile: { displayName: 'Glance', givenName: 'Sali', surname: 'Sapan' }
+    };
+    const hebrewGiven = await runPage({
+      htmlPatch: greet(hebrew), mailBody: hebrew, waitMs: 2500,
+      store: { outlookAuth: givenAuth, glanceOwnNames: [] }
+    });
+    check('Glance plus givenName Sali mounts היי סאלי', Boolean(hebrewGiven.chip), hebrewGiven.chip && hebrewGiven.chip.textContent);
+    const sapanAuth = {
       token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
       account: { address: ME, name: 'Sali Sapan' },
       ownAddresses: [ME],
-      profile: { displayName: 'Sali Sapan', givenName: 'Sali', surname: 'Sapan' }
+      profile: { displayName: 'Sali Sapan' }
     };
-    const hebrewHit = await runPage({
+    const hebrewSapan = await runPage({
       htmlPatch: greet(hebrew), mailBody: hebrew, waitMs: 2500,
-      store: { outlookAuth: hebrewAuth, glanceOwnNames: ['סאלי'] }
+      store: { outlookAuth: sapanAuth, glanceOwnNames: [] }
     });
-    check('Latin display name Sali Sapan plus known סאלי still mounts the Hebrew greeting', Boolean(hebrewHit.chip), hebrewHit.chip && hebrewHit.chip.textContent);
-    const hebrewMiss = await runPage({
-      htmlPatch: greet(hebrew), mailBody: hebrew, waitMs: 2500,
-      store: { outlookAuth: hebrewAuth, glanceOwnNames: [] }
-    });
-    check('Latin display name Sali Sapan with no Hebrew known name stays quiet', !hebrewMiss.chip, hebrewMiss.chip && hebrewMiss.chip.textContent);
+    check('account name Sali Sapan alone mounts היי סאלי', Boolean(hebrewSapan.chip), hebrewSapan.chip && hebrewSapan.chip.textContent);
     const other = await runPage({
       htmlPatch: greet('Hi Dana, could you review the pilot proposal and confirm by Wednesday?'),
       mailBody: 'Hi Dana, could you review the pilot proposal and confirm by Wednesday?',

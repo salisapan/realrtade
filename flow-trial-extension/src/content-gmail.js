@@ -1494,6 +1494,7 @@ function glanceUiCopy(kind) {
       ownNames: (typeof FlowIntent !== 'undefined' && typeof FlowIntent.readerNamesFrom === 'function')
         ? FlowIntent.readerNamesFrom({
           displayName: audience.userName,
+          profile: state && state.googleProfile,
           knownNames: state && state.glanceOwnNames
         })
         : ((state && state.glanceOwnNames) || null),

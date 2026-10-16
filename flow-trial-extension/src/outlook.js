@@ -271,6 +271,41 @@ const FlowOutlook = (() => {
       }
     }
 
+    function profileNameList(profile) {
+      const intentApi = (deps.planDeps && deps.planDeps.intent) || (typeof FlowIntent !== 'undefined' ? FlowIntent : null);
+      if (intentApi && typeof intentApi.readerNamesFrom === 'function') {
+        return intentApi.readerNamesFrom({ profile: profile || null });
+      }
+      const out = [];
+      function add(raw) {
+        const name = String(raw || '').trim();
+        if (!name || name.toLowerCase() === 'me') return;
+        if (out.some((n) => n.toLowerCase() === name.toLowerCase())) return;
+        out.push(name);
+      }
+      const p = profile || {};
+      add(p.displayName);
+      add(p.name);
+      const given = String(p.givenName || p.given_name || '').trim();
+      const surname = String(p.surname || p.familyName || '').trim();
+      add(given);
+      add(surname);
+      if (given && surname) add(given + ' ' + surname);
+      return out;
+    }
+    async function rememberProfileNames(profile) {
+      const names = profileNameList(profile);
+      if (!names.length) return;
+      try {
+        const bag = await deps.storage.get();
+        const prev = Array.isArray(bag && bag.glanceOwnNames) ? bag.glanceOwnNames : [];
+        const merged = prev.slice();
+        names.forEach((name) => {
+          if (!merged.some((n) => String(n).toLowerCase() === String(name).toLowerCase())) merged.push(name);
+        });
+        if (merged.length !== prev.length) await write('glanceOwnNames', merged);
+      } catch (e) { /* the page still reads the profile on the auth record */ }
+    }
     function buildOwnAddresses(profile, learned) {
       const g = gm();
       if (g && g.ownAddressesFrom) return Array.from(g.ownAddressesFrom(profile, learned));
@@ -303,7 +338,9 @@ const FlowOutlook = (() => {
       const primary = ownAddresses[0] || String(profile.mail || profile.userPrincipalName || '').toLowerCase();
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
+      const storedProfile = { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] };
+      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile });
+      await rememberProfileNames(storedProfile);
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
       // Register the OWA content script (same chip as Gmail) while Outlook is on.
@@ -587,6 +624,7 @@ const FlowOutlook = (() => {
       const graph = await deps.storage.getIdentityGraph();
       const planDeps = Object.assign({}, deps.planDeps, { actions: (deps.planDeps && deps.planDeps.actions) || deps.actions || null });
       const accountName = (auth.account && (auth.account.name || auth.account.displayName)) || (auth.profile && auth.profile.displayName) || '';
+      await rememberProfileNames(auth.profile);
       let knownNames = null;
       try {
         const bag = await deps.storage.get();

@@ -4778,8 +4778,45 @@ const FlowIntent = (() => {
     if (who && readerNameList(c).length && !nameIsReader(who, c)) return true;
     return false;
   }
+  // A Latin given name and the Hebrew greeting of that same name.
+  // The map only expands a name the reader already has. Hi Dana stays
+  // quiet when the reader is Sali. Nothing here is a setting.
+  const NAME_SCRIPT = [
+    ['sali', 'סאלי'],
+    ['noa', 'נועה'],
+    ['dana', 'דנה'],
+    ['maya', 'מאיה'],
+    ['avi', 'אבי'],
+    ['michael', 'מיכאל'],
+    ['sarah', 'שרה'],
+    ['rachel', 'רחל'],
+    ['lior', 'ליאור'],
+    ['tomer', 'תומר'],
+    ['yael', 'יעל'],
+    ['david', 'דוד'],
+    ['yossi', 'יוסי'],
+    ['ron', 'רון'],
+    ['tal', 'טל'],
+    ['shir', 'שיר'],
+    ['oren', 'אורן'],
+    ['amit', 'עמית'],
+    ['noam', 'נועם'],
+    ['michal', 'מיכל']
+  ];
+  function scriptAliases(token) {
+    const t = String(token || '').trim().toLowerCase();
+    if (!t) return [];
+    const out = [];
+    for (let i = 0; i < NAME_SCRIPT.length; i++) {
+      const pair = NAME_SCRIPT[i];
+      if (pair[0] === t) out.push(pair[1]);
+      else if (pair[1] === t) out.push(pair[0]);
+    }
+    return out;
+  }
   // Names the reader may be called. The account display name, its first
-  // word, and any other names the host already knows (סאלי beside Sali).
+  // word, any other names the host already knows, and the other script
+  // of a first name on that list (סאלי when the profile says Sali).
   function readerNameList(ctx) {
     const c = ctx || {};
     const names = [];
@@ -4787,8 +4824,16 @@ const FlowIntent = (() => {
       const s = String(raw || '').trim().toLowerCase();
       if (!s) return;
       if (names.indexOf(s) === -1) names.push(s);
+      scriptAliases(s).forEach((alias) => {
+        if (names.indexOf(alias) === -1) names.push(alias);
+      });
       const first = s.split(/\s+/)[0];
-      if (first && names.indexOf(first) === -1) names.push(first);
+      if (first && first !== s) {
+        if (names.indexOf(first) === -1) names.push(first);
+        scriptAliases(first).forEach((alias) => {
+          if (names.indexOf(alias) === -1) names.push(alias);
+        });
+      }
     }
     add(c.userName);
     if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
@@ -4818,8 +4863,9 @@ const FlowIntent = (() => {
     add(s.userName);
     const profile = s.profile && typeof s.profile === 'object' ? s.profile : {};
     add(profile.displayName);
-    const given = String(profile.givenName || '').trim();
-    const surname = String(profile.surname || '').trim();
+    add(profile.name);
+    const given = String(profile.givenName || profile.given_name || '').trim();
+    const surname = String(profile.surname || profile.familyName || profile.family_name || '').trim();
     add(given);
     add(surname);
     if (given && surname) add(given + ' ' + surname);
@@ -5291,8 +5337,9 @@ const FlowIntent = (() => {
           }
         }
       }
-      // "לצרף … לזימון" is the file track even when a family returned the request.
-      const invitePlan = attachToInvitePlan(text);
+      // "לצרף … לזימון" is the inbound file track. A note the user sent
+      // to themselves is the task, decided before this plan runs.
+      const invitePlan = addressedToSelf(ctx) ? null : attachToInvitePlan(text);
       if (invitePlan && type === TYPES.REQUEST) {
         intent.inviteFile = true;
         intent.label = invitePlan.label;
@@ -5522,11 +5569,19 @@ const FlowIntent = (() => {
     // missing file stays the card, never a banner and never silence.
     const attachToInvite = Boolean(attachToInvitePlan(text));
     // The file track is an inbound ask aimed at this person. A mail they
-    // sent, including a note to their own address, is not that ask. The
-    // meeting noun in it is the existing invite, not a new event.
-    // A mail the user sent to someone else is not this attach. A note
-    // to their own address is the task, with no draft.
-    if (!blocked && attachToInvite && sentByReader(ctx) && !addressedToSelf(ctx)) return stayQuiet('hedge');
+    // sent to someone else is not that ask. A note to their own address
+    // is the task, with no draft, and it is decided before the file plan.
+    if (!blocked && attachToInvite && addressedToSelf(ctx)) {
+      const noted = finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+      if (noted) noted.selfAttachTask = true;
+      return noted;
+    }
+    if (!blocked && attachToInvite && sentByReader(ctx)) return stayQuiet('hedge');
     if (!blocked && !replyMisaddressed && attachToInvite) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
@@ -6715,15 +6770,20 @@ const FlowActions = (() => {
       .replace(/\bper our call\b/ig, ' ');
     // The sender is the one calling. That promise is Log commitment.
     // "I'll join the call" at a clock stays a Meeting. "I will call the
-    // bank" stays the call reminder.
+    // bank" stays the call reminder. A subject line "Reminder" must not
+    // retitle either of those two sentences as Call.
     const senderCallYou = /\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(untimedSrc);
+    const senderJoinCall = /\b(?:i|we)(?:'|’)?ll\s+join\s+(?:the\s+)?call\b|\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(untimedSrc);
     const readerWill = /\byou(?:'|’)?ll\b|\byou will\b/i.test(untimedSrc) || /אתה\s*מעב/.test(untimedSrc);
     const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
     // Call is a reminder to phone someone. "I'll call you" is the sender's
     // own promise, and "you would call the bank" is the reader's commitment.
-    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
+    // "I'll join the call" names the meeting they are attending.
+    const callReminder = !senderCallYou && !senderJoinCall && (
+      (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
       || /^\s*call the day after tomorrow\b/i.test(callBody)
-      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody) && !senderCallYou);
+      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody))
+    );
     // "Let me know if you have any questions" offers help. It is not an ask.
     // "Let me know by Friday who will" still is.
     const helpOffer = /\blet me know if you (?:have|need|want)\b/i.test(untimedSrc)
@@ -6744,12 +6804,10 @@ const FlowActions = (() => {
     // A note the user sent is a task. An attach on that note keeps its
     // title and drops the draft. It is not the inbound file track.
     if (intent.selfTask) proc = logIt;
-    if (senderCallYou && !intent.inviteFile) {
-      proc = logIt;
-      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
-      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
-    }
-    if ((untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
+    // "I'll call you" is already the task. The untimed block would retitle
+    // it Call when the subject says Reminder, and would return null when
+    // the day has no clock ("I will call you on Friday.").
+    if (!senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
       if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
         proc = logIt;
       } else if ((createTaskAsk || callReminder) && !readerSaid) {
@@ -6775,6 +6833,11 @@ const FlowActions = (() => {
       } else if (untimedCalendar) {
         proc = logIt;
       }
+    }
+    if (senderCallYou && !intent.inviteFile) {
+      proc = logIt;
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
     }
     const taskPlan = taskInstead || senderCallYou || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
     // The card and the task title follow the plan that will actually run.
