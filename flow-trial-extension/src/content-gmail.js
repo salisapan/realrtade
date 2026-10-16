@@ -1491,6 +1491,12 @@ function glanceUiCopy(kind) {
       cc: audience.cc,
       ownAddresses: ownEmail ? [ownEmail] : [],
       userName: audience.userName || null,
+      ownNames: (typeof FlowIntent !== 'undefined' && typeof FlowIntent.readerNamesFrom === 'function')
+        ? FlowIntent.readerNamesFrom({
+          displayName: audience.userName,
+          knownNames: state && state.glanceOwnNames
+        })
+        : ((state && state.glanceOwnNames) || null),
       inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
     });
     // Reply-with-facts. Only when Google is already connected, so the chip

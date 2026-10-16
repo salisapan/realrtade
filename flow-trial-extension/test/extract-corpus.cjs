@@ -121,6 +121,9 @@ console.log('\n--- extract.js: an hour that could be either half of the day ---\
   // 15:00, the same as the word "שלוש". A written ":00" with no half of
   // the day is still not a time, and it is not 03:00.
   check('Hebrew "בשעה 3" is the workday hour 15:00', FlowExtract.parseTime('פגישה בשעה 3').hour === 15 && FlowExtract.parseTime('פגישה בשעה 3').minute === 0);
+  check('Hebrew "בשלוש" is the workday hour 15:00', FlowExtract.parseTime('הפגישה ביום שלישי בשלוש').hour === 15 && FlowExtract.parseTime('הפגישה ביום שלישי בשלוש').minute === 0);
+  check('Hebrew "בארבע" is the workday hour 16:00', FlowExtract.parseTime('בארבע').hour === 16 && FlowExtract.parseTime('בארבע').minute === 0);
+  check('Hebrew "בשלוש בבוקר" is 03:00', FlowExtract.parseTime('בשלוש בבוקר').hour === 3);
   check('Hebrew "בשעה 3:00" is refused', FlowExtract.parseTime('בשעה 3:00') === null);
   check('Hebrew "בשעה 15:00" is 15:00', FlowExtract.parseTime('בשעה 15:00').hour === 15 && FlowExtract.parseTime('בשעה 15:00').minute === 0);
   check('Hebrew "בשעה 9" is 09:00', FlowExtract.parseTime('בשעה 9').hour === 9);

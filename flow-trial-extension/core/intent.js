@@ -512,7 +512,10 @@ const FlowIntent = (() => {
   }
   function marketingWebinar(raw) {
     if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
-    if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open)\b/i.test(raw)) return true;
+    // A free webinar ad is marketing. It stays quiet even when the sender
+    // is the reader. A personal ask in the same mail is not this ad.
+    if (/וו?בינר/.test(raw) && /חינמי/.test(raw)) return true;
+    if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open|free)\b/i.test(raw)) return true;
     // A mass launch invite ("הזמנה … הירשמו", virtual, limited seats) is not
     // a meeting this person asked to put on the calendar.
     if (/הזמנה/.test(raw) && /הירשמו/.test(raw) && /(?:וירטואלית|השקה|לכל הלקוחות|מקומות מוגבלים)/.test(raw)) return true;
@@ -580,12 +583,7 @@ const FlowIntent = (() => {
     // action" is that case. A Cc line alone is not.
     if (own.length && (to.length || cc.length) && !onTo && !(onCc && namedReplySentence(text, c))) return false;
     const who = openingAddressee(text);
-    const userName = String(c.userName || '').trim().toLowerCase();
-    if (who && userName) {
-      const named = who.toLowerCase();
-      const first = userName.split(/\s+/)[0];
-      if (named !== userName && named !== first) return false;
-    }
+    if (who && readerNameList(c).length && !nameIsReader(who, c)) return false;
     return true;
   }
   // A reply ask is for someone else only when the mail shows who it is for
@@ -601,12 +599,7 @@ const FlowIntent = (() => {
     const onCc = cc.some((a) => own.indexOf(a) !== -1);
     if (!onTo && !(onCc && namedReplySentence(text, c))) return true;
     const who = openingAddressee(text);
-    const userName = String(c.userName || '').trim().toLowerCase();
-    if (who && userName) {
-      const named = who.toLowerCase();
-      const first = userName.split(/\s+/)[0];
-      if (named !== userName && named !== first) return true;
-    }
+    if (who && readerNameList(c).length && !nameIsReader(who, c)) return true;
     return false;
   }
   // Names the reader may be called. The account display name, its first
@@ -624,6 +617,39 @@ const FlowIntent = (() => {
     add(c.userName);
     if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
     return names;
+  }
+  // One comparison for every name check. The greeted token is the reader
+  // when it is the display name, its first word, or any known name, in
+  // either script. סאלי matches when the account name is Sali Sapan.
+  function nameIsReader(token, ctx) {
+    const named = String(token || '').trim().toLowerCase();
+    if (!named) return false;
+    return readerNameList(ctx).indexOf(named) !== -1;
+  }
+  // Display name, profile given name and surname, and the names the
+  // person already stored. Hosts pass this list as ownNames. Latin and
+  // Hebrew both stay on it. A blank and the chip word "me" do not.
+  function readerNamesFrom(src) {
+    const s = src || {};
+    const out = [];
+    function add(raw) {
+      const name = String(raw || '').trim();
+      if (!name || name.toLowerCase() === 'me') return;
+      if (out.some((n) => n.toLowerCase() === name.toLowerCase())) return;
+      out.push(name);
+    }
+    add(s.displayName);
+    add(s.userName);
+    const profile = s.profile && typeof s.profile === 'object' ? s.profile : {};
+    add(profile.displayName);
+    const given = String(profile.givenName || '').trim();
+    const surname = String(profile.surname || '').trim();
+    add(given);
+    add(surname);
+    if (given && surname) add(given + ' ' + surname);
+    const known = [].concat(s.knownNames || [], s.ownNames || [], s.glanceOwnNames || []);
+    known.forEach(add);
+    return out;
   }
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when it is
   // not the reader's name. The reader's names are the account display
@@ -719,7 +745,7 @@ const FlowIntent = (() => {
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
       if (!who) continue;
-      if (names.indexOf(who.toLowerCase()) !== -1) continue;
+      if (nameIsReader(who, ctx)) continue;
       return true;
     }
     // "היי, רק משהו קטן: מאיה, בבקשה …" names מאיה after the colon.
@@ -731,7 +757,7 @@ const FlowIntent = (() => {
     while ((m = inline.exec(raw))) {
       const name = m[1];
       if (!personToken(name) || !restIsAsk(m[2])) continue;
-      if (names.indexOf(name.toLowerCase()) !== -1) continue;
+      if (nameIsReader(name, ctx)) continue;
       return true;
     }
     return false;
@@ -754,14 +780,14 @@ const FlowIntent = (() => {
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
-      if (who && names.indexOf(who.toLowerCase()) !== -1) return false;
+      if (who && nameIsReader(who, c)) return false;
     }
     const inline = /[:：]\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,40})\s*[,،]\s*([^\n]{0,180})/g;
     let m;
     const raw = String(text || '');
     while ((m = inline.exec(raw))) {
       if (!personToken(m[1]) || !restIsAsk(m[2])) continue;
-      if (names.indexOf(m[1].toLowerCase()) !== -1) return false;
+      if (nameIsReader(m[1], c)) return false;
     }
     return true;
   }
@@ -1471,6 +1497,21 @@ const FlowIntent = (() => {
       if (intent) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
       return intent;
     }
+    // "Add this to my tasks: call the bank" is the call reminder. It does
+    // not need a clock. Call is that reminder, not a meeting.
+    if (!blocked && !replyMisaddressed && /\badd this to my tasks\b/i.test(text) && /\bcall\b/i.test(text)) {
+      const intent = finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: 'Call',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+      if (intent) {
+        intent.noReplyDraft = true;
+        intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+      }
+      return intent;
+    }
     if (!blocked && !replyMisaddressed && bankCallReminder && hasResolvedDate && !isPast) {
       const intent = finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
@@ -1570,19 +1611,23 @@ const FlowIntent = (() => {
     // "Please create a task:" is that task. The handoff list does not
     // name it. A resolved day is what makes it concrete.
     // "Any chance you could", "please email me", and "please loop in"
-    // are not asks from someone else. A note the user sent to themself
-    // still is that task (v2syn-13337).
+    // are the reply on the rows that use those words. A note the user
+    // sent to themself is still that task (v2syn-13337).
+    const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
     const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
-    const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase);
+    const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
     const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
-    if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
-    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text) && !replyAsk) {
+    // "any chance" is a hedge for every other sentence. These three
+    // phrases are the reply on the rows that use them.
+    const familyBlocks = familiesBlockAsk && !inboundAsk;
+    if (!quietHint && (askIsSoft || familyBlocks) && requestEvidence) quietHint = 'hedge';
+    if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && readerDecisionAsk(text) && !replyAsk) {
       quietHint = quietHint || 'hedge';
-    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyAsk && !replyOk) {
+    } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
-    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyOk) {
+    } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyOk) {
       // "בבקשה לצרף … לזימון" stays a request. The card is the file track,
       // not "Reply requested by …". The meeting path already stood down.
       return finish(TYPES.REQUEST, 'medium', {
@@ -1803,7 +1848,7 @@ const FlowIntent = (() => {
     };
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

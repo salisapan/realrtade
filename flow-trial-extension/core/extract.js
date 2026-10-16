@@ -630,6 +630,35 @@ const FlowExtract = (() => {
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
     }
 
+    // בשלוש / בארבע is the same workday hour as בשעה 3. Longest first, so
+    // באחת עשרה is eleven and not one. A longer Hebrew word does not match.
+    // English "at 3" and "בשעה 3:00" stay unresolved.
+    const heHourWords = [
+      ['אחת עשרה', 11], ['אחד עשרה', 11],
+      ['שתיים עשרה', 12], ['שתים עשרה', 12],
+      ['שתיים', 2], ['שתים', 2],
+      ['שלוש', 3], ['ארבע', 4], ['חמש', 5], ['שש', 6],
+      ['שבע', 7], ['שמונה', 8], ['תשע', 9], ['עשר', 10], ['אחת', 1]
+    ];
+    const heHourAlt = heHourWords.map((pair) => pair[0]).join('|');
+    m = text.match(new RegExp('(?:^|[^\\u0590-\\u05FF])ב(' + heHourAlt + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + hePart + '))?(?![\\u0590-\\u05FF])'));
+    if (m) {
+      const spokenHour = heHourWords.find((pair) => pair[0] === m[1]);
+      const rawPart = (m[3] || '').replace(/["״׳']/g, '');
+      const marker = rawPart === 'בבוקר' ? 'in the morning'
+        : rawPart === 'בצהריים' ? 'noon-window'
+        : (rawPart === 'אחר הצהריים' || rawPart === 'אחר הצהרים' || rawPart === 'אחהצ') ? 'in the afternoon'
+        : rawPart === 'בערב' ? 'in the evening'
+        : rawPart === 'בלילה' ? 'at night'
+        : '';
+      const extra = m[2] && m[2].indexOf('חצי') !== -1 ? 30 : (m[2] && m[2].indexOf('רבע') !== -1 ? 15 : 0);
+      let clock = spokenHour ? resolveClock(spokenHour[1], extra, marker) : null;
+      if (!clock && spokenHour && !marker && spokenHour[1] >= 1 && spokenHour[1] <= 7) {
+        clock = resolveClock(spokenHour[1], extra, 'pm');
+      }
+      if (clock) return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
     // "ב-14:00" is the same hour as "בשעה 14:00". A date ("ב-22/10") has no colon.
     m = text.match(/(?:^|[^\u0590-\u05FF\d])ב-\s*(\d{1,2}):(\d{2})(?!\d)/);
     if (m) {

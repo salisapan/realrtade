@@ -277,8 +277,8 @@ const FlowCloseFamilies = (() => {
   }
 
   // Hebrew clock words, longest first so "אחת עשרה" is not clipped to "אחת".
-  // A word with no day-part is the workday hour (שלוש → 15:00). Hebrew
-  // "בשעה 3" is that same hour with no minutes, so it is 15:00. English
+  // A word with no day-part is the workday hour (שלוש → 15:00, בשלוש → 15:00).
+  // Hebrew "בשעה 3" is that same hour with no minutes, so it is 15:00. English
   // "at 3" stays unresolved.
   const HE_HOUR_WORDS = [
     ['אחת עשרה', 11], ['אחד עשרה', 11],
@@ -297,9 +297,10 @@ const FlowCloseFamilies = (() => {
   }
   function hebrewWordClock(text) {
     const part = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    const m = String(text || '').match(new RegExp(
-      '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
-    ));
+    const src = String(text || '');
+    const marked = '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const bare = '(?:^|[^\\u0590-\\u05FF])ב(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const m = src.match(new RegExp(marked)) || src.match(new RegExp(bare));
     if (!m) return null;
     const hour = HE_HOUR_WORDS.find((pair) => pair[0] === m[1]);
     if (!hour) return null;

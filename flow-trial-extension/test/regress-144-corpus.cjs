@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '0c931848da23b919c063148e518db3cfc3411fdb2a1b9c33bb8fdaa9cd138ba7';
+const FIXTURE_SHA = 'f27b882627285849fe92617ebfd5d7f9cb5a0ec009df92c7047bd95f67902982';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -86,8 +86,8 @@ function judge(row, surface, ctx) {
     to: row.to || [],
     cc: row.cc || [],
     ownAddresses: ctx.own,
-    userName: 'Sali',
-    ownNames: NAMES,
+    userName: row.userName || 'Sali',
+    ownNames: Array.isArray(row.ownNames) ? row.ownNames : NAMES,
     direction: (ctx.outbound || ctx.inSent) ? 'outbound' : 'inbound',
     inbound: !(ctx.outbound || ctx.inSent),
     inSent: ctx.inSent,
@@ -108,7 +108,7 @@ function kindOk(out, row) {
   const intent = out && out.intent;
   if (!intent) return false;
   if (expectKind === 'quiet') return !intent.type;
-  if (expectKind === 'task') return taskOnly(out) || intent.noReplyDraft === true;
+  if (expectKind === 'task') return taskOnly(out);
   if (expectKind === 'task/dated-commitment') {
     const iso = intent.entities && intent.entities.dateIso;
     return taskOnly(out)
@@ -164,7 +164,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 610) {
+if (rows.length !== 657) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -501,6 +501,19 @@ for (const id of ['v2syn-3400', 'v2syn-3401', 'v2syn-3406']) {
     const hour = out.intent && out.intent.entities && out.intent.entities.hour;
     if (!shown(out) || !out.intent || out.intent.type !== 'event' || hour !== 16 || cal.length !== 1 || cal[0].params.hour !== 16) {
       console.log('FAIL: 1917 calendar ' + surface + ' ' + describe(out) + ' hour ' + hour);
+      process.exit(1);
+    }
+  }
+}
+for (const id of ['v2syn-3398', 'v2syn-3411', 'v2syn-3415', 'v2syn-3434']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const draft = steps.some((s) => s && (s.kind === 'gmailDraft' || s.kind === 'outlookDraft'));
+    if (!shown(out) || !taskOnly(out) || draft || (out.process && out.process.id) === 'attach-invite') {
+      console.log('FAIL: self attach ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.process && out.process.id) || ''));
       process.exit(1);
     }
   }

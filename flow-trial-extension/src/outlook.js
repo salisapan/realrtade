@@ -264,7 +264,7 @@ const FlowOutlook = (() => {
     async function fetchProfile(token) {
       // Optional fields: never fail the connect because of a refused field.
       try {
-        return await graphGet(token, cfg.GRAPH + '/me?$select=mail,userPrincipalName,displayName,otherMails,proxyAddresses');
+        return await graphGet(token, cfg.GRAPH + '/me?$select=mail,userPrincipalName,displayName,givenName,surname,otherMails,proxyAddresses');
       } catch (e) {
         try { return await graphGet(token, cfg.GRAPH + '/me?$select=mail,userPrincipalName,displayName'); }
         catch (e2) { return null; }
@@ -303,7 +303,7 @@ const FlowOutlook = (() => {
       const primary = ownAddresses[0] || String(profile.mail || profile.userPrincipalName || '').toLowerCase();
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
+      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
       // Register the OWA content script (same chip as Gmail) while Outlook is on.
@@ -586,6 +586,17 @@ const FlowOutlook = (() => {
       const watches = await deps.storage.getWatches();
       const graph = await deps.storage.getIdentityGraph();
       const planDeps = Object.assign({}, deps.planDeps, { actions: (deps.planDeps && deps.planDeps.actions) || deps.actions || null });
+      const accountName = (auth.account && (auth.account.name || auth.account.displayName)) || (auth.profile && auth.profile.displayName) || '';
+      let knownNames = null;
+      try {
+        const bag = await deps.storage.get();
+        knownNames = bag && bag.glanceOwnNames;
+      } catch (e) { knownNames = null; }
+      const intentApi = planDeps.intent;
+      planDeps.userName = accountName;
+      planDeps.ownNames = (intentApi && typeof intentApi.readerNamesFrom === 'function')
+        ? intentApi.readerNamesFrom({ displayName: accountName, profile: auth.profile, knownNames: knownNames })
+        : (knownNames || null);
       const p = deps.plan({ messages, me: meSet, watches, graph, state: st, now, deps: planDeps });
 
       for (const party of p.parties) { try { await deps.storage.observeIdentity(party); } catch (e) { /* optional */ } }

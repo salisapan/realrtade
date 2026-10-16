@@ -714,6 +714,7 @@
       cc: pane.cc || null,
       ownAddresses: ownAddresses || null,
       userName: pane.userName || null,
+      ownNames: pane.ownNames || null,
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true,
       inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
@@ -727,6 +728,21 @@
     const account = auth && auth.account;
     const profile = auth && auth.profile;
     return String((account && (account.name || account.displayName)) || (profile && profile.displayName) || '').trim();
+  }
+
+  // Display name, profile names, and the names stored for this person.
+  // Latin and Hebrew both stay on the list the judge compares.
+  function ownNamesOf(st) {
+    const auth = st && st.outlookAuth;
+    const known = st && st.glanceOwnNames;
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.readerNamesFrom === 'function') {
+      return FlowIntent.readerNamesFrom({
+        displayName: userNameOf(st),
+        profile: auth && auth.profile,
+        knownNames: known
+      });
+    }
+    return Array.isArray(known) ? known : null;
   }
 
   function ownAddressesOf(st) {
@@ -3719,6 +3735,7 @@
     if (!mailTokenLive(token)) return;
     const own = ownAddressesOf(st);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
+    if (pane) pane.ownNames = ownNamesOf(st);
     if (pane) {
       pane.text = stripGlanceLines(pane.text);
       pane.__epoch = mailEpoch;

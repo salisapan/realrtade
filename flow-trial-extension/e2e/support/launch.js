@@ -87,9 +87,9 @@ function outlookAuth(opts) {
       scopes: scopes.slice(),
       scope: scopes.join(' ')
     },
-    account: { address: ME, name: 'Glance', mail: ME, userPrincipalName: ME },
+    account: { address: ME, name: o.name || 'Glance', mail: ME, userPrincipalName: ME },
     ownAddresses: Array.isArray(o.ownAddresses) && o.ownAddresses.length ? o.ownAddresses.slice() : [ME],
-    profile: { mail: ME, userPrincipalName: ME, displayName: 'Glance' },
+    profile: { mail: ME, userPrincipalName: ME, displayName: o.name || 'Glance', givenName: o.givenName || null, surname: o.surname || null },
     requestedScopes: scopes.slice()
   };
 }

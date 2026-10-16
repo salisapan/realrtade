@@ -244,6 +244,9 @@ const FlowStorage = (() => {
     // UI language for card and panel chrome. Null follows the browser
     // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
     glanceUiLanguage: null,
+    // Names this person is called, beside the account display name.
+    // Latin and Hebrew. Hosts pass them as ownNames. Empty until set.
+    glanceOwnNames: [],
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

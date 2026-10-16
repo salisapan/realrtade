@@ -675,14 +675,29 @@ const FlowActions = (() => {
     const ownPromise = /\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
       || /\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
       || /(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(untimedSrc);
-    const createTaskAsk = /\bplease\s+create\s+a\s+task\b/i.test(untimedSrc);
-    const callBody = untimedSrc.replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ');
-    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody))
-      || /^\s*call the day after tomorrow\b/i.test(callBody)
-      || /\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody);
+    const createTaskAsk = /\bplease\s+create\s+a\s+task\b/i.test(untimedSrc) || /\badd this to my tasks\b/i.test(untimedSrc);
+    // "Per our call" and "following up on our call" name the conversation.
+    // The word call there is not a reminder to phone someone.
+    const callBody = untimedSrc
+      .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
+      .replace(/\bper our call\b/ig, ' ');
+    // The sender is the one calling. That promise is Log commitment.
+    // "I'll join the call" at a clock stays a Meeting. "I will call the
+    // bank" stays the call reminder.
+    const senderCallYou = /\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(untimedSrc);
     const readerWill = /\byou(?:'|’)?ll\b|\byou will\b/i.test(untimedSrc) || /אתה\s*מעב/.test(untimedSrc);
-    const answerAsk = /\b(?:let me know|who will|will you be|are you (?:free|available)|confirm the|please confirm)\b/i.test(untimedSrc)
-      || /פנוי|מי יגיע/.test(untimedSrc);
+    const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
+    // Call is a reminder to phone someone. "I'll call you" is the sender's
+    // own promise, and "you would call the bank" is the reader's commitment.
+    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
+      || /^\s*call the day after tomorrow\b/i.test(callBody)
+      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody) && !senderCallYou);
+    // "Let me know if you have any questions" offers help. It is not an ask.
+    // "Let me know by Friday who will" still is.
+    const helpOffer = /\blet me know if you (?:have|need|want)\b/i.test(untimedSrc)
+      || /\blet me know if (?:i|we) can\b/i.test(untimedSrc);
+    const answerAsk = !helpOffer && (/\b(?:let me know|who will|will you be|are you (?:free|available)|confirm the|please confirm)\b/i.test(untimedSrc)
+      || /פנוי|מי יגיע/.test(untimedSrc));
     const letsMeet = /\blet'?s\s+meet\b/i.test(untimedSrc) || /(?:בואו|בוא)\s+ניפגש|נתאם\s+פגישה|נקבע\s+פגישה/.test(untimedSrc);
     const coordinate = letsMeet
       || /\blet'?s\s+(?:do|set up|schedule|book)\b/i.test(untimedSrc)
@@ -694,11 +709,18 @@ const FlowActions = (() => {
     const handoff = Boolean(intent.signals && intent.signals.handoff);
     let replyInstead = false;
     const logIt = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
-    if (intent.selfTask && !intent.inviteFile) proc = logIt;
+    // A note the user sent is a task. An attach on that note keeps its
+    // title and drops the draft. It is not the inbound file track.
+    if (intent.selfTask) proc = logIt;
+    if (senderCallYou && !intent.inviteFile) {
+      proc = logIt;
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
+    }
     if ((untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
-      if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk) {
+      if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
         proc = logIt;
-      } else if (createTaskAsk || callReminder) {
+      } else if ((createTaskAsk || callReminder) && !readerSaid) {
         proc = logIt;
         if (callReminder) intent.label = heMail ? 'שיחה' : 'Call';
         else if (/^Reply requested\b/.test(String(intent.label || ''))) {
@@ -709,7 +731,7 @@ const FlowActions = (() => {
       } else if (coordinate) {
         proc = logIt;
         intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
-      } else if (readerWill && !intent.selfTask) {
+      } else if ((readerWill || readerSaid) && !intent.selfTask) {
         proc = logIt;
       } else if ((answerAsk || handoff) && !intent.selfTask) {
         proc = Object.assign({ id: 'reply-track' }, PROCESS_CATALOG['reply-track']);
@@ -722,11 +744,11 @@ const FlowActions = (() => {
         proc = logIt;
       }
     }
-    const taskPlan = taskInstead || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
+    const taskPlan = taskInstead || senderCallYou || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.
-    if (taskPlan && soloPhoneTask(vetoText)) {
+    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';

@@ -732,6 +732,35 @@ const FlowExtract = (() => {
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
     }
 
+    // בשלוש / בארבע is the same workday hour as בשעה 3. Longest first, so
+    // באחת עשרה is eleven and not one. A longer Hebrew word does not match.
+    // English "at 3" and "בשעה 3:00" stay unresolved.
+    const heHourWords = [
+      ['אחת עשרה', 11], ['אחד עשרה', 11],
+      ['שתיים עשרה', 12], ['שתים עשרה', 12],
+      ['שתיים', 2], ['שתים', 2],
+      ['שלוש', 3], ['ארבע', 4], ['חמש', 5], ['שש', 6],
+      ['שבע', 7], ['שמונה', 8], ['תשע', 9], ['עשר', 10], ['אחת', 1]
+    ];
+    const heHourAlt = heHourWords.map((pair) => pair[0]).join('|');
+    m = text.match(new RegExp('(?:^|[^\\u0590-\\u05FF])ב(' + heHourAlt + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + hePart + '))?(?![\\u0590-\\u05FF])'));
+    if (m) {
+      const spokenHour = heHourWords.find((pair) => pair[0] === m[1]);
+      const rawPart = (m[3] || '').replace(/["״׳']/g, '');
+      const marker = rawPart === 'בבוקר' ? 'in the morning'
+        : rawPart === 'בצהריים' ? 'noon-window'
+        : (rawPart === 'אחר הצהריים' || rawPart === 'אחר הצהרים' || rawPart === 'אחהצ') ? 'in the afternoon'
+        : rawPart === 'בערב' ? 'in the evening'
+        : rawPart === 'בלילה' ? 'at night'
+        : '';
+      const extra = m[2] && m[2].indexOf('חצי') !== -1 ? 30 : (m[2] && m[2].indexOf('רבע') !== -1 ? 15 : 0);
+      let clock = spokenHour ? resolveClock(spokenHour[1], extra, marker) : null;
+      if (!clock && spokenHour && !marker && spokenHour[1] >= 1 && spokenHour[1] <= 7) {
+        clock = resolveClock(spokenHour[1], extra, 'pm');
+      }
+      if (clock) return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
     // "ב-14:00" is the same hour as "בשעה 14:00". A date ("ב-22/10") has no colon.
     m = text.match(/(?:^|[^\u0590-\u05FF\d])ב-\s*(\d{1,2}):(\d{2})(?!\d)/);
     if (m) {
@@ -2535,8 +2564,8 @@ const FlowCloseFamilies = (() => {
   }
 
   // Hebrew clock words, longest first so "אחת עשרה" is not clipped to "אחת".
-  // A word with no day-part is the workday hour (שלוש → 15:00). Hebrew
-  // "בשעה 3" is that same hour with no minutes, so it is 15:00. English
+  // A word with no day-part is the workday hour (שלוש → 15:00, בשלוש → 15:00).
+  // Hebrew "בשעה 3" is that same hour with no minutes, so it is 15:00. English
   // "at 3" stays unresolved.
   const HE_HOUR_WORDS = [
     ['אחת עשרה', 11], ['אחד עשרה', 11],
@@ -2555,9 +2584,10 @@ const FlowCloseFamilies = (() => {
   }
   function hebrewWordClock(text) {
     const part = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    const m = String(text || '').match(new RegExp(
-      '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
-    ));
+    const src = String(text || '');
+    const marked = '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const bare = '(?:^|[^\\u0590-\\u05FF])ב(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const m = src.match(new RegExp(marked)) || src.match(new RegExp(bare));
     if (!m) return null;
     const hour = HE_HOUR_WORDS.find((pair) => pair[0] === m[1]);
     if (!hour) return null;
@@ -4658,7 +4688,10 @@ const FlowIntent = (() => {
   }
   function marketingWebinar(raw) {
     if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
-    if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open)\b/i.test(raw)) return true;
+    // A free webinar ad is marketing. It stays quiet even when the sender
+    // is the reader. A personal ask in the same mail is not this ad.
+    if (/וו?בינר/.test(raw) && /חינמי/.test(raw)) return true;
+    if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open|free)\b/i.test(raw)) return true;
     // A mass launch invite ("הזמנה … הירשמו", virtual, limited seats) is not
     // a meeting this person asked to put on the calendar.
     if (/הזמנה/.test(raw) && /הירשמו/.test(raw) && /(?:וירטואלית|השקה|לכל הלקוחות|מקומות מוגבלים)/.test(raw)) return true;
@@ -4726,12 +4759,7 @@ const FlowIntent = (() => {
     // action" is that case. A Cc line alone is not.
     if (own.length && (to.length || cc.length) && !onTo && !(onCc && namedReplySentence(text, c))) return false;
     const who = openingAddressee(text);
-    const userName = String(c.userName || '').trim().toLowerCase();
-    if (who && userName) {
-      const named = who.toLowerCase();
-      const first = userName.split(/\s+/)[0];
-      if (named !== userName && named !== first) return false;
-    }
+    if (who && readerNameList(c).length && !nameIsReader(who, c)) return false;
     return true;
   }
   // A reply ask is for someone else only when the mail shows who it is for
@@ -4747,12 +4775,7 @@ const FlowIntent = (() => {
     const onCc = cc.some((a) => own.indexOf(a) !== -1);
     if (!onTo && !(onCc && namedReplySentence(text, c))) return true;
     const who = openingAddressee(text);
-    const userName = String(c.userName || '').trim().toLowerCase();
-    if (who && userName) {
-      const named = who.toLowerCase();
-      const first = userName.split(/\s+/)[0];
-      if (named !== userName && named !== first) return true;
-    }
+    if (who && readerNameList(c).length && !nameIsReader(who, c)) return true;
     return false;
   }
   // Names the reader may be called. The account display name, its first
@@ -4770,6 +4793,39 @@ const FlowIntent = (() => {
     add(c.userName);
     if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
     return names;
+  }
+  // One comparison for every name check. The greeted token is the reader
+  // when it is the display name, its first word, or any known name, in
+  // either script. סאלי matches when the account name is Sali Sapan.
+  function nameIsReader(token, ctx) {
+    const named = String(token || '').trim().toLowerCase();
+    if (!named) return false;
+    return readerNameList(ctx).indexOf(named) !== -1;
+  }
+  // Display name, profile given name and surname, and the names the
+  // person already stored. Hosts pass this list as ownNames. Latin and
+  // Hebrew both stay on it. A blank and the chip word "me" do not.
+  function readerNamesFrom(src) {
+    const s = src || {};
+    const out = [];
+    function add(raw) {
+      const name = String(raw || '').trim();
+      if (!name || name.toLowerCase() === 'me') return;
+      if (out.some((n) => n.toLowerCase() === name.toLowerCase())) return;
+      out.push(name);
+    }
+    add(s.displayName);
+    add(s.userName);
+    const profile = s.profile && typeof s.profile === 'object' ? s.profile : {};
+    add(profile.displayName);
+    const given = String(profile.givenName || '').trim();
+    const surname = String(profile.surname || '').trim();
+    add(given);
+    add(surname);
+    if (given && surname) add(given + ' ' + surname);
+    const known = [].concat(s.knownNames || [], s.ownNames || [], s.glanceOwnNames || []);
+    known.forEach(add);
+    return out;
   }
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when it is
   // not the reader's name. The reader's names are the account display
@@ -4865,7 +4921,7 @@ const FlowIntent = (() => {
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
       if (!who) continue;
-      if (names.indexOf(who.toLowerCase()) !== -1) continue;
+      if (nameIsReader(who, ctx)) continue;
       return true;
     }
     // "היי, רק משהו קטן: מאיה, בבקשה …" names מאיה after the colon.
@@ -4877,7 +4933,7 @@ const FlowIntent = (() => {
     while ((m = inline.exec(raw))) {
       const name = m[1];
       if (!personToken(name) || !restIsAsk(m[2])) continue;
-      if (names.indexOf(name.toLowerCase()) !== -1) continue;
+      if (nameIsReader(name, ctx)) continue;
       return true;
     }
     return false;
@@ -4900,14 +4956,14 @@ const FlowIntent = (() => {
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
-      if (who && names.indexOf(who.toLowerCase()) !== -1) return false;
+      if (who && nameIsReader(who, c)) return false;
     }
     const inline = /[:：]\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,40})\s*[,،]\s*([^\n]{0,180})/g;
     let m;
     const raw = String(text || '');
     while ((m = inline.exec(raw))) {
       if (!personToken(m[1]) || !restIsAsk(m[2])) continue;
-      if (names.indexOf(m[1].toLowerCase()) !== -1) return false;
+      if (nameIsReader(m[1], c)) return false;
     }
     return true;
   }
@@ -5617,6 +5673,21 @@ const FlowIntent = (() => {
       if (intent) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
       return intent;
     }
+    // "Add this to my tasks: call the bank" is the call reminder. It does
+    // not need a clock. Call is that reminder, not a meeting.
+    if (!blocked && !replyMisaddressed && /\badd this to my tasks\b/i.test(text) && /\bcall\b/i.test(text)) {
+      const intent = finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: 'Call',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+      if (intent) {
+        intent.noReplyDraft = true;
+        intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+      }
+      return intent;
+    }
     if (!blocked && !replyMisaddressed && bankCallReminder && hasResolvedDate && !isPast) {
       const intent = finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
@@ -5716,19 +5787,23 @@ const FlowIntent = (() => {
     // "Please create a task:" is that task. The handoff list does not
     // name it. A resolved day is what makes it concrete.
     // "Any chance you could", "please email me", and "please loop in"
-    // are not asks from someone else. A note the user sent to themself
-    // still is that task (v2syn-13337).
+    // are the reply on the rows that use those words. A note the user
+    // sent to themself is still that task (v2syn-13337).
+    const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
     const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
-    const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase);
+    const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
     const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
-    if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
-    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text) && !replyAsk) {
+    // "any chance" is a hedge for every other sentence. These three
+    // phrases are the reply on the rows that use them.
+    const familyBlocks = familiesBlockAsk && !inboundAsk;
+    if (!quietHint && (askIsSoft || familyBlocks) && requestEvidence) quietHint = 'hedge';
+    if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && readerDecisionAsk(text) && !replyAsk) {
       quietHint = quietHint || 'hedge';
-    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyAsk && !replyOk) {
+    } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
-    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyOk) {
+    } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyOk) {
       // "בבקשה לצרף … לזימון" stays a request. The card is the file track,
       // not "Reply requested by …". The meeting path already stood down.
       return finish(TYPES.REQUEST, 'medium', {
@@ -5949,7 +6024,7 @@ const FlowIntent = (() => {
     };
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };
@@ -6632,14 +6707,29 @@ const FlowActions = (() => {
     const ownPromise = /\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
       || /\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
       || /(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(untimedSrc);
-    const createTaskAsk = /\bplease\s+create\s+a\s+task\b/i.test(untimedSrc);
-    const callBody = untimedSrc.replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ');
-    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody))
-      || /^\s*call the day after tomorrow\b/i.test(callBody)
-      || /\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody);
+    const createTaskAsk = /\bplease\s+create\s+a\s+task\b/i.test(untimedSrc) || /\badd this to my tasks\b/i.test(untimedSrc);
+    // "Per our call" and "following up on our call" name the conversation.
+    // The word call there is not a reminder to phone someone.
+    const callBody = untimedSrc
+      .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
+      .replace(/\bper our call\b/ig, ' ');
+    // The sender is the one calling. That promise is Log commitment.
+    // "I'll join the call" at a clock stays a Meeting. "I will call the
+    // bank" stays the call reminder.
+    const senderCallYou = /\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(untimedSrc);
     const readerWill = /\byou(?:'|’)?ll\b|\byou will\b/i.test(untimedSrc) || /אתה\s*מעב/.test(untimedSrc);
-    const answerAsk = /\b(?:let me know|who will|will you be|are you (?:free|available)|confirm the|please confirm)\b/i.test(untimedSrc)
-      || /פנוי|מי יגיע/.test(untimedSrc);
+    const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
+    // Call is a reminder to phone someone. "I'll call you" is the sender's
+    // own promise, and "you would call the bank" is the reader's commitment.
+    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
+      || /^\s*call the day after tomorrow\b/i.test(callBody)
+      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody) && !senderCallYou);
+    // "Let me know if you have any questions" offers help. It is not an ask.
+    // "Let me know by Friday who will" still is.
+    const helpOffer = /\blet me know if you (?:have|need|want)\b/i.test(untimedSrc)
+      || /\blet me know if (?:i|we) can\b/i.test(untimedSrc);
+    const answerAsk = !helpOffer && (/\b(?:let me know|who will|will you be|are you (?:free|available)|confirm the|please confirm)\b/i.test(untimedSrc)
+      || /פנוי|מי יגיע/.test(untimedSrc));
     const letsMeet = /\blet'?s\s+meet\b/i.test(untimedSrc) || /(?:בואו|בוא)\s+ניפגש|נתאם\s+פגישה|נקבע\s+פגישה/.test(untimedSrc);
     const coordinate = letsMeet
       || /\blet'?s\s+(?:do|set up|schedule|book)\b/i.test(untimedSrc)
@@ -6651,11 +6741,18 @@ const FlowActions = (() => {
     const handoff = Boolean(intent.signals && intent.signals.handoff);
     let replyInstead = false;
     const logIt = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
-    if (intent.selfTask && !intent.inviteFile) proc = logIt;
+    // A note the user sent is a task. An attach on that note keeps its
+    // title and drops the draft. It is not the inbound file track.
+    if (intent.selfTask) proc = logIt;
+    if (senderCallYou && !intent.inviteFile) {
+      proc = logIt;
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
+    }
     if ((untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
-      if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk) {
+      if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
         proc = logIt;
-      } else if (createTaskAsk || callReminder) {
+      } else if ((createTaskAsk || callReminder) && !readerSaid) {
         proc = logIt;
         if (callReminder) intent.label = heMail ? 'שיחה' : 'Call';
         else if (/^Reply requested\b/.test(String(intent.label || ''))) {
@@ -6666,7 +6763,7 @@ const FlowActions = (() => {
       } else if (coordinate) {
         proc = logIt;
         intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
-      } else if (readerWill && !intent.selfTask) {
+      } else if ((readerWill || readerSaid) && !intent.selfTask) {
         proc = logIt;
       } else if ((answerAsk || handoff) && !intent.selfTask) {
         proc = Object.assign({ id: 'reply-track' }, PROCESS_CATALOG['reply-track']);
@@ -6679,11 +6776,11 @@ const FlowActions = (() => {
         proc = logIt;
       }
     }
-    const taskPlan = taskInstead || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
+    const taskPlan = taskInstead || senderCallYou || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.
-    if (taskPlan && soloPhoneTask(vetoText)) {
+    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
