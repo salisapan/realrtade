@@ -16,6 +16,7 @@ catch (e) {
 
 const ROOT = path.join(__dirname, '..');
 const BODY = 'פגישת תכנון ביום שני 19/10 בשעה 11:00';
+const BODY_BET = 'פגישת תכנון ביום שני 19/10 ב-11:00';
 const ME = 'me@x.com';
 let failures = 0;
 function check(name, cond, detail) {
@@ -35,13 +36,27 @@ for (const f of ['domains.js', 'extract.js', 'judgment.js', 'source-text.js', 'g
 const FlowIntent = vm.runInContext('FlowIntent', core);
 const FlowActions = vm.runInContext('FlowActions', core);
 const NOW = new Date(2026, 9, 16, 12, 0, 0);
-const classified = FlowIntent.classify(BODY, { now: NOW, senderEmail: ME, inbound: false });
-const plan = classified && classified.type ? FlowActions.planFor(classified, {}) : null;
-const calendar = plan && (plan.steps || []).find((step) => step.kind === 'calendar');
+// The open mail is from the person to the person. inbound false with no
+// address is outbound and stays quiet; the card is this self-addressed note.
+function selfCtx() {
+  return { now: NOW, senderEmail: ME, ownAddresses: [ME], to: [ME], inbound: false };
+}
+function calendarHold(body) {
+  const classified = FlowIntent.classify(body, selfCtx());
+  const plan = classified && classified.type ? FlowActions.planFor(classified, { text: body }) : null;
+  const calendar = plan && (plan.steps || []).find((step) => step.kind === 'calendar');
+  return { classified, calendar };
+}
+const sha = calendarHold(BODY);
 check('פגישת תכנון on Monday 19/10 at 11:00 is a calendar hold',
-  classified && classified.type === 'event' && classified.entities && classified.entities.dateIso === '2026-10-19' &&
-  classified.entities.hour === 11 && classified.entities.minute === 0 && !!calendar,
-  { type: classified && classified.type, quiet: classified && classified.quiet, entities: classified && classified.entities, steps: plan && plan.steps && plan.steps.map((s) => s.kind) });
+  sha.classified && sha.classified.type === 'event' && sha.classified.entities && sha.classified.entities.dateIso === '2026-10-19' &&
+  sha.classified.entities.hour === 11 && sha.classified.entities.minute === 0 && !!sha.calendar,
+  { type: sha.classified && sha.classified.type, quiet: sha.classified && sha.classified.quiet, entities: sha.classified && sha.classified.entities });
+const bet = calendarHold(BODY_BET);
+check('פגישת תכנון on Monday 19/10 at ב-11:00 is a calendar hold',
+  bet.classified && bet.classified.type === 'event' && bet.classified.entities && bet.classified.entities.dateIso === '2026-10-19' &&
+  bet.classified.entities.hour === 11 && bet.classified.entities.minute === 0 && !!bet.calendar,
+  { type: bet.classified && bet.classified.type, quiet: bet.classified && bet.classified.quiet, entities: bet.classified && bet.classified.entities });
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
@@ -133,9 +148,10 @@ function page(html, store, lang) {
   return { w, doc: w.document, errors, close() { w.close(); } };
 }
 
-function gmailFixture() {
+function gmailFixture(body) {
+  const text = body || BODY;
   return `<!doctype html><html><body>
-    <h2 class="hP">${BODY}</h2>
+    <h2 class="hP">${text}</h2>
     <div role="main">
       <div role="listitem" data-legacy-thread-id="thread-plan" data-legacy-message-id="m-old" data-rfc822msgid="&lt;m-old@mail.gmail.com&gt;">
         <span email="dana@example.com" name="Dana">Dana</span>
@@ -144,8 +160,8 @@ function gmailFixture() {
       </div>
       <div role="listitem" data-legacy-thread-id="thread-plan" data-legacy-message-id="m-new" data-rfc822msgid="&lt;m-new@mail.gmail.com&gt;">
         <span email="${ME}" name="Me">Me</span>
-        <span email="${ME}">me</span>
-        <div class="a3s">${BODY}</div>
+        <div>to <span email="${ME}">me</span></div>
+        <div class="a3s">${text}</div>
       </div>
     </div>
   </body></html>`;
@@ -197,6 +213,16 @@ function shown(id, subject, intent, process) {
   check('the new card is not the old receipt',
     held.errors.length === 0, held.errors);
   held.close();
+
+  const betPage = page(gmailFixture(BODY_BET), store, 'en');
+  await sleep(900);
+  const betCard = betPage.doc.querySelector('[data-legacy-message-id="m-new"] .flow-chip-host');
+  const betText = betCard ? String(betCard.textContent || '').replace(/\s+/g, ' ') : '';
+  check('פגישת תכנון ב-11:00 on a self-sent mail gets a calendar card',
+    !!betCard && betCard.getAttribute('data-glance-chain') !== 'lane-proof' &&
+    /Schedule It|Hold It|Putting this on your calendar|Scheduling this/.test(betText) && /Do It/.test(betText),
+    { text: betText, errors: betPage.errors });
+  betPage.close();
 
   const ask = 'Please follow up with Dana about the invoice.';
   const intent = FlowIntent.classify(ask, { now: NOW, senderEmail: 'dana@example.com', inbound: true });

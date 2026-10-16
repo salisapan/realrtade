@@ -372,7 +372,8 @@ async function main() {
   check('a 2xx in the service worker does not clear reconnect', bg.indexOf('else if (res.ok) await clearGoogleReconnect()') < 0 && bg.indexOf('await clearGoogleReconnect()') > 0);
 
   const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
-  check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && popup.indexOf('needsReconnect') < popup.indexOf("badge on', 'Connected'"));
+  const connectedBadge = popup.indexOf("badge on', 'מחובר'");
+  check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && connectedBadge > 0 && popup.indexOf('needsReconnect') < connectedBadge);
   check('a lane warning is not the Connected header', popup.indexOf('status[k].warning') > 0 && popup.indexOf('warningLabel') > 0 && popup.indexOf('googleLaneWarning') > 0);
 
   delete stored.googleTasksAuth;
