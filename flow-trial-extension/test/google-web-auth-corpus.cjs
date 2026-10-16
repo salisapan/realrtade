@@ -33,7 +33,7 @@ function loadPure() {
   const src = stripModuleSyntax(fs.readFileSync(path.join(__dirname, '..', 'src', 'google-web-auth.js'), 'utf8'));
   const sandbox = { URL, URLSearchParams, decodeURIComponent, Date };
   vm.createContext(sandbox);
-  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
+  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_CONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
   return sandbox.__api;
 }
 
@@ -254,11 +254,16 @@ async function run() {
     const warned = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { lang: 'en', warning: { needed: true } });
     const warnedHe = api.googleConnectionState({ taskListId: 'LIST_A' }, null, { lang: 'he', warning: { needed: true } });
     const noGrant = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'en' });
+    const afterConnect = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'en', everConnected: { connected: true } });
+    const afterConnectHe = api.googleConnectionState(null, { needed: true, reason: '401' }, { lang: 'he', everConnected: { connected: true } });
+    const neverHe = api.googleConnectionState(null, null, { lang: 'he' });
     check('English UI reconnect is not the Hebrew label', english.connected === false && english.needsReconnect === true && english.headerLabel === 'Reconnect Google' && english.reconnectLabel === 'Reconnect Google', english);
     check('Hebrew UI reconnect stays Hebrew', hebrew.connected === false && hebrew.headerLabel === api.GOOGLE_RECONNECT_LABEL, hebrew);
     check('a partial lane warning is not Connected', warned.connected === false && warned.warning === true && warned.headerLabel === 'A step did not finish' && warned.headerLabel !== 'Connected', warned);
     check('a Hebrew partial warning follows the UI', warnedHe.connected === false && warnedHe.headerLabel === 'שלב אחד לא הושלם', warnedHe);
-    check('a 401 with no grant is still reconnect', noGrant.connected === false && noGrant.needsReconnect === true && noGrant.headerLabel === 'Reconnect Google', noGrant);
+    check('never connected shows Connect', noGrant.connected === false && noGrant.needsReconnect === false && noGrant.headerLabel === 'Connect Google', noGrant);
+    check('a previous Connect shows Reconnect', afterConnect.connected === false && afterConnect.needsReconnect === true && afterConnect.headerLabel === 'Reconnect Google', afterConnect);
+    check('Hebrew Connect and Reconnect follow the UI', neverHe.headerLabel === api.GOOGLE_CONNECT_LABEL && afterConnectHe.headerLabel === api.GOOGLE_RECONNECT_LABEL, { neverHe, afterConnectHe });
   }
 
   console.log('\n--- redirect URI and authorize URL ---\n');

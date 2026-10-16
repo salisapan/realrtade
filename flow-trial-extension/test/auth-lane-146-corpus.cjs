@@ -301,10 +301,18 @@ async function main() {
 
   delete stored.googleTasksAuth;
   delete stored.googleReconnect;
+  delete stored.googleEverConnected;
   resetFetches();
   const noGrant = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
-  const noGrantView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED);
-  check('a 401 with no grant is reconnect and not Connected', noGrant && noGrant.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && noGrantView.connected === false && noGrantView.needsReconnect === true && noGrantView.label === 'Reconnect Google', { noGrant, noGrantView });
+  const noGrantView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED, stored.googleEverConnected);
+  check('a 401 with no grant and no Connect is Connect', noGrant && noGrant.ok === false && !stored.googleReconnect && noGrantView.connected === false && noGrantView.needsReconnect === false && noGrantView.label === 'Connect Google', { noGrant, noGrantView });
+
+  stored.googleEverConnected = { connected: true };
+  delete stored.googleReconnect;
+  resetFetches();
+  const again = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
+  const againView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED, stored.googleEverConnected);
+  check('a 401 after a successful Connect is Reconnect', again && again.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && againView.needsReconnect === true && againView.label === 'Reconnect Google', { again, againView });
 
   console.log('\n--- Hebrew refusal ---\n');
   sandbox.fetch = async () => jsonResponse(200, { id: 'file-he', modifiedTime: '2026-10-15T00:00:00.000Z' });
@@ -326,8 +334,8 @@ async function main() {
   console.log('\nall passed');
 }
 
-function laneView(auth, reconnect, token) {
-  return vm.runInContext('laneGoogleStatus', sandbox)(auth, reconnect, token);
+function laneView(auth, reconnect, token, ever) {
+  return vm.runInContext('laneGoogleStatus', sandbox)(auth, reconnect, token, ever);
 }
 
 main();

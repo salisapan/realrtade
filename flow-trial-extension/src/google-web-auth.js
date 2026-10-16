@@ -18,7 +18,9 @@ export const GOOGLE_WEB_AUTH_STORAGE_KEY = 'googleWebAuth';
 // One status for the panel, Setup, and the popup. A stored Google grant
 // that cannot write is not "Connected".
 export const GOOGLE_RECONNECT_STORAGE_KEY = 'googleReconnect';
+export const GOOGLE_EVER_CONNECTED_STORAGE_KEY = 'googleEverConnected';
 export const GOOGLE_RECONNECT_LABEL = 'התחבר מחדש ל-Google';
+export const GOOGLE_CONNECT_LABEL = 'התחבר ל-Google';
 
 const UNCONFIRMED_EN = "Couldn't confirm it's unchanged. Undo left it alone.";
 const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
@@ -146,14 +148,21 @@ function statusEnglish(lang) {
   return code === 'en' || code.indexOf('en-') === 0;
 }
 
+function everConnectedRecord(value) {
+  return value === true || !!(value && value.connected);
+}
+
 export function googleConnectionState(auth, reconnect, extras) {
   const had = Boolean(auth);
   const extra = extras || {};
-  // A 401 is reconnect even when the grant record is already gone.
-  const needs = Boolean(reconnect && reconnect.needed);
+  // Reconnect only after a successful Connect. A grant still on disk counts.
+  // A person who never connected sees Connect, even if a stale flag is set.
+  const previous = had || everConnectedRecord(extra.everConnected);
+  const needs = previous && Boolean(reconnect && reconnect.needed);
   const warn = !needs && Boolean(extra.warning && extra.warning.needed);
   const english = statusEnglish(extra.lang);
   const reconnectLabel = english ? 'Reconnect Google' : GOOGLE_RECONNECT_LABEL;
+  const connectLabel = english ? 'Connect Google' : GOOGLE_CONNECT_LABEL;
   const warningLabel = english ? 'A step did not finish' : 'שלב אחד לא הושלם';
   const connected = had && !needs && !warn;
   return {
@@ -162,7 +171,7 @@ export function googleConnectionState(auth, reconnect, extras) {
     warning: warn,
     reconnectLabel: needs ? reconnectLabel : GOOGLE_RECONNECT_LABEL,
     warningLabel: warn ? warningLabel : '',
-    headerLabel: needs ? reconnectLabel : (warn ? warningLabel : (connected ? 'Connected' : '')),
+    headerLabel: needs ? reconnectLabel : (warn ? warningLabel : (connected ? 'Connected' : connectLabel)),
     configured: extra.configured != null ? Boolean(extra.configured) : had,
     detail: connected ? (extra.detail || null) : null
   };

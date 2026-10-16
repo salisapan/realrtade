@@ -82,30 +82,47 @@ function statusLanguage() {
   return (code === 'he' || code.indexOf('he-') === 0) ? 'he' : 'en';
 }
 
+const EVER_KEY = 'googleEverConnected';
+
 function reconnectWords() {
   return statusLanguage() === 'he' ? RECONNECT_LABEL : 'Reconnect Google';
 }
 
-function laneGoogleStatus(auth, reconnect, token) {
+function connectWords() {
+  return statusLanguage() === 'he' ? 'התחבר ל-Google' : 'Connect Google';
+}
+
+function everConnectedRecord(value) {
+  return value === true || !!(value && value.connected);
+}
+
+function laneGoogleStatus(auth, reconnect, token, ever) {
   const had = Boolean(auth);
+  const previous = had || everConnectedRecord(ever);
   const usable = typeof token === 'string' && token.length > 0;
-  const needs = Boolean(reconnect && reconnect.needed);
+  const needs = previous && Boolean(reconnect && reconnect.needed);
   const connected = had && usable && !needs;
   const label = reconnectWords();
   return {
     connected: connected,
     needsReconnect: needs,
     reconnectLabel: needs ? label : '',
-    label: connected ? 'Connected' : (needs ? label : '')
+    label: connected ? 'Connected' : (needs ? label : connectWords())
   };
 }
 
 function noteGoogleAuthFailure(reason) {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve();
   return Promise.resolve()
-    .then(() => chrome.storage.local.set({
-      [RECONNECT_KEY]: { needed: true, reason: String(reason || 'auth') }
-    }))
+    .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth']))
+    .then((bag) => {
+      const ever = bag && everConnectedRecord(bag[EVER_KEY]);
+      const grant = Boolean(bag && bag.googleTasksAuth);
+      if (!ever && !grant) return null;
+      const patch = { [RECONNECT_KEY]: { needed: true, reason: String(reason || 'auth') } };
+      if (!ever) patch[EVER_KEY] = { connected: true };
+      return chrome.storage.local.set(patch);
+    })
     .catch(() => {});
 }
 

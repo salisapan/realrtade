@@ -42,7 +42,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -1610,7 +1610,10 @@ async function connectGoogleTasks(interactive) {
   // web-flow consent window. Later API calls stay silent.
   await getGoogleAccessToken(interactive !== false);
   const taskListId = await findOrCreateGlanceTaskList();
-  await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
+  await chrome.storage.local.set({
+    googleTasksAuth: { taskListId },
+    [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
+  });
   await clearGoogleReconnect();
   return true;
 }
@@ -4844,14 +4847,15 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, 'googleLaneWarning']);
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, 'googleLaneWarning']);
   let uiLang = '';
   try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
     detail: GLANCE_TASK_LIST_TITLE + ' list',
     warning: reconnectBag.googleLaneWarning || null,
-    lang: uiLang
+    lang: uiLang,
+    everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null
   });
   return {
     googleTasks: googleTasks,

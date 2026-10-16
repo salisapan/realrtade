@@ -294,6 +294,7 @@ async function main() {
 
   delete stored.googleTasksAuth;
   delete stored.googleReconnect;
+  delete stored.googleEverConnected;
   const noGrant = await new Promise((resolve) => {
     listeners[0]({
       type: 'flow:google-write',
@@ -301,8 +302,20 @@ async function main() {
       input: { label: 'Pay the invoice', taskListId: 'glance-list' }
     }, {}, resolve);
   });
-  const noGrantView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
-  check('a 401 with no grant is reconnect, not Connect', noGrant && noGrant.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && noGrant.needsReconnect === true && noGrantView.connected === false && noGrantView.needsReconnect === true && noGrantView.label === 'Reconnect Google', { noGrant, noGrantView, flag: stored.googleReconnect });
+  const noGrantView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host', stored.googleEverConnected);
+  check('a 401 with no grant and no Connect is Connect', noGrant && noGrant.ok === false && !stored.googleReconnect && noGrant.needsReconnect !== true && noGrantView.connected === false && noGrantView.needsReconnect === false && noGrantView.label === 'Connect Google', { noGrant, noGrantView, flag: stored.googleReconnect });
+
+  stored.googleEverConnected = { connected: true };
+  delete stored.googleReconnect;
+  const again = await new Promise((resolve) => {
+    listeners[0]({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      input: { label: 'Pay the invoice', taskListId: 'glance-list' }
+    }, {}, resolve);
+  });
+  const againView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host', stored.googleEverConnected);
+  check('a 401 after a successful Connect is Reconnect', again && again.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && again.needsReconnect === true && againView.connected === false && againView.needsReconnect === true && againView.label === 'Reconnect Google', { again, againView, flag: stored.googleReconnect });
 
   stored.googleTasksAuth = { taskListId: 'glance-list' };
   delete stored.googleReconnect;

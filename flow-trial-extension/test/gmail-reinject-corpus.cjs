@@ -162,6 +162,203 @@ sandbox.reinjectGmailTabs().then((first) => {
     check('a later mutation does not touch chrome again', orphan.touches() === 1, orphan.touches());
   });
 }).then(() => {
+  const rejections = [];
+  const onRejection = (err) => { rejections.push(String(err && err.message || err)); };
+  process.on('unhandledRejection', onRejection);
+  function matchSel(node, sel) {
+    if (!node || !sel) return false;
+    if (sel === '.flow-chip-host, .flow-chip') return matchSel(node, '.flow-chip-host') || matchSel(node, '.flow-chip');
+    if (sel.charAt(0) === '.') return (' ' + (node.className || '') + ' ').indexOf(' ' + sel.slice(1) + ' ') >= 0;
+    const attr = /^([a-z0-9]+)?\[([a-z0-9-]+)(?:="([^"]*)")?\]$/i.exec(sel);
+    if (!attr) return false;
+    if (attr[1] && node.tag !== attr[1]) return false;
+    if (!node.attrs || !Object.prototype.hasOwnProperty.call(node.attrs, attr[2])) return false;
+    return attr[3] == null || node.attrs[attr[2]] === attr[3];
+  }
+  function makeNode(tag) {
+    const node = {
+      tag: tag, className: '', textContent: '', children: [], attrs: {}, style: {},
+      isConnected: true, parent: null, removed: false,
+      setAttribute(k, v) { this.attrs[k] = String(v); },
+      getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
+      appendChild(child) { child.parent = this; this.children.push(child); return child; },
+      insertBefore(child) { return this.appendChild(child); },
+      addEventListener() {},
+      remove() {
+        this.removed = true;
+        if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
+      },
+      querySelector(sel) { const found = this.querySelectorAll(sel); return found[0] || null; },
+      querySelectorAll(sel) {
+        const out = [];
+        const walk = (n) => {
+          (n.children || []).forEach((child) => {
+            if (matchSel(child, sel)) out.push(child);
+            walk(child);
+          });
+        };
+        walk(this);
+        return out;
+      }
+    };
+    node.classList = {
+      contains(name) { return (' ' + node.className + ' ').indexOf(' ' + name + ' ') >= 0; },
+      add(name) { if (!node.classList.contains(name)) node.className = (node.className + ' ' + name).trim(); }
+    };
+    return node;
+  }
+  function bootPage(opts) {
+    const timers = [];
+    let timerSeq = 1;
+    let now = 0;
+    const body = makeNode('body');
+    const main = makeNode('div');
+    main.setAttribute('role', 'main');
+    body.appendChild(main);
+    const message = makeNode('div');
+    message.setAttribute('role', 'listitem');
+    message.setAttribute('data-legacy-message-id', 'm-live');
+    const who = makeNode('span');
+    who.textContent = 'me';
+    who.setAttribute('email', 'me@example.com');
+    message.appendChild(who);
+    main.appendChild(message);
+    const stale = makeNode('div');
+    stale.className = 'flow-chip-host';
+    stale.textContent = 'Partly handled';
+    if (opts.stale) main.appendChild(stale);
+    const doc = {
+      body: body,
+      createElement: (tag) => makeNode(tag),
+      querySelector(sel) { const found = this.querySelectorAll(sel); return found[0] || null; },
+      querySelectorAll(sel) {
+        const out = [];
+        const walk = (n) => {
+          if (matchSel(n, sel)) out.push(n);
+          (n.children || []).forEach(walk);
+        };
+        walk(body);
+        return out;
+      }
+    };
+    const page = {
+      console,
+      document: doc,
+      MutationObserver: function MutationObserver(cb) {
+        this.cb = cb;
+        this.connected = false;
+        page.observers.push(this);
+      },
+      observers: [],
+      setTimeout(fn, ms) {
+        const id = timerSeq++;
+        timers.push({ id: id, fn: fn, at: now + (ms || 0) });
+        return id;
+      },
+      clearTimeout(id) {
+        const i = timers.findIndex((t) => t.id === id);
+        if (i >= 0) timers.splice(i, 1);
+      },
+      clearInterval() {},
+      location: { pathname: '/mail/u/0/' },
+      navigator: { language: 'en' },
+      Intl: Intl,
+      Date: Date,
+      Promise: Promise,
+      FlowStorage: {
+        get() { return Promise.resolve({ onboarded: false, log: [] }); },
+        hasTerminalOutcome() { return Promise.resolve(false); },
+        hasTerminalOutcomeFrom() { return false; },
+        verifyGateFrom() { return ''; },
+        markSeen() { return Promise.resolve(); },
+        forgetStillOpenScan() { return Promise.resolve(); },
+        markAlreadyClosed() { return Promise.resolve(); }
+      },
+      chrome: {
+        runtime: {
+          id: 'ext',
+          lastError: null,
+          sendMessage(msg, cb) { if (typeof cb === 'function') cb({ ok: true }); },
+          onMessage: { addListener() {} }
+        },
+        storage: {
+          local: {
+            get(key) {
+              if (key === 'glanceLaneUndo') return Promise.resolve({ glanceLaneUndo: opts.lane || null });
+              return Promise.resolve({});
+            },
+            set() {
+              if (opts.failSet) {
+                const card = makeNode('div');
+                card.className = 'flow-chip-host';
+                card.textContent = 'Partly handled';
+                main.appendChild(card);
+                page.diedCard = card;
+                throw new Error('Extension context invalidated');
+              }
+              return Promise.resolve();
+            },
+            remove() { return Promise.resolve(); }
+          },
+          onChanged: { addListener() {} }
+        },
+        i18n: { getUILanguage: () => 'en' }
+      }
+    };
+    page.MutationObserver.prototype.observe = function () { this.connected = true; };
+    page.MutationObserver.prototype.disconnect = function () { this.connected = false; };
+    page.MutationObserver.prototype.takeRecords = function () { return []; };
+    page.globalThis = page;
+    page.stale = stale;
+    vm.createContext(page);
+    vm.runInContext(gmail, page, { filename: 'content-gmail.js' });
+    return {
+      page: page,
+      flush(ms) {
+        now += ms;
+        const due = timers.filter((t) => t.at <= now);
+        due.forEach((t) => {
+          const i = timers.indexOf(t);
+          if (i >= 0) timers.splice(i, 1);
+        });
+        due.forEach((t) => t.fn());
+      }
+    };
+  }
+  const dead = bootPage({ failSet: true });
+  return new Promise((resolve) => setImmediate(resolve)).then(() => {
+    dead.flush(500);
+    return new Promise((resolve) => setImmediate(resolve));
+  }).then(() => {
+    const disconnected = dead.page.observers.length > 0 && dead.page.observers.every((o) => o.connected === false);
+    const texts = dead.page.document.querySelectorAll('.flow-chip-written').map((n) => n.textContent);
+    check('an invalidated scan removes the old card and rejects nothing',
+      disconnected && dead.page.diedCard && dead.page.diedCard.removed === true && rejections.length === 0 && texts.length === 0,
+      { disconnected, removed: dead.page.diedCard && dead.page.diedCard.removed, rejections, texts });
+    const live = bootPage({
+      stale: true,
+      lane: {
+        'm-live': {
+          expires: Date.now() + 86400000,
+          steps: [
+            { connectorId: 'googleHold', ref: { eventId: 'e1', contentHash: 'h', calendarId: 'primary' }, line: 'Calendar · Thursday', undoLine: 'Calendar event removed.' },
+            { connectorId: 'googleLaneTask', ref: { taskId: 't1', taskListId: 'glance-list', contentHash: 'h2' }, line: 'Google Task · Prepare', undoLine: 'Google Task removed.' }
+          ]
+        }
+      }
+    });
+    return new Promise((resolve) => setImmediate(resolve)).then(() => {
+      live.flush(500);
+      return new Promise((resolve) => setImmediate(resolve));
+    }).then(() => {
+      const written = live.page.document.querySelectorAll('.flow-chip-written').map((n) => n.textContent);
+      check('the new copy drops the previous card and paints the open mail',
+        live.page.stale.removed === true && written.indexOf('Calendar · Thursday') >= 0 && written.indexOf('Google Task · Prepare') >= 0 && rejections.length === 0,
+        { removed: live.page.stale.removed, written, rejections });
+      process.off('unhandledRejection', onRejection);
+    });
+  });
+}).then(() => {
   if (failures) {
     console.log('\n' + failures + ' failed');
     process.exit(1);

@@ -1,5 +1,5 @@
 // The chip and the header follow the UI language. A partial lane failure
-// is a warning, never Connected. A 401 is reconnect even with no grant.
+// is a warning, never Connected. Reconnect only after a successful Connect.
 // Run: node test/lane-header-corpus.cjs
 
 const fs = require('fs');
@@ -45,8 +45,10 @@ vm.runInContext(web, box, { filename: 'google-web-auth.js' });
 const state = box.googleConnectionState;
 const warned = state({ taskListId: 'L' }, null, { lang: 'en', warning: { needed: true } });
 const bare = state(null, { needed: true }, { lang: 'en' });
+const again = state(null, { needed: true }, { lang: 'en', everConnected: { connected: true } });
 check('a warning header is not Connected', warned.connected === false && warned.headerLabel === 'A step did not finish');
-check('a 401 with no grant reconnects in the UI language', bare.connected === false && bare.needsReconnect === true && bare.headerLabel === 'Reconnect Google', bare);
+check('never connected shows Connect', bare.connected === false && bare.needsReconnect === false && bare.headerLabel === 'Connect Google', bare);
+check('a previous Connect shows Reconnect', again.needsReconnect === true && again.headerLabel === 'Reconnect Google', again);
 
 if (failures) {
   console.log('\n' + failures + ' failed');

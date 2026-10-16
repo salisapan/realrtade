@@ -480,6 +480,71 @@ test('Undo after a Gmail reload deletes the task', async ({ glance }) => {
   await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/tasks/' + id) >= 0)).toBe(true);
 });
 
+const TWO_STEP = "Let's do a call on Thursday, October 22, 2026 at 2:00pm to review the contract.";
+
+test('Undo after a reload deletes the calendar and the task in reverse and names both', async ({ glance }) => {
+  const page = await open(glance, {
+    seed: { glanceTimeZone: 'Asia/Jerusalem' },
+    mail: {
+      messageId: 'm-two-reload',
+      threadId: 't-two-reload',
+      subject: 'Review',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: TWO_STEP
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const taskId = server.last.task;
+  const eventId = server.last.event;
+  expect(taskId).toBeTruthy();
+  expect(eventId).toBeTruthy();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('div[role="main"] button.flow-chip-undo')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('div[role="main"]')).toContainText('Calendar');
+  await expect(page.locator('div[role="main"]')).toContainText('Google Task');
+  const before = server.calls.length;
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect.poll(() => {
+    const after = server.calls.slice(before);
+    const taskDel = after.findIndex((c) => c.method === 'DELETE' && c.path.indexOf('/tasks/' + taskId) >= 0);
+    const eventDel = after.findIndex((c) => c.method === 'DELETE' && c.path.indexOf('/events/' + eventId) >= 0);
+    return taskDel >= 0 && eventDel > taskDel;
+  }).toBe(true);
+  await expect(page.locator('div[role="main"]')).toContainText('Google Task removed');
+  await expect(page.locator('div[role="main"]')).toContainText('Calendar event removed');
+});
+
+test('Undo after a reload refuses an edited task and still removes the calendar', async ({ glance }) => {
+  const page = await open(glance, {
+    seed: { glanceTimeZone: 'Asia/Jerusalem' },
+    mail: {
+      messageId: 'm-two-edit',
+      threadId: 't-two-edit',
+      subject: 'Review',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: TWO_STEP
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const taskId = server.last.task;
+  const eventId = server.last.event;
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('div[role="main"] button.flow-chip-undo')).toBeVisible({ timeout: 20000 });
+  server.editTask(taskId, { title: 'Changed by the person' });
+  const before = server.calls.length;
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect(page.locator('div[role="main"]')).toContainText('Undo stopped');
+  await expect(page.locator('div[role="main"]')).toContainText('Calendar event removed');
+  const after = server.calls.slice(before);
+  expect(after.some((c) => c.method === 'DELETE' && c.path.indexOf('/tasks/' + taskId) >= 0)).toBe(false);
+  expect(after.some((c) => c.method === 'DELETE' && c.path.indexOf('/events/' + eventId) >= 0)).toBe(true);
+  expect(server.task(taskId).title).toBe('Changed by the person');
+});
+
 test('Undo after a reload refuses an edited task', async ({ glance }) => {
   const page = await open(glance, {
     mail: {
