@@ -76,6 +76,12 @@ Object.keys(heChrome).forEach((key) => {
   if (bad.length) heBad.push(key + ':' + bad.join(','));
 });
 check('Hebrew chrome has no English besides brand names', heBad.length === 0, heBad);
+check('a Hebrew UI day is 17 באוק׳', D.localeDay('2026-10-17', 'he') === '17 באוק׳', D.localeDay('2026-10-17', 'he'));
+check('an English UI day is Oct 17', D.localeDay('2026-10-17', 'en') === 'Oct 17', D.localeDay('2026-10-17', 'en'));
+const ariaDiag = D.namesDiagFrom([], 'Sali Sapan');
+check('an aria name is labelled aria-label', D.namesDiagLine(ariaDiag) === 'Names: Sali Sapan, source: aria-label', D.namesDiagLine(ariaDiag));
+check('a profile name wins over the aria label', D.namesDiagLine(D.namesDiagFrom(['Sali Sapan'], 'Other')) === 'Names: Sali Sapan, source: profile');
+check('no name is source none', D.namesDiagLine(D.namesDiagFrom(['Glance', 'me'], '')) === 'Names: —, source: none');
 check('Hebrew chrome names the card buttons', heChrome.doIt === 'בצע' && heChrome.dismiss === 'הסתר' && heChrome.suggested === 'מוצע' && heChrome.added === 'נוסף' && heChrome.view === 'הצג' && heChrome.undo === 'בטל');
 check('English chrome keeps the English buttons', D.chrome('en').doIt === 'Do It' && D.chrome('en').dismiss === 'Dismiss' && D.chrome('en').suggested === 'Suggested');
 

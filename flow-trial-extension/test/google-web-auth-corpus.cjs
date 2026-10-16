@@ -35,12 +35,23 @@ function loadPure() {
   const src = stripModuleSyntax(fs.readFileSync(path.join(__dirname, '..', 'src', 'google-web-auth.js'), 'utf8'));
   const sandbox = { URL, URLSearchParams, decodeURIComponent, Date };
   vm.createContext(sandbox);
-  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_CONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, googleEverConnectedPatch, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
+  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_CONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, scopeVersion, googleScopeAction, unconfirmedRefusal, googleConnectionState, googleEverConnectedPatch, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
   return sandbox.__api;
 }
 
 function res(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+function scopeVersionOf(scopes) {
+  const list = Array.isArray(scopes) ? scopes : [];
+  const cleaned = [];
+  list.forEach((s) => {
+    const t = String(s || '').trim();
+    if (t && cleaned.indexOf(t) === -1) cleaned.push(t);
+  });
+  cleaned.sort();
+  return cleaned.join('\n');
 }
 
 function load(opts) {
@@ -50,6 +61,14 @@ function load(opts) {
   const tokens = [];
   const pendingWebFlows = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
+  if (!Object.prototype.hasOwnProperty.call(stored, 'googleGrantedScopes')) {
+    stored.googleGrantedScopes = {
+      version: scopeVersionOf(opts.scopes || SCOPES),
+      status: 'granted',
+      source: 'chrome',
+      at: 1
+    };
+  }
   let tokenSeq = 0;
   let onMessageListener = null;
   const runtime = {
@@ -690,6 +709,60 @@ async function run() {
     });
     await empty.fn('rememberGoogleProfile')('ya29.empty');
     check('userinfo with no name writes nothing', empty.sets.length === 0 && empty.stored.googleProfile == null && empty.stored.glanceOwnNames == null, empty.stored);
+  }
+
+  console.log('\n--- a scope change asks once, then stays quiet ---\n');
+  {
+    const oldScopes = SCOPES.filter((s) => s !== 'openid' && s.indexOf('userinfo.profile') < 0);
+    check('the same granted version is used silently', api.googleScopeAction({ version: api.scopeVersion(SCOPES), status: 'granted' }, SCOPES, 'silent') === 'use');
+    check('an older granted version upgrades', api.googleScopeAction({ version: api.scopeVersion(oldScopes), status: 'granted' }, SCOPES, 'silent') === 'upgrade');
+    check('a cancel on this version stays quiet', api.googleScopeAction({ version: api.scopeVersion(SCOPES), status: 'asked' }, SCOPES, 'silent') === 'use');
+    check('Connect after a cancel asks again', api.googleScopeAction({ version: api.scopeVersion(SCOPES), status: 'asked' }, SCOPES, 'interactive') === 'upgrade');
+    check('a missing grant upgrades', api.googleScopeAction(null, SCOPES, 'silent') === 'upgrade');
+    const stale = {
+      version: scopeVersionOf(oldScopes),
+      status: 'granted',
+      source: 'chrome',
+      at: 1
+    };
+    const env = load({
+      chromeToken: 'chrome-new',
+      stored: {
+        googleGrantedScopes: stale,
+        googleWebAuth: { accessToken: 'ya29.old', expiresAt: Date.now() + 3600e3 }
+      }
+    });
+    const out = await attempt(env.fn('getGoogleAccessToken')(false));
+    check('a stale scope version returns a fresh chrome token', out.ok && out.value && out.value.token === 'chrome-new' && out.value.source === 'chrome', out);
+    check('the stale web token is not reused', env.stored.googleWebAuth == null, env.stored.googleWebAuth);
+    check('the cached token is removed', env.calls.some((c) => c.indexOf('EVICT ') === 0), env.calls);
+    check('the ask is one interactive getAuthToken', env.calls.filter((c) => c === 'GET_AUTH true').length === 1, env.calls);
+    check('the granted version is the required list', env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted' && env.stored.googleGrantedScopes.version === scopeVersionOf(SCOPES) && env.stored.googleGrantedScopes.source === 'chrome', env.stored.googleGrantedScopes);
+    const before = env.calls.length;
+    const again = await attempt(env.fn('getGoogleAccessToken')(false));
+    const extra = env.calls.slice(before);
+    check('the next silent call does not ask again', again.ok && again.value.token === 'chrome-new' && extra.indexOf('GET_AUTH true') < 0 && extra.some((c) => c === 'GET_AUTH false'), extra);
+    const web = load({
+      getAuthTokenError: SIGNIN_OFF,
+      stored: {
+        googleGrantedScopes: stale,
+        googleWebAuth: { accessToken: 'ya29.old', expiresAt: Date.now() + 3600e3 }
+      }
+    });
+    const webOut = await attempt(web.fn('getGoogleAccessToken')(false));
+    check('a stale version falls back to one interactive web grant', webOut.ok && webOut.value && webOut.value.token === 'ya29.web-token' && webOut.value.source === 'web' && webOut.value.token !== 'ya29.old', webOut);
+    check('that web grant was interactive', web.calls.some((c) => c.indexOf('WEB prompt=select_account interactive=true') === 0), web.calls);
+    check('the web grant is stored as the new version', web.stored.googleGrantedScopes && web.stored.googleGrantedScopes.status === 'granted' && web.stored.googleGrantedScopes.source === 'web' && web.stored.googleWebAuth && web.stored.googleWebAuth.accessToken === 'ya29.web-token', web.stored.googleGrantedScopes);
+    const cancel = load({
+      getAuthTokenError: USER_CANCEL,
+      stored: { googleGrantedScopes: stale }
+    });
+    const cancelled = await attempt(cancel.fn('getGoogleAccessToken')(false));
+    check('a cancel stores asked and does not open the web flow', !cancelled.ok && cancel.stored.googleGrantedScopes.status === 'asked' && cancel.calls.filter((c) => c === 'GET_AUTH true').length === 1 && !cancel.calls.some((c) => c.indexOf('WEB ') === 0), cancel.calls);
+    const mark = cancel.calls.length;
+    await attempt(cancel.fn('getGoogleAccessToken')(false));
+    const quiet = cancel.calls.slice(mark);
+    check('the next silent call after a cancel is getAuthToken false only', quiet.length === 1 && quiet[0] === 'GET_AUTH false', quiet);
   }
 
   console.log('\n--- connector status shares the reconnect flag ---\n');

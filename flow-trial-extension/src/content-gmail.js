@@ -294,6 +294,7 @@ function glanceUiCopy(kind) {
   async function init() {
     if (!chromeLive()) return;
     state = await FlowStorage.get();
+    publishNamesDiag();
     // Watching starts regardless of onboarded state now — scanReadingPane()
     // still runs the real judgment pipeline on every message either way, and
     // it's the one that decides (in ensureGoogleAutoConnect(), right before
@@ -750,6 +751,28 @@ function glanceUiCopy(kind) {
       if (name) return name;
     }
     return '';
+  }
+
+  // The side panel reads this line. The aria name stays out of glanceOwnNames.
+  function publishNamesDiag() {
+    if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.namesDiagFrom !== 'function') return;
+    const st = state || {};
+    const profile = [];
+    const gp = st.googleProfile || {};
+    if (gp.displayName) profile.push(gp.displayName);
+    if (gp.givenName) profile.push(gp.givenName);
+    if (gp.surname) profile.push(gp.surname);
+    if (gp.givenName && gp.surname) profile.push(String(gp.givenName) + ' ' + String(gp.surname));
+    (Array.isArray(st.glanceOwnNames) ? st.glanceOwnNames : []).forEach(function (n) { profile.push(n); });
+    const diag = FlowDisplay.namesDiagFrom(profile, gmailAccountName());
+    const key = diag.source + '\n' + diag.names.join('\n');
+    if (publishNamesDiag.last === key) return;
+    publishNamesDiag.last = key;
+    try {
+      chrome.storage.local.set({
+        glanceNamesDiag: { names: diag.names.slice(), source: diag.source, at: Date.now() }
+      });
+    } catch (e) { /* the panel keeps the last line */ }
   }
 
   // To and Cc as the open message shows them. A line that starts with To or
@@ -1214,6 +1237,7 @@ function glanceUiCopy(kind) {
 
   async function scanReadingPane() {
     if (!watching || !chromeLive()) return;
+    publishNamesDiag();
     dropStaleCards();
     if (!chromeLive()) return;
     const main = document.querySelector('div[role="main"]');
@@ -4275,7 +4299,7 @@ function glanceUiCopy(kind) {
     // name inside its own body the way a named function declaration would.
     const rows = pending.map((entry) => ({
       id: entry.messageId,
-      title: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || entry.process.name,
+      title: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), glanceUiLang())) || entry.process.name,
       subtitle: briefRowSubtitle(entry),
       onDoIt(rowHost, doItBtn) {
         const ctx = ctxFromPendingEntry(entry);

@@ -132,7 +132,7 @@ check('the consent names every capability and says nothing is sent automatically
 check('the consent page uses the shared locale helper', enableSrc.indexOf('FlowDisplay.uiLangFrom') >= 0 && enableHtml.indexOf('core/display-copy.js') >= 0);
 check('the popup Meta row follows the panel locale and a permission change', popupJs.indexOf('document.documentElement.lang') >= 0 && /permissions\.onAdded[\s\S]{0,220}renderMetaChats/.test(popupJs) && /permissions\.onRemoved[\s\S]{0,220}renderMetaChats/.test(popupJs) && popupJs.indexOf('block.hidden = Boolean(on)') < 0);
 check('the popup page has a Meta row', popupHtml.indexOf('id="meta-chats"') >= 0 && popupHtml.indexOf('meta-consent.js') >= 0);
-check('the popup opens the enable page through the shared consent', popupJs.indexOf('FlowMetaConsent.paintLink') >= 0 && popupJs.indexOf('renderMetaChats') >= 0 && popupJs.indexOf("id === 'whatsapp'") >= 0);
+check('the popup opens the enable page through the shared consent', popupJs.indexOf('FlowMetaConsent.paintConnection') >= 0 && popupJs.indexOf('renderMetaChats') >= 0 && popupJs.indexOf("id === 'whatsapp'") >= 0);
 check('Meta consent does not ask for every url', !/<all_urls>/.test(enableSrc) && !/<all_urls>/.test(metaSrc) && (manifest.host_permissions || []).indexOf('<all_urls>') < 0 && (manifest.optional_host_permissions || []).indexOf('<all_urls>') < 0);
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
@@ -1353,6 +1353,17 @@ console.log('\n--- calendar evidence ---\n');
   check('a granted Meta consent shows the Hebrew on state', onHe && onHe.id === 'meta-chats-on' && onHe.textContent === 'צ׳אטים של Meta פועלים' && host.hidden === false && host.querySelector('button') == null);
   const onEn = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'en' });
   check('a granted Meta consent shows the English on state', onEn && onEn.textContent === 'Meta chats are on' && host.hidden === false && host.querySelector('button') == null);
+  const list = pop.window.document.createElement('div');
+  const row = pop.window.FlowMetaConsent.paintConnection(list, { granted: false, lang: 'he', chrome: { tabs: { create() {} }, runtime: { getURL: (p) => p } } });
+  check('Connections shows a Hebrew Meta connect row', row && row.id === 'meta-chats-link' && row.className === 'primary' && row.querySelector('.shell') && row.querySelector('.btn-label').textContent === 'הפעל צ׳אטים של Meta' && list.querySelector('[data-glance-connect="meta"] .badge').textContent === 'כבוי');
+  const onRow = pop.window.document.createElement('div');
+  pop.window.FlowMetaConsent.paintConnection(onRow, { granted: true, lang: 'he', chrome: { permissions: { remove() { return Promise.resolve(true); } } } });
+  const onBadge = onRow.querySelector('#meta-chats-on');
+  const offBtn = onRow.querySelector('button.ghost');
+  check('a granted Meta row shows the Hebrew on state and Disconnect', onBadge && onBadge.textContent === 'צ׳אטים של Meta פועלים' && offBtn && offBtn.textContent === 'נתק' && onRow.querySelector('#meta-chats-link') == null);
+  const enRow = pop.window.document.createElement('div');
+  pop.window.FlowMetaConsent.paintConnection(enRow, { granted: true, lang: 'en' });
+  check('a granted Meta row shows the English on state and Disconnect', enRow.querySelector('#meta-chats-on').textContent === 'Meta chats are on' && enRow.querySelector('button.ghost').textContent === 'Disconnect');
   let sent = null;
   const opened = await pop.window.FlowMetaConsent.open({
     runtime: {

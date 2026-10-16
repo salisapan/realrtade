@@ -228,15 +228,22 @@ const FlowDisplay = (() => {
   // day and the clock, and an empty string means there is no hold to show.
   const HE_MON = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
 
+  // The day follows the UI locale. Hebrew is 17 באוק׳. English is Oct 17.
+  // A different year adds the year. The clock stays off this string.
+  function localeDay(iso, lang, now) {
+    const day = ymd(iso);
+    if (!day) return '';
+    const which = arguments.length >= 2 ? uiLangFrom({ setting: lang }) : 'he';
+    const dt = new Date(day.y, day.mo - 1, day.d);
+    const clock = now == null ? null : new Date(now);
+    const sameYear = !clock || Number.isNaN(clock.getTime()) || dt.getFullYear() === clock.getFullYear();
+    const opts = { day: 'numeric', month: 'short' };
+    if (!sameYear) opts.year = 'numeric';
+    return new Intl.DateTimeFormat(which === 'he' ? 'he' : 'en', opts).format(dt);
+  }
+
   function hebrewDay(iso) {
-    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return '';
-    const y = +m[1];
-    const mo = +m[2];
-    const d = +m[3];
-    const dt = new Date(y, mo - 1, d);
-    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return '';
-    return d + ' ב' + HE_MON[mo - 1];
+    return localeDay(iso, 'he');
   }
 
   const EN_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -264,13 +271,10 @@ const FlowDisplay = (() => {
   }
 
   function cardDateLine(iso, lang) {
-    if (arguments.length >= 2 && uiLangFrom({ setting: lang }) === 'en') {
-      const day = ymd(iso);
-      if (!day) return '';
-      return 'until ' + EN_MON[day.mo - 1] + ' ' + day.d;
-    }
-    const day = hebrewDay(iso);
-    return day ? ('עד ' + day) : '';
+    const which = arguments.length >= 2 ? uiLangFrom({ setting: lang }) : 'he';
+    const day = localeDay(iso, which);
+    if (!day) return '';
+    return which === 'en' ? ('until ' + day) : ('עד ' + day);
   }
 
   // Chrome (buttons, headings, receipts) follows the UI language. The action
@@ -390,6 +394,16 @@ const FlowDisplay = (() => {
       closeQualityTitle: 'On this device only. A full close, a return, a refusal, and a false close.',
       quietTitle: 'On this device only. Trusted closes this week, and silence is a reason code.',
       stillTitle: 'On this device only. Open cards, closes, and undos.',
+      stillOpenOne: '1 thing still open',
+      stillOpenMany: '{n} things still open',
+      resurface: 'Still open from this thread',
+      moreOpenOne: '1 more still open — close these first and it moves up',
+      moreOpenMany: '{n} more still open — close these first and they move up',
+      close: 'Close',
+      promisedBy: 'You promised this by {when}',
+      promisedOpen: 'A dated promise is still open',
+      replyOwed: 'A reply is still owed',
+      amountOpen: 'A confirmed amount is still open',
       lmOn: 'The model built into this browser also reads wording nothing else recognises, for {langs} (it passed a precision check on this device). It only suggests; you decide.',
       lmOff: 'The model built into this browser did not pass the precision check on this device, so it stays off.',
       lmAnd: ' and ', langEn: 'English', langHe: 'Hebrew'
@@ -505,6 +519,16 @@ const FlowDisplay = (() => {
       closeQualityTitle: 'על המכשיר בלבד. סגירה מלאה, חזרה, סירוב, וסגירה שגויה.',
       quietTitle: 'על המכשיר בלבד. סגירות מהימנות השבוע, והשקט הוא קוד סיבה.',
       stillTitle: 'על המכשיר בלבד. כרטיסים פתוחים, סגירות, וביטולים.',
+      stillOpenOne: 'דבר אחד עדיין פתוח',
+      stillOpenMany: '{n} דברים עדיין פתוחים',
+      resurface: 'עדיין פתוח מהשרשור הזה',
+      moreOpenOne: 'עוד דבר אחד עדיין פתוח — סגור את אלה קודם והוא יעלה',
+      moreOpenMany: '{n} נוספים עדיין פתוחים — סגור את אלה קודם והם יעלו',
+      close: 'סגור',
+      promisedBy: 'התחייבת עד {when}',
+      promisedOpen: 'התחייבות עם תאריך עדיין פתוחה',
+      replyOwed: 'עדיין חייבים תשובה',
+      amountOpen: 'סכום שסוכם עדיין פתוח',
       lmOn: 'המודל שבדפדפן הזה גם קורא ניסוח ששום דבר אחר לא מזהה, עבור {langs} (הוא עבר בדיקת דיוק במכשיר הזה). הוא רק מציע; אתה מחליט.',
       lmOff: 'המודל שבדפדפן הזה לא עבר את בדיקת הדיוק במכשיר הזה, אז הוא נשאר כבוי.',
       lmAnd: ' ו-', langEn: 'אנגלית', langHe: 'עברית'
@@ -533,11 +557,8 @@ const FlowDisplay = (() => {
     const hrs = Math.round(mins / 60);
     if (hrs < 24) return fillChrome(L.hrsAgo, { n: hrs });
     const day = new Date(at);
-    if (which === 'he') {
-      const iso = day.getFullYear() + '-' + String(day.getMonth() + 1).padStart(2, '0') + '-' + String(day.getDate()).padStart(2, '0');
-      return hebrewDay(iso);
-    }
-    return EN_MON[day.getMonth()] + ' ' + day.getDate();
+    const iso = day.getFullYear() + '-' + String(day.getMonth() + 1).padStart(2, '0') + '-' + String(day.getDate()).padStart(2, '0');
+    return localeDay(iso, which);
   }
 
   // A greeting cannot be judged until userinfo (or the me chip) has a name.
@@ -598,14 +619,36 @@ const FlowDisplay = (() => {
     const clock = clockPad(hour, minute);
     if (!clock) return '';
     const which = arguments.length >= 4 ? uiLangFrom({ setting: lang }) : 'he';
-    if (which === 'en') {
-      const day = ymd(iso);
-      if (!day) return '';
-      return EN_MON[day.mo - 1] + ' ' + day.d + ' ' + clock;
-    }
-    const day = hebrewDay(iso);
+    const day = localeDay(iso, which);
     if (!day) return '';
     return day + ' ' + clock;
+  }
+
+  // The panel line David reads on a live account. English on purpose.
+  // source is profile, aria-label, or none. The aria name is not stored
+  // as glanceOwnNames.
+  function namesDiagFrom(profileNames, ariaName) {
+    const names = [];
+    function add(raw) {
+      const name = String(raw || '').trim();
+      if (!name) return;
+      const low = name.toLowerCase();
+      if (low === 'me' || low === 'glance') return;
+      if (names.some((n) => n.toLowerCase() === low)) return;
+      names.push(name);
+    }
+    (Array.isArray(profileNames) ? profileNames : []).forEach(add);
+    if (names.length) return { names: names, source: 'profile' };
+    add(ariaName);
+    if (names.length) return { names: names, source: 'aria-label' };
+    return { names: [], source: 'none' };
+  }
+
+  function namesDiagLine(diag) {
+    const d = diag || {};
+    const names = Array.isArray(d.names) ? d.names.map((n) => String(n || '').trim()).filter(Boolean) : [];
+    const source = d.source === 'profile' || d.source === 'aria-label' ? d.source : 'none';
+    return 'Names: ' + (names.join(', ') || '—') + ', source: ' + source;
   }
 
   // The card text itself: "Hold Mon 10:00", or "שריין ב׳ 10:00".
@@ -728,6 +771,9 @@ const FlowDisplay = (() => {
     whyNotShownLine: whyNotShownLine,
     whyNotShownRows: whyNotShownRows,
     hebrewDay: hebrewDay,
+    localeDay: localeDay,
+    namesDiagFrom: namesDiagFrom,
+    namesDiagLine: namesDiagLine,
     cardDateLine: cardDateLine,
     holdWhenLine: holdWhenLine,
     holdCardText: holdCardText,

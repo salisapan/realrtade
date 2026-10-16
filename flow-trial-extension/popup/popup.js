@@ -141,6 +141,13 @@
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || !ch.glanceNamesDiag) return;
+      if (state) state.glanceNamesDiag = ch.glanceNamesDiag.newValue || null;
+      paintNamesDiag();
+    });
+  } catch (e) { /* the line paints on the next open */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local' || nameStorageOnly(ch) || (!ch.glanceHostLanguage && !ch.glanceUiLanguage)) return;
       const before = uiLang();
       if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
@@ -210,6 +217,7 @@
   wireLoopView();
   await renderConnectors();
   await renderStatusPill();
+  paintNamesDiag();
   await renderLog();
   await renderOpen();
   await renderWaiting();
@@ -408,6 +416,7 @@
     }
     await renderConnectors();
     await renderStatusPill();
+    paintNamesDiag();
     renderSetupDone();
   }
 
@@ -436,7 +445,7 @@
     if (!svc) return '';
     if (svc.id === 'calendar') return 'שמירת זמן ביומן';
     if (svc.id === 'mail') return 'דואר';
-    if (svc.id === 'todo') return 'To Do';
+    if (svc.id === 'todo') return uiLang() === 'he' ? 'משימות' : 'To Do';
     if (svc.id === 'onedrive') return 'OneDrive';
     if (svc.id === 'contacts') return 'אנשי קשר';
     if (svc.id === 'teams') return 'Teams';
@@ -476,7 +485,7 @@
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
-      pill.textContent = (conn ? conn.label : live[0]) + ' connected';
+      pill.textContent = uiLang() === 'he' ? 'מחובר' : ((conn ? conn.label : live[0]) + ' connected');
       pill.className = 'ver on';
       return;
     }
@@ -501,7 +510,7 @@
       // them wired) but showing four more cards here is exactly the setup
       // friction the MVP is supposed to have zero of.
       FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
-    });
+    }).then(() => renderMetaChats());
   }
 
   // The panel opened on an Outlook tab. Setup offers one Microsoft consent,
@@ -563,6 +572,7 @@
   }
 
   function missingScopeSentence(scope, service) {
+    if (uiLang() === 'he') return 'ההרשאה לא כלולה בכניסה. בהגדרות, סמן ' + service + '.';
     if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) return FlowReceipt.missingScopeLine(scope, service);
     return scope + ' לא כלול בכניסה. בהגדרות, סמן ' + service + '.';
   }
@@ -756,9 +766,10 @@
     const card = el('div', 'conn' + (c.status === 'planned' ? ' planned' : '') + (st.connected ? ' on' : ''));
 
     const head = el('div', 'conn-head');
+    const heGoogle = uiLang() === 'he' && c.id === 'googleTasks';
     const name = el('div', 'conn-name');
     name.appendChild(el('b', null, c.label));
-    name.appendChild(el('i', null, c.kind));
+    name.appendChild(el('i', null, heGoogle ? 'משימות, יומן וטיוטות' : c.kind));
     head.appendChild(name);
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
@@ -775,8 +786,20 @@
     else head.appendChild(el('span', 'badge', 'צריך הגדרה'));
     card.appendChild(head);
 
-    if (c.note) card.appendChild(el('p', 'conn-note', c.note));
-    if (st.connected && st.detail) card.appendChild(el('p', 'conn-detail', 'Writing to: ' + st.detail));
+    if (c.note) {
+      const note = heGoogle
+        ? 'כניסה אחת ל-Google. משימות, יומן, טיוטות Gmail, וקבצים ב-Drive ש-Glance יוצר. Glance לא שולח.'
+        : c.note;
+      card.appendChild(el('p', 'conn-note', note));
+    }
+    if (st.connected && st.detail) {
+      const line = el('p', 'conn-detail');
+      line.appendChild(document.createTextNode(uiLang() === 'he' ? 'נכתב אל ' : 'Writing to: '));
+      const named = el('span', null, st.detail);
+      named.setAttribute('data-glance-user', 'list');
+      line.appendChild(named);
+      card.appendChild(line);
+    }
 
     if (c.status === 'planned') return card;
 
@@ -784,7 +807,7 @@
     err.hidden = true;
 
     if (st.connected) {
-      const off = el('button', 'ghost', 'Disconnect');
+      const off = el('button', 'ghost', uiLang() === 'he' ? 'נתק' : 'Disconnect');
       off.type = 'button';
       off.addEventListener('click', async () => {
         await send({ type: 'flow:disconnect', connectorId: c.id });
@@ -1256,7 +1279,7 @@
     const host = el('div', 'glance-panel-steps');
     item.appendChild(host);
     return FlowStepListView.mount(host, rows, {
-      intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
+      intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), uiLang())) || (entry.process && entry.process.name) || '',
       lang: entry.intent && entry.intent.lang,
       uiLang: uiLang(),
       surface: entry.app || 'gmail',
@@ -1274,7 +1297,7 @@
   function openRow(entry) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || entry.process.name;
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), uiLang())) || entry.process.name;
     top.appendChild(el('span', 'log-label', why));
     // 'app' only exists on entries logged after this was added — every
     // entry from before falls back to 'gmail', the only source that has
@@ -1360,7 +1383,7 @@
     const item = el('div', 'log-item');
     item.setAttribute('data-glance-status', 'expired');
     const top = el('div', 'log-top');
-    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '';
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), uiLang())) || (entry.process && entry.process.name) || '';
     top.appendChild(el('span', 'log-label', why));
     top.appendChild(el('span', 'log-kind', 'expired'));
     item.appendChild(top);
@@ -1388,7 +1411,8 @@
   // opened in Gmail.
   function dayShort(iso) {
     const d = new Date(iso + 'T00:00:00');
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat(uiLang() === 'he' ? 'he' : 'en', { month: 'short', day: 'numeric' }).format(d);
   }
 
   function whoLabel(w) {
@@ -1758,9 +1782,18 @@
         if (required) { box.checked = true; box.disabled = true; }
         boxes[svc.id] = box;
         const copy = el('span', null, serviceLabel(svc));
-        if (svc.detail) {
+        const heDetail = {
+          mail: 'קורא דואר וכותב טיוטת תשובה. לא שולח.',
+          todo: 'מוסיף משימה אחת. Glance קורא אותה לפני שהיא מטופלת. ביטול מוחק את המשימה.',
+          calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
+          onedrive: 'כותב קובץ אחד, קורא אותו, ומבטל את הכתיבה. מייל לא מחפש בקבצים.',
+          contacts: 'קורא אנשי קשר.',
+          teams: 'קורא צ׳אטים שאתה בהם.'
+        };
+        const detail = uiLang() === 'he' ? (heDetail[svc.id] || '') : svc.detail;
+        if (detail) {
           const small = document.createElement('small');
-          small.textContent = svc.detail;
+          small.textContent = detail;
           copy.appendChild(small);
         }
         if (!required && !box.checked) appendMissingScopeLine(copy, svc);
@@ -2164,16 +2197,24 @@
     slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
   };
+  function paintNamesDiag() {
+    const node = document.getElementById('namesDiag');
+    if (!node || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.namesDiagLine !== 'function') return;
+    const diag = (state && state.glanceNamesDiag) || { names: [], source: 'none' };
+    node.hidden = false;
+    node.textContent = FlowDisplay.namesDiagLine(diag);
+  }
+
   async function renderMetaChats() {
     const block = document.getElementById('metaChatsBlock');
-    const host = document.getElementById('meta-chats');
-    if (!block || !host || typeof FlowMetaConsent === 'undefined' || typeof FlowMetaConsent.paintLink !== 'function') return;
+    if (block) block.hidden = true;
+    const host = document.getElementById('connector-list');
+    if (!host || typeof FlowMetaConsent === 'undefined' || typeof FlowMetaConsent.paintConnection !== 'function') return;
     let on = false;
     try {
       if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
     } catch (e) { on = false; }
-    FlowMetaConsent.paintLink(host, { granted: on, lang: metaLang(), chrome: chrome });
-    block.hidden = false;
+    FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
   }
 
   async function renderSurfaces() {

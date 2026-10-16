@@ -20,6 +20,9 @@
 //   That consent window opens only after an explicit Connect click. Do It,
 //   a 401 retry, and Gmail auto-connect stay silent and, if they cannot
 //   mint a token, report not-connected instead of popping a window.
+//   A change in the required scopes is the one exception: the cached token
+//   still carries the old grant, so Glance drops it and asks once, including
+//   the web-auth fallback. A later silent call does not ask again.
 //   No server-side exchange and no Client Secret either way.
 //
 //   Notion authenticates with an internal integration token the user creates
@@ -42,7 +45,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -1566,6 +1569,7 @@ async function getGoogleWebAccessToken(interactive) {
 // written onto glanceOwnNames. A refusal leaves the name list as it is.
 let googleNamesFilled = false;
 let googleProfileFlight = null;
+let googleScopeUpgradeFlight = null;
 function namesFromGoogleUserinfo(info) {
   const out = [];
   function add(raw) {
@@ -1631,8 +1635,65 @@ function rememberGoogleProfile(token) {
   return googleProfileFlight;
 }
 
+async function readGoogleGrantedScopes() {
+  const bag = await chrome.storage.local.get(GOOGLE_GRANTED_SCOPES_KEY);
+  return bag[GOOGLE_GRANTED_SCOPES_KEY] || null;
+}
+
+async function writeGoogleGrantedScopes(status, source) {
+  await chrome.storage.local.set({
+    [GOOGLE_GRANTED_SCOPES_KEY]: {
+      version: scopeVersion(googleManifestScopes()),
+      status: status,
+      source: source || null,
+      at: Date.now()
+    }
+  });
+}
+
+// One shared ask. Drops the cached Chrome token and the stored web token,
+// then getAuthToken({ interactive: true }) once. A non-cancel failure uses
+// the web-auth window once. A cancel is remembered so a silent caller does
+// not ask again.
+async function upgradeGoogleScopesOnce() {
+  if (!googleScopeUpgradeFlight) {
+    let flight;
+    flight = (async () => {
+      await clearCachedChromeGoogleTokens();
+      await clearGoogleWebAuth();
+      try {
+        const token = await getGoogleAuthToken(true);
+        await writeGoogleGrantedScopes('granted', 'chrome');
+        return { token: token, source: 'chrome' };
+      } catch (err) {
+        const message = err && err.message;
+        if (!shouldFallbackFromGetAuthToken(message, { interactive: true })) {
+          await writeGoogleGrantedScopes('asked', 'chrome');
+          throw err;
+        }
+        try {
+          const saved = await runGoogleWebAuth(true);
+          await writeGoogleGrantedScopes('granted', 'web');
+          return { token: saved.accessToken, source: 'web' };
+        } catch (webErr) {
+          await writeGoogleGrantedScopes('asked', 'web');
+          throw webErr;
+        }
+      }
+    })().finally(() => {
+      if (googleScopeUpgradeFlight === flight) googleScopeUpgradeFlight = null;
+    });
+    googleScopeUpgradeFlight = flight;
+  }
+  return googleScopeUpgradeFlight;
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
+  const granted = await readGoogleGrantedScopes();
+  if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
+    return upgradeGoogleScopesOnce();
+  }
   try {
     const token = await getGoogleAuthToken(wantUi);
     return { token, source: 'chrome' };
@@ -1696,6 +1757,7 @@ async function disconnectConnector(connectorId) {
       GOOGLE_WEB_AUTH_STORAGE_KEY,
       GOOGLE_RECONNECT_STORAGE_KEY,
       GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      GOOGLE_GRANTED_SCOPES_KEY,
       'googleProfile',
       'glanceOwnNames'
     ]));

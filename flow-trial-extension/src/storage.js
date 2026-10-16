@@ -244,6 +244,8 @@ const FlowStorage = (() => {
     // UI language for card and panel chrome. Null follows the browser
     // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
     glanceUiLanguage: null,
+    // The Gmail page language. The side panel reads it through get().
+    glanceHostLanguage: null,
     // Names this person is called, beside the account display name.
     // Filled from the Google userinfo and Graph profile already granted.
     // No settings field. Empty until that profile read succeeds.
@@ -251,6 +253,9 @@ const FlowStorage = (() => {
     // Google userinfo name, given_name, and family_name on the existing
     // token. Hosts pass this as profile. Null until that read succeeds.
     googleProfile: null,
+    // Side-panel line. names and source (profile, aria-label, or none).
+    // The aria name is not copied into glanceOwnNames.
+    glanceNamesDiag: null,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

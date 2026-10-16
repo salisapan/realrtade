@@ -693,7 +693,21 @@ async function boot() {
       googleTasksAuth: { taskListId: 'glance-list' },
       // Headless Chrome has no browser sign-in. The lane asks identity first,
       // then this stored Connect token. Production never reads an e2e hook for it.
-      googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 }
+      googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
+      googleGrantedScopes: {
+        version: [
+          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/drive.file',
+          'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/gmail.compose',
+          'https://www.googleapis.com/auth/tasks',
+          'https://www.googleapis.com/auth/userinfo.profile',
+          'openid'
+        ].slice().sort().join('\n'),
+        status: 'granted',
+        source: 'chrome',
+        at: Date.now()
+      }
     }, extra || {}));
   };
 

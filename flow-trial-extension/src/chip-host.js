@@ -196,13 +196,19 @@ const FlowChipHost = (() => {
       else mountNode.appendChild(host);
       return host;
     }
-    host.appendChild(el('span', 'flow-chip-process-name', title));
+    const nameEl = el('span', 'flow-chip-process-name', title);
+    nameEl.setAttribute('data-glance-user', 'title');
+    host.appendChild(nameEl);
 
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
     const sentence = face.fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
-    if (sentence) textEl.appendChild(document.createTextNode(' ' + sentence));
+    if (sentence) {
+      const sent = el('span', null, ' ' + sentence);
+      sent.setAttribute('data-glance-user', 'draft');
+      textEl.appendChild(sent);
+    }
     host.appendChild(textEl);
 
     const liveSteps = (ctx.process.steps || []).slice();

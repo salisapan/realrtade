@@ -69,6 +69,35 @@ export function googleOAuthScopesFrom(scopes) {
   return list.length ? list : GOOGLE_OAUTH_SCOPES.slice();
 }
 
+// The scopes the last consent actually granted. A cached token keeps the
+// old list, so a different version has to drop that token and ask once.
+export const GOOGLE_GRANTED_SCOPES_KEY = 'googleGrantedScopes';
+
+export function scopeVersion(scopes) {
+  const list = Array.isArray(scopes) ? scopes : [];
+  const cleaned = [];
+  list.forEach((s) => {
+    const t = String(s || '').trim();
+    if (t && cleaned.indexOf(t) === -1) cleaned.push(t);
+  });
+  cleaned.sort();
+  return cleaned.join('\n');
+}
+
+// 'use' keeps the silent path. 'upgrade' drops the cached token and asks
+// once. A cancel on this version stays quiet until the next Connect.
+export function googleScopeAction(stored, requiredScopes, mode) {
+  const required = scopeVersion(requiredScopes);
+  const rec = stored && typeof stored === 'object' ? stored : null;
+  const version = rec && typeof rec.version === 'string' ? rec.version : '';
+  const status = rec && rec.status;
+  const same = Boolean(required) && version === required;
+  const interactive = mode === 'interactive' || mode === true;
+  if (same && status === 'granted') return 'use';
+  if (!interactive && same && status === 'asked') return 'use';
+  return 'upgrade';
+}
+
 export function googleImplicitAuthUrl(opts) {
   const options = opts || {};
   const params = new URLSearchParams();

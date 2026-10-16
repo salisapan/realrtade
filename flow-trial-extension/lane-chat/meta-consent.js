@@ -11,6 +11,18 @@
     en: 'Meta chats are on',
     he: 'צ׳אטים של Meta פועלים'
   };
+  const OFF_COPY = {
+    en: 'Off',
+    he: 'כבוי'
+  };
+  const DISCONNECT_COPY = {
+    en: 'Disconnect',
+    he: 'נתק'
+  };
+  const KIND_COPY = {
+    en: 'Chats',
+    he: 'צ׳אטים'
+  };
   const ORIGINS = [
     'https://web.whatsapp.com/*',
     'https://www.messenger.com/*',
@@ -39,6 +51,115 @@
     const raw = String(code || '').toLowerCase();
     if (raw.indexOf('he') === 0 || raw.indexOf('iw') === 0) return ON_COPY.he;
     return ON_COPY.en;
+  }
+
+  function heLang(code) {
+    const raw = String(code || '').toLowerCase();
+    return raw.indexOf('he') === 0 || raw.indexOf('iw') === 0;
+  }
+
+  function offLabel(code) {
+    return heLang(code) ? OFF_COPY.he : OFF_COPY.en;
+  }
+
+  function disconnectLabel(code) {
+    return heLang(code) ? DISCONNECT_COPY.he : DISCONNECT_COPY.en;
+  }
+
+  function kindLabel(code) {
+    return heLang(code) ? KIND_COPY.he : KIND_COPY.en;
+  }
+
+  function doitButton(doc, id, text) {
+    const link = doc.createElement('button');
+    link.type = 'button';
+    link.className = 'primary';
+    if (id) link.id = id;
+    ['shell', 'ring', 'shine'].forEach((name) => {
+      const span = doc.createElement('span');
+      span.className = name;
+      link.appendChild(span);
+    });
+    const label = doc.createElement('span');
+    label.className = 'btn-label';
+    label.textContent = text;
+    link.appendChild(label);
+    return link;
+  }
+
+  function disconnect(chromeApi) {
+    const api = chromeApi || globalThis.chrome;
+    if (!api || !api.permissions || typeof api.permissions.remove !== 'function') {
+      return Promise.resolve({ ok: false });
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      function done(ok) {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: ok !== false });
+      }
+      try {
+        const result = api.permissions.remove({ origins: ORIGINS.slice() }, done);
+        if (result && typeof result.then === 'function') {
+          result.then(done, () => done(false));
+        }
+      } catch (e) {
+        done(false);
+      }
+    });
+  }
+
+  // The Connections row. Connect is the same .primary / .doit button.
+  // Disconnect is .ghost, the same control the other connectors use.
+  function paintConnection(host, opts) {
+    if (!host) return null;
+    const doc = host.ownerDocument;
+    const prior = host.querySelector('[data-glance-connect="meta"]');
+    if (prior) prior.remove();
+    const granted = Boolean(opts && opts.granted);
+    const lang = opts && opts.lang;
+    const card = doc.createElement('div');
+    card.className = 'conn' + (granted ? ' on' : '');
+    card.setAttribute('data-glance-connect', 'meta');
+    const head = doc.createElement('div');
+    head.className = 'conn-head';
+    const name = doc.createElement('div');
+    name.className = 'conn-name';
+    const title = doc.createElement('b');
+    title.textContent = 'Meta';
+    const kind = doc.createElement('i');
+    kind.textContent = kindLabel(lang);
+    name.appendChild(title);
+    name.appendChild(kind);
+    head.appendChild(name);
+    const badge = doc.createElement('span');
+    badge.className = 'badge' + (granted ? ' on' : '');
+    if (granted) {
+      badge.id = 'meta-chats-on';
+      badge.textContent = onLabel(lang);
+    } else {
+      badge.textContent = offLabel(lang);
+    }
+    head.appendChild(badge);
+    card.appendChild(head);
+    if (granted) {
+      const off = doc.createElement('button');
+      off.type = 'button';
+      off.className = 'ghost';
+      off.textContent = disconnectLabel(lang);
+      off.addEventListener('click', () => { disconnect(opts && opts.chrome); });
+      card.appendChild(off);
+    } else {
+      const link = doitButton(doc, 'meta-chats-link', label(lang));
+      link.addEventListener('click', (event) => {
+        if (event && event.preventDefault) event.preventDefault();
+        open(opts && opts.chrome);
+      });
+      card.appendChild(link);
+    }
+    host.appendChild(card);
+    return granted ? badge : card.querySelector('#meta-chats-link');
   }
 
   function paintLink(host, opts) {
@@ -111,6 +232,7 @@
     label: label,
     onLabel: onLabel,
     paintLink: paintLink,
+    paintConnection: paintConnection,
     open: open
   };
 })();
