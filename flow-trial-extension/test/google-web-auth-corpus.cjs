@@ -491,13 +491,15 @@ async function run() {
       chromeToken: 'cached-chrome',
       stored: {
         googleTasksAuth: { taskListId: 'LIST_A' },
-        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 }
+        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 },
+        googleEverConnected: { connected: true }
       }
     });
     const out = await attempt(env.fn('disconnectConnector')('googleTasks'));
     check('disconnect succeeds', out.ok && out.value && out.value.ok === true, out);
     check('googleTasksAuth is gone', env.stored.googleTasksAuth == null, env.stored);
     check('the web-flow token is gone', env.stored.googleWebAuth == null, env.stored);
+    check('disconnect clears the ever-connected marker', env.stored.googleEverConnected == null, env.stored);
     check('the cached chrome token was evicted', env.calls.indexOf('EVICT cached-chrome') !== -1, env.calls);
     check('clearAllCachedAuthTokens ran', env.calls.indexOf('CLEAR_ALL') !== -1, env.calls);
     check('disconnect did not open the web flow', !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);

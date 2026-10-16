@@ -412,8 +412,10 @@
       pill.className = 'ver on';
       return;
     }
-    pill.textContent = 'לא מחובר';
-    pill.className = 'ver';
+    stampMicrosoft(pill, microsoft);
+    stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+    pill.textContent = microsoftFaceLabel(microsoft);
+    pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
   }
 
   /* ---------------------------------------------------------- connectors */

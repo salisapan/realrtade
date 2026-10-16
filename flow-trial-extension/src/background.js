@@ -1471,7 +1471,12 @@ async function disconnectConnector(connectorId) {
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY]));
+    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
+      key,
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      GOOGLE_RECONNECT_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY
+    ]));
     return { ok: true };
   }
   await chrome.storage.local.remove(key);
