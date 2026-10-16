@@ -142,10 +142,10 @@ const FlowIncomingJudge = (() => {
       executionMemory: i.executionMemory || null,
       text: vetoText
     });
-    // Same classifier as planFor. A meeting that itself was cancelled,
-    // postponed, or will not happen does not show. A cancelled contract,
-    // a webinar to put on the calendar, and a marketing registration do
-    // not share that refusal.
+    // Same classifier as planFor. A meeting that was cancelled, postponed,
+    // already held, or an out-of-office note does not show. A marketing
+    // webinar with no personal ask does not show. A second event that is
+    // still on, together with an ask, does show.
     if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
       return { show: false, reason: 'meeting-veto', intent };
     }

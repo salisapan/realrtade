@@ -422,33 +422,83 @@ const FlowIntent = (() => {
     if (AUTO_REPLY_TEXT.test(String(text || '').slice(0, 600))) return true;
     return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
   }
-  // A meeting plan is refused only when that meeting is what was cancelled,
-  // postponed, or will not happen. "The contract was cancelled, so let's
-  // meet" names a cancelled contract, not a cancelled meeting. A webinar
-  // the reader should add to the calendar is still a hold. An ask to
-  // cancel still deletes that slot. Hebrew forms are exact words: a near
-  // miss such as בולה is not בוטל. planFor and the judge both call this.
-  const VETO_MEET = '(?:meetings?|calls?|syncs?|kick-?offs?|events?|webinars?|appointments?)';
-  const VETO_CANCEL = '(?:cancell?ed|postponed|postpone|postone)';
-  const VETO_MEET_SUBJECT = new RegExp(
-    '\\b(?:the |our |this |that |a )?' + VETO_MEET + '\\b(?:[^.!?\\n]{0,48}?)\\b(?:is|was|were|has been|have been|been)\\s+' + VETO_CANCEL + '\\b|' +
-    '\\b(?:the |our |this |that )?' + VETO_MEET + '\\s+' + VETO_CANCEL + '\\b|' +
-    '\\b' + VETO_CANCEL + '\\s+(?:the |our |this |that |a )?(?:[A-Za-z]+\\s+){0,4}?' + VETO_MEET + '\\b',
-    'i'
-  );
-  const VETO_HE_MEET = '(?:הפגישה|פגישה|השיחה|שיחה|הוו?בינר|וו?בינר|המפגש|מפגש)';
-  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|לא\\s+תתקיים|נדחה)';
-  const VETO_HE_BOUND = '(?:^|[^\\u0590-\\u05FF])';
-  const VETO_HE_END = '(?![\\u0590-\\u05FF])';
-  const VETO_HE_MEET_THEN = new RegExp(VETO_HE_MEET + '(?:[^.!?\\n]{0,40})' + VETO_HE_BOUND + VETO_HE_CANCEL + VETO_HE_END);
-  const VETO_HE_CANCEL_THEN = new RegExp(VETO_HE_BOUND + '(?:בוטלה|בוטל|מבטלת|מבטל|נדחה)' + VETO_HE_END + '(?:[^.!?\\n]{0,24})' + VETO_HE_MEET);
+  // A meeting plan is refused when an event noun in the same clause was
+  // cancelled or postponed, when that meeting already happened, when the
+  // mail is out of office, or when a marketing webinar has no personal ask.
+  // Every cancel word is checked. A second event that is still on, together
+  // with an ask, is the close: "the contract was cancelled, so let's meet"
+  // and "the kickoff is cancelled, can we sync Thursday instead" both keep
+  // the new slot. "was on my list" is not a recap, because list is not an
+  // event noun. Hebrew forms are exact: בולה is not בוטל. An ask to cancel
+  // still clears that slot. planFor and the judge both call this.
+  const VETO_EVENT = '(?:meetings?|calls?|demos?|interviews?|check-ins?|kick-?offs?|syncs?|webinars?|reviews?|stand-?ups?)';
+  const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed)';
+  const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
+  const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
+  const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
+  const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|לא\\s+תתקיים|נדחה|לבטל|תבטל|בטל)';
+  const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
+  const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
+  const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
+  const VETO_PAST_EN = new RegExp('\\b(?:the |our |a |this )?' + VETO_EVENT + '\\s+was\\s+(?:on|yesterday)\\b', 'i');
+  const VETO_PAST_HE = new RegExp('(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')(?:[^\\n.!?]){0,40}(?:הייתה|היה|היו)|(?:הייתה|היה|היו)(?:[^\\n.!?]){0,40}(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')', 'i');
+  function vetoClauses(raw) {
+    return String(raw || '').split(/\n+|(?<=[.!?;])\s+|,\s+|\s+\bbut\b\s+|\s+אבל\s+/i);
+  }
+  function clauseHasEvent(clause) {
+    return VETO_EVENT_RE.test(clause) || VETO_HE_EVENT_RE.test(clause) || VETO_HE_LATIN_RE.test(clause);
+  }
+  function personalAsk(raw) {
+    const r = String(raw || '');
+    if (/\?/.test(r)) return true;
+    if (/\b(?:can|could|would)\s+(?:you|we)\b/i.test(r)) return true;
+    if (/\blet(?:'s| us)\b/i.test(r)) return true;
+    if (/\b(?:please|kindly)\b/i.test(r) && !/\b(?:please|kindly)\s+(?:register|join)\b/i.test(r)) return true;
+    if (/(?:אפשר|בבקשה|תוכל|תוכלי|תאשר|נוכל|תקבע|תכניס)/.test(r)) return true;
+    if (/\b(?:add|put) it (?:on|in) (?:your |the )?calendar\b/i.test(r)) return true;
+    return false;
+  }
+  function clauseCancelled(clause) {
+    if (VETO_EVENT_RE.test(clause) && VETO_CANCEL_RE.test(clause)) return true;
+    if ((VETO_HE_EVENT_RE.test(clause) || VETO_HE_LATIN_RE.test(clause)) && VETO_HE_CANCEL_RE.test(clause)) return true;
+    return false;
+  }
+  function clausePast(clause) {
+    if (/\bwas on my list\b/i.test(clause)) return false;
+    return VETO_PAST_EN.test(clause) || VETO_PAST_HE.test(clause);
+  }
+  function clauseLive(clause) {
+    if (clausePast(clause) || clauseCancelled(clause)) return false;
+    return clauseHasEvent(clause);
+  }
+  function askClause(clause) {
+    if (/confidentiality notice|please notify the sender|הודעה זו והמצורפים/i.test(clause)) return false;
+    return personalAsk(clause);
+  }
+  function liveWithAsk(clauses) {
+    for (let i = 0; i < clauses.length; i++) {
+      if (!clauseLive(clauses[i])) continue;
+      if (askClause(clauses[i])) return true;
+      if (askClause(clauses[i + 1] || '')) return true;
+    }
+    return false;
+  }
+  function marketingWebinar(raw) {
+    if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
+    if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open)\b/i.test(raw)) return true;
+    return false;
+  }
   function meetingPlanVeto(text) {
     const raw = String(text || '');
     if (/\b(?:please|kindly)\s+cancel\b/i.test(raw)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:בבקשה\s+)?(?:בטל|לבטל|תבטל)\s+את/.test(raw)) return false;
-    if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
-    if (VETO_MEET_SUBJECT.test(raw)) return true;
-    if (VETO_HE_MEET_THEN.test(raw) || VETO_HE_CANCEL_THEN.test(raw)) return true;
+    const clauses = vetoClauses(raw);
+    if (liveWithAsk(clauses)) return false;
+    if (marketingWebinar(raw)) return true;
+    if (AUTO_REPLY_TEXT.test(raw)) return true;
+    if (clauses.some(clausePast)) return true;
+    if (clauses.some(clauseCancelled)) return true;
     return false;
   }
   // A reply draft is offered only for an inbound ask addressed to the user.
@@ -542,7 +592,7 @@ const FlowIntent = (() => {
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
-  const LABEL_OPEN = /^(?:agreed|approved|reminder|update|urgent|fyi|quote|דחוף|תזכורת|עדכון|אושר)$/i;
+  const LABEL_OPEN = /^(?:agreed|approved|reminder|update|urgent|fyi|quote|re|fw|fwd|note|subject|דחוף|תזכורת|עדכון|אושר|השב|הועבר)$/i;
   function personToken(token) {
     if (!token || LABEL_OPEN.test(token) || NOT_A_VOCABLE.test(token) || GROUP_ADDRESSEE.test(token)) return false;
     if (/^[A-Z][a-zA-Z'’-]{1,40}$/.test(token)) return true;
@@ -574,23 +624,33 @@ const FlowIntent = (() => {
       if (!discourse) break;
       raw = raw.slice(discourse[0].length);
     }
-    const head = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})/);
-    if (!head) return '';
-    const name = head[1];
-    const after = raw.slice(name.length);
-    if (/^\s*:/.test(after)) {
-      if (!personToken(name) || !restIsAsk(after)) return '';
-      return name;
-    }
-    if (/^\s*(?:\u2014|\u2013|-)/.test(after)) {
-      if (!personToken(name)) return '';
-      const rest = after.replace(/^\s*(?:\u2014|\u2013|-)\s*/, '');
-      if (!restIsAsk(rest)) return '';
-      return name;
-    }
-    if (/^\s*(?:,|،)/.test(after)) {
-      if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
-      return name;
+    let hops = 0;
+    while (hops++ < 3) {
+      const head = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})/);
+      if (!head) return '';
+      const name = head[1];
+      const after = raw.slice(name.length);
+      // "Hi all, Noa:" and "Hi all — Dana," name the next person. all is
+      // the group. RE:, FW:, Note:, and הועבר: are labels, not names.
+      if (GROUP_ADDRESSEE.test(name) && /^\s*(?:(?:,|،)|(?:\u2014|\u2013|-))/.test(after)) {
+        raw = after.replace(/^\s*(?:(?:,|،)|(?:\u2014|\u2013|-))\s*/, '');
+        continue;
+      }
+      if (/^\s*:/.test(after)) {
+        if (!personToken(name) || !restIsAsk(after)) return '';
+        return name;
+      }
+      if (/^\s*(?:\u2014|\u2013|-)/.test(after)) {
+        if (!personToken(name)) return '';
+        const rest = after.replace(/^\s*(?:\u2014|\u2013|-)\s*/, '');
+        if (!restIsAsk(rest)) return '';
+        return name;
+      }
+      if (/^\s*(?:,|،)/.test(after)) {
+        if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
+        return name;
+      }
+      return '';
     }
     return '';
   }
@@ -966,7 +1026,12 @@ const FlowIntent = (() => {
     //        shape, not {dateTime: ...}) when hour/minute come through null,
     //        rather than erroring the way it used to when they were simply
     //        missing.
-    const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
+    // A cancel word that governs one clause does not call off a different
+    // event that is still on and is asked for. "ההזמנה בוטלה, אבל הפגישה
+    // בתוקף" and "the kickoff is cancelled, can we sync Thursday" keep the
+    // new slot. A mail whose only event was postponed stays called off.
+    const calledOff = (s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text))
+      && !liveWithAsk(vetoClauses(text));
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
     const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
     // infoOrNoise is the same veto as s.flags.noise, for phrasings the
@@ -1094,8 +1159,13 @@ const FlowIntent = (() => {
       return stayQuiet('family');
     }
     if (!replyMisaddressed && familyBox.hit && familyBox.hit.family === 'G') {
-      const viaMove = fromFamily(familyBox.hit);
-      if (viaMove) return viaMove;
+      // A delete of the old slot must not win when another event is still
+      // on and asked for. That event is the close.
+      const replaced = familyBox.hit.calendarOp === 'delete' && liveWithAsk(vetoClauses(text));
+      if (!replaced) {
+        const viaMove = fromFamily(familyBox.hit);
+        if (viaMove) return viaMove;
+      }
     }
     // A clear family D hold or dated promise is that write. The meeting
     // gate would otherwise file "let's sync Tuesday at 3pm" as a calendar
