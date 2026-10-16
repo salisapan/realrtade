@@ -28,7 +28,7 @@ REQUIRED = [
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",
-    # Registered at runtime when the person turns a site on (background.js SURFACES), so not in the manifest.
+    # Registered at runtime from background.js (SURFACES or LANE_CHAT), so not in the manifest.
     "src/content-outlook.js",
     "core/owa-parse.js",
     "src/chip-host.js",

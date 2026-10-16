@@ -478,7 +478,7 @@ const LANE_CHAT = [
   {
     id: 'glance-lane-whatsapp',
     origins: ['https://web.whatsapp.com/*'],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp-draft.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
   },
   {
     id: 'glance-lane-messenger',

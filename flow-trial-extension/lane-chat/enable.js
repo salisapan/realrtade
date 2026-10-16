@@ -14,7 +14,7 @@ const LANES = [
     id: 'whatsapp',
     title: 'WhatsApp',
     origins: ['https://web.whatsapp.com/*'],
-    js: SCRIPTS.concat(['src/whatsapp-parse.js', 'src/content-whatsapp-draft.js'])
+    js: SCRIPTS.concat(['src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'])
   },
   {
     id: 'messenger',
