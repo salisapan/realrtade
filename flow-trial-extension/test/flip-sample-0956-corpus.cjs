@@ -142,7 +142,10 @@ const ROWS = [
   { id: 'v2syn-26281', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'שינוי',
     body: 'הפגישה ביום שני לא תתקיים' },
-  { id: 'v2syn-10902', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+  // בולה is not one of בוטל/בוטלה/מבטל/מבטלת/לא תתקיים/נדחה. No edit
+  // distance, so this is a calendar offer, not a meeting veto.
+  { id: 'v2syn-10902', expect: 'cal', process: 'schedule', date: '2026-10-20', hour: 9,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'RE: שינוי',
     body: 'הcall ביום שלישי בשעה 9:00 בולה.' },
   { id: 'v2syn-16571', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
@@ -184,7 +187,102 @@ const ROWS = [
   { id: 'v2syn-9656', expect: 'as', type: 'decision', close: 'confirmed-amount', date: null, process: 'log-it', task: true,
     surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'נועה פרץ', email: 'noa@monday-partner.co.il' }, to: [OWN.gmail], subject: 'אושר',
-    body: 'שלום סאלי,\nאושר: \u20aa450 עבור המעבר לענן.' }
+    body: 'שלום סאלי,\nאושר: \u20aa450 עבור המעבר לענן.' },
+  // A label plus a dash is the decision or the ask, not a person named Agreed.
+  { id: 'narrow-agreed', expect: 'as', type: 'decision', close: 'confirmed-amount', date: null, process: 'log-it', task: true,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Globex',
+    body: 'Agreed \u2014 Globex it is, at $4,200 per month' },
+  { id: 'narrow-approved', expect: 'as', type: 'decision', date: null, process: 'log-it', task: true,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Renewal',
+    body: 'Approved \u2014 go ahead with the contract renewal, and let the whole team know it is confirmed.' },
+  { id: 'narrow-reminder-dash', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-23', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Reminder',
+    body: 'Reminder - please pay the invoice of $1,200 by Friday' },
+  { id: 'narrow-update', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-23', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Update',
+    body: 'Update \u2014 could you review the draft by Friday?' },
+  { id: 'narrow-urgent-he', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-22', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'דחוף',
+    body: 'דחוף - אפשר לשלוח לי את הדוח עד יום חמישי' },
+  { id: 'narrow-signature', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-22', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Report',
+    body: 'Could you send the signed report by Thursday?\nDana - Head of Ops' },
+  { id: 'narrow-hi', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-23', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Invoice',
+    body: 'Hi \u2014 could you send the invoice by Friday?' },
+  { id: 'narrow-sali', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-20', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Quote',
+    body: 'Sali \u2014 please review the quote by Tuesday' },
+  { id: 'narrow-sali-he', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-22', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'דוח',
+    body: 'סאלי - נא לשלוח את הדוח עד יום חמישי' },
+  { id: 'narrow-thanks', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-23', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Invoice',
+    body: 'Could you send the invoice by Friday?\nThanks \u2014 Dana' },
+  // The cancel word's subject is the contract or the order, not the meeting.
+  { id: 'narrow-contract', expect: 'cal', close: 'calendar-hold', process: 'hold', explicit: true, date: '2026-10-19', hour: 10,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Contract',
+    body: "The old contract was cancelled, so let's meet Monday at 10:00" },
+  { id: 'narrow-order', expect: 'cal', close: 'calendar-hold', process: 'hold', explicit: true, date: '2026-10-20', hour: 15,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Order',
+    body: 'Our order was canceled by the vendor. Can we meet Tuesday 15:00' },
+  // A webinar to put on the calendar is a schedule offer. Mentioning one is not a veto.
+  { id: 'narrow-webinar-add', expect: 'cal', process: 'schedule', date: '2026-10-22', hour: 10,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Webinar',
+    body: 'you registered for the Glance webinar Thursday 10:00, please add it to your calendar' },
+  { id: 'narrow-dry-run', expect: 'cal', process: 'schedule', date: '2026-10-20', hour: 14,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Dry run',
+    body: 'join the partner webinar dry-run with me Tuesday 14:00' },
+  { id: 'narrow-he-webinar', expect: 'cal', process: 'schedule', date: '2026-10-22', hour: 10,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'וובינר',
+    body: 'סאלי, נרשמת לוובינר ביום חמישי ב-10:00, תכניס ליומן' },
+  { id: 'narrow-was-on', expect: 'cal', process: 'schedule', date: '2026-10-22', hour: 9,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Sync',
+    body: 'The issue was on my list last week. Can we sync Thursday 9:00?' },
+  { id: 'narrow-field', expect: 'cal', process: 'schedule', date: '2026-10-19', hour: 10,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'שטח',
+    body: 'פגישה בשטח ביום שני ב-10:00' },
+  { id: 'narrow-hq', expect: 'cal', close: 'calendar-hold', process: 'hold', explicit: true, date: '2026-10-20', hour: 10,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'מטה',
+    body: 'נפגש במטה ביום שלישי ב-10:00' },
+  { id: 'narrow-webinar-on', expect: 'cal', process: 'schedule', date: '2026-10-22', hour: 11,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Webinar',
+    body: 'The webinar is on Thursday at 11am' },
+  { id: 'narrow-quote', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Quote',
+    body: 'Quote: "We\'re good at $3,900/mo for the 14th floor, signing Monday."' },
+  { id: 'narrow-dana-colon', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Report',
+    body: 'Dana: please send the report by Thursday' },
+  { id: 'narrow-dana-he', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'דוח',
+    body: 'דנה: נא לשלוח את הדוח עד יום חמישי' },
+  { id: 'self-sent-save', expect: 'self-file', surface: 'gmail', direction: 'self', attachmentCount: 1,
+    from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
+    body: 'please save the report to Drive by 20/10' },
+  { id: 'self-sent-hold', expect: 'cal', close: 'calendar-hold', process: 'hold', explicit: true, date: '2026-10-20', hour: 14,
+    surface: 'gmail', direction: 'self', attachmentCount: 0,
+    from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
+    body: 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00' }
 ];
 
 function summarise(out) {
@@ -220,6 +318,20 @@ for (const row of ROWS) {
       k.some((kind) => kind === 'driveFile' || kind === 'onedriveFile');
   } else if (row.expect === 'veto') {
     ok = out.show !== true && out.reason === 'meeting-veto' && !k.some((kind) => kind === 'calendar');
+  } else if (row.expect === 'cal') {
+    const date = out.intent && out.intent.entities ? out.intent.entities.dateIso : undefined;
+    const hour = out.intent && out.intent.entities ? out.intent.entities.hour : undefined;
+    const closeOk = !row.close || (out.intent && out.intent.personalClose === row.close);
+    ok = out.show === true && out.intent && out.intent.type === 'event' && closeOk &&
+      date === row.date && hour === row.hour && k.indexOf('calendar') !== -1 && !k.some(draftKind) &&
+      (!row.explicit || out.intent.explicitHold === true) &&
+      (!row.process || (out.process && out.process.id === row.process));
+  } else if (row.expect === 'self-file') {
+    ok = out.show === true && out.intent && out.intent.personalClose === 'drive-file' &&
+      out.process && out.process.id === 'file-it' &&
+      k.indexOf('driveFile') !== -1 && k.indexOf('gmailDraft') !== -1 &&
+      !k.some((kind) => /send/i.test(kind)) &&
+      out.intent.entities && out.intent.entities.dateIso === '2026-10-20';
   } else if (row.expect === 'as') {
     const date = out.intent && out.intent.entities ? out.intent.entities.dateIso : undefined;
     const closeOk = !row.close || (out.intent && out.intent.personalClose === row.close);

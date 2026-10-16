@@ -422,54 +422,33 @@ const FlowIntent = (() => {
     if (AUTO_REPLY_TEXT.test(String(text || '').slice(0, 600))) return true;
     return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
   }
-  function editDistance(a, b) {
-    const al = a.length;
-    const bl = b.length;
-    if (Math.abs(al - bl) > 2) return 3;
-    const row = [];
-    for (let j = 0; j <= bl; j++) row[j] = j;
-    for (let i = 1; i <= al; i++) {
-      let prev = row[0];
-      row[0] = i;
-      for (let j = 1; j <= bl; j++) {
-        const cur = row[j];
-        const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
-        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
-        prev = cur;
-      }
-    }
-    return row[bl];
-  }
-  // One classifier for a meeting that must not become a plan. A report
-  // that it is cancelled or postponed, including one slipped letter, an
-  // out-of-office, a past recap, or a marketing invite. An ask to cancel
-  // still deletes that slot. planFor and the judge both call this.
+  // A meeting plan is refused only when that meeting is what was cancelled,
+  // postponed, or will not happen. "The contract was cancelled, so let's
+  // meet" names a cancelled contract, not a cancelled meeting. A webinar
+  // the reader should add to the calendar is still a hold. An ask to
+  // cancel still deletes that slot. Hebrew forms are exact words: a near
+  // miss such as בולה is not בוטל. planFor and the judge both call this.
+  const VETO_MEET = '(?:meetings?|calls?|syncs?|kick-?offs?|events?|webinars?|appointments?)';
+  const VETO_CANCEL = '(?:cancell?ed|postponed|postpone|postone)';
+  const VETO_MEET_SUBJECT = new RegExp(
+    '\\b(?:the |our |this |that |a )?' + VETO_MEET + '\\b(?:[^.!?\\n]{0,48}?)\\b(?:is|was|were|has been|have been|been)\\s+' + VETO_CANCEL + '\\b|' +
+    '\\b(?:the |our |this |that )?' + VETO_MEET + '\\s+' + VETO_CANCEL + '\\b|' +
+    '\\b' + VETO_CANCEL + '\\s+(?:the |our |this |that |a )?(?:[A-Za-z]+\\s+){0,4}?' + VETO_MEET + '\\b',
+    'i'
+  );
+  const VETO_HE_MEET = '(?:הפגישה|פגישה|השיחה|שיחה|הוו?בינר|וו?בינר|המפגש|מפגש)';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|לא\\s+תתקיים|נדחה)';
+  const VETO_HE_BOUND = '(?:^|[^\\u0590-\\u05FF])';
+  const VETO_HE_END = '(?![\\u0590-\\u05FF])';
+  const VETO_HE_MEET_THEN = new RegExp(VETO_HE_MEET + '(?:[^.!?\\n]{0,40})' + VETO_HE_BOUND + VETO_HE_CANCEL + VETO_HE_END);
+  const VETO_HE_CANCEL_THEN = new RegExp(VETO_HE_BOUND + '(?:בוטלה|בוטל|מבטלת|מבטל|נדחה)' + VETO_HE_END + '(?:[^.!?\\n]{0,24})' + VETO_HE_MEET);
   function meetingPlanVeto(text) {
     const raw = String(text || '');
     if (/\b(?:please|kindly)\s+cancel\b/i.test(raw)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:בבקשה\s+)?(?:בטל|לבטל|תבטל)\s+את/.test(raw)) return false;
-    if (/\b(?:is|was|were|has been|have been|been)\s+cancell?ed\b/i.test(raw)) return true;
-    if (/\bcancell?ed\b/i.test(raw)) return true;
-    const latin = raw.toLowerCase().match(/[a-z]{4,12}/g) || [];
-    for (let i = 0; i < latin.length; i++) {
-      if (editDistance(latin[i], 'postpone') <= 1 || editDistance(latin[i], 'postponed') <= 1) return true;
-      if (editDistance(latin[i], 'cancelled') <= 1 || editDistance(latin[i], 'canceled') <= 1) return true;
-    }
-    if (/לא\s+[תינ]תקיים/.test(raw)) return true;
-    if (/(?:מבוטל|בוטל|בוטלה)/.test(raw)) return true;
-    const hebrew = raw.match(/[\u0590-\u05FF]{3,6}/g) || [];
-    for (let h = 0; h < hebrew.length; h++) {
-      const word = hebrew[h];
-      // בוטל with the tet slipped (בולה, בטלה) or one letter added. A
-      // ordinary ב-word such as בכל is not this.
-      if (word.charAt(0) === 'ב' && editDistance(word, 'בוטל') <= 2 && (word.indexOf('ט') >= 0 || word === 'בולה')) return true;
-    }
-    if (AUTO_REPLY_TEXT.test(raw.slice(0, 800))) return true;
-    if (EVENT_RECAP.test(raw) || EVENT_RECAP_HE.test(raw)) return true;
-    if (/\b(?:was|were)\s+on\b/i.test(raw)) return true;
-    if (/(?:הייתה|היה|היו)\s+ביום/.test(raw)) return true;
-    if (/\bwebinars?\b/i.test(raw) || /וו?בינר/.test(raw)) return true;
-    if (/הצטרפו/.test(raw) && /(?:הרשמה|מבצע)/.test(raw)) return true;
+    if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
+    if (VETO_MEET_SUBJECT.test(raw)) return true;
+    if (VETO_HE_MEET_THEN.test(raw) || VETO_HE_CANCEL_THEN.test(raw)) return true;
     return false;
   }
   // A reply draft is offered only for an inbound ask addressed to the user.
@@ -561,9 +540,30 @@ const FlowIntent = (() => {
   // because the only stored name is Latin, and the reverse.
   const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
-  // A name plus a comma, or a name plus a dash, at the start of any line
-  // or sentence. A token and a colon is a label (Reminder:, אושר:), not a
-  // person. Also and Separately open the sentence; they are not names.
+  // A status word that opens a line is a label, not a person. "Agreed —"
+  // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
+  const LABEL_OPEN = /^(?:agreed|approved|reminder|update|urgent|fyi|quote|דחוף|תזכורת|עדכון|אושר)$/i;
+  function personToken(token) {
+    if (!token || LABEL_OPEN.test(token) || NOT_A_VOCABLE.test(token) || GROUP_ADDRESSEE.test(token)) return false;
+    if (/^[A-Z][a-zA-Z'’-]{1,40}$/.test(token)) return true;
+    if (/^[\u0590-\u05FF][\u0590-\u05FF'’-]{1,40}$/.test(token)) return true;
+    return false;
+  }
+  // The words after a dash or a colon are an ask when they request the
+  // work. A title ("Head of Ops") is not an ask, so a signature is not
+  // an address.
+  function restIsAsk(rest) {
+    const r = String(rest || '');
+    if (/\?/.test(r)) return true;
+    if (/\b(?:could|can|would|will|please|kindly|pls)\b/i.test(r)) return true;
+    if (/\b(?:review|send|pay|forward|confirm|schedule)\b/i.test(r)) return true;
+    if (/(?:אפשר|נא|בבקשה|תוכל|תוכלי|לשלוח|שלח|תשלח|לבדוק)/.test(r)) return true;
+    return false;
+  }
+  // A comma still names the addressee ("Lior,"). A dash or a colon does
+  // that only when the token is a person's name and the rest is an ask.
+  // "Agreed — Globex" and "Dana - Head of Ops" are not that. Also and
+  // Separately open the sentence; they are not names.
   function vocativeAt(chunk) {
     let raw = String(chunk || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
     const greet = raw.match(OPEN_GREET);
@@ -574,11 +574,31 @@ const FlowIntent = (() => {
       if (!discourse) break;
       raw = raw.slice(discourse[0].length);
     }
-    if (/^[A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}\s*:/.test(raw)) return '';
-    const named = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*(?:,|،|\u2014|\u2013|\s-\s)/);
-    if (!named) return '';
-    if (GROUP_ADDRESSEE.test(named[1]) || NOT_A_VOCABLE.test(named[1])) return '';
-    return named[1];
+    const head = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})/);
+    if (!head) return '';
+    const name = head[1];
+    const after = raw.slice(name.length);
+    if (/^\s*:/.test(after)) {
+      if (!personToken(name) || !restIsAsk(after)) return '';
+      return name;
+    }
+    if (/^\s*(?:\u2014|\u2013|-)/.test(after)) {
+      if (!personToken(name)) return '';
+      const rest = after.replace(/^\s*(?:\u2014|\u2013|-)\s*/, '');
+      if (!restIsAsk(rest)) return '';
+      return name;
+    }
+    if (/^\s*(?:,|،)/.test(after)) {
+      if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
+      return name;
+    }
+    return '';
+  }
+  // "Quote: \"We're good at …\"" reports someone else's words. The commit
+  // phrase inside the quotation is not this person's decision.
+  function thirdPartyQuote(text) {
+    const raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    return /^quote\s*:/i.test(raw) && /["“”«»]/.test(raw);
   }
   function vocativeIsOther(text, ctx) {
     const names = readerNameList(ctx);
@@ -1055,7 +1075,7 @@ const FlowIntent = (() => {
     // Own outbound, a note to self, or a vocative that names someone else
     // is not this person's Do It. A hold does not get past that by not
     // being a reply ask.
-    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx)) return stayQuiet('hedge');
+    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {

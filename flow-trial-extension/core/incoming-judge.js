@@ -142,9 +142,10 @@ const FlowIncomingJudge = (() => {
       executionMemory: i.executionMemory || null,
       text: vetoText
     });
-    // Same classifier as planFor. A cancelled, postponed, out-of-office,
-    // past, or marketing meeting does not show, including when the plan
-    // would have been a hold or a schedule.
+    // Same classifier as planFor. A meeting that itself was cancelled,
+    // postponed, or will not happen does not show. A cancelled contract,
+    // a webinar to put on the calendar, and a marketing registration do
+    // not share that refusal.
     if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
       return { show: false, reason: 'meeting-veto', intent };
     }
