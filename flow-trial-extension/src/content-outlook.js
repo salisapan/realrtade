@@ -4369,6 +4369,7 @@
     if (log[0] && log[0].key === key) return;
     log.unshift({
       key: key, at: Date.now(), messageId: entry.messageId || null, reason: entry.reason,
+      detail: entry.detail || '',
       fileCount: entry.fileCount || 0, target: entry.target || null, surface: entry.surface || 'outlook'
     });
     await FlowStorage.set({ suggestLog: log.slice(0, 40) });
@@ -4999,7 +5000,7 @@
       } else files = read;
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
-      await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
+      await appendSuggestLog({ messageId: messageId, reason: stageReason, detail: (read && read.detail) || '', surface: 'outlook' });
       if (!pageAlreadyDecided(pane) || genericTextQuiet(pane)) {
         await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
       }

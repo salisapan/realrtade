@@ -103,7 +103,6 @@ test('Why-not-shown drops the message once its card is showing', async ({ glance
   const list = popup.locator('#surface-list');
   await expect(list.getByText('Show me')).toHaveCount(0);
   await expect(list.locator('[data-glance-why-line]')).toHaveCount(0);
-
   const quiet = await glance.openOutlook({
     id: S.MSG_B,
     subject: 'Stay quiet',

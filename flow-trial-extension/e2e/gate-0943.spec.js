@@ -38,6 +38,7 @@ test('a handled promise hides Do It, and Undo offers it once in both places', as
   test.setTimeout(90000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkGlanceE2EPromise0943',
     subject: 'Numbers for Dana',
     senderEmail: S.SENDER,
@@ -103,6 +104,7 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
   });
 
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: CONV,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
@@ -113,6 +115,7 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
   await expect(page.locator('#ReadingPaneContainerId .flow-chip-process-name')).toHaveText('Save the file?');
 
   const skipped = await glance.openOutlook({
+    confirmConversation: true,
     id: SKIP_CONV,
     subject: 'Northwind agreement - small PDF',
     senderEmail: S.SENDER,
@@ -121,6 +124,7 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
     attachments: pdf(800)
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
+  await expect(skipPane.locator('.flow-chip-process-name')).toBeVisible();
   await expect(skipPane.locator('.flow-chip-process-name')).toHaveText('Save the file?');
   await expect(skipPane.locator('.chip-txt')).toHaveText('Save the file?');
 });
