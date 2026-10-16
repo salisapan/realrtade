@@ -55,7 +55,11 @@ function gmailHtml(opts) {
     ? '<div role="list"><div role="listitem" data-legacy-thread-id="inbox-other"><span class="y2">older snippet</span></div></div>'
     : '';
   const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
+  const account = o.accountLabel
+    ? ('<a class="gb_d" aria-label="' + esc(o.accountLabel) + '" href="https://accounts.google.com/SignOutOptions"></a>')
+    : '';
   return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
+    account +
     '<div role="main">' +
     inbox +
     '<h2 class="hP">' + esc(subject) + '</h2>' +

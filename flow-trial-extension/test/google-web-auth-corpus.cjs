@@ -18,7 +18,9 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/drive.readonly',
-  'https://www.googleapis.com/auth/drive.file'
+  'https://www.googleapis.com/auth/drive.file',
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.profile'
 ];
 const SIGNIN_OFF = 'The user turned off browser signin';
 const USER_CANCEL = 'The user did not approve access.';
@@ -284,7 +286,10 @@ async function run() {
   check('unpacked redirect', api.googleRedirectUriForExtension(EXTENSION_ID) === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/');
   check('store redirect', api.googleRedirectUriForExtension('lbihckfmoffgjjlnneoeaehbhoonfenh') === 'https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/');
   check('blank extension id has no redirect', api.googleRedirectUriForExtension('  ') === '');
-  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 5);
+  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 7);
+  check('the one consent includes openid and userinfo.profile',
+    api.GOOGLE_OAUTH_SCOPES.indexOf('openid') !== -1 &&
+    api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/userinfo.profile') !== -1);
   check('explicit scopes are trimmed and kept', JSON.stringify(api.googleOAuthScopesFrom(['', '  https://www.googleapis.com/auth/tasks  '])) === JSON.stringify(['https://www.googleapis.com/auth/tasks']));
   const built = new URL(api.googleImplicitAuthUrl({
     clientId: WEB_CLIENT,
@@ -301,6 +306,10 @@ async function run() {
     built.searchParams.get('prompt') === 'select_account' &&
     built.searchParams.get('include_granted_scopes') === 'true');
   check('authorize URL lists every manifest scope', api.GOOGLE_OAUTH_SCOPES.every((s) => built.searchParams.get('scope').split(' ').indexOf(s) !== -1), built.searchParams.get('scope'));
+  check('openid and the profile scope share that one consent URL',
+    built.searchParams.getAll('scope').length === 1 &&
+    built.searchParams.get('scope').split(' ').indexOf('openid') !== -1 &&
+    built.searchParams.get('scope').split(' ').indexOf('https://www.googleapis.com/auth/userinfo.profile') !== -1);
 
   console.log('\n--- redirect token parse ---\n');
   const hashUrl = 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/#access_token=' + encodeURIComponent('ya29.hash') + '&expires_in=3599&token_type=Bearer&state=abc';

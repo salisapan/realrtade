@@ -727,6 +727,31 @@ function glanceUiCopy(kind) {
     return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
   }
 
+  // The Gmail account button, for example
+  // "Google Account: Sali Sapan (x@y)". The name only. No scope, no token.
+  // A label that is not that button is not a name.
+  function accountNameFromLabel(label) {
+    const raw = String(label || '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const prefixed = raw.match(/^(?:Google Account|חשבון Google)\s*:\s*(.+)$/i);
+    if (!prefixed) return '';
+    const body = prefixed[1].trim();
+    const email = body.match(/^(.*)\(([^)]*@[^)]+)\)\s*$/);
+    const name = (email ? email[1] : body).trim();
+    if (!name || /@/.test(name)) return '';
+    if (name.toLowerCase() === 'me') return '';
+    return name;
+  }
+
+  function gmailAccountName() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) return '';
+    const nodes = document.querySelectorAll('a[aria-label], button[aria-label], [role="button"][aria-label]');
+    for (let i = 0; i < nodes.length; i++) {
+      const name = accountNameFromLabel(nodes[i].getAttribute('aria-label'));
+      if (name) return name;
+    }
+    return '';
+  }
+
   // To and Cc as the open message shows them. A line that starts with To or
   // Cc (or אל / עותק) is that list. The sender's address is not a recipient.
   function audienceOf(messageNode) {
@@ -1503,14 +1528,9 @@ function glanceUiCopy(kind) {
       cc: audience.cc,
       ownAddresses: ownEmail ? [ownEmail] : [],
       userName: audience.userName || null,
-      ownNames: (typeof FlowIntent !== 'undefined' && typeof FlowIntent.readerNamesFrom === 'function')
-        ? FlowIntent.readerNamesFrom({
-          displayName: audience.userName,
-          profile: state && state.googleProfile,
-          knownNames: state && state.glanceOwnNames
-        })
-        : ((state && state.glanceOwnNames) || null),
-      namesPending: readerNamesNotCached(audience.userName),
+      ownNames: ownNamesForChip(audience.userName),
+      namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
+      namesWaitDone: namesWaitDone === true,
       inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
     });
     // Reply-with-facts. Only when Google is already connected, so the chip
@@ -1543,10 +1563,17 @@ function glanceUiCopy(kind) {
     // don't show a chip" contract the local path already follows.
     // Names are not cached yet. No card, and this is not a quiet. The
     // line on the mail is names-pending. The storage listener judges
-    // the open mail again once userinfo or the me chip lands a name.
+    // the open mail again once userinfo or the account button lands a
+    // name. The hold lasts at most 2s. After that the same mail is
+    // judged with whatever names are known, including none.
     if (intent && intent.namesPending) {
       paintNamesPending(message, messageId, subject);
+      armNamesHold();
       return;
+    }
+    if (namesWaitDone && message && message.setAttribute) {
+      message.setAttribute('data-glance-names', intent && intent.type ? 'offer' : 'quiet');
+      releaseNamesPending(message);
     }
     const localFired = Boolean(intent.type);
     // A local 'low' is a decision to stay quiet, not a miss. A named quiet
@@ -4560,9 +4587,54 @@ function glanceUiCopy(kind) {
 
   if (typeof globalThis !== 'undefined') globalThis.glanceUndoStoredLane = undoStoredLane;
 
-  // glanceOwnNames is written after the first userinfo read. Until that
-  // list or a real display name exists, a greeting stays unjudged.
+  // Two seconds from the first names-pending paint. A later scan does
+  // not restart it. Mail is judged when it fires, names or none.
+  const NAMES_HOLD_MS = 2000;
+  let namesWaitDone = false;
+  let namesHoldSince = 0;
+  let namesWaitTimer = null;
+
+  function armNamesHold() {
+    if (namesWaitDone) return;
+    if (!namesHoldSince) namesHoldSince = Date.now();
+    if (namesWaitTimer) return;
+    const left = Math.max(0, NAMES_HOLD_MS - (Date.now() - namesHoldSince));
+    namesWaitTimer = setTimeout(() => {
+      namesWaitTimer = null;
+      namesWaitDone = true;
+      scanReadingPane();
+    }, left);
+  }
+
+  function releaseNamesPending(messageNode) {
+    clearGmailWhy(messageNode);
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.get().then((bag) => {
+      const why = bag && bag.glanceWhyCurrent;
+      if (!why || why.reason !== 'names-pending') return;
+      return FlowStorage.set({ glanceWhyCurrent: null });
+    }).catch(() => {});
+  }
+
+  function ownNamesForChip(userName) {
+    const aria = gmailAccountName();
+    const known = (state && state.glanceOwnNames) || [];
+    const extra = aria ? [].concat(known, [aria]) : known;
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.readerNamesFrom === 'function') {
+      return FlowIntent.readerNamesFrom({
+        displayName: userName,
+        profile: state && state.googleProfile,
+        knownNames: extra
+      });
+    }
+    return extra;
+  }
+
+  // glanceOwnNames is written after the first userinfo read. The account
+  // button's name counts the same way, with no token. Until one of those
+  // or a real display name exists, a greeting stays unjudged, for at most 2s.
   function readerNamesNotCached(userName) {
+    if (gmailAccountName()) return false;
     const known = state && Array.isArray(state.glanceOwnNames) ? state.glanceOwnNames : [];
     for (let i = 0; i < known.length; i++) {
       const name = String(known[i] || '').trim().toLowerCase();

@@ -112,6 +112,47 @@ test('Gmail chrome follows the page language, including the card date', async ({
   clean();
 });
 
+test('no token, account aria-label Sali Sapan, Hi Sali offers within 3s', async ({ glance }) => {
+  const clean = since(glance);
+  await glance.seedGmail({ glanceOwnNames: [], googleProfile: null });
+  const worker = glance.context.serviceWorkers()[0];
+  await worker.evaluate(async () => {
+    await chrome.storage.local.remove(['googleWebAuth']);
+  });
+  const page = await glance.openGmail(mail({
+    messageId: 'm-gate163-aria',
+    threadId: 't-gate163-aria',
+    accountLabel: 'Google Account: Sali Sapan (ai.local.flow@gmail.com)',
+    body: HI
+  }));
+  const card = page.locator('[data-legacy-message-id="m-gate163-aria"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 3000 });
+  clean();
+});
+
+test('with no names at all a judgment arrives after 2s', async ({ glance }) => {
+  const clean = since(glance);
+  await glance.seedGmail({ glanceOwnNames: [], googleProfile: null });
+  const worker = glance.context.serviceWorkers()[0];
+  await worker.evaluate(async () => {
+    await chrome.storage.local.remove(['googleWebAuth']);
+  });
+  const page = await glance.openGmail(mail({
+    messageId: 'm-gate163-noname',
+    threadId: 't-gate163-noname',
+    body: HI
+  }));
+  const row = page.locator('[data-legacy-message-id="m-gate163-noname"]');
+  await expect(row.locator('.flow-why-not')).toBeVisible({ timeout: 1500 });
+  await expect(row.locator('.flow-why-not')).toHaveAttribute('data-glance-why', 'names-pending');
+  const seen = Date.now();
+  await expect(row).toHaveAttribute('data-glance-names', 'quiet', { timeout: 4000 });
+  expect(Date.now() - seen).toBeGreaterThanOrEqual(1500);
+  await expect(row.locator('.flow-chip-host')).toHaveCount(0);
+  await expect(row.locator('.flow-why-not')).toHaveCount(0);
+  clean();
+});
+
 test('the Gmail path has no console error or unhandled rejection', async ({ glance }) => {
   const clean = since(glance);
   await glance.seedGmail({ glanceOwnNames: [], googleProfile: null });

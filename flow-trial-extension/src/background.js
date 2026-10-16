@@ -1561,8 +1561,9 @@ async function getGoogleWebAccessToken(interactive) {
 }
 
 // getAuthToken first. The web flow runs only after a non-cancel failure.
-// given_name, family_name, and name from the userinfo endpoint the existing
-// token can already call. No new scope. A refusal leaves the name list as it is.
+// openid and userinfo.profile sit on that same consent (Instinct R1). There
+// is no second prompt. given_name, family_name, and name from userinfo are
+// written onto glanceOwnNames. A refusal leaves the name list as it is.
 let googleNamesFilled = false;
 let googleProfileFlight = null;
 function namesFromGoogleUserinfo(info) {

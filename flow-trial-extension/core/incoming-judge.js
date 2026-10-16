@@ -114,7 +114,8 @@ const FlowIncomingJudge = (() => {
       onBehalfOf: i.onBehalfOf || null,
       graphSender: i.graphSender || null,
       forwarded: i.forwarded === true,
-      namesPending: i.namesPending === true
+      namesPending: i.namesPending === true,
+      namesWaitDone: i.namesWaitDone === true
     });
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.

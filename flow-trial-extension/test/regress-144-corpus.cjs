@@ -723,6 +723,44 @@ for (const id of ['v2syn-2054', 'v2syn-2057', 'v2syn-2060', 'v2syn-2086', 'v2syn
     console.log('FAIL: Hi Sali after the profile loaded ' + describe(offered));
     process.exit(1);
   }
+  const expired = J.judge({
+    text: hi.body,
+    subject: hi.subject,
+    sender: { name: 'Dana Levi', email: 'dana@acme.io' },
+    surface: 'gmail',
+    to: hi.to,
+    cc: [],
+    ownAddresses: [OWN_GMAIL],
+    userName: null,
+    ownNames: [],
+    namesPending: false,
+    namesWaitDone: true,
+    direction: 'inbound',
+    inbound: true
+  });
+  if (shown(expired) || expired.reason === 'names-pending') {
+    console.log('FAIL: Hi Sali after the name wait with no names ' + describe(expired) + ' ' + (expired.reason || ''));
+    process.exit(1);
+  }
+  const expiredNamed = J.judge({
+    text: hi.body,
+    subject: hi.subject,
+    sender: { name: 'Dana Levi', email: 'dana@acme.io' },
+    surface: 'gmail',
+    to: hi.to,
+    cc: [],
+    ownAddresses: [OWN_GMAIL],
+    userName: null,
+    ownNames: ['Sali Sapan'],
+    namesPending: false,
+    namesWaitDone: true,
+    direction: 'inbound',
+    inbound: true
+  });
+  if (!shown(expiredNamed)) {
+    console.log('FAIL: Hi Sali after the name wait with Sali Sapan ' + describe(expiredNamed));
+    process.exit(1);
+  }
 }
 console.log('offer pass ' + counts.offerPass + ' fail ' + counts.offerFail);
 console.log('quiet pass ' + counts.quietPass + ' fail ' + counts.quietFail);

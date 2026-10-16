@@ -4978,11 +4978,24 @@ const FlowIntent = (() => {
     }
     return false;
   }
+  // namesWaitDone means the host already waited (at most 2s on Gmail).
+  // An empty list is then a judgment: the greeting is not this person.
   function greetingAwaitingNames(text, ctx) {
     const c = ctx || {};
+    if (c.namesWaitDone === true) return false;
     const unresolved = c.namesPending === true || !readerNameList(c).length;
     if (!unresolved) return false;
     return greetedPerson(text);
+  }
+  function greetingUnconfirmed(text, ctx) {
+    const c = ctx || {};
+    if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i], text);
+      if (who && nameIsReader(who, c)) return false;
+    }
+    return true;
   }
   function vocativeIsOther(text, ctx) {
     const names = readerNameList(ctx);
@@ -5592,10 +5605,12 @@ const FlowIntent = (() => {
     // is not this person's Do It. "אבי שלום," plus an ask is that vocative.
     // A hold does not get past that by not being a reply ask.
     // A greeting with no cached name is not that quiet and not an offer.
-    // The host judges the same mail again once the profile names are stored.
+    // The host judges the same mail again once the profile names are stored,
+    // or after the name wait (at most 2s), with whatever names are known.
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
+    if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge');
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {

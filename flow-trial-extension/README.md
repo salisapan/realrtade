@@ -313,8 +313,9 @@ same Web client. Do not put this Web client id into `oauth2.client_id`.
 
 ### 6. Confirm the scopes match
 
-`manifest.json`'s `oauth2.scopes` should already list all five (this ships
-in the repo — nothing to add here unless it's been edited):
+`manifest.json`'s `oauth2.scopes` should already list these (this ships
+in the repo — nothing to add here unless it's been edited). `openid` and
+`userinfo.profile` are on that same consent, so Connect stays one prompt:
 
 ```
 https://www.googleapis.com/auth/tasks
@@ -322,6 +323,8 @@ https://www.googleapis.com/auth/calendar.events
 https://www.googleapis.com/auth/gmail.compose
 https://www.googleapis.com/auth/drive.readonly
 https://www.googleapis.com/auth/drive.file
+openid
+https://www.googleapis.com/auth/userinfo.profile
 ```
 
 `drive.readonly` is read access across the whole Drive. When an open
