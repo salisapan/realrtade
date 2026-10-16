@@ -61,7 +61,15 @@ const FlowIntent = (() => {
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
-  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+  // Construct state (smichut) is the ordinary way to name whose meeting it
+  // is: "פגישת צוות" and "שיחת צוות", not the absolute "פגישה" / "שיחה".
+  // The absolute form does not match the tav ending, so "סאלי, פגישת צוות
+  // ביום רביעי בשעה 15:00 במשרד" stayed silent while the same sentence with
+  // "פגישה" filed the calendar hold. The letter boundary stops the tav form
+  // matching inside a longer word ("פגישתנו"). The artifact lookahead also
+  // accepts the definite ה ("פגישת הסיכום"), the same refusal as a meeting
+  // summary.
+  const MEETING_NOUN_HE = /(פגיש(?:ה|ת)|שיח(?:ה|ת)|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?![\u0590-\u05FF])(?!\s*(?:(?:ה)?(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת)|סדר יום))/;
 
   // An explicit ask to meet, narrower than HANDOFF. "Could you please
   // confirm you can make it" is a confirm ask on a meeting that is already
@@ -133,7 +141,9 @@ const FlowIntent = (() => {
     '(?:the |our )?(?:call|meeting|sync|chat) was on',
     'already had (?:the |our )?(?:call|meeting|sync|chat)'
   ].join('|'), 'i');
-  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר)/;
+  // "תודה על פגישת הצוות" is the same already-happened thanks as
+  // "תודה על הפגישה". The construct form has no article on the first noun.
+  const EVENT_RECAP_HE = /(תודה על (?:ה)?(?:שיחה|פגישה|שיחת|פגישת)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר)/;
 
   // The other half of the "don't schedule the past" fix above: EVENT_RECAP
   // only helps when the message uses recognizable past-tense phrasing.
