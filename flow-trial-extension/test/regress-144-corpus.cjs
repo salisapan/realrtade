@@ -177,6 +177,19 @@ for (const row of rows) {
   }
   byId[row.id] = row;
 }
+// The fixture freezes "tomorrow" as Oct 17, the day after 2026-10-16.
+// Asia/Jerusalem is three hours ahead of UTC, so that job is already the
+// next local day while UTC is still the 16th. The mail says tomorrow.
+// The label is that local day, same shape as humanDateFallback.
+{
+  const row = byId['v2syn-2019'];
+  if (row) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    row.expectLabel = 'Log commitment for ' + months[d.getMonth()] + ' ' + d.getDate() + ' 10:00';
+  }
+}
 for (const id of OUTBOUND_QUIET) {
   const row = byId[id];
   const mark = row && row.context;
