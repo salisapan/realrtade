@@ -128,19 +128,30 @@ const FlowIncomingJudge = (() => {
       return { show: false, reason: 'fact-reply-block', intent };
     }
     const isRequest = intentApi.TYPES ? intent.type === intentApi.TYPES.REQUEST : intent.type === 'request';
+    const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
+    // Phishing and a bank-change payment stay quiet before any plan.
+    // The Outlook task path and the Gmail path both stop here.
+    if (typeof intentApi.phishingOrNegative === 'function' && intentApi.phishingOrNegative(vetoText)) {
+      return { show: false, reason: 'quiet:family', intent };
+    }
     const gate = fileAttach && typeof fileAttach.gate === 'function' ? fileAttach.gate(text) : { kind: 'ignore' };
-    if (isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
+    // "Following up on our call" is not the event. The ask under it, with
+    // no parsed clock, is the reply. A file ask that does not use that
+    // frame stays on the file chain.
+    const noParsedClock = !(intent.entities && Number.isInteger(intent.entities.hour) && Number.isInteger(intent.entities.minute));
+    const followUpCall = /\bfollowing up on (?:our|the|that) call\b/i.test(text);
+    const replyInsteadOfFile = isRequest && noParsedClock && intent.personalClose === 'follow-up-ask' && !intent.inviteFile && followUpCall;
+    if (!replyInsteadOfFile && isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
     // A deadline whose day was dropped (31/2, or a weekday that is not that
     // calendar day) is still the reply. The file chain is not that close.
     const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
-    if (isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
+    if (!replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
       if (resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
       // (task + short attached draft), on Outlook as well as Gmail.
       if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile)) return { show: false, reason: 'file-chain-not-run', intent };
     }
-    const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
     // Same classifier as planFor. A meeting that was cancelled, postponed,
     // already held, or an out-of-office note does not show. A marketing
     // webinar with no personal ask does not show. A second event that is

@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '26acfd3d383a2ca9ab89d5879cf27af867976311acb685f2c77f6937516c7812';
+const FIXTURE_SHA = 'c4417a87f4f2256c79cc4dc4f00ea7bf86b9d4931c8e811a5b4898563eeec1d9';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -161,7 +161,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 529) {
+if (rows.length !== 558) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -375,6 +375,71 @@ for (const row of rows) {
   const outlookOk = shown(o) ? (o.intent && o.intent.entities && o.intent.entities.hour === 10) : connectorQuiet('outlook', o);
   if (!shown(g) || g.intent.type !== 'event' || hour !== 10 || minute !== 0 || cal.length !== 1 || cal[0].params.hour !== 10 || !outlookOk) {
     console.log('FAIL: 23409 calendar gmail ' + describe(g) + ' outlook ' + describe(o) + ' hour ' + hour);
+    process.exit(1);
+  }
+}
+{
+  const row = byId['v2syn-6673'];
+  const ctx = contextOf(row);
+  const g = judge(row, 'gmail', ctx);
+  const o = judge(row, 'outlook', ctx);
+  if (!row || row.expected !== 'quiet' || shown(g) || shown(o) || g.reason !== 'quiet:family' || o.reason !== 'quiet:family') {
+    console.log('FAIL: 6673 phishing gmail ' + describe(g) + ' outlook ' + describe(o));
+    process.exit(1);
+  }
+}
+const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-2557','v2syn-3315','v2syn-3317','v2syn-3328','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12553','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787','v2syn-13797','v2syn-12060','v2syn-12219','v2syn-13338','v2syn-13339','v2syn-1506'];
+for (const id of REPLY_TRACK) {
+  const row = byId[id];
+  if (!row || row.expected !== 'offer' || row.expectKind !== 'request') {
+    console.log('FAIL: reply label ' + id);
+    process.exit(1);
+  }
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const draft = steps.some((s) => s && (s.kind === 'gmailDraft' || s.kind === 'outlookDraft'));
+    const cal = steps.some((s) => s && s.kind === 'calendar');
+    if (!shown(out) || !out.process || out.process.id !== 'reply-track' || !draft || cal) {
+      console.log('FAIL: reply track ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.process && out.process.id) || ''));
+      process.exit(1);
+    }
+  }
+}
+for (const id of ['v2syn-1797', 'v2syn-1806']) {
+  const row = byId[id];
+  if (!row || row.expected !== 'offer' || row.expectKind !== 'task' || row.expectLabel !== 'Schedule meeting') {
+    console.log('FAIL: schedule label ' + id);
+    process.exit(1);
+  }
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const cal = steps.some((s) => s && s.kind === 'calendar');
+    if (!shown(out) || !taskOnly(out) || cal || !out.intent || out.intent.label !== 'Schedule meeting') {
+      console.log('FAIL: schedule meeting ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.intent && out.intent.label) || ''));
+      process.exit(1);
+    }
+  }
+}
+{
+  const he = J.judge({
+    text: 'סאלי, בוא ניפגש מחר כדי לדבר על התקציב. תודה.',
+    subject: '',
+    sender: { name: 'Ethan Hunt', email: 'ethan@initech.com' },
+    surface: 'gmail',
+    to: [OWN_GMAIL],
+    cc: [],
+    ownAddresses: [OWN_GMAIL, OWN_OUTLOOK],
+    userName: 'Sali',
+    ownNames: NAMES,
+    direction: 'inbound',
+    inbound: true
+  });
+  if (!shown(he) || !taskOnly(he) || !he.intent || he.intent.label !== 'לתאם פגישה') {
+    console.log('FAIL: Hebrew schedule ' + describe(he) + ' ' + ((he.intent && he.intent.label) || ''));
     process.exit(1);
   }
 }

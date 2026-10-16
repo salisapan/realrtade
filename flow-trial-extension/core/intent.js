@@ -528,14 +528,25 @@ const FlowIntent = (() => {
     return named[1];
   }
   // A changed bank plus a payment is not a task. Quiet beats a wrong Do It.
-  const BANK_CHANGE = /\b(?:changed banks|new account|update (?:our |the )?(?:bank|account) details)\b|פרטי חשבון חדשים|החלפנו בנק/i;
+  // "wire … to the new bank account below" is the same quiet: a payment
+  // aimed at an account the sender just introduced. A dated invoice with
+  // no new account is still the ask.
+  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below)\b|פרטי חשבון חדשים|החלפנו בנק/i;
   const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|תשלם|להעביר)(?![\u0590-\u05FF])/i;
   function bankChangePayment(text) {
     const raw = String(text || '');
     return BANK_CHANGE.test(raw) && PAY_MOVE.test(raw);
   }
+  // Phishing and the bank-change negative. One predicate, used before any
+  // plan is built, on every host.
+  function phishingOrNegative(text) {
+    return bankChangePayment(text);
+  }
   function replyDraftAllowed(text, ctx) {
     const c = ctx || {};
+    // A note the user sent to their own address is still the ask. The
+    // draft is prepared for them. A mail they sent to someone else is not.
+    if (addressedToSelf(c) && c.autoReply !== true) return true;
     if (c.autoReply === true || c.noteToSelf === true || c.senderIsUser === true) return false;
     if (c.inbound === false || c.direction === 'outbound' || c.inSent === true) return false;
     const sender = String(c.senderEmail || '').toLowerCase();
@@ -910,6 +921,11 @@ const FlowIntent = (() => {
         if (FlowJudgment.isNegatedBefore(s.slice(0, index))) continue;
         if (MEETING_SOFT.test(s)) continue;
         if (deadlineBeforeMeeting(s.slice(0, index))) continue;
+        // "Following up on our call" names a call that already happened.
+        // It is not a meeting to schedule, and the date in the next
+        // sentence is the ask, not that call.
+        const noun = String(hit[1] || hit[0] || '');
+        if (/^call$/i.test(noun) && /\bfollowing up on (?:our|the|that) call\b/i.test(s) && !/\b(?:tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}:\d{2}|next\s+\w+)\b/i.test(s)) continue;
         return true;
       }
       return false;
@@ -1518,7 +1534,11 @@ const FlowIntent = (() => {
     }
 
     const dateDropped = Boolean(facts.date && facts.date.dropped);
-    const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
+    // "Any chance you could", "please email me", and "please loop in"
+    // are asks. The handoff list does not name them. A resolved day is
+    // what makes the ask concrete. No day, no chip from this phrase.
+    const datedAsk = hasResolvedDate && !isPast && /\b(?:any chance you could|please (?:email|e-mail|loop in|create)|kindly (?:email|loop in))\b/i.test(text);
+    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
@@ -1735,7 +1755,7 @@ const FlowIntent = (() => {
     };
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

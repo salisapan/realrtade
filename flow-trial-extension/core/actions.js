@@ -665,8 +665,30 @@ const FlowActions = (() => {
       && calendarOp !== 'delete' && calendarOp !== 'update'
       && intent.personalClose !== 'calendar-cancel'
       && intent.personalClose !== 'calendar-move';
-    if (untimedCalendar) proc = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
-    const taskPlan = taskInstead || untimedCalendar;
+    // No parsed clock. An ask from someone else is the reply (a draft),
+    // not a Log commitment. Log commitment is the user's own promise.
+    // "Let's meet tomorrow" with no time is the task Schedule meeting.
+    const untimedSrc = String(vetoText || '');
+    const letsMeet = /\blet'?s\s+meet\b/i.test(untimedSrc) || /(?:בואו|בוא)\s+ניפגש|נתאם\s+פגישה|נקבע\s+פגישה/.test(untimedSrc);
+    const ownPromise = Boolean(intent.signals && intent.signals.flags && intent.signals.flags.senderPromise)
+      || /\b(?:i|we)(?:'|’)ll\b|\b(?:i|we)\s+will\b/i.test(untimedSrc)
+      || /(?:^|[^\u0590-\u05FF])(?:אני|אנחנו)\s+(?:אשלח|אעביר|אשלם|נשלח|נעביר|נשלם)/.test(untimedSrc);
+    const askOther = !ownPromise && Boolean(intent.signals && intent.signals.flags && intent.signals.flags.handoff);
+    let scheduleMeet = false;
+    let replyInstead = false;
+    if (untimedCalendar && letsMeet) {
+      proc = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
+      scheduleMeet = true;
+      intent.label = /[\u0590-\u05FF]/.test(untimedSrc) ? 'לתאם פגישה' : 'Schedule meeting';
+    } else if (untimedCalendar && askOther) {
+      proc = Object.assign({ id: 'reply-track' }, PROCESS_CATALOG['reply-track']);
+      replyInstead = true;
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      intent.label = 'Reply requested' + (when ? ' by ' + when : '');
+    } else if (untimedCalendar) {
+      proc = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
+    }
+    const taskPlan = taskInstead || (untimedCalendar && !replyInstead);
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.
