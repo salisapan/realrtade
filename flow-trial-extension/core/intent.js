@@ -597,9 +597,10 @@ const FlowIntent = (() => {
     if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
     return names;
   }
-  // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
-  // the reader's names in that script. A Hebrew name is not "other" just
-  // because the only stored name is Latin, and the reverse.
+  // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when it is
+  // not the reader's name. The reader's names are the account display
+  // name and ownNames, in either script. A name in the other script is
+  // still someone else.
   const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
@@ -679,17 +680,18 @@ const FlowIntent = (() => {
     const raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
     return /^quote\s*:/i.test(raw) && /["“”«»]/.test(raw);
   }
+  // The greeted name is this person only when it is the display name or
+  // one of ownNames (סאלי beside Sali). Any other name stays quiet, even
+  // when this person is on To. "סאלי שלום," and "Sali, could you" are the
+  // reader. "נועה שלום," and "Lior, could you" are not.
   function vocativeIsOther(text, ctx) {
     const names = readerNameList(ctx);
     if (!names.length) return false;
-    const hebrew = /[\u0590-\u05FF]/;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
       if (!who) continue;
-      const named = who.toLowerCase();
-      if (names.indexOf(named) !== -1) continue;
-      if (!names.some((n) => hebrew.test(n) === hebrew.test(who))) continue;
+      if (names.indexOf(who.toLowerCase()) !== -1) continue;
       return true;
     }
     return false;
@@ -1626,9 +1628,6 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  // A file asked onto an invite that already exists. One plan, reused by
-  // both lanes: a task, then a short attached draft. The title replaces
-  // "Reply requested". A missing file is still this card, never a banner.
   // A solo phone task is not an event noun. "Call Tom", "I will call the
   // bank", and "I'll call the bank" stay tasks. "I'll call you" is the
   // two-party call, so this returns false.
@@ -1640,18 +1639,42 @@ const FlowIntent = (() => {
     return false;
   }
 
-  function attachToInvitePlan(text) {
+  function cleanInviteFile(raw) {
+    const name = String(raw || '').replace(/\s+/g, ' ').trim().replace(/^[\s:,.-]+|[\s:,.!-]+$/g, '');
+    if (!name || name.length > 80) return '';
+    if (/^(?:file|files|it|this|that|the file|קובץ|הקובץ|אותו|את זה)$/i.test(name)) return '';
+    return name;
+  }
+  function inviteFileName(raw) {
+    const he = String(raw || '').match(/לצרר?ף\s+את\s+([\s\S]{1,80}?)\s+לזימון/);
+    if (he) return cleanInviteFile(he[1]);
+    const en = String(raw || '').match(/\battach\s+(?:the\s+|a\s+|an\s+)?([\s\S]{1,80}?)\s+to\s+the\s+(?:sync|invite|invitation|meeting|call)\b/i);
+    if (en) return cleanInviteFile(en[1]);
+    return '';
+  }
+  // A file asked onto an invite that already exists. One plan, reused by
+  // both lanes: a task, then a short draft. The title names the file.
+  // A missing file is still this card, never a banner. The draft says
+  // the file is attached only when a file is on the draft.
+  // opts.attached is true only when the draft will carry a real file.
+  // An inbound attachment, or a file that was not found, is not that.
+  function attachToInvitePlan(text, opts) {
     const raw = String(text || '');
     const heAttach = /לצרר?ף[\s\S]{0,160}?לזימון/.test(raw);
-    const enAttach = /\battach\b[\s\S]{0,120}?\bto\s+the\s+(?:sync|invite|invitation)\b/i.test(raw);
+    const enAttach = /\battach\b[\s\S]{0,160}?\bto\s+the\s+(?:sync|invite|invitation|meeting|call)\b/i.test(raw);
     if (!heAttach && !enAttach) return null;
     const he = /[\u0590-\u05FF]/.test(raw);
+    const named = inviteFileName(raw);
+    const file = named || (he ? 'קובץ' : 'file');
+    const attached = Boolean(opts && opts.attached === true);
     return {
       inviteFile: true,
-      label: he ? 'לצרף קובץ לזימון' : 'Attach file to invite',
+      fileName: named || null,
+      attached: attached,
+      label: he ? ('לצרף ' + file + ' לזימון') : ('Attach ' + file + ' to invite'),
       processId: 'attach-invite',
       stepKinds: ['task', 'draft'],
-      draft: he ? 'מצורף.' : 'Attached.',
+      draft: attached ? (he ? 'מצורף.' : 'Attached.') : (he ? 'אצרף בהקדם.' : "I'll attach it shortly."),
       banner: false
     };
   }

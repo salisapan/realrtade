@@ -253,7 +253,8 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
     const kinds = row.process && row.process.steps && row.process.steps.map((s) => s.kind);
     const taskAt = kinds ? kinds.findIndex((k) => k === 'googleTask' || k === 'outlookTask') : -1;
     const draftAt = kinds ? kinds.findIndex((k) => k === 'gmailDraft' || k === 'outlookDraft') : -1;
-    return row.show === true && row.intent && row.intent.label === 'לצרף קובץ לזימון' && taskAt !== -1 && draftAt > taskAt;
+    const draft = row.process && row.process.steps && row.process.steps[draftAt] && row.process.steps[draftAt].params && row.process.steps[draftAt].params.body;
+    return row.show === true && row.intent && row.intent.label === 'לצרף טופס 101 לזימון' && draft === 'אצרף בהקדם.' && !/מצורף/.test(String(draft || '')) && taskAt !== -1 && draftAt > taskAt;
   }
   check('attaching a form to a demo invite is the file track',
     inviteTrack(formOutlook) && inviteTrack(formGmail),

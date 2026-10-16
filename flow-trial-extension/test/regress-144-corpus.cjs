@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '2a319148449cb199699a9a37b3dc498a8123f0c290505200a9a8f494f84073aa';
+const FIXTURE_SHA = 'f179852b2eb118d73384c349d0aea76b77b3b71485437b4e6c9d478389c6e8f2';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -130,6 +130,13 @@ function connectorQuiet(surface, out) {
 
 function shown(out) { return out && out.show === true; }
 
+function draftClaimsAttached(out) {
+  const body = J.draftText(out && out.process, {});
+  if (!body) return '';
+  if (/Attached/.test(body) || /מצורף/.test(body)) return body.replace(/\s+/g, ' ').trim();
+  return '';
+}
+
 function fileTrack(out) {
   if (!shown(out)) return true;
   const kinds = ((out.process && out.process.steps) || []).map((s) => s && s.kind);
@@ -154,7 +161,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 517) {
+if (rows.length !== 523) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -176,6 +183,30 @@ for (const id of OUTBOUND_QUIET) {
   const addresses = own.indexOf(from) >= 0 && to.length > 0 && to.some((a) => own.indexOf(a) < 0);
   if (!row || row.expected !== 'quiet' || row.expectKind || row.reason !== OUTBOUND_REASON || !mark || mark.from !== 'user' || mark.to !== 'other' || !addresses) {
     console.log('FAIL: outbound label ' + id);
+    process.exit(1);
+  }
+}
+const NEW_FILE = {
+  'v2syn-3392': 'Attach CV to invite',
+  'v2syn-3427': 'Attach SOW to invite'
+};
+const NEW_VOC = {
+  'cto-1016-voc-he-own': 'offer',
+  'cto-1016-voc-en-own': 'offer',
+  'cto-1016-voc-he-other': 'quiet',
+  'cto-1016-voc-en-other': 'quiet'
+};
+for (const id of Object.keys(NEW_FILE)) {
+  const row = byId[id];
+  if (!row || row.expected !== 'offer' || row.expectTrack !== 'file' || row.expectLabel !== NEW_FILE[id]) {
+    console.log('FAIL: meeting attach label ' + id);
+    process.exit(1);
+  }
+}
+for (const id of Object.keys(NEW_VOC)) {
+  const row = byId[id];
+  if (!row || row.expected !== NEW_VOC[id] || row.to.indexOf('ai.local.flow@gmail.com') < 0) {
+    console.log('FAIL: vocative label ' + id);
     process.exit(1);
   }
 }
@@ -264,13 +295,15 @@ for (const row of rows) {
     const labelWhy = labelMismatch(g, row) || labelMismatch(o, row);
     const label = !row.expectLabel || ((!shown(g) || (g.intent && g.intent.label === row.expectLabel)) && (!shown(o) || (o.intent && o.intent.label === row.expectLabel)));
     const track = row.expectTrack !== 'file' || (fileTrack(g) && fileTrack(o));
-    ok = gOk && oOk && oneShows && kind && !labelWhy && label && track;
+    const draftClaim = row.expectTrack === 'file' ? (draftClaimsAttached(g) || draftClaimsAttached(o)) : '';
+    ok = gOk && oOk && oneShows && kind && !labelWhy && label && track && !draftClaim;
     if (!ok) {
       why = 'gmail ' + describe(g) + ' outlook ' + describe(o);
       if (row.expectKind && !kind) why += ' expectKind ' + row.expectKind + (row.expectDate ? ' ' + row.expectDate : '');
       if (labelWhy) why += ' label ' + labelWhy;
       if (row.expectLabel && !label) why += ' label gmail ' + ((g.intent && g.intent.label) || '') + ' outlook ' + ((o.intent && o.intent.label) || '');
       if (row.expectTrack === 'file' && !track) why += ' track';
+      if (draftClaim) why += ' draft ' + draftClaim;
     }
   } else {
     ok = !shown(g) && !shown(o);

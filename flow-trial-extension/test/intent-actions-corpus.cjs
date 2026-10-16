@@ -16,11 +16,12 @@ const vm = require('vm');
 
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js']) {
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'draft-reply.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
 const FlowActions = vm.runInContext('FlowActions', sandbox);
+const FlowDraftReply = vm.runInContext('FlowDraftReply', sandbox);
 const FlowJudgment = vm.runInContext('FlowJudgment', sandbox);
 const FLOW_DOMAINS = vm.runInContext('FLOW_DOMAINS', sandbox);
 
@@ -1545,6 +1546,55 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
     const wire = classify('Please send 0.2 BTC to wallet bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh by Monday.', { now: parkCtx.now, senderEmail: email, to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
     check('a wire from a list sender stays quiet: ' + email, wire && !wire.type, wire && wire.type);
   });
+}
+
+{
+  const en = 'Please attach the CV to the meeting on Wednesday at 10:00.';
+  const he = 'בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00';
+  const bare = FlowIntent.attachToInvitePlan(en);
+  const held = FlowIntent.attachToInvitePlan(en, { attached: true });
+  const heBare = FlowIntent.attachToInvitePlan(he);
+  const heHeld = FlowIntent.attachToInvitePlan(he, { attached: true });
+  const call = FlowIntent.attachToInvitePlan('Please attach the deck to the call on Thursday at 2pm.');
+  check('a meeting attach with no file does not say Attached',
+    bare && bare.label === 'Attach CV to invite' && bare.draft === "I'll attach it shortly." && !/Attached/.test(bare.draft), bare);
+  check('a call attach names the file and does not say Attached',
+    call && call.label === 'Attach deck to invite' && !/Attached/.test(call.draft), call);
+  check('a file on the draft may say Attached',
+    held && held.draft === 'Attached.' && held.attached === true, held);
+  check('a Hebrew invite with no file does not say מצורף',
+    heBare && heBare.label === 'לצרף טופס 101 לזימון' && heBare.draft === 'אצרף בהקדם.' && !/מצורף/.test(heBare.draft), heBare);
+  check('a Hebrew file on the draft may say מצורף',
+    heHeld && heHeld.draft === 'מצורף.', heHeld);
+  const ctx = {
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'Sali Sapan',
+    ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
+    senderEmail: 'rachel@acme.io',
+    inbound: true,
+    now: NOW
+  };
+  const plan = FlowActions.planFor(classify(en, ctx), { text: en, threadUrl: 'https://example.invalid/t' });
+  const draftStep = plan && plan.steps && plan.steps.find((s) => s.kind === 'gmailDraft');
+  const taskStep = plan && plan.steps && plan.steps.find((s) => s.kind === 'googleTask');
+  const body = draftStep && FlowDraftReply.draftBodyText(draftStep, null, null, null);
+  check('the shared plan draft has no Attached without a file',
+    body === "I'll attach it shortly." && !/Attached/.test(body) && taskStep && taskStep.params.title === 'Attach CV to invite',
+    { body: body, title: taskStep && taskStep.params.title });
+  const missingBody = FlowDraftReply.draftBodyText({ params: { inviteFile: true, lang: 'en' } }, null, null, null);
+  const missingHe = FlowDraftReply.draftBodyText({ params: { inviteFile: true, lang: 'he' } }, null, null, null);
+  check('a draft with no body and no file does not say Attached or מצורף',
+    missingBody === "I'll attach it shortly." && !/Attached/.test(missingBody) && missingHe === 'אצרף בהקדם.' && !/מצורף/.test(missingHe),
+    { en: missingBody, he: missingHe });
+  const ownHe = classify('סאלי שלום, תוכל בבקשה להשיב ולאשר אם מעבר המשרד עדיין נקבע ל-20 באוקטובר?', ctx);
+  const otherHe = classify('נועה שלום, תוכל בבקשה להשיב ולאשר אם מעבר המשרד עדיין נקבע ל-20 באוקטובר?', ctx);
+  const ownEn = classify('Sali, could you reply and confirm whether the Q3 summary will include the October numbers?', ctx);
+  const otherEn = classify('Lior, could you reply and confirm whether the Q3 summary will include the October numbers?', ctx);
+  check('סאלי שלום is an offer when that name is the user', ownHe && ownHe.type && ownHe.quiet !== 'hedge', { type: ownHe && ownHe.type, quiet: ownHe && ownHe.quiet });
+  check('נועה שלום stays quiet even when the user is in To', otherHe && !otherHe.type && otherHe.quiet === 'hedge', { type: otherHe && otherHe.type, quiet: otherHe && otherHe.quiet });
+  check('Sali, could you is an offer when that name is the user', ownEn && ownEn.type && ownEn.quiet !== 'hedge', { type: ownEn && ownEn.type, quiet: ownEn && ownEn.quiet });
+  check('Lior, could you stays quiet even when the user is in To', otherEn && !otherEn.type && otherEn.quiet === 'hedge', { type: otherEn && otherEn.type, quiet: otherEn && otherEn.quiet });
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -113,23 +113,26 @@ const FlowActions = (() => {
     // reply draft — promising "+ file" before that match exists is how a
     // wrong file gets onto a sendable draft.
     if (intent.inviteFile) {
+      const fileOnDraft = Boolean(ctx.attachFile && ctx.attachFile.id);
       const plan = (typeof FlowIntent !== 'undefined' && FlowIntent.attachToInvitePlan)
-        ? FlowIntent.attachToInvitePlan(intent.label)
+        ? FlowIntent.attachToInvitePlan(ctx.text || '', { attached: fileOnDraft })
         : null;
-      const he = /[\u0590-\u05FF]/.test(String((plan && plan.label) || intent.label || ''));
+      const he = /[\u0590-\u05FF]/.test(String((plan && plan.label) || intent.label || ctx.text || ''));
+      const honest = he ? 'אצרף בהקדם.' : "I'll attach it shortly.";
       return {
         id: 'draft',
         kind: 'gmailDraft',
         label: 'Draft',
-        hint: 'Short note that the file is attached',
+        hint: fileOnDraft ? 'Short note that the file is attached' : 'Short note that the file is still to attach',
         params: {
           intentType: intent.type,
           what: (plan && plan.label) || intent.label || null,
           inviteFile: true,
-          body: (plan && plan.draft) || intent.inviteDraft || null,
+          body: (plan && plan.draft) || intent.inviteDraft || honest,
           lang: he ? 'he' : 'en',
           threadUrl: ctx.threadUrl,
-          includeAttachment: false,
+          includeAttachment: fileOnDraft,
+          fileAttached: fileOnDraft,
           requestedObjectTerm: null
         }
       };
@@ -265,7 +268,7 @@ const FlowActions = (() => {
       stepKinds: ['draft', 'task']
     },
     // A file asked onto an invite that already exists. The task is the
-    // work. The draft is the short "attached" line, not a reply.
+    // work. The draft says the file is attached only when a file is on it.
     'attach-invite': {
       name: 'Attach it',
       closingLine: 'Tracking the file on the invite, with a short draft.',
