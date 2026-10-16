@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 
 const EXT = path.join(__dirname, '..');
 const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
-const start = gmail.indexOf('function glanceUiLanguage');
+const start = gmail.indexOf('function glancePickLang');
 const end = gmail.indexOf('(function flowGmailWatcher');
 const reason = gmail.slice(gmail.indexOf('function reasonMessage'), gmail.indexOf('function arrayBufferToBase64'));
 check('the chip does not render a stored reconnect label', reason.indexOf('response.reconnectLabel') < 0 && reason.indexOf('glanceUiCopy(\'reconnect\')') > 0);

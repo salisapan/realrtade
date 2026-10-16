@@ -67,7 +67,14 @@ check('the version line stays 0.9.56', manifest.version === '0.9.56');
 check('Gmail is still the first content script', manifest.content_scripts[0].js[manifest.content_scripts[0].js.length - 1] === 'src/content-gmail.js');
 const gmailJs = manifest.content_scripts[0].js;
 check('#144 native-edit.js stays ahead of follow.js', gmailJs.indexOf('src/native-edit.js') > 0 && gmailJs.indexOf('src/follow.js') > gmailJs.indexOf('src/native-edit.js'));
-check('chat drafts are not extra static content scripts', manifest.content_scripts.length === 1);
+const outlookLaneHosts = ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'];
+const outlookLane = (manifest.content_scripts || [])[1] || {};
+check('chat drafts are not extra static content scripts',
+  manifest.content_scripts.length === 2 &&
+  (manifest.content_scripts[0].matches || [])[0] === 'https://mail.google.com/*' &&
+  outlookLaneHosts.every((host) => (outlookLane.matches || []).indexOf(host) >= 0) &&
+  (outlookLane.js || []).indexOf('src/content-outlook-lane-ms.js') >= 0 &&
+  (outlookLane.js || []).every((file) => !/chat-draft|content-messenger|content-instagram|content-whatsapp|lane-chat/.test(file)));
 const scriptBlob = JSON.stringify(manifest.content_scripts);
 check('business.facebook.com is not a static content script match', scriptBlob.indexOf('business.facebook.com') < 0);
 check('no chat host is a static content script match', !/whatsapp|messenger|instagram/.test(scriptBlob));

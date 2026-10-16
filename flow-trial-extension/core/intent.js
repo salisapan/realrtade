@@ -799,11 +799,6 @@ const FlowIntent = (() => {
         facts.date = slot.date;
       }
     }
-    // A weekday that names a different day than the written date is not a
-    // meeting. Staying quiet beats filing Thursday's words on Sunday.
-    if (facts.date && facts.date.contradictsWeekday) {
-      return { type: null, signals: {}, facts: facts, quiet: 'date' };
-    }
     const s = FlowJudgment.score(text, domain, facts);
     // A bad deadline drops only the date. The reply stays, with no due date
     // and no quick-pick. A meeting conflict keeps both choices for the card.

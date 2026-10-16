@@ -1,5 +1,6 @@
 // Weekday + day-first date + בשעה HH:MM is one clock. A contradicting
-// weekday stays quiet. The calendar refusal does not say "file".
+// weekday is a schedule and does not book either day. The calendar
+// refusal does not say "file".
 // Run in UTC and Asia/Jerusalem: node test/hebrew-hold-corpus.cjs
 
 const fs = require('fs');
@@ -38,7 +39,11 @@ const calendar = plan && plan.steps && plan.steps.find((step) => step.kind === '
 check('the plan writes a calendar hold', !!(calendar && calendar.params && calendar.params.dateIso === '2026-10-22' && calendar.params.hour === 14), plan && plan.steps && plan.steps.map((s) => s.kind));
 
 const quiet = FlowIntent.classify(QUIET, { now: now, senderName: 'flow' });
-check('a weekday that contradicts the date stays quiet', quiet && quiet.type == null && quiet.quiet === 'date', quiet && { type: quiet.type, quiet: quiet.quiet });
+const quietPlan = FlowActions.planFor(quiet, {});
+check('a weekday that contradicts the date stays a schedule and does not book one day',
+  quiet && quiet.type === 'event' && quiet.entities && quiet.entities.dateIso == null &&
+  quietPlan && quietPlan.id === 'schedule' && quietPlan.needsDateChoice !== true,
+  quiet && { type: quiet.type, quiet: quiet.quiet, dateIso: quiet.entities && quiet.entities.dateIso, plan: quietPlan && quietPlan.id });
 
 const body = Cal.eventBody({
   dateIso: '2026-10-22',

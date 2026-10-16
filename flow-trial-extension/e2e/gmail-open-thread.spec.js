@@ -1,8 +1,8 @@
 // G146-1: a new mail is opened beside the inbox list. Those rows are
 // listitems with no message body. The card belongs on the opened mail
 // within 3s, including after a reload of that same thread.
-// G146-6: a Hebrew sync meeting is titled פגישה, and the card chrome
-// follows the page language.
+// G146-6: a Hebrew sync meeting shows within 3s. The title is the hold
+// line (שריין plus the day and clock). The primary button stays בצע.
 const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
@@ -27,7 +27,7 @@ test('a new Gmail mail shows a card within 3s, including after reload', async ({
   await expect(card).toBeVisible({ timeout: 3000 });
 });
 
-test('a Hebrew sync meeting is titled פגישה and the chrome follows the page', async ({ glance }) => {
+test('a Hebrew sync meeting shows the hold line and the chrome follows the page', async ({ glance }) => {
   await glance.seedOutlook();
   const page = await glance.openOutlook({
     id: 'AQMkGlanceSyncTitle',
@@ -40,7 +40,7 @@ test('a Hebrew sync meeting is titled פגישה and the chrome follows the page
   });
   const card = page.locator('#ReadingPaneContainerId .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 3000 });
-  await expect(card.locator('.gs-intent')).toHaveText('פגישה');
+  await expect(card.locator('.gs-intent')).toHaveText('שריין ה׳ 11:00');
   await expect(card.locator('.gs-intent-label')).toHaveText('כוונה שזוהתה');
   await expect(card.locator('.doit-dark')).toHaveText('בצע');
 });

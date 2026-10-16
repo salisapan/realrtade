@@ -15,6 +15,18 @@
 
 // Chip and header lines follow the browser UI language. A stored Hebrew
 // label must not appear in an English UI, and the reverse is the same rule.
+// FlowDisplay.uiLangFrom is the one picker. This fallback is that same
+// order (setting, host, UI, navigator) when the shared file has not loaded.
+function glancePickLang(sources) {
+  const s = sources || {};
+  if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+    return FlowDisplay.uiLangFrom(s);
+  }
+  const raw = String(s.setting || s.hostLanguage || s.uiLanguage || s.navigatorLanguage || '').trim().toLowerCase();
+  if (raw === 'he' || raw.indexOf('he-') === 0 || raw === 'iw' || raw.indexOf('iw-') === 0) return 'he';
+  return 'en';
+}
+
 function glanceUiLanguage() {
   let host = '';
   let ui = '';
@@ -25,10 +37,7 @@ function glanceUiLanguage() {
     if (i18n && typeof i18n.getUILanguage === 'function') ui = i18n.getUILanguage() || '';
   } catch (e) {}
   try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
-  if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
-    return FlowDisplay.uiLangFrom({ hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
-  }
-  return 'en';
+  return glancePickLang({ hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
 }
 
 function glanceUiHebrew() {
@@ -88,12 +97,8 @@ function glanceUiCopy(kind) {
     try { nav = (navigator && navigator.language) || ''; } catch (e) {}
     let host = '';
     try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
-    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
-      rememberHostLanguage(host);
-      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
-    }
     rememberHostLanguage(host);
-    return 'en';
+    return glancePickLang({ setting: state && state.glanceUiLanguage, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
   }
 
   function rememberHostLanguage(host) {

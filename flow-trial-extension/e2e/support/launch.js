@@ -41,6 +41,32 @@ function copyExtension(opts) {
     'https://www.business.facebook.com/latest/inbox/*'
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
+  // This copy only. The repo manifest does not load the compose filler.
+  // The lane specs fill a Gmail compose window, so this copy inserts the
+  // full-flavor scripts in the same order, ahead of the card.
+  const gmail = (manifest.content_scripts || []).find((s) => (s.matches || []).indexOf('https://mail.google.com/*') >= 0);
+  if (gmail && Array.isArray(gmail.js)) {
+    const filler = [
+      'core/draft-reply.js',
+      'core/google-config.js',
+      'core/google-calendar.js',
+      'core/google-tasks.js',
+      'core/google-drive.js',
+      'core/google-docs.js',
+      'core/google-sheets.js',
+      'core/google-contacts.js',
+      'core/google-compose.js',
+      'core/google-proof.js',
+      'src/google-compose-page.js'
+    ];
+    let at = gmail.js.indexOf('src/content-gmail.js');
+    filler.forEach((file) => {
+      if (gmail.js.indexOf(file) >= 0) return;
+      if (at < 0) { gmail.js.push(file); return; }
+      gmail.js.splice(at, 0, file);
+      at += 1;
+    });
+  }
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
 }

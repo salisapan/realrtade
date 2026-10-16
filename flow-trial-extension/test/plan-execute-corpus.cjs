@@ -50,14 +50,20 @@ function shownFamilies(host) {
   return out;
 }
 function connectorFamily(id) {
-  if (id === 'outlookCalendar' || id === 'calendar') return 'calendar';
-  if (id === 'outlookTask' || id === 'googleTask' || id === 'googleTasks' || id === 'microsoftTodo') return 'task';
-  if (id === 'outlookDraft' || id === 'gmailDraft') return 'draft';
-  if (id === 'onedriveFile' || id === 'driveFile' || id === 'attachmentSave' || id === 'googleDriveFile') return 'file';
+  if (id === 'outlookCalendar' || id === 'calendar' || id === 'googleHold') return 'calendar';
+  if (id === 'outlookTask' || id === 'googleTask' || id === 'googleTasks' || id === 'microsoftTodo' || id === 'googleLaneTask') return 'task';
+  if (id === 'outlookDraft' || id === 'gmailDraft' || id === 'gmailCompose') return 'draft';
+  if (id === 'onedriveFile' || id === 'driveFile' || id === 'attachmentSave' || id === 'googleDriveFile' || id === 'googleDriveSave') return 'file';
   return null;
 }
+function messageConnector(msg) {
+  if (!msg) return '';
+  if (msg.type === 'flow:execute-action') return msg.payload && msg.payload.connectorId;
+  if (msg.type === 'flow:google-write' || msg.type === 'flow:gmail-compose') return msg.connectorId;
+  return '';
+}
 function executedFamilies(sent) {
-  return (sent || []).filter((m) => m.type === 'flow:execute-action').map((m) => connectorFamily(m.payload && m.payload.connectorId)).filter(Boolean);
+  return (sent || []).map((m) => connectorFamily(messageConnector(m))).filter(Boolean);
 }
 
 function lines(text) {

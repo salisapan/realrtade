@@ -480,7 +480,7 @@ test('Undo after a Gmail reload deletes the task', async ({ glance }) => {
   await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/tasks/' + id) >= 0)).toBe(true);
 });
 
-const TWO_STEP = "Let's do a call on Thursday, October 22, 2026 at 2:00pm to review the contract.";
+const TWO_STEP = "Let's do a call on Thursday at 2:00pm to review the contract.";
 
 test('Undo after a reload deletes the calendar and the task in reverse and names both', async ({ glance }) => {
   const page = await open(glance, {

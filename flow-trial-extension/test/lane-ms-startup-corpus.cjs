@@ -154,7 +154,7 @@ function boot(stripHook) {
   check('the hook adds one listener and nothing else',
     withHook.listeners.length === without.listeners.length + 1, { with: withHook.listeners.length, without: without.listeners.length });
 
-  const lane = withHook.listeners[0];
+  const lane = withHook.listeners.filter((fn) => String(fn).indexOf('lane-failed') >= 0)[0];
   const replies = [];
   const ignored = lane({ type: 'flow:execute-action', payload: { connectorId: 'googleTasks' } }, {}, (r) => replies.push(r));
   const claimed = lane({ type: 'flow:lane-execute', payload: { connectorId: 'outlookWord' } }, {}, (r) => replies.push(r));
