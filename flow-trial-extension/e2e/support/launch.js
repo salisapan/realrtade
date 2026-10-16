@@ -96,8 +96,27 @@ function outlookAuth(opts) {
 
 // Installed inside the service worker. Inert unless this harness calls it.
 // Network mocks live here because extension fetches do not always hit context.route.
+// chrome.identity.launchWebAuthFlow cannot be replaced here. background.js
+// calls e2e.launchWebAuthFlow when that function is set. Rebind it on every
+// install, including the already-installed reset path. This helper stays
+// inside installE2EHooks because Playwright serializes only that function.
 function installE2EHooks() {
-  if (globalThis.__glanceE2e && globalThis.__glanceE2e.installed) return { ok: true, already: true };
+  function bindGlanceE2eWebAuth(e2e) {
+    if (!e2e) return;
+    e2e.flows = e2e.flows || [];
+    e2e.launchWebAuthFlow = function (details) {
+      e2e.flows.push({
+        url: details && details.url,
+        interactive: details ? details.interactive : undefined,
+        at: Date.now()
+      });
+      return Promise.reject(new Error('e2e-no-window'));
+    };
+  }
+  if (globalThis.__glanceE2e && globalThis.__glanceE2e.installed) {
+    bindGlanceE2eWebAuth(globalThis.__glanceE2e);
+    return { ok: true, already: true };
+  }
   const e2e = globalThis.__glanceE2e || {};
   e2e.installed = true;
   e2e.calls = e2e.calls || [];
@@ -395,6 +414,7 @@ function installE2EHooks() {
     if (e2e.authFail) return Promise.reject(new Error('The user did not approve access.'));
     return Promise.resolve('ya29.e2e');
   };
+  bindGlanceE2eWebAuth(e2e);
 
   const identity = chrome.identity;
   if (!identity) return { ok: true, authWritable: false, identity: false };

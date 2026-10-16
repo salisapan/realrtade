@@ -221,18 +221,28 @@ function refreshStoredGoogleNames() {
     if (session && session.token) return rememberGoogleProfile(session.token);
   }).catch(() => {});
 }
+// One silent pass per service-worker start. onInstalled (unpacked reload is
+// reason "update"), onStartup, and a timer all call this. The first one
+// runs. A new worker starts the flag over.
+let googleAuthBooted = false;
+function bootGoogleAuth() {
+  if (googleAuthBooted) return;
+  googleAuthBooted = true;
+  refreshStoredGoogleNames();
+}
 chrome.runtime.onInstalled.addListener((details) => {
   const reason = details && details.reason;
   if (reason !== 'install' && reason !== 'update') return;
   migrateGoogleEverConnected();
   injectOpenGmailTabs();
-  refreshStoredGoogleNames();
+  bootGoogleAuth();
 });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
   migrateGoogleEverConnected();
   injectOpenGmailTabs();
-  refreshStoredGoogleNames();
+  bootGoogleAuth();
 });
+if (typeof setTimeout === 'function') setTimeout(bootGoogleAuth, 0);
 
 /* ---------------------------------------------------- other apps (opt-in) */
 // Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
@@ -1456,7 +1466,18 @@ function removeCachedGoogleAuthToken(token) {
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
+// Headless regression only. chrome.identity.launchWebAuthFlow cannot be
+// replaced inside the service worker, the same reason getAuthToken goes
+// through glanceE2eGoogleAuth. Production never sets __glanceE2e.
+function glanceE2eWebAuthFlow(details) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || typeof e2e.launchWebAuthFlow !== 'function') return null;
+  return e2e.launchWebAuthFlow(details);
+}
+
 function launchGoogleWebAuthFlow(details) {
+  const hooked = glanceE2eWebAuthFlow(details);
+  if (hooked && typeof hooked.then === 'function') return hooked;
   return new Promise((resolve, reject) => {
     try {
       chrome.identity.launchWebAuthFlow(details, (responseUrl) => {
@@ -1519,18 +1540,22 @@ async function runGoogleWebAuth(interactive) {
   const redirectUri = googleWebRedirectUri();
   if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
   const state = randomOAuthState();
+  const hint = await googleLoginHint();
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
     scopes: googleManifestScopes(),
     state,
-    prompt: interactive ? 'select_account' : 'none'
+    prompt: interactive ? 'select_account' : 'none',
+    loginHint: hint
   });
   const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
   if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
   const parsed = parseGoogleImplicitRedirect(resultUrl, state);
-  const record = { accessToken: parsed.accessToken };
+  const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
   if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
+  const keptHint = parsed.email || hint;
+  if (keptHint) record.loginHint = keptHint;
   const committed = await commitGoogleWebAuth(record, epoch);
   if (!committed) throw new Error('Google sign-in was closed or denied.');
   return record;
@@ -1809,11 +1834,25 @@ async function clearGoogleReconnect() {
 }
 
 // chrome.storage.local, never session storage and never a module variable.
-// A new service worker still sees this record.
-async function persistGoogleAccessToken(token, source) {
+// A new service worker still sees this record. A Chrome getAuthToken
+// callback has no expires_in. The access token is the same one-hour
+// implicit window, so the next start can tell age from expiry.
+const CHROME_TOKEN_MS = 60 * 60 * 1000;
+async function persistGoogleAccessToken(token, source, extra) {
   const accessToken = String(token || '').trim();
   if (!accessToken) return false;
-  return commitGoogleWebAuth({ accessToken: accessToken, source: source || null }, googleWebAuthEpoch);
+  const more = extra || {};
+  const record = {
+    accessToken: accessToken,
+    source: source || null,
+    obtainedAt: Date.now()
+  };
+  if (more.expiresAt) record.expiresAt = more.expiresAt;
+  else if ((source || '') === 'chrome') record.expiresAt = Date.now() + CHROME_TOKEN_MS;
+  const existing = await readGoogleWebAuth();
+  const hint = more.loginHint || (existing && existing.loginHint) || '';
+  if (hint) record.loginHint = hint;
+  return commitGoogleWebAuth(record, googleWebAuthEpoch);
 }
 
 // The account chooser returns a token and does not write googleWebAuth.
@@ -1835,32 +1874,238 @@ function googleHadAccount(bag) {
   return Boolean(web && (web.accessToken || web.refreshToken));
 }
 
-// Service-worker start. getAuthToken is non-interactive. A valid stored
-// token counts. Reconnect is set only when both of those fail and this
-// account had already connected. Nothing here opens a consent window,
-// and nothing here deletes a stored token first.
+// A stored implicit token with no expiresAt is not a session. Reading it
+// is not a refresh. prompt=none has to run.
+function storedImplicitNeedsRefresh(record, now) {
+  if (!record || typeof record.accessToken !== 'string' || !record.accessToken) return true;
+  if (record.expiresAt == null || record.expiresAt === '') return true;
+  return !webTokenUsable(record, now);
+}
+
+function tokenAgeMs(record, now) {
+  if (!record) return null;
+  if (typeof record.obtainedAt === 'number' && Number.isFinite(record.obtainedAt)) return now - record.obtainedAt;
+  if (typeof record.expiresAt === 'number' && Number.isFinite(Number(record.expiresAt))) {
+    return now - (Number(record.expiresAt) - CHROME_TOKEN_MS);
+  }
+  return null;
+}
+
+function glanceAuthSafe(message) {
+  return String(message || '').replace(/ya29\.[A-Za-z0-9._\-]+/g, '[token]').slice(0, 300);
+}
+
+const glanceAuthLines = [];
+async function glanceAuthLog(fields) {
+  const row = fields || {};
+  const out = {
+    call: row.call || '',
+    result: row.result || '',
+    message: glanceAuthSafe(row.message),
+    expiresAt: row.expiresAt == null ? null : row.expiresAt,
+    ageMs: row.ageMs == null ? null : row.ageMs,
+    state: row.state || '',
+    source: row.source || '',
+    interactive: row.interactive === undefined ? null : Boolean(row.interactive),
+    prompt: row.prompt || '',
+    extensionId: row.extensionId || '',
+    idFromKey: row.idFromKey || '',
+    keyPinned: row.keyPinned === undefined ? null : Boolean(row.keyPinned),
+    clientId: row.clientId || '',
+    extensionIdMatchesKey: row.extensionIdMatchesKey === undefined ? null : Boolean(row.extensionIdMatchesKey)
+  };
+  const line = '[glance-auth] ' + JSON.stringify(out);
+  console.info(line);
+  glanceAuthLines.push(line);
+  if (glanceAuthLines.length > 12) glanceAuthLines.shift();
+  try { await chrome.storage.local.set({ glanceAuthLog: glanceAuthLines.slice() }); }
+  catch (e) { /* the console line is the log */ }
+}
+
+async function extensionIdFromManifestKey() {
+  let key = '';
+  try { key = String((chrome.runtime.getManifest() || {}).key || ''); } catch (e) { key = ''; }
+  if (!key || !crypto || !crypto.subtle || typeof atob !== 'function') return '';
+  try {
+    const bin = atob(key);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    let hex = '';
+    for (let i = 0; i < digest.length; i++) hex += digest[i].toString(16).padStart(2, '0');
+    let id = '';
+    for (let i = 0; i < 32; i++) id += String.fromCharCode('a'.charCodeAt(0) + parseInt(hex[i], 16));
+    return id;
+  } catch (e) {
+    return '';
+  }
+}
+
+async function googleAuthIdentity() {
+  const manifest = chrome.runtime.getManifest() || {};
+  const oauth2 = manifest.oauth2 || {};
+  const extensionId = chrome.runtime && chrome.runtime.id || '';
+  const idFromKey = await extensionIdFromManifestKey();
+  return {
+    extensionId: extensionId,
+    idFromKey: idFromKey,
+    keyPinned: Boolean(manifest.key),
+    clientId: oauth2.client_id || '',
+    extensionIdMatchesKey: Boolean(idFromKey) && idFromKey === extensionId
+  };
+}
+
+async function googleLoginHint() {
+  const stored = await readGoogleWebAuth();
+  const hint = stored && typeof stored.loginHint === 'string' ? stored.loginHint.trim() : '';
+  return hint.indexOf('@') > 0 ? hint : '';
+}
+
+// Service-worker start. Two silent calls, never a consent window, and the
+// stored token is not deleted first. getAuthToken({interactive:false}) uses
+// the manifest Chrome-extension client. An implicit launchWebAuthFlow token
+// expires in about an hour and has no refresh token. When that expiry is
+// missing or past, the second call is launchWebAuthFlow with prompt=none,
+// the same scopes, and login_hint when one is known. That call uses the
+// Google session cookie. Reconnect is set only when both silent calls fail
+// on an account that had already connected.
 async function refreshGoogleSession() {
+  const now = Date.now();
   const before = await chrome.storage.local.get([
     GOOGLE_WEB_AUTH_STORAGE_KEY,
     GOOGLE_EVER_CONNECTED_STORAGE_KEY,
     'googleTasksAuth'
   ]);
   const hadAccount = googleHadAccount(before);
+  const stored = before[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
+  const who = await googleAuthIdentity();
+  const ageMs = tokenAgeMs(stored, now);
+  await glanceAuthLog(Object.assign({
+    call: 'startup',
+    result: storedImplicitNeedsRefresh(stored, now) ? 'expired-or-missing' : 'usable',
+    message: hadAccount ? 'had account' : 'never connected',
+    expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+    ageMs: ageMs,
+    state: ''
+  }, who));
   let chromeToken = '';
-  try { chromeToken = await getGoogleAuthToken(false); } catch (e) { chromeToken = ''; }
-  if (chromeToken) {
-    if (hadAccount) {
-      await persistGoogleAccessToken(chromeToken, 'chrome');
-      await clearGoogleReconnect();
-    }
+  let chromeError = '';
+  try { chromeToken = await getGoogleAuthToken(false); }
+  catch (e) { chromeError = (e && e.message) || String(e); }
+  await glanceAuthLog(Object.assign({
+    call: 'getAuthToken',
+    interactive: false,
+    result: chromeToken ? 'ok' : 'error',
+    message: chromeToken ? '' : (chromeError || 'no token'),
+    expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+    ageMs: ageMs
+  }, who));
+  if (chromeToken && hadAccount) {
+    const expiresAt = now + CHROME_TOKEN_MS;
+    await persistGoogleAccessToken(chromeToken, 'chrome', { expiresAt: expiresAt });
+    await clearGoogleReconnect();
+    await glanceAuthLog(Object.assign({
+      call: 'final',
+      result: 'ok',
+      message: 'silent getAuthToken',
+      expiresAt: expiresAt,
+      ageMs: 0,
+      state: 'connected',
+      source: 'chrome'
+    }, who));
     return { ok: true, source: 'chrome', token: chromeToken };
   }
-  const stored = await readGoogleWebAuth();
-  if (webTokenUsable(stored)) {
+  if (chromeToken && !hadAccount) {
+    await glanceAuthLog(Object.assign({
+      call: 'final',
+      result: 'ok',
+      message: 'silent getAuthToken ignored until this account has connected',
+      state: 'connect',
+      source: 'chrome'
+    }, who));
+    return { ok: true, source: 'chrome', token: chromeToken };
+  }
+  const needsWeb = hadAccount && storedImplicitNeedsRefresh(stored, now);
+  if (!needsWeb && webTokenUsable(stored, now)) {
     if (hadAccount) await clearGoogleReconnect();
+    await glanceAuthLog(Object.assign({
+      call: 'launchWebAuthFlow',
+      interactive: false,
+      prompt: 'none',
+      result: 'skipped',
+      message: 'stored token still inside expiresAt',
+      expiresAt: stored.expiresAt,
+      ageMs: ageMs
+    }, who));
+    await glanceAuthLog(Object.assign({
+      call: 'final',
+      result: 'ok',
+      message: 'stored token still inside expiresAt; reading storage is not a refresh',
+      expiresAt: stored.expiresAt,
+      ageMs: ageMs,
+      state: 'stored',
+      source: 'stored'
+    }, who));
     return { ok: true, source: 'stored', token: stored.accessToken };
   }
+  if (needsWeb) {
+    let webError = '';
+    try {
+      const saved = await runGoogleWebAuth(false);
+      const fresh = await readGoogleWebAuth();
+      if (hadAccount) await clearGoogleReconnect();
+      await glanceAuthLog(Object.assign({
+        call: 'launchWebAuthFlow',
+        interactive: false,
+        prompt: 'none',
+        result: 'ok',
+        message: '',
+        expiresAt: fresh && fresh.expiresAt != null ? fresh.expiresAt : null,
+        ageMs: 0
+      }, who));
+      await glanceAuthLog(Object.assign({
+        call: 'final',
+        result: 'ok',
+        message: 'silent launchWebAuthFlow prompt=none',
+        expiresAt: fresh && fresh.expiresAt != null ? fresh.expiresAt : null,
+        ageMs: 0,
+        state: 'connected',
+        source: 'web'
+      }, who));
+      return { ok: true, source: 'web', token: saved.accessToken };
+    } catch (e) {
+      webError = (e && e.message) || String(e);
+      await glanceAuthLog(Object.assign({
+        call: 'launchWebAuthFlow',
+        interactive: false,
+        prompt: 'none',
+        result: 'error',
+        message: webError,
+        expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+        ageMs: ageMs
+      }, who));
+    }
+  } else {
+    await glanceAuthLog(Object.assign({
+      call: 'launchWebAuthFlow',
+      interactive: false,
+      prompt: 'none',
+      result: 'skipped',
+      message: hadAccount ? 'no stored token to refresh' : 'never connected',
+      expiresAt: null,
+      ageMs: null
+    }, who));
+  }
   if (hadAccount) await markGoogleReconnect('not signed in');
+  await glanceAuthLog(Object.assign({
+    call: 'final',
+    result: 'error',
+    message: hadAccount ? 'both silent calls failed' : 'never connected',
+    expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+    ageMs: ageMs,
+    state: hadAccount ? 'reconnect' : 'connect',
+    source: ''
+  }, who));
   return { ok: false, source: null, token: '' };
 }
 
@@ -1883,6 +2128,9 @@ async function refreshLaneCredential(cred) {
 globalThis.FlowGoogleAccess = {
   refreshSilent() {
     return getGoogleWebAccessToken(false);
+  },
+  refreshSession() {
+    return refreshGoogleSession();
   },
   retry(cred) {
     return refreshLaneCredential(cred);

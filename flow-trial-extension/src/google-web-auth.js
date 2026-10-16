@@ -108,7 +108,40 @@ export function googleImplicitAuthUrl(opts) {
   params.set('include_granted_scopes', 'true');
   if (options.state) params.set('state', options.state);
   if (options.prompt) params.set('prompt', options.prompt);
+  const hint = String(options.loginHint || '').trim();
+  if (hint.indexOf('@') > 0) params.set('login_hint', hint);
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+}
+
+// The implicit redirect may include an OpenID id_token. The email inside it
+// is only a login_hint for the next silent prompt=none. It is not a login.
+function emailFromIdToken(idToken) {
+  const parts = String(idToken || '').split('.');
+  if (parts.length < 2 || !parts[1]) return '';
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const segment = parts[1].replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  let acc = 0;
+  let bits = 0;
+  const bytes = [];
+  for (let i = 0; i < segment.length; i++) {
+    const v = alphabet.indexOf(segment[i]);
+    if (v < 0) return '';
+    acc = (acc << 6) | v;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((acc >> bits) & 255);
+    }
+  }
+  let raw = '';
+  for (let i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i]);
+  try {
+    const json = JSON.parse(raw);
+    const email = json && typeof json.email === 'string' ? json.email.trim() : '';
+    return email.indexOf('@') > 0 ? email : '';
+  } catch (e) {
+    return '';
+  }
 }
 
 function formParams(serialized) {
@@ -160,7 +193,8 @@ export function parseGoogleImplicitRedirect(redirectUrl, expectedState) {
   const expiresIn = expiresRaw == null || expiresRaw === '' ? null : Number(expiresRaw);
   return {
     accessToken: accessToken.trim(),
-    expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null
+    expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null,
+    email: emailFromIdToken(pick('id_token'))
   };
 }
 

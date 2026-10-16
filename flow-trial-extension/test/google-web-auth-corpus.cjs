@@ -332,6 +332,27 @@ async function run() {
     built.searchParams.get('prompt') === 'select_account' &&
     built.searchParams.get('include_granted_scopes') === 'true');
   check('authorize URL lists every manifest scope', api.GOOGLE_OAUTH_SCOPES.every((s) => built.searchParams.get('scope').split(' ').indexOf(s) !== -1), built.searchParams.get('scope'));
+  const silentUrl = new URL(api.googleImplicitAuthUrl({
+    clientId: WEB_CLIENT,
+    redirectUri: 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/',
+    scopes: api.GOOGLE_OAUTH_SCOPES,
+    state: 'abc',
+    prompt: 'none',
+    loginHint: 'ai.local.flow@gmail.com'
+  }));
+  check('silent authorize URL is prompt=none with the same scopes and login_hint',
+    silentUrl.searchParams.get('prompt') === 'none' &&
+    silentUrl.searchParams.get('login_hint') === 'ai.local.flow@gmail.com' &&
+    silentUrl.searchParams.get('response_type') === 'token' &&
+    api.GOOGLE_OAUTH_SCOPES.every((s) => silentUrl.searchParams.get('scope').split(' ').indexOf(s) !== -1));
+  const noHint = new URL(api.googleImplicitAuthUrl({
+    clientId: WEB_CLIENT,
+    redirectUri: 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/',
+    scopes: api.GOOGLE_OAUTH_SCOPES,
+    prompt: 'none',
+    loginHint: ''
+  }));
+  check('login_hint is omitted when it is not known', noHint.searchParams.get('login_hint') == null);
   check('openid and the profile scope share that one consent URL',
     built.searchParams.getAll('scope').length === 1 &&
     built.searchParams.get('scope').split(' ').indexOf('openid') !== -1 &&
@@ -351,6 +372,9 @@ async function run() {
   check('missing token is rejected', (await attempt(Promise.resolve().then(() => api.parseGoogleImplicitRedirect('https://ext.chromiumapp.org/#state=abc', 'abc')))).error.indexOf('did not return an access token') !== -1);
   check('garbage redirect is rejected', (await attempt(Promise.resolve().then(() => api.parseGoogleImplicitRedirect('not a url', 'abc')))).ok === false);
   check('non-numeric expires_in is omitted', api.parseGoogleImplicitRedirect('https://ext.chromiumapp.org/#access_token=ya29.x&expires_in=nope&state=abc', 'abc').expiresIn === null);
+  const idPayload = Buffer.from(JSON.stringify({ email: 'ai.local.flow@gmail.com' })).toString('base64url');
+  const idUrl = 'https://ext.chromiumapp.org/#access_token=ya29.hash&expires_in=3600&state=abc&id_token=' + encodeURIComponent('e30.' + idPayload + '.sig');
+  check('an id_token email is kept as a login hint', api.parseGoogleImplicitRedirect(idUrl, 'abc').email === 'ai.local.flow@gmail.com');
   const now = 1_700_000_000_000;
   check('token with no expiry is usable', api.webTokenUsable({ accessToken: 't' }, now) === true);
   check('token inside skew is not usable', api.webTokenUsable({ accessToken: 't', expiresAt: now + 30000 }, now, 60000) === false);
@@ -376,7 +400,7 @@ async function run() {
     const out = await attempt(env.fn('getGoogleAccessToken')(true));
     check('a successful getAuthToken is the token we use', out.ok && out.value.token === 'chrome-primary' && out.value.source === 'chrome', out);
     check('the web flow is not opened', !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
-    check('a successful getAuthToken is stored in chrome.storage.local', env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'chrome-primary' && env.stored.googleWebAuth.source === 'chrome', env.stored);
+    check('a successful getAuthToken is stored in chrome.storage.local', env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'chrome-primary' && env.stored.googleWebAuth.source === 'chrome' && env.stored.googleWebAuth.expiresAt > Date.now(), env.stored);
   }
   {
     const env = load({
@@ -798,7 +822,7 @@ async function run() {
       routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_KEPT', title: 'Glance' }] }) }]]
     });
     const signedIn = await attempt(kept.fn('connectGoogleTasks')(true));
-    check('a Connect that does not upgrade still stores the chrome token in chrome.storage.local', signedIn.ok && kept.stored.googleWebAuth && kept.stored.googleWebAuth.accessToken === 'ya29.kept' && kept.stored.googleWebAuth.source === 'chrome', kept.stored.googleWebAuth);
+    check('a Connect that does not upgrade still stores the chrome token in chrome.storage.local', signedIn.ok && kept.stored.googleWebAuth && kept.stored.googleWebAuth.accessToken === 'ya29.kept' && kept.stored.googleWebAuth.source === 'chrome' && kept.stored.googleWebAuth.expiresAt > Date.now(), kept.stored.googleWebAuth);
     const snapshot = JSON.parse(JSON.stringify(kept.stored));
     snapshot.googleReconnect = { needed: true, reason: '401' };
     const restarted = load({
@@ -807,19 +831,70 @@ async function run() {
     });
     const session = await restarted.fn('refreshGoogleSession')();
     const afterRestart = await restarted.fn('connectorStatus')();
-    check('a new service worker keeps the stored token when silent getAuthToken fails', session && session.ok === true && session.source === 'stored' && session.token === 'ya29.kept' && restarted.stored.googleWebAuth && restarted.stored.googleWebAuth.accessToken === 'ya29.kept', { session, auth: restarted.stored.googleWebAuth });
-    check('that restart does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB ') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length === 1 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
-    const gone = load({
+    check('a new service worker keeps a stored token that is still inside expiresAt when silent getAuthToken fails', session && session.ok === true && session.source === 'stored' && session.token === 'ya29.kept' && restarted.stored.googleWebAuth && restarted.stored.googleWebAuth.accessToken === 'ya29.kept', { session, auth: restarted.stored.googleWebAuth });
+    check('that unexpired token does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB prompt=') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length === 1 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
+    const lapsed = load({
       getAuthTokenError: 'The user is not signed in.',
+      webToken: 'ya29.silent-new',
       stored: {
         googleTasksAuth: { taskListId: 'LIST_KEPT' },
         googleEverConnected: { connected: true },
-        googleWebAuth: null
+        googleWebAuth: {
+          accessToken: 'ya29.expired',
+          source: 'web',
+          expiresAt: Date.now() - 5000,
+          loginHint: 'ai.local.flow@gmail.com'
+        }
+      }
+    });
+    const renewed = await lapsed.fn('refreshGoogleSession')();
+    const renewedPanel = await lapsed.fn('connectorStatus')();
+    const silentCall = lapsed.calls.filter((c) => c.indexOf('WEB_URL ') === 0);
+    check('an expired implicit token is replaced by launchWebAuthFlow prompt=none',
+      renewed && renewed.ok === true && renewed.source === 'web' && renewed.token === 'ya29.silent-new' &&
+      lapsed.stored.googleWebAuth && lapsed.stored.googleWebAuth.accessToken === 'ya29.silent-new' && lapsed.stored.googleWebAuth.expiresAt > Date.now() &&
+      lapsed.calls.filter((c) => c === 'GET_AUTH true').length === 0 &&
+      lapsed.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0) &&
+      silentCall.some((c) => c.indexOf('prompt=none') !== -1 && c.indexOf('login_hint=ai.local.flow%40gmail.com') !== -1) &&
+      lapsed.stored.googleReconnect == null && renewedPanel && renewedPanel.googleTasks && renewedPanel.googleTasks.needsReconnect === false,
+      { renewed, calls: lapsed.calls, panel: renewedPanel && renewedPanel.googleTasks });
+    const missingExpiry = load({
+      getAuthTokenError: 'OAuth2 not granted or revoked.',
+      webToken: 'ya29.from-missing',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_KEPT' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.no-expiry', source: 'web' }
+      }
+    });
+    const filled = await missingExpiry.fn('refreshGoogleSession')();
+    check('a stored token with no expiresAt is not a refresh and prompt=none runs',
+      filled && filled.ok === true && filled.source === 'web' && filled.token === 'ya29.from-missing' &&
+      missingExpiry.stored.googleWebAuth && missingExpiry.stored.googleWebAuth.expiresAt > Date.now() &&
+      missingExpiry.calls.filter((c) => c === 'GET_AUTH false').length === 1 &&
+      missingExpiry.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0) &&
+      missingExpiry.calls.filter((c) => c === 'GET_AUTH true').length === 0 &&
+      missingExpiry.stored.googleReconnect == null,
+      { filled, calls: missingExpiry.calls, auth: missingExpiry.stored.googleWebAuth });
+    const gone = load({
+      getAuthTokenError: 'The user is not signed in.',
+      webFlowError: 'Authorization page could not be loaded.',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_KEPT' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.expired', source: 'web', expiresAt: Date.now() - 5000 }
       }
     });
     const failed = await gone.fn('refreshGoogleSession')();
     const failedPanel = await gone.fn('connectorStatus')();
-    check('Reconnect is set only when the silent call and the stored token both fail', failed && failed.ok === false && gone.calls.filter((c) => c === 'GET_AUTH true').length === 0 && gone.stored.googleReconnect && gone.stored.googleReconnect.needed === true && failedPanel && failedPanel.googleTasks && failedPanel.googleTasks.needsReconnect === true, { failed, panel: failedPanel && failedPanel.googleTasks, calls: gone.calls });
+    check('Reconnect is set only when silent getAuthToken and silent launchWebAuthFlow both fail',
+      failed && failed.ok === false &&
+      gone.calls.filter((c) => c === 'GET_AUTH true').length === 0 &&
+      gone.calls.filter((c) => c === 'GET_AUTH false').length === 1 &&
+      gone.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0) &&
+      gone.stored.googleReconnect && gone.stored.googleReconnect.needed === true &&
+      failedPanel && failedPanel.googleTasks && failedPanel.googleTasks.needsReconnect === true,
+      { failed, panel: failedPanel && failedPanel.googleTasks, calls: gone.calls });
   }
 
   console.log('\n--- connector status shares the reconnect flag ---\n');
