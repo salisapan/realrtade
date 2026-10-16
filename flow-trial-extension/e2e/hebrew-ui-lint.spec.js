@@ -1,7 +1,11 @@
 // Hebrew UI chrome. A Gmail fixture with lang=he. Mail titles, names, and
 // file names are user content. Glance and the other product names stay.
 // An English month or any other Latin word in chrome fails.
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('./support/harness');
+
+const SHOTS = '/opt/cursor/artifacts/screenshots';
 
 const MONTHS = /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/;
 const BRANDS = new Set([
@@ -103,10 +107,34 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
   const popupText = await visibleChrome(popup, 'body');
   expect(offenders(popupText), popupText).toEqual([]);
 
-  await popup.locator('html').evaluate((el) => el.setAttribute('data-theme', 'light'));
-  const light = await popup.locator('[data-glance-connect="meta"]').evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(light).toBe('rgb(247, 244, 238)');
-  await popup.locator('html').evaluate((el) => el.setAttribute('data-theme', 'dark'));
-  const dark = await popup.locator('[data-glance-connect="meta"]').evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(dark).not.toBe('rgb(247, 244, 238)');
+  await expect(popup.locator('#meta-chats-link')).toHaveClass('primary sm');
+  fs.mkdirSync(SHOTS, { recursive: true });
+  const list = popup.locator('#connector-list');
+  for (const theme of ['light', 'dark']) {
+    await popup.locator('html').evaluate((el, name) => el.setAttribute('data-theme', name), theme);
+    const paint = await list.evaluate((root) => {
+      const meta = root.querySelector('[data-glance-connect="meta"]');
+      const neighbour = root.querySelector('.conn:not([data-glance-connect="meta"])');
+      function box(el) {
+        const style = getComputedStyle(el);
+        return {
+          backgroundColor: style.backgroundColor,
+          color: style.color,
+          borderTopColor: style.borderTopColor
+        };
+      }
+      const off = root.querySelector('.conn:not(.on):not([data-glance-connect="meta"])');
+      return {
+        meta: box(meta),
+        neighbour: neighbour ? box(neighbour) : null,
+        off: off ? box(off) : null
+      };
+    });
+    expect(paint.neighbour).toBeTruthy();
+    expect(paint.meta.backgroundColor).toBe(paint.neighbour.backgroundColor);
+    expect(paint.meta.color).toBe(paint.neighbour.color);
+    expect(paint.meta.backgroundColor).not.toBe('rgb(247, 244, 238)');
+    if (paint.off) expect(paint.meta).toEqual(paint.off);
+    await list.screenshot({ path: path.join(SHOTS, 'connections-' + theme + '.png') });
+  }
 });

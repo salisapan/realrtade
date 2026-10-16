@@ -73,7 +73,7 @@
   function doitButton(doc, id, text) {
     const link = doc.createElement('button');
     link.type = 'button';
-    link.className = 'primary';
+    link.className = 'primary sm';
     if (id) link.id = id;
     ['shell', 'ring', 'shine'].forEach((name) => {
       const span = doc.createElement('span');
@@ -110,8 +110,8 @@
     });
   }
 
-  // The Connections row. Connect is the same .primary / .doit button.
-  // Disconnect is .ghost, the same control the other connectors use.
+  // The Connections row. Connect is .primary.sm, the same size as the
+  // other rows. Disconnect is .ghost, the same control those rows use.
   function paintConnection(host, opts) {
     if (!host) return null;
     const doc = host.ownerDocument;
@@ -177,7 +177,7 @@
     }
     const link = doc.createElement('button');
     link.type = 'button';
-    link.className = 'primary';
+    link.className = 'primary sm';
     link.id = 'meta-chats-link';
     ['shell', 'ring', 'shine'].forEach((name) => {
       const span = doc.createElement('span');

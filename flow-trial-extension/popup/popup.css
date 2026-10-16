@@ -122,15 +122,6 @@ main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anc
 }
 .badge.on{background:var(--ok-wash); color:var(--ok)}
 .badge.live{background:var(--accent-wash); color:var(--accent)}
-html[data-theme="light"] .conn[data-glance-connect="meta"]{
-  --paper:#f7f4ee; --surface:#f7f4ee; --surface-2:#efeae2;
-  --ink:#1c1c1e; --ink-2:#3a3a3c; --ink-3:#3a3a3c;
-  --glass-top:rgba(255,255,255,.72); --glass-bot:rgba(255,255,255,.4);
-  --glass-gloss:rgba(255,255,255,.85); --glass-border:rgba(28,28,30,.12);
-  background:#f7f4ee; color:#1c1c1e; border-color:rgba(28,28,30,.12);
-}
-html[data-theme="light"] .conn[data-glance-connect="meta"] .conn-name b,
-html[data-theme="light"] .conn[data-glance-connect="meta"] .conn-name i{color:#1c1c1e}
 .conn-note{font-size:.75rem; color:var(--ink-3); line-height:1.55; margin:var(--space-3) 0 0}
 .conn-detail{font-size:.75rem; color:var(--ok); margin:var(--space-2) 0 0}
 .conn-err{font-size:.75rem; color:var(--err); margin:var(--space-2) 0 0; line-height:1.45}

@@ -1344,7 +1344,7 @@ console.log('\n--- calendar evidence ---\n');
     }
   });
   link.click();
-  check('the popup link is present in English', link && link.tagName === 'BUTTON' && !link.getAttribute('href') && link.querySelector('.btn-label').textContent === 'Turn on Meta chats' && host.hidden === false);
+  check('the popup link is present in English', link && link.tagName === 'BUTTON' && link.className === 'primary sm' && !link.getAttribute('href') && link.querySelector('.btn-label').textContent === 'Turn on Meta chats' && host.hidden === false);
   check('the popup opens the enable page in a tab', created.length === 1 && created[0].url === 'chrome-extension://glance/lane-chat/enable.html');
   const heHost = pop.window.document.createElement('div');
   const heLink = pop.window.FlowMetaConsent.paintLink(heHost, { granted: false, lang: 'he', chrome: { tabs: { create() {} }, runtime: { getURL: (p) => p } } });
@@ -1355,7 +1355,7 @@ console.log('\n--- calendar evidence ---\n');
   check('a granted Meta consent shows the English on state', onEn && onEn.textContent === 'Meta chats are on' && host.hidden === false && host.querySelector('button') == null);
   const list = pop.window.document.createElement('div');
   const row = pop.window.FlowMetaConsent.paintConnection(list, { granted: false, lang: 'he', chrome: { tabs: { create() {} }, runtime: { getURL: (p) => p } } });
-  check('Connections shows a Hebrew Meta connect row', row && row.id === 'meta-chats-link' && row.className === 'primary' && row.querySelector('.shell') && row.querySelector('.btn-label').textContent === 'הפעל צ׳אטים של Meta' && list.querySelector('[data-glance-connect="meta"] .badge').textContent === 'כבוי');
+  check('Connections shows a Hebrew Meta connect row', row && row.id === 'meta-chats-link' && row.className === 'primary sm' && row.querySelector('.shell') && row.querySelector('.btn-label').textContent === 'הפעל צ׳אטים של Meta' && list.querySelector('[data-glance-connect="meta"] .badge').textContent === 'כבוי');
   const onRow = pop.window.document.createElement('div');
   pop.window.FlowMetaConsent.paintConnection(onRow, { granted: true, lang: 'he', chrome: { permissions: { remove() { return Promise.resolve(true); } } } });
   const onBadge = onRow.querySelector('#meta-chats-on');
