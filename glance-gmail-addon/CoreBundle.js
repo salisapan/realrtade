@@ -5390,8 +5390,13 @@ const FlowIntent = (() => {
           intent.label = 'Log commitment';
         } else if (type === TYPES.SCHEDULED_EVENT) {
           if (!intent.googleClose) {
-            const titled = selfAskTitle(text, subject);
-            if (titled && (bareSelfTitle(intent.label) || /^Call\b/.test(titled) || titled.indexOf('להתקשר') === 0)) {
+            const monthCall = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(text);
+            const titled = monthCall ? '' : selfAskTitle(text, subject);
+            if (monthCall) {
+              // "call October 19" is a meeting. October is not a person,
+              // and the raw sentence is not the title.
+              intent.label = labelFor(TYPES.SCHEDULED_EVENT);
+            } else if (titled && (bareSelfTitle(intent.label) || /^Call\b/.test(titled) || titled.indexOf('להתקשר') === 0)) {
               intent.label = titled;
             }
           }
@@ -5404,6 +5409,12 @@ const FlowIntent = (() => {
             const iso = intent.entities && intent.entities.dateIso;
             const dateText = iso ? humanDateFallback({ iso: iso }) : '';
             intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
+          } else if (!intent.googleClose && type === TYPES.DECISION_TO_LOG && facts && facts.moneyText) {
+            // "We agreed on $1,200 for the the migration work" is the amount
+            // that was agreed. The sentence is not the title.
+            const iso = intent.entities && intent.entities.dateIso;
+            const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+            intent.label = FlowJudgment.neutralTitle({ moneyText: facts.moneyText, dateText: dateText || null });
           }
         }
       }
@@ -6148,7 +6159,7 @@ const FlowIntent = (() => {
     return /\bwe\s+agreed\s+to\b/i.test(String(text || ''));
   }
   function bareSelfTitle(label) {
-    return /^(?:Pay|Send|Review|Call|Update|File|Approve|Confirm|Sign|Scan|Upload|Prepare|Resend|Reply|Fill out|Loop in|Sign-off|לשלם|לשלוח|להעביר|להכין|למלא|לחזור|להעלות|לאשר|להגיש|לעדכן|להשלים|לסרוק|לבדוק|שיחה)$/.test(String(label || '').trim());
+    return /^(?:Pay|Send|Review|Call|Update|File|Approve|Confirm|Sign|Scan|Upload|Prepare|Resend|Reply|Fill out|Loop in|Sign off|Sign-off|לשלם|לשלוח|להעביר|להכין|למלא|לחזור|להעלות|לאשר|להגיש|לעדכן|להשלים|לסרוק|לבדוק|שיחה)$/.test(String(label || '').trim());
   }
   function payAsk(src) {
     if (/\b(?:pay|wire)\b/i.test(src)) return true;
@@ -6200,6 +6211,9 @@ const FlowIntent = (() => {
       .replace(/\s+/g, ' ')
       .trim();
   }
+  function heTopic(subject) {
+    return cleanSubject(subject).replace(/^בהמשך\s+ל/, '').replace(/\s+/g, ' ').trim();
+  }
   function cleanSubject(subject) {
     return String(subject || '')
       .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0]/g, ' ')
@@ -6246,6 +6260,7 @@ const FlowIntent = (() => {
     s = s.replace(/^on\s+the\s+(\S+)$/i, '$1');
     s = s.replace(/\s+attached$/i, '');
     s = s.replace(/\s+is$/i, '');
+    s = s.replace(/\b([A-Za-z]{2,})\s+\1\b/gi, '$1');
     s = s.replace(/[,\s]+$/g, '').replace(/\s+/g, ' ').trim();
     return s;
   }
@@ -6280,13 +6295,20 @@ const FlowIntent = (() => {
       if (money && /^(?:deposit|invoice|payment|balance|bill)$/i.test(String(obj || '').trim())) object = money;
     }
     if (!object && opts && opts.pay) object = moneyPhrase(opts.src || '');
+    if (object && /(?:\$|₪|€|£)/.test(object)) object = object.replace(/\s+payments?\b/ig, ' ').replace(/\s+/g, ' ').trim();
+    if (verb === 'Reply' && object && !/^(?:about|to|with|on)\b/i.test(object)) object = 'about ' + object;
+    if (verb === 'Sign off' && object && !/^on\b/i.test(object)) object = 'on ' + object;
     if (object) {
       const title = clipTitle(verb + ' ' + object);
       if (title.split(/\s+/).length >= 2 && !bareSelfTitle(title)) return title;
     }
     if (opts && opts.phoneHe) {
-      const sub = cleanSubject(subject).replace(/^בהמשך\s+ל/, '');
-      if (sub) return clipTitle('להתקשר ל' + sub);
+      const topic = heTopic(subject);
+      if (topic) return clipTitle('להתקשר בנושא ' + topic);
+    }
+    if (verb === 'לחזור') {
+      const topic = heTopic(subject);
+      if (topic) return clipTitle('לחזור בנושא ' + topic);
     }
     const sub = cleanSubject(subject);
     if (sub && !weakSubject(sub)) {
@@ -6297,7 +6319,7 @@ const FlowIntent = (() => {
   }
   function titleAfter(verb, match, src, subject, opts) {
     const rest = src.slice(match.index + match[0].length);
-    const keepThe = Boolean(opts && opts.keepThe);
+    const keepThe = Boolean(opts && opts.keepThe) || verb === 'Fill out' || verb === 'Confirm';
     let obj = takeObject(rest, keepThe);
     if (weakObject(obj)) obj = takeObject(earlierNoun(src, match.index), keepThe);
     if (opts && opts.pay && (weakObject(obj) || /^payment of\b/i.test(obj))) obj = moneyPhrase(src) || obj;
@@ -6312,7 +6334,7 @@ const FlowIntent = (() => {
     }
     return best;
   }
-  const NOT_CALLEE = /^(?:you|me|us|it|the|a|an|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|eod|asap|next|this|on|at|by|for|and|back|please|day|week|time|morning|afternoon|evening|is|was)$/i;
+  const NOT_CALLEE = /^(?:you|me|us|it|the|a|an|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|eod|asap|next|this|on|at|by|for|and|back|please|day|week|time|morning|afternoon|evening|is|was|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)$/i;
   function callTitle(src, subject) {
     if (/להחזיר(?:י|ו)?\s+לי\s+טלפון/.test(src)) {
       return joinTitle('להתקשר', '', subject, { phoneHe: true, src: src });
@@ -6337,7 +6359,7 @@ const FlowIntent = (() => {
     [/\bfill out\b/i, 'Fill out'],
     [/\bfill in\b/i, 'Fill out'],
     [/\bloop in\b/i, 'Loop in'],
-    [/\bsign-?off\b/i, 'Sign-off'],
+    [/\bsign-?off\b/i, 'Sign off'],
     [/\bresend\b/i, 'Resend'],
     [/\bupload\b/i, 'Upload'],
     [/\bprepare\b/i, 'Prepare'],
@@ -7175,11 +7197,16 @@ const FlowActions = (() => {
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
-      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
-      const dateText = when || null;
-      intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
-        ? FlowJudgment.neutralTitle({ dateText: dateText })
-        : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
+      // "call October 19" named the month as a person. A dated call with
+      // no person keeps the meeting title. Shall we hop on a call is that meeting.
+      const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
+      if (!callNamesADate) {
+        const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+        const dateText = when || null;
+        intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
+          ? FlowJudgment.neutralTitle({ dateText: dateText })
+          : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
+      }
     }
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);

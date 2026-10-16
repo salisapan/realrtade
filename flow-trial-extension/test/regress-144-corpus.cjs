@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'c250bf129c06f79678ace2d0d29f80a2e7ad39368a0904b2376af0e4144c3567';
+const FIXTURE_SHA = 'd5826b21492059918243e833c6b4d7ce3bf1e4f04dd75b4d7c415d24e8863547';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -508,6 +508,16 @@ for (const id of ['v2syn-3400', 'v2syn-3401', 'v2syn-3406']) {
 function oneWordTitle(label) {
   return String(label || '').trim().split(/\s+/).filter(Boolean).length < 2;
 }
+function titleGrammarFault(label) {
+  const t = String(label || '').trim();
+  const faults = [];
+  if (/\b([A-Za-z]{2,})\s+\1\b/i.test(t)) faults.push('duplicate-word');
+  if (/(?:\$|₪|€|£)\s?\d[\d,]*(?:\.\d+)?\s+payment\b/i.test(t)) faults.push('duplicate-word');
+  if (/^Call\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(t)) faults.push('date-as-person');
+  const afterVerb = t.replace(/^(?:להתקשר|להכין|להעביר|להגיש|להשלים|להעלות|לעדכן|לאשר|לבדוק|לשלוח|לשלם|למלא|לחזור|לסרוק)\s+/, '');
+  if (/ל(?=ה)/.test(afterVerb) || /בהמשך\s+לה/.test(t)) faults.push('lamed-he');
+  return faults.join(',');
+}
 const SELF_TITLE = [
   { subject: 'Payment reminder', body: 'Can you pay the $4,850 deposit tomorrow?', label: 'Pay $4,850 deposit' },
   { subject: 'Re: the Q4 plan', body: 'Quick one: Can you review the SOW and get back to me on Monday? Thanks', label: 'Review SOW' },
@@ -516,8 +526,23 @@ const SELF_TITLE = [
   { subject: 'Note to self', body: 'Call Yossi tomorrow at 10:00.', label: 'Call Yossi' },
   { subject: 'Reminder', body: 'Need to call the bank tomorrow.', label: 'Call the bank' },
   { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Log commitment' },
-  { subject: 'בהמשך להקמפיין', body: 'בבקשה תחזור אליי עד מחר בבוקר', label: 'לחזור בהמשך להקמפיין' },
-  { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'להתקשר לקליטת העובד החדש' }
+  { subject: 'בהמשך להקמפיין', body: 'בבקשה תחזור אליי עד מחר בבוקר', label: 'לחזור בנושא הקמפיין' },
+  { subject: 'בהמשך להתקציב', body: 'בבקשה תחזרי אליי עד יום ראשון', label: 'לחזור בנושא התקציב' },
+  { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'להתקשר בנושא קליטת העובד החדש' },
+  { subject: 'בהמשך לחידוש החוזה', body: 'נשמח אם תוכלו להחזיר לי טלפון ביום ראשון?', label: 'להתקשר בנושא חידוש החוזה' },
+  { subject: 'Need the signed contract', body: 'Please reply with the tax form attached by Friday.', label: 'Reply about tax form' },
+  { subject: 'בהמשך לה-onboarding', body: 'צריך sign-off שלך על ה-PO עד 20/10', label: 'Sign off on PO' },
+  { subject: 'RE: W-9 form', body: "I'd appreciate it if you could fill out the lease tomorrow?", label: 'Fill out the lease' },
+  { subject: 'Re: Re: Following up', body: 'Could you fill out the deck by end of week?', label: 'Fill out the deck' },
+  { subject: 'Re: Re: Quick question', body: 'Can you please confirm the numbers for onboarding by Oct 20?', label: 'Confirm the numbers for onboarding' },
+  { subject: 'Re: the campaign', body: 'Can you please confirm the numbers for the pilot by Friday?', label: 'Confirm the numbers for the pilot' },
+  { subject: 'Approved', body: 'We agreed on $1,200 for the the migration work. Cheers', label: 'Log $1,200 agreed' },
+  { subject: 'Approved', body: 'We agreed on $500 for the the campaign work.', label: 'Log $500 agreed' },
+  { subject: 'RE: Re: the budget', body: 'Confirming €750 for the the Q4 plan work.', label: 'Log €750 agreed' },
+  { subject: 'FW: Payment reminder', body: 'Could you process the ₪1,200 payment next Tuesday?', label: 'Pay ₪1,200' },
+  { subject: 'Payment reminder', body: 'Please process the $4,850 payment for the pilot tomorrow.', label: 'Pay $4,850 for the pilot' },
+  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Meeting Oct 19 09:00' },
+  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Meeting Oct 19 15:00' }
 ];
 for (const sample of SELF_TITLE) {
   const out = J.judge({
@@ -536,10 +561,27 @@ for (const sample of SELF_TITLE) {
   });
   const label = String((out.intent && out.intent.label) || '');
   const face = shown(out) && out.process ? Display.cardFace(out.process, out.intent, { bodyText: sample.body }).title : '';
-  if (!shown(out) || oneWordTitle(label) || label !== sample.label || (sample.label === 'Log commitment' && face !== 'Log commitment')) {
-    console.log('FAIL: one-word self title rejected, got ' + JSON.stringify(label) + ' face ' + JSON.stringify(face) + ' wanted ' + sample.label);
+  const fault = titleGrammarFault(label);
+  if (!shown(out) || oneWordTitle(label) || fault || label !== sample.label || face !== sample.label || (sample.label === 'Log commitment' && face !== 'Log commitment')) {
+    console.log('FAIL: title grammar ' + JSON.stringify(fault) + ' got ' + JSON.stringify(label) + ' face ' + JSON.stringify(face) + ' wanted ' + sample.label);
     process.exit(1);
   }
+}
+if (titleGrammarFault('לחזור בהמשך להקמפיין') !== 'lamed-he') {
+  console.log('FAIL: lamed-he detector');
+  process.exit(1);
+}
+if (titleGrammarFault('Call October') !== 'date-as-person') {
+  console.log('FAIL: date-as-person detector');
+  process.exit(1);
+}
+if (titleGrammarFault('We agreed on $1,200 for the the migration work.') !== 'duplicate-word') {
+  console.log('FAIL: duplicate-word detector');
+  process.exit(1);
+}
+if (titleGrammarFault('Pay ₪1,200 payment') !== 'duplicate-word') {
+  console.log('FAIL: payment repeat detector');
+  process.exit(1);
 }
 for (const row of rows) {
   const from = parseFrom(row.from).email.toLowerCase();

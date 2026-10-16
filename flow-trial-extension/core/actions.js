@@ -768,11 +768,16 @@ const FlowActions = (() => {
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
-      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
-      const dateText = when || null;
-      intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
-        ? FlowJudgment.neutralTitle({ dateText: dateText })
-        : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
+      // "call October 19" named the month as a person. A dated call with
+      // no person keeps the meeting title. Shall we hop on a call is that meeting.
+      const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
+      if (!callNamesADate) {
+        const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+        const dateText = when || null;
+        intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
+          ? FlowJudgment.neutralTitle({ dateText: dateText })
+          : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
+      }
     }
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
