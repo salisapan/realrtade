@@ -55,11 +55,13 @@ function shape(process) {
 
 function both(text, extra) {
   extra = extra || {};
+  const attachmentCount = Number.isInteger(extra.attachmentCount) ? extra.attachmentCount : null;
   return vm.runInContext(`
     (function () {
       const now = new Date(${fix.now.join(',')});
       const text = ${JSON.stringify(text)};
       const subject = ${JSON.stringify(extra.subject || '')};
+      const attachmentCount = ${JSON.stringify(attachmentCount)};
       const ctx = {
         subject: subject,
         senderEmail: 'flow@example.com',
@@ -69,7 +71,8 @@ function both(text, extra) {
         userName: 'Sali',
         ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
         ownAddresses: ['glance.salisapan@outlook.com'],
-        to: ['glance.salisapan@outlook.com']
+        to: ['glance.salisapan@outlook.com'],
+        attachmentCount: attachmentCount
       };
       const g = planOpenMail(text, ctx);
       const o = FlowIncomingJudge.judge({
@@ -83,7 +86,8 @@ function both(text, extra) {
         ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
         ownAddresses: ['glance.salisapan@outlook.com'],
         to: ['glance.salisapan@outlook.com'],
-        threadUrl: 'https://example.invalid/t'
+        threadUrl: 'https://example.invalid/t',
+        attachmentCount: attachmentCount
       });
       return { g: g, o: o, intent: g && g.intent };
     })()
@@ -205,16 +209,20 @@ for (const text of fix.deadlines) {
 
 let quietWrong = 0;
 for (const row of fix.quiet) {
-  const got = both(row.body, { subject: row.subject });
+  const got = both(row.body, { subject: row.subject, attachmentCount: row.attachmentCount });
   const showed = (got.g && got.g.show === true) || (got.o && got.o.show === true);
-  if (showed) quietWrong++;
-  check(row.id + ' stays quiet', !showed, {
+  const googleQuiet = row.attachmentCount === 1
+    ? Boolean(got.g && got.g.intent && got.g.intent.googleSilence) && Boolean(got.o && got.o.intent && got.o.intent.googleSilence)
+    : true;
+  if (showed || !googleQuiet) quietWrong++;
+  check(row.id + ' stays quiet', !showed && googleQuiet, {
     g: got.g && (got.g.reason || (got.g.process && got.g.process.id)),
-    o: got.o && (got.o.reason || (got.o.process && got.o.process.id))
+    o: got.o && (got.o.reason || (got.o.process && got.o.process.id)),
+    googleSilence: [got.g && got.g.intent && got.g.intent.googleSilence, got.o && got.o.intent && got.o.intent.googleSilence]
   });
 }
 check('quiet fixtures: 0 wrong shows', quietWrong === 0, quietWrong);
-check('quiet fixtures are the set of ' + fix.quiet.length, fix.quiet.length === 15, fix.quiet.length);
+check('quiet fixtures are the set of ' + fix.quiet.length, fix.quiet.length === 17, fix.quiet.length);
 
 {
   const row = fix.offer8473;
@@ -242,19 +250,6 @@ for (const row of relativePromises) {
     o: got.o && (got.o.reason || (got.o.process && got.o.process.id))
   });
 }
-
-let pendingWrong = 0;
-for (const row of fix.pending144) {
-  const got = both(row.body, { subject: row.subject });
-  const showed = (got.g && got.g.show === true) || (got.o && got.o.show === true);
-  if (showed) pendingWrong++;
-  check(row.id + ' expected quiet, pending-' + row.pending, !showed && row.pending === '#144', {
-    pending: row.pending,
-    g: got.g && (got.g.reason || (got.g.process && got.g.process.id)),
-    o: got.o && (got.o.reason || (got.o.process && got.o.process.id))
-  });
-}
-check('pending-#144 save negations: 0 wrong shows', pendingWrong === 0, pendingWrong);
 
 const html = FlowStepKit.stageHTML({
   intent: 'Meeting',

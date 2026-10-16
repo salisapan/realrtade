@@ -66,7 +66,9 @@
     { "id": "v2syn-16630", "subject": "Change of plans", "body": "The check-in Sunday at 11:15 is no loner needed." },
     { "id": "v2syn-5784", "subject": "Change of plans", "body": "The kickoff tomorrow at 9am is cancelled." },
     { "id": "v2syn-5749", "subject": "Change of plans", "body": "The review meeting next Monday at 10:00 is cancelled." },
-    { "id": "v2syn-26311", "subject": "הועבר: שינוי", "body": "סאלי שלום, הפגישה ביום חמישי לא תתקיים יום נעים, דנה" }
+    { "id": "v2syn-26311", "subject": "הועבר: שינוי", "body": "סאלי שלום, הפגישה ביום חמישי לא תתקיים יום נעים, דנה" },
+    { "id": "v2syn-15670", "subject": "", "body": "You don't ned to save the attachmment to Drive.", "attachmentCount": 1 },
+    { "id": "v2syn-24499", "subject": "", "body": "לא צרךי לשמור את הקובץ המצורף ל-Drive", "attachmentCount": 1 }
   ],
   "offer8473": {
     "id": "v2syn-8473",
@@ -75,10 +77,6 @@
     "date": "2026-10-19",
     "plan": "log-it"
   },
-  "pending144": [
-    { "id": "v2syn-15670", "subject": "", "body": "You don't ned to save the attachmment to Drive.", "pending": "#144" },
-    { "id": "v2syn-24499", "subject": "", "body": "לא צרךי לשמור את הקובץ המצורף ל-Drive", "pending": "#144" }
-  ],
   "replies": [
     "בבקשה תשיב לי ביום ראשון 22/10 בשעה 14:00 לגבי ההצעה",
     "Could you please confirm by Wednesday 22/10 at 14:00 so we can proceed?"
