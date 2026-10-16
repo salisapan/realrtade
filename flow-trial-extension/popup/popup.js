@@ -116,8 +116,10 @@
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local' || (!ch.glanceHostLanguage && !ch.glanceUiLanguage)) return;
+      const before = uiLang();
       if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
       if (ch.glanceUiLanguage) state.glanceUiLanguage = ch.glanceUiLanguage.newValue;
+      if (uiLang() === before) return;
       const panel = document.querySelector && document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
       else paintActivityShell();
