@@ -197,7 +197,9 @@ const FlowStepListView = (() => {
 
     function cfg() {
       const surface = o.surface || 'outlook';
-      const ui = o.uiLang === 'he' ? 'he' : 'en';
+      const ui = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+        ? FlowDisplay.uiLangFrom({ setting: o.uiLang })
+        : (o.uiLang === 'he' ? 'he' : 'en');
       const labels = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
         ? FlowDisplay.chrome(ui)
         : { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };

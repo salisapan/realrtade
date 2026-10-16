@@ -34,6 +34,7 @@
   // finally had something to say, rather than the first time anyone opened
   // the popup.
   const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
+  const STEP_NOUNS_HE = { calendar: 'את צעד היומן', draft: 'את צעד הטיוטה', task: 'את צעד המשימה' };
 
   // Declared up here for the same temporal-dead-zone reason as the two above:
   // wirePro() runs a few lines below, long before this function's body would
@@ -64,6 +65,10 @@
   }
   function showWords(text) {
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(uiLang(), text);
+    return text == null ? '' : String(text);
+  }
+  function metricLine(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.activityMetric === 'function') return FlowDisplay.activityMetric(uiLang(), text);
     return text == null ? '' : String(text);
   }
   function fillWords(template, map) {
@@ -2901,10 +2906,11 @@
     const span = FlowJudgment.MAX_THRESHOLD - FlowJudgment.MIN_THRESHOLD;
     const talkative = 1 - (t - FlowJudgment.MIN_THRESHOLD) / span;
     document.getElementById('senseFill').style.width = Math.round(talkative * 100) + '%';
+    const sense = words();
     document.getElementById('senseNote').textContent =
-      t <= FlowJudgment.BASE_THRESHOLD - 4 ? 'Speaking up more — you keep clicking'
-      : t >= FlowJudgment.BASE_THRESHOLD + 6 ? 'Holding back — you keep dismissing'
-      : 'Balanced';
+      t <= FlowJudgment.BASE_THRESHOLD - 4 ? sense.senseMore
+      : t >= FlowJudgment.BASE_THRESHOLD + 6 ? sense.senseLess
+      : sense.senseEven;
     wrap.hidden = false;
   }
 
@@ -2923,9 +2929,10 @@
     const wrap = document.getElementById('weekStat');
     const counts = FlowStorage.writeCountsFrom(s);
     if (!counts.total) { wrap.hidden = true; return; }
+    const weekWords = words();
     document.getElementById('weekCount').textContent = counts.week;
-    document.getElementById('weekLabel').textContent = ' logged this week';
-    document.getElementById('weekTotal').textContent = counts.total + ' all-time';
+    document.getElementById('weekLabel').textContent = weekWords.weekLogged;
+    document.getElementById('weekTotal').textContent = fillWords(weekWords.weekAll, { n: counts.total });
     wrap.hidden = false;
   }
 
@@ -2952,9 +2959,10 @@
     if (!wrap || !FlowStorage.getLocalLm) return;
     const st = await FlowStorage.getLocalLm();
     if (!st || !st.checkedAt) { wrap.hidden = true; return; }
-    const on = [st.en && st.en.ok ? 'English' : null, st.he && st.he.ok ? 'Hebrew' : null].filter(Boolean);
-    if (on.length) wrap.textContent = 'The model built into this browser also reads wording nothing else recognises, for ' + on.join(' and ') + ' (it passed a precision check on this device). It only suggests; you decide.';
-    else if (st.reason === 'failed') wrap.textContent = 'The model built into this browser did not pass the precision check on this device, so it stays off.';
+    const lm = words();
+    const on = [st.en && st.en.ok ? lm.langEn : null, st.he && st.he.ok ? lm.langHe : null].filter(Boolean);
+    if (on.length) wrap.textContent = fillWords(lm.lmOn, { langs: on.join(lm.lmAnd) });
+    else if (st.reason === 'failed') wrap.textContent = lm.lmOff;
     else { wrap.hidden = true; return; }
     wrap.hidden = false;
   }
@@ -2998,7 +3006,8 @@
       }
     }
     if (!count) { wrap.hidden = true; return; }
-    wrap.textContent = 'Glance has adjusted ' + count + (count === 1 ? ' thing' : ' things') + ' about how it works for you.';
+    const learned = words();
+    wrap.textContent = fillWords(learned.learned, { n: count, noun: count === 1 ? learned.learnedOne : learned.learnedMany });
     wrap.hidden = false;
   }
 
@@ -3039,9 +3048,12 @@
 
     if (!currentInsight) { wrap.hidden = true; return; }
 
-    document.getElementById('memoryInsightText').textContent =
-      'Glance noticed you usually remove ' + (STEP_NOUNS[currentInsight.stepKind] || 'a step') +
-      ' in ' + currentInsight.processName + ' processes — keep it that way?';
+    const insight = words();
+    const nouns = uiLang() === 'he' ? STEP_NOUNS_HE : STEP_NOUNS;
+    document.getElementById('memoryInsightText').textContent = fillWords(insight.insight, {
+      step: nouns[currentInsight.stepKind] || insight.learnedOne,
+      process: currentInsight.processName
+    });
     wrap.hidden = false;
   }
 
@@ -3097,7 +3109,7 @@
         const code = await FlowStorage.getInstallId();
         await navigator.clipboard.writeText('https://theflow-ai.com/trial.html?ref=' + code);
         const original = btn.textContent;
-        btn.textContent = 'Copied';
+        btn.textContent = words().copied;
         setTimeout(() => { btn.textContent = original; }, 1800);
       } catch (e) {
         btn.textContent = 'https://theflow-ai.com/trial.html';
@@ -3114,7 +3126,7 @@
       const btn = document.getElementById('referralExportRecipe');
       exportRecipe();
       const original = btn.textContent;
-      btn.textContent = 'Exported';
+      btn.textContent = words().exported;
       setTimeout(() => { btn.textContent = original; }, 1800);
     });
   }
@@ -3125,7 +3137,7 @@
     const btn = document.getElementById('clearCloseMemory');
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      const ok = window.confirm('Clear personal close memory and Outlook loop cards on this device? Draft receipts and From Outlook offers will be removed. This cannot be undone.');
+      const ok = window.confirm(words().clearMemConfirm);
       if (!ok) return;
       btn.disabled = true;
       if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.clear();
@@ -3147,7 +3159,7 @@
     if (typeof FlowCloseQuality === 'undefined') { node.hidden = true; return; }
     const line = FlowCloseQuality.activityLine(FlowCloseQuality.computeSnapshot(s.closeQuality));
     if (!line) { node.hidden = true; return; }
-    node.textContent = line;
+    node.textContent = metricLine(line);
     node.hidden = false;
   }
 
@@ -3157,7 +3169,7 @@
     if (typeof FlowQuietMetrics === 'undefined') { node.hidden = true; return; }
     const line = FlowQuietMetrics.activityLine(FlowQuietMetrics.snapshot(s.quietMetrics));
     if (!line) { node.hidden = true; return; }
-    node.textContent = line;
+    node.textContent = metricLine(line);
     node.hidden = false;
   }
 
@@ -3172,14 +3184,52 @@
     const line = FlowStillOpen.activityLine(metrics);
     if (!line && !metrics.shown && !metrics.doIt && !metrics.undo && !metrics.falseClose) { node.hidden = true; return; }
     if (!line) { node.hidden = true; return; }
-    node.textContent = line;
+    node.textContent = metricLine(line);
     node.hidden = false;
+  }
+
+  function paintActivityShell() {
+    const L = words();
+    const lang = uiLang();
+    const tab = document.querySelector && document.querySelector('button[data-tab="log"]');
+    if (tab) tab.textContent = L.activityTab;
+    const panel = document.querySelector && document.querySelector('[data-panel="log"]');
+    if (panel && panel.setAttribute) {
+      panel.setAttribute('lang', lang);
+      panel.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    }
+    function put(id, text, attr) {
+      const node = document.getElementById(id);
+      if (!node || text == null) return;
+      if (attr) node.setAttribute(attr, text);
+      else node.textContent = text;
+    }
+    put('log-empty', L.logEmpty);
+    put('closeQuality', L.closeQualityTitle, 'title');
+    put('quietMetrics', L.quietTitle, 'title');
+    put('stillOpenQuality', L.stillTitle, 'title');
+    put('senseLabel', L.senseLabel);
+    const ledgerLabel = document.querySelector && document.querySelector('#ledgerBlock .label');
+    if (ledgerLabel) ledgerLabel.textContent = L.ledgerTitle;
+    const ledgerHint = document.querySelector && document.querySelector('#ledgerBlock .hint');
+    if (ledgerHint) ledgerHint.textContent = L.ledgerHint;
+    put('ledgerReset', L.ledgerReset);
+    put('memoryInsightConfirm', L.insightYes);
+    put('memoryInsightReject', L.insightNo);
+    const memHint = document.querySelector && document.querySelector('.close-memory .hint');
+    if (memHint) memHint.textContent = L.closeMemHint;
+    put('clearCloseMemory', L.closeMem);
+    put('referralCopy', L.referralCopy);
+    put('referralExportRecipe', L.referralExport);
+    const referralTxt = document.querySelector && document.querySelector('.referral-txt');
+    if (referralTxt) referralTxt.textContent = L.referralTxt;
   }
 
   async function renderLog() {
     beginRender();
     const revAtLog = whyRev;
     try {
+    paintActivityShell();
     await ensureOutlookMigrated();
     const s = await FlowStorage.get();
     renderWeekStat(s);

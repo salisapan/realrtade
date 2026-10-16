@@ -32,8 +32,10 @@
     try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
     let nav = '';
     try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    let host = '';
+    try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
-      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
     }
     return 'en';
   }
@@ -1881,8 +1883,10 @@
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
 
+    const lang = glanceUiLang();
     const host = el('div', 'flow-chip-host');
-    host.setAttribute('dir', 'ltr');
+    host.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    host.setAttribute('lang', lang);
 
     // The process name as its own small, quiet label — "this is one named
     // thing Glance is closing," stated before the sentence explains what
@@ -1890,7 +1894,9 @@
     const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
       ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || '' })
       : { title: ctx.process.name, sentence: null, fileCard: false };
-    host.appendChild(el('span', 'flow-chip-process-name', face.title || ctx.process.name));
+    let title = face.title || ctx.process.name;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.cardTitle === 'function') title = FlowDisplay.cardTitle(lang, ctx, title);
+    host.appendChild(el('span', 'flow-chip-process-name', title));
 
     // loop mark + gradient "Glance" + the rest of the sentence as its own
     // text node — three children in that DOM order, mark first, right
@@ -1957,7 +1963,12 @@
 
     if (multi && pillRow) {
       const stepCount = ctx.process.steps.length;
-      const toggle = el('button', 'flow-chip-more-toggle', stepCount + ' steps');
+      const stepWords = glanceChrome();
+      const stepsLabel = (typeof FlowDisplay !== 'undefined' && FlowDisplay.fillChrome)
+        ? FlowDisplay.fillChrome(stepWords.steps || '{n} steps', { n: stepCount })
+        : (stepCount + ' steps');
+      const hideLabel = stepWords.hideSteps || 'Hide steps';
+      const toggle = el('button', 'flow-chip-more-toggle', stepsLabel);
       toggle.type = 'button';
       toggle.setAttribute('aria-expanded', 'false');
       toggle.addEventListener('click', (e) => {
@@ -1966,7 +1977,7 @@
         host.classList.toggle('flow-chip-expanded', expanding);
         pillRow.inert = !expanding;
         toggle.setAttribute('aria-expanded', String(expanding));
-        toggle.textContent = expanding ? 'Hide steps' : stepCount + ' steps';
+        toggle.textContent = expanding ? hideLabel : stepsLabel;
       });
       mainRow.appendChild(toggle);
     }
@@ -1992,9 +2003,9 @@
       host.replaceChildren();
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
-        intent: face.title || ctx.process.name,
+        intent: title,
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
-        uiLang: glanceUiLang(),
+        uiLang: lang,
         surface: 'gmail',
         onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
         onDismiss: () => onDismiss(host, ctx),

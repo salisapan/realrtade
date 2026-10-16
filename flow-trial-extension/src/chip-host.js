@@ -50,6 +50,7 @@ const FlowChipHost = (() => {
   }
 
   function clockOf(ctx) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdClockFrom === 'function') return FlowDisplay.holdClockFrom(ctx);
     const bags = [];
     if (ctx.holdClock) bags.push(ctx.holdClock);
     if (ctx.calendarHold && ctx.calendarHold.params) bags.push(ctx.calendarHold.params);
@@ -68,6 +69,19 @@ const FlowChipHost = (() => {
     return null;
   }
 
+  function cardLang(ctx) {
+    const raw = (ctx && ctx.uiLang) || uiLang;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') return FlowDisplay.uiLangFrom({ setting: raw });
+    return raw === 'he' ? 'he' : 'en';
+  }
+
+  function cardTitle(ctx, face) {
+    const lang = cardLang(ctx);
+    const fallback = (face && face.title) || (ctx.process && ctx.process.name) || 'Reply';
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.cardTitle === 'function') return FlowDisplay.cardTitle(lang, ctx, fallback);
+    return fallback;
+  }
+
   function holdCard(ctx) {
     if (!ctx) return false;
     if (ctx.glanceChain === 'calendar-hold') return true;
@@ -77,18 +91,19 @@ const FlowChipHost = (() => {
   function paintWhen(host, ctx) {
     if (!host || typeof FlowDisplay === 'undefined') return;
     const clock = clockOf(ctx);
+    const lang = cardLang(ctx);
     let line = '';
     if (holdCard(ctx)) {
       line = clock && typeof FlowDisplay.holdWhenLine === 'function'
-        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
+        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang)
         : '';
     } else if (clock && clock.dateIso && typeof FlowDisplay.cardDateLine === 'function') {
-      line = FlowDisplay.cardDateLine(clock.dateIso);
+      line = FlowDisplay.cardDateLine(clock.dateIso, lang);
     }
     if (!line) return;
     const node = el('p', 'flow-chip-when', line);
     node.setAttribute('data-glance-when', line);
-    node.setAttribute('dir', 'rtl');
+    node.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
     host.appendChild(node);
   }
 
@@ -120,19 +135,22 @@ const FlowChipHost = (() => {
     if (ctx && ctx.uiLang) setUiLang(ctx.uiLang);
     if (mountNode.querySelector('.flow-chip-host')) return mountNode.querySelector('.flow-chip-host');
 
+    const lang = cardLang(ctx);
     const host = el('div', 'flow-chip-host');
-    host.setAttribute('dir', 'ltr');
+    host.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    host.setAttribute('lang', lang);
     const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
       ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || ctx.text || '', fileCard: ctx.fileCard === true })
       : { title: ctx.process.name || 'Reply', sentence: null, fileCard: false };
+    const title = cardTitle(ctx, face);
     const kitReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && typeof FlowStepKit !== 'undefined' && (ctx.process.steps || []).length;
     if (kitReady) {
       const liveSteps = (ctx.process.steps || []).slice();
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
-        intent: face.title || ctx.process.name || 'Reply',
+        intent: title,
         lang: ctx.intent && ctx.intent.lang,
-        uiLang: ctx.uiLang || 'en',
+        uiLang: lang,
         fileCard: face.fileCard === true || ctx.fileCard === true,
         surface: ctx.app || 'outlook',
         onDoIt: function (button) { if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps); },
@@ -162,7 +180,7 @@ const FlowChipHost = (() => {
       else mountNode.appendChild(host);
       return host;
     }
-    host.appendChild(el('span', 'flow-chip-process-name', face.title || ctx.process.name || 'Reply'));
+    host.appendChild(el('span', 'flow-chip-process-name', title));
 
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
@@ -178,7 +196,7 @@ const FlowChipHost = (() => {
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
     const uiWords = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
-      ? FlowDisplay.chrome(ctx.uiLang || 'en')
+      ? FlowDisplay.chrome(lang)
       : { dismiss: 'Dismiss', doIt: 'Do It' };
     dismiss.setAttribute('aria-label', uiWords.dismiss || 'Dismiss');
     dismiss.addEventListener('click', (e) => {
@@ -194,7 +212,7 @@ const FlowChipHost = (() => {
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
     let doText = (ctx.doLabel && ctx.doLabel !== 'Do It') ? ctx.doLabel : (uiWords.doIt || ctx.doLabel || 'Do It');
-    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') doText = FlowDisplay.showChrome(ctx.uiLang || uiLang, doText);
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') doText = FlowDisplay.showChrome(lang, doText);
     chip.appendChild(el('span', 'flow-chip-do-label', doText));
     chip.addEventListener('click', () => {
       if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
@@ -205,7 +223,7 @@ const FlowChipHost = (() => {
     if (typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && (ctx.process.steps || []).length) {
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       const view = FlowStepListView.mount(host, rows, {
-        uiLang: ctx.uiLang || uiLang,
+        uiLang: lang,
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;

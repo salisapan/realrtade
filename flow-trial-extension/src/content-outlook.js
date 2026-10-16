@@ -184,8 +184,10 @@
     try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
     let nav = '';
     try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    let host = '';
+    try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
     const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
-      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, uiLanguage: ui, navigatorLanguage: nav })
+      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav })
       : 'en';
     if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.setUiLang === 'function') FlowChipHost.setUiLang(lang);
     return lang;
