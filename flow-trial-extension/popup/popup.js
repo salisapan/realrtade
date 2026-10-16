@@ -112,16 +112,26 @@
     scroller.scrollTop = y;
     scrollLock = false;
   }
+  let scrollAtRender = 0;
   function beginRender() {
     if (renderDepth === 0) {
       rememberScroll();
+      const scroller = panelScroller();
+      scrollAtRender = scroller ? scroller.scrollTop : 0;
       scrollLock = true;
     }
     renderDepth += 1;
   }
   function endRender() {
     renderDepth = Math.max(0, renderDepth - 1);
-    if (renderDepth === 0) restoreScroll();
+    if (renderDepth !== 0) return;
+    const scroller = panelScroller();
+    const now = scroller ? scroller.scrollTop : 0;
+    // A paint can reset the scroller to 0. A move to any other spot while
+    // the paint was in flight is the person. Keep that spot.
+    if (now !== scrollAtRender && now !== 0) tabScroll[activeTabId()] = now;
+    scrollLock = false;
+    restoreScroll();
   }
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
