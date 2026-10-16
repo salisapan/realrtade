@@ -8,7 +8,7 @@ const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
 
-function copyExtension() {
+function copyExtension(opts) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-ext-'));
   fs.cpSync(EXT_ROOT, dest, {
     recursive: true,
@@ -20,6 +20,7 @@ function copyExtension() {
     }
   });
   const manifestPath = path.join(dest, 'manifest.json');
+  if (opts && opts.bare) return dest;
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const extra = [
     'https://outlook.live.com/*',

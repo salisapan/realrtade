@@ -62,6 +62,7 @@ function showCopy(code) {
   try {
     doc.documentElement.lang = he ? 'he' : 'en';
     doc.documentElement.dir = he ? 'rtl' : 'ltr';
+    doc.title = he ? 'טיוטה בצ׳אט' : 'A draft in the chat';
   } catch (e) { /* the words are still in the page */ }
 }
 
@@ -88,15 +89,15 @@ function metaOrigins() {
 
 function nowOn(code) {
   return isHe(code)
-    ? "צ'אטים של Meta פעילים. פתח את הצ'אט שוב כדי שטיוטה תוכל להופיע."
+    ? 'צ׳אטים של Meta פועלים. פתח את הצ׳אט שוב כדי שטיוטה תוכל להופיע.'
     : 'Meta chats are on. Open the chat again so a draft can appear.';
 }
 function staysOff(code) {
-  return isHe(code) ? "צ'אטים של Meta נשארים כבויים." : 'Meta chats stay off.';
+  return isHe(code) ? 'צ׳אטים של Meta נשארים כבויים.' : 'Meta chats stay off.';
 }
 function readerFailed(code) {
   return isHe(code)
-    ? "צ'אטים של Meta מותרים, אבל הקורא לא עלה. פתח את הדף שוב."
+    ? 'צ׳אטים של Meta מותרים, אבל הקורא לא עלה. פתח את הדף שוב.'
     : 'Meta chats are allowed, but the reader did not start. Open this page again.';
 }
 function cannotAsk(code) {
@@ -117,7 +118,13 @@ async function preferredLang() {
   } catch (e) { ui = ''; }
   let nav = '';
   try { nav = (navigator && navigator.language) || ''; } catch (e) { nav = ''; }
-  return setting || ui || nav || 'en';
+  const panel = (doc.documentElement && doc.documentElement.lang) || '';
+  if (typeof FlowDisplay !== 'undefined' && FlowDisplay && typeof FlowDisplay.uiLangFrom === 'function') {
+    return FlowDisplay.uiLangFrom({ setting: setting || panel, uiLanguage: ui, navigatorLanguage: nav });
+  }
+  const raw = (setting || panel || ui || nav || 'en').toLowerCase();
+  if (raw === 'he' || raw.indexOf('he-') === 0 || raw === 'iw' || raw.indexOf('iw-') === 0) return 'he';
+  return 'en';
 }
 
 async function granted(origins) {

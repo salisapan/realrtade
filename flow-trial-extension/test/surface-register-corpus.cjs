@@ -144,9 +144,10 @@ function load(opts) {
   }
 
   console.log('\n--- legacy WhatsApp registration ---\n');
+  const rowOn = { surfaces: { outlook: { enabled: true }, whatsapp: { enabled: true } } };
   {
     const env = load({
-      granted: false,
+      stored: rowOn,
       registered: [
         { id: 'flow-whatsapp', js: ['src/content-whatsapp.js'], matches: ['https://web.whatsapp.com/*'] },
         { id: 'glance-lane-whatsapp', js: ['src/content-whatsapp-draft.js'], matches: ['https://web.whatsapp.com/*'] }
@@ -154,7 +155,7 @@ function load(opts) {
     });
     await env.settle();
     const ids = env.registered().map((row) => row.id);
-    check('an upgraded profile unregisters flow-whatsapp once', ids.indexOf('flow-whatsapp') < 0 && env.log.filter((line) => line === 'unregister flow-whatsapp').length === 1, env.log);
+    check('an upgraded profile with the old WhatsApp row on unregisters flow-whatsapp once', ids.indexOf('flow-whatsapp') < 0 && env.log.filter((line) => line === 'unregister flow-whatsapp').length === 1, env.log);
     check('glance-lane-whatsapp stays registered', ids.indexOf('glance-lane-whatsapp') >= 0, ids);
     check('the storage flag remembers that the legacy script was cleared', env.stored().glanceLegacyWhatsAppCleared === true);
     const before = env.log.filter((line) => line === 'unregister flow-whatsapp').length;
@@ -162,15 +163,25 @@ function load(opts) {
     check('a later wake does not unregister again', env.log.filter((line) => line === 'unregister flow-whatsapp').length === before && env.stored().glanceLegacyWhatsAppCleared === true);
   }
   {
-    const env = load({ granted: false, strictMissing: true, registered: [{ id: 'glance-lane-whatsapp', js: ['src/content-whatsapp-draft.js'], matches: ['https://web.whatsapp.com/*'] }] });
+    const env = load({
+      granted: false,
+      registered: [
+        { id: 'flow-whatsapp', js: ['src/content-whatsapp.js'], matches: ['https://web.whatsapp.com/*'] }
+      ]
+    });
     await env.settle();
-    check('a missing flow-whatsapp is ignored and remembered', env.stored().glanceLegacyWhatsAppCleared === true && env.registered().some((row) => row.id === 'glance-lane-whatsapp') && env.log.some((line) => line === 'unregister-missing flow-whatsapp'), env.log);
+    check('a profile whose old WhatsApp row was off keeps flow-whatsapp', env.registered().some((row) => row.id === 'flow-whatsapp') && env.log.indexOf('unregister flow-whatsapp') < 0 && env.stored().glanceLegacyWhatsAppCleared !== true, env.log);
+  }
+  {
+    const env = load({ granted: false, stored: rowOn, strictMissing: true, registered: [{ id: 'glance-lane-whatsapp', js: ['src/content-whatsapp-draft.js'], matches: ['https://web.whatsapp.com/*'] }] });
+    await env.settle();
+    check('a missing flow-whatsapp is ignored and remembered', env.stored().glanceLegacyWhatsAppCleared === true && env.log.some((line) => line === 'unregister-missing flow-whatsapp'), env.log);
     const before = env.log.length;
     await env.fn('dropLegacyWhatsApp')();
     check('the remembered miss is not asked again', env.log.length === before);
   }
   {
-    const env = load({ granted: false, unregisterError: 'scripting unavailable' });
+    const env = load({ granted: false, stored: rowOn, unregisterError: 'scripting unavailable' });
     await env.settle();
     check('a real scripting failure is not remembered as cleared', env.stored().glanceLegacyWhatsAppCleared !== true, env.stored().glanceLegacyWhatsAppCleared);
   }

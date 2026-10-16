@@ -41,6 +41,22 @@ def die(message: str) -> None:
     raise SystemExit(1)
 
 
+def assert_manifest_at_extract_root(archive: zipfile.ZipFile, label: str) -> None:
+    """Chrome reports 'Manifest missing' when the zip unpacks as flow-trial-extension/manifest.json."""
+    names = archive.namelist()
+    if "manifest.json" not in names:
+        die(f"{label} zip has no manifest.json at the archive root")
+    if any(name == "flow-trial-extension/manifest.json" or name.startswith("flow-trial-extension/") for name in names):
+        die(f"{label} zip nests the extension under flow-trial-extension/")
+    with tempfile.TemporaryDirectory() as tmp:
+        archive.extractall(tmp)
+        root = Path(tmp)
+        if not (root / "manifest.json").is_file():
+            die(f"{label} unzip has no manifest.json at the folder root")
+        if (root / "flow-trial-extension" / "manifest.json").exists():
+            die(f"{label} unzip nests manifest.json under flow-trial-extension/")
+
+
 def assert_dev_fixture_absent(archive: zipfile.ZipFile, label: str) -> None:
     """The live Gate fixture is dev-only. A store zip omits the page, and the worker refuses the flag when update_url is set."""
     for name in archive.namelist():
@@ -89,6 +105,7 @@ def check_zip() -> None:
         if b'"manifest_version": 3' not in manifest and b'"manifest_version":3' not in manifest:
             die("packaged manifest is not version 3")
         assert_dev_fixture_absent(archive, "install")
+        assert_manifest_at_extract_root(archive, "install")
 
 
 RUNTIME_MARKERS = ("vendor/web-llm.js", "vendor/Phi-3-mini-4k-instruct-q4f16_1-MLC-webgpu.wasm", "src/offscreen.html", "src/offscreen.js")
@@ -115,6 +132,7 @@ def check_profiles() -> None:
                 if archive.testzip() is not None:
                     die(f"{profile} zip is corrupt")
                 assert_dev_fixture_absent(archive, profile)
+                assert_manifest_at_extract_root(archive, profile)
             sizes[profile] = out.stat().st_size
             for rel in REQUIRED:
                 if rel not in names:

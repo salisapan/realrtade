@@ -472,10 +472,11 @@ async function restoreSurfaces() {
   } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
 }
 // Builds from before the one Meta consent registered WhatsApp Web as
-// flow-whatsapp. That registration can still be in the browser after an
-// update, and it would run beside glance-lane-whatsapp. One wake-up removes
-// it. A missing id is the usual case and is remembered so later wakes do
-// not ask again.
+// flow-whatsapp when that row was on. That registration can still be in
+// the browser after an update, and it would run beside glance-lane-whatsapp.
+// One wake-up removes it, only for a profile whose old WhatsApp row was on.
+// A missing id is the usual case and is remembered so later wakes do not
+// ask again. A profile that never turned that row on is left alone.
 const LEGACY_WHATSAPP_SCRIPT = 'flow-whatsapp';
 const LEGACY_WHATSAPP_FLAG = 'glanceLegacyWhatsAppCleared';
 
@@ -487,8 +488,10 @@ function legacyWhatsAppAlreadyGone(err) {
 async function dropLegacyWhatsApp() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts || !chrome.storage || !chrome.storage.local) return;
   let bag = {};
-  try { bag = await chrome.storage.local.get({ [LEGACY_WHATSAPP_FLAG]: false }); } catch (e) { return; }
+  try { bag = await chrome.storage.local.get({ [LEGACY_WHATSAPP_FLAG]: false, surfaces: {} }); } catch (e) { return; }
   if (bag[LEGACY_WHATSAPP_FLAG]) return;
+  const surfaces = bag.surfaces || {};
+  if (!surfaces.whatsapp || !surfaces.whatsapp.enabled) return;
   try {
     await chrome.scripting.unregisterContentScripts({ ids: [LEGACY_WHATSAPP_SCRIPT] });
   } catch (e) {
@@ -534,12 +537,24 @@ const LANE_CHAT = [
   }
 ];
 
+async function clearLaneChats() {
+  if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
+  for (const lane of LANE_CHAT) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered */ }
+  }
+}
+
 async function restoreLaneChats() {
   if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
   const metaOrigins = (typeof FlowMetaConsent !== 'undefined' && Array.isArray(FlowMetaConsent.ORIGINS)) ? FlowMetaConsent.ORIGINS.slice() : [];
   let on = false;
-  try { on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins }); } catch (e) { on = false; }
+  let known = false;
+  try {
+    on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    known = true;
+  } catch (e) { on = false; known = false; }
   if (!on) {
+    if (known) await clearLaneChats();
     if (chrome.tabs && chrome.tabs.query) {
       const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
       const urls = messenger ? messenger.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) : [];
@@ -588,6 +603,14 @@ restoreSurfaces();
 restoreLaneChats();
 chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+try {
+  if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
+    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+  }
+  if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
+    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+  }
+} catch (e) { /* the next wake reads the grant again */ }
 
 async function surfaceStatus() {
   const surfaces = await readSurfaces();

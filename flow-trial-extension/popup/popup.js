@@ -59,6 +59,18 @@
     }
     return 'en';
   }
+  function metaLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    const panel = document.documentElement && document.documentElement.lang;
+    const stored = state && state.glanceUiLanguage;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: stored || panel || '', uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return uiLang();
+  }
   function words() {
     return FlowDisplay.chrome(uiLang());
   }
@@ -156,6 +168,14 @@
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
   renderMetaChats().catch(() => {});
+  try {
+    if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
+      chrome.permissions.onAdded.addListener(() => { renderMetaChats().catch(() => {}); });
+    }
+    if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
+      chrome.permissions.onRemoved.addListener(() => { renderMetaChats().catch(() => {}); });
+    }
+  } catch (e) { /* the row still refreshes the next time the popup opens */ }
   renderOutlookCards().catch(() => {});
   outlookAutoSync().catch(() => {});
   renderBuildStamp().catch(() => {});
@@ -2051,8 +2071,8 @@
     try {
       if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
     } catch (e) { on = false; }
-    FlowMetaConsent.paintLink(host, { granted: on, lang: uiLang(), chrome: chrome });
-    block.hidden = Boolean(on);
+    FlowMetaConsent.paintLink(host, { granted: on, lang: metaLang(), chrome: chrome });
+    block.hidden = false;
   }
 
   async function renderSurfaces() {

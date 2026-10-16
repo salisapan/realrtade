@@ -5,7 +5,11 @@
   const MESSAGE = 'flow:open-meta-chats';
   const COPY = {
     en: 'Turn on Meta chats',
-    he: "הפעל צ'אטים של Meta"
+    he: 'הפעל צ׳אטים של Meta'
+  };
+  const ON_COPY = {
+    en: 'Meta chats are on',
+    he: 'צ׳אטים של Meta פועלים'
   };
   const ORIGINS = [
     'https://web.whatsapp.com/*',
@@ -31,15 +35,25 @@
     return COPY.en;
   }
 
+  function onLabel(code) {
+    const raw = String(code || '').toLowerCase();
+    if (raw.indexOf('he') === 0 || raw.indexOf('iw') === 0) return ON_COPY.he;
+    return ON_COPY.en;
+  }
+
   function paintLink(host, opts) {
     if (!host) return null;
     const doc = host.ownerDocument;
     host.replaceChildren();
-    if (opts && opts.granted) {
-      host.hidden = true;
-      return null;
-    }
     host.hidden = false;
+    if (opts && opts.granted) {
+      const status = doc.createElement('p');
+      status.className = 'hint';
+      status.id = 'meta-chats-on';
+      status.textContent = onLabel(opts && opts.lang);
+      host.appendChild(status);
+      return status;
+    }
     const link = doc.createElement('button');
     link.type = 'button';
     link.className = 'primary';
@@ -92,8 +106,10 @@
     PAGE: PAGE,
     MESSAGE: MESSAGE,
     COPY: COPY,
+    ON_COPY: ON_COPY,
     ORIGINS: ORIGINS,
     label: label,
+    onLabel: onLabel,
     paintLink: paintLink,
     open: open
   };

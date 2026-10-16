@@ -119,8 +119,11 @@ const enableHtml = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'ut
 const popupHtml = fs.readFileSync(path.join(ROOT, 'popup/popup.html'), 'utf8');
 const popupJs = fs.readFileSync(path.join(ROOT, 'popup/popup.js'), 'utf8');
 check('one Meta consent replaces the per-app off line', enableSrc.indexOf('Messenger is off, so Business Suite stays quiet') < 0 && enableSrc.split('permissions.request(').length === 2);
-check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web on together/.test(enableHtml) && /Glance סוגר לולאות פתוחות\. Gmail הוא המקום שבו הוא מתחיל היום\./.test(enableHtml) && /הסכמה אחת מפעילה יחד את Messenger/.test(enableHtml));
-check('Hebrew and English name the one Meta button', metaSrc.indexOf('Turn on Meta chats') >= 0 && metaSrc.indexOf("הפעל צ'אטים של Meta") >= 0);
+check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns on drafts in Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web/.test(enableHtml) && /Glance סוגר לולאות פתוחות\. Gmail הוא המקום שבו הוא מתחיל היום\./.test(enableHtml) && /הסכמה אחת מפעילה טיוטות/.test(enableHtml));
+check('Hebrew and English name the one Meta button', metaSrc.indexOf('Turn on Meta chats') >= 0 && metaSrc.indexOf('הפעל צ׳אטים של Meta') >= 0 && metaSrc.indexOf('צ׳אטים של Meta פועלים') >= 0);
+check('the consent names every capability and says nothing is sent automatically', /Nothing is ever sent automatically/.test(enableHtml) && /reads the chat you have open/.test(enableHtml) && /tracks follow-ups/.test(enableHtml) && /location of events/.test(enableHtml) && /שום דבר לא נשלח אוטומטית/.test(enableHtml) && /קורא את הצ׳אט שפתוח/.test(enableHtml) && /בצ׳אטים של WhatsApp הוא גם עוקב אחרי המשך/.test(enableHtml) && /המיקום של אירועים/.test(enableHtml));
+check('the consent page uses the shared locale helper', enableSrc.indexOf('FlowDisplay.uiLangFrom') >= 0 && enableHtml.indexOf('core/display-copy.js') >= 0);
+check('the popup Meta row follows the panel locale and a permission change', popupJs.indexOf('document.documentElement.lang') >= 0 && /permissions\.onAdded[\s\S]{0,220}renderMetaChats/.test(popupJs) && /permissions\.onRemoved[\s\S]{0,220}renderMetaChats/.test(popupJs) && popupJs.indexOf('block.hidden = Boolean(on)') < 0);
 check('the popup page has a Meta row', popupHtml.indexOf('id="meta-chats"') >= 0 && popupHtml.indexOf('meta-consent.js') >= 0);
 check('the popup opens the enable page through the shared consent', popupJs.indexOf('FlowMetaConsent.paintLink') >= 0 && popupJs.indexOf('renderMetaChats') >= 0 && popupJs.indexOf("id === 'whatsapp'") >= 0);
 check('Meta consent does not ask for every url', !/<all_urls>/.test(enableSrc) && !/<all_urls>/.test(metaSrc) && (manifest.host_permissions || []).indexOf('<all_urls>') < 0 && (manifest.optional_host_permissions || []).indexOf('<all_urls>') < 0);
@@ -1261,11 +1264,12 @@ console.log('\n--- calendar evidence ---\n');
         unregisterContentScripts: async () => {},
         registerContentScripts: async (scripts) => { registered.push(scripts); }
       },
-      storage: { local: { get: async () => ({ glanceUiLanguage: (opts && opts.lang) || 'en' }) } },
-      i18n: { getUILanguage: () => 'en' },
+      storage: { local: { get: async () => (opts && opts.unsetLang ? {} : { glanceUiLanguage: (opts && opts.lang) || 'en' }) } },
+      i18n: { getUILanguage: () => (opts && opts.ui) || 'en' },
       runtime: { id: 'glance-test', sendMessage() { throw new Error('the enable page must not message'); } }
     };
     const ctx = enable.getInternalVMContext();
+    new vm.Script(fs.readFileSync(path.join(ROOT, 'core/display-copy.js'), 'utf8'), { filename: 'display-copy.js' }).runInContext(ctx);
     new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8'), { filename: 'meta-consent.js' }).runInContext(ctx);
     new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8'), { filename: 'enable.js' }).runInContext(ctx);
     return { enable, asked, registered };
@@ -1277,7 +1281,7 @@ console.log('\n--- calendar evidence ---\n');
   const enCopy = en.enable.window.document.querySelector('[data-lang="en"]');
   const enHeCopy = en.enable.window.document.querySelector('[data-lang="he"]');
   check('the prompt waits for the one Meta button', en.asked.length === 0 && en.registered.length === 0 && enButtons.length === 1 && enLabel && enLabel.textContent === 'Turn on Meta chats' && enButtons[0].querySelector('.shell') && enButtons[0].querySelector('.ring') && enButtons[0].querySelector('.shine'));
-  check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
+  check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && /Nothing is ever sent automatically/.test(enCopy.textContent) && /tracks follow-ups/.test(enCopy.textContent) && /location of events/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
   enButtons[0].click();
   await new Promise((r) => setTimeout(r, 40));
   check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => optional.indexOf(origin) >= 0) && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
@@ -1303,8 +1307,16 @@ console.log('\n--- calendar evidence ---\n');
   const heLabel = he.enable.window.document.querySelector('.btn-label');
   const heCopy = he.enable.window.document.querySelector('[data-lang="he"]');
   const heEnCopy = he.enable.window.document.querySelector('[data-lang="en"]');
-  check('Hebrew UI names the one Meta button', he.asked.length === 0 && heLabel && heLabel.textContent === "הפעל צ'אטים של Meta" && he.enable.window.document.documentElement.lang === 'he');
-  check('Hebrew UI shows the Hebrew explanation', heCopy && heCopy.hidden === false && /Glance סוגר לולאות פתוחות/.test(heCopy.textContent) && /הסכמה אחת מפעילה יחד/.test(heCopy.textContent) && /טיוטה אינה לולאה סגורה/.test(heCopy.textContent) && heEnCopy && heEnCopy.hidden === true);
+  check('Hebrew UI names the one Meta button', he.asked.length === 0 && heLabel && heLabel.textContent === 'הפעל צ׳אטים של Meta' && he.enable.window.document.documentElement.lang === 'he');
+  check('Hebrew UI shows the Hebrew explanation', heCopy && heCopy.hidden === false && /Glance סוגר לולאות פתוחות/.test(heCopy.textContent) && /הסכמה אחת מפעילה טיוטות/.test(heCopy.textContent) && /בצ׳אטים של WhatsApp הוא גם עוקב אחרי המשך/.test(heCopy.textContent) && /המיקום של אירועים/.test(heCopy.textContent) && /שום דבר לא נשלח אוטומטית/.test(heCopy.textContent) && /טיוטה אינה לולאה סגורה/.test(heCopy.textContent) && heEnCopy && heEnCopy.hidden === true);
+  he.enable.window.close();
+
+  const panel = bootEnable({ unsetLang: true, ui: 'en-US' });
+  await new Promise((r) => setTimeout(r, 40));
+  const panelLabel = panel.enable.window.document.querySelector('.btn-label');
+  const panelHe = panel.enable.window.document.querySelector('[data-lang="he"]');
+  const panelEn = panel.enable.window.document.querySelector('[data-lang="en"]');
+  check('a Hebrew panel stays Hebrew when the browser UI is English', panel.asked.length === 0 && panelLabel && panelLabel.textContent === 'הפעל צ׳אטים של Meta' && panelHe && panelHe.hidden === false && panelEn && panelEn.hidden === true && panel.enable.window.document.documentElement.lang === 'he');
   he.enable.window.close();
 
   const already = bootEnable({ lang: 'en', granted: true });
@@ -1329,9 +1341,11 @@ console.log('\n--- calendar evidence ---\n');
   check('the popup opens the enable page in a tab', created.length === 1 && created[0].url === 'chrome-extension://glance/lane-chat/enable.html');
   const heHost = pop.window.document.createElement('div');
   const heLink = pop.window.FlowMetaConsent.paintLink(heHost, { granted: false, lang: 'he', chrome: { tabs: { create() {} }, runtime: { getURL: (p) => p } } });
-  check('the popup link is present in Hebrew', heLink && heLink.tagName === 'BUTTON' && heLink.querySelector('.btn-label').textContent === "הפעל צ'אטים של Meta");
-  const gone = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'en' });
-  check('a granted Meta consent hides the popup row', gone == null && host.hidden === true && host.querySelector('button') == null);
+  check('the popup link is present in Hebrew', heLink && heLink.tagName === 'BUTTON' && heLink.querySelector('.btn-label').textContent === 'הפעל צ׳אטים של Meta');
+  const onHe = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'he' });
+  check('a granted Meta consent shows the Hebrew on state', onHe && onHe.id === 'meta-chats-on' && onHe.textContent === 'צ׳אטים של Meta פועלים' && host.hidden === false && host.querySelector('button') == null);
+  const onEn = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'en' });
+  check('a granted Meta consent shows the English on state', onEn && onEn.textContent === 'Meta chats are on' && host.hidden === false && host.querySelector('button') == null);
   let sent = null;
   const opened = await pop.window.FlowMetaConsent.open({
     runtime: {

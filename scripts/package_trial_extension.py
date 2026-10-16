@@ -299,6 +299,11 @@ def collect(profile: str = "full") -> dict[str, Path]:
 
 
 def write_zip(files: dict[str, Path], out: Path) -> int:
+    if "manifest.json" not in files:
+        die("install zip has no manifest.json at its root")
+    for rel in files:
+        if rel.startswith("flow-trial-extension/") or rel.startswith("/") or ".." in Path(rel).parts:
+            die(f"install zip entry would not sit at the extension root: {rel}")
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
