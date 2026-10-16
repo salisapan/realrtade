@@ -137,9 +137,8 @@ for (const row of fix.plans) {
   const o = shape(got.o && got.o.process);
   if (row.id === 'log-it') {
     const noCalendar = !(got.g.process && got.g.process.steps || []).some((s) => s && s.kind === 'calendar');
-    check('no parsed time is a task, never a calendar step: ' + row.text,
-      got.g && got.g.show === true && g && g.id === 'log-it' && g.steps === 'task' && noCalendar &&
-      got.o && got.o.show === true && o && o.id === 'log-it' && o.steps === 'task',
+    check('no parsed time on a statement is quiet, never a calendar step: ' + row.text,
+      got.g && got.g.show === false && got.o && got.o.show === false && noCalendar,
       { g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason] });
     continue;
   }
@@ -164,10 +163,8 @@ for (const text of fix.replies) {
 const bare = fix.noTimeConflict;
 const bareGot = both(bare.text);
 const bareG = shape(bareGot.g && bareGot.g.process);
-check('a weekday that is not 22/10, with no clock, is a task and does not book either day',
-  bareGot.g && bareGot.g.show === true &&
-  bareG && bareG.id === 'log-it' && bareG.steps === 'task' &&
-  !(bareGot.g.process.steps || []).some((s) => s && s.kind === 'calendar'),
+check('a weekday that is not 22/10, with no clock, stays quiet and does not book either day',
+  bareGot.g && bareGot.g.show === false && bareGot.o && bareGot.o.show === false,
   { bareG: bareG, reason: [bareGot.g && bareGot.g.reason, bareGot.o && bareGot.o.reason] });
 
 for (const text of fix.deadlines) {

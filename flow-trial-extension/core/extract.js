@@ -546,10 +546,11 @@ const FlowExtract = (() => {
   // would be the same mistake parseDate() above already refuses to make for
   // an ambiguous year.
   //
-  // An hour that could be either half of the day is not a time. "at 3" and
-  // "בשעה 3" both used to be readable as 03:00; English already refused
-  // that, Hebrew did not, and a 03:00 Calendar event is a wrong close.
-  // A day-part word is the sender stating which half, so that hour is kept.
+  // An hour that could be either half of the day is not a time. English
+  // "at 3" stays unresolved, and a written ":00" with no half of the day
+  // stays unresolved: both used to become a 03:00 event. Hebrew "בשעה 3"
+  // names the hour and no minutes. That hour is the workday clock, the
+  // same as the word "שלוש", so the meeting keeps a calendar step.
   function resolveClock(hour, minute, marker) {
     let h = hour;
     if (h > 23 || minute > 59 || h < 0 || minute < 0) return null;
@@ -618,7 +619,13 @@ const FlowExtract = (() => {
         : rawPart === 'בערב' ? 'in the evening'
         : rawPart === 'בלילה' ? 'at night'
         : '';
-      const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
+      const minuteWritten = Boolean(m[2]);
+      let clock = resolveClock(+m[1], minuteWritten ? +m[2] : 0, marker);
+      // "בשעה 3" is an hour with no minutes. 1–7 with no day-part is the
+      // workday hour (15:00), not 03:00 and not an unresolved day.
+      if (!clock && !marker && !minuteWritten && +m[1] >= 1 && +m[1] <= 7) {
+        clock = resolveClock(+m[1], 0, 'pm');
+      }
       if (!clock) return null;
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
     }

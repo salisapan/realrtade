@@ -279,7 +279,7 @@ const ROWS = [
   { id: 'self-sent-save', expect: 'self-file', surface: 'gmail', direction: 'self', attachmentCount: 1,
     from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
     body: 'please save the report to Drive by 20/10' },
-  { id: 'self-sent-hold', expect: 'cal', close: 'calendar-hold', process: 'hold', explicit: true, date: '2026-10-20', hour: 14,
+  { id: 'self-sent-hold', expect: TASK, date: '2026-10-20', hour: 14,
     surface: 'gmail', direction: 'self', attachmentCount: 0,
     from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
     body: 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00' }

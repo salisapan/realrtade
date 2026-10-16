@@ -1059,8 +1059,13 @@ const FlowIntent = (() => {
       if (googleClose) intent.googleClose = googleClose;
       // "No need to reply, just get it done" still does the work. The draft stays off.
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
-      // A note the user sent to themselves is the task. The draft stays off.
-      if (addressedToSelf(ctx) && type === TYPES.REQUEST && !intent.inviteFile) intent.noReplyDraft = true;
+      // A note the user sent to themselves is a task, for every kind.
+      // The draft stays off. It is not Reply requested, and it is not quiet.
+      if (addressedToSelf(ctx)) {
+        intent.noReplyDraft = true;
+        intent.selfTask = true;
+      }
+      if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
       if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
@@ -1317,7 +1322,9 @@ const FlowIntent = (() => {
     // The file track is an inbound ask aimed at this person. A mail they
     // sent, including a note to their own address, is not that ask. The
     // meeting noun in it is the existing invite, not a new event.
-    if (!blocked && attachToInvite && sentByReader(ctx)) return stayQuiet('hedge');
+    // A mail the user sent to someone else is not this attach. A note
+    // to their own address is the task, with no draft.
+    if (!blocked && attachToInvite && sentByReader(ctx) && !addressedToSelf(ctx)) return stayQuiet('hedge');
     if (!blocked && !replyMisaddressed && attachToInvite) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
@@ -1560,10 +1567,13 @@ const FlowIntent = (() => {
     }
 
     const dateDropped = Boolean(facts.date && facts.date.dropped);
+    // "Please create a task:" is that task. The handoff list does not
+    // name it. A resolved day is what makes it concrete.
     // "Any chance you could", "please email me", and "please loop in"
-    // are asks. The handoff list does not name them. A resolved day is
-    // what makes the ask concrete. No day, no chip from this phrase.
-    const datedAsk = hasResolvedDate && !isPast && /\b(?:any chance you could|please (?:email|e-mail|loop in|create)|kindly (?:email|loop in))\b/i.test(text);
+    // are not asks from someone else. A note the user sent to themself
+    // still is that task (v2syn-13337).
+    const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
+    const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase);
     const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);

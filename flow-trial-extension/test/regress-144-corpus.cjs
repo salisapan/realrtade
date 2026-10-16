@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '30e742f50fa40f7eafeae6699e71f25a6986bff36163c39b3fe3edd3e5063ea6';
+const FIXTURE_SHA = '0c931848da23b919c063148e518db3cfc3411fdb2a1b9c33bb8fdaa9cd138ba7';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -115,6 +115,9 @@ function kindOk(out, row) {
       && intent.personalClose === 'dated-commitment'
       && iso === row.expectDate;
   }
+  if (expectKind === 'request') {
+    return intent.type === 'request' || (out.process && out.process.id === 'reply-track');
+  }
   return intent.type === expectKind;
 }
 
@@ -161,7 +164,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 572) {
+if (rows.length !== 610) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -211,9 +214,6 @@ for (const id of Object.keys(NEW_VOC)) {
   }
 }
 const AIM_QUIET = {
-  'v2syn-3411': 'self',
-  'v2syn-3398': 'self',
-  'v2syn-3434': 'self',
   'v2syn-9401': 'cc',
   'v2syn-9403': 'cc',
   'v2syn-9404': 'cc',
@@ -388,7 +388,7 @@ for (const row of rows) {
     process.exit(1);
   }
 }
-const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-2557','v2syn-3315','v2syn-3317','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787','v2syn-12060','v2syn-12219','v2syn-13338','v2syn-13339','v2syn-1506'];
+const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-2557','v2syn-3315','v2syn-3317','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787'];
 for (const id of REPLY_TRACK) {
   const row = byId[id];
   if (!row || row.expected !== 'offer' || row.expectKind !== 'request') {

@@ -116,7 +116,8 @@ function gmailDecide(m) {
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
   // A clear file ask goes to Drive search on Gmail (flow:search-drive) before any chip: outside this pure comparison.
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST) return { show: 'drive', reason: 'drive-search', intent };
-  const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {} });
+  const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {}, text: text });
+  if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
   return { show: true, intent, process };
 }
 // content-gmail.js buildActionPayload for a gmailDraft step with no file.
@@ -404,16 +405,16 @@ const CASES = [
       { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o) });
     const heG = pair(GMAIL, GMAIL, HE, ownGmail, 0);
     const heO = pair(ME, ME, HE, ownOutlook, 0);
-    check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a calendar hold',
-      heG.g.show === true && heG.g.intent && heG.g.intent.personalClose === 'calendar-hold' && steps(heG.g).length === 1 && steps(heG.g)[0] === 'calendar',
+    check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',
+      heG.g.show === true && steps(heG.g).join(',') === 'googleTask',
       { show: heG.g.show, reason: heG.g.reason, steps: steps(heG.g) });
-    check('Outlook shape, Hebrew meeting on 20/10 at 14:00, self-sent is a calendar hold',
-      heO.o.show === true && heO.o.intent && heO.o.intent.personalClose === 'calendar-hold' && steps(heO.o).length === 1 && steps(heO.o)[0] === 'calendar',
+    check('Outlook shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',
+      heO.o.show === true && steps(heO.o).join(',') === 'outlookTask',
       { show: heO.o.show, reason: heO.o.reason, steps: steps(heO.o) });
     const alias = pair(ALIAS, OTHER_MAIL, HE, ownAlias, 0);
-    check('an alias writing to another alias of the same user is incoming',
-      alias.o.show === true && alias.o.intent && alias.o.intent.personalClose === 'calendar-hold',
-      { show: alias.o.show, reason: alias.o.reason });
+    check('an alias writing to another alias of the same user is a task with no draft',
+      alias.o.show === true && steps(alias.o).join(',') === 'outlookTask',
+      { show: alias.o.show, reason: alias.o.reason, steps: steps(alias.o) });
     const outbound = pair(ME, 'dana@acme.com', HE, ownOutlook, 0);
     check('a mail from the user to someone else stays quiet',
       outbound.g.show === false && outbound.o.show === false && outbound.o.reason === 'quiet:hedge',

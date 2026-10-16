@@ -277,9 +277,9 @@ const FlowCloseFamilies = (() => {
   }
 
   // Hebrew clock words, longest first so "אחת עשרה" is not clipped to "אחת".
-  // A word with no day-part is the workday hour (שלוש → 15:00). A bare digit
-  // ("בשעה 3", "at 3") stays unresolved: that form is not a stated half of
-  // the day, and writing 03:00 was the wrong close.
+  // A word with no day-part is the workday hour (שלוש → 15:00). Hebrew
+  // "בשעה 3" is that same hour with no minutes, so it is 15:00. English
+  // "at 3" stays unresolved.
   const HE_HOUR_WORDS = [
     ['אחת עשרה', 11], ['אחד עשרה', 11],
     ['שתיים עשרה', 12], ['שתים עשרה', 12],
@@ -575,8 +575,9 @@ const FlowCloseFamilies = (() => {
         time: time
       });
     }
-    // "at 3" / "בשעה 3" named an hour we will not invent. A commitment
+    // English "at 3" named an hour we will not invent. A commitment
     // still has its day. A meet does not become an all-day hold here.
+    // Hebrew "בשעה 3" is already a workday clock, so it is not this case.
     if (bareAmbiguousHour(sentence)) {
       if (!commit) return null;
       return hit({

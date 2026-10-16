@@ -665,30 +665,64 @@ const FlowActions = (() => {
       && calendarOp !== 'delete' && calendarOp !== 'update'
       && intent.personalClose !== 'calendar-cancel'
       && intent.personalClose !== 'calendar-move';
-    // No parsed clock. An ask from someone else is the reply (a draft),
-    // not a Log commitment. Log commitment is the user's own promise.
-    // "Let's meet tomorrow" with no time is the task Schedule meeting.
+    // No parsed clock. The order is the CTO's:
+    // a first-person send promise is Log commitment, and an untimed
+    // statement is quiet; "Please create a task:" is a task ahead of
+    // a reply; coordinating a meeting is Schedule meeting, and a
+    // request for an answer is the reply; a call reminder is Call.
     const untimedSrc = String(vetoText || '');
+    const heMail = /[\u0590-\u05FF]/.test(untimedSrc);
+    const ownPromise = /\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
+      || /\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
+      || /(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(untimedSrc);
+    const createTaskAsk = /\bplease\s+create\s+a\s+task\b/i.test(untimedSrc);
+    const callBody = untimedSrc.replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ');
+    const callReminder = (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody))
+      || /^\s*call the day after tomorrow\b/i.test(callBody)
+      || /\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody);
+    const readerWill = /\byou(?:'|’)?ll\b|\byou will\b/i.test(untimedSrc) || /אתה\s*מעב/.test(untimedSrc);
+    const answerAsk = /\b(?:let me know|who will|will you be|are you (?:free|available)|confirm the|please confirm)\b/i.test(untimedSrc)
+      || /פנוי|מי יגיע/.test(untimedSrc);
     const letsMeet = /\blet'?s\s+meet\b/i.test(untimedSrc) || /(?:בואו|בוא)\s+ניפגש|נתאם\s+פגישה|נקבע\s+פגישה/.test(untimedSrc);
-    const ownPromise = Boolean(intent.signals && intent.signals.flags && intent.signals.flags.senderPromise)
-      || /\b(?:i|we)(?:'|’)ll\b|\b(?:i|we)\s+will\b/i.test(untimedSrc)
-      || /(?:^|[^\u0590-\u05FF])(?:אני|אנחנו)\s+(?:אשלח|אעביר|אשלם|נשלח|נעביר|נשלם)/.test(untimedSrc);
-    const askOther = !ownPromise && Boolean(intent.signals && intent.signals.flags && intent.signals.flags.handoff);
-    let scheduleMeet = false;
+    const coordinate = letsMeet
+      || /\blet'?s\s+(?:do|set up|schedule|book)\b/i.test(untimedSrc)
+      || /\b(?:can|could|would)\s+(?:you|we)\s+(?:schedule|set up|book)\b/i.test(untimedSrc)
+      || /\bbook a time\b/i.test(untimedSrc)
+      || /\b(?:schedule|set up)\s+a\b/i.test(untimedSrc)
+      || /(?:בואו|בוא)\s+(?:ניפגש|נקבע)|(?:^|[^\u0590-\u05FF])(?:נתאם|נקבע|לתאם|לקבוע)(?![\u0590-\u05FF])|אפשר\s+לתאם/.test(untimedSrc)
+      || (/\?/.test(untimedSrc) && !answerAsk && !/\b(?:send|attach|forward|share|pay)\b/i.test(untimedSrc));
+    const handoff = Boolean(intent.signals && intent.signals.handoff);
     let replyInstead = false;
-    if (untimedCalendar && letsMeet) {
-      proc = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
-      scheduleMeet = true;
-      intent.label = /[\u0590-\u05FF]/.test(untimedSrc) ? 'לתאם פגישה' : 'Schedule meeting';
-    } else if (untimedCalendar && askOther) {
-      proc = Object.assign({ id: 'reply-track' }, PROCESS_CATALOG['reply-track']);
-      replyInstead = true;
-      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
-      intent.label = 'Reply requested' + (when ? ' by ' + when : '');
-    } else if (untimedCalendar) {
-      proc = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
+    const logIt = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
+    if (intent.selfTask && !intent.inviteFile) proc = logIt;
+    if ((untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
+      if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk) {
+        proc = logIt;
+      } else if (createTaskAsk || callReminder) {
+        proc = logIt;
+        if (callReminder) intent.label = heMail ? 'שיחה' : 'Call';
+        else if (/^Reply requested\b/.test(String(intent.label || ''))) {
+          const named = untimedSrc.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n.]+)/i);
+          const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+          intent.label = named ? named[1].replace(/\s+/g, ' ').trim() : (when ? ('Log commitment for ' + when) : 'Log this decision');
+        }
+      } else if (coordinate) {
+        proc = logIt;
+        intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
+      } else if (readerWill && !intent.selfTask) {
+        proc = logIt;
+      } else if ((answerAsk || handoff) && !intent.selfTask) {
+        proc = Object.assign({ id: 'reply-track' }, PROCESS_CATALOG['reply-track']);
+        replyInstead = true;
+        const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+        intent.label = 'Reply requested' + (when ? ' by ' + when : '');
+      } else if (untimedCalendar && !intent.selfTask) {
+        return null;
+      } else if (untimedCalendar) {
+        proc = logIt;
+      }
     }
-    const taskPlan = taskInstead || (untimedCalendar && !replyInstead);
+    const taskPlan = taskInstead || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.

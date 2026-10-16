@@ -259,9 +259,13 @@ console.log('--- intent.js: type + entity checks ---\n');
     heMonth && heMonth.entities);
 
   const heBareHour = classify('נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.', { now });
-  check('Hebrew "בשעה 3" does not schedule 03:00',
-    heBareHour && heBareHour.type === FlowIntent.TYPES.SCHEDULED_EVENT && heBareHour.entities.hour === null && heBareHour.entities.dateIso === '2026-09-21',
+  check('Hebrew "בשעה 3" is a meeting at 15:00, not 03:00',
+    heBareHour && heBareHour.type === FlowIntent.TYPES.SCHEDULED_EVENT && heBareHour.entities.hour === 15 && heBareHour.entities.minute === 0 && heBareHour.entities.dateIso === '2026-09-21',
     heBareHour && heBareHour.entities);
+  const heBarePlan = FlowActions.planFor(heBareHour, { threadUrl: 'x', text: 'נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.' });
+  check('Hebrew "בשעה 3" keeps a calendar step',
+    heBarePlan && heBarePlan.steps.some((s) => s.kind === 'calendar') && /^Meeting\b/.test(heBareHour.label),
+    heBarePlan && { id: heBarePlan.id, steps: heBarePlan.steps.map((s) => s.kind), label: heBareHour.label });
   const heAfternoon = classify('נקבע פגישה ביום שני בשעה 3 אחר הצהריים לסקירת החוזה.', { now });
   check('Hebrew "בשעה 3 אחר הצהריים" is 15:00 that Monday',
     heAfternoon && heAfternoon.type === FlowIntent.TYPES.SCHEDULED_EVENT && heAfternoon.entities.hour === 15 && heAfternoon.entities.minute === 0 && heAfternoon.entities.dateIso === '2026-09-21',

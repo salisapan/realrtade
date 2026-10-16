@@ -3,7 +3,7 @@
 //   flow-trial-extension/core/extract.js
 //   flow-trial-extension/core/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-09-28
+// Last synced: 2026-10-16
 //
 // This is the exact client-side judgment engine the Glance extension
 // runs — concatenated as-is (no edits) so the live demo on trial.html
@@ -125,6 +125,13 @@ const FlowExtract = (() => {
   // Gregorian month names as Israeli business mail actually writes them
   // ("7 בספטמבר"), in the same order as MONTHS so the index is the month.
   const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  // Short month names ("Oct 8, 2026") are the same dates as the full names
+  // above. "sept" is the four-letter form of September. Full names are
+  // matched first, so this map is only for the abbreviation.
+  const MONTH_ABBR = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7,
+    sep: 8, sept: 8, oct: 9, nov: 10, dec: 11
+  };
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -238,6 +245,40 @@ const FlowExtract = (() => {
   // not in doubt. Two candidates in the window, or none, means the message
   // genuinely did not say — and per this file's rule, no date beats a
   // confidently wrong one, so it returns the sender's own words and no ISO.
+  // Weekday + a day-first date + בשעה HH:MM is one clock. 22/10 is 22 October,
+  // not October 22. The weekday has to be that calendar day. A mismatch is
+  // not a date: the caller stays quiet instead of picking one of the two.
+  function weekdayDayFirst(text, now) {
+    const src = String(text || '');
+    const dayName = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
+    const clock = src.match(/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/);
+    if (!dayName || !slash || !clock || !now) return null;
+    const weekday = DAYS_HE.indexOf(dayName[1]);
+    const day = +slash[1];
+    const month = +slash[2];
+    const raw = dayName[0] + ' ' + slash[1] + '/' + slash[2] + (slash[3] ? '/' + slash[3] : '');
+    if (weekday < 0 || month < 1 || month > 12 || day < 1 || day > 31) {
+      return { raw: raw, iso: null, contradictsWeekday: true };
+    }
+    let year = null;
+    if (slash[3]) {
+      year = +slash[3];
+      if (year < 100) year += 2000;
+    }
+    if (year) {
+      const dated = buildDate(year, month - 1, day);
+      if (!dated || dated.getDay() !== weekday) return { raw: raw, iso: null, contradictsWeekday: true };
+      return { raw: raw, iso: iso(dated) };
+    }
+    const y = now.getFullYear();
+    const candidates = [y - 1, y, y + 1]
+      .map((yy) => buildDate(yy, month - 1, day))
+      .filter((d) => d && d.getDay() === weekday && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+    if (candidates.length !== 1) return { raw: raw, iso: null, contradictsWeekday: true };
+    return { raw: raw, iso: iso(candidates[0]) };
+  }
+
   function monthDay(raw, monthIdx, day, explicitYear, now) {
     if (explicitYear) {
       const d = buildDate(+explicitYear, monthIdx, day);
@@ -254,6 +295,160 @@ const FlowExtract = (() => {
       return anyValid ? { raw, iso: null, ambiguousYear: true } : null;
     }
     return { raw, iso: iso(inWindow[0]) };
+  }
+
+  function localToday(now) {
+    const d = now || new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  // An invoice number, a version, or a phone is not a day.
+  function slashRejected(text, index) {
+    const before = text.slice(Math.max(0, index - 32), index);
+    if (/(?:invoice|inv|version|ver|חשבונית|גרסה|טלפון|phone|ext)\.?\s*[#:]?\s*$/i.test(before)) return true;
+    if (/(?:^|[^A-Za-z])v\s*$/i.test(before)) return true;
+    return false;
+  }
+  // A slash is a date only beside a preposition, a weekday, or a time or meeting word.
+  function slashDateContext(text, index, raw) {
+    const before = text.slice(Math.max(0, index - 40), index);
+    const window = text.slice(Math.max(0, index - 48), Math.min(text.length, index + String(raw || '').length + 48));
+    if (/(?:עד|ב-|ב־|לפני|ביום)\s*$/.test(before)) return true;
+    if (/\b(?:on|by|until|before|due|no later than)\s*$/i.test(before)) return true;
+    if (/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(window)) return true;
+    if (/יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window)) return true;
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(window)) return true;
+    if (/(?:בשעה|(?<![\u0590-\u05FF])בעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
+    return false;
+  }
+  // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
+  // Day-first stays. A bare slash, a past day, or a number inside an invoice is not a date.
+  function slashDate(text, now) {
+    const src = String(text || '');
+    const re = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    const today = localToday(now || new Date());
+    let ambiguous = null;
+    let m;
+    while ((m = re.exec(src))) {
+      if (slashRejected(src, m.index)) continue;
+      const a = +m[1];
+      const b = +m[2];
+      let day = null;
+      let monthIdx = null;
+      if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
+      else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+      else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
+      let year = m[3] ? +m[3] : null;
+      if (year != null && year < 100) year += 2000;
+      const built = monthDay(m[0], monthIdx, day, year, now || new Date());
+      const iso = built && built.iso;
+      if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
+        if (!ambiguous) ambiguous = { raw: m[0], iso: null };
+        continue;
+      }
+      return built;
+    }
+    return ambiguous;
+  }
+
+  // A clock, however it is written. בשעה, ב-14:00, at 14:00, and a bare HH:MM
+  // are the same hour. The conflict check must not depend on one spelling.
+  function hasStatedClock(src) {
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/(?:^|[^\u0590-\u05FF\d])ב-\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/\bat\s+\d{1,2}(?::\d{2})?\b/i.test(src)) return true;
+    if (/(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    return false;
+  }
+  function numericDayMonth(src) {
+    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
+    const dotted = src.match(/(?:^|[^\d])(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?(?!\d)/);
+    const m = slash || dotted;
+    if (!m) return null;
+    const a = +m[1];
+    const b = +m[2];
+    let day = null;
+    let month = null;
+    if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; month = b; }
+    else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; month = a; }
+    else return null;
+    return { day: day, month: month, yearRaw: m[3] || null, token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '') };
+  }
+  function namedWeekday(src) {
+    const he = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    const en = src.match(new RegExp('\\b(' + DAYS.join('|') + ')\\b', 'i'));
+    if (he && (!en || he.index <= en.index)) return { index: DAYS_HE.indexOf(he[1]), he: true, raw: he[0] };
+    if (en) return { index: DAYS.indexOf(en[1].toLowerCase()), he: false, raw: en[0] };
+    return null;
+  }
+  function choiceLabel(date, he) {
+    const name = he
+      ? DAYS_HE[date.getDay()]
+      : DAYS[date.getDay()].charAt(0).toUpperCase() + DAYS[date.getDay()].slice(1);
+    return name + ' ' + date.getDate() + '/' + (date.getMonth() + 1);
+  }
+  function nearestWeekday(anchor, weekday) {
+    for (let delta = 1; delta <= 3; delta++) {
+      const before = new Date(anchor.getTime());
+      before.setDate(anchor.getDate() - delta);
+      if (before.getDay() === weekday) return before;
+      const after = new Date(anchor.getTime());
+      after.setDate(anchor.getDate() + delta);
+      if (after.getDay() === weekday) return after;
+    }
+    return null;
+  }
+  // Weekday + a day-first date is one statement. 22/10 and 22.10 are 22
+  // October. When the weekday is that calendar day and a clock was written,
+  // the date stands. When it is not, and a clock was written, neither
+  // reading is chosen: both dates come back as choices and iso stays empty.
+  // No clock keeps the older read, so a conflict does not become a new event.
+  function weekdayDayFirst(text, now) {
+    const src = String(text || '');
+    const dayName = namedWeekday(src);
+    const num = numericDayMonth(src);
+    if (!dayName || !num || !now) return null;
+    const clock = hasStatedClock(src);
+    const raw = dayName.raw + ' ' + num.token;
+    if (dayName.index < 0 || num.month < 1 || num.month > 12 || num.day < 1 || num.day > 31) {
+      if (!clock) return null;
+      return { raw: raw, iso: null, invalidDate: true };
+    }
+    let year = null;
+    if (num.yearRaw) {
+      year = +num.yearRaw;
+      if (year < 100) year += 2000;
+    }
+    let written = null;
+    if (year) {
+      written = buildDate(year, num.month - 1, num.day);
+      if (!written) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
+    } else {
+      const y = now.getFullYear();
+      const inWindow = [y - 1, y, y + 1]
+        .map((yy) => buildDate(yy, num.month - 1, num.day))
+        .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+      if (inWindow.length !== 1) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
+      written = inWindow[0];
+    }
+    if (written.getDay() === dayName.index) {
+      if (!clock) return null;
+      return { raw: raw, iso: iso(written), statedWeekday: true };
+    }
+    // No clock: leave the day to the older parser. A conflict with no
+    // clock must not become a new event the base judge does not make.
+    if (!clock) return null;
+    const other = nearestWeekday(written, dayName.index);
+    if (!other) return { raw: raw, iso: null, contradictsWeekday: true };
+    return {
+      raw: raw,
+      iso: null,
+      contradictsWeekday: true,
+      choices: [
+        { iso: iso(other), label: choiceLabel(other, dayName.he) },
+        { iso: iso(written), label: choiceLabel(written, dayName.he) }
+      ]
+    };
   }
 
   // Only dates the message states outright. A date guessed from context is worse
@@ -287,6 +482,14 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
     if (m) return monthDay(m[0], MONTHS.indexOf(m[2].toLowerCase()), +m[1], m[3], now);
 
+    // "Oct 8, 2026" / "Oct. 8". Same monthDay rules as "October 8, 2026":
+    // a written year is that year, a bare day uses the window. Checked
+    // before "tomorrow", so "tomorrow (Oct 8, 2026)" keeps October 8
+    // after tomorrow has moved on. "sept" is listed before "sep" so the
+    // shorter token does not clip it.
+    m = text.match(/\b(sept|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/i);
+    if (m) return monthDay(m[0], MONTH_ABBR[m[1].toLowerCase()], +m[2], m[3], now);
+
     // "7 בספטמבר" / "ב-21 בספטמבר 2026". The ב clings to the month name
     // (בספטמבר), the same way English puts the month name next to the day.
     // No year uses monthDay()'s window, so a bare day six months out stays
@@ -294,6 +497,11 @@ const FlowExtract = (() => {
     // after the month name ("בספטמבראי") is not that month.
     m = text.match(new RegExp('(?:^|[^\\d\\u0590-\\u05FF])(\\d{1,2})\\s+ב-?(' + MONTHS_HE.join('|') + ')(?![\\u0590-\\u05FF])(?:\\s+(\\d{4}))?'));
     if (m) return monthDay(m[0].replace(/^[^\d]+/, ''), MONTHS_HE.indexOf(m[2]), +m[1], m[3], now);
+
+    // Weekday + numeric day + any clock spelling. A conflict returns both
+    // dates and no iso, before a bare "ביום רביעי" can book a different day.
+    const stated = weekdayDayFirst(text, now);
+    if (stated) return stated;
 
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
@@ -312,6 +520,9 @@ const FlowExtract = (() => {
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta += 7;
       d.setDate(d.getDate() + delta);
+      // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
+      const numbered = slashDate(text, now);
+      if (numbered && numbered.iso) return numbered;
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -429,10 +640,9 @@ const FlowExtract = (() => {
       return { raw: 'היום', iso: iso(d) };
     }
 
-    // Numeric M/D or D/M is genuinely ambiguous across locales, so it is kept as
-    // written and never normalized to an ISO date we cannot justify.
-    m = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-    if (m) return { raw: m[0], iso: null };
+    // One side above 12 is a day or a month, not a guess. 5/6 stays unresolved.
+    const slash = slashDate(text, now);
+    if (slash) return slash.iso ? slash : { raw: slash.raw, iso: null };
 
     return null;
   }
@@ -443,10 +653,11 @@ const FlowExtract = (() => {
   // would be the same mistake parseDate() above already refuses to make for
   // an ambiguous year.
   //
-  // An hour that could be either half of the day is not a time. "at 3" and
-  // "בשעה 3" both used to be readable as 03:00; English already refused
-  // that, Hebrew did not, and a 03:00 Calendar event is a wrong close.
-  // A day-part word is the sender stating which half, so that hour is kept.
+  // An hour that could be either half of the day is not a time. English
+  // "at 3" stays unresolved, and a written ":00" with no half of the day
+  // stays unresolved: both used to become a 03:00 event. Hebrew "בשעה 3"
+  // names the hour and no minutes. That hour is the workday clock, the
+  // same as the word "שלוש", so the meeting keeps a calendar step.
   function resolveClock(hour, minute, marker) {
     let h = hour;
     if (h > 23 || minute > 59 || h < 0 || minute < 0) return null;
@@ -505,7 +716,8 @@ const FlowExtract = (() => {
     // there, has the same Hebrew boundary: it must not be a prefix of a
     // longer word.
     const hePart = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    m = text.match(new RegExp('(?:בשעה|בשעות)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
+    // בעה is the typo of בשעה. It is the same "at the hour of" marker.
+    m = text.match(new RegExp('(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
     if (m) {
       const rawPart = (m[3] || '').replace(/["״׳']/g, '');
       const marker = rawPart === 'בבוקר' ? 'in the morning'
@@ -514,9 +726,35 @@ const FlowExtract = (() => {
         : rawPart === 'בערב' ? 'in the evening'
         : rawPart === 'בלילה' ? 'at night'
         : '';
-      const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
+      const minuteWritten = Boolean(m[2]);
+      let clock = resolveClock(+m[1], minuteWritten ? +m[2] : 0, marker);
+      // "בשעה 3" is an hour with no minutes. 1–7 with no day-part is the
+      // workday hour (15:00), not 03:00 and not an unresolved day.
+      if (!clock && !marker && !minuteWritten && +m[1] >= 1 && +m[1] <= 7) {
+        clock = resolveClock(+m[1], 0, 'pm');
+      }
       if (!clock) return null;
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // "ב-14:00" is the same hour as "בשעה 14:00". A date ("ב-22/10") has no colon.
+    m = text.match(/(?:^|[^\u0590-\u05FF\d])ב-\s*(\d{1,2}):(\d{2})(?!\d)/);
+    if (m) {
+      const clock = resolveClock(+m[1], +m[2], '');
+      if (!clock) return null;
+      return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // 11:00 next to a meeting noun is the hour. A bare 11:00 with no meeting
+    // is still a flight, a room, or a price, and stays unresolved.
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text)) {
+      const re = /(?:^|[^\d])(\d{1,2}):(\d{2})(?!\d)/g;
+      let tm;
+      while ((tm = re.exec(text))) {
+        const clock = resolveClock(+tm[1], +tm[2], '');
+        if (!clock) continue;
+        return { raw: tm[1] + ':' + tm[2], hour: clock.hour, minute: clock.minute };
+      }
     }
 
     return null;
@@ -540,7 +778,9 @@ const FlowExtract = (() => {
   function senderIsAutomated(email, text) {
     const local = String(email || '').split('@')[0].toLowerCase();
     if (/^(no-?reply|do-?not-?reply|noreply|notifications?|alerts?|mailer|bounce|postmaster|automated|support-bot)/.test(local)) return true;
-    if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b/i.test(text)) return true;
+    // newsletter@ news@ marketing@ — the local part, not a longer word such as newspaper.
+    if (/^(newsletter|news|marketing)(?![a-z0-9])/.test(local)) return true;
+    if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b|\byou are receiving this\b|\byou(?:'|’)re receiving this\b|\byou received this email because\b|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום/i.test(text)) return true;
     return false;
   }
 
@@ -592,6 +832,10 @@ const FlowJudgment = (() => {
   // ahead" with no figure and no date — while the old scorer let cold pitches
   // through. The cold-pitch penalty below is what buys the headroom to sit at 50.
   const BASE_THRESHOLD = 50;
+  // Strong authorisations have to clear this bar on their own. 42 is the
+  // weight; the gap up to BASE_THRESHOLD is added only when nothing else
+  // positive is present (see score), so a reply bonus is not required.
+  const STRONG_WEIGHT = 42;
   const MIN_THRESHOLD = 38;
   // Capped where a genuine decision can still clear it. Higher than this and a
   // run of dismissals mutes Flow outright, which is indistinguishable from a
@@ -610,7 +854,7 @@ const FlowJudgment = (() => {
   // assertedIn's per-sentence negation/hedge/question check (unlike
   // HANDOFF/HANDOFF_HE above and LOST/LOST_HE below, which are bare
   // .test() and documented separately for exactly that reason).
-  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement|you have my (?:ok|okay|approval)|give you our ok|i commit to|on the hook to|count on me to)\b/i;
+  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement|you have my (?:ok|okay|approval)|give you our ok|i commit to|on the hook to|count on me to|paid in full|(?:invoice|fee|payment) is paid)\b/i;
   // An explicit, unambiguous authorisation. These carry more weight than the
   // general list because "Approved — go ahead" is the single most common real
   // decision in business email and it arrives with no money and no date
@@ -657,8 +901,13 @@ const FlowJudgment = (() => {
   // below threshold. Same false-positive-adjacent bug class this file's
   // NEG_BEFORE_HE/HEDGE_HE header comments already document — found here by
   // the same "run the negative corpus before committing" discipline.
-  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה|אאשר|מתחייב|מתחייבת)/;
-  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל)/;
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה|אאשר|מתחייב|מתחייבת|שול(?:מה|מו|ם)(?![\u0590-\u05FF]))/;
+  // "נחתם" is the passive twin of English "countersigned" / "fully executed",
+  // which already sit on COMMIT_STRONG. Left only on the weaker executed
+  // list, "ההסכם נחתם" cannot clear 50: executed is 26, and a short note
+  // also eats the length penalty. "עותק חתום" stays off this list — it is
+  // the document someone asks you to send, not the fact that it was signed.
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל|נחתם|ההסכם נחתם)/;
   const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין|החלטנו לוותר|לא מתאים לנו|הולכים על ספק אחר|פורשים מההסכם|לא נמשיך בתהליך)/;
   const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר|נשלח חתום|העותק החתום מצורף|העסקה נסגרה|הניירת הושלמה)/;
   const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון|עד סוף החודש|יש להעביר עד|נדרש לשלם עד|יש להשלים עד|יש להגיש עד|נדרש להשלים עד|התשלום נדרש עד|יש לסיים עד)/;
@@ -684,15 +933,15 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
   // HANDOFF on purpose — these go through directedAsk() below (negation and
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
-  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|send (?:a |the )?reminder)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי/;
+  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
   // A first-person delivery promise. Not a COMMIT word ("agreed",
   // "approved") and not a reader reminder ("you agreed to") — "I will send
   // the contract by Friday" is the sender closing a dated obligation on
@@ -745,6 +994,9 @@ const FlowJudgment = (() => {
     /^\s*בתאריך[\s\S]{3,200}?:\s*$/im,
     /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
     /^\s*-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
+    // Hebrew forward banner ("---------- הודעה שהועברה ---------"). The same cut
+    // the Graph reader uses, so a forwarded ask is not judged as the new message.
+    /^\s*-{2,}\s*הודעה שהועברה.*$/im,
     /^\s*From:\s.*$\n^\s*Sent:\s/im,
     // Outlook's Hebrew locale equivalent of the From:/Sent: header block
     // above — same no-\b rule applies to both מאת and נשלח.
@@ -858,8 +1110,10 @@ const FlowJudgment = (() => {
     for (const s of String(text || '').split(SENTENCE_SPLIT)) {
       const m = s.match(pattern);
       if (!m) continue;
-      // A question asks for a decision; it does not record one.
+      // A question asks for a decision; it does not record one. "האם"
+      // is the Hebrew question particle and often arrives without "?".
       if (/\?\s*$/.test(s.trim())) continue;
+      if (/(?:^|\s)האם\s/.test(s)) continue;
       if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
       const before = s.slice(0, m.index);
       if (isNegatedBefore(before)) continue;
@@ -888,6 +1142,126 @@ const FlowJudgment = (() => {
   const anyOf = (text, pats, fn) => pats.some((p) => fn(text, p));
   const testsIn = (text, p) => p.test(text);
 
+  // Bare confirm / agree / accept / approve. Real closes still use these
+  // words ("I confirm", "we agree", "the proposal is accepted", "Approved").
+  // A reader-directed request uses the same words and is not a close
+  // ("can you agree", "please confirm", "do you accept", "אתה מסכים").
+  // The optional " to" / " on" in COMMIT is part of the match ("agree to"),
+  // so the head word is what decides bare vs phrase. "we're good at" does
+  // not start with one of these verbs.
+  const BARE_DECISION_WORD = /^(?:confirm(?:ed|ing)?|agree[ds]?|accept(?:ed|s)?|approv(?:e|ed))(?:\s|$)/i;
+  const BARE_DECISION_HE = /^(?:מאשר(?:ת|ים)?|מסכימה|מסכימים|מסכים|מאושר)/;
+  // Rightmost request cue before a decision word. "האם" is a question
+  // particle and withdraws every decision after it, the way "?" already
+  // does. The others withdraw only the bare verbs above, so "countersigned"
+  // and "we're good" in the same note still count.
+  const READER_CUE_RES = [
+    { re: /\b(?:(?:can|could|would|will) you|please|kindly|do you|(?:asking|requesting) you to|need you to)\b/gi, kind: 'ask' },
+    { re: /\byou\s+(?=agree[ds]?|accept(?:ed|s)?|confirm)/gi, kind: 'ask' },
+    { re: /בבקשה|אנא|(?:^|\s)נא(?=\s)/g, kind: 'ask' },
+    { re: /(?:^|\s)האם(?=\s)/g, kind: 'whether' },
+    { re: /(?:^|\s)אתה(?=\s)|(?:^|\s)אתם(?=\s)|(?:^|\s)אתן(?=\s)|(?:^|\s)את(?=\s+מ(?:אשר|סכימ))/g, kind: 'ask' }
+  ];
+
+  function isBareDecision(word) {
+    return BARE_DECISION_WORD.test(word) || BARE_DECISION_HE.test(word);
+  }
+
+  function cuesBefore(sentence, index) {
+    const cues = [];
+    for (const spec of READER_CUE_RES) {
+      const re = new RegExp(spec.re.source, spec.re.flags);
+      let found;
+      while ((found = re.exec(sentence))) {
+        if (!found[0]) { re.lastIndex += 1; continue; }
+        if (found.index < index) cues.push({ index: found.index, text: found[0], kind: spec.kind });
+      }
+    }
+    cues.sort((a, b) => a.index - b.index);
+    return cues;
+  }
+
+  // True when this match is the reader being asked to decide, not the
+  // sender deciding. "We agree, please send the contract" keeps "agree":
+  // the request cue sits after it. "Please confirm we are agreed" drops
+  // both verbs: "please" leads, and "confirm" sits between it and "agreed",
+  // so the "we" there is the content of the ask.
+  function decisionSuppressed(sentence, m) {
+    const cues = cuesBefore(sentence, m.index);
+    if (!cues.length) return false;
+    if (cues.some((c) => c.kind === 'whether')) return true;
+    if (!isBareDecision(m[0])) return false;
+    const cue = cues[cues.length - 1];
+    const between = sentence.slice(cue.index + cue.text.length, m.index);
+    const before = sentence.slice(0, m.index);
+    const speaker = /\b(?:we(?:'re|\s+are|\s+have)?|i(?:'m|\s+am|\s+have)?)\s+$/i.test(before)
+      || /(?:^|\s)(?:אני|אנחנו)\s+$/.test(before);
+    const requestVerbBetween = /\b(?:confirm(?:ed|ing)?|agree[ds]?|accept(?:ed|s)?|approv(?:e|ed)|please|kindly)\b/i.test(between)
+      || /(?:בבקשה|אנא|האם|מאשר|מסכימ)/.test(between);
+    if (speaker && !requestVerbBetween) return false;
+    return true;
+  }
+
+  // "nothing is confirmed yet" names the decision in order to say it has
+  // not been made. "not" already covers "do NOT approve"; "nothing" does
+  // not contain a free-standing "not", so it never reached that window.
+  function bareWithdrawn(sentence, m) {
+    if (!isBareDecision(m[0])) return false;
+    const before = sentence.slice(Math.max(0, m.index - 48), m.index);
+    const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 16);
+    if (/\b(?:nothing|nobody|no one|not yet|yet to be)\b/i.test(before)) return true;
+    if (/^\s*(?:yet|nothing)\b/i.test(after)) return true;
+    return false;
+  }
+
+  function eachMatch(sentence, pattern, visit) {
+    const re = new RegExp(pattern.source, pattern.flags.indexOf('g') === -1 ? pattern.flags + 'g' : pattern.flags);
+    let found;
+    while ((found = re.exec(sentence))) {
+      if (!found[0]) { re.lastIndex += 1; continue; }
+      if (visit(found)) return true;
+    }
+    return false;
+  }
+
+  // Same per-sentence hedge / negation / question test as assertedIn, plus
+  // the reader-ask bar above. Used only for commitment patterns. Executed
+  // and obligation stay on assertedIn: "please confirm the invoice is
+  // payable" is still an obligation.
+  function assertedCommit(text, pattern) {
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      if (/\?\s*$/.test(s.trim())) continue;
+      if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
+      const hit = eachMatch(s, pattern, (found) => {
+        if (isNegatedBefore(s.slice(0, found.index))) return false;
+        if (bareWithdrawn(s, found)) return false;
+        if (decisionSuppressed(s, found)) return false;
+        return true;
+      });
+      if (hit) return true;
+    }
+    return false;
+  }
+
+  const COMMIT_MENTION_PATS = [COMMIT, COMMIT_HE, COMMIT_STRONG, COMMIT_STRONG_HE];
+
+  // Every commitment word in the note is a reader being asked to decide.
+  // "We do NOT approve" is not this — the word is a refusal, and the
+  // negated penalty below is what keeps the figure from reading as a close.
+  function commitMentionsAreReaderAsks(text) {
+    let saw = false;
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      for (const pattern of COMMIT_MENTION_PATS) {
+        const open = eachMatch(s, pattern, (found) => {
+          saw = true;
+          return !decisionSuppressed(s, found);
+        });
+        if (open) return false;
+      }
+    }
+    return saw;
+  }
+
   function score(text, domain, facts) {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
@@ -903,14 +1277,17 @@ const FlowJudgment = (() => {
     const marketing = MARKETING.test(text);
     const solicitation = SOLICITATION.test(text);
     const calendarNoise = CALENDAR_NOISE.test(text);
-    const noise = automated || calendarNoise || PITCH_VETO.test(text) || MARKETING_VETO.test(text);
+    const automatedNoise = automated;
+    const marketingNoise = MARKETING_VETO.test(text);
+    const noise = automatedNoise || calendarNoise || PITCH_VETO.test(text) || marketingNoise;
     if (automated) add('automated', -60, 'The sender looks automated');
     if (marketing) add('marketing', -45, 'Reads like a mailing list, not a person');
     if (solicitation) add('solicitation', -55, 'Reads like a cold pitch, not your work');
     if (calendarNoise) add('calendar', -35, 'Calendar notification boilerplate');
-    if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    // A commitment counts only where a sentence actually states it. The
+    // A commitment counts only where a sentence actually states it. Bare
+    // confirm/agree/accept in a reader-directed ask do not — assertedCommit
+    // drops those and keeps "we agree" / "I confirm" / "Approved". The
     // "mentioned" forms are kept alongside so the difference between the two
     // can be scored: a message that talks about approving without approving is
     // not neutral evidence, it is evidence AGAINST acting.
@@ -919,8 +1296,13 @@ const FlowJudgment = (() => {
     const EXEC_PATS = [EXECUTED, EXECUTED_HE];
     const OBLIG_PATS = [OBLIGATION, OBLIGATION_HE];
 
-    const commitStrong = anyOf(text, STRONG_PATS, assertedIn);
-    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedIn);
+    const commitStrong = anyOf(text, STRONG_PATS, assertedCommit);
+    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedCommit);
+    // A length penalty is for a fragment that has not said what happened
+    // ("Thanks!", an empty reply). "Approved. Go ahead." and "מאושר. אפשר
+    // להתקדם." are short because the decision is the whole note — the flat
+    // <12 cutoff was silencing them. Weaker commitments stay under it.
+    if (facts.wordCount < 12 && !commitStrong) add('too-short', -25, 'Too little text to judge');
     const commitMentioned = anyOf(text, COMMIT_PATS, testsIn);
     const executed = anyOf(text, EXEC_PATS, assertedIn);
     const executedMentioned = anyOf(text, EXEC_PATS, testsIn);
@@ -935,7 +1317,7 @@ const FlowJudgment = (() => {
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
-    if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
+    if (commitStrong) add('commitment', STRONG_WEIGHT, 'Someone authorised something outright');
     else if (commit) add('commitment', 30, 'Someone committed to something');
     // Weighted to clear threshold alongside a domain match on its own — a lost
     // deal is exactly the kind of news worth logging without needing a second,
@@ -949,6 +1331,13 @@ const FlowJudgment = (() => {
     const onDomain = domain.entityWords.test(text);
     if (onDomain) add('domain', 14, 'About ' + domain.entity.toLowerCase());
     if (facts.isReply) add('reply', 8, 'Part of an ongoing thread');
+    // COMMIT_STRONG is 42, eight under the bar, so "Approved. Go ahead."
+    // only cleared when a reply bonus happened to be present. The chip
+    // path does not set that bonus. A plain authorisation has to clear
+    // on its own — that is why this list is weighted above a normal commit.
+    if (commitStrong && !signals.some((s) => s.weight > 0 && s.id !== 'commitment')) {
+      add('bare-strong', BASE_THRESHOLD - STRONG_WEIGHT, 'States the authorisation on its own');
+    }
 
     // A message with a number and nothing else decided is a quote, not a decision.
     // Requiring a second signal alongside money is what keeps price lists quiet.
@@ -960,8 +1349,17 @@ const FlowJudgment = (() => {
     // bonus — 56 against a threshold of 50 — so it would clear the bar anyway
     // and be labelled from the money alone, which reads "Log $40,000 agreed".
     // A denied or merely-contemplated commitment has to push the other way.
-    if (!commit && commitMentioned) add('negated', -34, 'Names a decision the sentence does not actually make');
-    else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
+    if (!commit && commitMentioned) {
+      // "please confirm" next to a real dispute, a signed agreement, or a
+      // due invoice is the ask, not a denied decision. The other signal
+      // stands. A confirm/agree request with only a figure and a date does
+      // not: money + handoff + domain clears 50 and the label reads
+      // "Log $3,900 confirmed".
+      const readerAsk = commitMentionsAreReaderAsks(text);
+      const standsBeside = readerAsk && (lost || executed || dispute || obligation);
+      if (!standsBeside && readerAsk) add('unsettled', -55, 'Asks you to confirm or agree, which is not a decision');
+      else if (!standsBeside) add('negated', -34, 'Names a decision the sentence does not actually make');
+    } else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
     return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain, senderPromise, noise } };

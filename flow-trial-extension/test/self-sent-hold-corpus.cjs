@@ -1,6 +1,6 @@
 // A new self-sent mail in a thread that already has a handled message
-// gets its own calendar card. The handled record matches only that
-// mail's legacy message id or rfc Message-ID.
+// gets its own task card, with no draft and no calendar step. The
+// handled record matches only that mail's legacy message id or rfc Message-ID.
 // Run: node test/self-sent-hold-corpus.cjs
 // Needs jsdom. Missing jsdom is a failed run.
 const fs = require('fs');
@@ -41,22 +41,23 @@ const NOW = new Date(2026, 9, 16, 12, 0, 0);
 function selfCtx() {
   return { now: NOW, senderEmail: ME, ownAddresses: [ME], to: [ME], inbound: false };
 }
-function calendarHold(body) {
+function selfTask(body) {
   const classified = FlowIntent.classify(body, selfCtx());
   const plan = classified && classified.type ? FlowActions.planFor(classified, { text: body }) : null;
-  const calendar = plan && (plan.steps || []).find((step) => step.kind === 'calendar');
-  return { classified, calendar };
+  const steps = (plan && plan.steps) || [];
+  const task = steps.length > 0 && steps.every((step) => step.kind === 'googleTask' || step.kind === 'googleTasks');
+  return { classified, task, steps: steps.map((step) => step.kind) };
 }
-const sha = calendarHold(BODY);
-check('פגישת תכנון on Monday 19/10 at 11:00 is a calendar hold',
+const sha = selfTask(BODY);
+check('פגישת תכנון on Monday 19/10 at 11:00 is a task with no draft',
   sha.classified && sha.classified.type === 'event' && sha.classified.entities && sha.classified.entities.dateIso === '2026-10-19' &&
-  sha.classified.entities.hour === 11 && sha.classified.entities.minute === 0 && !!sha.calendar,
-  { type: sha.classified && sha.classified.type, quiet: sha.classified && sha.classified.quiet, entities: sha.classified && sha.classified.entities });
-const bet = calendarHold(BODY_BET);
-check('פגישת תכנון on Monday 19/10 at ב-11:00 is a calendar hold',
+  sha.classified.entities.hour === 11 && sha.classified.entities.minute === 0 && sha.task,
+  { type: sha.classified && sha.classified.type, steps: sha.steps, entities: sha.classified && sha.classified.entities });
+const bet = selfTask(BODY_BET);
+check('פגישת תכנון on Monday 19/10 at ב-11:00 is a task with no draft',
   bet.classified && bet.classified.type === 'event' && bet.classified.entities && bet.classified.entities.dateIso === '2026-10-19' &&
-  bet.classified.entities.hour === 11 && bet.classified.entities.minute === 0 && !!bet.calendar,
-  { type: bet.classified && bet.classified.type, quiet: bet.classified && bet.classified.quiet, entities: bet.classified && bet.classified.entities });
+  bet.classified.entities.hour === 11 && bet.classified.entities.minute === 0 && bet.task,
+  { type: bet.classified && bet.classified.type, steps: bet.steps, entities: bet.classified && bet.classified.entities });
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
@@ -202,10 +203,10 @@ function shown(id, subject, intent, process) {
   const old = held.doc.querySelector('[data-legacy-message-id="m-old"]');
   const card = fresh && fresh.querySelector('.flow-chip-host');
   const text = card ? String(card.textContent || '').replace(/\s+/g, ' ') : '';
-  check('a new self-sent mail in a handled thread gets a calendar card',
+  check('a new self-sent mail in a handled thread gets a task card',
     !!card && card.getAttribute('data-glance-chain') !== 'lane-proof' &&
-    /Schedule It|Hold It|Putting this on your calendar|Scheduling this/.test(text) && /Do It/.test(text) &&
-    !/Handled\.|Nothing to close|טופל/.test(text),
+    /To Do/.test(text) && /Do It/.test(text) &&
+    !/Putting this on your calendar|Scheduling this|Handled\.|Nothing to close|טופל/.test(text),
     { text, chain: card && card.getAttribute('data-glance-chain'), errors: held.errors });
   check('the older message keeps its own Handled receipt',
     !!(old && old.querySelector('.flow-chip-handled')) && old.querySelector('.flow-chip-handled').textContent === 'Handled.',
@@ -218,9 +219,10 @@ function shown(id, subject, intent, process) {
   await sleep(900);
   const betCard = betPage.doc.querySelector('[data-legacy-message-id="m-new"] .flow-chip-host');
   const betText = betCard ? String(betCard.textContent || '').replace(/\s+/g, ' ') : '';
-  check('פגישת תכנון ב-11:00 on a self-sent mail gets a calendar card',
+  check('פגישת תכנון ב-11:00 on a self-sent mail gets a task card',
     !!betCard && betCard.getAttribute('data-glance-chain') !== 'lane-proof' &&
-    /Schedule It|Hold It|Putting this on your calendar|Scheduling this/.test(betText) && /Do It/.test(betText),
+    /To Do/.test(betText) && /Do It/.test(betText) &&
+    !/Putting this on your calendar|Scheduling this/.test(betText),
     { text: betText, errors: betPage.errors });
   betPage.close();
 
