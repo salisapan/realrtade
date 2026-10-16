@@ -105,9 +105,12 @@ const FlowIntent = (() => {
     'push(?:ed|ing)? (?:back|out)',
     'mov(?:e|ed|ing)\\b[^.!?;]{0,60}?\\bto (?:next|another|the following|a later|sometime)',
     "skip(?:ping)? (?:this|next) week'?s?",
-    '(?:take|drop) (?:it|this|that) (?:off|from) the calendar'
+    '(?:take|drop) (?:it|this|that) (?:off|from) the calendar',
+    "don'?t schedule",
+    'do not schedule',
+    'no loner needed'
   ].join('|'), 'i');
-  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
+  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|מבטלת|מבטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
 
   // "This already happened — don't schedule it again."
   //
@@ -132,10 +135,10 @@ const FlowIntent = (() => {
     'glad (?:we|to have) (?:synced|caught up|connected|spoke|talked)',
     // "The call was on Monday" resolves Monday forward. The meeting already
     // happened; "was on" is the tense cue EVENT_RECAP's thank-you list misses.
-    '(?:the |our )?(?:call|meeting|sync|chat) was on',
-    'already had (?:the |our )?(?:call|meeting|sync|chat)'
+    '(?:the |our )?(?:call|meeting|sync|chat|demo|interview|check-?in|appointment) was on',
+    'already had (?:the |our )?(?:call|meeting|sync|chat|demo|interview|check-?in)'
   ].join('|'), 'i');
-  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר)/;
+  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר|(?:שיחת|פגישת|הראיון|הפגישה|השיחה|הישיבה|ראיון).{0,40}(?:הייתה|היה|היו)|(?:הייתה|היה|היו) ביום)/;
 
   // The other half of the "don't schedule the past" fix above: EVENT_RECAP
   // only helps when the message uses recognizable past-tense phrasing.
@@ -590,7 +593,7 @@ const FlowIntent = (() => {
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
   // the reader's names in that script. A Hebrew name is not "other" just
   // because the only stored name is Latin, and the reverse.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
@@ -1186,7 +1189,7 @@ const FlowIntent = (() => {
     // A clear family D hold or dated promise is that write. The meeting
     // gate would otherwise file "let's sync Tuesday at 3pm" as a calendar
     // event plus a reminder task.
-    if (!replyMisaddressed && familyBox.hit && familyBox.hit.family === 'D' &&
+    if (!replyMisaddressed && !calledOff && !isRecap && !isPast && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);
       if (viaHold) return viaHold;
@@ -1217,7 +1220,7 @@ const FlowIntent = (() => {
       facts.time.hour >= 0 && facts.time.hour <= 23 && facts.time.minute >= 0 && facts.time.minute <= 59
       ? facts.time : null;
     const pendingChoices = Boolean(facts.date && Array.isArray(facts.date.choices) && facts.date.choices.length >= 2 && !facts.date.iso);
-    const eventEvidence = ((hasMeetingNoun && facts.date && facts.date.iso) || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast;
+    const eventEvidence = ((hasMeetingNoun && facts.date && facts.date.iso) || (pendingChoices && (clock || hasMeetingNoun))) && !calledOff && !isRecap && !isPast;
     // "if you're free" / "maybe" is not a time the sender has actually
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
@@ -1302,6 +1305,17 @@ const FlowIntent = (() => {
           dateChoices: facts.date.choices,
           hour: clock.hour,
           minute: clock.minute
+        });
+      }
+      if (pendingChoices && hasMeetingNoun) {
+        return finish(TYPES.SCHEDULED_EVENT, 'high', {
+          who, amount,
+          what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
+          when: null,
+          dateIso: null,
+          dateChoices: facts.date.choices,
+          hour: null,
+          minute: null
         });
       }
       // A meeting that is also a timed commitment, or an explicit ask to

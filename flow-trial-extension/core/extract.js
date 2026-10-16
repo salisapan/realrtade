@@ -257,17 +257,22 @@ const FlowExtract = (() => {
     }
     return null;
   }
-  // Weekday + a day-first date + a clock is one statement. 22/10 and 22.10
-  // are 22 October. When the weekday is that calendar day, the date stands.
-  // When it is not, neither reading is chosen: both dates come back as
-  // choices and iso stays empty. A later weekday-only match must not run.
+  // Weekday + a day-first date is one statement. 22/10 and 22.10 are 22
+  // October. When the weekday is that calendar day and a clock was written,
+  // the date stands. When it is not, neither reading is chosen: both dates
+  // come back as choices and iso stays empty, including when no clock was
+  // written on a meeting. A later weekday-only match must not book the
+  // weekday by itself. A deadline with no clock keeps the older read.
   function weekdayDayFirst(text, now) {
     const src = String(text || '');
     const dayName = namedWeekday(src);
     const num = numericDayMonth(src);
-    if (!dayName || !num || !hasStatedClock(src) || !now) return null;
+    if (!dayName || !num || !now) return null;
+    const clock = hasStatedClock(src);
+    const meetingish = /(?:פגישה|ישיבה|שיחה|ראיון|\b(?:meeting|call|sync|demo|check-?in|interview)\b)/i.test(src);
     const raw = dayName.raw + ' ' + num.token;
     if (dayName.index < 0 || num.month < 1 || num.month > 12 || num.day < 1 || num.day > 31) {
+      if (!clock) return null;
       return { raw: raw, iso: null, invalidDate: true };
     }
     let year = null;
@@ -278,18 +283,20 @@ const FlowExtract = (() => {
     let written = null;
     if (year) {
       written = buildDate(year, num.month - 1, num.day);
-      if (!written) return { raw: raw, iso: null, invalidDate: true };
+      if (!written) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
     } else {
       const y = now.getFullYear();
       const inWindow = [y - 1, y, y + 1]
         .map((yy) => buildDate(yy, num.month - 1, num.day))
         .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
-      if (inWindow.length !== 1) return { raw: raw, iso: null, invalidDate: true };
+      if (inWindow.length !== 1) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
       written = inWindow[0];
     }
     if (written.getDay() === dayName.index) {
+      if (!clock) return null;
       return { raw: raw, iso: iso(written), statedWeekday: true };
     }
+    if (!clock && !meetingish) return null;
     const other = nearestWeekday(written, dayName.index);
     if (!other) return { raw: raw, iso: null, contradictsWeekday: true };
     return {

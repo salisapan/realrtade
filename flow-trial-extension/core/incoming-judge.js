@@ -130,7 +130,10 @@ const FlowIncomingJudge = (() => {
     const isRequest = intentApi.TYPES ? intent.type === intentApi.TYPES.REQUEST : intent.type === 'request';
     const gate = fileAttach && typeof fileAttach.gate === 'function' ? fileAttach.gate(text) : { kind: 'ignore' };
     if (isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
-    if (isRequest && gate.kind === 'clear') {
+    // A deadline whose day was dropped (31/2, or a weekday that is not that
+    // calendar day) is still the reply. The file chain is not that close.
+    const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
+    if (isRequest && gate.kind === 'clear' && !droppedDeadline) {
       if (resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-chain-not-run', intent };

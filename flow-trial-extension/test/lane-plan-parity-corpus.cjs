@@ -25,6 +25,15 @@ vm.createContext(kit);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'src', 'step-kit.js'), 'utf8'), kit, { filename: 'step-kit.js' });
 const FlowStepKit = kit.FlowStepKit;
 
+const gmailSrc = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
+const planAt = gmailSrc.indexOf('function planOpenMail(');
+const planEnd = gmailSrc.indexOf('function deadlineWasDropped(');
+if (planAt < 0 || planEnd <= planAt) {
+  console.log('FAIL: content-gmail.js planOpenMail is missing');
+  process.exit(1);
+}
+vm.runInContext(gmailSrc.slice(planAt, planEnd) + '\nthis.planOpenMail = planOpenMail;\n', sandbox, { filename: 'content-gmail.js' });
+
 const fix = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'parity-148-dates.json'), 'utf8'));
 
 function shape(process) {
@@ -44,16 +53,39 @@ function shape(process) {
   };
 }
 
-function both(text) {
+function both(text, extra) {
+  extra = extra || {};
   return vm.runInContext(`
     (function () {
       const now = new Date(${fix.now.join(',')});
       const text = ${JSON.stringify(text)};
-      const base = { text: text, subject: '', sender: { name: 'flow', email: 'flow@example.com' }, now: now, inbound: true };
-      const g = FlowIncomingJudge.judge(Object.assign({ surface: 'gmail' }, base));
-      const o = FlowIncomingJudge.judge(Object.assign({ surface: 'outlook' }, base));
-      const intent = FlowIntent.classify(text, { now: now, senderName: 'flow' });
-      return { g: g, o: o, intent: intent };
+      const subject = ${JSON.stringify(extra.subject || '')};
+      const ctx = {
+        subject: subject,
+        senderEmail: 'flow@example.com',
+        senderName: 'flow',
+        now: now,
+        inbound: true,
+        userName: 'Sali',
+        ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
+        ownAddresses: ['glance.salisapan@outlook.com'],
+        to: ['glance.salisapan@outlook.com']
+      };
+      const g = planOpenMail(text, ctx);
+      const o = FlowIncomingJudge.judge({
+        text: text,
+        subject: subject,
+        sender: { name: 'flow', email: 'flow@example.com' },
+        now: now,
+        inbound: true,
+        surface: 'outlook',
+        userName: 'Sali',
+        ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
+        ownAddresses: ['glance.salisapan@outlook.com'],
+        to: ['glance.salisapan@outlook.com'],
+        threadUrl: 'https://example.invalid/t'
+      });
+      return { g: g, o: o, intent: g && g.intent };
     })()
   `, sandbox);
 }
@@ -115,6 +147,74 @@ for (const text of fix.replies) {
     got.g.show === true && got.o.show === true,
     { type: got.intent && got.intent.type, date: got.intent && got.intent.entities && got.intent.entities.dateIso, g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason] });
 }
+
+const bare = fix.noTimeConflict;
+const bareGot = both(bare.text);
+const bareG = shape(bareGot.g && bareGot.g.process);
+const bareO = shape(bareGot.o && bareGot.o.process);
+const bareLabels = ((bareGot.g && bareGot.g.process && bareGot.g.process.dateChoices) || []).map((c) => c.label);
+const bareIsos = ((bareGot.g && bareGot.g.process && bareGot.g.process.dateChoices) || []).map((c) => c.iso);
+check('a weekday that is not 22/10, with no clock, is the quick-pick and does not book 2026-10-21',
+  bareGot.g && bareGot.g.show === true && bareGot.o && bareGot.o.show === true &&
+  bareG && bareO && bareG.id === 'hold' && bareO.id === 'hold' &&
+  bareG.needs === true && bareO.needs === true && bareG.date === '' && bareO.date === '' &&
+  bareLabels.length === 2 && bare.labels.every((label) => bareLabels.indexOf(label) >= 0) &&
+  bareIsos.indexOf(bare.forbiddenIso) >= 0 && bareIsos.length === 2 &&
+  !(bareGot.g.process.steps || []).some((s) => s && s.params && s.params.dateIso === bare.forbiddenIso),
+  { bareG: bareG, bareO: bareO, labels: bareLabels, reason: [bareGot.g && bareGot.g.reason, bareGot.o && bareGot.o.reason] });
+const bareHtml = FlowStepKit.stageHTML({
+  intent: 'Meeting',
+  uiLang: 'he',
+  he: true,
+  rows: [],
+  chip: {
+    mode: 'count',
+    needsDateChoice: bareGot.g.process.needsDateChoice === true,
+    dateChoices: bareGot.g.process.dateChoices
+  }
+});
+check('that quick-pick disables Do it until a tap',
+  bare.labels.every((label) => bareHtml.indexOf(label) >= 0) &&
+  bareHtml.indexOf('aria-pressed="true"') < 0 && /class="do-halo[^"]*" [^>]*disabled/.test(bareHtml),
+  bareHtml.slice(bareHtml.indexOf('chip-dates'), bareHtml.indexOf('chip-dates') + 400));
+
+for (const text of fix.deadlines) {
+  const got = both(text);
+  const g = shape(got.g && got.g.process);
+  const o = shape(got.o && got.o.process);
+  const dropped = got.intent && got.intent.facts && got.intent.facts.date && got.intent.facts.date.dropped === true;
+  check('dropped deadline is Reply & Track, not file-chain-not-run: ' + text.slice(0, 22),
+    dropped && got.g && got.g.show === true && got.o && got.o.show === true &&
+    got.o.reason !== 'file-chain-not-run' &&
+    g && o && g.id === 'reply-track' && o.id === 'reply-track' &&
+    got.intent.entities && got.intent.entities.dateIso == null,
+    { dropped: dropped, g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason], type: got.intent && got.intent.type });
+}
+
+{
+  const row = fix.offer14096;
+  const got = both(row.body, { subject: row.subject });
+  const g = shape(got.g && got.g.process);
+  const o = shape(got.o && got.o.process);
+  check(row.id + ' offers the commitment dated ' + row.date,
+    got.g && got.g.show === true && got.o && got.o.show === true &&
+    g && o && g.id === 'follow-through' && o.id === 'follow-through' &&
+    got.intent && got.intent.entities && got.intent.entities.dateIso === row.date,
+    { g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason], date: got.intent && got.intent.entities && got.intent.entities.dateIso });
+}
+
+let quietWrong = 0;
+for (const row of fix.quiet) {
+  const got = both(row.body, { subject: row.subject });
+  const showed = (got.g && got.g.show === true) || (got.o && got.o.show === true);
+  if (showed) quietWrong++;
+  check(row.id + ' stays quiet', !showed, {
+    g: got.g && (got.g.reason || (got.g.process && got.g.process.id)),
+    o: got.o && (got.o.reason || (got.o.process && got.o.process.id))
+  });
+}
+check('quiet fixtures: 0 wrong shows', quietWrong === 0, quietWrong);
+check('quiet fixtures are the set of ' + fix.quiet.length, fix.quiet.length === 12, fix.quiet.length);
 
 const html = FlowStepKit.stageHTML({
   intent: 'Meeting',

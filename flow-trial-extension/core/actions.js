@@ -514,11 +514,34 @@ const FlowActions = (() => {
     return null;
   }
 
-  // The only hold-versus-schedule decision. Gmail and Outlook both call
-  // this and then only execute the plan. A meeting noun plus a date plus a
-  // time, and no request to send a reply, is one event (hold). The same
-  // noun and date with no time is schedule. A weekday that contradicts the
-  // calendar day is still a hold, with both dates and no chosen one.
+  // The only hold-versus-schedule decision. It runs only for a meeting
+  // that has both a date and a clock, and for a meeting whose weekday
+  // contradicts the calendar day even when no clock was written. Every
+  // other mail keeps processFor, the plan from before this override.
+  // A weekday contradiction is a hold with both dates and no chosen one.
+  function meetingClock(intent) {
+    const e = intent && intent.entities;
+    return Boolean(e && Number.isInteger(e.hour) && Number.isInteger(e.minute));
+  }
+  function meetingNarrow(intent) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    const close = intent.personalClose;
+    if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
+    const sig = intent.signals || {};
+    const e = intent.entities || {};
+    const choices = dateChoicesOf(intent);
+    const hasDate = Boolean(e.dateIso) || Boolean(choices);
+    if (!hasDate || !meetingClock(intent)) return false;
+    return Boolean(sig.hasMeetingNoun || close === 'calendar-hold' || choices);
+  }
+  function meetingConflictNoTime(intent) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    const sig = intent.signals || {};
+    if (!sig.hasMeetingNoun || meetingClock(intent)) return false;
+    const e = intent.entities || {};
+    const choices = dateChoicesOf(intent);
+    return Boolean(choices && !e.dateIso);
+  }
   function meetingPlan(intent, proc) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
     const close = intent.personalClose;
@@ -530,11 +553,11 @@ const FlowActions = (() => {
     const openChoice = Boolean(choices && !e.dateIso);
     const hasDate = Boolean(e.dateIso) || openChoice;
     if (!hasDate) return proc;
-    const timed = Number.isInteger(e.hour) && Number.isInteger(e.minute);
-    if (openChoice && timed) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    const timed = meetingClock(intent);
+    if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
-    const id = timed ? 'hold' : 'schedule';
-    return Object.assign({ id: id }, PROCESS_CATALOG[id]);
+    if (!timed) return proc;
+    return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
 
   // The person's tap. Only one of the two offered dates is accepted, and
@@ -563,7 +586,8 @@ const FlowActions = (() => {
 
     const e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
-    const proc = meetingPlan(intent, processFor(intent));
+    const useMeeting = meetingNarrow(intent) || meetingConflictNoTime(intent);
+    const proc = useMeeting ? meetingPlan(intent, processFor(intent)) : processFor(intent);
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 
@@ -574,7 +598,7 @@ const FlowActions = (() => {
     if (intent.noReplyDraft) steps = steps.filter((s) => s && s.kind !== 'gmailDraft' && s.kind !== 'outlookDraft');
     if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
 
-    const choices = dateChoicesOf(intent);
+    const choices = useMeeting ? dateChoicesOf(intent) : null;
     const needsDateChoice = Boolean(choices && !e.dateIso);
     if (needsDateChoice) {
       steps.forEach((step) => {

@@ -362,6 +362,35 @@
     return 'https://mail.google.com/mail/u/' + accountIndex() + '/#inbox/' + threadId;
   }
 
+  // The chip's plan. The inbox scan and the reading pane both call this,
+  // then only the surface differs. Outlook's judge calls the same planFor.
+  function planOpenMail(text, ctx) {
+    ctx = ctx || {};
+    let intent = ctx.intent || null;
+    if (!intent || !intent.type) {
+      const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
+        ? FlowIncomingJudge.prepareForJudge(text)
+        : text;
+      intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, ctx) : null;
+    }
+    if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.shouldShowChip === 'function' && !FlowIntent.shouldShowChip(intent)) {
+      return { show: false, reason: 'chip-low-confidence', intent: intent };
+    }
+    const process = (typeof FlowActions !== 'undefined') ? FlowActions.planFor(intent, {
+      threadUrl: ctx.threadUrl || null,
+      hasThreadAttachment: Boolean(ctx.hasThreadAttachment),
+      executionMemory: ctx.executionMemory || null,
+      attachFile: ctx.attachFile || null
+    }) : null;
+    if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
+    return { show: true, intent: intent, process: process };
+  }
+
+  function deadlineWasDropped(intent) {
+    return Boolean(intent && intent.facts && intent.facts.date && intent.facts.date.dropped);
+  }
+
   async function considerInboxRow(row, executionMemory, freshState) {
     const threadId = row.getAttribute('data-legacy-thread-id') || row.getAttribute('data-thread-id');
     if (!threadId) return false;
@@ -399,11 +428,13 @@
     if (!FlowStillOpen.scoreOf(probe, Date.now())) return false;
     if (await personalCloseSaysSilence(intent, threadId, subject)) return false;
     const threadLink = inboxThreadUrl(threadId);
-    const process = FlowActions.planFor(intent, {
+    const planned = planOpenMail(text, {
+      intent: intent,
       threadUrl: threadLink,
       hasThreadAttachment: false,
       executionMemory: executionMemory
     });
+    const process = planned && planned.process;
     if (!process) return false;
     await FlowStorage.upsertStillOpenScan({
       messageId: 'scan:' + threadId,
@@ -1190,7 +1221,7 @@
     // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
     // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
     // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
-    if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+    if (!deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
       recordSilence(messageId, 'file');
       return;
     }
@@ -1219,7 +1250,7 @@
     if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
 
     let attachFile = null;
-    if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
+    if (!deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
@@ -1284,12 +1315,14 @@
       }
     }
 
-    const process = FlowActions.planFor(intent, {
+    const planned = planOpenMail(text, {
+      intent: intent,
       threadUrl: threadUrl(legacyId),
       hasThreadAttachment: Boolean(chosenAttachment) || Boolean(attachFile),
-      executionMemory,
-      attachFile
+      executionMemory: executionMemory,
+      attachFile: attachFile
     });
+    const process = planned && planned.process;
     if (!process) { void flushSuggest(false); return; }
 
     injectChip(message, {
