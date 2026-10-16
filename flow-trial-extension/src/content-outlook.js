@@ -1770,13 +1770,24 @@
       if (ignoreStaleClick(host)) return;
       undo.textContent = pageChrome().undoing;
       undo.disabled = true;
-      readBackOrTimeout(send({
+      const sent = send({
         type: 'flow:undo-action',
         connectorId: copy.connectorId,
         ref: copy.ref,
         created: (copy.ref && copy.ref.created) || null
-      })).then(async (result) => {
+      });
+      readBackOrTimeout(sent).then(async function applyUndo(result) {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
+        // The 8s clock can fire after Graph already deleted the row. Keep
+        // the late success so Activity does not stay Handled.
+        if (result && result.reason === 'verify-timeout' && !applyUndo.late) {
+          sent.then((late) => {
+            if (!late || !late.ok || late.reason === 'verify-timeout') return;
+            if (todoUndo && late.fetchedBack !== true) return;
+            applyUndo.late = true;
+            return applyUndo(late);
+          }).catch(() => {});
+        }
         if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited' || result.reason === 'unconfirmed')) {
           undo.textContent = pageChrome().undo;
           undo.disabled = false;

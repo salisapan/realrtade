@@ -460,6 +460,19 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('gone draft becomes undone with reopen', undone.length >= 1 && undone[0].outlookReopen, undone);
     check('gone draft no longer resolved', (w.store.resolvedMessageIds || []).indexOf('gone1') === -1, w.store.resolvedMessageIds);
 
+    w.storage.getActiveOutlookReceipts = async () => (w.store.log || []).slice();
+    w.store.log.push({
+      ts: NOW, kind: 'written', messageId: 'task1', connectorId: 'outlookTask',
+      ref: { taskId: 'e2e-todo-1', externalId: 'e2e-todo-1' },
+      fetchedBack: true, system: 'microsoft/todo', app: 'outlook'
+    });
+    const before = w.calls.length;
+    const kept = await o.reconcileReceipts();
+    const task = (w.store.log || []).find((e) => e && e.messageId === 'task1' && e.kind === 'written' && !e.undone);
+    const urls = w.calls.slice(before).map((c) => String(c.url));
+    check('reconcile leaves a To Do receipt in the log', !!task && kept.ok === true, { task: task, kept: kept });
+    check('reconcile does not read a task ref as a message id', !urls.some((u) => u.indexOf('object') >= 0 || u.indexOf('e2e-todo') >= 0), urls);
+
     const gone = await o.undoReplyDraft('still-missing');
     check('Undo when draft already missing is success alreadyGone', gone.ok && gone.alreadyGone && /already gone/i.test(gone.written), gone);
   }

@@ -1052,12 +1052,35 @@ const FlowOutlook = (() => {
       return out;
     }
 
+    // A draft ref is a Graph message id. A To Do or file ref is an object.
+    // Reconcile reads drafts only. Passing that object to /me/messages makes
+    // the URL "[object Object]", and a 404 then hides the real close.
+    function draftMessageId(ref) {
+      if (typeof ref === 'string') {
+        const id = ref.trim();
+        return id && id.indexOf('[object') !== 0 ? id : '';
+      }
+      if (ref && typeof ref === 'object') {
+        const id = ref.draftId || (typeof ref.id === 'string' ? ref.id : '');
+        return typeof id === 'string' ? id.trim() : '';
+      }
+      return '';
+    }
+
+    function draftReceiptsOnly(list) {
+      return (list || []).filter((e) => {
+        if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) return false;
+        if (e.undone || e.outlookSent || e.outlookReceipt === false) return false;
+        return !!draftMessageId(e.ref);
+      });
+    }
+
     async function listActiveReceipts() {
       if (typeof deps.storage.getActiveOutlookReceipts === 'function') {
-        return deps.storage.getActiveOutlookReceipts();
+        return draftReceiptsOnly(await deps.storage.getActiveOutlookReceipts());
       }
       const st = await deps.storage.get();
-      return receiptsFromState(st);
+      return draftReceiptsOnly(receiptsFromState(st));
     }
 
     async function dropReceiptAsUndone(messageId, ref) {
@@ -1115,8 +1138,9 @@ const FlowOutlook = (() => {
       const receipts = await listActiveReceipts();
       let dropped = 0, sent = 0, kept = 0;
       for (const r of receipts) {
-        if (!r || !r.ref) continue;
-        const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(r.ref) + '?$select=id,isDraft';
+        const draftId = draftMessageId(r && r.ref);
+        if (!draftId || (r.connectorId && r.connectorId !== 'outlookDraft')) continue;
+        const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft';
         let msg = null;
         let gone = false;
         try { msg = await graphGet(token, getUrl); }

@@ -46,6 +46,7 @@
   const tabScroll = { setup: 0, open: 0, log: 0 };
   let scrollLock = false;
   let renderDepth = 0;
+  let openPaintGen = 0;
   let surfaceGen = 0;
   // Bumps on every glanceWhyCurrent write. A refresh that started earlier
   // must not paint over the value this listener already applied.
@@ -2781,13 +2782,16 @@
     return { openOnly: openOnly, receipts: receipts };
   }
 
-  async function renderOpen() {
+  async function renderOpen(reconcile) {
+    const followUp = reconcile !== false;
+    const gen = ++openPaintGen;
     beginRender();
     let loops;
     try {
     await ensureOutlookMigrated();
-    await reconcileOutlookReceiptsSafe();
+    if (gen !== openPaintGen) return;
     loops = await visibleLoops();
+    if (gen !== openPaintGen) return;
     const openOnly = loops.openOnly;
     const receipts = loops.receipts;
     const expired = Array.isArray(loops.expired) ? loops.expired : [];
@@ -2882,6 +2886,13 @@
         if (empty.nextSibling && parent.insertBefore) parent.insertBefore(box, empty.nextSibling);
         else parent.appendChild(box);
       } else host.appendChild(box);
+    }
+    if (followUp) {
+      const reconcileGen = gen;
+      reconcileOutlookReceiptsSafe().then(() => {
+        if (reconcileGen !== openPaintGen) return;
+        return renderOpen(false);
+      }).catch(() => {});
     }
     } finally { endRender(); }
   }
