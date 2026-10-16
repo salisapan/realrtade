@@ -110,12 +110,13 @@ const FlowChipHost = (() => {
   // handlers: { onDoIt(host, chip, ctx, liveSteps), onDismiss(host, ctx) }
   function inject(mountNode, ctx, handlers) {
     if (!mountNode || !ctx || !ctx.process) return null;
+    const dateWaiting = ctx.process.needsDateChoice === true && Array.isArray(ctx.process.dateChoices) && ctx.process.dateChoices.length >= 2;
     if (holdCard(ctx)) {
       const clock = clockOf(ctx);
       const line = clock && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function'
         ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
         : '';
-      if (!line) return null;
+      if (!line && !dateWaiting) return null;
     }
     if (ctx && ctx.uiLang) setUiLang(ctx.uiLang);
     if (mountNode.querySelector('.flow-chip-host')) return mountNode.querySelector('.flow-chip-host');
@@ -138,7 +139,18 @@ const FlowChipHost = (() => {
         noHold: taskOnly,
         fileCard: face.fileCard === true || ctx.fileCard === true,
         surface: ctx.app || 'outlook',
-        onDoIt: function (button) { if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps); },
+        dateChoices: ctx.process.dateChoices || null,
+        onDateChoice: function (iso) {
+          if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
+          liveSteps.forEach(function (step) {
+            if (step && step.kind === 'calendar' && step.params) step.params.dateIso = iso;
+          });
+        },
+        onDoIt: function (button) {
+          if (button && button.disabled) return;
+          if (ctx.process.needsDateChoice) return;
+          if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps);
+        },
         onDismiss: function () {
           if (handlers && handlers.onDismiss) handlers.onDismiss(host, ctx);
           else host.remove();

@@ -61,7 +61,9 @@ const FlowIntent = (() => {
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
-  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+  // One lexicon. ישיבה / ישיבת / פגישת are the construct forms a team
+  // meeting actually uses. meeting, call, and sync are the English list above.
+  const MEETING_NOUN_HE = /(ישיבת|ישיבה|פגישת|פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
 
   // An explicit ask to meet, narrower than HANDOFF. "Could you please
   // confirm you can make it" is a confirm ask on a meeting that is already
@@ -775,14 +777,18 @@ const FlowIntent = (() => {
     if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.readSlot) {
       const slot = FlowCloseFamilies.readSlot(text, ctx.now);
       if (slot && slot.time && !facts.time) facts.time = slot.time;
-      if (slot && slot.date && slot.date.iso && !(facts.date && facts.date.iso)) facts.date = slot.date;
-    }
-    // A weekday that names a different day than the written date is not a
-    // meeting. Staying quiet beats filing Thursday's words on Sunday.
-    if (facts.date && facts.date.contradictsWeekday) {
-      return { type: null, signals: {}, facts: facts, quiet: 'date' };
+      // A weekday/date conflict already refused to pick a day. A slot read
+      // must not fill that hole with "next Wednesday".
+      if (slot && slot.date && slot.date.iso && !(facts.date && (facts.date.iso || facts.date.contradictsWeekday || facts.date.invalidDate))) {
+        facts.date = slot.date;
+      }
     }
     const s = FlowJudgment.score(text, domain, facts);
+    // A bad deadline drops only the date. The reply stays, with no due date
+    // and no quick-pick. A meeting conflict keeps both choices for the card.
+    if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate) && s.flags.handoff) {
+      facts.date = { raw: facts.date.raw || null, iso: null, dropped: true };
+    }
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
     // dateText is what neutralTitle() uses to name a dated close ("Log
     // commitment for Sep 21"). extract() only stores date.iso; without this,
@@ -1088,6 +1094,9 @@ const FlowIntent = (() => {
       : null;
     function fromFamily(fam) {
       if (!fam || fam.suppress) return null;
+      // A contradicted or invalid day is not a day a family may book.
+      // A reply whose deadline was dropped is still the reply, not a hold.
+      if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate || facts.date.dropped)) return null;
       if (suppressed(fam.type)) return null;
       const date = fam.date || null;
       const time = fam.time || null;
@@ -1201,13 +1210,14 @@ const FlowIntent = (() => {
     // deadline of the request, not evidence of a meeting to schedule. A
     // schedule close still needs an explicit proposal to meet, or a time
     // offered for choice (family D / the explicit-ask gate below).
-    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
     // A clock time the extractor actually resolved. Missing either field is
     // not a time we may invent — date-only meetings stay all-day events on
     // the existing schedule process, and date-only commitments stay tasks.
     const clock = facts.time && Number.isInteger(facts.time.hour) && Number.isInteger(facts.time.minute) &&
       facts.time.hour >= 0 && facts.time.hour <= 23 && facts.time.minute >= 0 && facts.time.minute <= 59
       ? facts.time : null;
+    const pendingChoices = Boolean(facts.date && Array.isArray(facts.date.choices) && facts.date.choices.length >= 2 && !facts.date.iso);
+    const eventEvidence = ((hasMeetingNoun && facts.date && facts.date.iso) || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast;
     // "if you're free" / "maybe" is not a time the sender has actually
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
@@ -1281,6 +1291,19 @@ const FlowIntent = (() => {
       };
     }
     if (!blocked && !replyMisaddressed && eventEvidence) {
+      // Two readings of one weekday and one calendar day. Neither is chosen.
+      // planFor turns this into a hold whose Do it stays off until a tap.
+      if (pendingChoices && clock) {
+        return finish(TYPES.SCHEDULED_EVENT, 'high', {
+          who, amount,
+          what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
+          when: null,
+          dateIso: null,
+          dateChoices: facts.date.choices,
+          hour: clock.hour,
+          minute: clock.minute
+        });
+      }
       // A meeting that is also a timed commitment, or an explicit ask to
       // meet at that clock time, is the calendar-hold personal close: one
       // event, not the schedule process's extra reminder task. A bare
@@ -1365,7 +1388,8 @@ const FlowIntent = (() => {
       }, 'follow-up-ask');
     }
 
-    const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject);
+    const dateDropped = Boolean(facts.date && facts.date.dropped);
+    const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';

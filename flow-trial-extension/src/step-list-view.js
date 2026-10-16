@@ -184,6 +184,7 @@ const FlowStepListView = (() => {
         return (r && r.suggested) ? Object.assign({}, r, { checked: false }) : r;
       });
     }
+    let pickedIso = null;
     const root = document.createElement('div');
     root.className = 'flow-step-card flow-step-list';
     if (o.theme === 'dark' || themeDark()) root.setAttribute('data-theme', 'dark');
@@ -212,6 +213,11 @@ const FlowStepListView = (() => {
         chip = { mode: 'files', noHold: true, target: target };
       } else {
         chip = { mode: 'count', noHold: o.noHold === true };
+      }
+      if (o.dateChoices && o.dateChoices.length >= 2) {
+        chip.dateChoices = o.dateChoices;
+        chip.selectedIso = pickedIso;
+        chip.needsDateChoice = !pickedIso;
       }
       return {
         he: he,
@@ -315,10 +321,22 @@ const FlowStepListView = (() => {
           root.setAttribute('data-glance-held', '1');
         });
       }
+      stage.querySelectorAll('.chip-date').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const iso = btn.getAttribute('data-date-iso');
+          if (!iso) return;
+          pickedIso = iso;
+          if (o.onDateChoice) o.onDateChoice(iso);
+          draw();
+        });
+      });
       const go = stage.querySelector('.do-halo');
       if (go) {
         go.addEventListener('click', function (e) {
           e.preventDefault();
+          if (go.disabled) return;
           if (o.onDoIt) o.onDoIt(go);
         });
       }

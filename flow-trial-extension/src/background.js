@@ -3726,12 +3726,33 @@ async function outlookAccessToken(opts) {
 }
 
 // A Graph call with the session's token; a 401 is answered once with a forced refresh (or silent renewal) and a retry.
+// A read-back GET gives up after 8s. The controller aborts the fetch. Undo then refuses and deletes nothing.
+const OUTLOOK_READ_MS = 8000;
 async function outlookFetch(url, init) {
   let token = await outlookAccessToken();
   if (!token) return { status: 0, ok: false, notConnected: true };
-  const call = (t) => fetch(url, Object.assign({}, init || {}, { headers: Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t }) }));
+  const call = async (t) => {
+    const method = String((init && init.method) || 'GET').toUpperCase();
+    const headers = Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t });
+    const opts = Object.assign({}, init || {}, { headers: headers });
+    let ctl = null;
+    let timer = null;
+    if (method === 'GET' && typeof AbortController === 'function') {
+      ctl = new AbortController();
+      timer = setTimeout(() => ctl.abort(), OUTLOOK_READ_MS);
+      opts.signal = ctl.signal;
+    }
+    try {
+      return await fetch(url, opts);
+    } catch (e) {
+      if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: 'verify-timeout', timedOut: true };
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
   let res = await call(token);
-  if (res.status === 401) {
+  if (res && res.status === 401) {
     token = await outlookAccessToken({ force: true });
     if (token) res = await call(token);
   }

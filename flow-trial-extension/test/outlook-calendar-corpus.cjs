@@ -216,6 +216,7 @@ const heHold = vm.runInContext(`
   const classified = FlowIntent.classify(TEXT, { now: now, senderName: 'flow' });
   const plan = FlowActions.planFor(classified, {});
   const quiet = FlowIntent.classify(QUIET, { now: now, senderName: 'flow' });
+  const quietPlan = FlowActions.planFor(quiet, {});
   const judged = FlowIncomingJudge.judge({
     text: TEXT,
     subject: '',
@@ -227,6 +228,13 @@ const heHold = vm.runInContext(`
   const body = FlowOutlookCalendar.meetingBody({
     dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', quote: TEXT, timeZone: 'Asia/Jerusalem'
   });
+  const read = {
+    subject: 'פגישה',
+    body: { contentType: 'Text', content: TEXT },
+    start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' },
+    end: { dateTime: '2026-10-22T14:30:00', timeZone: 'Asia/Jerusalem' }
+  };
+  const readClock = String(read.start.dateTime).slice(11, 16);
   ({
     date: facts.date,
     time: facts.time,
@@ -237,6 +245,13 @@ const heHold = vm.runInContext(`
     steps: plan && plan.steps && plan.steps.map((s) => s.kind),
     quietType: quiet && quiet.type,
     quiet: quiet && quiet.quiet,
+    quietPlan: quietPlan && quietPlan.id,
+    quietNeeds: quietPlan && quietPlan.needsDateChoice,
+    quietIso: quiet && quiet.entities && quiet.entities.dateIso,
+    quietChoices: quietPlan && quietPlan.dateChoices,
+    readBack: readClock,
+    readZone: read.start.timeZone,
+    readHash: FlowOutlookCalendar.contentHash(read) === FlowOutlookCalendar.contentHash(read),
     show: judged && judged.show,
     reason: judged && judged.reason,
     judgedId: judged && judged.process && judged.process.id,
@@ -251,14 +266,20 @@ check('the meeting is an explicit calendar hold with no file step',
   heHold.planId === 'hold' && heHold.steps && heHold.steps.length === 1 && heHold.steps[0] === 'calendar', heHold);
 check('Outlook shows the hold instead of staying quiet',
   heHold.show === true && heHold.judgedId === 'hold', heHold);
-check('a weekday that contradicts 22/10 stays quiet',
-  heHold.quietType == null && heHold.quiet === 'date', heHold);
-check('14:00 Asia/Jerusalem is 11:00Z with no attendees and no file',
-  heHold.body && heHold.body.start.dateTime === '2026-10-22T11:00:00Z' &&
-  heHold.body.end.dateTime === '2026-10-22T11:30:00Z' &&
+check('a weekday that contradicts 22/10 offers both dates and does not book one',
+  heHold.quietType === 'event' && heHold.quietPlan === 'hold' && heHold.quietNeeds === true &&
+  heHold.quietIso == null && Array.isArray(heHold.quietChoices) && heHold.quietChoices.length === 2 &&
+  heHold.quietChoices.some((c) => c.iso === '2026-10-22' && c.label === 'חמישי 22/10') &&
+  heHold.quietChoices.some((c) => c.iso === '2026-10-25' && c.label === 'ראשון 25/10'), heHold);
+check('14:00 Asia/Jerusalem is local 14:00 with no Z, no attendees, and no file',
+  heHold.body && heHold.body.start.dateTime === '2026-10-22T14:00:00' &&
+  heHold.body.end.dateTime === '2026-10-22T14:30:00' &&
+  !/Z$/i.test(heHold.body.start.dateTime) &&
   heHold.body.start.timeZone === 'Asia/Jerusalem' &&
   Array.isArray(heHold.body.attendees) && heHold.body.attendees.length === 0 &&
   heHold.body.subject === 'פגישה' && !/File:/.test(heHold.body.body.content || ''), heHold.body);
+check('a read-back in Asia/Jerusalem is 14:00',
+  heHold.readBack === '14:00' && heHold.readZone === 'Asia/Jerusalem');
 check('an unknown zone is not written',
   Cal.meetingBody({ dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', timeZone: 'Not/AZone' }) === null);
 check('a meeting body hashes the subject, the text, and the start',

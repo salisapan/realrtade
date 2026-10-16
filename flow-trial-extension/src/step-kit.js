@@ -53,9 +53,18 @@ const FlowStepKit = (() => {
     return Object.assign({}, base, FlowDisplay.chrome(ui));
   }
 
-  function doItHTML(label) {
+  function doItHTML(label, disabled) {
     const name = label || 'Do It';
-    return '<button type="button" class="do-halo flow-chip" aria-label="' + esc(name) + '"><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt=""><span class="doit-dark" role="img" aria-label="' + esc(name) + '">' + esc(name) + '</span></button>';
+    const off = disabled ? ' disabled aria-disabled="true"' : '';
+    return '<button type="button" class="do-halo flow-chip" aria-label="' + esc(name) + '"' + off + '><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt=""><span class="doit-dark" role="img" aria-label="' + esc(name) + '">' + esc(name) + '</span></button>';
+  }
+
+  function dateChoicesHTML(choices, selected) {
+    if (!choices || !choices.length) return '';
+    return '<span class="chip-dates" role="group">' + choices.map(function (c) {
+      const on = selected && c && c.iso === selected;
+      return '<button type="button" class="chip-date" data-date-iso="' + esc(c && c.iso) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(c && c.label) + '</button>';
+    }).join('') + '</span>';
   }
 
   function appB(app) { return '<b class="act-app"><bdi>' + esc(app) + '</bdi></b>'; }
@@ -132,10 +141,12 @@ const FlowStepKit = (() => {
   function chipHTML(cfg, L) {
     const c = cfg.chip || { mode: 'count' };
     const hold = c.noHold ? '' : '<button type="button" class="chip-hold">' + L.hold + '</button>';
+    const waiting = c.needsDateChoice === true;
     return '<div class="chip chip-invoice">' + hold +
       (c.icon ? '<span class="ss-chip-glyph" aria-hidden="true">' + glyph(c.icon) + '</span>' : '') +
       '<span class="chip-txt">' + (c.q || '') + '</span>' +
-      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + doItHTML(L.doIt) + '</span></div>';
+      dateChoicesHTML(waiting || c.selectedIso ? c.dateChoices : null, c.selectedIso) +
+      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + doItHTML(L.doIt, waiting) + '</span></div>';
   }
 
   function addHTML(L) {

@@ -42,11 +42,22 @@ function background(opts) {
     atob: (s) => Buffer.from(String(s), 'base64').toString('binary'),
     setTimeout: opts.clock || setTimeout,
     clearTimeout: opts.clearClock || clearTimeout,
+    AbortController: AbortController,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
       try { body = init && init.body ? JSON.parse(init.body) : null; } catch (e) { body = init && init.body; }
       calls.push({ method, url: String(url), body, headers: (init && init.headers) || null });
+      if (opts.hangGet && method === 'GET' && /\/me\/events\//.test(String(url))) {
+        return new Promise((resolve, reject) => {
+          const signal = init && init.signal;
+          if (signal) signal.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      }
       for (const route of routes) {
         if (route.method === method && route.test.test(String(url))) return route.reply(body);
       }
@@ -427,7 +438,7 @@ console.log('\n--- a late To Do read-back still counts, and the fields have to m
     missed.ok === false && missed.fetchedBack === false && missed.written === "Created, couldn't verify", missed);
 }
 
-console.log('\n--- a Jerusalem hold is one event at 11:00Z ---\n');
+console.log('\n--- a Jerusalem hold is one event at local 14:00 ---\n');
 {
   const posted = background({
     scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite', 'offline_access'],
@@ -438,8 +449,8 @@ console.log('\n--- a Jerusalem hold is one event at 11:00Z ---\n');
         id: 'EVT1',
         subject: 'פגישה',
         body: { contentType: 'Text', content: 'פגישה ביום חמישי 22/10 בשעה 14:00' },
-        start: { dateTime: '2026-10-22T11:00:00Z', timeZone: 'Asia/Jerusalem' },
-        end: { dateTime: '2026-10-22T11:30:00Z', timeZone: 'Asia/Jerusalem' },
+        start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' },
+        end: { dateTime: '2026-10-22T14:30:00', timeZone: 'Asia/Jerusalem' },
         attendees: []
       }), text: async () => '' }) }
     ]
@@ -449,12 +460,15 @@ console.log('\n--- a Jerusalem hold is one event at 11:00Z ---\n');
   });
   const post = posted.calls.find((c) => c.method === 'POST');
   const get = posted.calls.find((c) => c.method === 'GET' && /\/me\/events\/EVT1/.test(c.url));
-  check('one POST /me/events at 11:00Z, Prefer outlook.timezone, no attendees, GET proof and contentHash',
+  const read = get && { subject: 'פגישה', body: { content: 'פגישה ביום חמישי 22/10 בשעה 14:00' }, start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' } };
+  check('one POST /me/events at local 14:00 with no Z, Prefer outlook.timezone, no attendees, GET proof and contentHash',
     wrote && wrote.ok === true && wrote.fetchedBack === true && wrote.ref && wrote.ref.eventId === 'EVT1' && wrote.ref.contentHash &&
-    post && post.body && post.body.start.dateTime === '2026-10-22T11:00:00Z' && post.body.start.timeZone === 'Asia/Jerusalem' &&
+    post && post.body && post.body.start.dateTime === '2026-10-22T14:00:00' && !/Z$/i.test(post.body.start.dateTime) &&
+    post.body.end.dateTime === '2026-10-22T14:30:00' && post.body.start.timeZone === 'Asia/Jerusalem' &&
     Array.isArray(post.body.attendees) && post.body.attendees.length === 0 && !post.body.isOnlineMeeting &&
     post.headers && String(post.headers.Prefer).indexOf('Asia/Jerusalem') >= 0 &&
-    posted.calls.filter((c) => c.method === 'POST').length === 1 && get,
+    posted.calls.filter((c) => c.method === 'POST').length === 1 && get &&
+    String(read.start.dateTime).slice(11, 16) === '14:00',
     { wrote: wrote && { ok: wrote.ok, reason: wrote.reason, ref: wrote.ref }, start: post && post.body && post.body.start, headers: post && post.headers });
   const bare = await posted.fn('outlookCalendarUndo')({ eventId: 'EVT1' });
   check('Undo with no snapshot refuses and does not delete',
@@ -474,6 +488,19 @@ console.log('\n--- a Jerusalem hold is one event at 11:00Z ---\n');
   }, { created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T11:00:00' } });
   check('Undo after an edit refuses and does not delete',
     refused && refused.ok === false && refused.reason === 'user-edited' && !edited.calls.some((c) => c.method === 'DELETE'), refused);
+  const hung = background({
+    hangGet: true,
+    scopes: ['Mail.ReadWrite', 'Calendars.ReadWrite'],
+    routes: []
+  });
+  const timed = await hung.fn('outlookCalendarUndo')({
+    eventId: 'EVT1',
+    created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T14:00:00' }
+  }, { created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T14:00:00' } });
+  check('a read-back that times out refuses and deletes nothing',
+    timed && timed.ok === false && (timed.reason === 'unconfirmed' || timed.reason === 'verify-timeout') &&
+    !hung.calls.some((c) => c.method === 'DELETE') && hung.calls.filter((c) => c.method === 'DELETE').length === 0,
+    timed);
 }
 
 const { FlowDisplay } = require('../core/display-copy.js');

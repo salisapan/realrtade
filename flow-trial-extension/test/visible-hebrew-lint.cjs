@@ -45,7 +45,7 @@ check('paintIfCurrent clears the why line', /function paintIfCurrent\(token, fn\
 check('a mail switch clears the current why', page.indexOf('glanceWhyCurrent: null') >= 0);
 check('consent buttons stay אפשר פעם אחת / אפשר תמיד / לא עכשיו', page.indexOf("['אפשר פעם אחת', 'once']") >= 0 && page.indexOf('אין הרשאת To Do') >= 0);
 const kit = fs.readFileSync(path.join(ROOT, 'src', 'step-kit.js'), 'utf8');
-check('the step kit takes its button from the UI-language table', kit.indexOf('FlowDisplay.chrome') >= 0 && kit.indexOf('doItHTML(L.doIt)') >= 0);
+check('the step kit takes its button from the UI-language table', kit.indexOf('FlowDisplay.chrome') >= 0 && kit.indexOf('doItHTML(L.doIt') >= 0);
 
 const sandbox = { console: console, globalThis: {} };
 sandbox.globalThis = sandbox;

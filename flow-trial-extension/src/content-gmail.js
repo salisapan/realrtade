@@ -1996,7 +1996,18 @@
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
         uiLang: glanceUiLang(),
         surface: 'gmail',
-        onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
+        dateChoices: ctx.process.dateChoices || null,
+        onDateChoice: (iso) => {
+          if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
+          liveSteps.forEach((step) => {
+            if (step && step.kind === 'calendar' && step.params) step.params.dateIso = iso;
+          });
+        },
+        onDoIt: (button) => {
+          if (button && button.disabled) return;
+          if (ctx.process.needsDateChoice) return;
+          onDoIt(host, button, ctx, liveSteps);
+        },
         onDismiss: () => onDismiss(host, ctx),
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, 'gmail');

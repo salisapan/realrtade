@@ -155,8 +155,12 @@ const FlowIncomingJudge = (() => {
     // stays quiet rather than offering a reply in its place.
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
-    const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !calendarHold) {
+    // The plan is the decision. Hold, schedule, clear, and move are the same
+    // process on Gmail and on Outlook. A calendar event that is none of
+    // those, and has no draft and no task, stays quiet.
+    const taskStep = (process && process.steps || []).some((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask' || s.kind === 'task'));
+    const samePlan = process && (process.id === 'hold' || process.id === 'clear-it' || process.id === 'move-it' || (process.id === 'schedule' && taskStep));
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !samePlan) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.

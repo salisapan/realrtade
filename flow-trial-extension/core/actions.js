@@ -185,12 +185,9 @@ const FlowActions = (() => {
   // table processFor() selects from, instead of a second, hand-copied list
   // that could quietly drift out of sync with it.
   const PROCESS_CATALOG = {
-    // personalClose `calendar-hold` only. One Google Calendar event.
-    // A commitment with a resolved date and a clock time, or an explicit
-    // ask to meet at a clock time. A date with no clock time stays log-it
-    // (a Google Task). An ask that is not a meeting stays reply-track
-    // (a Gmail draft, plus a follow-up task). A bare meeting announcement
-    // stays schedule / schedule-confirm.
+    // One event, no reminder. planFor chooses this when a meeting noun, a
+    // date, and a time are present and the mail does not ask for a reply.
+    // A meeting noun and a date with no time stays schedule.
     'hold': {
       name: 'Hold It',
       closingLine: 'Putting this on your calendar.',
@@ -509,6 +506,50 @@ const FlowActions = (() => {
     };
   }
 
+  function dateChoicesOf(intent) {
+    const e = intent && intent.entities;
+    if (e && Array.isArray(e.dateChoices) && e.dateChoices.length >= 2) return e.dateChoices;
+    const d = intent && intent.facts && intent.facts.date;
+    if (d && Array.isArray(d.choices) && d.choices.length >= 2) return d.choices;
+    return null;
+  }
+
+  // The only hold-versus-schedule decision. Gmail and Outlook both call
+  // this and then only execute the plan. A meeting noun plus a date plus a
+  // time, and no request to send a reply, is one event (hold). The same
+  // noun and date with no time is schedule. A weekday that contradicts the
+  // calendar day is still a hold, with both dates and no chosen one.
+  function meetingPlan(intent, proc) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
+    const close = intent.personalClose;
+    if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return proc;
+    const sig = intent.signals || {};
+    if (sig.handoff) return proc;
+    const e = intent.entities || {};
+    const choices = dateChoicesOf(intent);
+    const openChoice = Boolean(choices && !e.dateIso);
+    const hasDate = Boolean(e.dateIso) || openChoice;
+    if (!hasDate) return proc;
+    const timed = Number.isInteger(e.hour) && Number.isInteger(e.minute);
+    if (openChoice && timed) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    if (!sig.hasMeetingNoun) return proc;
+    const id = timed ? 'hold' : 'schedule';
+    return Object.assign({ id: id }, PROCESS_CATALOG[id]);
+  }
+
+  // The person's tap. Only one of the two offered dates is accepted, and
+  // until that happens the plan still has no date.
+  function chooseDate(plan, iso) {
+    const want = String(iso || '');
+    const choices = plan && plan.dateChoices;
+    if (!want || !Array.isArray(choices) || !choices.some((c) => c && c.iso === want)) return false;
+    (plan.steps || []).forEach((step) => {
+      if (step && step.kind === 'calendar' && step.params) step.params.dateIso = want;
+    });
+    plan.needsDateChoice = false;
+    return true;
+  }
+
   function planFor(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
@@ -522,7 +563,7 @@ const FlowActions = (() => {
 
     const e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
-    const proc = processFor(intent);
+    const proc = meetingPlan(intent, processFor(intent));
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 
@@ -533,7 +574,26 @@ const FlowActions = (() => {
     if (intent.noReplyDraft) steps = steps.filter((s) => s && s.kind !== 'gmailDraft' && s.kind !== 'outlookDraft');
     if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
 
-    return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };
+    const choices = dateChoicesOf(intent);
+    const needsDateChoice = Boolean(choices && !e.dateIso);
+    if (needsDateChoice) {
+      steps.forEach((step) => {
+        if (step && step.kind === 'calendar' && step.params) {
+          step.params.dateIso = null;
+          step.params.dateChoices = choices;
+        }
+      });
+    }
+
+    return {
+      id: proc.id,
+      name: proc.name,
+      closingLine: proc.closingLine,
+      closedLine: proc.closedLine,
+      needsDateChoice: needsDateChoice,
+      dateChoices: needsDateChoice ? choices : null,
+      steps: steps
+    };
   }
 
   // The receipt lines for writes that actually landed. A failed step can
@@ -551,7 +611,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };

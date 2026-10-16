@@ -5187,7 +5187,8 @@
     if (!ctx || !ctx.messageId) return false;
     let loopSt = null;
     try { loopSt = await FlowStorage.get(); } catch (e) { loopSt = null; }
-    if ((ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold') && !meetingClock(ctx)) return false;
+    const dateWaiting = ctx.process.needsDateChoice === true && Array.isArray(ctx.process.dateChoices) && ctx.process.dateChoices.length >= 2;
+    if ((ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold') && !meetingClock(ctx) && !dateWaiting) return false;
     if (taskOnlyProcess(ctx.process) && todoAsk(loopSt)) {
       const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
       if (!asked) return false;

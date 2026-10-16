@@ -328,9 +328,25 @@ const FlowOutlookCalendar = (() => {
     return Date.UTC(Number(bag.year), Number(bag.month) - 1, Number(bag.day), hour, Number(bag.minute), Number(bag.second));
   }
 
-  // 14:00 in Asia/Jerusalem is 2026-10-22T11:00:00Z, whether this process
-  // runs in UTC or Jerusalem. The offset is applied twice so a DST boundary
-  // uses the offset of the resulting instant.
+  // Wall clock in the person's zone. Graph must not receive a Z instant
+  // together with timeZone Asia/Jerusalem. 14:00 is 2026-10-22T14:00:00
+  // and the zone travels in timeZone.
+  function zoneOk(zone) {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: zone }).format(0);
+      return true;
+    } catch (e) { return false; }
+  }
+  function wallIso(dateIso, hour, minute, addMinutes) {
+    const parts = dateIso.split('-').map(Number);
+    const ms = Date.UTC(parts[0], parts[1] - 1, parts[2], hour, minute + (addMinutes || 0), 0);
+    const d = new Date(ms);
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) +
+      'T' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }
+  // Kept so a caller can still name the UTC instant of a wall clock. The
+  // event body does not send that instant.
   function instantIso(dateIso, hour, minute, addMinutes, timeZone) {
     const parts = dateIso.split('-').map(Number);
     const wall = Date.UTC(parts[0], parts[1] - 1, parts[2], hour, minute + (addMinutes || 0), 0);
@@ -341,8 +357,8 @@ const FlowOutlookCalendar = (() => {
     return new Date(utc).toISOString().replace(/\.000Z$/, 'Z');
   }
 
-  // One meeting, no file, nobody invited. dateTime is the UTC instant.
-  // timeZone is the person's zone, so 14:00 Jerusalem is 11:00Z.
+  // One meeting, no file, nobody invited. dateTime is the local wall
+  // clock with no Z. timeZone is the person's zone.
   function meetingBody(input) {
     const i = input || {};
     const date = isoDate(i.dateIso);
@@ -353,16 +369,10 @@ const FlowOutlookCalendar = (() => {
     const title = String(i.title || i.quote || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
     const zone = zoneName(i.timeZone);
-    if (!zone) return null;
-    let startIso = '';
-    let endIso = '';
-    try {
-      startIso = instantIso(date, hour, minute, 0, zone);
-      endIso = instantIso(date, hour, minute, DURATION_MIN, zone);
-    } catch (e) {
-      return null;
-    }
-    if (!startIso || !endIso) return null;
+    if (!zone || !zoneOk(zone)) return null;
+    const startIso = wallIso(date, hour, minute, 0);
+    const endIso = wallIso(date, hour, minute, DURATION_MIN);
+    if (!startIso || !endIso || /Z$/i.test(startIso)) return null;
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     return {
       subject: title,
