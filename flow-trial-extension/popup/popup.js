@@ -2887,13 +2887,10 @@
         else parent.appendChild(box);
       } else host.appendChild(box);
     }
-    if (followUp) {
-      const reconcileGen = gen;
-      reconcileOutlookReceiptsSafe().then(() => {
-        if (reconcileGen !== openPaintGen) return;
-        return renderOpen(false);
-      }).catch(() => {});
-    }
+    // Reconcile after the paint. A slow Graph call must not hold the scroll
+    // lock, and it must not paint again on its own: a log write already
+    // re-renders, and a second paint here resets a scroll the person made.
+    if (followUp) reconcileOutlookReceiptsSafe().catch(() => {});
     } finally { endRender(); }
   }
 
