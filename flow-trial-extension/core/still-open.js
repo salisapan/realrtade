@@ -233,6 +233,20 @@ const FlowStillOpen = (() => {
     return 0.35;
   }
 
+  // The due calendar day is before today. The card leaves. Loops keeps
+  // the row as expired, which is not a close and not a missing card.
+  function deadlinePassed(item, now) {
+    const iso = dueIsoOf(item);
+    if (!iso) return false;
+    const parts = iso.split('-');
+    if (parts.length < 3) return false;
+    const due = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    if (Number.isNaN(due.getTime())) return false;
+    const clock = now == null ? new Date() : new Date(now);
+    const start = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate());
+    return due.getTime() < start.getTime();
+  }
+
   function deadlineMs(item) {
     const iso = item && item.intent && item.intent.facts && item.intent.facts.date && item.intent.facts.date.iso;
     if (!iso) return null;
@@ -380,6 +394,7 @@ const FlowStillOpen = (() => {
     for (const raw of list) {
       if (!raw || !raw.messageId || !raw.process || !raw.process.steps || !raw.process.steps.length) continue;
       if (activeProofFor(log, raw)) continue;
+      if (deadlinePassed(raw, now)) continue;
       const score = scoreOf(raw, now);
       if (!score) continue;
       const commit = commitmentDedupeKey(raw);
@@ -470,7 +485,81 @@ const FlowStillOpen = (() => {
     const whoA = senderKeyOf(row);
     const whoB = senderKeyOf(pane);
     if (whoA && whoB && whoA !== whoB) return false;
+    const convA = conversationOf(row);
+    const convB = conversationOf(pane);
+    if (convA && convB && convA !== convB) return false;
     return true;
+  }
+
+  function conversationOf(row) {
+    if (!row) return '';
+    if (row.outlookConversationId) return String(row.outlookConversationId);
+    if (row.conversationId) return String(row.conversationId);
+    const t = String(row.threadId || '');
+    return t.indexOf('ol:') === 0 ? t.slice(3) : '';
+  }
+
+  function loopIds(row) {
+    return [row && row.messageId, row && row.itemId, row && row.pathId, row && row.outlookIncomingId].filter(Boolean).map(String);
+  }
+
+  // A receipt and a still-open row are one loop when they name the same
+  // message, the same promise, or the same conversation and promise.
+  // Two different promises stay two rows.
+  function sameLoopRow(a, b) {
+    if (!a || !b) return false;
+    const left = loopIds(a);
+    const right = loopIds(b);
+    if (left.some((id) => right.indexOf(id) >= 0)) return true;
+    const keyA = commitmentDedupeKey(a);
+    const keyB = commitmentDedupeKey(b);
+    if (keyA && keyB && keyA === keyB) return true;
+    const convA = conversationOf(a);
+    const convB = conversationOf(b);
+    if (convA && convB && convA === convB && sameSubjectPromise(a, b)) return true;
+    return false;
+  }
+
+  // A passed deadline is not an open card. The loop stays, marked expired.
+  function expiredOf(candidates, now, log) {
+    const out = [];
+    const list = Array.isArray(candidates) ? candidates : [];
+    for (const raw of list) {
+      if (!raw || !raw.messageId) continue;
+      if (!deadlinePassed(raw, now)) continue;
+      if (activeProofFor(log, raw)) continue;
+      const key = commitmentDedupeKey(raw);
+      if (key && out.some((row) => commitmentDedupeKey(row) === key)) continue;
+      if (out.some((row) => row.messageId === raw.messageId)) continue;
+      out.push(Object.assign({}, raw, { status: 'expired' }));
+    }
+    return out;
+  }
+
+  // Loops shows one row per loop. A receipt wins over the open copy.
+  // An expired deadline is its own row, not an open card and not a receipt.
+  function panelLoops(openRows, receipts, expiredRows) {
+    const opens = Array.isArray(openRows) ? openRows.filter(Boolean) : [];
+    const recs = Array.isArray(receipts) ? receipts.filter(Boolean) : [];
+    const keptReceipts = [];
+    recs.forEach((r) => {
+      if (!keptReceipts.some((k) => sameLoopRow(k, r))) keptReceipts.push(r);
+    });
+    const openOnly = [];
+    opens.forEach((row) => {
+      if (keptReceipts.some((r) => sameLoopRow(r, row))) return;
+      if (openOnly.some((k) => sameLoopRow(k, row))) return;
+      openOnly.push(row);
+    });
+    const expired = [];
+    (Array.isArray(expiredRows) ? expiredRows : []).forEach((row) => {
+      if (!row) return;
+      if (keptReceipts.some((r) => sameLoopRow(r, row))) return;
+      if (openOnly.some((k) => sameLoopRow(k, row))) return;
+      if (expired.some((k) => sameLoopRow(k, row))) return;
+      expired.push(Object.assign({}, row, { status: 'expired' }));
+    });
+    return { openOnly: openOnly, receipts: keptReceipts, expired: expired };
   }
 
   function humanDate(iso, now) {
@@ -665,8 +754,11 @@ const FlowStillOpen = (() => {
     scoreOf: scoreOf,
     fromLogEntry: fromLogEntry,
     select: select,
+    deadlinePassed: deadlinePassed,
+    expiredOf: expiredOf,
     promiseKey: commitmentDedupeKey,
     sameSubjectPromise: sameSubjectPromise,
+    panelLoops: panelLoops,
     activeProofFor: activeProofFor,
     whyLine: whyLine,
     notificationText: notificationText,

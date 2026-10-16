@@ -1204,9 +1204,6 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   }
 
   const holds = [
-    ['EN promise + date + time', 'I will send you the signed contract by Friday, September 18 at 3pm.'],
-    ['EN agreed + date + time, no meeting noun', 'We agreed to file the amendment by September 21 at 3pm.'],
-    ['HE promise + date + time', 'אני אשלח לך את החוזה ביום שישי בשעה 15:00.'],
     ['EN explicit schedule-a-call ask', 'Can you schedule a call Friday, September 18 at 3pm?'],
     ['EN could-you-meet ask', 'Could you meet Friday, September 18 at 3pm to review the contract?'],
     ['EN can-we-meet ask', 'Can we meet Friday, September 18 at 10:00am?'],
@@ -1227,12 +1224,15 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   }
 
   const promise = planOf('I will send you the signed contract by Friday, September 18 at 3pm.');
-  check('a timed promise stays a decision, and the step carries 15:00',
-    promise.intent.type === FlowIntent.TYPES.DECISION_TO_LOG &&
-      promise.process.steps[0].params.hour === 15 && promise.process.steps[0].params.minute === 0,
-    promise.process.steps[0].params);
-  check('a timed promise does not also open a task or a draft',
-    promise.process.steps.every((s) => s.kind === 'calendar'));
+  check('a timed sender promise is quiet, not a hold',
+    !promise.intent.type && !promise.intent.personalClose, { type: promise.intent.type, close: promise.intent.personalClose });
+  const agreed = planOf('We agreed to file the amendment by September 21 at 3pm.');
+  check('an agreed day with a clock stays a task, not a hold',
+    agreed.intent.personalClose === 'dated-commitment' && agreed.process.id === 'log-it',
+    { close: agreed.intent.personalClose, id: agreed.process && agreed.process.id });
+  const hePromise = planOf('אני אשלח לך את החוזה ביום שישי בשעה 15:00.');
+  check('a Hebrew timed sender promise is quiet, not a hold',
+    !hePromise.intent.type && !hePromise.intent.personalClose, { type: hePromise.intent.type, close: hePromise.intent.personalClose });
 
   const ask = planOf('Can you schedule a call Friday, September 18 at 3pm?');
   check('an explicit meeting ask stays an event, not a draft',
@@ -1296,8 +1296,11 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   const suppressedPromise = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyDecision });
   check('heavy decision dismissals suppress a timed commitment', !suppressedPromise.type, suppressedPromise.type);
   const notThat = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyEvent });
-  check('event-dismissal history does not suppress a timed commitment',
-    notThat.personalClose === 'calendar-hold', notThat.personalClose);
+  check('a timed sender promise stays quiet under event-dismissal history',
+    !notThat.type && !notThat.personalClose, notThat.personalClose);
+  const meetDespite = classify('Can we meet Friday, September 18 at 10:00am?', { calibrationByType: heavyDecision });
+  check('decision-dismissal history does not suppress an explicit meet',
+    meetDespite.personalClose === 'calendar-hold', meetDespite.personalClose);
 
   const Q3 = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
   const q3open = classify(Q3, { to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
@@ -1350,6 +1353,60 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     const intent = classify(text, extra);
     check('reply draft stays silent: ' + label, !intent.type && intent.quiet === 'hedge', { type: intent.type, quiet: intent.quiet });
   });
+  const heWhen = new Date('2026-10-14T09:00:00.000Z');
+  const heBody = 'שלום אבי,\nתוכל בבקשה להשיב ולאשר אם מעבר המשרד עדיין נקבע ל-20 באוקטובר?\nתודה,\nנועה';
+  const heCc = classify(heBody, {
+    to: ['avi.mizrahi@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Hebrew Cc-only reply addressed to Avi stays quiet:hedge', !heCc.type && heCc.quiet === 'hedge', { type: heCc.type, quiet: heCc.quiet });
+  check('שלום אבי names אבי', FlowIntent.openingAddressee(heBody) === 'אבי');
+  const heSend = classify('תוכל לשלוח לי את החוזה עד יום חמישי?', {
+    to: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Hebrew send-ask is not treated as a reply ask', heSend.type === FlowIntent.TYPES.REQUEST && heSend.quiet !== 'hedge', { type: heSend.type, quiet: heSend.quiet });
+  const heReader = {
+    to: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  };
+  const heReply = classify('תוכלי בבקשה להשיב עד 20 באוקטובר?\nתודה,\nנועה', heReader);
+  check('Hebrew להשיב addressed to the reader is a reply ask', heReply.type === FlowIntent.TYPES.REQUEST && heReply.quiet !== 'hedge', { type: heReply.type, quiet: heReply.quiet });
+  const heConfirm = classify('תוכל להשיב ולאשר את המועד עד 20 באוקטובר.', heReader);
+  check('Hebrew להשיב ולאשר addressed to the reader is a reply ask', heConfirm.type === FlowIntent.TYPES.REQUEST && heConfirm.quiet !== 'hedge', { type: heConfirm.type, quiet: heConfirm.quiet });
+  const heCcReply = classify('תוכל להשיב אם המעבר עדיין ב-20 באוקטובר?\nתודה,\nנועה', {
+    to: ['avi.mizrahi@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Hebrew להשיב on Cc only stays quiet:hedge', !heCcReply.type && heCcReply.quiet === 'hedge', { type: heCcReply.type, quiet: heCcReply.quiet });
+  const namedCc = classify('Hi all,\nDana, can you reply and confirm whether your section of the board pack is final by October 20?\nEveryone else, no action needed.\nNoa', {
+    to: ['finance@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    userName: 'Dana Cohen',
+    senderEmail: 'noa.levi@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('Dana named on Cc with a reply ask still offers', namedCc.type === FlowIntent.TYPES.REQUEST && namedCc.quiet !== 'noise' && namedCc.quiet !== 'hedge', { type: namedCc.type, quiet: namedCc.quiet });
 }
 
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
@@ -1421,7 +1478,7 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   check('a parking subject above a receiving-this footer stays quiet',
     subjectFooter && subjectFooter.quiet === 'noise' && subjectFooter.type == null, subjectFooter);
 
-  const PARK_BODY = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  const PARK_BODY = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
   const parkCtx = {
     now: new Date('2026-10-08T13:34:00Z'),
     senderEmail: 'ai.local.flow@gmail.com',

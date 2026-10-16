@@ -72,7 +72,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
 
   // "This is not happening at the time this message names."
   //
@@ -323,8 +323,42 @@ const FlowIntent = (() => {
     if (ACTION_PLEASE.test(raw)) return true;
     return JUST_DO.test(raw) && DUE_CUE.test(raw);
   }
-  function infoOnlyMail(text) {
+  // "Everyone else, no action needed" stands the rest of the room down.
+  // It does not cancel a different sentence that names the reader and asks
+  // them to reply. A blanket "No action needed" still quiets the whole mail.
+  function isReaderStandDown(sentence) {
+    return /^(?:everyone else|all others|everybody else|the rest(?: of you)?)[,:]?\s+no action (?:needed|required|necessary)\b/i.test(String(sentence || '').trim());
+  }
+  function mailSentences(text) {
+    return String(text || '').split(/\n+|(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  }
+  function sentenceNamesReader(sentence, ctx) {
+    const first = String((ctx && ctx.userName) || '').trim().split(/\s+/)[0];
+    if (!first) return false;
+    const escaped = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(?:^|[^A-Za-z\\u0590-\\u05FF])' + escaped + '(?:[^A-Za-z\\u0590-\\u05FF]|$)', 'i').test(String(sentence || ''));
+  }
+  function namedReplySentence(text, ctx) {
+    const parts = mailSentences(text);
+    for (let i = 0; i < parts.length; i++) {
+      if (sentenceNamesReader(parts[i], ctx) && explicitReplyAsk(parts[i])) return true;
+    }
+    return false;
+  }
+  function infoOnlyMail(text, ctx) {
     const raw = String(text || '');
+    const parts = mailSentences(raw);
+    const kept = [];
+    let stoodDown = false;
+    for (let i = 0; i < parts.length; i++) {
+      if (isReaderStandDown(parts[i])) { stoodDown = true; continue; }
+      kept.push(parts[i]);
+    }
+    if (stoodDown && kept.some((s) => sentenceNamesReader(s, ctx) && explicitReplyAsk(s))) {
+      const body = kept.join('\n');
+      if (INFO_FULL.test(body)) return true;
+      return REPLY_CANCEL.test(body) && !replyCancelOnly(body);
+    }
     if (INFO_FULL.test(raw)) return true;
     return REPLY_CANCEL.test(raw) && !replyCancelOnly(raw);
   }
@@ -362,6 +396,10 @@ const FlowIntent = (() => {
     if (/\b(?:can|could|would|will)\s+you\s+(?:please\s+)?reply\b/i.test(raw)) return true;
     if (/\b(?:please|kindly)\s+reply\b/i.test(raw)) return true;
     if (/\breply and confirm\b/i.test(raw)) return true;
+    // Hebrew has no word boundary. תוכל / תוכלי / תוכלו next to להשיב is a
+    // reply ask. להשיב ולאשר is the same ask. תוכל לשלוח is a send, not a reply.
+    if (/תוכל(?:י|ו)?(?:\s+\S+){0,4}\s+להשיב/.test(raw)) return true;
+    if (/להשיב\s+ולאשר/.test(raw)) return true;
     return false;
   }
   const AUTO_REPLY_TEXT = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|בחופשה עד|בחופשה|אעדר)/i;
@@ -384,12 +422,91 @@ const FlowIntent = (() => {
     if (AUTO_REPLY_TEXT.test(String(text || '').slice(0, 600))) return true;
     return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
   }
+  // A meeting plan is refused when an event noun in the same clause was
+  // cancelled or postponed, when that meeting already happened, when the
+  // mail is out of office, or when a marketing webinar has no personal ask.
+  // Every cancel word is checked. A second event that is still on, together
+  // with an ask, is the close: "the contract was cancelled, so let's meet"
+  // and "the kickoff is cancelled, can we sync Thursday instead" both keep
+  // the new slot. "was on my list" is not a recap, because list is not an
+  // event noun. Hebrew forms are exact: בולה is not בוטל. An ask to cancel
+  // still clears that slot. planFor and the judge both call this.
+  const VETO_EVENT = '(?:meetings?|calls?|demos?|interviews?|check-ins?|kick-?offs?|syncs?|webinars?|reviews?|stand-?ups?)';
+  const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed)';
+  const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
+  const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
+  const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
+  const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|לא\\s+תתקיים|נדחה|לבטל|תבטל|בטל)';
+  const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
+  const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
+  const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
+  const VETO_PAST_EN = new RegExp('\\b(?:the |our |a |this )?' + VETO_EVENT + '\\s+was\\s+(?:on|yesterday)\\b', 'i');
+  const VETO_PAST_HE = new RegExp('(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')(?:[^\\n.!?]){0,40}(?:הייתה|היה|היו)|(?:הייתה|היה|היו)(?:[^\\n.!?]){0,40}(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')', 'i');
+  function vetoClauses(raw) {
+    return String(raw || '').split(/\n+|(?<=[.!?;])\s+|,\s+|\s+\bbut\b\s+|\s+אבל\s+/i);
+  }
+  function clauseHasEvent(clause) {
+    return VETO_EVENT_RE.test(clause) || VETO_HE_EVENT_RE.test(clause) || VETO_HE_LATIN_RE.test(clause);
+  }
+  function personalAsk(raw) {
+    const r = String(raw || '');
+    if (/\?/.test(r)) return true;
+    if (/\b(?:can|could|would)\s+(?:you|we)\b/i.test(r)) return true;
+    if (/\blet(?:'s| us)\b/i.test(r)) return true;
+    if (/\b(?:please|kindly)\b/i.test(r) && !/\b(?:please|kindly)\s+(?:register|join)\b/i.test(r)) return true;
+    if (/(?:אפשר|בבקשה|תוכל|תוכלי|תאשר|נוכל|תקבע|תכניס)/.test(r)) return true;
+    if (/\b(?:add|put) it (?:on|in) (?:your |the )?calendar\b/i.test(r)) return true;
+    return false;
+  }
+  function clauseCancelled(clause) {
+    if (VETO_EVENT_RE.test(clause) && VETO_CANCEL_RE.test(clause)) return true;
+    if ((VETO_HE_EVENT_RE.test(clause) || VETO_HE_LATIN_RE.test(clause)) && VETO_HE_CANCEL_RE.test(clause)) return true;
+    return false;
+  }
+  function clausePast(clause) {
+    if (/\bwas on my list\b/i.test(clause)) return false;
+    return VETO_PAST_EN.test(clause) || VETO_PAST_HE.test(clause);
+  }
+  function clauseLive(clause) {
+    if (clausePast(clause) || clauseCancelled(clause)) return false;
+    return clauseHasEvent(clause);
+  }
+  function askClause(clause) {
+    if (/confidentiality notice|please notify the sender|הודעה זו והמצורפים/i.test(clause)) return false;
+    return personalAsk(clause);
+  }
+  function liveWithAsk(clauses) {
+    for (let i = 0; i < clauses.length; i++) {
+      if (!clauseLive(clauses[i])) continue;
+      if (askClause(clauses[i])) return true;
+      if (askClause(clauses[i + 1] || '')) return true;
+    }
+    return false;
+  }
+  function marketingWebinar(raw) {
+    if (/הצטרפו/.test(raw) && /וו?בינר/.test(raw) && /הרשמה/.test(raw)) return true;
+    if (/\bwebinar\b/i.test(raw) && /\b(?:join our|register now|registration(?:\s+is)?\s+open)\b/i.test(raw)) return true;
+    return false;
+  }
+  function meetingPlanVeto(text) {
+    const raw = String(text || '');
+    if (/\b(?:please|kindly)\s+cancel\b/i.test(raw)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:בבקשה\s+)?(?:בטל|לבטל|תבטל)\s+את/.test(raw)) return false;
+    const clauses = vetoClauses(raw);
+    if (liveWithAsk(clauses)) return false;
+    if (marketingWebinar(raw)) return true;
+    if (AUTO_REPLY_TEXT.test(raw)) return true;
+    if (clauses.some(clausePast)) return true;
+    if (clauses.some(clauseCancelled)) return true;
+    return false;
+  }
   // A reply draft is offered only for an inbound ask addressed to the user.
   // No To and no Cc is not that ask: the page did not show who it was for.
   // "Hi," is a greeting, not a person named Hi. "Hi Dana," names Dana.
-  const OPEN_GREET = /^(?:good\s+(?:morning|afternoon|evening)|greetings|hi|hey|hello|dear)\b|^(?:בוקר\s+טוב|ערב\s+טוב|שלום|היי|הי)(?![\u0590-\u05FF])/i;
+  const OPEN_GREET = /^(?:good\s+(?:morning|afternoon|evening)|greetings|hi|hey|hello|dear)\b|^(?:בוקר\s+טוב|ערב\s+טוב|שלום\s+רב|שלום|היי\s+לכולם|היי\s+לכולן|היי|הי)(?![\u0590-\u05FF])/i;
   // "Hi all," is the group, not a person named All. A real name still counts.
-  const GROUP_ADDRESSEE = /^(?:all|team|everyone|everybody|there|folks|guys|y['’]all|colleagues|both|כולם|צוות|חברים|חבר['׳’]ה)$/i;
+  const GROUP_ADDRESSEE = /^(?:all|team|everyone|everybody|there|folks|guys|y['’]all|colleagues|both|כולם|לכולם|לכולן|צוות|חברים|חבר['׳’]ה)$/i;
   function openingAddressee(text) {
     let raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
     const greet = raw.match(OPEN_GREET);
@@ -416,7 +533,12 @@ const FlowIntent = (() => {
     const to = addressList(c.to || c.toRecipients);
     const cc = addressList(c.cc || c.ccRecipients);
     if (!to.length && !cc.length) return false;
-    if (own.length && (to.length || cc.length) && !to.some((a) => own.indexOf(a) !== -1)) return false;
+    const onTo = to.some((a) => own.indexOf(a) !== -1);
+    const onCc = cc.some((a) => own.indexOf(a) !== -1);
+    // Not on To is not this person's reply, unless a sentence names them
+    // and asks them to reply while they sit on Cc. "Everyone else, no
+    // action" is that case. A Cc line alone is not.
+    if (own.length && (to.length || cc.length) && !onTo && !(onCc && namedReplySentence(text, c))) return false;
     const who = openingAddressee(text);
     const userName = String(c.userName || '').trim().toLowerCase();
     if (who && userName) {
@@ -425,6 +547,163 @@ const FlowIntent = (() => {
       if (named !== userName && named !== first) return false;
     }
     return true;
+  }
+  // A reply ask is for someone else only when the mail shows who it is for
+  // and that person is not the reader. No To and no Cc is not that fact:
+  // the page did not name an audience, and a family close still stands.
+  function replyAimedElsewhere(text, ctx) {
+    const c = ctx || {};
+    const to = addressList(c.to || c.toRecipients);
+    const cc = addressList(c.cc || c.ccRecipients);
+    const own = addressList(c.ownAddresses || c.own);
+    if (!own.length || (!to.length && !cc.length)) return false;
+    const onTo = to.some((a) => own.indexOf(a) !== -1);
+    const onCc = cc.some((a) => own.indexOf(a) !== -1);
+    if (!onTo && !(onCc && namedReplySentence(text, c))) return true;
+    const who = openingAddressee(text);
+    const userName = String(c.userName || '').trim().toLowerCase();
+    if (who && userName) {
+      const named = who.toLowerCase();
+      const first = userName.split(/\s+/)[0];
+      if (named !== userName && named !== first) return true;
+    }
+    return false;
+  }
+  // Names the reader may be called. The account display name, its first
+  // word, and any other names the host already knows (סאלי beside Sali).
+  function readerNameList(ctx) {
+    const c = ctx || {};
+    const names = [];
+    function add(raw) {
+      const s = String(raw || '').trim().toLowerCase();
+      if (!s) return;
+      if (names.indexOf(s) === -1) names.push(s);
+      const first = s.split(/\s+/)[0];
+      if (first && names.indexOf(first) === -1) names.push(first);
+    }
+    add(c.userName);
+    if (Array.isArray(c.ownNames)) c.ownNames.forEach(add);
+    return names;
+  }
+  // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
+  // the reader's names in that script. A Hebrew name is not "other" just
+  // because the only stored name is Latin, and the reverse.
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
+  // A status word that opens a line is a label, not a person. "Agreed —"
+  // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
+  const LABEL_OPEN = /^(?:agreed|approved|reminder|update|urgent|fyi|quote|re|fw|fwd|note|subject|דחוף|תזכורת|עדכון|אושר|השב|הועבר)$/i;
+  function personToken(token) {
+    if (!token || LABEL_OPEN.test(token) || NOT_A_VOCABLE.test(token) || GROUP_ADDRESSEE.test(token)) return false;
+    if (/^[A-Z][a-zA-Z'’-]{1,40}$/.test(token)) return true;
+    if (/^[\u0590-\u05FF][\u0590-\u05FF'’-]{1,40}$/.test(token)) return true;
+    return false;
+  }
+  // The words after a dash or a colon are an ask when they request the
+  // work. A title ("Head of Ops") is not an ask, so a signature is not
+  // an address.
+  function restIsAsk(rest) {
+    const r = String(rest || '');
+    if (/\?/.test(r)) return true;
+    if (/\b(?:could|can|would|will|please|kindly|pls)\b/i.test(r)) return true;
+    if (/\b(?:review|send|pay|forward|confirm|schedule)\b/i.test(r)) return true;
+    if (/(?:אפשר|נא|בבקשה|תוכל|תוכלי|לשלוח|שלח|תשלח|לבדוק)/.test(r)) return true;
+    return false;
+  }
+  // A comma still names the addressee ("Lior,"). A dash or a colon does
+  // that only when the token is a person's name and the rest is an ask.
+  // "Agreed — Globex" and "Dana - Head of Ops" are not that. Also and
+  // Separately open the sentence; they are not names.
+  function vocativeAt(chunk) {
+    let raw = String(chunk || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    const greet = raw.match(OPEN_GREET);
+    if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
+    let guard = 0;
+    while (guard++ < 3) {
+      const discourse = raw.match(DISCOURSE_OPEN);
+      if (!discourse) break;
+      raw = raw.slice(discourse[0].length);
+    }
+    let hops = 0;
+    while (hops++ < 3) {
+      const head = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})/);
+      if (!head) return '';
+      const name = head[1];
+      const after = raw.slice(name.length);
+      // "Hi all, Noa:" and "Hi all — Dana," name the next person. all is
+      // the group. RE:, FW:, Note:, and הועבר: are labels, not names.
+      if (GROUP_ADDRESSEE.test(name) && /^\s*(?:(?:,|،)|(?:\u2014|\u2013|-))/.test(after)) {
+        raw = after.replace(/^\s*(?:(?:,|،)|(?:\u2014|\u2013|-))\s*/, '');
+        continue;
+      }
+      if (/^\s*:/.test(after)) {
+        if (!personToken(name) || !restIsAsk(after)) return '';
+        return name;
+      }
+      if (/^\s*(?:\u2014|\u2013|-)/.test(after)) {
+        if (!personToken(name)) return '';
+        const rest = after.replace(/^\s*(?:\u2014|\u2013|-)\s*/, '');
+        if (!restIsAsk(rest)) return '';
+        return name;
+      }
+      if (/^\s*(?:,|،)/.test(after)) {
+        if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
+        return name;
+      }
+      return '';
+    }
+    return '';
+  }
+  // "Quote: \"We're good at …\"" reports someone else's words. The commit
+  // phrase inside the quotation is not this person's decision.
+  function thirdPartyQuote(text) {
+    const raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    return /^quote\s*:/i.test(raw) && /["“”«»]/.test(raw);
+  }
+  function vocativeIsOther(text, ctx) {
+    const names = readerNameList(ctx);
+    if (!names.length) return false;
+    const hebrew = /[\u0590-\u05FF]/;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i]);
+      if (!who) continue;
+      const named = who.toLowerCase();
+      if (names.indexOf(named) !== -1) continue;
+      if (!names.some((n) => hebrew.test(n) === hebrew.test(who))) continue;
+      return true;
+    }
+    return false;
+  }
+  // From and every To/Cc are the user, including an alias. A delegate
+  // (a sender that is not the from) and a mail to anyone else are not this.
+  function addressedToSelf(ctx) {
+    const c = ctx || {};
+    if (c.forwarded === true) return false;
+    const from = String(c.senderEmail || '').trim().toLowerCase();
+    const behalf = String(c.onBehalfOf || c.graphSender || '').trim().toLowerCase();
+    if (behalf && behalf.indexOf('@') >= 0 && behalf !== from) return false;
+    const own = addressList(c.ownAddresses || c.own);
+    if (!from || !own.length || own.indexOf(from) < 0) return false;
+    const to = addressList(c.to || c.toRecipients);
+    if (!to.length) return false;
+    const cc = addressList(c.cc || c.ccRecipients);
+    for (let i = 0; i < to.length; i++) if (own.indexOf(to[i]) < 0) return false;
+    for (let i = 0; i < cc.length; i++) if (own.indexOf(cc[i]) < 0) return false;
+    return true;
+  }
+  // The reader's own outbound mail, or a sent copy addressed to someone else.
+  // A mail the user sent to their own address, or to one of their aliases, is
+  // incoming: it is the ask, not a note that stays quiet.
+  function mailIsOwn(ctx) {
+    const c = ctx || {};
+    if (addressedToSelf(c)) return false;
+    if (c.noteToSelf === true || c.senderIsUser === true || c.inSent === true) return true;
+    if (c.direction === 'outbound' || c.direction === 'self') return true;
+    if (c.inbound === false) return true;
+    const sender = String(c.senderEmail || '').toLowerCase();
+    const own = addressList(c.ownAddresses || c.own);
+    return Boolean(sender && own.length && own.indexOf(sender) !== -1);
   }
   function readerDecisionAsk(text) {
     const raw = String(text || '');
@@ -624,7 +903,8 @@ const FlowIntent = (() => {
       hasDate: Boolean(facts.date && facts.date.iso),
       hasTime: Boolean(facts.time),
       hasMoney: Boolean(facts.money),
-      score: s.total, threshold
+      score: s.total, threshold,
+      meetingVeto: meetingPlanVeto(((ctx && ctx.subject) ? String(ctx.subject) + '\n' : '') + String(text || ''))
     };
 
     // personalClose is set only on the Trusted Do It gates: an explicit
@@ -664,6 +944,9 @@ const FlowIntent = (() => {
       if (googleClose) intent.googleClose = googleClose;
       // "No need to reply, just get it done" still does the work. The draft stays off.
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
+      // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
+      // "תזכורת" (a payment reminder) is not this phrase.
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       if (familyAgrees(type, fam)) {
         intent.closeFamily = fam.family;
@@ -690,6 +973,17 @@ const FlowIntent = (() => {
         const iso = intent.entities && intent.entities.dateIso;
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
         if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
+      }
+      // Outlook may show a hold that has no reply draft. Only an explicit
+      // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
+      // A file placed on a calendar is not that exemption.
+      if (personalClose === 'calendar-hold') {
+        const held = familyBox.hit;
+        const fileHold = Boolean(held && held.fileTarget);
+        const familyMeet = Boolean(held && held.family === 'D' && held.type === 'event' && held.personalClose === 'calendar-hold');
+        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
+          intent.explicitHold = true;
+        }
       }
       return gateCreateWhenMissing(intent);
     }
@@ -732,14 +1026,19 @@ const FlowIntent = (() => {
     //        shape, not {dateTime: ...}) when hour/minute come through null,
     //        rather than erroring the way it used to when they were simply
     //        missing.
-    const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
+    // A cancel word that governs one clause does not call off a different
+    // event that is still on and is asked for. "ההזמנה בוטלה, אבל הפגישה
+    // בתוקף" and "the kickoff is cancelled, can we sync Thursday" keep the
+    // new slot. A mail whose only event was postponed stays called off.
+    const calledOff = (s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text))
+      && !liveWithAsk(vetoClauses(text));
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
     const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
     // infoOrNoise is the same veto as s.flags.noise, for phrasings the
     // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
     // It also stops the score path below: a FYI wrapped around a strong
     // approval would otherwise clear 50 after the hard gates declined.
-    const infoOrNoise = infoOnlyMail(text) || EXTRA_NOISE.test(text);
+    const infoOrNoise = infoOnlyMail(text, ctx) || EXTRA_NOISE.test(text);
     const blocked = s.flags.noise || infoOrNoise;
     // Softness is about the ask that would actually chip. The quoted
     // sentence is the first handoff, so a conditional opener ("במידה
@@ -832,6 +1131,16 @@ const FlowIntent = (() => {
     // A family veto (cancel with no new slot, two file targets, a retraction,
     // a doc comment we cannot write) is silence. A reschedule that names
     // one new slot is that slot, not the old time the event gate would file.
+    // A reply ask addressed to someone else is not this person's close,
+    // including when a date makes a family hold look like their meeting.
+    const replyAsk = explicitReplyAsk(text);
+    const replyOk = !replyAsk || replyDraftAllowed(text, ctx);
+    const replyMisaddressed = replyAsk && replyAimedElsewhere(text, ctx);
+    if (replyMisaddressed && !quietHint) quietHint = 'hedge';
+    // Own outbound, a note to self, or a vocative that names someone else
+    // is not this person's Do It. A hold does not get past that by not
+    // being a reply ask.
+    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {
@@ -849,21 +1158,26 @@ const FlowIntent = (() => {
       }
       return stayQuiet('family');
     }
-    if (familyBox.hit && familyBox.hit.family === 'G') {
-      const viaMove = fromFamily(familyBox.hit);
-      if (viaMove) return viaMove;
+    if (!replyMisaddressed && familyBox.hit && familyBox.hit.family === 'G') {
+      // A delete of the old slot must not win when another event is still
+      // on and asked for. That event is the close.
+      const replaced = familyBox.hit.calendarOp === 'delete' && liveWithAsk(vetoClauses(text));
+      if (!replaced) {
+        const viaMove = fromFamily(familyBox.hit);
+        if (viaMove) return viaMove;
+      }
     }
     // A clear family D hold or dated promise is that write. The meeting
     // gate would otherwise file "let's sync Tuesday at 3pm" as a calendar
     // event plus a reminder task.
-    if (familyBox.hit && familyBox.hit.family === 'D' &&
+    if (!replyMisaddressed && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);
       if (viaHold) return viaHold;
     }
     // Family H: a later confirmed amount, hold, or promise is the write.
     // An earlier "please send" must not draft a reply over that close.
-    if (familyBox.hit && !familyBox.hit.suppress && familyBox.hit.what && familyBox.hit.type && familyBox.hit.type !== TYPES.REQUEST) {
+    if (!replyMisaddressed && familyBox.hit && !familyBox.hit.suppress && familyBox.hit.what && familyBox.hit.type && familyBox.hit.type !== TYPES.REQUEST) {
       const at = text.indexOf(familyBox.hit.what);
       const head = at > 0 ? text.slice(0, at) : '';
       const earlierAsk = head && (
@@ -959,13 +1273,15 @@ const FlowIntent = (() => {
         minute: facts.time.minute
       };
     }
-    if (!blocked && eventEvidence) {
+    if (!blocked && !replyMisaddressed && eventEvidence) {
       // A meeting that is also a timed commitment, or an explicit ask to
       // meet at that clock time, is the calendar-hold personal close: one
       // event, not the schedule process's extra reminder task. A bare
       // announcement ("let's do a call Friday at 3") and a confirm ask on
       // an already-stated meeting stay the schedule processes.
-      const meetingHold = Boolean(clock) && (explicitMeetingAsk || s.flags.commit || s.flags.senderPromise);
+      // A hold here is an explicit ask to meet at that clock. A sender's
+      // promise plus a time ("I'll send it at 9am") is not a hold.
+      const meetingHold = explicitMeetingAsk;
       if (meetingHold) {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
@@ -984,7 +1300,7 @@ const FlowIntent = (() => {
     // gate above never saw it, and REQUEST below would draft a reply
     // instead of holding the time. Only the explicit-ask phrase, and only
     // with a resolved clock time.
-    if (!blocked && explicitMeetingAsk && !hasMeetingNoun) {
+    if (!blocked && !replyMisaddressed && explicitMeetingAsk && !hasMeetingNoun) {
       if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
       return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
     }
@@ -1043,8 +1359,6 @@ const FlowIntent = (() => {
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
-    const replyAsk = explicitReplyAsk(text);
-    const replyOk = !replyAsk || replyDraftAllowed(text, ctx);
     if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text) && !replyAsk) {
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyAsk && !replyOk) {
@@ -1087,14 +1401,15 @@ const FlowIntent = (() => {
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso
       };
-      // A clock time makes the close a calendar hold. A date alone stays a
-      // task (dated-commitment). "The report is due at 3pm" never reaches
-      // here — it has no agreement word and no sender promise.
-      if (clock) {
+      // An explicit meet at this clock is the hold. A sender's own promise
+      // plus a clock ("I'll send the form tomorrow at 9am", "אחזור אליך ב-11")
+      // is quiet. "We agreed … at 3pm" stays a task, not a new event.
+      if (clock && explicitMeetingAsk) {
         committed.hour = facts.time.hour;
         committed.minute = facts.time.minute;
-        return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'calendar-hold');
+        return finish(TYPES.SCHEDULED_EVENT, 'high', committed, 'calendar-hold');
       }
+      if (clock && s.flags.senderPromise) return stayQuiet('hedge');
       return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
@@ -1133,8 +1448,10 @@ const FlowIntent = (() => {
     if (infoOrNoise) return stayQuiet('noise');
     if (askIsSoft && !isDecision) return stayQuiet('hedge');
     if (s.total < gatingThreshold) {
-      const via = fromFamily(familyBox.hit);
-      if (via) return via;
+      if (!replyMisaddressed) {
+        const via = fromFamily(familyBox.hit);
+        if (via) return via;
+      }
       if (quietHint) return stayQuiet(quietHint);
       return { type: null, signals, facts };
     }
@@ -1160,7 +1477,7 @@ const FlowIntent = (() => {
     //        silently dropping something the proven scorer already vouched for.
     //        A clear family close is not this catch-all. A payable invoice
     //        with no family cue stays low, and low does not show a chip.
-    {
+    if (!replyMisaddressed) {
       const via = fromFamily(familyBox.hit);
       if (via) return via;
     }
@@ -1184,7 +1501,7 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

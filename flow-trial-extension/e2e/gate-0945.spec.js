@@ -122,8 +122,8 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '800 B' }]
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
-  await expect(skipPane.getByText('northwind-agreement-signed.pdf · skipped · small-doc')).toBeVisible();
-  await expect(skipPane.getByText('Save the file?')).toHaveCount(0);
+  await expect(skipPane.getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
+  await expect(skipPane.locator('.flow-chip-process-name')).toHaveText('Save the file?');
 });
 
 test('a no-ask attachment mail shows the file that is open', async ({ glance }) => {
@@ -509,24 +509,20 @@ test('an older undone promise shows one Do It on a mail with the same words', as
   await expect(pane.getByText(line)).toHaveCount(0);
 });
 
-test('Show all keeps the side panel scroll', async ({ glance }) => {
+test('the why line is the current mail only', async ({ glance }) => {
   test.setTimeout(60000);
   const diags = [];
   for (let i = 0; i < 25; i++) {
     diags.push({ key: 'page:quiet|' + i, reason: 'page:quiet-' + i, subject: 'Quiet mail ' + i, at: i });
   }
-  await glance.seedOutlook({ outlookPageDiag: diags });
+  await glance.seedOutlook({
+    outlookPageDiag: diags,
+    glanceWhyCurrent: { reason: 'page:intent-null', subject: 'Quiet mail 24', messageId: 'current' }
+  });
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="setup"]').click();
-  await popup.setViewportSize({ width: 380, height: 420 });
-  const before = await popup.locator('main').evaluate((el) => {
-    el.scrollTop = 140;
-    return el.scrollTop;
-  });
-  expect(before).toBe(140);
-  await popup.locator('#surface-list summary').evaluate((el) => el.click());
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  await popup.locator('#surface-list').getByRole('button', { name: 'Show all' }).evaluate((el) => el.click());
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  await expect(popup.locator('#surface-list').getByText('page:quiet-24')).toBeVisible();
+  const lines = popup.locator('#surface-list [data-glance-why-line]');
+  await expect(lines).toHaveCount(1);
+  await expect(lines).toContainText('לא זוהתה בקשה');
+  await expect(popup.locator('#surface-list').getByRole('button', { name: 'Show all' })).toHaveCount(0);
 });

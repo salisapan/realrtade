@@ -162,7 +162,7 @@ console.log('\n--- page wiring ---\n');
   check('the worker can read attachment bytes and the page does not ask it for a grant', bg.indexOf('function outlookAttachmentBytes') > 0 && bg.indexOf("msg.type === 'flow:onedrive-grant'") < 0);
   check('Activity uses the row title', popup.indexOf('FlowDisplay.activityTitle') > 0);
   check('Clear close memory re-renders the panel', /function wireClearCloseMemory\(\)[\s\S]{0,1200}renderSurfaces\(/.test(popup));
-  check('Why not shown can show every row', popup.indexOf('whyNotShownAll') > 0 && popup.indexOf('Show all') > 0);
+  check('Why not shown is one line for the current mail', popup.indexOf('glanceWhyCurrent') > 0 && popup.indexOf('data-glance-why-line') > 0 && popup.indexOf('Show all') < 0);
   check('clear drops Outlook loop rows', storage.indexOf('dropOutlookLoopRow') > 0);
   check('the panel lists proved Outlook receipts', storage.indexOf('isPanelReceipt') > 0);
   const js = manifest.content_scripts[0].js;
@@ -170,7 +170,7 @@ console.log('\n--- page wiring ---\n');
     js.indexOf('core/commitment-title.js') >= 0 && js.indexOf('core/display-copy.js') >= 0 &&
     js.indexOf('core/step-list.js') >= 0 && js.indexOf('src/step-list-view.js') >= 0 &&
     js.indexOf('core/onedrive-file.js') >= 0 && js.indexOf('src/step-kit.js') >= 0);
-  check('the extension version is 0.9.55', manifest.version === '0.9.55');
+  check('the extension version is 0.9.56', manifest.version === '0.9.56');
   check('permissions are unchanged', JSON.stringify(manifest.permissions) === JSON.stringify([
     'storage', 'identity', 'sidePanel', 'alarms', 'notifications', 'scripting', 'contextMenus', 'offscreen'
   ]));

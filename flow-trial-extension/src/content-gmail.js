@@ -26,6 +26,27 @@
   // remember to.
   const SOURCE_APP = 'gmail';
   let state = null;
+
+  function glanceUiLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return 'en';
+  }
+
+  function glanceChrome() {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(glanceUiLang());
+    return { dismiss: 'Dismiss', doIt: 'Do It', view: 'View', undo: 'Undo', undoing: 'Undoing…', holdingReply: 'Draft a holding reply', draftReadyNotSent: 'Draft ready. Not sent.' };
+  }
+
+  function glanceShow(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(glanceUiLang(), text);
+    return text == null ? '' : String(text);
+  }
   let watching = false;
   let observer = null;
   // Guards ensureGoogleAutoConnect() below against firing twice for two
@@ -125,6 +146,7 @@
     if (!watching || typeof FlowWeekly === 'undefined') return;
     const summary = await FlowStorage.consumeWeeklySummaryTrigger();
     if (!summary) return; // not due, or due with nothing to report — stay silent either way
+    if (typeof FlowWeekly.setUiLang === 'function') FlowWeekly.setUiLang(glanceUiLang());
     FlowWeekly.showSummary(summary, {
       onOpenList: async () => {
         // Re-read at click time. This opens the same Still Open list the
@@ -1593,7 +1615,7 @@
     mainRow.setAttribute('dir', 'ltr');
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
     mainRow.appendChild(dismiss);
     const chip = el('button', 'flow-chip');
@@ -1601,7 +1623,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', he ? 'טיוטת תשובת ביניים' : 'Draft a holding reply'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().holdingReply));
     mainRow.appendChild(chip);
     host.appendChild(mainRow);
 
@@ -1641,8 +1663,8 @@
       }
       const done = el('div', 'flow-chip flow-chip-done');
       done.setAttribute('role', 'status');
-      done.appendChild(el('span', 'flow-chip-label', he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.'));
-      const undo = el('button', 'flow-chip-undo', 'Undo');
+      done.appendChild(el('span', 'flow-chip-label', glanceChrome().draftReadyNotSent));
+      const undo = el('button', 'flow-chip-undo', glanceChrome().undo);
       undo.type = 'button';
       undo.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -1690,7 +1712,7 @@
     mainRow.setAttribute('dir', 'ltr');
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
     mainRow.appendChild(dismiss);
 
@@ -1699,7 +1721,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().doIt));
     mainRow.appendChild(chip);
     host.appendChild(mainRow);
 
@@ -1951,7 +1973,7 @@
 
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, ctx); });
     mainRow.appendChild(dismiss);
 
@@ -1960,7 +1982,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().doIt));
     chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveSteps));
     mainRow.appendChild(chip);
 
@@ -1972,6 +1994,7 @@
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
         intent: face.title || ctx.process.name,
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
+        uiLang: glanceUiLang(),
         surface: 'gmail',
         onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
         onDismiss: () => onDismiss(host, ctx),
@@ -1991,6 +2014,7 @@
     if (stepsReady) {
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
       const view = FlowStepListView.mount(host, rows, {
+        uiLang: glanceUiLang(),
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, 'gmail');
           liveSteps.length = 0;
@@ -2008,13 +2032,14 @@
   }
 
   function setChipState(chip, cls, text) {
+    const shown = glanceShow(text);
     if (chip && chip.classList && (chip.classList.contains('do-halo') || (chip.closest && chip.closest('.flow-step-card')))) {
       chip.setAttribute('data-glance-chip-state', cls || '');
-      if (text) chip.setAttribute('data-glance-chip-label', text);
+      if (shown) chip.setAttribute('data-glance-chip-label', shown);
       return;
     }
     chip.className = 'flow-chip ' + cls;
-    chip.replaceChildren(el('span', 'flow-chip-label', text));
+    chip.replaceChildren(el('span', 'flow-chip-label', shown));
   }
 
   function reasonMessage(response, ctx) {
@@ -2456,7 +2481,7 @@
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', copy.status));
+    done.appendChild(el('span', 'flow-chip-handled', glanceShow(copy.status)));
     if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
@@ -2465,14 +2490,14 @@
       done.appendChild(detail);
     }
 
-    const undo = el('button', 'flow-chip-undo', copy.undoHint);
+    const undo = el('button', 'flow-chip-undo', glanceShow(copy.undoHint));
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
-      const view = el('a', 'flow-chip-link', 'View');
+      const view = el('a', 'flow-chip-link', glanceChrome().view);
       view.href = copy.url;
       view.target = '_blank';
       view.rel = 'noopener';
@@ -2480,7 +2505,7 @@
     }
     undo.addEventListener('click', () => {
       if (copy.connectorId === 'computerClose') {
-        undo.textContent = 'Undoing…';
+        undo.textContent = glanceChrome().undoing;
         undo.disabled = true;
         const messageId = row.messageId;
         const mark = typeof FlowStorage.markComputerUndone === 'function'
@@ -2516,7 +2541,7 @@
         });
         return;
       }
-      undo.textContent = 'Undoing…';
+      undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
       new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }, resolve);
@@ -2585,15 +2610,12 @@
     // close cannot say "Handled." and the first three closes cannot
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
-    const he = /[\u0590-\u05FF]/.test(
-      ((ctx && ctx.subject) || '') + ((ctx && ctx.bodyText) || '') + ((ctx && ctx.intent && ctx.intent.label) || '')
-    );
     const taskSteps = results.filter(taskKind);
     const copy = FlowReceipt.confirmation({
       succeeded: succeeded.length,
       total: results.length,
       priorCloses,
-      lang: he ? 'he' : 'en',
+      lang: glanceUiLang(),
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
         ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
@@ -2613,9 +2635,9 @@
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
 
-    const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), copy.status);
+    const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), glanceShow(copy.status));
     done.appendChild(status);
-    if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', copy.earlyLine));
+    if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', glanceShow(copy.earlyLine)));
 
     // What landed, before the process badge. The written line is the
     // record ("Google Task · due Sep 21") — the same record Undo removes.
@@ -2635,7 +2657,7 @@
     const sole = succeeded.length === 1 ? succeeded[0].response : null;
     const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres);
     // The sentence is the control. A filled pill would be a second Do It.
-    const undo = el('button', 'flow-chip-undo', undoHint);
+    const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
@@ -2644,12 +2666,12 @@
     actionsRow.appendChild(undo);
     for (const r of succeeded) {
       if (!r.response.url) continue;
-      const view = el('a', 'flow-chip-link', succeeded.length > 1 ? 'View ' + r.response.where : 'View');
+      const view = el('a', 'flow-chip-link', succeeded.length > 1 ? (glanceChrome().view + ' ' + r.response.where) : glanceChrome().view);
       view.href = r.response.url; view.target = '_blank'; view.rel = 'noopener';
       actionsRow.appendChild(view);
     }
     undo.addEventListener('click', () => {
-      undo.textContent = 'Undoing…';
+      undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
       rollbackChain(succeeded, ctx).then((result) => {
         // Recorded regardless of whether the whole rollback reported ok —
@@ -2681,7 +2703,7 @@
         }
         if (result.ok) {
           const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
-          done.replaceChildren(el('span', 'flow-chip-label', undone));
+          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(undone)));
           const taskSteps = succeeded.filter(taskKind);
           const markTask = taskSteps.length && typeof FlowStorage.markGoogleTaskUndone === 'function'
             ? Promise.all(taskSteps.map((r) => FlowStorage.markGoogleTaskUndone(ctx.messageId, r.response && r.response.ref, ctx.threadId)))
@@ -2710,10 +2732,10 @@
             remaining: succeeded.length - result.undoneIds.length,
             keptWhere: result.keptWhere
           });
-          undo.textContent = copy.undoLabel;
+          undo.textContent = glanceShow(copy.undoLabel);
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = note;
+          hint.textContent = glanceShow(note);
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         }
       });
@@ -3070,6 +3092,7 @@
     const match = pending.find((entry) => threadIds.has(entry.messageId));
     if (!match) { FlowBrief.hideResurface(); return; }
 
+    if (typeof FlowBrief.setUiLang === 'function') FlowBrief.setUiLang(glanceUiLang());
     FlowBrief.showResurface({
       id: match.messageId,
       title: match.process.name,
@@ -3114,6 +3137,7 @@
     // panel — closing it is the other moment the indicator's count (and its
     // very existence) might now be stale, e.g. every item was resolved
     // while the panel stayed open and nothing has re-triggered a check since.
+    if (typeof FlowBrief.setUiLang === 'function') FlowBrief.setUiLang(glanceUiLang());
     FlowBrief.openPanel(rows, { onClose: () => { FlowBrief.closePanel(); checkBrief(); } });
   }
 
@@ -3173,6 +3197,7 @@
         .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
     }
 
+    if (typeof FlowBrief.setUiLang === 'function') FlowBrief.setUiLang(glanceUiLang());
     FlowBrief.show(open.length, () => openBriefPanel(open));
 
     // The only thing resembling a daily ritual, and only spent on a day that
@@ -3292,16 +3317,27 @@
       FlowSidebar.renderDraft('error', { message: 'Open Reply in Gmail first, then Insert into Reply.', onDraft: handleDraftIt });
       return;
     }
-    box.focus();
-    // execCommand is deprecated but still the one reliable way to make
-    // Gmail's own editor notice the change — a raw textContent assignment
-    // bypasses the input events its autosave and character counter are
-    // listening for, so it's kept as a fallback rather than the first try.
-    const inserted = document.execCommand && document.execCommand('insertText', false, text);
-    if (!inserted) {
-      box.textContent = text;
-      box.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    const Edit = globalThis.FlowNativeEdit;
+    const write = (node, value) => {
+      node.focus();
+      // execCommand is deprecated but still the one reliable way to make
+      // Gmail's own editor notice the change — a raw textContent assignment
+      // bypasses the input events its autosave and character counter are
+      // listening for, so it's kept as a fallback rather than the first try.
+      const inserted = document.execCommand && document.execCommand('insertText', false, value);
+      if (!inserted) {
+        node.textContent = value;
+        node.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+    };
+    if (Edit && Edit.fillOnce) {
+      const filled = Edit.fillOnce(box, text, { write: write });
+      if (!filled.wrote) {
+        FlowSidebar.renderDraft('error', { message: Edit.userEditedLine(), onDraft: handleDraftIt });
+      }
+      return;
     }
+    write(box, text);
   }
 
   /* ------------------------------------------------- Feature 3: attachment X-ray */

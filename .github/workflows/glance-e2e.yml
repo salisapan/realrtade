@@ -31,6 +31,14 @@ jobs:
       - name: Install dependencies
         working-directory: flow-trial-extension
         run: npm ci
+      - name: Run the jsdom regressions
+        working-directory: flow-trial-extension
+        run: |
+          node test/mail-switch-race-corpus.cjs
+          node test/cc-only-recipients-corpus.cjs
+          node test/glance-0956-corpus.cjs
+          node test/outlook-calendar-corpus.cjs
+          node test/regress-144-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium

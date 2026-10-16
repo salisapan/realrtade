@@ -249,6 +249,41 @@ console.log('\n--- family C: create is the ask ---\n');
   const still = plan('No need to call. Please save the attached file to Drive.', { attachmentCount: 1 });
   check('a different no-need does not hide a real save',
     still.intent && still.intent.personalClose === 'drive-file', still.intent && still.intent.personalClose);
+  const laterIt = plan("Please save the attached contract to Drive. Actually, don't save it, I'll send a new version.", { attachmentCount: 1 });
+  check("a later don't-save-it refers back and stays quiet",
+    laterIt.intent && !laterIt.intent.type && laterIt.intent.googleSilence === true && laterIt.intent.personalClose !== 'drive-file' && !laterIt.process,
+    laterIt.intent && { type: laterIt.intent.type, personal: laterIt.intent.personalClose, process: laterIt.process && laterIt.process.id });
+  const readOnly = plan("don't save it yet, just read", { attachmentCount: 1 });
+  check("don't save it yet, just read stays quiet",
+    readOnly.intent && readOnly.intent.personalClose !== 'drive-file' && !(readOnly.process && readOnly.process.steps && readOnly.process.steps.some((s) => s.kind === 'driveFile' || s.kind === 'onedriveFile')),
+    readOnly.intent && readOnly.intent.personalClose);
+  const laterHe = plan('תשמור את הקובץ בדרייב. בעצם אל תשמור אותו', { attachmentCount: 1 });
+  check('a later Hebrew אל תשמור אותו refers back and stays quiet',
+    laterHe.intent && !laterHe.intent.type && laterHe.intent.googleSilence === true && !laterHe.process,
+    laterHe.intent && { type: laterHe.intent.type, personal: laterHe.intent.personalClose });
+  const laterThis = plan("Please save the attached file to Drive. Don't save this.", { attachmentCount: 1 });
+  const laterThat = plan("Please save the attached file to Drive. Don't save that.", { attachmentCount: 1 });
+  const laterZe = plan('תשמור את הקובץ בדרייב. אל תשמור את זה', { attachmentCount: 1 });
+  [laterThis, laterThat, laterZe].forEach((row, i) => {
+    check('a later anaphor still refuses the same save ' + i,
+      row.intent && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file' && !row.process,
+      row.intent && row.intent.personalClose);
+  });
+  const typos = [
+    "You don't ned to save the attachmment to Drive.",
+    "You don't need to save the attachment to Drive.",
+    'No need to save the attachment to Drive.'
+  ];
+  typos.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a typo refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && !row.process,
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const sheet = plan('please save the attached sheet to Drive by 20/10', { attachmentCount: 1 });
+  check('please save the attached sheet to Drive by 20/10 is still a file',
+    sheet.intent && sheet.intent.personalClose === 'drive-file' && sheet.process && sheet.process.steps.some((s) => s.kind === 'driveFile'),
+    sheet.intent && sheet.intent.personalClose);
 }
 
 console.log('\n--- OneDrive wording is the same save; shared files are not ---\n');
@@ -275,6 +310,21 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
     const row = plan(text, { attachmentCount: 1 });
     check('a Hebrew refusal to save stays silent: ' + text,
       row.intent && !row.intent.type && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file',
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const heTypos = [
+    'לא צרכי לשמור את הקובץ המצורף ל-Drive',
+    'לא צריך לשמור את הקובץ המצורף ל-Drive',
+    'אל תשמור את הקובץ המצורף ל-Drive',
+    'לא לשמור את הקובץ המצורף ל-Drive',
+    'אין צורך לשמור את הקובץ המצורף ל-Drive',
+    'אין צרך לשמור את הקובץ המצורף בדרייב.',
+    'לא צרךי לשמור את הקובץ המצורף ל-Drive'
+  ];
+  heTypos.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a Hebrew typo refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && !row.process,
       row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
   });
   const forget = plan("Don't forget to save the attached file to OneDrive.", { attachmentCount: 1 });

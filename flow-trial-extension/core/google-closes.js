@@ -59,11 +59,26 @@ const FlowGoogleCloses = (() => {
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
-  // A refusal of that save is silence. The negation has to govern the verb,
-  // so a different "no need to" in the same mail does not hide a real save.
-  const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צריך\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
+  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
+  // A refusal of that save is silence. The negation has to govern the verb
+  // in the same clause, so a different "no need to" does not hide a real save.
+  // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
+  // is not a refusal: forget sits where need would.
+  const SAVE_NO = /\b(?:(?:do not|don't|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)|no\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  // אין / לא / אל, then a need-word, then the save verb. The need-word is
+  // צריך or צורך with י or ו slipped or dropped (צרך, צרכי, צרךי). The
+  // letters are the shape, not a list of spellings.
+  function hebrewNeedRefusal(text) {
+    const raw = String(text || '');
+    const re = /(?:^|[^\u0590-\u05FF])(?:אין|לא|אל)\s+(צ[וריכך]{2,4})\s+ל?(?:שמור|שמרי|לשמור|תתייק|תשמור)/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const word = m[1];
+      if (word.length >= 3 && word.length <= 5 && word.indexOf('ר') >= 0) return true;
+    }
+    return false;
+  }
 
   // Save-shaped only. The open Outlook page counts file attachments for
   // this sentence and for no other, so the rest of show and silence stay put.
@@ -72,8 +87,36 @@ const FlowGoogleCloses = (() => {
     return SAVE_EN.test(t) || SAVE_HE.test(t);
   }
 
+  function saveClauses(text) {
+    return String(text || '').split(/[.!?\n\r]+/);
+  }
+
+  function clauseSaves(clause) {
+    return SAVE_EN.test(clause) || SAVE_HE.test(clause);
+  }
+
+  // A later "don't save it" names the same save without saying Drive again.
+  const SAVE_BACK = /\b(?:it|this|that)\b|אותו|את\s+זה/;
+
+  // Quiet when a save clause is itself negated. A "no need" that does not
+  // govern save, in another clause, leaves a real save in place. A later
+  // "don't save" still refuses the whole mail, including when that later
+  // clause only says "it" / "this" / "that" / אותו / את זה.
+  function saveRefused(clause) {
+    return SAVE_NO.test(clause) || hebrewNeedRefusal(clause);
+  }
   function refusesSave(text) {
-    return SAVE_NO.test(String(text || ''));
+    const raw = String(text || '');
+    const clauses = saveClauses(raw);
+    if (clauses.some((clause) => clauseSaves(clause) && saveRefused(clause))) return true;
+    let seenSave = false;
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (seenSave && saveRefused(clause) && SAVE_BACK.test(clause)) return true;
+      if (clauseSaves(clause)) seenSave = true;
+    }
+    if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return saveRefused(raw);
+    return false;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
@@ -310,7 +353,7 @@ const FlowGoogleCloses = (() => {
     }
 
     if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
-      if (SAVE_NO.test(text) || input.attachmentCount !== 1) return { silence: true };
+      if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {

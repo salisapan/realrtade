@@ -517,15 +517,32 @@ console.log('\n--- one promise is one Do It ---\n');
 
 console.log('\n--- still open: one Do It after Undo, and a no-reply ask keeps its title ---\n');
 {
-  const parkText = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
-  const park = candidate(parkText, 'park-a');
-  park.subject = 'Parking permit - please renew by Sunday';
-  const parkAgain = candidate(parkText, 'park-b');
-  parkAgain.subject = park.subject;
+  const parkText = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  // The permit week, not the corpus morning. "by Sunday" is the coming
+  // Sunday on this clock (11 Oct 2026), and that day is still ahead.
+  const parkWhen = new Date(2026, 9, 8, 9, 0, 0);
+  const parkNow = parkWhen.getTime();
+  function parkRow(id) {
+    const intent = FlowIntent.classify(parkText, { now: parkWhen });
+    const process = intent && intent.type
+      ? FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#all/' + id, hasThreadAttachment: false })
+      : null;
+    return {
+      messageId: id,
+      threadId: 't-' + id,
+      threadUrl: 'https://mail.google.com/mail/u/0/#all/' + id,
+      sender: { name: 'Dana', email: 'dana@example.com' },
+      subject: 'Parking permit - please renew by Sunday',
+      text: parkText,
+      ts: parkNow,
+      app: 'gmail',
+      intent: intent,
+      process: process
+    };
+  }
+  const park = parkRow('park-a');
+  const parkAgain = parkRow('park-b');
   parkAgain.sender = {};
-  // October 11 is six weeks after the corpus morning. The Gate clock is
-  // the week of the permit, which is when this ask clears the bar.
-  const parkNow = new Date(2026, 9, 8, 9, 0, 0).getTime();
   const loops = FlowStillOpen.select([park, parkAgain], parkNow);
   check('a parking ask stored under two ids is one Do It', loops.length === 1, loops.map((r) => r.messageId));
   check('the parking Loops title is the work and the date',
@@ -548,6 +565,161 @@ console.log('\n--- still open: one Do It after Undo, and a no-reply ask keeps it
     FlowStillOpen.sameSubjectPromise(other, {
       text: sibling.text, subject: sibling.subject, sender: sibling.sender
     }) === false);
+}
+
+console.log('\n--- 0.9.56: another conversation is not this mail, and a receipt covers its open copy ---\n');
+{
+  const row = candidate('I will send you the signed contract by Friday, September 18.', 'conv-row');
+  row.subject = 'Signed contract';
+  row.outlookConversationId = 'conv-a';
+  check('same subject and promise in another conversation do not match',
+    FlowStillOpen.sameSubjectPromise(row, {
+      text: row.text, subject: row.subject, sender: row.sender, outlookConversationId: 'conv-b'
+    }) === false);
+  check('the same conversation still matches',
+    FlowStillOpen.sameSubjectPromise(row, {
+      text: row.text, subject: row.subject, sender: row.sender, outlookConversationId: 'conv-a'
+    }) === true);
+  const twin = Object.assign({}, row, { messageId: 'conv-row-scan' });
+  const other = candidate('I will send the passport scan by Monday, September 21.', 'passport-other');
+  other.subject = row.subject;
+  other.outlookConversationId = 'conv-b';
+  const receipt = {
+    messageId: 'receipt-1',
+    outlookConversationId: 'conv-a',
+    subject: row.subject,
+    text: row.text,
+    intent: row.intent,
+    sender: row.sender,
+    process: row.process
+  };
+  const panel = FlowStillOpen.panelLoops([row, twin, other], [receipt]);
+  check('a receipt covers the open copies of that promise',
+    panel.receipts.length === 1 && panel.openOnly.length === 1 && panel.openOnly[0].messageId === 'passport-other',
+    { open: panel.openOnly.map((r) => r.messageId), receipts: panel.receipts.length });
+  check('a panel with no passed deadline has an empty expired list',
+    Array.isArray(panel.expired) && panel.expired.length === 0, panel.expired);
+}
+
+console.log('\n--- 0.9.56: a passed deadline leaves the card and stays in Loops as expired ---\n');
+{
+  const text = 'Please send the car insurance certificate by October 12.';
+  const dueMorning = new Date(2026, 9, 12, 8, 0, 0);
+  const after = new Date(2026, 9, 14, 8, 0, 0);
+  const intent = FlowIntent.classify(text, { now: dueMorning });
+  const process = intent && intent.type
+    ? FlowActions.planFor(intent, { threadUrl: 'https://outlook.office.com/mail/insurance', hasThreadAttachment: false })
+    : null;
+  const row = {
+    messageId: 'car-insurance',
+    threadId: 't-car-insurance',
+    threadUrl: 'https://outlook.office.com/mail/insurance',
+    sender: { name: 'Dana', email: 'dana@example.com' },
+    subject: 'Car insurance certificate',
+    text: text,
+    ts: dueMorning.getTime(),
+    app: 'outlook',
+    intent: intent,
+    process: process
+  };
+  const iso = intent && intent.facts && intent.facts.date && intent.facts.date.iso;
+  check('October 12 on the due morning is that calendar day, not a later year', iso === '2026-10-12', iso);
+  check('the car-insurance card is on the list the morning it is due',
+    FlowStillOpen.select([row], dueMorning.getTime()).length === 1 &&
+    FlowStillOpen.deadlinePassed(row, dueMorning.getTime()) === false,
+    { type: intent && intent.type, iso: iso });
+  const gone = FlowStillOpen.select([row], after.getTime());
+  const expired = FlowStillOpen.expiredOf([row], after.getTime(), []);
+  check('two days later the card is gone because the deadline passed',
+    gone.length === 0 && FlowStillOpen.deadlinePassed(row, after.getTime()) === true, ids(gone));
+  check('Loops records that row as expired, and it is not a close',
+    expired.length === 1 && expired[0].status === 'expired' && expired[0].messageId === 'car-insurance',
+    expired.map((r) => ({ id: r.messageId, status: r.status })));
+  const listed = FlowStillOpen.panelLoops([], [], expired);
+  check('the expired row is the Loops list for that mail',
+    listed.openOnly.length === 0 && listed.expired.length === 1 && listed.expired[0].status === 'expired' && listed.expired[0].messageId === 'car-insurance');
+  const proof = {
+    kind: 'written', undone: false, connectorId: 'outlookTask', fetchedBack: true,
+    messageId: 'car-insurance', text: text, intent: intent, sender: row.sender
+  };
+  check('a proved close is not also recorded as expired',
+    FlowStillOpen.expiredOf([row], after.getTime(), [proof]).length === 0);
+}
+
+console.log('\n--- 0.9.56: a Loops date follows the run clock, and only a past day expires ---\n');
+{
+  function isoOf(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  const clock = new Date();
+  const todayIso = isoOf(clock);
+  const parkText = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  const intent = FlowIntent.classify(parkText, { now: clock });
+  const process = intent && intent.type
+    ? FlowActions.planFor(intent, { threadUrl: 'https://outlook.office.com/mail/park-run', hasThreadAttachment: false })
+    : null;
+  const iso = intent && intent.facts && intent.facts.date && intent.facts.date.iso;
+  const row = {
+    messageId: 'park-run',
+    threadId: 't-park-run',
+    threadUrl: 'https://outlook.office.com/mail/park-run',
+    sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+    subject: 'Parking permit - please renew by Sunday',
+    text: parkText,
+    ts: clock.getTime(),
+    app: 'outlook',
+    intent: intent,
+    process: process
+  };
+  check('a Sunday parking ask on the run clock is still ahead', Boolean(iso) && iso >= todayIso, { iso: iso, today: todayIso });
+  check('that parking card stays on the open list',
+    FlowStillOpen.select([row], clock.getTime()).length === 1, { type: intent && intent.type, iso: iso });
+  check('that parking card is not expired',
+    FlowStillOpen.expiredOf([row], clock.getTime(), []).length === 0);
+  const again = Object.assign({}, row, { messageId: 'park-run-2' });
+  check('the same parking ask under two ids is one Do It on the run clock',
+    FlowStillOpen.select([row, again], clock.getTime()).length === 1);
+  const passText = 'I will send the passport scan by Friday.';
+  const passIntent = FlowIntent.classify(passText, { now: clock });
+  const passProcess = passIntent && passIntent.type
+    ? FlowActions.planFor(passIntent, { threadUrl: 'https://outlook.office.com/mail/passport-run', hasThreadAttachment: false })
+    : null;
+  const passIso = passIntent && passIntent.facts && passIntent.facts.date && passIntent.facts.date.iso;
+  const pass = Object.assign({}, row, {
+    messageId: 'passport-run',
+    subject: 'Passport scan',
+    text: passText,
+    intent: passIntent,
+    process: passProcess
+  });
+  check('a Friday passport promise on the run clock stays open',
+    Boolean(passIso) && passIso >= todayIso && FlowStillOpen.select([pass], clock.getTime()).length === 1 &&
+    FlowStillOpen.expiredOf([pass], clock.getTime(), []).length === 0,
+    { type: passIntent && passIntent.type, iso: passIso });
+  const stale = Object.assign({}, row, {
+    messageId: 'stale-oct',
+    text: 'Please renew the parking permit by Sunday, October 11.'
+  });
+  check('an old October phrase does not expire a deadline that is still ahead',
+    FlowStillOpen.select([stale], clock.getTime()).length === 1 &&
+    FlowStillOpen.expiredOf([stale], clock.getTime(), []).length === 0);
+  const yesterday = new Date(clock.getFullYear(), clock.getMonth(), clock.getDate() - 1);
+  const pastIntent = Object.assign({}, intent, {
+    facts: Object.assign({}, intent && intent.facts, { date: { iso: isoOf(yesterday) } })
+  });
+  const past = Object.assign({}, row, { messageId: 'past-day', intent: pastIntent });
+  const expired = FlowStillOpen.expiredOf([past], clock.getTime(), []);
+  check('the calendar day before today is expired and leaves the open list',
+    FlowStillOpen.select([past], clock.getTime()).length === 0 &&
+    expired.length === 1 && expired[0].status === 'expired' && expired[0].messageId === 'past-day');
+  const todayIntent = Object.assign({}, intent, {
+    facts: Object.assign({}, intent && intent.facts, { date: { iso: todayIso } })
+  });
+  const todayRow = Object.assign({}, row, { messageId: 'due-today', intent: todayIntent });
+  check('the due day itself stays open',
+    FlowStillOpen.deadlinePassed(todayRow, clock.getTime()) === false &&
+    FlowStillOpen.select([todayRow], clock.getTime()).length === 1 &&
+    FlowStillOpen.expiredOf([todayRow], clock.getTime(), []).length === 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

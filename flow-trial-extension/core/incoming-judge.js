@@ -41,6 +41,27 @@ const FlowIncomingJudge = (() => {
     }).join('\n').trim();
   }
 
+  // A short body still carries the subject when the subject itself is the slot:
+  // a meeting noun, or a slash date that is a day in one locale only.
+  function subjectCarriesSlot(subject) {
+    const s = String(subject || '');
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(s)) return true;
+    const m = s.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+    if (!m) return false;
+    const a = +m[1];
+    const b = +m[2];
+    return (a > 12 && a <= 31 && b >= 1 && b <= 12) || (b > 12 && b <= 31 && a >= 1 && a <= 12);
+  }
+
+  function textForJudge(rawText, subject) {
+    const body = withoutPhoneSignature(prepareForJudge(rawText));
+    const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
+    if (body.length >= MIN_TEXT || !sub) return body;
+    if (body.indexOf(sub) !== -1) return body;
+    if (!subjectCarriesSlot(sub)) return body;
+    return (sub + '\n' + body).trim();
+  }
+
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
@@ -64,8 +85,9 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
-    const text = withoutPhoneSignature(prepareForJudge(i.text));
-    const factProbe = (text.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(text) : null;
+    const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
+    const text = textForJudge(i.text, i.subject);
+    const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
     const sender = i.sender || {};
@@ -82,12 +104,16 @@ const FlowIncomingJudge = (() => {
       cc: i.cc || i.ccRecipients || null,
       ownAddresses: i.ownAddresses || i.own || null,
       userName: i.userName || null,
+      ownNames: i.ownNames || null,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,
       inbound: i.inbound,
       direction: i.direction || null,
-      inSent: i.inSent === true
+      inSent: i.inSent === true,
+      onBehalfOf: i.onBehalfOf || null,
+      graphSender: i.graphSender || null,
+      forwarded: i.forwarded === true
     });
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
@@ -109,16 +135,28 @@ const FlowIncomingJudge = (() => {
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-chain-not-run', intent };
     }
+    const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
     const process = actionsApi.planFor(intent, {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
-      executionMemory: i.executionMemory || null
+      executionMemory: i.executionMemory || null,
+      text: vetoText
     });
+    // Same classifier as planFor. A meeting that was cancelled, postponed,
+    // already held, or an out-of-office note does not show. A marketing
+    // webinar with no personal ask does not show. A second event that is
+    // still on, together with an ask, does show.
+    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+      return { show: false, reason: 'meeting-veto', intent };
+    }
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     // Outlook's Do It writes a reply draft when the process has one. A task-only
     // close writes Microsoft To Do. A calendar event with no draft and no task
     // stays quiet rather than offering a reply in its place.
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process)) {
+    // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
+    // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
+    const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !calendarHold) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.

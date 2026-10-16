@@ -37,6 +37,7 @@ function background(opts) {
   const routes = opts.routes || [];
   const sandbox = {
     console, URLSearchParams, URL, TextEncoder, Uint8Array, atob, crypto: webcrypto,
+    setTimeout, clearTimeout,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
@@ -269,6 +270,18 @@ console.log('\n--- create, read back, undo ---\n');
   const del = env.calls.filter((c) => c.method === 'DELETE');
   check('Undo DELETEs a file this write created',
     undo.ok === true && del.length === 1 && /\/me\/drive\/items\/FILE1$/.test(del[0].url), del.map((c) => c.url));
+  const renamed = background({ routes: [
+    { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 200, json: async () => Object.assign({}, FILE, { name: 'renamed.pdf', eTag: 'user' }), text: async () => '' }) }
+  ] });
+  const kept = await renamed.fn('outlookFileUndo')({
+    fileId: 'FILE1', itemId: 'FILE1', externalId: 'FILE1', created: true,
+    editSnap: { name: 'passport.pdf', eTag: 'created' }
+  });
+  check('a file the person edited is not deleted',
+    kept.ok === false && kept.reason === 'user-edited' &&
+    kept.written === 'You edited this. Undo left it alone.' &&
+    !renamed.calls.some((c) => c.method === 'DELETE' || c.method === 'PUT' || c.method === 'PATCH'),
+    kept);
 }
 
 console.log('\n--- a verify miss is not Handled ---\n');

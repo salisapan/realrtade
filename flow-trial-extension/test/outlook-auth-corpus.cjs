@@ -132,6 +132,26 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
     check('silent reauth login_required needs interaction', !fail2.ok && fail2.needsInteraction && fail2.error === 'login_required', fail2);
   }
 
+  console.log('\n--- one Microsoft status for the panel and Setup ---\n');
+  {
+    function jwt(scp) {
+      const body = Buffer.from(JSON.stringify({ scp: scp })).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return 'e.' + body + '.s';
+    }
+    const live = { token: { accessToken: 'AT', expiresAt: NOW + 3600e3, grantedScopes: ['Mail.ReadWrite', 'Tasks.ReadWrite'] } };
+    check('a live mail token is valid', A.microsoftConnection(live, {}, NOW) === 'valid');
+    check('a past expiry is expired', A.microsoftConnection({ token: Object.assign({}, live.token, { expiresAt: NOW - 1 }) }, {}, NOW) === 'expired');
+    check('needsSignIn is expired', A.microsoftConnection(live, { needsSignIn: true }, NOW) === 'expired');
+    check('mail missing from the token is missing-scope', A.microsoftConnection({ token: { accessToken: 'AT', expiresAt: NOW + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, NOW) === 'missing-scope');
+    check('no token is missing', A.microsoftConnection(null, {}, NOW) === 'missing');
+    check('the JWT scp wins over a stale granted list',
+      A.microsoftConnection({ token: { accessToken: jwt('Mail.Read'), expiresAt: NOW + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, NOW) === 'valid' &&
+      A.microsoftConnection({ token: { accessToken: jwt('Tasks.ReadWrite'), expiresAt: NOW + 1000, grantedScopes: ['Mail.ReadWrite'] } }, {}, NOW) === 'missing-scope');
+    check('a Graph mail audience counts and another audience does not',
+      A.microsoftConnection({ token: { accessToken: jwt('https://graph.microsoft.com/Mail.Read'), expiresAt: NOW + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, NOW) === 'valid' &&
+      A.microsoftConnection({ token: { accessToken: jwt('api://app/Mail.Read'), expiresAt: NOW + 1000, grantedScopes: [] } }, {}, NOW) === 'missing-scope');
+  }
+
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
   console.log('TOTAL FAILURES: ' + failures);
   process.exit(failures ? 1 : 0);

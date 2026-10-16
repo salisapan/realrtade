@@ -3,13 +3,17 @@
 // world, on a Hebrew outlook.live.com reading pane whose ad slot changes every 200 ms, with the Graph mailbox behind the
 // worker faked. It must mount the Glance card in the open message and log each stage in debug mode.
 //
-// Needs jsdom (not a dependency of this repo): `npm i --no-save jsdom` or NODE_PATH pointing at one. Without it, SKIPPED.
+// Needs jsdom, a devDependency of this package. Missing jsdom is a failed run.
 // Run: node test/owa-page-harness.cjs
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 let JSDOM;
-try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('SKIPPED: jsdom not available'); process.exit(0); }
+try { ({ JSDOM } = require('jsdom')); }
+catch (e) {
+  console.error('FAIL: jsdom is not installed. The Outlook page harness cannot run.');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..');
 let failures = 0;
@@ -365,7 +369,7 @@ async function runPage(opts) {
     const missing = await runPage({ htmlPatch: invoice, emptyInbox: true, urlId: MSG, driveFiles: [], store: { glanceDebug: true }, waitMs: 5000 });
     check('the open invoice ask searches Drive', missing.sent.some((m) => m.type === 'flow:search-drive'), missing.sent.map((m) => m.type));
     check('nothing in Drive or this thread: a holding card', missing.chip && missing.chip.getAttribute('data-glance-chain') === 'needs-you', missing.logs.filter((l) => /^Glance:/.test(l)));
-    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /Draft a holding reply/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
+    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /טיוטת תשובת ביניים/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
     check('the page did not send', !missing.sent.some((m) => /send/i.test(String(m.type)) && m.type !== 'flow:search-drive'));
     const found = await runPage({
       htmlPatch: invoice, emptyInbox: true, urlId: MSG, waitMs: 4000,
@@ -403,7 +407,7 @@ async function runPage(opts) {
     check('one Drive file: Why not shown drops the file stall', !stalled(oneWhy), oneWhy);
 
     const none = await runPage({ htmlPatch: q4html, mailBody: Q4, driveFiles: [], waitMs: 6000 });
-    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /Draft a holding reply/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
+    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /טיוטת תשובת ביניים/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
 
     const failed = await runPage({
       htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
@@ -618,7 +622,9 @@ async function runPage(opts) {
       driveFind: { match: 'one', file: file }
     });
     const blockedWhy = (blocked.store.outlookPageDiag || []).map((d) => d.reason);
-    check('without Calendars.ReadWrite the note stays quiet and names the missing scope', !blocked.chip && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0, blockedWhy);
+    check('without Calendars.ReadWrite a calendar card names the scope and Connect Microsoft',
+      Boolean(blocked.chip) && /Calendars\.ReadWrite/.test(blocked.chip.textContent) && /Connect Microsoft/.test(blocked.chip.textContent) && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0,
+      { text: blocked.chip && blocked.chip.textContent, why: blockedWhy });
     check('that quiet path does not draft a reply', !blocked.sent.some((m) => m.type === 'flow:execute-action'), blocked.sent.map((m) => m.type));
 
     const shown = await runPage({

@@ -119,9 +119,16 @@ const FlowOutlookSync = (() => {
         if (extra) Object.assign(row, extra);
         out.diagnostics.push(row);
       }
-      const cp = graphMail.counterpartOf(raws, me);
-      // Note to self (every party is me): produce nothing.
-      if (!cp) { out.stats.conversations++; note('note-to-self'); return; }
+      let cp = graphMail.counterpartOf(raws, me);
+      const selfMsg = byId[last.id] || lastRaw0;
+      const selfAddressed = graphMail.addressedToSelf && graphMail.addressedToSelf(selfMsg, meSet);
+      // Every party is the user, and the mail is not to the user: a note
+      // with no ask. A mail from the user to the user is incoming.
+      if (!cp && !selfAddressed) { out.stats.conversations++; note('note-to-self'); return; }
+      if (!cp && selfAddressed) {
+        const fa = selfMsg.from && selfMsg.from.emailAddress;
+        cp = channel.party({ channel: 'outlook', name: fa && fa.name, email: fa && fa.address });
+      }
       if (cp.email && !seenParty[cp.email]) { seenParty[cp.email] = true; out.parties.push(cp); }
       out.stats.conversations++;
       const id = watchId(conv);
@@ -163,8 +170,9 @@ const FlowOutlookSync = (() => {
 
       // ---- their message is the newest -------------------------------------------------------------------
       const party = last.from;
-      // Never classify a message whose sender is in ownAddresses.
-      if (meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) { note('own-sender', { counterpart: party.email || null }); return; }
+      // A sender in ownAddresses who wrote to someone else stays quiet.
+      // The same sender writing to their own address, or to an alias, is the ask.
+      if (!selfAddressed && meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) { note('own-sender', { counterpart: party.email || null }); return; }
 
       // The incoming-ask judgment comes first and is Gmail's own (core/incoming-judge.js): the message's own text, the
       // subject as context, the same silence bar, the same process. Gmail shows its chip on a new ask whatever loops exist
@@ -311,7 +319,27 @@ const FlowOutlookSync = (() => {
     return steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
   }
 
-  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan, keepMailboxFileCard };
+  // A Drafts-folder message Glance already created for a loop is not a
+  // new silence line. A draft with no known conversation and no stored ref
+  // is the unexplained one.
+  function explainDrafts(drafts, ctx) {
+    const conversations = {};
+    const refs = {};
+    ((ctx && ctx.conversations) || []).forEach((id) => { if (id) conversations[String(id)] = 1; });
+    ((ctx && ctx.refs) || []).forEach((id) => { if (id) refs[String(id)] = 1; });
+    return (drafts || []).filter(Boolean).map((d) => {
+      const id = String((d && d.id) || '');
+      const conv = String((d && d.conversationId) || '');
+      const known = (id && refs[id]) || (conv && conversations[conv]);
+      return {
+        id: id,
+        conversationId: conv || null,
+        reason: known ? 'draft-for-loop' : 'draft-unexplained'
+      };
+    });
+  }
+
+  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan, keepMailboxFileCard, explainDrafts };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookSync };

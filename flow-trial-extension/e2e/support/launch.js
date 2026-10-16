@@ -50,7 +50,7 @@ function outlookAuth(opts) {
       scope: scopes.join(' ')
     },
     account: { address: ME, name: 'Glance', mail: ME, userPrincipalName: ME },
-    ownAddresses: [ME],
+    ownAddresses: Array.isArray(o.ownAddresses) && o.ownAddresses.length ? o.ownAddresses.slice() : [ME],
     profile: { mail: ME, userPrincipalName: ME, displayName: 'Glance' },
     requestedScopes: scopes.slice()
   };
@@ -198,7 +198,15 @@ function installE2EHooks() {
       const createdReply = path.match(/\/me\/messages\/([^/]+)\/createReply$/);
       if (createdReply && method === 'POST') {
         const id = 'e2e-draft-' + (e2e.seq++);
-        e2e.drafts[id] = { id: id, isDraft: true };
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        e2e.drafts[id] = {
+          id: id,
+          isDraft: true,
+          subject: 'RE: e2e',
+          body: { contentType: 'Text', content: posted.comment || '' },
+          toRecipients: []
+        };
         return Promise.resolve(json(201, e2e.drafts[id]));
       }
       const todoOne = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks\/([^/]+)$/);
@@ -289,7 +297,13 @@ function installE2EHooks() {
             delete e2e.drafts[id];
             return Promise.resolve(empty(204));
           }
-          if (method === 'PATCH') return Promise.resolve(json(200, e2e.drafts[id]));
+          if (method === 'PATCH') {
+            let patch = {};
+            try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
+            if (patch.body) e2e.drafts[id].body = patch.body;
+            if (patch.subject) e2e.drafts[id].subject = patch.subject;
+            return Promise.resolve(json(200, e2e.drafts[id]));
+          }
           return Promise.resolve(json(200, e2e.drafts[id]));
         }
         const row = scenario.messages && Object.prototype.hasOwnProperty.call(scenario.messages, id) ? scenario.messages[id] : null;
@@ -297,7 +311,9 @@ function installE2EHooks() {
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
       }
       if (path === '/v1.0/me' || path.endsWith('/me')) {
-        return Promise.resolve(json(200, { mail: 'glance.salisapan@outlook.com', userPrincipalName: 'glance.salisapan@outlook.com', displayName: 'Glance' }));
+        if (scenario.meFail) return Promise.resolve(json(500, { error: { message: 'me-failed' } }));
+        const me = scenario.me || { mail: 'glance.salisapan@outlook.com', userPrincipalName: 'glance.salisapan@outlook.com', displayName: 'Glance' };
+        return Promise.resolve(json(200, me));
       }
       return Promise.resolve(json(404, { error: { message: 'e2e-unmocked', path: path } }));
     }
@@ -442,7 +458,21 @@ async function boot() {
   await closeStrayPopups();
 
   harness.seed = async function seed(data) {
-    await evalWorker(async (bag) => { await chrome.storage.local.set(bag); }, data);
+    await evalWorker(async (bag) => {
+      const e = globalThis.__glanceE2e;
+      if (e && e.todoTasks) {
+        const rows = (bag && bag.log) || [];
+        rows.forEach((row) => {
+          if (!row || row.kind !== 'written' || row.deleted === true || row.glanceDeleted === true) return;
+          const todo = row.system === 'microsoft/todo' || row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo';
+          if (!todo) return;
+          const id = row.externalId || (row.ref && (row.ref.taskId || row.ref.externalId));
+          if (!id || e.todoTasks[id]) return;
+          e.todoTasks[id] = { id: id, title: row.actionTitle || row.label || 'e2e', status: 'notStarted' };
+        });
+      }
+      await chrome.storage.local.set(bag);
+    }, data);
   };
 
   harness.storage = async function storage() {
@@ -481,6 +511,18 @@ async function boot() {
 
   harness.reset = async function reset() {
     harness.keepPopup = false;
+    // Close the mail and the panel before wiping storage. A page that is
+    // still scanning writes its log back after a clear, and the next mail
+    // then inherits that promise.
+    const closing = [];
+    for (const p of context.pages()) {
+      const url = p.url();
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0) {
+        closing.push(p.close().catch(() => {}));
+      }
+    }
+    await Promise.all(closing);
+    harness.page = null;
     await evalWorker(installE2EHooks);
     await evalWorker(async () => {
       await chrome.storage.local.clear();
@@ -497,13 +539,6 @@ async function boot() {
       e.driveByName = {};
       e.seq = 1;
     });
-    for (const p of context.pages()) {
-      const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0) {
-        await p.close().catch(() => {});
-      }
-    }
-    harness.page = null;
   };
 
   async function openDocument(url, html) {

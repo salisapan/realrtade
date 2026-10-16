@@ -42,11 +42,34 @@
   let proOffer = { enabled: false, trialDays: 0 };
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
-  let whyNotShownAll = false;
-  let whyDetailsOpen = false;
   const tabScroll = { setup: 0, open: 0, log: 0 };
   let scrollLock = false;
   let renderDepth = 0;
+  let surfaceGen = 0;
+  // Bumps on every glanceWhyCurrent write. A refresh that started earlier
+  // must not paint over the value this listener already applied.
+  let whyRev = 0;
+  function uiLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return 'en';
+  }
+  function words() {
+    return FlowDisplay.chrome(uiLang());
+  }
+  function showWords(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(uiLang(), text);
+    return text == null ? '' : String(text);
+  }
+  function fillWords(template, map) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.fillChrome === 'function') return FlowDisplay.fillChrome(template, map);
+    return String(template || '').replace(/\{(\w+)\}/g, function (_, key) { return map && map[key] != null ? String(map[key]) : ''; });
+  }
   function panelScroller() { return document.querySelector('main'); }
   function activeTabId() {
     const tab = document.querySelector('.tab[aria-selected="true"]');
@@ -87,6 +110,32 @@
       renderOpen().catch(() => {});
     });
   } catch (e) { /* panel is already showing the last render */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local') return;
+      if (ch.glanceWhyCurrent || ch.glanceWhyByConv) {
+        whyRev += 1;
+        if (state && ch.glanceWhyCurrent) state.glanceWhyCurrent = ch.glanceWhyCurrent.newValue || null;
+        if (state && ch.glanceWhyByConv) state.glanceWhyByConv = ch.glanceWhyByConv.newValue || {};
+        // The row already on screen updates now. A rebuild still in flight
+        // reads this same value when it appends, so a late snapshot cannot
+        // leave the line off after the write has landed.
+        syncWhyLine(whyRev).catch(() => {});
+      }
+      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceWhyByConv || ch.glanceUiLanguage)) return;
+      const rev = whyRev;
+      refresh().then(() => {
+        if (rev !== whyRev) return;
+        return Promise.all([
+          renderSurfaces().catch(() => {}),
+          renderOutlookCards().catch(() => {}),
+          renderWaiting().catch(() => {}),
+          renderOpen().catch(() => {}),
+          renderLog().catch(() => {})
+        ]);
+      }).catch(() => {});
+    });
+  } catch (e) { /* the open panel keeps the last status until the next open */ }
   const scroller = panelScroller();
   if (scroller) scroller.addEventListener('scroll', rememberScroll, { passive: true });
   wireTabs();
@@ -94,7 +143,7 @@
   wireRecipe();
   wirePro();
   wireLoopView();
-  renderConnectors();
+  await renderConnectors();
   await renderStatusPill();
   await renderLog();
   await renderOpen();
@@ -224,7 +273,7 @@
     } catch (e) { theirs = ''; }
     const stale = !theirs || theirs !== mine;
     line.hidden = !stale;
-    if (stale) line.textContent = 'Reload Glance';
+    if (stale) line.textContent = 'רענן את Glance';
   }
 
   function el(tag, cls, text) {
@@ -245,9 +294,21 @@
   }
 
   async function refresh() {
+    const rev = whyRev;
     status = await send({ type: 'flow:connector-status' });
-    state = await FlowStorage.get();
-    renderConnectors();
+    const next = await FlowStorage.get();
+    if (rev !== whyRev && state) {
+      const latest = state.glanceWhyCurrent;
+      const map = state.glanceWhyByConv;
+      const list = state.glanceWhyList;
+      state = next;
+      state.glanceWhyCurrent = latest;
+      if (map) state.glanceWhyByConv = map;
+      if (list) state.glanceWhyList = list;
+    } else {
+      state = next;
+    }
+    await renderConnectors();
     await renderStatusPill();
     renderSetupDone();
   }
@@ -262,14 +323,44 @@
     const done = connected && !!(state && state.onboarded);
     saveBtn.style.display = done ? 'none' : '';
     if (done) {
-      note.textContent = 'You\u2019re set. Open an email in Gmail \u2014 Glance stays quiet until one matters.';
+      note.textContent = 'מוכן. פתח מייל — Glance שותק עד שלולאה באמת פתוחה.';
       note.hidden = false;
     }
+  }
+
+  function microsoftFaceLabel(connection) {
+    if (connection === 'valid') return 'מחובר';
+    if (connection === 'expired' || connection === 'missing-scope') return 'התחבר מחדש';
+    return 'לא מחובר';
+  }
+
+  function serviceLabel(svc) {
+    if (!svc) return '';
+    if (svc.id === 'calendar') return 'שמירת זמן ביומן';
+    if (svc.id === 'mail') return 'דואר';
+    if (svc.id === 'todo') return 'To Do';
+    if (svc.id === 'onedrive') return 'OneDrive';
+    if (svc.id === 'contacts') return 'אנשי קשר';
+    if (svc.id === 'teams') return 'Teams';
+    return svc.label || svc.id;
+  }
+
+  function stampMicrosoft(node, connection) {
+    if (node && node.setAttribute) node.setAttribute('data-glance-microsoft', connection);
   }
 
   async function renderStatusPill() {
     const pill = document.getElementById('statusPill');
     if (!pill) return;
+    const onOutlook = await outlookHostOpen();
+    const microsoft = microsoftTokenStatus();
+    if (onOutlook) {
+      stampMicrosoft(pill, microsoft);
+      stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+      pill.textContent = microsoftFaceLabel(microsoft);
+      pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+      return;
+    }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
@@ -277,19 +368,10 @@
       pill.className = 'ver on';
       return;
     }
-    let outlookOn = false;
-    try {
-      const o = outlook();
-      const st = o && typeof o.status === 'function' ? await o.status() : null;
-      outlookOn = Boolean(st && st.connected && !st.needsSignIn);
-    } catch (e) { outlookOn = false; }
-    if (outlookOn) {
-      pill.textContent = 'Outlook connected';
-      pill.className = 'ver on';
-      return;
-    }
-    pill.textContent = 'Not connected';
-    pill.className = 'ver';
+    stampMicrosoft(pill, microsoft);
+    stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+    pill.textContent = microsoftFaceLabel(microsoft);
+    pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
   }
 
   /* ---------------------------------------------------------- connectors */
@@ -297,11 +379,264 @@
   function renderConnectors() {
     const host = document.getElementById('connector-list');
     host.replaceChildren();
-    // MVP surface is one connector, one decision: sign in, or don't. The rest
-    // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
-    // them wired) but showing four more cards here is exactly the setup
-    // friction the MVP is supposed to have zero of.
-    FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
+    return outlookHostOpen().then((onOutlook) => {
+      if (onOutlook) {
+        host.appendChild(microsoftConnectCard());
+        return renderOutlookRefresh(host);
+      }
+      // MVP surface is one connector, one decision: sign in, or don't. The rest
+      // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
+      // them wired) but showing four more cards here is exactly the setup
+      // friction the MVP is supposed to have zero of.
+      FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
+    });
+  }
+
+  // The panel opened on an Outlook tab. Setup offers one Microsoft consent,
+  // not the Google sign-in that covers Gmail.
+  async function outlookHostOpen() {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return false;
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const url = (tabs && tabs[0] && tabs[0].url) || '';
+      return /https:\/\/outlook\.(live|office|office365)\.com\//i.test(url);
+    } catch (e) { return false; }
+  }
+
+  async function renderOutlookRefresh(host) {
+    if (!host) return;
+    let tabId = null;
+    try {
+      if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.query === 'function') {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs && tabs[0];
+        const url = (tab && tab.url) || '';
+        if (!/https:\/\/outlook\.(live|office|office365)\.com\//i.test(url)) return;
+        tabId = tab && typeof tab.id === 'number' ? tab.id : null;
+      }
+    } catch (e) { return; }
+    if (typeof tabId !== 'number') return;
+    const bag = state && state.glanceOutlookRefresh;
+    const flagged = Boolean(bag && (bag[String(tabId)] === true || bag[tabId] === true));
+    if (!flagged) return;
+    const row = el('div', 'conn');
+    row.id = 'glance-outlook-refresh';
+    row.setAttribute('data-glance-refresh', '1');
+    row.appendChild(el('p', 'conn-note', 'Glance התעדכן — רענן את הדף כדי להתחבר מחדש'));
+    const btn = el('button', 'ghost sm', 'רענן');
+    btn.type = 'button';
+    btn.setAttribute('data-glance-refresh-btn', '1');
+    btn.addEventListener('click', () => { send({ type: 'flow:outlook-refresh-tab', tabId: tabId }); });
+    row.appendChild(btn);
+    host.appendChild(row);
+  }
+
+  function microsoftTokenStatus() {
+    const auth = state && state.outlookAuth;
+    if (!auth || !auth.token) return 'missing';
+    const Auth = typeof FlowOutlookAuth !== 'undefined' ? FlowOutlookAuth : null;
+    if (!Auth || typeof Auth.microsoftConnection !== 'function') return 'missing';
+    return Auth.microsoftConnection(auth, state && state.outlookSync, Date.now());
+  }
+
+  function grantedOutlookScopes() {
+    const auth = state && state.outlookAuth;
+    const token = auth && auth.token;
+    const Cal = typeof FlowOutlookCalendar !== 'undefined' ? FlowOutlookCalendar : null;
+    if (Cal && typeof Cal.scopesFromToken === 'function') {
+      const from = Cal.scopesFromToken(token);
+      if (from && from.length) return from;
+    }
+    return (token && token.grantedScopes) || [];
+  }
+
+  function missingScopeSentence(scope, service) {
+    if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) return FlowReceipt.missingScopeLine(scope, service);
+    return scope + ' לא כלול בכניסה. בהגדרות, סמן ' + service + '.';
+  }
+
+  function appendMissingScopeLine(copy, svc) {
+    const label = serviceLabel(svc) || (svc && (svc.label || svc.id)) || '';
+    ((svc && svc.scopes) || []).forEach((scope) => {
+      if (!scope || !label) return;
+      const line = document.createElement('small');
+      line.className = 'ms-scope';
+      line.setAttribute('data-glance-scope-line', scope);
+      line.textContent = missingScopeSentence(scope, label);
+      copy.appendChild(line);
+    });
+  }
+
+  function readBackOrTimeout(promise) {
+    const line = (typeof FlowReceipt !== 'undefined' && FlowReceipt.verifyTimeoutLine)
+      ? FlowReceipt.verifyTimeoutLine()
+      : "Couldn't verify, try again";
+    return new Promise((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: false, reason: 'verify-timeout', written: line });
+      }, 8000);
+      Promise.resolve(promise).then((result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      }, () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ ok: false, reason: 'verify-timeout', written: line });
+      });
+    });
+  }
+
+  function microsoftConnectCard() {
+    const o = outlook();
+    const tokenStatus = microsoftTokenStatus();
+    const card = el('div', 'conn');
+    card.setAttribute('data-glance-connect', 'microsoft');
+    card.setAttribute('data-glance-microsoft', tokenStatus);
+    const head = el('div', 'conn-head');
+    const name = el('div', 'conn-name');
+    name.appendChild(el('b', null, 'Microsoft'));
+    name.appendChild(el('i', null, 'דואר, To Do ושמירת זמן'));
+    head.appendChild(name);
+    head.appendChild(el('span', 'badge' + (tokenStatus === 'valid' ? ' on' : ''), microsoftFaceLabel(tokenStatus)));
+    card.appendChild(head);
+    if (tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
+      card.appendChild(el('p', 'conn-note', 'התחבר מחדש ל-Microsoft'));
+    }
+    card.appendChild(el('p', 'conn-note', 'כניסה אחת ל-Microsoft. סמן שמירת זמן כדי לשים קובץ על היומן. Glance לא שולח.'));
+    const screen = el('div', 'ms-connect');
+    const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
+      { id: 'mail', label: 'Mail', required: true },
+      { id: 'todo', label: 'To Do', scopes: ['Tasks.ReadWrite'] },
+      { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite'] }
+    ];
+    const granted = grantedOutlookScopes();
+    const boxes = {};
+    services.forEach((svc) => {
+      const lab = document.createElement('label');
+      lab.className = 'ms-svc';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.setAttribute('data-glance-service', svc.id);
+      const required = Boolean(svc.required || svc.id === 'mail');
+      const has = (svc.scopes || []).every((sc) => granted.indexOf(sc) >= 0);
+      if (required) { box.checked = true; box.disabled = true; }
+      else if (has && granted.length) box.checked = true;
+      boxes[svc.id] = box;
+      const copy = el('span', null, serviceLabel(svc));
+      if (svc.detail) {
+        const small = document.createElement('small');
+        small.textContent = svc.detail;
+        copy.appendChild(small);
+      }
+      if (!required && !box.checked) appendMissingScopeLine(copy, svc);
+      lab.appendChild(box);
+      lab.appendChild(copy);
+      screen.appendChild(lab);
+    });
+    card.appendChild(screen);
+    const err = el('p', 'conn-err');
+    err.hidden = true;
+    const btn = el('button', 'primary sm');
+    btn.type = 'button';
+    btn.appendChild(el('span', 'shell'));
+    btn.appendChild(el('span', 'ring'));
+    btn.appendChild(el('span', 'shine'));
+    const missingOptional = services.filter((svc) => {
+      if (svc.required || svc.id === 'mail') return false;
+      return (svc.scopes || []).some((sc) => granted.indexOf(sc) < 0);
+    });
+    const connectLabel = (tokenStatus === 'expired' || tokenStatus === 'missing-scope')
+      ? 'התחבר מחדש'
+      : (tokenStatus === 'valid' ? (missingOptional.length ? 'הוסף הרשאה' : 'מחובר') : 'התחבר ל-Microsoft');
+    btn.appendChild(el('span', 'btn-label', connectLabel));
+    if (tokenStatus === 'valid' && !missingOptional.length) btn.disabled = true;
+    btn.addEventListener('click', async () => {
+      if (!o) return;
+      btn.disabled = true; setBtnLabel(btn, 'מתחבר…'); err.hidden = true;
+      if (tokenStatus === 'valid') {
+        const add = services.filter((svc) => {
+          const box = boxes[svc.id];
+          if (!box || !box.checked || box.disabled) return false;
+          return (svc.scopes || []).some((sc) => granted.indexOf(sc) < 0);
+        });
+        for (let i = 0; i < add.length; i++) {
+          const scopes = add[i].scopes || [];
+          for (let j = 0; j < scopes.length; j++) {
+            if (granted.indexOf(scopes[j]) >= 0) continue;
+            const grantedNow = await send({ type: 'flow:outlook-consent-scope', scope: scopes[j], policy: 'always' });
+            if (!grantedNow || grantedNow.ok !== true) {
+              btn.disabled = false; setBtnLabel(btn, 'הוסף הרשאה');
+              err.textContent = (grantedNow && (grantedNow.error || grantedNow.reason)) || 'ההרשאה לא נוספה.';
+              err.hidden = false;
+              return;
+            }
+          }
+        }
+        await refresh();
+        return;
+      }
+      const ids = services.filter((svc) => {
+        const box = boxes[svc.id];
+        return box && (box.checked || box.disabled);
+      }).map((svc) => svc.id);
+      const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
+        ? FlowOutlookConfig.scopesFor(ids) : null;
+      const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();
+      if (!r || !r.ok) {
+        btn.disabled = false; setBtnLabel(btn, 'התחבר ל-Microsoft');
+        err.textContent = (r && (r.error || r.reason)) || 'החיבור נכשל.';
+        err.hidden = false;
+        return;
+      }
+      await refresh();
+    });
+    card.appendChild(btn);
+    card.appendChild(err);
+    const calendarPolicy = state && state.glanceCalendarConsent;
+    if (calendarPolicy && calendarPolicy.mode === 'always' && calendarPolicy.revoked !== true) {
+      card.appendChild(el('p', 'conn-note', 'הרשאת יומן: תמיד'));
+      const revoke = el('button', 'ghost', 'בטל הרשאת יומן');
+      revoke.type = 'button';
+      revoke.setAttribute('data-glance-revoke-calendar', 'always');
+      revoke.addEventListener('click', async () => {
+        await FlowStorage.set({ glanceCalendarConsent: { mode: null, revoked: true, scope: 'Calendars.ReadWrite', at: Date.now() } });
+        await FlowStorage.appendLog({
+          kind: 'shown',
+          label: 'הרשאת יומן בוטלה',
+          app: 'outlook',
+          reason: 'calendar-consent-revoked',
+          messageId: 'calendar-consent'
+        });
+        await refresh();
+      });
+      card.appendChild(revoke);
+    }
+    const todoPolicy = state && state.glanceTodoConsent;
+    if (todoPolicy && todoPolicy.mode === 'always' && todoPolicy.revoked !== true) {
+      card.appendChild(el('p', 'conn-note', 'הרשאת To Do: תמיד'));
+      const revokeTodo = el('button', 'ghost', 'בטל הרשאת To Do');
+      revokeTodo.type = 'button';
+      revokeTodo.setAttribute('data-glance-revoke-todo', 'always');
+      revokeTodo.addEventListener('click', async () => {
+        await FlowStorage.set({ glanceTodoConsent: { mode: null, revoked: true, scope: 'Tasks.ReadWrite', at: Date.now() } });
+        await FlowStorage.appendLog({
+          kind: 'shown',
+          label: 'הרשאת To Do בוטלה',
+          app: 'outlook',
+          reason: 'todo-consent-revoked',
+          messageId: 'todo-consent'
+        });
+        await refresh();
+      });
+      card.appendChild(revokeTodo);
+    }
+    return card;
   }
 
   function connectorCard(c) {
@@ -314,10 +649,10 @@
     name.appendChild(el('i', null, c.kind));
     head.appendChild(name);
 
-    if (c.status === 'planned') head.appendChild(el('span', 'badge', 'Planned'));
-    else if (st.connected) head.appendChild(el('span', 'badge on', 'Connected'));
-    else if (c.status === 'live' || st.configured === true) head.appendChild(el('span', 'badge live', 'Works now'));
-    else head.appendChild(el('span', 'badge', 'Needs setup'));
+    if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
+    else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
+    else if (c.status === 'live' || st.configured === true) head.appendChild(el('span', 'badge live', 'עובד'));
+    else head.appendChild(el('span', 'badge', 'צריך הגדרה'));
     card.appendChild(head);
 
     if (c.note) card.appendChild(el('p', 'conn-note', c.note));
@@ -374,9 +709,9 @@
       btn.appendChild(el('span', 'shell'));
       btn.appendChild(el('span', 'ring'));
       btn.appendChild(el('span', 'shine'));
-      btn.appendChild(el('span', 'btn-label', 'Connect ' + c.label));
+      btn.appendChild(el('span', 'btn-label', 'התחבר ל-' + c.label));
     } else {
-      btn.textContent = 'Connect ' + c.label;
+      btn.textContent = 'התחבר ל-' + c.label;
     }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
@@ -391,7 +726,7 @@
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
-        btn.disabled = false; setBtnLabel(btn, 'Connect ' + c.label);
+        btn.disabled = false; setBtnLabel(btn, 'התחבר ל-' + c.label);
         err.textContent = (res && res.error) || 'Connection failed.';
         err.hidden = false;
       }
@@ -613,12 +948,14 @@
       await renderOutlookCards();
       return;
     }
+    const keptSnap = r.created || (r.ref && typeof r.ref === 'object' && r.ref.created) || null;
     const fields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.receiptLogFields)
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
         processName: entry.process && entry.process.name,
         closedLine: entry.process && entry.process.closedLine,
-        status: 'Handled.'
+        status: 'Handled.',
+        created: keptSnap
       })
       : null;
     const provedTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
@@ -639,6 +976,7 @@
       app: 'outlook',
       connectorId: route.connectorId,
       ref: r.ref,
+      created: keptSnap,
       where: r.where,
       url: r.url || null,
       sender: entry.sender || null,
@@ -797,6 +1135,7 @@
     return FlowStepListView.mount(host, rows, {
       intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
       lang: entry.intent && entry.intent.lang,
+      uiLang: uiLang(),
       surface: entry.app || 'gmail',
       // The panel background is dark even when the OS theme is light.
       theme: 'dark',
@@ -819,7 +1158,8 @@
     // ever existed, rather than showing a blank tag.
     top.appendChild(el('span', 'log-kind', (entry.app || 'gmail').toUpperCase()));
     item.appendChild(top);
-    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', 'From Outlook'));
+    const L = words();
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', L.fromOutlook));
 
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
@@ -835,8 +1175,7 @@
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
     if (entry.verifying) {
-      const he = /[\u0590-\u05FF]/.test(String(entry.text || '') + String(entry.subject || ''));
-      item.appendChild(el('span', 'log-where', he ? 'מאמת' : 'Verifying…'));
+      item.appendChild(el('span', 'log-where', L.verifying));
       return item;
     }
 
@@ -848,24 +1187,24 @@
       doIt.appendChild(el('span', 'shell'));
       doIt.appendChild(el('span', 'ring'));
       doIt.appendChild(el('span', 'shine'));
-      doIt.appendChild(el('span', 'btn-label', 'Do It'));
+      doIt.appendChild(el('span', 'btn-label', L.doIt));
       doIt.addEventListener('click', async () => {
         doIt.disabled = true;
         const label = doIt.querySelector('.btn-label');
-        if (label) label.textContent = 'Closing…';
+        if (label) label.textContent = L.closing;
         await closeStillOpenFromPopup(entry);
       });
       acts.appendChild(doIt);
     }
     if (entry.threadUrl || entry.url) {
-      const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? 'Open draft' : 'View');
+      const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? L.openDraft : L.view);
       view.href = entry.url || entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
       acts.appendChild(view);
     }
-    const dismiss = el('button', 'ghost sm', 'Dismiss');
+    const dismiss = el('button', 'ghost sm', L.dismiss);
     dismiss.type = 'button';
     dismiss.addEventListener('click', async () => {
-      dismiss.disabled = true; dismiss.textContent = 'Dismissing…';
+      dismiss.disabled = true; dismiss.textContent = L.dismissing;
       // The exact same storage/module calls content-gmail.js's own
       // onDismiss makes, verbatim — no DOM, no background.js round trip.
       await FlowStorage.appendLog({
@@ -889,6 +1228,30 @@
     });
     acts.appendChild(dismiss);
     item.appendChild(acts);
+    return item;
+  }
+
+  // A passed deadline is not an open card and not a close. Loops keeps the
+  // row and names it expired. Do It stays off: the due day already passed.
+  function expiredRow(entry) {
+    const item = el('div', 'log-item');
+    item.setAttribute('data-glance-status', 'expired');
+    const top = el('div', 'log-top');
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '';
+    top.appendChild(el('span', 'log-label', why));
+    top.appendChild(el('span', 'log-kind', 'expired'));
+    item.appendChild(top);
+    const Lx = words();
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', Lx.fromOutlook));
+    const subtitle = pendingRowSubtitle(entry);
+    if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
+    if (entry.threadUrl || entry.url) {
+      const view = el('a', 'ghost sm', Lx.view);
+      view.href = entry.url || entry.threadUrl;
+      view.target = '_blank';
+      view.rel = 'noopener';
+      item.appendChild(view);
+    }
     return item;
   }
 
@@ -1095,22 +1458,113 @@
     return outlook.inst || (outlook.inst = FlowOutlook.create(outlookDeps()));
   }
 
-  const OUTLOOK_COPY = 'Reads the last 14 days of your Outlook mail on this device, while this panel or Outlook on the web is open: asks made of you and answers to yours. On Do It (here or inside Outlook on the web), writes a reply draft into your Outlook Drafts, with the same judgment and draft as Gmail. Never sends. Uses your own Microsoft sign-in, kept alive in this browser; nothing is sent to Glance\'s servers.';
+  const OUTLOOK_COPY = 'קורא 14 ימים אחרונים של דואר Outlook על המכשיר, כל עוד הלוח או Outlook באינטרנט פתוחים. בסגירה נכתבת טיוטת תשובה. לא שולח. שום דבר לא נשלח ל-Glance.';
   const OUTLOOK_ERRORS = { permission: 'The browser did not grant access, so it stays off.', cancelled: 'The sign-in window was closed.', profile: 'Signed in, but Microsoft did not say whose mailbox this is. Try again.', 'not-configured': 'Not set up yet.' };
 
-  async function renderOutlookRow(host) {
+  function whyCopy(why) {
+    if (!why || !why.reason) return null;
+    const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function')
+      ? FlowDisplay.whyNotShownLine(why.reason)
+      : '';
+    if (!line) return null;
+    const subject = String(why.subject || '').trim();
+    return {
+      line: line,
+      subject: subject,
+      reason: String(why.reason),
+      text: subject ? (line + ' — ' + subject) : line
+    };
+  }
+
+  function dropWhyLine(row) {
+    if (!row || !row.children) return;
+    for (let i = row.children.length - 1; i >= 0; i--) {
+      const n = row.children[i];
+      if (!n || !n.getAttribute || n.getAttribute('data-glance-why-line') == null) continue;
+      if (typeof n.remove === 'function') n.remove();
+      else if (typeof row.removeChild === 'function') row.removeChild(n);
+    }
+  }
+
+  function whyRowsFrom(bag) {
+    const map = bag && bag.glanceWhyByConv;
+    const rows = [];
+    if (map && typeof map === 'object') {
+      Object.keys(map).forEach((key) => {
+        const row = map[key];
+        if (row && row.reason) rows.push(row);
+      });
+    }
+    rows.sort((a, b) => (a.at || 0) - (b.at || 0));
+    if (rows.length) return rows;
+    const one = bag && bag.glanceWhyCurrent;
+    return one && one.reason ? [one] : [];
+  }
+
+  function appendWhyLine(row, why) {
+    const copy = whyCopy(why);
+    if (!copy || !row) return;
+    const item = el('div', 'wait-note', copy.text);
+    item.setAttribute('data-glance-why-line', copy.line);
+    if (copy.subject) item.setAttribute('data-glance-why-subject', copy.subject);
+    item.setAttribute('data-glance-why', copy.reason);
+    const first = row.firstChild || (row.children && row.children[0]) || null;
+    if (first && typeof row.insertBefore === 'function') row.insertBefore(item, first);
+    else row.appendChild(item);
+  }
+
+  function mountWhyLine(row, why) {
+    paintWhyList(row, why && why.reason ? [why] : []);
+  }
+
+  function paintWhyList(row, rows) {
+    if (!row) return;
+    dropWhyLine(row);
+    const list = (rows || []).slice().reverse();
+    list.forEach((why) => appendWhyLine(row, why));
+  }
+
+  function paintWhyHosts(rows) {
+    paintWhyList(document.getElementById('surface-list'), rows);
+    paintWhyList(document.getElementById('log-list'), rows);
+  }
+
+  // Paint the current quiet mail on Settings and on Activity.
+  // A newer glanceWhyCurrent write bumps whyRev and this read is dropped.
+  async function syncWhyLine(rev) {
+    const seen = rev == null ? whyRev : rev;
+    let rows = whyRowsFrom(state);
+    try {
+      const fresh = await FlowStorage.get();
+      if (seen !== whyRev) return;
+      rows = whyRowsFrom(fresh);
+      if (state) {
+        state.glanceWhyCurrent = (fresh && fresh.glanceWhyCurrent) || null;
+        state.glanceWhyByConv = (fresh && fresh.glanceWhyByConv) || {};
+        state.glanceWhyList = rows;
+      }
+    } catch (e) { /* the value the change applied still paints */ }
+    if (seen !== whyRev) return;
+    paintWhyHosts(rows);
+  }
+
+  async function renderOutlookRow(host, gen) {
     const o = outlook();
     if (!o) return;
     const st = await o.status();
     const row = el('div', 'wait-item');
     const top = el('div', 'wait-top');
     top.appendChild(el('span', 'wait-who', 'Outlook'));
-    const label = !st.configured ? 'Not set up yet' : st.connected ? (st.needsSignIn ? 'Sign in again' : 'On') : 'Off';
-    top.appendChild(el('span', 'wait-state' + (st.connected && !st.needsSignIn ? ' ok' : ''), label));
+    const link = microsoftTokenStatus();
+    row.setAttribute('data-glance-surface', 'outlook');
+    stampMicrosoft(row, link);
+    stampMicrosoft(document.getElementById('outlookBlock'), link);
+    const label = microsoftFaceLabel(link);
+    top.appendChild(el('span', 'wait-state' + (link === 'valid' ? ' ok' : ''), label));
     row.appendChild(top);
     row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
     if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
-    if (st.connected) {
+    if (link === 'valid' || (st.pageDiagnostics && st.pageDiagnostics.length) || (st.diagnostics && st.diagnostics.length)) {
       // If OWA host permission is already granted (e.g. after reconnect), ensure the content script is registered.
       try {
         const origins = (typeof FlowOutlook !== 'undefined' && FlowOutlook.OWA_ORIGINS) || [
@@ -1131,85 +1585,29 @@
           + (typeof st.lastIncoming === 'number' ? (', ' + st.lastIncoming + ' incoming') : '')
           + '.')
         : 'Not checked yet.';
-      row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
-      // The mailbox check's reasons, then the Outlook-on-the-web card's own (newest first): every incoming message ends
-      // in a card or in a line here.
-      const diags = (Array.isArray(st.pageDiagnostics) ? st.pageDiagnostics : []).concat(Array.isArray(st.diagnostics) ? st.diagnostics : []);
-      if (diags.length) {
-        const details = document.createElement('details');
-        details.className = 'wait-note';
-        const cap = whyNotShownAll ? diags.length : Math.min(20, diags.length);
-        const shown = diags.slice(0, cap);
-        const sum = document.createElement('summary');
-        sum.textContent = (typeof FlowDisplay !== 'undefined' && FlowDisplay.whyNotShownHeader)
-          ? FlowDisplay.whyNotShownHeader(diags.length, shown.length)
-          : ('Why not shown (' + shown.length + ')');
-        details.appendChild(sum);
-        if (whyDetailsOpen) details.open = true;
-        const holdOpen = () => { rememberScroll(); scrollLock = true; };
-        sum.addEventListener('pointerdown', holdOpen);
-        sum.addEventListener('mousedown', holdOpen);
-        sum.addEventListener('click', holdOpen, true);
-        details.addEventListener('toggle', () => {
-          whyDetailsOpen = details.open;
-          const scroller = panelScroller();
-          const y = tabScroll[activeTabId()] || 0;
-          scrollLock = true;
-          let left = 4;
-          const pin = () => {
-            if (scroller) scroller.scrollTop = y;
-            if (left > 0) { left -= 1; requestAnimationFrame(pin); }
-            else scrollLock = false;
-          };
-          pin();
-        });
-        const list = el('div', 'wait-note');
-        // Safe local-only readout: subject + reason code, no body text.
-        shown.forEach((d) => {
-          const sub = (typeof FlowDisplay !== 'undefined' && FlowDisplay.diagSubject)
-            ? FlowDisplay.diagSubject(d.subject)
-            : ((d.subject && String(d.subject).indexOf('/mail/') !== 0) ? String(d.subject).slice(0, 80) : 'Untitled message');
-          const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
-          const files = (d.fileCount && d.target) ? (' · ' + d.fileCount + ' ' + d.target) : '';
-          const detail = d.detail ? (' (' + String(d.detail).slice(0, 160) + ')') : '';
-          list.appendChild(el('div', 'wait-note', d.reason + detail + ' — “' + sub + '”' + who2 + files));
-        });
-        details.appendChild(list);
-        if (diags.length > shown.length) {
-          const more = el('button', 'ghost sm', 'Show all');
-          more.type = 'button';
-          more.addEventListener('click', () => {
-            rememberScroll();
-            whyNotShownAll = true;
-            whyDetailsOpen = true;
-            scrollLock = true;
-            renderSurfaces().then(() => {
-              const scroller = panelScroller();
-              const y = tabScroll[activeTabId()] || 0;
-              if (scroller) scroller.scrollTop = y;
-              requestAnimationFrame(() => {
-                if (scroller) scroller.scrollTop = y;
-                requestAnimationFrame(() => { scrollLock = false; });
-              });
-            }).catch(() => { scrollLock = false; });
-          });
-          details.appendChild(more);
-        }
-        row.appendChild(details);
+      if (link === 'valid' && idN === 0) {
+        stampMicrosoft(row, 'missing');
+        stampMicrosoft(document.getElementById('outlookBlock'), 'missing');
+        stampMicrosoft(document.getElementById('statusPill'), 'missing');
+        const face = row.querySelector('.wait-state');
+        if (face) face.textContent = microsoftFaceLabel('missing');
+        const pill = document.getElementById('statusPill');
+        if (pill) pill.textContent = microsoftFaceLabel('missing');
       }
+      if (link === 'valid' && idN > 0) row.appendChild(el('div', 'wait-note', (who ? ('מחובר כ-' + who + '. ') : '') + idN + ' זהויות. ' + (st.lastAt ? 'נבדק.' : 'עדיין לא נבדק.')));
       if (st.fromAliasHint) row.appendChild(el('div', 'wait-note', st.fromAliasHint));
     }
     if (st.error) {
       const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
         ? FlowOutlookAuth.errorSentence(st.error, st.errorDetail, st.aadsts)
         : (OUTLOOK_ERRORS[st.error] || st.error);
-      row.appendChild(el('div', 'wait-note', 'Last check: ' + sentence));
+      row.appendChild(el('div', 'wait-note', 'בדיקה אחרונה: ' + sentence));
     }
     const note = el('p', 'wait-note');
     note.hidden = true;
     const acts = el('div', 'wait-acts');
     let offRow = null;
-    if (st.configured && !st.connected) {
+    if (link === 'missing' && st.configured) {
       // One Connect screen: Select all, then one checkbox per Graph service.
       // Mail stays on. Extra scopes are added only for a checked box.
       const screen = el('div', 'ms-connect');
@@ -1225,7 +1623,7 @@
       allBox.type = 'checkbox';
       allBox.setAttribute('data-glance-select-all', '1');
       all.appendChild(allBox);
-      all.appendChild(el('span', null, 'Select all'));
+      all.appendChild(el('span', null, 'בחר הכל'));
       screen.appendChild(all);
       services.forEach((svc) => {
         const lab = document.createElement('label');
@@ -1236,12 +1634,13 @@
         const required = Boolean(svc.required || svc.id === 'mail');
         if (required) { box.checked = true; box.disabled = true; }
         boxes[svc.id] = box;
-        const copy = el('span', null, svc.label || svc.id);
+        const copy = el('span', null, serviceLabel(svc));
         if (svc.detail) {
           const small = document.createElement('small');
           small.textContent = svc.detail;
           copy.appendChild(small);
         }
+        if (!required && !box.checked) appendMissingScopeLine(copy, svc);
         lab.appendChild(box);
         lab.appendChild(copy);
         screen.appendChild(lab);
@@ -1257,7 +1656,7 @@
         optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
       });
       optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
-      const c = el('button', 'ghost sm', 'Connect');
+      const c = el('button', 'ghost sm', 'התחבר');
       c.type = 'button';
       c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
@@ -1281,19 +1680,79 @@
       });
       screen.appendChild(c);
       acts.appendChild(screen);
-    } else if (st.connected) {
-      const chk = el('button', 'ghost sm', st.needsSignIn ? 'Sign in again' : 'Check now');
+    } else if (link === 'expired' || link === 'missing-scope') {
+      const again = el('button', 'ghost sm', 'התחבר מחדש');
+      again.type = 'button';
+      again.addEventListener('click', async () => {
+        beginRender();
+        try {
+          again.disabled = true;
+          const r = await o.connect();
+          if (!r.ok) { again.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
+          await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
+        } finally { endRender(); }
+      });
+      acts.appendChild(again);
+    } else if (link === 'valid') {
+      const grantedNow = grantedOutlookScopes();
+      const scopeServices = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [];
+      const scopeScreen = el('div', 'ms-connect');
+      scopeScreen.setAttribute('data-glance-scopes', '1');
+      const scopeBoxes = {};
+      scopeServices.forEach((svc) => {
+        const lab = document.createElement('label');
+        lab.className = 'ms-svc';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.setAttribute('data-glance-service', svc.id);
+        const required = Boolean(svc.required || svc.id === 'mail');
+        const has = (svc.scopes || []).every((sc) => grantedNow.indexOf(sc) >= 0);
+        if (required) { box.checked = true; box.disabled = true; }
+        else box.checked = has;
+        scopeBoxes[svc.id] = box;
+        lab.appendChild(box);
+        lab.appendChild(el('span', null, serviceLabel(svc)));
+        scopeScreen.appendChild(lab);
+      });
+      const addScope = el('button', 'ghost sm', 'הוסף הרשאה');
+      addScope.type = 'button';
+      addScope.setAttribute('data-glance-add-scope', '1');
+      addScope.addEventListener('click', async () => {
+        addScope.disabled = true;
+        const add = scopeServices.filter((svc) => {
+          const box = scopeBoxes[svc.id];
+          if (!box || !box.checked || box.disabled) return false;
+          return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
+        });
+        for (let i = 0; i < add.length; i++) {
+          const scopes = add[i].scopes || [];
+          for (let j = 0; j < scopes.length; j++) {
+            if (grantedNow.indexOf(scopes[j]) >= 0) continue;
+            const grantedScope = await send({ type: 'flow:outlook-consent-scope', scope: scopes[j], policy: 'always' });
+            if (!grantedScope || grantedScope.ok !== true) {
+              addScope.disabled = false;
+              note.hidden = false;
+              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              return;
+            }
+          }
+        }
+        await renderSurfaces();
+      });
+      scopeScreen.appendChild(addScope);
+      row.appendChild(scopeScreen);
+      const chk = el('button', 'ghost sm', 'בדוק עכשיו');
       chk.type = 'button';
       chk.addEventListener('click', async () => {
         beginRender();
         try {
           chk.disabled = true;
-          const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
+          const r = await o.sync({ force: true });
           if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
           await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
         } finally { endRender(); }
       });
-      const off = el('button', 'ghost sm', 'Turn off');
+      const off = el('button', 'ghost sm', 'כבה');
       off.type = 'button';
       off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
       acts.appendChild(chk);
@@ -1307,18 +1766,18 @@
             'https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'
           ];
           if (await chrome.permissions.contains({ origins: origins })) return;
-          const btn = el('button', 'ghost sm', 'Show Do It in Outlook on the web');
+          const btn = el('button', 'ghost sm', 'הצג את בצע ב-Outlook באינטרנט');
           btn.type = 'button';
           btn.addEventListener('click', async () => {
             btn.disabled = true;
             let ok = false;
             try { ok = await chrome.permissions.request({ origins: origins }); } catch (e) { ok = false; }
-            if (!ok) { btn.disabled = false; note.hidden = false; note.textContent = 'The browser did not grant access to Outlook on the web.'; return; }
+            if (!ok) { btn.disabled = false; note.hidden = false; note.textContent = 'הדפדפן לא נתן גישה ל-Outlook באינטרנט.'; return; }
             const r = await send({ type: 'flow:surface-enable', id: 'outlook' });
-            if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'Could not turn on the Outlook page card.'; return; }
+            if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'לא הצלחתי להפעיל את הכרטיס בעמוד Outlook.'; return; }
             btn.remove();
             note.hidden = false;
-            note.textContent = 'Do It will appear on open messages at outlook.live.com / outlook.office.com.';
+            note.textContent = 'בצע יופיע על הודעות פתוחות ב-outlook.live.com / outlook.office.com.';
           });
           acts.appendChild(btn);
         } catch (e) { /* ignore */ }
@@ -1327,6 +1786,7 @@
     row.appendChild(acts);
     if (offRow) row.appendChild(offRow);
     row.appendChild(note);
+    if (gen !== surfaceGen) return;
     host.appendChild(row);
   }
 
@@ -1334,14 +1794,14 @@
   // ---- a model on this computer (core/local-lm-server.js) ---------------------------------------------------
   // Optional. Ollama or LM Studio, running on THIS computer. Turned on only after it passes the same precision test as the browser's
   // own model, per language, and only ever asked about sentences Glance could not read itself. It only proposes.
-  const LOCAL_MODEL_COPY = 'Optional. If you run Ollama or LM Studio on this computer, Glance can ask that model about a sentence it could not read itself. It runs here, costs nothing and needs no key; nothing leaves this computer, and Glance only proposes, you still tap. It is switched on per language only after it passes a precision test on your model.';
+  const LOCAL_MODEL_COPY = 'רשות. אם Ollama או LM Studio רצים על המחשב הזה, Glance יכול לשאול את המודל על משפט שהוא לא הצליח לקרוא בעצמו. זה רץ כאן, בלי עלות ובלי מפתח. שום דבר לא יוצא מהמחשב, ו-Glance רק מציע — אתה עדיין לוחץ. זה נדלק לכל שפה רק אחרי שעבר מבחן דיוק על המודל.';
   const LM_PROVIDER_LABEL = { ollama: 'Ollama', lmstudio: 'LM Studio' };
 
-  function fmtLm(r) { return r && r.ok ? 'on (precision ' + (r.precision == null ? '?' : r.precision) + ', recall ' + (r.recall == null ? '?' : r.recall) + ')' : r && r.precision != null ? 'off (precision ' + r.precision + ', needs ' + FlowLocalLM.TEST_MIN_PRECISION + ')' : 'off'; }
+  function fmtLm(r) { return r && r.ok ? 'פעיל (דיוק ' + (r.precision == null ? '?' : r.precision) + ', כיסוי ' + (r.recall == null ? '?' : r.recall) + ')' : r && r.precision != null ? 'כבוי (דיוק ' + r.precision + ', צריך ' + FlowLocalLM.TEST_MIN_PRECISION + ')' : 'כבוי'; }
 
   // The on-device model and the server fallback (core/hybrid-status.js turns the worker's status into this line). Hidden while the hybrid path is not
   // enabled in this build (config/hybrid.public.js): a row for something that is not there would be a promise with nothing behind it.
-  async function renderHybridRow(host) {
+  async function renderHybridRow(host, gen) {
     if (typeof FlowHybridStatus === 'undefined') return;
     const raw = await send({ type: 'flow:hybrid-status' });
     const v = FlowHybridStatus.describe(raw);
@@ -1370,12 +1830,13 @@
     if (v.canRetry) act('Check again', { type: 'flow:hybrid-retry' });
     if (v.canRemove) act('Turn off and free the disk', { type: 'flow:hybrid-consent', patch: { localModel: false } });
     if (acts.children.length) row.appendChild(acts);
+    if (gen !== surfaceGen) return;
     host.appendChild(row);
   }
 
   // The deeper read (core/ai-ladder.js): the one-time choice, how many are left, and what happens when they run out. Hidden until the server says it is running:
   // a row for something that is not there would be a promise with nothing behind it. Words come from the core, so the corpus can hold them to the identity rules.
-  async function renderLadderRow(host) {
+  async function renderLadderRow(host, gen) {
     if (typeof FlowAiLadder === 'undefined') return;
     const info = await send({ type: 'flow:ladder-info' });
     if (!info || !info.ok || !info.enabled) return;
@@ -1404,31 +1865,32 @@
       act(c.secondary, 'ghost sm', () => send({ type: 'flow:ladder-consent', given: false }));
     }
     row.appendChild(acts);
+    if (gen !== surfaceGen) return;
     host.appendChild(row);
   }
 
-  async function renderLocalModelRow(host) {
+  async function renderLocalModelRow(host, gen) {
     if (typeof FlowLocalLMServer === 'undefined' || typeof FlowLocalLM === 'undefined' || typeof FlowStorage.getLocalLmServer !== 'function') return;
     const cfg = await FlowStorage.getLocalLmServer();
     const on = cfg.enabled === true && cfg.status && ((cfg.status.en && cfg.status.en.ok) || (cfg.status.he && cfg.status.he.ok));
     const row = el('div', 'wait-item');
     const top = el('div', 'wait-top');
-    top.appendChild(el('span', 'wait-who', 'A model on your computer'));
-    top.appendChild(el('span', 'wait-state' + (on ? ' ok' : ''), on ? 'On' : 'Off'));
+    top.appendChild(el('span', 'wait-who', 'מודל על המחשב'));
+    top.appendChild(el('span', 'wait-state' + (on ? ' ok' : ''), on ? 'פעיל' : 'כבוי'));
     row.appendChild(top);
     row.appendChild(el('div', 'wait-note', LOCAL_MODEL_COPY));
     if (cfg.model && cfg.status) {
-      row.appendChild(el('div', 'wait-note', (LM_PROVIDER_LABEL[cfg.provider] || cfg.provider) + ' · ' + cfg.model + '. English: ' + fmtLm(cfg.status.en) + '. Hebrew: ' + fmtLm(cfg.status.he) + '.'));
+      row.appendChild(el('div', 'wait-note', (LM_PROVIDER_LABEL[cfg.provider] || cfg.provider) + ' · ' + cfg.model + '. אנגלית: ' + fmtLm(cfg.status.en) + '. עברית: ' + fmtLm(cfg.status.he) + '.'));
     }
     const note = el('p', 'wait-note');
     note.hidden = true;
     const say = (t) => { note.hidden = !t; note.textContent = t || ''; };
 
     const provider = document.createElement('select');
-    provider.setAttribute('aria-label', 'Program');
+    provider.setAttribute('aria-label', 'תוכנית');
     Object.keys(LM_PROVIDER_LABEL).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = LM_PROVIDER_LABEL[k]; if (k === cfg.provider) o.selected = true; provider.appendChild(o); });
     const model = document.createElement('input');
-    model.type = 'text'; model.placeholder = 'Model name, e.g. llama3:8b'; model.value = cfg.model || ''; model.setAttribute('aria-label', 'Model name'); model.setAttribute('list', 'lm-models'); model.maxLength = 120;
+    model.type = 'text'; model.placeholder = 'שם המודל, למשל llama3:8b'; model.value = cfg.model || ''; model.setAttribute('aria-label', 'שם המודל'); model.setAttribute('list', 'lm-models'); model.maxLength = 120;
     const listEl = document.createElement('datalist'); listEl.id = 'lm-models';
     const current = () => ({ provider: provider.value, baseUrl: '', model: model.value.trim() });
     const need = (c) => {
@@ -1446,36 +1908,36 @@
     };
 
     const acts = el('div', 'wait-acts');
-    const find = el('button', 'ghost sm', 'Find models');
+    const find = el('button', 'ghost sm', 'מצא מודלים');
     find.type = 'button';
     find.addEventListener('click', async () => {
       const { pat } = need(current());
-      if (!(await askPermission(pat))) { say('The browser did not allow Glance to reach this computer’s model server, so it stays off.'); return; }
-      find.disabled = true; say('Looking…');
+      if (!(await askPermission(pat))) { say('הדפדפן לא איפשר ל-Glance להגיע לשרת המודל על המחשב, אז זה נשאר כבוי.'); return; }
+      find.disabled = true; say('מחפש…');
       const r = await FlowLocalLMServer.listModels({ provider: provider.value }, { fetch: (u, o) => fetch(u, o) });
       find.disabled = false;
-      if (!r.ok) { say(r.hint || 'Could not reach it.'); return; }
+      if (!r.ok) { say(r.hint || 'לא הצלחתי להגיע.'); return; }
       listEl.replaceChildren();
       r.models.forEach((m) => { const o = document.createElement('option'); o.value = m; listEl.appendChild(o); });
       if (r.models.length && !model.value) model.value = r.models[0];
-      say(r.models.length ? 'Found ' + r.models.length + ' model' + (r.models.length === 1 ? '' : 's') + '. Pick one, then Test and turn on.' : 'The server is running but has no models yet. Pull one first (for Ollama: ollama pull llama3).');
+      say(r.models.length ? 'נמצאו ' + r.models.length + (r.models.length === 1 ? ' מודל' : ' מודלים') + '. בחר אחד, ואז בדוק והפעל.' : 'השרת רץ ועדיין אין בו מודלים. משוך אחד קודם (ל-Ollama: ollama pull llama3).');
     });
-    const test = el('button', 'ghost sm', on ? 'Test again' : 'Test and turn on');
+    const test = el('button', 'ghost sm', on ? 'בדוק שוב' : 'בדוק והפעל');
     test.type = 'button';
     test.addEventListener('click', async () => {
       const c = current();
       const { n, pat } = need(c);
-      if (!n) { say(c.model ? 'That address is not allowed: only a program on this computer.' : 'Type the model name first (or press Find models).'); return; }
-      if (!(await askPermission(pat))) { say('The browser did not allow Glance to reach this computer’s model server, so it stays off.'); return; }
+      if (!n) { say(c.model ? 'הכתובת הזו לא מותרת: רק תוכנית על המחשב הזה.' : 'כתוב קודם את שם המודל (או לחץ מצא מודלים).'); return; }
+      if (!(await askPermission(pat))) { say('הדפדפן לא איפשר ל-Glance להגיע לשרת המודל על המחשב, אז זה נשאר כבוי.'); return; }
       test.disabled = true; find.disabled = true;
-      say('Testing this model on sentences written for the purpose. This can take a few minutes: keep this panel open.');
+      say('בודק את המודל על משפטים שנכתבו לצורך הזה. זה יכול לקחת כמה דקות: השאר את הלוח פתוח.');
       const session = FlowLocalLMServer.session(n, { fetch: (u, o) => fetch(u, o), timeoutMs: 60000 });
       const probe = await FlowLocalLMServer.listModels(n, { fetch: (u, o) => fetch(u, o) });
-      if (!probe.ok) { test.disabled = false; find.disabled = false; say(probe.hint || 'Could not reach it.'); return; }
-      if (probe.models.length && probe.models.indexOf(n.model) < 0) { test.disabled = false; find.disabled = false; say('The server does not have a model called ' + n.model + '. Pick one from the list.'); return; }
+      if (!probe.ok) { test.disabled = false; find.disabled = false; say(probe.hint || 'לא הצלחתי להגיע.'); return; }
+      if (probe.models.length && probe.models.indexOf(n.model) < 0) { test.disabled = false; find.disabled = false; say('בשרת אין מודל בשם ' + n.model + '. בחר אחד מהרשימה.'); return; }
       let res;
       try {
-        res = await FlowLocalLM.selfTest(session, typeof FlowLocalLMAudit !== 'undefined' ? FlowLocalLMAudit : [], { now: Date.now(), onProgress: (lang, i, total) => { if (i % 10 === 0) say('Testing ' + (lang === 'he' ? 'Hebrew' : 'English') + ': ' + i + ' of ' + total + '. Keep this panel open.'); } });
+        res = await FlowLocalLM.selfTest(session, typeof FlowLocalLMAudit !== 'undefined' ? FlowLocalLMAudit : [], { now: Date.now(), onProgress: (lang, i, total) => { if (i % 10 === 0) say('בודק ' + (lang === 'he' ? 'עברית' : 'אנגלית') + ': ' + i + ' מתוך ' + total + '. השאר את הלוח פתוח.'); } });
       } catch (e) { res = null; }
       const pass = Boolean(res && ((res.en && res.en.ok) || (res.he && res.he.ok)));
       await FlowStorage.setLocalLmServer({ enabled: pass, provider: n.provider, baseUrl: n.baseUrl, model: n.model, status: res ? Object.assign({}, res, { provider: n.provider, baseUrl: n.baseUrl, model: n.model, nextCheckAt: res.checkedAt + FlowLocalLM.TEST_MAX_AGE_MS, reason: pass ? 'passed' : 'failed' }) : null });
@@ -1483,7 +1945,7 @@
     });
     acts.appendChild(find); acts.appendChild(test);
     if (cfg.enabled) {
-      const off = el('button', 'ghost sm', 'Turn off');
+      const off = el('button', 'ghost sm', 'כבה');
       off.type = 'button';
       off.addEventListener('click', async () => { off.disabled = true; await FlowStorage.setLocalLmServer(Object.assign({}, cfg, { enabled: false })); await renderSurfaces(); });
       acts.appendChild(off);
@@ -1493,6 +1955,7 @@
     row.appendChild(inputs);
     row.appendChild(acts);
     row.appendChild(note);
+    if (gen !== surfaceGen) return;
     host.appendChild(row);
   }
 
@@ -1575,16 +2038,23 @@
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
   // with a property for its wiring, not a let: it runs during init.
   const SURFACE_COPY = {
-    whatsapp: 'Reads your one-to-one chats, only to see whether something you asked was answered. Never sends, types or opens anything; groups, lists and channels are ignored. Experimental: WhatsApp can change its page without notice, and Glance goes quiet if it cannot read it.',
-    slack: 'Reads your one-to-one direct messages, only to see whether something you asked was answered. Never sends, types or opens anything; channels, group messages and threads are ignored. Experimental: Slack can change its page without notice, and Glance goes quiet if it cannot read it.',
-    telegram: 'Reads your one-to-one chats with people, only to see whether something you asked was answered. Never sends, types or opens anything; groups, channels and bots are ignored. Experimental: Telegram can change its page without notice, and Glance goes quiet if it cannot read it.'
+    whatsapp: 'קורא שיחות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, רשימות וערוצים לא נקראים. ניסיוני: WhatsApp יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
+    slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
+    telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
   };
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
     if (!host) return;
+    const gen = ++surfaceGen;
     const st = await send({ type: 'flow:surface-status' });
+    if (gen !== surfaceGen) return;
     host.replaceChildren();
-    if (!st || !st.ok) return;
+    function paintWhy() {
+      if (gen !== surfaceGen) return;
+      paintWhyList(host, (state && state.glanceWhyList) || whyRowsFrom(state));
+    }
+    if (!st || !st.ok) { paintWhy(); return; }
+    try {
     for (const id of Object.keys(st.surfaces || {})) {
       if (id === 'outlook') continue; // managed by the Outlook row (connect registers the OWA chip)
       const s = st.surfaces[id];
@@ -1592,23 +2062,23 @@
       const top = el('div', 'wait-top');
       top.appendChild(el('span', 'wait-who', s.label));
       const bad = s.enabled && s.health && s.health.ok === false;
-      top.appendChild(el('span', 'wait-state' + (bad ? '' : s.enabled ? ' ok' : ''), s.enabled ? (bad ? 'On, but its page is not recognised' : 'On') : 'Off'));
+      top.appendChild(el('span', 'wait-state' + (bad ? '' : s.enabled ? ' ok' : ''), s.enabled ? (bad ? 'פעיל, אבל הדף לא מזוהה' : 'פעיל') : 'כבוי'));
       row.appendChild(top);
       row.appendChild(el('div', 'wait-note', SURFACE_COPY[id] || ''));
-      if (s.revoked) row.appendChild(el('div', 'wait-note', 'The browser permission was removed, so this is off.'));
+      if (s.revoked) row.appendChild(el('div', 'wait-note', 'הרשאת הדפדפן הוסרה, אז זה כבוי.'));
       const note = el('p', 'wait-note');
       note.hidden = true;
       const acts = el('div', 'wait-acts');
-      const btn = el('button', 'ghost sm', s.enabled ? 'Turn off' : 'Turn on');
+      const btn = el('button', 'ghost sm', s.enabled ? 'כבה' : 'הפעל');
       btn.type = 'button';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         if (s.enabled) { await send({ type: 'flow:surface-disable', id }); await renderSurfaces(); return; }
         let granted = false;
         try { granted = await chrome.permissions.request({ origins: s.origins }); } catch (e) { granted = false; }
-        if (!granted) { btn.disabled = false; note.hidden = false; note.textContent = 'The browser did not grant access, so it stays off.'; return; }
+        if (!granted) { btn.disabled = false; note.hidden = false; note.textContent = 'הדפדפן לא נתן גישה, אז זה נשאר כבוי.'; return; }
         const r = await send({ type: 'flow:surface-enable', id });
-        if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'Could not turn it on. Try again.'; return; }
+        if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'לא הצלחתי להפעיל. נסה שוב.'; return; }
         await renderSurfaces();
       });
       acts.appendChild(btn);
@@ -1616,10 +2086,15 @@
       row.appendChild(note);
       host.appendChild(row);
     }
-    await renderOutlookRow(host);
-    await renderLocalModelRow(host);
-    await renderHybridRow(host);
-    await renderLadderRow(host);
+    await renderOutlookRow(host, gen);
+    if (gen !== surfaceGen) return;
+    await renderLocalModelRow(host, gen);
+    if (gen !== surfaceGen) return;
+    await renderHybridRow(host, gen);
+    if (gen !== surfaceGen) return;
+    await renderLadderRow(host, gen);
+    } catch (e) { /* a row that throws does not drop the why line */ }
+    paintWhy();
   }
 
   // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.
@@ -1969,7 +2444,7 @@
 
     const mineLoop = FlowFollowUp.isMine(w);
     const clockLoop = FlowFollowUp.isClock(w);
-    const done = el('button', 'ghost sm', clockLoop ? 'Handled' : mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done');
+    const done = el('button', 'ghost sm', showWords(clockLoop ? 'Handled' : mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done'));
     done.type = 'button';
     done.addEventListener('click', async () => {
       await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: clockLoop ? 'manual' : mineLoop ? 'kept' : isPay ? 'paid' : 'manual' });
@@ -1979,7 +2454,7 @@
     });
     acts.appendChild(done);
 
-    const stop = el('button', 'ghost sm', 'Stop tracking');
+    const stop = el('button', 'ghost sm', showWords('Stop tracking'));
     stop.type = 'button';
     stop.addEventListener('click', async () => {
       await FlowStorage.updateWatch(w.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'manual' });
@@ -2169,47 +2644,66 @@
   }
 
   function outlookReceiptRow(entry) {
+    const L = words();
     const proof = entry && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.fetchedBack === true) && entry.connectorId !== 'outlookDraft';
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
     const title = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
       ? FlowDisplay.activityTitle(entry)
       : (entry.actionTitle || entry.label || (proof ? 'Handled.' : 'Reply draft ready in Outlook Drafts. Not sent.'));
-    top.appendChild(el('span', 'log-label', proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.')));
-    top.appendChild(el('span', 'log-kind written', proof ? 'Handled' : 'Draft'));
+    top.appendChild(el('span', 'log-label', showWords(proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.'))));
+    const deleted = entry.glanceDeleted === true || entry.deleted === true;
+    top.appendChild(el('span', 'log-kind written', deleted ? showWords(entry.deletedLine || 'Deleted in To Do') : (proof ? L.kindHandled : L.kindDraft)));
     item.appendChild(top);
-    item.appendChild(el('span', 'log-where', 'From Outlook'));
+    item.appendChild(el('span', 'log-where', L.fromOutlook));
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
     const acts = el('div', 'log-acts');
-    if (entry.url || entry.where) {
-      const a = el('a', 'ghost sm', proof ? 'View' : 'Open draft');
+    if (!deleted && (entry.url || entry.where)) {
+      const a = el('a', 'ghost sm', proof ? L.view : L.openDraft);
       a.href = entry.url || entry.where; a.target = '_blank'; a.rel = 'noopener';
       acts.appendChild(a);
     }
-    const u = el('button', 'ghost sm', 'Undo');
+    const u = el('button', 'ghost sm', L.undo);
     u.type = 'button';
     const note = el('span', 'log-undo-note', '');
     note.hidden = true;
     u.addEventListener('click', async () => {
-      u.disabled = true; u.textContent = 'Undoing…';
+      u.disabled = true; u.textContent = L.undoing;
       note.hidden = true;
       let r = { ok: false };
       try {
         if (proof) {
-          r = await send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref });
+          r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref, created: entry.created }));
         } else {
           const o = outlook();
-          if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
+          if (o && entry.ref) r = await o.undoReplyDraft(entry.created ? { id: entry.ref, created: entry.created } : entry.ref);
           else if (!entry.ref) r = { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
           else r = { ok: false, error: 'not-connected' };
         }
       } catch (err) {
         r = { ok: false, error: String(err && err.message || err) };
       }
-      // Always drop the local receipt — stale cards after Graph delete are the bug.
+      if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
+        u.disabled = false;
+        u.textContent = L.undo;
+        note.textContent = showWords(r.written) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
+        note.hidden = false;
+        if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
+          await FlowStorage.patchGlanceProof(entry.messageId, { undoRefused: 'user-edited', undoLine: note.textContent });
+        }
+        return;
+      }
+      const todoUndo = proof && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.system === 'microsoft/todo');
+      if (todoUndo && !(r && r.ok && r.fetchedBack === true)) {
+        u.disabled = false;
+        u.textContent = L.undo;
+        note.textContent = showWords((r && r.written) || 'Still there — the To Do task was not removed.');
+        note.hidden = false;
+        return;
+      }
       if (proof && (entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.system === 'microsoft/onedrive') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
         await FlowStorage.markOnedriveFileUndone(entry.messageId, entry.ref, entry.threadId);
-      } else if (proof && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+      } else if (todoUndo && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
         await FlowStorage.markMicrosoftTodoUndone(entry.messageId, entry.ref, entry.threadId);
         await reopenOutlookTask(entry);
       } else if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
@@ -2235,8 +2729,15 @@
       await renderLog();
       await notifyOutlookProof();
     });
-    acts.appendChild(u);
+    if (!deleted) acts.appendChild(u);
     item.appendChild(acts);
+    if (entry.undoLine) {
+      note.textContent = entry.undoLine;
+      note.hidden = false;
+    } else if (entry.verifyNote) {
+      note.textContent = entry.verifyNote;
+      note.hidden = false;
+    }
     item.appendChild(note);
     return item;
   }
@@ -2266,6 +2767,10 @@
     const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
       ? await FlowStorage.getActiveOutlookReceipts()
       : [];
+    const expired = (typeof FlowStorage.getExpiredLoops === 'function')
+      ? await FlowStorage.getExpiredLoops()
+      : [];
+    if (typeof FlowStillOpen.panelLoops === 'function') return FlowStillOpen.panelLoops(pending, receipts, expired);
     const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
     const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
     return { openOnly: openOnly, receipts: receipts };
@@ -2280,8 +2785,11 @@
     loops = await visibleLoops();
     const openOnly = loops.openOnly;
     const receipts = loops.receipts;
-    const total = openOnly.length + receipts.length;
-    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: total });
+    const expired = Array.isArray(loops.expired) ? loops.expired : [];
+    // The badge counts work that is still open. An expired deadline stays
+    // in the list as a record, and it does not ask for another Do It.
+    const openCount = openOnly.length + receipts.length;
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: openCount });
     for (const item of openOnly) {
       FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: item.messageId })
         .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
@@ -2290,13 +2798,18 @@
     const host = document.getElementById('open-list');
     const empty = document.getElementById('open-empty');
     host.replaceChildren();
-    empty.hidden = total > 0;
+    const priorExpired = document.querySelector && document.querySelector('#loops-expired');
+    if (priorExpired && priorExpired.parentNode && priorExpired.parentNode.removeChild) priorExpired.parentNode.removeChild(priorExpired);
+    // Expired rows are not open work. The empty line stays when nothing is still open.
+    empty.hidden = openCount > 0;
     // Suggested and Added are list headings, including a single Do It and a
     // Handled row that has no step list. The chip alone is not the heading.
     function loopsHeading(which) {
       const row = el('div', 'loops-section act-section');
       row.setAttribute('data-glance-section', which);
-      row.appendChild(el('span', 'acts-label', which === 'added' ? 'Added' : 'Suggested'));
+      const Lw = words();
+      const title = which === 'expired' ? Lw.expired : (which === 'added' ? Lw.added : Lw.suggested);
+      row.appendChild(el('span', 'acts-label', title));
       return row;
     }
     function hasAdded(entry) {
@@ -2318,26 +2831,63 @@
     }
     receipts.forEach((entry) => place(entry, outlookReceiptRow(entry)));
     openOnly.forEach((entry) => place(entry, openRow(entry)));
-    // A row that carries a step list already starts with its own Suggested or Added heading (src/step-kit.js). The Loops heading is
-    // for lists that have none (one Do It, one Handled row), so the same heading never shows twice.
-    const ownsHeading = (node, which) => Boolean(node && node.querySelector && node.querySelector('[data-glance-section="' + which + '"]'));
+    // The list owns Suggested and Added. A step list inside a card used to
+    // repeat that word (src/step-kit.js). The card keeps its steps. The
+    // heading stays once, above the cards.
+    function dropRepeatedHeading(node, which) {
+      if (!node || !node.children) return;
+      const kids = Array.prototype.slice.call(node.children);
+      for (let i = 0; i < kids.length; i++) {
+        const child = kids[i];
+        const section = child.getAttribute && child.getAttribute('data-glance-section');
+        if (section === which) {
+          if (node.removeChild) node.removeChild(child);
+          continue;
+        }
+        dropRepeatedHeading(child, which);
+      }
+    }
     if (suggested.length) {
-      if (!ownsHeading(suggested[0], 'suggested')) host.appendChild(loopsHeading('suggested'));
-      suggested.forEach((node) => host.appendChild(node));
+      host.appendChild(loopsHeading('suggested'));
+      suggested.forEach((node) => {
+        dropRepeatedHeading(node, 'suggested');
+        host.appendChild(node);
+      });
     }
     if (added.length) {
-      if (!ownsHeading(added[0], 'added')) host.appendChild(loopsHeading('added'));
-      added.forEach((node) => host.appendChild(node));
+      host.appendChild(loopsHeading('added'));
+      added.forEach((node) => {
+        dropRepeatedHeading(node, 'added');
+        host.appendChild(node);
+      });
+    }
+    if (expired.length) {
+      // Collapsed, and after Suggested and Added. It never replaces those headings.
+      const box = document.createElement('details');
+      box.id = 'loops-expired';
+      box.className = 'loops-section loops-expired';
+      box.setAttribute('data-glance-section', 'expired');
+      const sum = document.createElement('summary');
+      sum.className = 'acts-label';
+      sum.textContent = words().expired;
+      box.appendChild(sum);
+      expired.forEach((entry) => box.appendChild(expiredRow(entry)));
+      const parent = empty && empty.parentNode;
+      if (parent && parent.appendChild) {
+        if (empty.nextSibling && parent.insertBefore) parent.insertBefore(box, empty.nextSibling);
+        else parent.appendChild(box);
+      } else host.appendChild(box);
     }
     } finally { endRender(); }
   }
 
   function when(ts) {
     const mins = Math.round((Date.now() - ts) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return mins + 'm ago';
+    const Lw = words();
+    if (mins < 1) return Lw.justNow;
+    if (mins < 60) return fillWords(Lw.minsAgo, { n: mins });
     const hrs = Math.round(mins / 60);
-    if (hrs < 24) return hrs + 'h ago';
+    if (hrs < 24) return fillWords(Lw.hrsAgo, { n: hrs });
     return new Date(ts).toLocaleDateString();
   }
 
@@ -2628,6 +3178,7 @@
 
   async function renderLog() {
     beginRender();
+    const revAtLog = whyRev;
     try {
     await ensureOutlookMigrated();
     const s = await FlowStorage.get();
@@ -2648,6 +3199,8 @@
     const rows = activityRows(s.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
+    const whyNow = (revAtLog !== whyRev && state) ? ((state.glanceWhyList) || whyRowsFrom(state)) : whyRowsFrom(s);
+    paintWhyList(host, whyNow);
     } finally { endRender(); }
   }
 
@@ -2707,33 +3260,37 @@
     top.appendChild(el('span', 'log-label', rowTitle));
     // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
-    const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
+    const Lw = words();
+    const KIND_LABEL = { written: Lw.kindHandled, undone: Lw.kindUndone, clicked: Lw.kindClicked, dismissed: Lw.kindDismissed };
     const draftWrite = e.kind === 'written' && e.connectorId === 'outlookDraft';
-    top.appendChild(el('span', 'log-kind ' + e.kind, draftWrite ? 'Draft' : (KIND_LABEL[e.kind] || e.kind)));
+    top.appendChild(el('span', 'log-kind ' + e.kind, draftWrite ? Lw.kindDraft : (KIND_LABEL[e.kind] || e.kind)));
     item.appendChild(top);
 
-    if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
+    if (e.where) item.appendChild(el('span', 'log-where', Lw.writtenTo + e.where));
+    if (e.kind === 'undone' && (e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowReceipt !== 'undefined' && FlowReceipt.todoUiCacheLine) {
+      item.appendChild(el('span', 'log-where', FlowReceipt.todoUiCacheLine()));
+    }
     item.appendChild(el('span', 'when', when(e.ts)));
 
     if (e.kind === 'written' && (e.url || e.ref)) {
       const acts = el('div', 'log-acts');
       let undoNote = null;
       if (e.url) {
-        const link = e.connectorId === 'outlookCalendar' ? 'Open event' : (e.connectorId === 'outlookDraft' ? 'Open draft' : 'View');
+        const link = e.connectorId === 'outlookCalendar' ? Lw.openEvent : (e.connectorId === 'outlookDraft' ? Lw.openDraft : Lw.show);
         const a = el('a', 'ghost sm', link);
         a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
         acts.appendChild(a);
       }
       if (e.ref) {
         const hintLine = FlowReceipt.undoHint(e.where ? [e.where] : []);
-        const u = el('button', 'ghost sm', 'Undo');
+        const u = el('button', 'ghost sm', Lw.undo);
         u.type = 'button';
         u.setAttribute('aria-label', hintLine);
         const note = el('span', 'log-undo-note', hintLine);
         undoNote = note;
         u.addEventListener('click', async () => {
           if (isComputerActivityRow(e) && typeof FlowStorage.markComputerUndone === 'function') {
-            u.textContent = 'Undoing…';
+            u.textContent = Lw.undoing;
             u.disabled = true;
             const marked = await FlowStorage.markComputerUndone(e.messageId, e.ref, e.threadId);
             if (marked && marked.hit && marked.stayedHandled === false) {
@@ -2745,8 +3302,8 @@
               await renderLog();
               if (typeof renderOpen === 'function') await renderOpen();
             } else {
-              const line = 'Undo unavailable.';
-              u.textContent = 'Undo';
+              const line = Lw.undoUnavailable;
+              u.textContent = Lw.undo;
               u.disabled = false;
               u.setAttribute('aria-label', line);
               note.textContent = line;
@@ -2754,10 +3311,11 @@
             }
             return;
           }
-          u.textContent = 'Undoing…';
+          u.textContent = Lw.undoing;
           u.disabled = true;
-          const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
-          if (r && r.ok) {
+          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
+          const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
+          if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
             const isOutlookCalendar = e.connectorId === 'outlookCalendar';
             if (isOutlookDraft && typeof FlowStorage.markOutlookDraftUndone === 'function') {
@@ -2789,8 +3347,10 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
-            u.textContent = 'Undo';
+            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
+              ? r.written
+              : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
+            u.textContent = Lw.undo;
             u.disabled = false;
             u.setAttribute('aria-label', line);
             note.textContent = line;

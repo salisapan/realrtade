@@ -54,6 +54,7 @@ import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitment
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
+import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -254,6 +255,57 @@ async function registerSurfaceNow(id) {
   return { ok: true, registered: !same, injected };
 }
 
+// What to do with an Outlook tab after the service worker returns.
+// A live script is asked to look again. An empty page is injected.
+// A dead script is left in place: reloading the tab would wipe a message
+// the person is still writing. The page paints the refresh line itself.
+// If that line is missing, the icon badge is the fallback. A window that
+// is not a normal browser window is left alone.
+function recoverOutlookTab(probe) {
+  const windowType = probe && probe.windowType;
+  // "missing" is a failed window lookup, not a popup. Only a known
+  // non-browser window is left alone.
+  if (windowType && windowType !== 'normal' && windowType !== 'missing') return 'skip';
+  // A fresh injection has its own chrome.runtime.id. That is not the page
+  // script. Only a ping the existing script answers means it is still live.
+  if (probe && probe.pingOk) return 'rescan';
+  if (probe && probe.hasPage && probe.refreshShown) return 'leave';
+  if (probe && probe.hasPage) return 'ask';
+  return 'inject';
+}
+
+async function noteOutlookNeedsRefresh(tabId) {
+  try {
+    const cur = await chrome.storage.local.get({ glanceOutlookRefresh: {} });
+    const map = Object.assign({}, (cur && cur.glanceOutlookRefresh) || {});
+    map[String(tabId)] = true;
+    await chrome.storage.local.set({ glanceOutlookRefresh: map });
+  } catch (e) { /* the icon badge still marks the tab */ }
+  try {
+    if (chrome.action && typeof chrome.action.setBadgeText === 'function') {
+      chrome.action.setBadgeText({ text: '!', tabId: tabId });
+      if (typeof chrome.action.setBadgeBackgroundColor === 'function') {
+        chrome.action.setBadgeBackgroundColor({ color: '#123ccb', tabId: tabId });
+      }
+    }
+  } catch (e) { /* the popup still reads the stored flag */ }
+  console.warn('Glance: outlook tab ' + tabId + ' needs a manual refresh');
+}
+
+async function clearOutlookNeedsRefresh(tabId) {
+  try {
+    const cur = await chrome.storage.local.get({ glanceOutlookRefresh: {} });
+    const map = Object.assign({}, (cur && cur.glanceOutlookRefresh) || {});
+    delete map[String(tabId)];
+    await chrome.storage.local.set({ glanceOutlookRefresh: map });
+  } catch (e) { /* the flag expires when the page is fresh */ }
+  try {
+    if (chrome.action && typeof chrome.action.setBadgeText === 'function') {
+      chrome.action.setBadgeText({ text: '', tabId: tabId });
+    }
+  } catch (e) { /* the number badge can return */ }
+}
+
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
 async function injectSurfaceIntoOpenTabs(id, script, stamp) {
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
@@ -263,6 +315,79 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp) {
   let n = 0;
   for (const tab of tabs || []) {
     if (!tab || typeof tab.id !== 'number') continue;
+    if (id === 'outlook') {
+      let windowType = 'normal';
+      try {
+        if (chrome.windows && chrome.windows.get && tab.windowId != null) {
+          const win = await chrome.windows.get(tab.windowId);
+          windowType = (win && win.type) || 'normal';
+        }
+      } catch (e) { windowType = 'missing'; }
+      let pingOk = false;
+      try {
+        const pong = await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-ping' });
+        pingOk = Boolean(pong && pong.ok);
+      } catch (e) { pingOk = false; }
+      if (windowType && windowType !== 'normal' && windowType !== 'missing') continue;
+      if (pingOk) {
+        try { await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }); } catch (e) { /* the ping just answered */ }
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      let seen = { globals: false, refreshShown: false };
+      try {
+        const probe = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            // DOM only. This function runs in a new isolated world, so
+            // chrome.runtime.id here is the new extension, not the page script.
+            let line = null;
+            let marked = false;
+            try {
+              line = document.querySelector('[data-glance-refresh]');
+              const root = document.documentElement;
+              marked = Boolean(root && root.getAttribute('data-glance-outlook')) ||
+                Boolean(document.querySelector('.flow-chip-host, .flow-why-not'));
+            } catch (e) { line = null; marked = false; }
+            return { globals: marked || Boolean(line), refreshShown: Boolean(line) };
+          }
+        });
+        seen = (probe && probe[0] && probe[0].result) || seen;
+      } catch (e) { seen = { globals: false, refreshShown: false }; }
+      const action = recoverOutlookTab({
+        windowType: windowType,
+        pingOk: false,
+        hasPage: Boolean(seen.globals),
+        refreshShown: Boolean(seen.refreshShown)
+      });
+      if (action === 'rescan') {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } }
+          });
+        } catch (e) { /* the next open looks again */ }
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      if (action === 'leave') {
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      if (action === 'ask') {
+        await noteOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      try {
+        if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+        n++;
+      } catch (e) {
+        // A second inject cannot redeclare the dead script. Leave the tab.
+        await noteOutlookNeedsRefresh(tab.id);
+      }
+      continue;
+    }
     try {
       const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
         let alive = false;
@@ -292,7 +417,9 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp) {
       if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
       n++;
-    } catch (e) { console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e); }
+    } catch (e) {
+      console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e);
+    }
   }
   if (n) console.info('Glance: ' + id + ' injected into ' + n + ' open tab(s)');
   return n;
@@ -339,6 +466,7 @@ async function restoreSurfaces() {
 }
 restoreSurfaces();
 chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { restoreSurfaces(); });
 
 async function surfaceStatus() {
   const surfaces = await readSurfaces();
@@ -3393,6 +3521,18 @@ const OUTLOOK_KEEPALIVE_MINUTES = 30;
 // minutes and, from hour 16 of the 24-hour single-page-application window, renews silently (prompt=none, no window) so a
 // new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
 // staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
+function outlookLaunchInteractive(url) {
+  return new Promise((resolve) => {
+    try {
+      chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => {
+        const err = chrome.runtime.lastError;
+        if (err || !r) resolve(null);
+        else resolve(r);
+      });
+    } catch (e) { resolve(null); }
+  });
+}
+
 function outlookLaunchSilent(url) {
   return new Promise((resolve) => {
     try {
@@ -3410,6 +3550,83 @@ function outlookPrimaryHint(auth) {
   const opaque = /^outlook_[0-9a-f]+@outlook\.com$/i;
   const list = [auth.account && auth.account.address, auth.account && auth.account.mail].concat(auth.ownAddresses || []).filter(Boolean).map((a) => String(a).toLowerCase());
   return list.find((a) => !opaque.test(a)) || list[0] || null;
+}
+
+// Hold asks for Calendars.ReadWrite only. Already granted scopes stay on the
+// request so Mail is not replaced. This does not call connect(), which clears
+// judgment. No new Chrome permission: launchWebAuthFlow is already the sign-in.
+async function outlookConsentScope(msg) {
+  const A = globalThis.FlowOutlookAuth;
+  const cfg = globalThis.FlowOutlookConfig;
+  if (!A || !cfg || typeof A.signIn !== 'function' || typeof cfg.incrementalConsentScopes !== 'function') {
+    return { ok: false, reason: 'not-configured' };
+  }
+  const scope = String((msg && msg.scope) || '');
+  const todoScope = scope === 'Tasks.ReadWrite';
+  const calendarScope = scope === 'Calendars.ReadWrite';
+  if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
+  const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = bag[OUTLOOK_AUTH_KEY];
+  if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
+  const scopes = cfg.incrementalConsentScopes(
+    [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []),
+    scope
+  );
+  if (!scopes) return { ok: false, reason: 'scope-refused' };
+  const r = await A.signIn({
+    fetch: (u, i) => fetch(u, i),
+    now: () => Date.now(),
+    random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+    sha256: (b) => crypto.subtle.digest('SHA-256', b),
+    launch: outlookLaunchInteractive
+  }, cfg, chrome.identity.getRedirectURL(), {
+    scopes: scopes,
+    prompt: 'consent',
+    loginHint: outlookPrimaryHint(auth)
+  });
+  if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
+  // The scopes we asked for are not a grant. The new token's scp (or its
+  // scope string, never the word unknown) is. A consent window that comes
+  // back without Calendars.ReadWrite does not count.
+  const Cal = globalThis.FlowOutlookCalendar;
+  const effective = (Cal && typeof Cal.scopesFromToken === 'function') ? Cal.scopesFromToken(r.token) : null;
+  const names = Array.isArray(effective) ? effective : [];
+  const has = names.some((s) => String(s).toLowerCase() === scope.toLowerCase());
+  if (calendarScope && (!Cal || !Cal.hasWriteScope(effective))) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (todoScope && !has) return { ok: false, reason: 'tasks-not-granted' };
+  const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
+  const policyKey = todoScope ? 'glanceTodoConsent' : 'glanceCalendarConsent';
+  const stored = {
+    [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {
+      token: r.token,
+      requestedScopes: scopes
+    })
+  };
+  stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
+  await chrome.storage.local.set(stored);
+  return { ok: true, policy: policy, scope: scope };
+}
+
+async function outlookReconcileProof(msg) {
+  const ref = (msg && msg.ref && typeof msg.ref === 'object') ? msg.ref : {};
+  const id = (msg && msg.externalId) || ref.externalId || ref.taskId || ref.fileId || ref.itemId || ref.eventId;
+  if (!id) return { ok: false, status: 0, reason: 'no-id' };
+  let url = '';
+  if ((msg && msg.connectorId) === 'outlookCalendar' || ref.eventId) {
+    url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(ref.eventId || id);
+  } else if ((msg && (msg.connectorId === 'onedriveFile' || msg.system === 'microsoft/onedrive')) || ref.fileId) {
+    url = OUTLOOK_GRAPH + '/me/drive/items/' + encodeURIComponent(ref.fileId || ref.itemId || id);
+  } else {
+    const listId = ref.taskListId;
+    if (!listId) return { ok: false, status: 0, reason: 'no-id' };
+    url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId || id);
+  }
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); }
+  catch (e) { return { ok: false, status: 0, reason: 'error' }; }
+  if (!res) return { ok: false, status: 0, reason: 'error' };
+  return { ok: res.ok === true, status: Number(res.status) || 0 };
 }
 
 let outlookSessionBusy = null;
@@ -3575,9 +3792,158 @@ async function outlookPreferredFrom(explicit) {
   }
   return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
 }
+async function outlookDraftMap() {
+  const bag = await chrome.storage.local.get(OUTLOOK_STATE_KEY);
+  const st = bag[OUTLOOK_STATE_KEY] || {};
+  return { st: st, map: Object.assign({}, st.glanceDraftByMessage || {}) };
+}
+async function outlookSaveDraftMap(st, map) {
+  await chrome.storage.local.set({ [OUTLOOK_STATE_KEY]: Object.assign({}, st, { glanceDraftByMessage: map }) });
+}
+function outlookUserEditedLine() {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.userEditedLine) ? N.userEditedLine() : 'You edited this. Undo left it alone.';
+}
+
+function outlookUnconfirmedLine() {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.unconfirmedLine) ? N.unconfirmedLine() : "Couldn't confirm it's unchanged. Undo left it alone.";
+}
+
+function outlookContentKeys() {
+  const N = globalThis.FlowNativeEdit;
+  if (N && Array.isArray(N.CONTENT_KEYS) && N.CONTENT_KEYS.length) return N.CONTENT_KEYS;
+  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'];
+}
+
+// An owned content key is a snapshot, including an explicit null. An empty
+// object and a changeKey-only object are not.
+function outlookHasSnap(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+  const keys = outlookContentKeys();
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(snapshot, keys[i])) return true;
+  }
+  return false;
+}
+
+function outlookEditVerdict(snapshot, live) {
+  const N = globalThis.FlowNativeEdit;
+  if (N && N.compareContent) return N.compareContent(snapshot, live);
+  if (N && N.userEdited && N.userEdited(snapshot, live)) return 'edited';
+  return 'match';
+}
+
+function outlookUnconfirmed() {
+  return { ok: false, reason: 'unconfirmed', written: outlookUnconfirmedLine(), deleted: false };
+}
+
+function outlookCreationSnap(obj) {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.snapshotOf) ? N.snapshotOf(obj) : {};
+}
+
+async function outlookObjectSnap(url, prefer) {
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET', headers: prefer || {} }); }
+  catch (e) { return null; }
+  if (!res || !res.ok) return null;
+  const body = await outlookReadJson(res);
+  return body ? outlookCreationSnap(body) : null;
+}
+
+// The snapshot is a successful GET of the stored object, tried twice.
+// The POST body and the 201 body are not a snapshot. A miss is null,
+// and Undo then says it could not confirm the object is unchanged.
+async function outlookReadSnap(url, prefer) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const snap = await outlookObjectSnap(url, prefer);
+    if (outlookHasSnap(snap)) return snap;
+  }
+  return null;
+}
+
+// A draft verify read fails only when both GETs are not ok. A 200 whose
+// body has no content keys is a read: there is no snapshot, and the card
+// still says the draft is ready. Undo then cannot confirm it is unchanged.
+async function outlookDraftRead(url, prefer) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try { res = await outlookFetch(url, { method: 'GET', headers: prefer || {} }); }
+    catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const body = await outlookReadJson(res);
+    const snap = body ? outlookCreationSnap(body) : null;
+    return { ok: true, snap: outlookHasSnap(snap) ? snap : null };
+  }
+  return { ok: false, snap: null };
+}
+
+function outlookUnverifiedLine() {
+  return "Created, couldn't verify";
+}
+
+const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance';
+
+async function outlookStoredEventSnap(eventId) {
+  return outlookReadSnap(
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT
+  );
+}
+
+// Read the object Glance created. Undo deletes only after this GET succeeds
+// and still matches the creation snapshot. 404 means it is already gone.
+// A 5xx, a network error, a timeout, or a body that will not parse refuses
+// with the unconfirmed line and does not delete. A field that changed is
+// an edit, and that is the only path that says the person edited it.
+async function outlookRefuseIfEdited(url, snapshot, prefer) {
+  if (!outlookHasSnap(snapshot)) return null;
+  let got;
+  try { got = await outlookUndoConfirm(url, prefer); }
+  catch (e) { return outlookUnconfirmed(); }
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (got && got.status === 404) return { ok: true, alreadyGone: true, fetchedBack: true };
+  const readable = got && (got.status === 200 || got.ok === true) && got.reason !== 'verify-timeout';
+  if (!readable) return outlookUnconfirmed();
+  let body = null;
+  try { body = await got.json(); } catch (e) { body = null; }
+  if (!body) return outlookUnconfirmed();
+  const verdict = outlookEditVerdict(snapshot, body);
+  if (verdict === 'edited') {
+    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine(), fetchedBack: true };
+  }
+  if (verdict === 'unconfirmed') return outlookUnconfirmed();
+  return null;
+}
+
 async function outlookDraftWrite(p) {
   const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   if (!incomingId) return { ok: false, reason: 'no-message' };
+  const remembered = await outlookDraftMap();
+  const priorId = remembered.map[String(incomingId)] || '';
+  if (priorId) {
+    const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(priorId) + '?$select=id,isDraft,webLink';
+    outlookAssertNotSend(getUrl);
+    const got = await outlookFetch(getUrl, { method: 'GET' });
+    if (got && got.ok) {
+      let existing = null;
+      try { existing = await got.json(); } catch (e) { existing = null; }
+      if (existing && existing.isDraft !== false) {
+        return {
+          ok: true,
+          ref: existing.id || priorId,
+          where: existing.webLink || null,
+          url: existing.webLink || null,
+          reused: true,
+          reason: 'draft-already',
+          written: 'Reply draft already in Outlook Drafts. Not sent.'
+        };
+      }
+    } else if (!got || got.status === 404) {
+      delete remembered.map[String(incomingId)];
+      await outlookSaveDraftMap(remembered.st, remembered.map);
+    }
+  }
   // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
   // same composer gmailDraftWrite uses (FlowDraftReply.draftBodyText). A ready-made body is only a fallback for older callers.
   let comment = '';
@@ -3604,6 +3970,7 @@ async function outlookDraftWrite(p) {
   outlookAssertNotSend(patchUrl);
   const patchBody = { body: { contentType: 'Text', content: comment } };
   let fromSet = false;
+  let bodyWritten = false;
   if (wantFrom && draft.isDraft !== false && !outlookIsOpaqueMailbox(wantFrom)) {
     patchBody.from = { emailAddress: { address: wantFrom } };
     patchBody.sender = { emailAddress: { address: wantFrom } };
@@ -3611,10 +3978,12 @@ async function outlookDraftWrite(p) {
   if (draft.isDraft !== false) {
     try {
       const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
+      if (pr && pr.ok) bodyWritten = true;
       fromSet = Boolean(pr && pr.ok && patchBody.from);
-      if (pr && !pr.ok && patchBody.from) {
-        // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
-        await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+      // One body write. A refused From does not send the body again.
+      if (!bodyWritten && comment) {
+        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+        bodyWritten = Boolean(bodyOnly && bodyOnly.ok);
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
@@ -3645,18 +4014,38 @@ async function outlookDraftWrite(p) {
     }
     attachmentId = created.id;
   }
-  return {
-    ok: true,
+  const saved = await outlookDraftMap();
+  saved.map[String(incomingId)] = String(draft.id);
+  const keys = Object.keys(saved.map);
+  if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
+  await outlookSaveDraftMap(saved.st, saved.map);
+  const read = await outlookDraftRead(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
+  const base = {
     ref: draft.id,
     where: draft.webLink || null,
     url: draft.webLink || null,
     attachmentId: attachmentId,
-    written: attachmentId
-      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
-      : 'Reply draft ready in Outlook Drafts. Not sent.',
     fromAddress: wantFrom || null,
     fromSet: fromSet
   };
+  if (!read.ok) {
+    return Object.assign({}, base, {
+      ok: true,
+      fetchedBack: false,
+      reason: 'unverified',
+      created: null,
+      proof: null,
+      written: outlookUnverifiedLine()
+    });
+  }
+  return Object.assign({}, base, {
+    ok: true,
+    fetchedBack: read.snap ? true : undefined,
+    created: read.snap,
+    written: attachmentId
+      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+      : 'Reply draft ready in Outlook Drafts. Not sent.'
+  });
 }
 async function outlookFileForDraft(p) {
   if (p.driveFileId) {
@@ -3686,15 +4075,83 @@ async function outlookDeleteDraft(draftId, prefer) {
 // One calendar event for a Family B file-on-hold. The Calendar checkbox asks
 // for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
 // The body never includes attendees, so the write does not invite anyone.
+// A meeting Hold It names a clock. It is one event on the person's calendar.
+// attendees stays empty, so the write does not invite anyone.
+async function outlookMeetingWrite(p) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const meetingScopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : (session.token.grantedScopes);
+  if (!Cal || !Cal.hasWriteScope(meetingScopes)) {
+    return { ok: false, reason: 'calendar-write-not-granted' };
+  }
+  const params = (p && p.params) || {};
+  const dateIso = calendarIsoDate(params.dateIso);
+  const clock = calendarClock(params.hour, params.minute);
+  if (!dateIso || !clock || clock.invalid || clock.absent) {
+    return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
+  }
+  const title = String(params.title || 'Meeting').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting';
+  const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
+  const zone = localTimeZone();
+  const lines = [];
+  if (quote) lines.push(quote);
+  if (p && p.threadUrl) lines.push(String(p.threadUrl));
+  const body = {
+    subject: title,
+    body: { contentType: 'Text', content: lines.join('\n') },
+    start: { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute), timeZone: zone },
+    end: { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone: zone },
+    showAs: 'busy',
+    attendees: []
+  };
+  if ((Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) {
+    return { ok: false, reason: 'refused' };
+  }
+  const url = OUTLOOK_GRAPH + '/me/events';
+  outlookAssertNotSend(url);
+  const res = await outlookFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 403) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  let event = null;
+  try { event = await res.json(); } catch (e) { event = null; }
+  if (!event || typeof event.id !== 'string' || !event.id) {
+    return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
+  }
+  const eventSnap = await outlookStoredEventSnap(event.id);
+  const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
+  const ref = { eventId: event.id, created: eventSnap };
+  const base = {
+    where: 'Outlook Calendar',
+    target: 'your calendar',
+    url: event.webLink || null
+  };
+  if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
+  return Object.assign({
+    ok: true,
+    fetchedBack: true,
+    written: 'Calendar · ' + title + (when ? ' · ' + when : ''),
+    ref: ref
+  }, base);
+}
+
 async function outlookCalendarWrite(p) {
+  const params = (p && p.params) || {};
+  if (params.meeting === true) return outlookMeetingWrite(p);
   const Cal = globalThis.FlowOutlookCalendar;
   if (!Cal || typeof Cal.eventBody !== 'function') return { ok: false, reason: 'not-configured' };
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
-  if (!Cal.hasWriteScope(session.token.grantedScopes)) {
+  const fileScopes = Cal.scopesFromToken ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  if (!Cal.hasWriteScope(fileScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
-  const params = (p && p.params) || {};
   const body = Cal.eventBody({
     dateIso: params.dateIso,
     hour: params.hour,
@@ -3729,23 +4186,44 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  return {
-    ok: true,
+  const eventSnap = await outlookStoredEventSnap(event.id);
+  const ref = { eventId: event.id, created: eventSnap };
+  const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
-    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
-    ref: { eventId: event.id },
     url: event.webLink || null
   };
+  if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
+  return Object.assign({
+    ok: true,
+    fetchedBack: true,
+    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
+    ref: ref
+  }, base);
 }
 
-async function outlookCalendarUndo(ref) {
+function outlookUnverifiedWrite(base, ref) {
+  return Object.assign({}, base, {
+    ok: true,
+    fetchedBack: false,
+    reason: 'unverified',
+    written: outlookUnverifiedLine(),
+    ref: ref,
+    proof: null
+  });
+}
+
+async function outlookCalendarUndo(ref, hint) {
   const Cal = globalThis.FlowOutlookCalendar;
   const id = ref && typeof ref === 'object' ? ref.eventId : ref;
   const req = Cal && Cal.undoRequest(id);
   if (!req || req.method !== 'DELETE' || !/^\/me\/events\/[^/]+$/.test(req.path)) return { ok: false };
   const url = OUTLOOK_GRAPH + req.path;
   outlookAssertNotSend(url);
+  const calSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  if (!outlookHasSnap(calSnap)) return outlookUnconfirmed();
+  const edited = await outlookRefuseIfEdited(url, calSnap);
+  if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del.notConnected) return { ok: false, reason: 'not-connected' };
   if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Calendar event removed.' };
@@ -3777,7 +4255,12 @@ function outlookTodoListIdFrom(body) {
 
 async function outlookTaskWrite(p) {
   const session = await outlookSession({});
-  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  if (!session || !session.ok || !session.token) {
+    if (session && (session.needsSignIn || session.error === 'expired' || session.error === 'login_required')) {
+      return { ok: false, reason: 'token-expired' };
+    }
+    return { ok: false, reason: 'not-connected' };
+  }
   const scope = outlookHasTasksScope(session.token);
   if (scope === false) return { ok: false, reason: 'tasks-not-granted' };
 
@@ -3785,7 +4268,8 @@ async function outlookTaskWrite(p) {
   outlookAssertNotSend(listUrl);
   const listed = await outlookFetch(listUrl, { method: 'GET' });
   if (listed && listed.notConnected) return { ok: false, reason: 'not-connected' };
-  if (listed && (listed.status === 401 || listed.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (listed && listed.status === 401) return { ok: false, reason: 'token-expired' };
+  if (listed && listed.status === 403) return { ok: false, reason: 'tasks-not-granted' };
   if (!listed || !listed.ok) return { ok: false, reason: 'http-' + ((listed && listed.status) || 0) };
   let lists = null;
   try { lists = await listed.json(); } catch (e) { lists = null; }
@@ -3802,6 +4286,18 @@ async function outlookTaskWrite(p) {
   const body = { title: title };
   if (notes) body.body = { contentType: 'text', content: notes };
   if (close.dueIso) body.dueDateTime = { dateTime: close.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+  const reminder = p && p.params && p.params.reminder;
+  if (reminder) {
+    const remDay = calendarIsoDate(reminder.dateIso);
+    const remClock = calendarClock(reminder.hour, reminder.minute);
+    if (remDay && remClock && !remClock.invalid && !remClock.absent) {
+      body.isReminderOn = true;
+      body.reminderDateTime = {
+        dateTime: calendarDateTime(remDay, remClock.hour, remClock.minute),
+        timeZone: localTimeZone()
+      };
+    }
+  }
 
   const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
   outlookAssertNotSend(postUrl);
@@ -3811,7 +4307,8 @@ async function outlookTaskWrite(p) {
     body: JSON.stringify(body)
   });
   if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
-  if (res && (res.status === 401 || res.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (res && res.status === 401) return { ok: false, reason: 'token-expired' };
+  if (res && res.status === 403) return { ok: false, reason: 'tasks-not-granted' };
   if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
   let task = null;
   try { task = await res.json(); } catch (e) { task = null; }
@@ -3823,10 +4320,13 @@ async function outlookTaskWrite(p) {
   if (!task || typeof task.id !== 'string' || !task.id) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
-  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id, created: null };
   const fetched = await outlookTaskFetchBack(taskListId, task.id);
-  if (!fetched.ok) {
-    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  if (fetched && fetched.task) ref.created = outlookCreationSnap(fetched.task);
+  if (!fetched.ok || !outlookHasSnap(ref.created)) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
+      written: outlookUnverifiedLine()
+    });
   }
   const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
   if (link) base.url = link;
@@ -3843,7 +4343,7 @@ async function outlookTaskWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
-async function outlookTaskFetchBack(taskListId, taskId) {
+async function outlookTaskFetchOnce(taskListId, taskId) {
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
   let res;
@@ -3859,30 +4359,104 @@ async function outlookTaskFetchBack(taskListId, taskId) {
   return { ok: true, task: body };
 }
 
-async function outlookTaskUndo(ref) {
+async function outlookTaskFetchBack(taskListId, taskId) {
+  let last = { ok: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    last = await outlookTaskFetchOnce(taskListId, taskId);
+    if (last.ok) return last;
+  }
+  return last;
+}
+
+async function outlookTaskUndo(ref, hint) {
   const taskId = ref && (ref.externalId || ref.taskId);
   const listId = ref && ref.taskListId;
   if (!taskId || !listId) return { ok: false };
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
+  const taskSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  if (!outlookHasSnap(taskSnap)) return outlookUnconfirmed();
+  const edited = await outlookRefuseIfEdited(url, taskSnap);
+  if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
-  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'To Do task removed.' };
-  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  if (!(del && (del.ok || del.status === 204 || del.status === 404))) {
+    return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  }
+  let got;
+  try {
+    got = await outlookUndoConfirm(url);
+  } catch (e) {
+    return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() };
+  }
+  if (got && got.reason === 'verify-timeout') return got;
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  const cache = (globalThis.FlowReceipt && FlowReceipt.todoUiCacheLine)
+    ? FlowReceipt.todoUiCacheLine()
+    : 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.';
+  if (got && got.status === 404) {
+    return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. ' + cache };
+  }
+  // A 200 means the task is still there. A deleted flag on that body is not a delete.
+  if (got && (got.status === 200 || got.ok)) {
+    return { ok: false, reason: 'still-present', fetchedBack: true, written: 'Still there — the To Do task was not removed.' };
+  }
+  return { ok: false, reason: 'http-' + ((got && got.status) || 0) };
+}
+
+function outlookVerifyTimeoutLine() {
+  return (globalThis.FlowReceipt && FlowReceipt.verifyTimeoutLine)
+    ? FlowReceipt.verifyTimeoutLine()
+    : "Couldn't verify, try again";
+}
+
+// The confirming GET is the read-back. If it does not answer, Undo stops.
+// A late 200 must not become Undone after this wait.
+function outlookUndoConfirm(url, prefer) {
+  const waitMs = 8000;
+  let timer = null;
+  const timed = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ verifyTimeout: true }), waitMs);
+  });
+  return Promise.race([
+    outlookFetch(url, { method: 'GET', headers: prefer || {} }).catch(() => ({ status: 0, ok: false })),
+    timed
+  ]).then((got) => {
+    if (timer != null) clearTimeout(timer);
+    if (got && got.verifyTimeout) {
+      return { ok: false, reason: 'verify-timeout', fetchedBack: false, written: outlookVerifyTimeoutLine() };
+    }
+    return got;
+  }, (e) => {
+    if (timer != null) clearTimeout(timer);
+    throw e;
+  });
 }
 
 async function outlookDraftUndo(ref, hint) {
-  if (!ref) return { ok: false };
+  const id = typeof ref === 'string' ? ref : (ref && (ref.draftId || ref.id));
+  if (!id) return { ok: false };
+  const snapshot = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
+  if (!outlookHasSnap(snapshot)) return outlookUnconfirmed();
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,subject,body,toRecipients,ccRecipients,importance,categories';
   outlookAssertNotSend(getUrl);
-  const got = await outlookFetch(getUrl, { headers: prefer });
-  if (got.notConnected) return { ok: false, reason: 'not-connected' };
-  if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
-  if (!got.ok) return { ok: false, reason: 'http-' + got.status };
-  const msg = await got.json();
-  if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
-  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
+  let got;
+  try { got = await outlookUndoConfirm(getUrl, prefer); }
+  catch (e) { return outlookUnconfirmed(); }
+  if (got && got.reason === 'verify-timeout') return outlookUnconfirmed();
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (got && got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+  if (!got || !got.ok) return outlookUnconfirmed();
+  let msg = null;
+  try { msg = await got.json(); } catch (e) { msg = null; }
+  if (!msg) return outlookUnconfirmed();
+  if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  const verdict = outlookEditVerdict(snapshot, msg);
+  if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  if (verdict === 'unconfirmed') return outlookUnconfirmed();
+  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id);
   outlookAssertNotSend(delUrl);
   const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });
   if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
@@ -4000,7 +4574,12 @@ async function outlookFileWrite(p) {
   const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
   if (previousVersionId) ref.previousVersionId = previousVersionId;
   const fetched = await outlookFileFetchBack(itemId);
-  if (!fetched.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  if (fetched && fetched.item) ref.editSnap = outlookCreationSnap(fetched.item);
+  if (!fetched.ok || !outlookHasSnap(ref.editSnap)) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
+      written: outlookUnverifiedLine()
+    });
+  }
   const link = fetched.item && fetched.item.webUrl && String(fetched.item.webUrl).slice(0, 8) === 'https://' ? fetched.item.webUrl : null;
   if (link) base.url = link;
   const proof = Proof && Proof.buildProof({
@@ -4014,7 +4593,7 @@ async function outlookFileWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
-async function outlookFileFetchBack(itemId) {
+async function outlookFileFetchOnce(itemId) {
   const Files = globalThis.FlowOnedriveFile;
   if (!Files || !itemId) return { ok: false };
   const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
@@ -4027,10 +4606,23 @@ async function outlookFileFetchBack(itemId) {
   return { ok: true, item: body };
 }
 
+async function outlookFileFetchBack(itemId) {
+  let last = { ok: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    last = await outlookFileFetchOnce(itemId);
+    if (last.ok) return last;
+  }
+  return last;
+}
+
 async function outlookFileUndo(ref) {
   const Files = globalThis.FlowOnedriveFile;
   const itemId = ref && (ref.externalId || ref.fileId || ref.itemId);
   if (!Files || !itemId) return { ok: false };
+  const itemUrl = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(itemUrl);
+  const edited = await outlookRefuseIfEdited(itemUrl, ref && ref.editSnap);
+  if (edited) return edited;
   if (ref.created === false && ref.previousVersionId) {
     const url = OUTLOOK_GRAPH + Files.restorePath(itemId, ref.previousVersionId);
     outlookAssertNotSend(url);
@@ -4193,6 +4785,15 @@ function reply(sendResponse, promise) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  // The person pressed רענן. Recovery never reloads a tab on its own.
+  if (msg.type === 'flow:outlook-refresh-tab') {
+    const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
+    if (typeof tabId === 'number' && chrome.tabs && typeof chrome.tabs.reload === 'function') {
+      try { chrome.tabs.reload(tabId); } catch (e) { /* the browser tab can be refreshed by hand */ }
+    }
+    try { sendResponse({ ok: true }); } catch (e) { /* the popup closed */ }
+    return true;
+  }
 
   const hybridAnswer = hybrid.handle(msg, sender);
   if (hybridAnswer) return reply(sendResponse, hybridAnswer);
@@ -4276,6 +4877,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
   if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
+  if (msg.type === 'flow:outlook-consent-scope') return reply(sendResponse, outlookConsentScope(msg));
+  if (msg.type === 'flow:reconcile-proof') return reply(sendResponse, outlookReconcileProof(msg));
   if (msg.type === 'flow:outlook-keepalive') {
     if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
     return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());

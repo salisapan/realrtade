@@ -31,7 +31,7 @@ test('the steps list records Queued, Preparing, Verifying, and Verified', async 
   await expect.poll(async () => order(await host.getAttribute('data-glance-states'))).toBe(true);
 });
 
-test('a missed read-back stays Couldn\'t confirm and Retry then verifies', async ({ glance }) => {
+test('a missed To Do read-back shows Created, couldn\'t verify, with Undo, and is not Handled', async ({ glance }) => {
   await glance.seedOutlook();
   await glance.setScenario({
     inbox: [], sent: [], messages: {}, attachments: {}, conversation: [], todoVerifyFail: true
@@ -43,17 +43,13 @@ test('a missed read-back stays Couldn\'t confirm and Retry then verifies', async
     body: DANA
   });
   await page.locator('#ReadingPaneContainerId button.flow-chip').click();
-  const list = page.locator('#ReadingPaneContainerId .flow-step-list');
-  await expect(list.getByText(/Couldn.t confirm · Retry/)).toBeVisible();
-  await expect(page.locator('#ReadingPaneContainerId .flow-chip-handled')).toHaveCount(0);
-  await glance.evaluateWorker(() => { globalThis.__glanceE2e.scenario.todoVerifyFail = false; });
-  await page.locator('#ReadingPaneContainerId .ss-retry').click();
   const host = page.locator('#ReadingPaneContainerId .flow-chip-host');
-  await expect(host.locator('.flow-chip-handled')).toHaveText('Handled.');
-  await expect.poll(async () => {
-    const trail = await host.getAttribute('data-glance-states');
-    return order(trail) && String(trail).indexOf('failed') >= 0;
-  }).toBe(true);
+  await expect(host.locator('.flow-chip-handled')).toHaveText("Created, couldn't verify");
+  await expect(host.getByText('Handled.')).toHaveCount(0);
+  await host.locator('button.flow-chip-undo').click();
+  await expect(host.getByText(/Couldn't confirm it's unchanged/)).toBeVisible();
+  const calls = await glance.apiCalls();
+  expect(calls.some((c) => c.method === 'DELETE' && /\/tasks\//.test(c.url))).toBe(false);
 });
 
 test('Add step marks a task Added and a loose line Manual', async ({ glance }) => {

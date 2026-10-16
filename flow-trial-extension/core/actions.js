@@ -513,6 +513,12 @@ const FlowActions = (() => {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
     if (intent.googleClose) return planGoogle(intent, ctx);
+    // The classifier lives on the intent, and planFor calls it again when
+    // the mail text is in hand. Either one vetoes the meeting plan.
+    const vetoText = ctx.text;
+    const vetoed = Boolean(intent.signals && intent.signals.meetingVeto) ||
+      Boolean(vetoText && typeof FlowIntent !== 'undefined' && typeof FlowIntent.meetingPlanVeto === 'function' && FlowIntent.meetingPlanVeto(vetoText));
+    if (intent.type === 'event' && vetoed) return null;
 
     const e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);

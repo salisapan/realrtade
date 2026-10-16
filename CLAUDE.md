@@ -6,7 +6,7 @@
 
 **Standing constraints.** Glance is not only a Gmail add-on (Gmail is the entry surface). Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox" (owner, 2026-10-09). Pro is the personal depth
 layer, not team or enterprise (that is Flow). Waiting or tracking alone is not success; true close is. Free must stay genuinely useful, never a dead demo. Zero-Prompt is sacred. Multi-platform means
-execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Do not describe Glance as "a Chrome
+execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Glance never blocks the user: a draft, task, event, or file it created stays editable, and Undo leaves an edited one alone. Do not describe Glance as "a Chrome
 extension for Gmail", "an AI email assistant" or "a smart inbox", and never describe tracking or a prepared draft as completion. Full rules, required framing and before/after examples: `docs/product-identity.md`.
 
 **Every report keeps two parts apart.** *Product definition (vision-locked)*: the block above, unchanged by what the code does today. *Current implementation status (code reality)*: what ships in this

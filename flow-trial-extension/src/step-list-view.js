@@ -86,13 +86,23 @@ const FlowStepListView = (() => {
     return live.length === 1 && live[0].kind === 'attachmentSave' && filesOf(live[0]).length <= 1;
   }
 
-  function paintModel(row, surface) {
+  function displayTag(tag, L) {
+    if (tag === 'Suggested') return (L && L.suggested) || tag;
+    if (tag === 'Added') return (L && L.added) || tag;
+    if (tag === 'Manual' || tag === 'Manual · for you') return (L && L.manual) || tag;
+    if (tag === 'after Approve') return (L && L.afterApprove) || tag;
+    return tag || '';
+  }
+
+  function paintModel(row, surface, labels) {
+    const L = labels || { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };
     const tool = toolOf(row, surface);
+    const app = tool.app === 'Calendar' ? (L.calendarApp || tool.app) : (tool.app === 'You' ? (L.youApp || tool.app) : tool.app);
     if (row.manual || row.role === 'manual') {
-      return { kind: 'manual', id: row.id, text: row.copy, tag: 'Manual · for you' };
+      return { kind: 'manual', id: row.id, text: row.copy, tag: L.manual || 'Manual · for you' };
     }
     if (row.role === 'close') {
-      return { kind: 'close', id: row.id, text: row.copy, tag: row.tag || 'after Approve', st: row.state ? stateClass(row.state) : '' };
+      return { kind: 'close', id: row.id, text: row.copy, tag: row.tag || L.afterApprove || 'after Approve', st: row.state ? stateClass(row.state) : '' };
     }
     const files = filesOf(row);
     const failed = row.state === 'failed';
@@ -100,11 +110,11 @@ const FlowStepListView = (() => {
     const base = {
       id: row.id,
       tool: tool.tool,
-      app: tool.app,
+      app: app,
       suggested: row.suggested === true,
       added: row.added === true,
       checked: row.checked !== false,
-      tag: row.suggested ? 'Suggested' : (row.added ? 'Added' : (row.tag || '')),
+      tag: row.suggested ? (L.suggested || 'Suggested') : (row.added ? (L.added || 'Added') : displayTag(row.tag, L)),
       st: stateClass(row.state),
       kind: row.suggested ? 'suggested' : ''
     };
@@ -116,18 +126,23 @@ const FlowStepListView = (() => {
       return base;
     }
     if (row.state === 'offline') {
-      base.out = row.offlineLine || 'Outlook is not connected';
+      base.out = row.offlineLine || L.outlookOff || 'Outlook is not connected';
       return base;
     }
     if (failed) {
-      base.out = 'Couldn’t confirm · <em class="ss-retry">Retry</em>';
+      base.out = (L.couldnt || 'Couldn’t confirm') + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
       return base;
+    }
+    function statusWord(name) {
+      const key = name || 'queued';
+      if (L[key]) return L[key];
+      return stateLabel(key);
     }
     if (verified) {
-      base.res = stateLabel('verified') + ' <i class="ss-ok" aria-label="verified">✓</i>';
+      base.res = statusWord('verified') + ' <i class="ss-ok" aria-label="' + statusWord('verified') + '">✓</i>';
       return base;
     }
-    base.out = stateLabel(row.state || 'queued');
+    base.out = statusWord(row.state || 'queued');
     return base;
   }
 
@@ -182,8 +197,12 @@ const FlowStepListView = (() => {
 
     function cfg() {
       const surface = o.surface || 'outlook';
-      const he = o.lang === 'he';
-      const painted = list.map(function (r) { return paintModel(r, surface); });
+      const ui = o.uiLang === 'he' ? 'he' : 'en';
+      const labels = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
+        ? FlowDisplay.chrome(ui)
+        : { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };
+      const he = ui === 'he';
+      const painted = list.map(function (r) { return paintModel(r, surface, labels); });
       const multi = painted.some(function (r) { return r.kind === 'multi'; });
       let chip;
       if (only) {
@@ -196,6 +215,7 @@ const FlowStepListView = (() => {
       }
       return {
         he: he,
+        uiLang: ui,
         intent: o.intent || '',
         rows: painted,
         chip: chip,
@@ -291,6 +311,7 @@ const FlowStepListView = (() => {
       if (hold) {
         hold.addEventListener('click', function (e) {
           e.preventDefault();
+          if (o.onHold && o.onHold() === false) return;
           root.setAttribute('data-glance-held', '1');
         });
       }
