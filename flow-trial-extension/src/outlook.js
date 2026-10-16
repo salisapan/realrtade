@@ -303,7 +303,8 @@ const FlowOutlook = (() => {
         names.forEach((name) => {
           if (!merged.some((n) => String(n).toLowerCase() === String(name).toLowerCase())) merged.push(name);
         });
-        if (merged.length !== prev.length) await write('glanceOwnNames', merged);
+        const same = merged.length === prev.length && merged.every((name, i) => String(name) === String(prev[i]));
+        if (!same) await write('glanceOwnNames', merged);
       } catch (e) { /* the page still reads the profile on the auth record */ }
     }
     function buildOwnAddresses(profile, learned) {

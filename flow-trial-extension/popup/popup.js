@@ -104,6 +104,10 @@
     if (!scroller) return;
     tabScroll[activeTabId()] = scroller.scrollTop;
   }
+  function nameStorageOnly(ch) {
+    const keys = Object.keys(ch || {});
+    return keys.length > 0 && keys.every((k) => k === 'googleProfile' || k === 'glanceOwnNames');
+  }
   function restoreScroll() {
     const scroller = panelScroller();
     if (!scroller) return;
@@ -127,17 +131,17 @@
     if (renderDepth !== 0) return;
     const scroller = panelScroller();
     const now = scroller ? scroller.scrollTop : 0;
-    // A paint can reset the scroller to 0. A move to any other spot while
-    // the paint was in flight is the person. Keep that spot.
-    if (now !== scrollAtRender && now !== 0) tabScroll[activeTabId()] = now;
-    scrollLock = false;
+    // A paint can reset the scroller to 0. A non-zero spot at the end of
+    // the paint is the person. The scroll listener keeps a non-zero move
+    // that the paint then clears.
+    if (now > 0 && now !== scrollAtRender) tabScroll[activeTabId()] = now;
     restoreScroll();
   }
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local' || (!ch.glanceHostLanguage && !ch.glanceUiLanguage)) return;
+      if (area !== 'local' || nameStorageOnly(ch) || (!ch.glanceHostLanguage && !ch.glanceUiLanguage)) return;
       const before = uiLang();
       if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
       if (ch.glanceUiLanguage) state.glanceUiLanguage = ch.glanceUiLanguage.newValue;
@@ -149,13 +153,13 @@
   } catch (e) { /* the open panel keeps the language it painted */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local' || (!ch.googleReconnect && !ch.googleLaneWarning)) return;
+      if (area !== 'local' || nameStorageOnly(ch) || (!ch.googleReconnect && !ch.googleLaneWarning)) return;
       refresh().catch(() => {});
     });
   } catch (e) { /* the pill refreshes the next time the popup opens */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local' || !ch.log) return;
+      if (area !== 'local' || nameStorageOnly(ch) || !ch.log) return;
       const panel = document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
       renderOpen().catch(() => {});
@@ -163,7 +167,7 @@
   } catch (e) { /* panel is already showing the last render */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local') return;
+      if (area !== 'local' || nameStorageOnly(ch)) return;
       if (ch.glanceWhyCurrent || ch.glanceWhyByConv) {
         whyRev += 1;
         if (state && ch.glanceWhyCurrent) state.glanceWhyCurrent = ch.glanceWhyCurrent.newValue || null;
@@ -189,7 +193,16 @@
     });
   } catch (e) { /* the open panel keeps the last status until the next open */ }
   const scroller = panelScroller();
-  if (scroller) scroller.addEventListener('scroll', rememberScroll, { passive: true });
+  if (scroller) scroller.addEventListener('scroll', () => {
+    const y = scroller.scrollTop;
+    // The lock means a paint is replacing the list. A move to 0 is that
+    // paint. Any other spot is the person, and the restore puts it back.
+    if (scrollLock) {
+      if (y > 0) tabScroll[activeTabId()] = y;
+      return;
+    }
+    rememberScroll();
+  }, { passive: true });
   wireTabs();
   wireSave();
   wireRecipe();

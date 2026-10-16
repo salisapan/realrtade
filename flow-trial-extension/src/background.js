@@ -1582,6 +1582,20 @@ function namesFromGoogleUserinfo(info) {
   if (given && family) add(given + ' ' + family);
   return out;
 }
+function sameTextList(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (String(a[i]) !== String(b[i])) return false;
+  }
+  return true;
+}
+function sameGoogleProfile(a, b) {
+  const left = a || {};
+  const right = b || {};
+  return (left.displayName || null) === (right.displayName || null)
+    && (left.givenName || null) === (right.givenName || null)
+    && (left.surname || null) === (right.surname || null);
+}
 function rememberGoogleProfile(token) {
   if (!token || googleNamesFilled) return Promise.resolve();
   if (googleProfileFlight) return googleProfileFlight;
@@ -1599,13 +1613,16 @@ function rememberGoogleProfile(token) {
         givenName: info.given_name || null,
         surname: info.family_name || null
       };
-      const bag = await chrome.storage.local.get({ glanceOwnNames: [] });
+      const bag = await chrome.storage.local.get({ glanceOwnNames: [], googleProfile: null });
       const prev = Array.isArray(bag.glanceOwnNames) ? bag.glanceOwnNames : [];
       const merged = prev.slice();
       names.forEach((name) => {
         if (!merged.some((n) => String(n).toLowerCase() === name.toLowerCase())) merged.push(name);
       });
-      await chrome.storage.local.set({ googleProfile: profile, glanceOwnNames: merged });
+      const patch = {};
+      if (!sameTextList(prev, merged)) patch.glanceOwnNames = merged;
+      if (!sameGoogleProfile(bag.googleProfile, profile)) patch.googleProfile = profile;
+      if (Object.keys(patch).length) await chrome.storage.local.set(patch);
       googleNamesFilled = true;
     } catch (e) { /* userinfo refused; the greeting stays on the names already stored */ }
     finally { googleProfileFlight = null; }

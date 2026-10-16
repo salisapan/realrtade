@@ -44,6 +44,7 @@ function res(status, body) {
 function load(opts) {
   opts = opts || {};
   const calls = [];
+  const sets = [];
   const tokens = [];
   const pendingWebFlows = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
@@ -140,7 +141,7 @@ function load(opts) {
       storage: {
         local: {
           get: async (k) => (typeof k === 'string' ? { [k]: stored[k] } : stored),
-          set: async (patch) => { Object.assign(stored, patch); },
+          set: async (patch) => { sets.push(JSON.parse(JSON.stringify(patch))); Object.assign(stored, patch); },
           remove: async (keys) => {
             const list = Array.isArray(keys) ? keys : [keys];
             list.forEach((k) => { delete stored[k]; });
@@ -162,6 +163,7 @@ function load(opts) {
     calls,
     tokens,
     stored,
+    sets,
     onMessage: onMessageListener,
     releaseWebFlows() {
       const queued = pendingWebFlows.splice(0);
@@ -652,6 +654,33 @@ async function run() {
     await new Promise((r) => setImmediate(r));
     check('the late approval is not a saved token', out.ok === false, out);
     check('the late approval does not restore googleWebAuth', env.stored.googleWebAuth == null, env.stored);
+  }
+
+  console.log('\n--- profile names are stored only when they change ---\n');
+  {
+    const info = { name: 'Sali Sapan', given_name: 'Sali', family_name: 'Sapan' };
+    const route = [[/\/oauth2\/v2\/userinfo/, { reply: res(200, info) }]];
+    const fresh = load({ chromeToken: 'ya29.names', routes: route });
+    await fresh.fn('rememberGoogleProfile')('ya29.names');
+    check('a new Google profile is written once',
+      fresh.sets.length === 1 && fresh.stored.googleProfile && fresh.stored.googleProfile.givenName === 'Sali' && fresh.stored.glanceOwnNames.indexOf('Sali') !== -1,
+      { sets: fresh.sets, stored: fresh.stored.googleProfile });
+    fresh.fn('googleNamesFilled = false');
+    await fresh.fn('rememberGoogleProfile')('ya29.names');
+    check('the same Google profile is not written again', fresh.sets.length === 1, fresh.sets);
+    const held = {
+      googleProfile: { displayName: 'Sali Sapan', givenName: 'Sali', surname: 'Sapan' },
+      glanceOwnNames: ['Sali Sapan', 'Sali', 'Sapan']
+    };
+    const again = load({ chromeToken: 'ya29.names', routes: route, stored: held });
+    await again.fn('rememberGoogleProfile')('ya29.names');
+    check('a startup with the stored profile writes nothing', again.sets.length === 0, again.sets);
+    const empty = load({
+      chromeToken: 'ya29.empty',
+      routes: [[/\/oauth2\/v2\/userinfo/, { reply: res(200, { files: [], items: [] }) }]]
+    });
+    await empty.fn('rememberGoogleProfile')('ya29.empty');
+    check('userinfo with no name writes nothing', empty.sets.length === 0 && empty.stored.googleProfile == null && empty.stored.glanceOwnNames == null, empty.stored);
   }
 
   console.log('\n--- connector status shares the reconnect flag ---\n');
