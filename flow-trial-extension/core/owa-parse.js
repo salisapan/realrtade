@@ -672,7 +672,8 @@ const FlowOwaParse = (() => {
   function senderOf(container, bodyRoot, own) {
     const mine = new Set((own || []).map((a) => String(a || '').toLowerCase()));
     const ok = (e) => e && !mine.has(e);
-    if (!container || !container.querySelectorAll) return { email: '', name: '' };
+    let ownEmail = '';
+    if (!container || !container.querySelectorAll) return { email: '', name: '', ownEmail: '' };
     const nodes = container.querySelectorAll('a[href^="mailto:"], [title*="@"], [aria-label*="@"], span, button');
     for (const n of nodes) {
       if (inRecipientBlock(n)) continue;
@@ -697,9 +698,12 @@ const FlowOwaParse = (() => {
         if (m) { email = m[2]; name = m[1].trim(); }
       }
       email = normEmail(email);
-      if (EMAIL_RE.test(email) && ok(email)) return { email, name: looksLikeDateTime(name) ? '' : name.slice(0, 80) };
+      if (!EMAIL_RE.test(email)) continue;
+      const clean = looksLikeDateTime(name) ? '' : name.slice(0, 80);
+      if (ok(email)) return { email, name: clean, ownEmail: '' };
+      if (!ownEmail) ownEmail = email;
     }
-    return { email: '', name: '' };
+    return { email: '', name: '', ownEmail: ownEmail };
   }
 
   const HEADINGS = '[role="heading"], h1, h2, h3';
@@ -944,6 +948,7 @@ const FlowOwaParse = (() => {
       rawUrlId: ids.raw || null,
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
+      ownSenderEmail: who.ownEmail || '',
       senderName: senderName.slice(0, 80),
       text: stripReadingChrome(body),
       to: whoTo.to,

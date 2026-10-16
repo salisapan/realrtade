@@ -18,15 +18,23 @@ function gmailHtml(opts) {
   const threadId = o.threadId || 't-1';
   const toList = Array.isArray(o.to) ? o.to : [];
   const ccList = Array.isArray(o.cc) ? o.cc : [];
+  const ownEmail = o.ownEmail || 'me@x.com';
+  const files = Array.isArray(o.attachments) ? o.attachments : [];
   const toLine = toList.length ? ('<div class="to">To: ' + toList.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>') : '';
   const ccLine = ccList.length ? ('<div class="cc">Cc: ' + ccList.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>') : '';
-  return '<!doctype html><html><head><title>Inbox - me@x.com - Gmail</title></head><body>' +
+  const chips = files.map((f) => {
+    const name = (f && (f.name || f.filename)) || 'report.pdf';
+    const mime = (f && f.mimeType) || 'application/pdf';
+    const url = (f && f.url) || ('https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(name));
+    return '<span download_url="' + esc(mime + ':' + name + ':' + url) + '">' + esc(name) + '</span>';
+  }).join('');
+  return '<!doctype html><html><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
     '<div role="main">' +
     '<h2 class="hP">' + esc(subject) + '</h2>' +
     '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
     '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
-    '<span email="me@x.com"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
-    toLine + ccLine +
+    '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
+    toLine + ccLine + chips +
     '<div class="a3s">' + esc(body) + '</div>' +
     '</div></div></body></html>';
 }

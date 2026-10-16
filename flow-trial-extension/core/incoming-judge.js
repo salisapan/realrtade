@@ -110,7 +110,10 @@ const FlowIncomingJudge = (() => {
       senderIsUser: i.senderIsUser === true,
       inbound: i.inbound,
       direction: i.direction || null,
-      inSent: i.inSent === true
+      inSent: i.inSent === true,
+      onBehalfOf: i.onBehalfOf || null,
+      graphSender: i.graphSender || null,
+      forwarded: i.forwarded === true
     });
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };

@@ -50,7 +50,7 @@ function outlookAuth(opts) {
       scope: scopes.join(' ')
     },
     account: { address: ME, name: 'Glance', mail: ME, userPrincipalName: ME },
-    ownAddresses: [ME],
+    ownAddresses: Array.isArray(o.ownAddresses) && o.ownAddresses.length ? o.ownAddresses.slice() : [ME],
     profile: { mail: ME, userPrincipalName: ME, displayName: 'Glance' },
     requestedScopes: scopes.slice()
   };

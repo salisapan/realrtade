@@ -258,3 +258,160 @@ test('a truncated bodyPreview is outlook:body-preview-only and not a card', asyn
   expect(onPage.fullBodyWins).toBe(true);
   expect(onPage.shortPreview).toBe(true);
 });
+
+const SELF_SAVE = 'please save the report to Drive by 20/10';
+const SELF_HOLD = 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00';
+
+function reportFile() {
+  return [{ id: 'att-report', name: 'report.pdf', contentType: 'application/pdf', size: 4096, isInline: false }];
+}
+
+async function quietReason(glance, page) {
+  const bag = await glance.storage();
+  const diags = bag.outlookPageDiag || [];
+  return {
+    chips: await page.locator('#ReadingPaneContainerId .flow-chip-host').count(),
+    silenced: diags.some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender' || d.reason === 'page:sender-mismatch'))
+  };
+}
+
+test('Outlook self-sent save and Hebrew meeting get a card', async ({ glance }) => {
+  await glance.seedOutlook({}, { ownAddresses: [S.ME, S.SENDER] });
+  await glance.setScenario({
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: { AQMkGlanceSelfSaveGmail: reportFile() },
+    conversation: [],
+    me: {
+      mail: S.ME,
+      userPrincipalName: S.ME,
+      proxyAddresses: ['SMTP:' + S.ME],
+      otherMails: [S.SENDER]
+    }
+  });
+  const save = await glance.openOutlook({
+    id: 'AQMkGlanceSelfSaveGmail',
+    subject: 'Report',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    to: [S.SENDER],
+    body: SELF_SAVE,
+    attachments: reportFile()
+  });
+  await expect(save.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+  await expect.poll(async () => quietReason(glance, save)).toEqual({ chips: 1, silenced: false });
+
+  await glance.setScenario({
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: { AQMkGlanceSelfSaveOutlook: reportFile() },
+    conversation: [],
+    me: { mail: S.ME, userPrincipalName: S.ME, displayName: 'Glance' }
+  });
+  const saveOutlook = await glance.openOutlook({
+    id: 'AQMkGlanceSelfSaveOutlook',
+    subject: 'Report',
+    senderEmail: S.ME,
+    senderName: 'Glance',
+    to: [S.ME],
+    body: SELF_SAVE,
+    attachments: reportFile()
+  });
+  await expect(saveOutlook.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  const hold = await glance.openOutlook({
+    id: 'AQMkGlanceSelfHoldGmail',
+    subject: 'פגישה',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    to: [S.SENDER],
+    body: SELF_HOLD
+  });
+  await expect(hold.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  const holdOutlook = await glance.openOutlook({
+    id: 'AQMkGlanceSelfHoldOutlook',
+    subject: 'פגישה',
+    senderEmail: S.ME,
+    senderName: 'Glance',
+    to: [S.ME],
+    body: SELF_HOLD
+  });
+  await expect(holdOutlook.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  await glance.setScenario({
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: {},
+    conversation: [],
+    me: {
+      mail: S.ME,
+      userPrincipalName: 'sali.upn@glance.test',
+      proxyAddresses: ['SMTP:' + S.ME, 'smtp:sali.alias@glance.test'],
+      otherMails: ['sali.other@glance.test']
+    }
+  });
+  const alias = await glance.openOutlook({
+    id: 'AQMkGlanceSelfHoldAlias',
+    subject: 'פגישה',
+    senderEmail: 'sali.alias@glance.test',
+    senderName: 'Sali',
+    to: ['sali.other@glance.test'],
+    body: SELF_HOLD
+  });
+  await expect(alias.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  const outbound = await glance.openOutlook({
+    id: 'AQMkGlanceSelfOutbound',
+    subject: 'פגישה',
+    senderEmail: S.ME,
+    senderName: 'Glance',
+    to: ['dana@acme.com'],
+    body: SELF_HOLD
+  });
+  await expect.poll(async () => quietReason(glance, outbound)).toEqual({ chips: 0, silenced: true });
+});
+
+test('Gmail self-sent save and Hebrew meeting get a card', async ({ glance }) => {
+  await glance.seedGmail();
+  const save = await glance.openGmail({
+    messageId: 'm-self-save',
+    threadId: 't-self-save',
+    subject: 'Report',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    ownEmail: S.SENDER,
+    to: [S.SENDER],
+    body: SELF_SAVE,
+    attachments: [{ name: 'report.pdf', mimeType: 'application/pdf' }]
+  });
+  await expect(save.locator('div[role="main"] .flow-chip-host')).toHaveCount(1);
+
+  const hold = await glance.openGmail({
+    messageId: 'm-self-hold',
+    threadId: 't-self-hold',
+    subject: 'פגישה',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    ownEmail: S.SENDER,
+    to: [S.SENDER],
+    body: SELF_HOLD
+  });
+  await expect(hold.locator('div[role="main"] .flow-chip-host')).toHaveCount(1);
+
+  const outbound = await glance.openGmail({
+    messageId: 'm-self-out',
+    threadId: 't-self-out',
+    subject: 'פגישה',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    ownEmail: S.SENDER,
+    to: ['dana@acme.com'],
+    body: SELF_HOLD
+  });
+  await expect(outbound.locator('div.a3s')).toContainText(SELF_HOLD);
+  await expect.poll(async () => outbound.locator('div[role="main"] .flow-chip-host').count()).toBe(0);
+});

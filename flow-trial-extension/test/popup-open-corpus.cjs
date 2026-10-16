@@ -1268,7 +1268,15 @@ async function run() {
   })(whyPanel.document.getElementById('surface-list'));
   const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
   const pageUsesShared = /function whyNotText\(reason\) \{[\s\S]*?FlowDisplay\.whyNotShownLine\(reason\)/.test(pageSrc);
+  const whyLog = [];
+  (function walkLog(n) {
+    if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) whyLog.push(n);
+    (n.children || []).forEach(walkLog);
+  })(whyPanel.document.getElementById('log-list'));
   check('Setup shows one why line, for the current mail only', whyNodes.length === 1, whyNodes.map((n) => n.textContent));
+  check('Activity shows the same why line',
+    whyNodes.length === 1 && whyLog.length === 1 && whyLog[0].getAttribute('data-glance-why-line') === whyNodes[0].getAttribute('data-glance-why-line'),
+    whyLog.map((n) => n.textContent));
   whyReasons.forEach((reason) => {
     const expected = whyPanel.sandbox.FlowDisplay.whyNotShownLine(reason);
     const expectedPage = whyPanel.sandbox.FlowDisplay.whyNotShownLine('page:' + reason);
@@ -1305,9 +1313,13 @@ async function run() {
   });
   for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
   const after = countWhy(latePanel.document.getElementById('surface-list'));
+  const afterLog = countWhy(latePanel.document.getElementById('log-list'));
   check('glanceWhyCurrent after open paints the why line',
     after.length === 1 && after[0].getAttribute('data-glance-why-line') === 'לא זוהתה בקשה' && after[0].textContent.indexOf('לא זוהתה בקשה') === 0 && after[0].textContent.indexOf('Stay quiet') >= 0,
     after.map((n) => n.textContent));
+  check('glanceWhyCurrent after open paints the why line on Activity',
+    afterLog.length === 1 && afterLog[0].textContent.indexOf('לא זוהתה בקשה') === 0 && afterLog[0].textContent.indexOf('Stay quiet') >= 0,
+    afterLog.map((n) => n.textContent));
 
   const refreshPanel = load({ glanceOutlookRefresh: { '7': true } }, { activeTabs: [{ id: 7, url: 'https://outlook.live.com/mail/0/inbox' }] });
   vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), refreshPanel.sandbox, { filename: 'popup.js' });

@@ -355,6 +355,115 @@ const CASES = [
     check('neither write sent the mail', !gate.calls.some((c) => /\/(send|sendMail)(\b|$)/.test(c.url)));
   }
 
+  console.log('\n--- a mail from the user to the user is incoming ---\n');
+  {
+    const SAVE = 'please save the report to Drive by 20/10';
+    const HE = 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00';
+    const GMAIL = 'ai.local.flow@gmail.com';
+    const ALIAS = 'sali.alias@glance.test';
+    const OTHER_MAIL = 'sali.other@glance.test';
+    const UPN = 'sali.upn@glance.test';
+    const ownGmail = [GMAIL];
+    const ownOutlook = [ME, 'salisapan1@gmail.com'];
+    const ownAlias = [ME, ALIAS, OTHER_MAIL, UPN];
+    const judgeDeps = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    function pair(from, to, text, own, att) {
+      const base = {
+        text: text, subject: 'Note to myself',
+        sender: { name: 'Sali', email: from },
+        now: new Date(NOW),
+        to: [to],
+        ownAddresses: own,
+        inbound: false,
+        attachmentCount: att,
+        hasThreadAttachment: att === 1
+      };
+      return {
+        g: J.judge(Object.assign({ surface: 'gmail' }, base), judgeDeps),
+        o: J.judge(Object.assign({ surface: 'outlook' }, base), judgeDeps)
+      };
+    }
+    function steps(r) {
+      return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
+    }
+    const saveG = pair(GMAIL, GMAIL, SAVE, ownGmail, 1);
+    check('Gmail shape, save the report to Drive by 20/10, self-sent shows a Drive card',
+      saveG.g.show === true && steps(saveG.g).indexOf('driveFile') >= 0 && steps(saveG.g).indexOf('gmailDraft') >= 0 && !steps(saveG.g).some((k) => /send/i.test(k)),
+      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g) });
+    const saveO = pair(ME, ME, SAVE, ownOutlook, 1);
+    check('Outlook shape, save the report to Drive by 20/10, self-sent shows a OneDrive card',
+      saveO.o.show === true && steps(saveO.o).indexOf('onedriveFile') >= 0 && steps(saveO.o).indexOf('outlookDraft') >= 0 && !steps(saveO.o).some((k) => /send/i.test(k)),
+      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o) });
+    const heG = pair(GMAIL, GMAIL, HE, ownGmail, 0);
+    const heO = pair(ME, ME, HE, ownOutlook, 0);
+    check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a calendar hold',
+      heG.g.show === true && heG.g.intent && heG.g.intent.personalClose === 'calendar-hold' && steps(heG.g).length === 1 && steps(heG.g)[0] === 'calendar',
+      { show: heG.g.show, reason: heG.g.reason, steps: steps(heG.g) });
+    check('Outlook shape, Hebrew meeting on 20/10 at 14:00, self-sent is a calendar hold',
+      heO.o.show === true && heO.o.intent && heO.o.intent.personalClose === 'calendar-hold' && steps(heO.o).length === 1 && steps(heO.o)[0] === 'calendar',
+      { show: heO.o.show, reason: heO.o.reason, steps: steps(heO.o) });
+    const alias = pair(ALIAS, OTHER_MAIL, HE, ownAlias, 0);
+    check('an alias writing to another alias of the same user is incoming',
+      alias.o.show === true && alias.o.intent && alias.o.intent.personalClose === 'calendar-hold',
+      { show: alias.o.show, reason: alias.o.reason });
+    const outbound = pair(ME, 'dana@acme.com', HE, ownOutlook, 0);
+    check('a mail from the user to someone else stays quiet',
+      outbound.g.show === false && outbound.o.show === false && outbound.o.reason === 'quiet:hedge',
+      { g: outbound.g.reason, o: outbound.o.reason });
+    const behalf = J.judge({
+      text: HE, subject: 'Note to myself',
+      sender: { name: 'Sali', email: ME },
+      now: new Date(NOW), surface: 'outlook',
+      to: [ME], ownAddresses: ownOutlook, inbound: false,
+      onBehalfOf: 'delegate@acme.com', attachmentCount: 0
+    }, judgeDeps);
+    check('a delegate sending as the user stays quiet', behalf.show === false, { reason: behalf.reason });
+
+    function graphSelf(from, to, text, i, extra) {
+      return Object.assign({
+        id: 'self' + i, conversationId: 'convself' + i, subject: 'Note to myself', isDraft: false,
+        hasAttachments: false,
+        from: { emailAddress: { name: 'Sali', address: from } },
+        toRecipients: [{ emailAddress: { name: 'Sali', address: to } }],
+        receivedDateTime: new Date(NOW - 3600000).toISOString(),
+        body: { contentType: 'text', content: text }
+      }, extra || {});
+    }
+    const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+    function planned(messages, me) {
+      return S.plan({ messages: messages, me: me, watches: [], graph: I.empty(), state: {}, now: NOW, deps: deps });
+    }
+    const report = { hasAttachments: true, attachments: [{ id: 'a1', name: 'report.pdf', isInline: false }] };
+    const saveBox = planned([graphSelf(GMAIL, GMAIL, SAVE, 1, report)], [GMAIL, ME]);
+    check('Outlook mailbox, Gmail address to itself, the save is incoming',
+      saveBox.incoming.length === 1 && !(saveBox.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: saveBox.incoming.length, why: (saveBox.diagnostics || []).map((d) => d.reason) });
+    const saveMe = planned([graphSelf(ME, ME, SAVE, 2, report)], ownOutlook);
+    check('Outlook mailbox, Outlook address to itself, the save is incoming',
+      saveMe.incoming.length === 1 && !(saveMe.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: saveMe.incoming.length, why: (saveMe.diagnostics || []).map((d) => d.reason) });
+    const heBox = planned([graphSelf(GMAIL, GMAIL, HE, 3)], [GMAIL, ME]);
+    const heMe = planned([graphSelf(ME, ME, HE, 4)], ownOutlook);
+    check('Outlook mailbox, Gmail address, the Hebrew meeting is a calendar hold',
+      heBox.incoming.length === 1 && heBox.incoming[0].intent && heBox.incoming[0].intent.personalClose === 'calendar-hold',
+      { incoming: heBox.incoming.length, why: (heBox.diagnostics || []).map((d) => d.reason) });
+    check('Outlook mailbox, Outlook address, the Hebrew meeting is a calendar hold',
+      heMe.incoming.length === 1 && heMe.incoming[0].intent && heMe.incoming[0].intent.personalClose === 'calendar-hold',
+      { incoming: heMe.incoming.length, why: (heMe.diagnostics || []).map((d) => d.reason) });
+    const aliasBox = planned([graphSelf(ALIAS, OTHER_MAIL, HE, 5)], ownAlias);
+    check('Outlook mailbox, proxy address to otherMails, the Hebrew meeting is incoming',
+      aliasBox.incoming.length === 1 && !(aliasBox.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: aliasBox.incoming.length, why: (aliasBox.diagnostics || []).map((d) => d.reason) });
+    const toDana = planned([graphSelf(ME, 'dana@acme.com', HE, 6)], ownOutlook);
+    check('Outlook mailbox, a mail to someone else is not an incoming card',
+      toDana.incoming.length === 0,
+      { incoming: toDana.incoming.length, why: (toDana.diagnostics || []).map((d) => d.reason) });
+    const fwd = planned([graphSelf(ME, ME, HE, 7, { sender: { emailAddress: { name: 'Delegate', address: 'delegate@acme.com' } } })], ownOutlook);
+    check('Outlook mailbox, a delegate on a self-addressed mail stays quiet',
+      fwd.incoming.length === 0 && (fwd.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: fwd.incoming.length, why: (fwd.diagnostics || []).map((d) => d.reason) });
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();

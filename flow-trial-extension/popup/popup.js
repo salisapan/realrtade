@@ -1490,27 +1490,17 @@
     item.setAttribute('data-glance-why-line', copy.line);
     if (copy.subject) item.setAttribute('data-glance-why-subject', copy.subject);
     item.setAttribute('data-glance-why', copy.reason);
-    const kids = row.children || [];
-    let before = null;
-    for (let i = 0; i < kids.length; i++) {
-      const cls = String(kids[i].className || '');
-      if (cls.split(/\s+/).indexOf('wait-acts') >= 0) { before = kids[i]; break; }
-    }
-    if (before && typeof row.insertBefore === 'function') row.insertBefore(item, before);
+    const first = row.firstChild || (row.children && row.children[0]) || null;
+    if (first && typeof row.insertBefore === 'function') row.insertBefore(item, first);
     else row.appendChild(item);
   }
 
-  function outlookSurfaceRow() {
-    const host = document.getElementById('surface-list');
-    if (!host || !host.children) return null;
-    for (let i = 0; i < host.children.length; i++) {
-      const n = host.children[i];
-      if (n && n.getAttribute && n.getAttribute('data-glance-surface') === 'outlook') return n;
-    }
-    return null;
+  function paintWhyHosts(why) {
+    mountWhyLine(document.getElementById('surface-list'), why);
+    mountWhyLine(document.getElementById('log-list'), why);
   }
 
-  // Paint the current quiet mail onto the Outlook row already on screen.
+  // Paint the current quiet mail on Settings and on Activity.
   // A newer glanceWhyCurrent write bumps whyRev and this read is dropped.
   async function syncWhyLine(rev) {
     const seen = rev == null ? whyRev : rev;
@@ -1522,7 +1512,7 @@
       if (state) state.glanceWhyCurrent = why || null;
     } catch (e) { /* the value the change applied still paints */ }
     if (seen !== whyRev) return;
-    mountWhyLine(outlookSurfaceRow(), why);
+    paintWhyHosts(why);
   }
 
   async function renderOutlookRow(host, gen) {
@@ -1763,20 +1753,6 @@
     row.appendChild(acts);
     if (offRow) row.appendChild(offRow);
     row.appendChild(note);
-    // Read after the awaits above. The open snapshot can be from before
-    // glanceWhyCurrent landed, and a change while this row was building
-    // has to win over that snapshot.
-    let currentWhy = state && state.glanceWhyCurrent;
-    try {
-      const revAtRead = whyRev;
-      const fresh = await FlowStorage.get();
-      if (revAtRead !== whyRev && state) currentWhy = state.glanceWhyCurrent;
-      else {
-        currentWhy = fresh && fresh.glanceWhyCurrent;
-        if (state) state.glanceWhyCurrent = currentWhy || null;
-      }
-    } catch (e) { /* the snapshot from open still paints */ }
-    mountWhyLine(row, currentWhy);
     if (gen !== surfaceGen) return;
     host.appendChild(row);
   }
@@ -2040,7 +2016,12 @@
     const st = await send({ type: 'flow:surface-status' });
     if (gen !== surfaceGen) return;
     host.replaceChildren();
-    if (!st || !st.ok) return;
+    function paintWhy() {
+      if (gen !== surfaceGen) return;
+      mountWhyLine(host, state && state.glanceWhyCurrent);
+    }
+    if (!st || !st.ok) { paintWhy(); return; }
+    try {
     for (const id of Object.keys(st.surfaces || {})) {
       if (id === 'outlook') continue; // managed by the Outlook row (connect registers the OWA chip)
       const s = st.surfaces[id];
@@ -2079,6 +2060,8 @@
     await renderHybridRow(host, gen);
     if (gen !== surfaceGen) return;
     await renderLadderRow(host, gen);
+    } catch (e) { /* a row that throws does not drop the why line */ }
+    paintWhy();
   }
 
   // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.
@@ -3162,6 +3145,7 @@
 
   async function renderLog() {
     beginRender();
+    const revAtLog = whyRev;
     try {
     await ensureOutlookMigrated();
     const s = await FlowStorage.get();
@@ -3182,6 +3166,8 @@
     const rows = activityRows(s.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
+    const whyNow = (revAtLog !== whyRev && state) ? state.glanceWhyCurrent : (s && s.glanceWhyCurrent);
+    mountWhyLine(host, whyNow);
     } finally { endRender(); }
   }
 

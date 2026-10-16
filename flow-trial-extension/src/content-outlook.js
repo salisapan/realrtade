@@ -648,6 +648,14 @@
         }).length;
       }
     }
+    const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
+      senderEmail: pane.senderEmail,
+      to: pane.to,
+      cc: pane.cc,
+      ownAddresses: ownAddresses,
+      onBehalfOf: pane.onBehalfOf || null,
+      forwarded: pane.onBehalf === true
+    });
     const r = FlowIncomingJudge.judge({
       text: own, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
@@ -659,7 +667,9 @@
       cc: pane.cc || null,
       ownAddresses: ownAddresses || null,
       userName: pane.userName || null,
-      inbound: from ? (ownAddresses || []).indexOf(from) < 0 : true
+      onBehalfOf: pane.onBehalfOf || null,
+      forwarded: pane.onBehalf === true,
+      inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
     });
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
@@ -725,6 +735,21 @@
       if (m) add(m[1]);
     });
     return set;
+  }
+
+  // Stored own addresses plus /me mail, UPN, smtp proxies, and otherMails.
+  // A failed /me read leaves the stored list, so the exact compare stays.
+  async function ownWithAliases(own) {
+    const list = [];
+    function add(raw) {
+      const e = String(raw || '').trim().toLowerCase();
+      if (!e || e.indexOf('@') < 0 || list.indexOf(e) >= 0) return;
+      list.push(e);
+    }
+    (own || []).forEach(add);
+    const known = await loadUserAddresses();
+    if (known && typeof known.forEach === 'function') known.forEach(add);
+    return list;
   }
 
   async function loadUserAddresses() {
@@ -2435,16 +2460,19 @@
 
   // senderOf leaves the person's own address off the pane so it is never the
   // counterpart. The persona title still names that address on a note to self.
-  function personaOwnSender(own) {
+  function personaEmails() {
     let node = null;
     try { node = document.querySelector('#ReadingPaneContainerId .persona'); } catch (e) { node = null; }
-    if (!node) return false;
+    if (!node) return [];
     const bits = [];
     if (node.getAttribute) bits.push(node.getAttribute('title') || '', node.getAttribute('aria-label') || '');
     const spans = node.querySelectorAll ? node.querySelectorAll('[title], [aria-label]') : [];
     for (let i = 0; i < spans.length; i++) bits.push(spans[i].getAttribute('title') || '', spans[i].getAttribute('aria-label') || '');
-    const found = bits.join(' ').match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/ig) || [];
-    return found.some((email) => ownSender(email, own));
+    return bits.join(' ').match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/ig) || [];
+  }
+
+  function personaOwnSender(own) {
+    return personaEmails().some((email) => ownSender(email, own));
   }
 
   // A silence replaces whatever card was already floating. The schedule card
@@ -3766,15 +3794,37 @@
     const planned = plannedRow(bag, pane);
     const selfPlanned = planned || unconfirmedSyncRow(bag, pane);
     const receiptOnly = Boolean(entry && entry.outlookReceipt && entry.ref && !entry.process);
-    const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || personaOwnSender(own) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
-      if (selfMail) {
+    const ownAll = await ownWithAliases(own);
+    // The header walk leaves the person's own address off the pane so it is
+    // never the counterpart. A mail addressed to that same person still has
+    // the address on the persona. Put it back only then, so the judge sees
+    // an incoming ask and a mail to someone else stays quiet.
+    const headerFrom = String(pane.senderEmail || pane.ownSenderEmail || '').trim().toLowerCase();
+    if (!pane.senderEmail && headerFrom && typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
+      senderEmail: headerFrom,
+      to: pane.to,
+      cc: pane.cc,
+      ownAddresses: ownAll,
+      onBehalfOf: pane.onBehalfOf || null,
+      forwarded: pane.onBehalf === true
+    })) pane.senderEmail = headerFrom;
+    const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
+      senderEmail: pane.senderEmail || headerFrom,
+      to: pane.to,
+      cc: pane.cc,
+      ownAddresses: ownAll,
+      onBehalfOf: pane.onBehalfOf || null,
+      forwarded: pane.onBehalf === true
+    });
+    const selfMail = !receiptOnly && !selfAddressed && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
+    if (selfMail) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);
       return;
     }
     if (!receiptOnly) {
       pane.userName = userNameOf(st);
-      decided = await decideFromText(pane, own, entry);
+      decided = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
       if (decided && decided.reason === 'third-party') {
         dropStuckCard(pane);
         await pageReason('page:third-party', pane);
@@ -4456,6 +4506,10 @@
       if (!senderAgrees && pageFrom && one && !behalfSplit(one, graphSender)) {
         const known = await loadUserAddresses();
         senderAgrees = Boolean(known && known.has(pageFrom) && known.has(one));
+      }
+      if (behalfSplit(one, graphSender)) {
+        patch.onBehalf = true;
+        patch.onBehalfOf = graphSender;
       }
       if (senderAgrees) {
         if (hydrateHow === 'subject-fallback' && picked.id && !isConversationId(picked.id)) {

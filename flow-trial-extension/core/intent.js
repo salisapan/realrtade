@@ -536,9 +536,29 @@ const FlowIntent = (() => {
     }
     return false;
   }
-  // The reader's own outbound mail, a note to self, or a sent copy.
+  // From and every To/Cc are the user, including an alias. A delegate
+  // (a sender that is not the from) and a mail to anyone else are not this.
+  function addressedToSelf(ctx) {
+    const c = ctx || {};
+    if (c.forwarded === true) return false;
+    const from = String(c.senderEmail || '').trim().toLowerCase();
+    const behalf = String(c.onBehalfOf || c.graphSender || '').trim().toLowerCase();
+    if (behalf && behalf.indexOf('@') >= 0 && behalf !== from) return false;
+    const own = addressList(c.ownAddresses || c.own);
+    if (!from || !own.length || own.indexOf(from) < 0) return false;
+    const to = addressList(c.to || c.toRecipients);
+    if (!to.length) return false;
+    const cc = addressList(c.cc || c.ccRecipients);
+    for (let i = 0; i < to.length; i++) if (own.indexOf(to[i]) < 0) return false;
+    for (let i = 0; i < cc.length; i++) if (own.indexOf(cc[i]) < 0) return false;
+    return true;
+  }
+  // The reader's own outbound mail, or a sent copy addressed to someone else.
+  // A mail the user sent to their own address, or to one of their aliases, is
+  // incoming: it is the ask, not a note that stays quiet.
   function mailIsOwn(ctx) {
     const c = ctx || {};
+    if (addressedToSelf(c)) return false;
     if (c.noteToSelf === true || c.senderIsUser === true || c.inSent === true) return true;
     if (c.direction === 'outbound' || c.direction === 'self') return true;
     if (c.inbound === false) return true;
@@ -1331,7 +1351,7 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

@@ -558,8 +558,9 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const aliasSync = await oa.sync({ force: true });
     const aliasIn = (wa.store.outlookPending && wa.store.outlookPending.incoming) || [];
     const aliasDiag = (wa.store.outlookSync && wa.store.outlookSync.diagnostics) || [];
-    check('a same-account sender stays silent', aliasSync.ok && aliasIn.length === 0, aliasIn);
-    check('that silence is own-sender or note-to-self', aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')), aliasDiag);
+    check('a mail from the account to itself is not silenced as own-sender',
+      aliasSync.ok && !aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')),
+      { incoming: aliasIn, diag: aliasDiag });
     delete global.FlowFileAttach;
     delete global.FlowCloseChains;
   }

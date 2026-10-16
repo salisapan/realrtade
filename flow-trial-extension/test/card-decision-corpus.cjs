@@ -215,8 +215,8 @@ function panel(store) {
   });
   await settle(self);
   const selfRow = records(self.store).find((d) => d.verdict === 'quiet');
-  check('a note to self stores the page reason, not the sync own-sender',
-    selfRow && selfRow.reason === 'note-to-self' && !panel(self.store).some((d) => d.reason === 'own-sender'),
+  check('a mail the user sent to themself is judged, and the sync own-sender line is dropped',
+    selfRow && selfRow.reason !== 'note-to-self' && selfRow.reason !== 'own-sender' && !self.doc.querySelector('.flow-chip-host') && !panel(self.store).some((d) => d.reason === 'own-sender' || d.reason === 'note-to-self'),
     { row: selfRow && selfRow.reason, panel: panel(self.store).map((d) => d.reason) });
   self.w.close();
 
@@ -232,7 +232,7 @@ function panel(store) {
           subject: 'Pilot proposal',
           isDraft: false,
           from: { emailAddress: { name: 'Glance', address: ME } },
-          toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+          toRecipients: [],
           receivedDateTime: new Date().toISOString(),
           body: { contentType: 'text', content: "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" }
         }] };
