@@ -622,8 +622,9 @@ const FlowIntent = (() => {
   // that only when the token is a person's name and the rest is an ask.
   // "Agreed — Globex" and "Dana - Head of Ops" are not that. Also and
   // Separately open the sentence; they are not names.
-  function vocativeAt(chunk) {
+  function vocativeAt(chunk, askText) {
     let raw = String(chunk || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    const askFrom = askText == null ? chunk : askText;
     const greet = raw.match(OPEN_GREET);
     if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
     let guard = 0;
@@ -658,6 +659,11 @@ const FlowIntent = (() => {
         if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
         return name;
       }
+      // "אבי שלום," is the same vocative as "שלום אבי,". שלום is already the
+      // greeting in OPEN_GREET; the name comes first, then the greeting,
+      // then the comma. The rest of the mail has to be an ask, the same
+      // restIsAsk a dash or a colon already uses. A signature is not an ask.
+      if (/^\s+שלום\s*(?:,|،)/.test(after) && personToken(name) && restIsAsk(askFrom)) return name;
       return '';
     }
     return '';
@@ -674,7 +680,7 @@ const FlowIntent = (() => {
     const hebrew = /[\u0590-\u05FF]/;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     for (let i = 0; i < chunks.length; i++) {
-      const who = vocativeAt(chunks[i]);
+      const who = vocativeAt(chunks[i], text);
       if (!who) continue;
       const named = who.toLowerCase();
       if (names.indexOf(named) !== -1) continue;
@@ -1151,8 +1157,8 @@ const FlowIntent = (() => {
     const replyMisaddressed = replyAsk && replyAimedElsewhere(text, ctx);
     if (replyMisaddressed && !quietHint) quietHint = 'hedge';
     // Own outbound, a note to self, or a vocative that names someone else
-    // is not this person's Do It. A hold does not get past that by not
-    // being a reply ask.
+    // is not this person's Do It. "אבי שלום," plus an ask is that vocative.
+    // A hold does not get past that by not being a reply ask.
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
@@ -1223,6 +1229,22 @@ const FlowIntent = (() => {
     const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי/i.test(text);
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
+
+    // Cc-only is not this meeting. replyAimedElsewhere is the check the
+    // reply path already uses; a פגישת line is not a reply ask, so the
+    // reply gate never reached it. A vocative that names the reader
+    // (סאלי שלום,) is still their meeting. "אבי שלום," already returned
+    // above, through vocativeIsOther.
+    if ((eventEvidence || explicitMeetingAsk) && replyAimedElsewhere(text, ctx)) {
+      let namedReader = false;
+      const readerNames = readerNameList(ctx);
+      const pieces = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+      for (let i = 0; i < pieces.length; i++) {
+        const who = vocativeAt(pieces[i], text);
+        if (who && readerNames.indexOf(who.toLowerCase()) !== -1) namedReader = true;
+      }
+      if (!namedReader) return stayQuiet('hedge');
+    }
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
     // the remote fallback must not turn it into a different chip. A wait
