@@ -732,7 +732,7 @@ const FlowActions = (() => {
         proc = logIt;
       } else if ((createTaskAsk || callReminder) && !readerSaid) {
         proc = logIt;
-        if (callReminder) intent.label = heMail ? 'שיחה' : 'Call';
+        if (callReminder && !intent.selfTask) intent.label = heMail ? 'שיחה' : 'Call';
         else if (/^Reply requested\b/.test(String(intent.label || ''))) {
           const named = untimedSrc.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n.]+)/i);
           const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
@@ -763,7 +763,9 @@ const FlowActions = (() => {
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.
-    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid) {
+    // A self-sent phone task already named the person. Putting Call back
+    // would drop that object. Inbound "add this to my tasks: call …" stays Call.
+    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';

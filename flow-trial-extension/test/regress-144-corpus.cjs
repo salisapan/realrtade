@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '8bf84ed5b58a8a8c068fdc96980212b2a5126bcb3fd309e221b647de0c9430ee';
+const FIXTURE_SHA = 'c250bf129c06f79678ace2d0d29f80a2e7ad39368a0904b2376af0e4144c3567';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -503,6 +503,51 @@ for (const id of ['v2syn-3400', 'v2syn-3401', 'v2syn-3406']) {
       console.log('FAIL: 1917 calendar ' + surface + ' ' + describe(out) + ' hour ' + hour);
       process.exit(1);
     }
+  }
+}
+function oneWordTitle(label) {
+  return String(label || '').trim().split(/\s+/).filter(Boolean).length < 2;
+}
+const SELF_TITLE = [
+  { subject: 'Payment reminder', body: 'Can you pay the $4,850 deposit tomorrow?', label: 'Pay $4,850 deposit' },
+  { subject: 'Re: the Q4 plan', body: 'Quick one: Can you review the SOW and get back to me on Monday? Thanks', label: 'Review SOW' },
+  { subject: 'Re: תזכורת', body: 'תזכיר לי לשלם את חשבון החשמל עד יום שישי.', label: 'לשלם את חשבון החשמל' },
+  { subject: 'Fwd: pricing sheet', body: 'Action needed from you: approve onboarding before Sunday. Best regards', label: 'Approve onboarding' },
+  { subject: 'Note to self', body: 'Call Yossi tomorrow at 10:00.', label: 'Call Yossi' },
+  { subject: 'Reminder', body: 'Need to call the bank tomorrow.', label: 'Call the bank' },
+  { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Log commitment' },
+  { subject: 'בהמשך להקמפיין', body: 'בבקשה תחזור אליי עד מחר בבוקר', label: 'לחזור בהמשך להקמפיין' },
+  { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'להתקשר לקליטת העובד החדש' }
+];
+for (const sample of SELF_TITLE) {
+  const out = J.judge({
+    text: sample.body,
+    subject: sample.subject,
+    sender: { name: 'Sali Sapan', email: OWN_GMAIL },
+    surface: 'gmail',
+    to: [OWN_GMAIL],
+    cc: [],
+    ownAddresses: [OWN_GMAIL, OWN_OUTLOOK],
+    userName: 'Sali',
+    ownNames: NAMES,
+    direction: 'self',
+    inbound: false,
+    now: new Date('2026-10-16T12:00:00')
+  });
+  const label = String((out.intent && out.intent.label) || '');
+  const face = shown(out) && out.process ? Display.cardFace(out.process, out.intent, { bodyText: sample.body }).title : '';
+  if (!shown(out) || oneWordTitle(label) || label !== sample.label || (sample.label === 'Log commitment' && face !== 'Log commitment')) {
+    console.log('FAIL: one-word self title rejected, got ' + JSON.stringify(label) + ' face ' + JSON.stringify(face) + ' wanted ' + sample.label);
+    process.exit(1);
+  }
+}
+for (const row of rows) {
+  const from = parseFrom(row.from).email.toLowerCase();
+  const to = (row.to || []).map((a) => String(a).toLowerCase());
+  const self = (from === OWN_GMAIL || from === OWN_OUTLOOK) && to.indexOf(from) >= 0;
+  if (self && row.expectLabel && oneWordTitle(row.expectLabel)) {
+    console.log('FAIL: one-word self title ' + row.id + ' ' + row.expectLabel);
+    process.exit(1);
   }
 }
 for (const id of ['v2syn-13337', 'v2syn-3328', 'v2syn-12553', 'v2syn-13797']) {

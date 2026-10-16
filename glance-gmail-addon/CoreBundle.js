@@ -5376,22 +5376,35 @@ const FlowIntent = (() => {
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
         if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
       }
-      // A note to self is that task. Log commitment is only this person's
-      // own first-person promise. Any other self-sent ask is titled from
-      // the action: Attach <file> to invite, Pay, Review, Call, or the
-      // verb in the mail. The file plan's process stays off this note.
-      if (intent.selfTask && type !== TYPES.SCHEDULED_EVENT && !intent.inviteFile) {
+      // A note to self is that task. "We agreed to …" is this person's
+      // promise, titled Log commitment with no date glued on. I'll send
+      // and I'll call you stay Log commitment for that day. Any other
+      // self-sent ask is the verb plus the object, or the verb plus the
+      // subject when the mail names no object. A file save already named
+      // its title. A real meeting keeps the label it had. A self-sent
+      // "call" that the event noun swallowed is still the phone task.
+      if (intent.selfTask && !intent.inviteFile) {
         intent.noReplyDraft = true;
-        const promise = ownFirstPersonPromise(text);
-        // A file save already named its title. The action title is the ask
-        // and the decision. Anything else keeps the label it already had.
-        const ask = type === TYPES.REQUEST || type === TYPES.DECISION_TO_LOG;
-        const titled = (promise || intent.googleClose || !ask) ? '' : selfAskTitle(text);
-        if (titled) intent.label = titled;
-        else if (!intent.googleClose && (type === TYPES.REQUEST || promise)) {
-          const iso = intent.entities && intent.entities.dateIso;
-          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-          intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
+        const subject = ctx && ctx.subject;
+        if (weAgreedPromise(text)) {
+          intent.label = 'Log commitment';
+        } else if (type === TYPES.SCHEDULED_EVENT) {
+          if (!intent.googleClose) {
+            const titled = selfAskTitle(text, subject);
+            if (titled && (bareSelfTitle(intent.label) || /^Call\b/.test(titled) || titled.indexOf('להתקשר') === 0)) {
+              intent.label = titled;
+            }
+          }
+        } else {
+          const promise = ownFirstPersonPromise(text);
+          const ask = type === TYPES.REQUEST || type === TYPES.DECISION_TO_LOG;
+          const titled = (promise || intent.googleClose || !ask) ? '' : selfAskTitle(text, subject);
+          if (titled) intent.label = titled;
+          else if (!intent.googleClose && (type === TYPES.REQUEST || promise)) {
+            const iso = intent.entities && intent.entities.dateIso;
+            const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+            intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
+          }
         }
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
@@ -5753,7 +5766,7 @@ const FlowIntent = (() => {
         hour: clock.hour,
         minute: clock.minute
       }, 'dated-commitment');
-      if (intent) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+      if (intent && !intent.selfTask) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
       return intent;
     }
     if (!blocked && !replyMisaddressed && typeof soloPhoneTask === 'function' && soloPhoneTask(text) && hasResolvedDate && clock && !isPast && !calledOff) {
@@ -5765,7 +5778,7 @@ const FlowIntent = (() => {
         hour: clock.hour,
         minute: clock.minute
       }, 'dated-commitment');
-      if (intent) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+      if (intent && !intent.selfTask) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
       return intent;
     }
     // "Add this to my tasks: call the bank" is the call reminder. It does
@@ -5779,7 +5792,7 @@ const FlowIntent = (() => {
       }, 'follow-up-ask');
       if (intent) {
         intent.noReplyDraft = true;
-        intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+        if (!intent.selfTask) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
       }
       return intent;
     }
@@ -5790,7 +5803,7 @@ const FlowIntent = (() => {
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso
       }, 'dated-commitment');
-      if (intent) intent.label = 'Call';
+      if (intent && !intent.selfTask) intent.label = 'Call';
       return intent;
     }
 
@@ -6120,7 +6133,9 @@ const FlowIntent = (() => {
   }
 
   // The user's own "I'll send" / "אשלח" / "I'll call you". That task stays
-  // Log commitment. "I need" and "could you" are the ask, not this promise.
+  // Log commitment for the day. "We agreed to …" is the same promise, and
+  // its title is Log commitment with no date. "I need" and "could you" are
+  // the ask, not this promise.
   function ownFirstPersonPromise(text) {
     const src = String(text || '');
     if (/\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(src)) return true;
@@ -6128,6 +6143,12 @@ const FlowIntent = (() => {
     if (/\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
     if (/(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(src)) return true;
     return false;
+  }
+  function weAgreedPromise(text) {
+    return /\bwe\s+agreed\s+to\b/i.test(String(text || ''));
+  }
+  function bareSelfTitle(label) {
+    return /^(?:Pay|Send|Review|Call|Update|File|Approve|Confirm|Sign|Scan|Upload|Prepare|Resend|Reply|Fill out|Loop in|Sign-off|לשלם|לשלוח|להעביר|להכין|למלא|לחזור|להעלות|לאשר|להגיש|לעדכן|להשלים|לסרוק|לבדוק|שיחה)$/.test(String(label || '').trim());
   }
   function payAsk(src) {
     if (/\b(?:pay|wire)\b/i.test(src)) return true;
@@ -6148,18 +6169,167 @@ const FlowIntent = (() => {
     if (/\bcall\b/i.test(src) && /\b(?:reminder|remember)\b/i.test(src) && !/\bto the call\b/i.test(src)) return true;
     return false;
   }
-  function earliestTitle(src, rows) {
-    let best = '';
+  function earliestVerb(src, rows) {
+    let best = null;
     let at = -1;
     for (let i = 0; i < rows.length; i++) {
       const m = src.match(rows[i][0]);
       if (!m || m.index == null) continue;
       if (at < 0 || m.index < at) {
         at = m.index;
-        best = rows[i][1];
+        best = { verb: rows[i][1], match: m };
       }
     }
     return best;
+  }
+  function prepareAsk(raw) {
+    return String(raw || '')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0]/g, ' ')
+      .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
+      .replace(/\bper our (?:call|chat)\b/ig, ' ')
+      .replace(/בהמשך לשיחתנו/g, ' ')
+      .replace(/\[[^\]]*image[^\]]*\]/ig, ' ')
+      .replace(/CONFIDENTIALITY[\s\S]*$/i, ' ')
+      .replace(/הודעה זו[\s\S]*$/, ' ')
+      .replace(/Sent from my iPhone/ig, ' ')
+      .replace(/נשלח מה-?\s*iPhone[\s\S]*/ig, ' ')
+      .replace(/(?:^|\n)\s*--\s*\n[\s\S]*$/, ' ')
+      .replace(/^(?:שבוע טוב|בוקר טוב|צהריים טובים|ערב טוב|happy monday|hope you(?:r week)? (?:is |are )?well)[.!,\s]*/i, ' ')
+      .replace(/\b(?:best regards|many thanks|thank you|thanks|regards|cheers)\b[\s\S]*$/i, ' ')
+      .replace(/(?:בברכה|בתודה|תודה רבה|יום נעים|המשך יום טוב|תודה)[\s\S]*$/, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function cleanSubject(subject) {
+    return String(subject || '')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '')
+      .replace(/\s+attached$/i, '')
+      .trim();
+  }
+  function weakSubject(subject) {
+    return /^(?:quick question|following up|reminder|todo|note to self|next steps|please add|task|payment reminder|outstanding balance|משימה|תזכורת|שאלה קצרה|תזכורת תשלום)$/i.test(String(subject || '').trim());
+  }
+  function weakObject(obj) {
+    return /^(?:it|this|that|them|me|you|us|file|files|attached file|the file|a file|attachment|an attachment|הקובץ|קובץ|אותו|את זה|זה|אליי|אלי|לי)$/i.test(String(obj || '').trim());
+  }
+  const EN_DATE_TAIL = /\s+(?:by|due|until|before|no later than|tomorrow|today|tonight|asap|eod|eow|end of (?:the )?(?:week|day)|for\s+next\b|tomorr\w*|next\s+(?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|on\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|oct(?:ober)?|nov(?:ember)?|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:tember)?|dec(?:ember)?|\d{1,2})|(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|january|february|march|april|may|june|july|august|september|october|november|december)\b[\s\S]*$/i;
+  const EN_DATE_LEAD = /^(?:by|on|before|until|due|no later than)\s+(?:eod|eow|asap|tomorrow|today|tonight|end of (?:the )?(?:week|day)|next\s+(?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|oct|nov)(?:\s+\d{1,2})?(?:,\s*(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2})?)\b\s*/i;
+  const HE_DATE_WORD = '(?:עד|מחר|היום|השבוע|ביום|ליום|לפני|סוף|asap|למערכת)';
+  const HE_DATE_TAIL = new RegExp('\\s+' + HE_DATE_WORD + '(?=\\s|$|[.,!?])[\\s\\S]*$', 'i');
+  const HE_DATE_LEAD = new RegExp('^' + HE_DATE_WORD + '(?=\\s|$|[.,!?])[\\s\\S]*$', 'i');
+  const AT_CLOCK = /\s+at\s+\d[\s\S]*$/i;
+  const NUM_DATE = /\s+(?:עד\s+)?(?:ה-)?\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?[\s\S]*$/;
+  function takeObject(rest, keepThe) {
+    let s = String(rest || '').replace(/\s+/g, ' ').trim();
+    s = s.replace(EN_DATE_LEAD, '');
+    s = s.replace(HE_DATE_LEAD, '');
+    s = s.replace(/\s+is\s+due\b[\s\S]*$/i, '');
+    s = s.replace(EN_DATE_TAIL, '').replace(AT_CLOCK, '').replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
+    s = s.replace(/\s+(?:and\s+get\s+back|and\s+send|so\s+(?:we|i)\s+can)\b[\s\S]*$/i, '');
+    s = s.replace(/\s+as\s+an\s+attachment\b[\s\S]*$/i, '');
+    s = s.split(/[.!?]/)[0];
+    s = s.replace(/\s+to\s+(?:my\s+)?(?:the\s+)?(?:portal|drive)\b[\s\S]*$/i, '');
+    s = s.replace(/\s+from\s+you\b[\s\S]*$/i, '');
+    s = s.replace(/^(?:and\s+(?:send|email)\s+)/i, '');
+    s = s.replace(/^(?:please|kindly|over|back|just)\s+/i, '');
+    s = s.replace(/^(?:me|you|us)\s+/i, '');
+    s = s.replace(/^(?:with)\s+/i, '');
+    if (!keepThe) s = s.replace(/^(?:the|a|an)\s+/i, '');
+    s = s.replace(/^(?:שלך|אליי|אלי|לי|לך|לכם|אותי|בבקשה|נא)\s+/, '');
+    s = s.replace(HE_DATE_LEAD, '').replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
+    s = s.replace(/^ו\S+\s+(?=את\s)/, '');
+    if (/^ל[\u0590-\u05FF]/.test(s) && !/^ל[השמב]/.test(s)) s = 'את ' + s.slice(1);
+    s = s.replace(/^על\s+ה-(\S+)/, '$1').replace(/^על\s+ה\s+(\S+)/, '$1');
+    s = s.replace(/^on\s+the\s+(\S+)$/i, '$1');
+    s = s.replace(/\s+attached$/i, '');
+    s = s.replace(/\s+is$/i, '');
+    s = s.replace(/[,\s]+$/g, '').replace(/\s+/g, ' ').trim();
+    return s;
+  }
+  function earlierNoun(src, index) {
+    const before = String(src || '').slice(0, index);
+    const re = /\b(?:the|a|an)\s+((?:[A-Za-z0-9$₪€£][\w$₪€£.,-]*)(?:\s+[A-Za-z0-9$₪€£][\w$₪€£.,-]*){0,4})/gi;
+    let found = '';
+    let m;
+    while ((m = re.exec(before))) found = m[1];
+    if (!found || /^(?:moment|call|week|day|time|email|mail|message|one)$/i.test(found)) return '';
+    return found;
+  }
+  function moneyPhrase(src) {
+    const m = String(src || '').match(/(?:\$|₪|€|£)\s?\d[\d,]*(?:\.\d+)?/);
+    if (!m) return '';
+    const amount = m[0].replace(/\s+/g, '').replace(/,+$/g, '');
+    const noun = String(src || '').match(/\b(deposit|invoice|balance|bill)\b/i);
+    return noun ? (amount + ' ' + noun[1].toLowerCase()) : amount;
+  }
+  function clipTitle(value) {
+    const t = String(value || '').replace(/\s+/g, ' ').trim();
+    if (t.length <= 72) return t;
+    const cut = t.lastIndexOf(' ', 72);
+    return (cut >= 12 ? t.slice(0, cut) : t.slice(0, 72)).trim();
+  }
+  function joinTitle(verb, obj, subject, opts) {
+    let object = String(obj || '').replace(/\s+/g, ' ').trim();
+    if (weakObject(object)) object = '';
+    if ((opts && opts.pay) && object && !/(?:\$|₪|€|£)/.test(object)) {
+      const money = moneyPhrase(opts.src || '');
+      if (money) object = money + (/^(?:deposit|invoice|payment|balance|bill)$/i.test(object) ? '' : '');
+      if (money && /^(?:deposit|invoice|payment|balance|bill)$/i.test(String(obj || '').trim())) object = money;
+    }
+    if (!object && opts && opts.pay) object = moneyPhrase(opts.src || '');
+    if (object) {
+      const title = clipTitle(verb + ' ' + object);
+      if (title.split(/\s+/).length >= 2 && !bareSelfTitle(title)) return title;
+    }
+    if (opts && opts.phoneHe) {
+      const sub = cleanSubject(subject).replace(/^בהמשך\s+ל/, '');
+      if (sub) return clipTitle('להתקשר ל' + sub);
+    }
+    const sub = cleanSubject(subject);
+    if (sub && !weakSubject(sub)) {
+      const title = clipTitle(verb + ' ' + sub);
+      if (title.split(/\s+/).length >= 2) return title;
+    }
+    return '';
+  }
+  function titleAfter(verb, match, src, subject, opts) {
+    const rest = src.slice(match.index + match[0].length);
+    const keepThe = Boolean(opts && opts.keepThe);
+    let obj = takeObject(rest, keepThe);
+    if (weakObject(obj)) obj = takeObject(earlierNoun(src, match.index), keepThe);
+    if (opts && opts.pay && (weakObject(obj) || /^payment of\b/i.test(obj))) obj = moneyPhrase(src) || obj;
+    return joinTitle(verb, obj, subject, Object.assign({ src: src }, opts || {}));
+  }
+  function firstOf(src, regs) {
+    let best = null;
+    for (let i = 0; i < regs.length; i++) {
+      const m = src.match(regs[i]);
+      if (!m || m.index == null) continue;
+      if (!best || m.index < best.index) best = m;
+    }
+    return best;
+  }
+  const NOT_CALLEE = /^(?:you|me|us|it|the|a|an|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|eod|asap|next|this|on|at|by|for|and|back|please|day|week|time|morning|afternoon|evening|is|was)$/i;
+  function callTitle(src, subject) {
+    if (/להחזיר(?:י|ו)?\s+לי\s+טלפון/.test(src)) {
+      return joinTitle('להתקשר', '', subject, { phoneHe: true, src: src });
+    }
+    const re = /\bcall\s+(?:(the|a|an)\s+)?([A-Za-z][A-Za-z'’-]{1,40})\b/gi;
+    let m;
+    let picked = null;
+    while ((m = re.exec(src))) {
+      if (NOT_CALLEE.test(m[2])) continue;
+      picked = m;
+    }
+    if (!picked) return '';
+    const article = picked[1] ? picked[1].toLowerCase() : '';
+    let name = picked[2];
+    if (article) name = name.toLowerCase();
+    else if (name.charAt(0) === name.charAt(0).toLowerCase()) name = name.charAt(0).toUpperCase() + name.slice(1);
+    return 'Call' + (article ? ' ' + article : '') + ' ' + name;
   }
   // Self-sent, and not this person's own promise. The title is the action.
   const SELF_EN_VERBS = [
@@ -6194,19 +6364,39 @@ const FlowIntent = (() => {
     [/להשלים|יש להשלים/, 'להשלים'],
     [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק']
   ];
-  function selfAskTitle(text) {
+  function selfAskTitle(text, subject) {
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
-    const src = raw
-      .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
-      .replace(/\bper our (?:call|chat)\b/ig, ' ')
-      .replace(/בהמשך לשיחתנו/g, ' ');
+    const src = prepareAsk(raw);
     const he = /[\u0590-\u05FF]/.test(src);
-    if (payAsk(src)) return he ? 'לשלם' : 'Pay';
-    if (reviewAsk(src)) return he ? 'לבדוק' : 'Review';
-    if (callAsk(src)) return he ? 'שיחה' : 'Call';
-    return earliestTitle(src, he ? SELF_HE_VERBS.concat(SELF_EN_VERBS) : SELF_EN_VERBS);
+    if (payAsk(src)) {
+      const m = firstOf(src, [/לשלם|תשלמ(?:י|ו)?/, /להעביר|תעביר(?:י|ו)?/, /לסגור/, /\bpay\b/i, /\bwire\b/i, /\bprocess\b/i, /\btransfer\b/i, /\bclear\b/i]);
+      if (m) {
+        const verb = /[\u0590-\u05FF]/.test(m[0]) ? 'לשלם' : 'Pay';
+        const titled = titleAfter(verb, m, src, subject, { pay: true });
+        if (titled) return titled;
+      }
+    }
+    if (reviewAsk(src)) {
+      const m = firstOf(src, [/לבדוק|תבדק(?:י|ו)?/, /\bdouble-?check\b/i, /\breview\b/i]);
+      if (m) {
+        const verb = he ? 'לבדוק' : 'Review';
+        const titled = titleAfter(verb, m, src, subject, {});
+        if (titled) return titled;
+      }
+    }
+    const phone = callTitle(src, subject);
+    if (phone) return phone;
+    if (callAsk(src)) {
+      const titled = he
+        ? joinTitle('להתקשר', '', subject, { phoneHe: true, src: src })
+        : '';
+      if (titled) return titled;
+    }
+    const hit = earliestVerb(src, he ? SELF_HE_VERBS.concat(SELF_EN_VERBS) : SELF_EN_VERBS);
+    if (!hit) return '';
+    return titleAfter(hit.verb, hit.match, src, subject, {});
   }
 
   return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
@@ -6949,7 +7139,7 @@ const FlowActions = (() => {
         proc = logIt;
       } else if ((createTaskAsk || callReminder) && !readerSaid) {
         proc = logIt;
-        if (callReminder) intent.label = heMail ? 'שיחה' : 'Call';
+        if (callReminder && !intent.selfTask) intent.label = heMail ? 'שיחה' : 'Call';
         else if (/^Reply requested\b/.test(String(intent.label || ''))) {
           const named = untimedSrc.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n.]+)/i);
           const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
@@ -6980,7 +7170,9 @@ const FlowActions = (() => {
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.
-    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid) {
+    // A self-sent phone task already named the person. Putting Call back
+    // would drop that object. Inbound "add this to my tasks: call …" stays Call.
+    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';

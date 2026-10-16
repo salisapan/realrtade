@@ -155,6 +155,9 @@ const FlowDisplay = (() => {
     if (fileCard) return { title: SAVE_TITLE, sentence: '', fileCard: true, logIt: false };
     const logIt = id === 'log-it' || /^log it$/i.test(name);
     if (logIt) {
+      if (intent && intent.label === 'Log commitment') {
+        return { title: 'Log commitment', sentence: p.closingLine || '', fileCard: false, logIt: true };
+      }
       if (intent && (intent.label === 'Call' || intent.label === 'שיחה')) {
         return { title: intent.label, sentence: p.closingLine || '', fileCard: false, logIt: true };
       }
