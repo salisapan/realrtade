@@ -105,7 +105,8 @@ const backgroundLines = backgroundSrc.split('\n');
 const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
 check('background.js loads the Meta consent on the line after the chat worker', /import '\.\.\/lane-chat\/meta-consent\.js'/.test(backgroundLines[nativeAt + 2] || ''));
-check('signup can open the Meta consent page', /msg\.type === 'flow:open-meta-chats'[\s\S]{0,700}openOptionsPage/.test(backgroundSrc));
+check('signup can open the Meta consent page', /msg\.type === 'flow:open-meta-chats'[\s\S]{0,400}tabs\.create/.test(backgroundSrc) && !/msg\.type === 'flow:open-meta-chats'[\s\S]{0,400}openOptionsPage/.test(backgroundSrc));
+check('WhatsApp Web is not a separate surface', !/label: 'WhatsApp Web'/.test(backgroundSrc));
 check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
@@ -118,10 +119,10 @@ const enableHtml = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'ut
 const popupHtml = fs.readFileSync(path.join(ROOT, 'popup/popup.html'), 'utf8');
 const popupJs = fs.readFileSync(path.join(ROOT, 'popup/popup.js'), 'utf8');
 check('one Meta consent replaces the per-app off line', enableSrc.indexOf('Messenger is off, so Business Suite stays quiet') < 0 && enableSrc.split('permissions.request(').length === 2);
-check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web on together/.test(enableHtml));
+check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web on together/.test(enableHtml) && /Glance סוגר לולאות פתוחות\. Gmail הוא המקום שבו הוא מתחיל היום\./.test(enableHtml) && /הסכמה אחת מפעילה יחד את Messenger/.test(enableHtml));
 check('Hebrew and English name the one Meta button', metaSrc.indexOf('Turn on Meta chats') >= 0 && metaSrc.indexOf("הפעל צ'אטים של Meta") >= 0);
 check('the popup page has a Meta row', popupHtml.indexOf('id="meta-chats"') >= 0 && popupHtml.indexOf('meta-consent.js') >= 0);
-check('the popup opens the enable page through the shared consent', popupJs.indexOf('FlowMetaConsent.paintLink') >= 0 && popupJs.indexOf('renderMetaChats') >= 0 && popupJs.indexOf('lane-chat/enable.html') >= 0);
+check('the popup opens the enable page through the shared consent', popupJs.indexOf('FlowMetaConsent.paintLink') >= 0 && popupJs.indexOf('renderMetaChats') >= 0 && popupJs.indexOf("id === 'whatsapp'") >= 0);
 check('Meta consent does not ask for every url', !/<all_urls>/.test(enableSrc) && !/<all_urls>/.test(metaSrc) && (manifest.host_permissions || []).indexOf('<all_urls>') < 0 && (manifest.optional_host_permissions || []).indexOf('<all_urls>') < 0);
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 check('jsdom is a devDependency', Boolean(pkg.devDependencies && pkg.devDependencies.jsdom));
@@ -1273,7 +1274,10 @@ console.log('\n--- calendar evidence ---\n');
   await new Promise((r) => setTimeout(r, 40));
   const enButtons = en.enable.window.document.querySelectorAll('button');
   const enLabel = enButtons[0] && enButtons[0].querySelector('.btn-label');
+  const enCopy = en.enable.window.document.querySelector('[data-lang="en"]');
+  const enHeCopy = en.enable.window.document.querySelector('[data-lang="he"]');
   check('the prompt waits for the one Meta button', en.asked.length === 0 && en.registered.length === 0 && enButtons.length === 1 && enLabel && enLabel.textContent === 'Turn on Meta chats' && enButtons[0].querySelector('.shell') && enButtons[0].querySelector('.ring') && enButtons[0].querySelector('.shine'));
+  check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
   enButtons[0].click();
   await new Promise((r) => setTimeout(r, 40));
   check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => optional.indexOf(origin) >= 0) && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
@@ -1297,7 +1301,10 @@ console.log('\n--- calendar evidence ---\n');
   const he = bootEnable({ lang: 'he' });
   await new Promise((r) => setTimeout(r, 40));
   const heLabel = he.enable.window.document.querySelector('.btn-label');
+  const heCopy = he.enable.window.document.querySelector('[data-lang="he"]');
+  const heEnCopy = he.enable.window.document.querySelector('[data-lang="en"]');
   check('Hebrew UI names the one Meta button', he.asked.length === 0 && heLabel && heLabel.textContent === "הפעל צ'אטים של Meta" && he.enable.window.document.documentElement.lang === 'he');
+  check('Hebrew UI shows the Hebrew explanation', heCopy && heCopy.hidden === false && /Glance סוגר לולאות פתוחות/.test(heCopy.textContent) && /הסכמה אחת מפעילה יחד/.test(heCopy.textContent) && /טיוטה אינה לולאה סגורה/.test(heCopy.textContent) && heEnCopy && heEnCopy.hidden === true);
   he.enable.window.close();
 
   const already = bootEnable({ lang: 'en', granted: true });
@@ -1308,13 +1315,23 @@ console.log('\n--- calendar evidence ---\n');
   const pop = new JSDOM('<div id="metaChatsBlock"><div id="meta-chats"></div></div>', { runScripts: 'outside-only', url: 'chrome-extension://glance/popup/popup.html' });
   new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8'), { filename: 'meta-consent.js' }).runInContext(pop.getInternalVMContext());
   const host = pop.window.document.getElementById('meta-chats');
-  const link = pop.window.FlowMetaConsent.paintLink(host, { granted: false, lang: 'en', href: '../lane-chat/enable.html' });
-  check('the popup link is present in English', link && link.tagName === 'A' && link.getAttribute('href').indexOf('lane-chat/enable.html') >= 0 && link.querySelector('.btn-label').textContent === 'Turn on Meta chats' && host.hidden === false);
+  const created = [];
+  const link = pop.window.FlowMetaConsent.paintLink(host, {
+    granted: false,
+    lang: 'en',
+    chrome: {
+      tabs: { create(spec) { created.push(spec); } },
+      runtime: { getURL: (p) => 'chrome-extension://glance/' + p, lastError: null, sendMessage() { throw new Error('the popup opens a tab itself'); } }
+    }
+  });
+  link.click();
+  check('the popup link is present in English', link && link.tagName === 'BUTTON' && !link.getAttribute('href') && link.querySelector('.btn-label').textContent === 'Turn on Meta chats' && host.hidden === false);
+  check('the popup opens the enable page in a tab', created.length === 1 && created[0].url === 'chrome-extension://glance/lane-chat/enable.html');
   const heHost = pop.window.document.createElement('div');
-  const heLink = pop.window.FlowMetaConsent.paintLink(heHost, { granted: false, lang: 'he', href: '../lane-chat/enable.html' });
-  check('the popup link is present in Hebrew', heLink && heLink.querySelector('.btn-label').textContent === "הפעל צ'אטים של Meta" && heLink.getAttribute('href').indexOf('lane-chat/enable.html') >= 0);
-  const gone = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'en', href: '../lane-chat/enable.html' });
-  check('a granted Meta consent hides the popup row', gone == null && host.hidden === true && host.querySelector('a') == null);
+  const heLink = pop.window.FlowMetaConsent.paintLink(heHost, { granted: false, lang: 'he', chrome: { tabs: { create() {} }, runtime: { getURL: (p) => p } } });
+  check('the popup link is present in Hebrew', heLink && heLink.tagName === 'BUTTON' && heLink.querySelector('.btn-label').textContent === "הפעל צ'אטים של Meta");
+  const gone = pop.window.FlowMetaConsent.paintLink(host, { granted: true, lang: 'en' });
+  check('a granted Meta consent hides the popup row', gone == null && host.hidden === true && host.querySelector('button') == null);
   let sent = null;
   const opened = await pop.window.FlowMetaConsent.open({
     runtime: {
@@ -1324,6 +1341,45 @@ console.log('\n--- calendar evidence ---\n');
   });
   check('signup can call the Meta consent opener', sent && sent.type === 'flow:open-meta-chats' && opened.ok === true && opened.page === 'lane-chat/enable.html' && pop.window.FlowMetaConsent.ORIGINS.join('\n') === META_ORIGINS.join('\n'));
   pop.window.close();
+
+  function loadLanes(granted) {
+    const registered = [];
+    const stored = { surfaces: {} };
+    const sandbox = {
+      console: { log() {}, info() {}, warn() {}, error() {} },
+      URLSearchParams, URL, TextEncoder, Uint8Array,
+      fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+      chrome: {
+        runtime: { getManifest: () => ({ version: '0.9.56', oauth2: { client_id: 'x' }, content_scripts: [{ js: ['core/domains.js', 'src/storage.js', 'src/content-gmail.js'] }] }), onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} }, lastError: null, getURL: (s) => s, id: 'ext' },
+        identity: { getAuthToken(x, cb) { cb(null); }, removeCachedAuthToken(x, cb) { cb(); }, getRedirectURL: () => 'https://ext.chromiumapp.org/' },
+        storage: { local: { get: async (k) => { const s = JSON.parse(JSON.stringify(stored)); if (k && typeof k === 'object' && !Array.isArray(k)) return Object.assign({}, k, s); return s; }, set: async (p) => { Object.assign(stored, p); }, remove: async () => {} }, onChanged: { addListener() {} } },
+        permissions: { contains: async (spec) => { const origins = (spec && spec.origins) || []; return origins.length > 0 && origins.every((origin) => granted.indexOf(origin) >= 0); }, remove: async () => true },
+        scripting: {
+          getRegisteredContentScripts: async () => registered.slice(),
+          registerContentScripts: async (list) => { list.forEach((row) => registered.push(row)); },
+          unregisterContentScripts: async () => {},
+          executeScript: async () => [{ result: false }]
+        },
+        tabs: { query: async () => [], sendMessage: async () => undefined, reload: async () => {} },
+        windows: { create() {}, onRemoved: { addListener() {} } },
+        alarms: { create() {}, onAlarm: { addListener() {} } },
+        contextMenus: { create() {}, removeAll(cb) { if (cb) cb(); }, onClicked: { addListener() {} } },
+        action: { setBadgeText() {}, setBadgeBackgroundColor() {} }
+      }
+    };
+    sandbox.self = sandbox;
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+    return { registered, settle: () => new Promise((r) => setTimeout(r, 40)) };
+  }
+  const waOnly = loadLanes(['https://web.whatsapp.com/*']);
+  await waOnly.settle();
+  check('a WhatsApp-only grant registers no lane', waOnly.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).length === 0, waOnly.registered.map((row) => row.id));
+  const full = loadLanes(META_ORIGINS.slice());
+  await full.settle();
+  const fullIds = full.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
+  check('a full Meta grant registers three lanes', fullIds.join(',') === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp', fullIds);
 
   const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
   const fixtureClock = fs.readFileSync(path.join(ROOT, 'dev/fixture-clock.js'), 'utf8');

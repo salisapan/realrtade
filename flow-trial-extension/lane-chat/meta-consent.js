@@ -40,10 +40,10 @@
       return null;
     }
     host.hidden = false;
-    const link = doc.createElement('a');
+    const link = doc.createElement('button');
+    link.type = 'button';
     link.className = 'primary';
     link.id = 'meta-chats-link';
-    link.href = (opts && opts.href) || PAGE;
     ['shell', 'ring', 'shine'].forEach((name) => {
       const span = doc.createElement('span');
       span.className = name;
@@ -53,12 +53,24 @@
     text.className = 'btn-label';
     text.textContent = label(opts && opts.lang);
     link.appendChild(text);
+    link.addEventListener('click', (event) => {
+      if (event && event.preventDefault) event.preventDefault();
+      open(opts && opts.chrome);
+    });
     host.appendChild(link);
     return link;
   }
 
   function open(chromeApi) {
     const api = chromeApi || globalThis.chrome;
+    if (api && api.tabs && typeof api.tabs.create === 'function') {
+      let url = PAGE;
+      try { if (api.runtime && typeof api.runtime.getURL === 'function') url = api.runtime.getURL(PAGE); } catch (e) { url = PAGE; }
+      try {
+        api.tabs.create({ url: url });
+        return Promise.resolve({ ok: true, page: PAGE });
+      } catch (e) { /* the worker can open the tab */ }
+    }
     if (!api || !api.runtime || typeof api.runtime.sendMessage !== 'function') {
       return Promise.resolve({ ok: false, page: PAGE });
     }

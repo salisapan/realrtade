@@ -2040,7 +2040,6 @@
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
   // with a property for its wiring, not a let: it runs during init.
   const SURFACE_COPY = {
-    whatsapp: 'קורא שיחות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, רשימות וערוצים לא נקראים. ניסיוני: WhatsApp יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
   };
@@ -2052,11 +2051,7 @@
     try {
       if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
     } catch (e) { on = false; }
-    let href = '../lane-chat/enable.html';
-    try {
-      if (chrome.runtime && typeof chrome.runtime.getURL === 'function') href = chrome.runtime.getURL(FlowMetaConsent.PAGE);
-    } catch (e) { href = '../lane-chat/enable.html'; }
-    FlowMetaConsent.paintLink(host, { granted: on, lang: uiLang(), href: href });
+    FlowMetaConsent.paintLink(host, { granted: on, lang: uiLang(), chrome: chrome });
     block.hidden = Boolean(on);
   }
 
@@ -2075,6 +2070,7 @@
     try {
     for (const id of Object.keys(st.surfaces || {})) {
       if (id === 'outlook') continue; // managed by the Outlook row (connect registers the OWA chip)
+      if (id === 'whatsapp') continue; // WhatsApp Web turns on with the one Meta consent
       const s = st.surfaces[id];
       const row = el('div', 'wait-item');
       const top = el('div', 'wait-top');

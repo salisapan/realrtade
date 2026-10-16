@@ -203,8 +203,8 @@ chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
 // Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
 // site's permission (an OPTIONAL host permission: the install itself asks for nothing new) and then registers the content scripts for
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
+// WhatsApp Web is not its own row. It turns on with the one Meta consent.
 const SURFACES = {
-  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
   slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
   telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
@@ -510,18 +510,20 @@ const LANE_CHAT = [
 
 async function restoreLaneChats() {
   if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
-  for (const lane of LANE_CHAT) {
-    let on = false;
-    try { on = await chrome.permissions.contains({ origins: lane.origins }); } catch (e) { on = false; }
-    if (!on) {
-      if (lane.id !== 'glance-lane-messenger' || !chrome.tabs || !chrome.tabs.query) continue;
+  const metaOrigins = (typeof FlowMetaConsent !== 'undefined' && Array.isArray(FlowMetaConsent.ORIGINS)) ? FlowMetaConsent.ORIGINS.slice() : [];
+  let on = false;
+  try { on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins }); } catch (e) { on = false; }
+  if (!on) {
+    if (chrome.tabs && chrome.tabs.query) {
+      const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
+      const urls = messenger ? messenger.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) : [];
       let open = [];
-      try {
-        open = await chrome.tabs.query({ url: lane.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) });
-      } catch (e) { open = []; }
+      try { open = urls.length ? await chrome.tabs.query({ url: urls }) : []; } catch (e) { open = []; }
       if (open.length) console.info('[Glance] whyNotShown: messenger-not-granted');
-      continue;
     }
+    return;
+  }
+  for (const lane of LANE_CHAT) {
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
     try {
       await chrome.scripting.registerContentScripts([{
@@ -4880,17 +4882,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Signup, later, opens the one Meta consent page. The prompt stays on that page.
   if (msg.type === 'flow:open-meta-chats') {
     const page = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.PAGE) || 'lane-chat/enable.html';
-    const fallback = () => {
-      try {
-        if (chrome.tabs && typeof chrome.tabs.create === 'function') chrome.tabs.create({ url: chrome.runtime.getURL(page) });
-      } catch (e) { /* the signup page can open the link itself */ }
-    };
     try {
-      if (chrome.runtime && typeof chrome.runtime.openOptionsPage === 'function') {
-        const pending = chrome.runtime.openOptionsPage();
-        if (pending && typeof pending.then === 'function') pending.catch(() => fallback());
-      } else fallback();
-    } catch (e) { fallback(); }
+      if (chrome.tabs && typeof chrome.tabs.create === 'function') chrome.tabs.create({ url: chrome.runtime.getURL(page) });
+    } catch (e) { /* the signup page can open the link itself */ }
     try { sendResponse({ ok: true, page: page }); } catch (e) { /* the caller closed */ }
     return true;
   }

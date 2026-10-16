@@ -53,6 +53,18 @@ const note = doc.getElementById('note');
 
 function say(text) { if (note) note.textContent = text; }
 
+function showCopy(code) {
+  const he = isHe(code);
+  const blocks = doc.querySelectorAll('[data-lang]');
+  blocks.forEach((node) => {
+    node.hidden = (node.getAttribute('data-lang') === 'he') !== he;
+  });
+  try {
+    doc.documentElement.lang = he ? 'he' : 'en';
+    doc.documentElement.dir = he ? 'rtl' : 'ltr';
+  } catch (e) { /* the words are still in the page */ }
+}
+
 function isHe(code) {
   const raw = String(code || '').toLowerCase();
   return raw.indexOf('he') === 0 || raw.indexOf('iw') === 0;
@@ -166,6 +178,7 @@ async function turnOn(code) {
 
 async function start() {
   const code = await preferredLang();
+  showCopy(code);
   const on = await granted(metaOrigins());
   if (!on) { showButton(code); return; }
   try {
