@@ -211,7 +211,8 @@ const FlowDisplay = (() => {
     'third-party': 'משתמש חיצוני',
     'calendar-write-not-granted': 'צריך הרשאה ליומן',
     'outlook-calendar-write-not-granted': 'צריך הרשאה ליומן',
-    'scan-skipped': 'עדיין קורא את המייל'
+    'scan-skipped': 'עדיין קורא את המייל',
+    'names-pending': 'ממתין לשם'
   };
 
   function whyNotShownLine(reason) {
@@ -516,6 +517,35 @@ const FlowDisplay = (() => {
     });
   }
 
+  // The age on a still-open row. Same picker as the chrome: a Hebrew UI
+  // says לפני 11 שע׳, an English UI says 11h ago. A day past that is
+  // 17 באוק׳ or Oct 17. The mail's own title is not this string.
+  function ageLine(ts, lang, now) {
+    const which = uiLangFrom({ setting: lang });
+    const L = chrome(which);
+    const at = Number(ts);
+    const clock = Number(now);
+    const base = Number.isFinite(clock) ? clock : Date.now();
+    if (!Number.isFinite(at)) return '';
+    const mins = Math.round((base - at) / 60000);
+    if (mins < 1) return L.justNow;
+    if (mins < 60) return fillChrome(L.minsAgo, { n: mins });
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return fillChrome(L.hrsAgo, { n: hrs });
+    const day = new Date(at);
+    if (which === 'he') {
+      const iso = day.getFullYear() + '-' + String(day.getMonth() + 1).padStart(2, '0') + '-' + String(day.getDate()).padStart(2, '0');
+      return hebrewDay(iso);
+    }
+    return EN_MON[day.getMonth()] + ' ' + day.getDate();
+  }
+
+  // A greeting cannot be judged until userinfo (or the me chip) has a name.
+  // This line is that hold. It is not a quiet.
+  function namesPendingLine(lang) {
+    return uiLangFrom({ setting: lang }) === 'he' ? 'ממתין לשם' : 'Waiting for your name';
+  }
+
   function uiLangFrom(sources) {
     const s = sources || {};
     const setting = s.setting == null ? '' : String(s.setting).trim();
@@ -706,6 +736,8 @@ const FlowDisplay = (() => {
     localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,
+    ageLine: ageLine,
+    namesPendingLine: namesPendingLine,
     chrome: chrome,
     actionLabel: actionLabel,
     fillChrome: fillChrome,

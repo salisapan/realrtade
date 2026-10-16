@@ -30,6 +30,16 @@ check('the Hebrew chip date stays the calendar day', D.holdWhenLine('2026-10-18'
 check('an English chip date is English', D.holdWhenLine('2026-10-18', 11, 0, 'en') === 'Oct 18 11:00', D.holdWhenLine('2026-10-18', 11, 0, 'en'));
 check('an English deadline is English', D.cardDateLine('2026-10-23', 'en') === 'until Oct 23', D.cardDateLine('2026-10-23', 'en'));
 check('a deadline with no language stays Hebrew', D.cardDateLine('2026-10-23') === 'עד 23 באוק׳');
+const elevenHours = Date.parse('2026-10-16T01:00:00Z');
+const elevenNow = Date.parse('2026-10-16T12:00:00Z');
+check('11h ago follows an English UI', D.ageLine(elevenHours, 'en', elevenNow) === '11h ago', D.ageLine(elevenHours, 'en', elevenNow));
+check('11h ago follows a Hebrew UI', D.ageLine(elevenHours, 'he', elevenNow) === 'לפני 11 שע׳', D.ageLine(elevenHours, 'he', elevenNow));
+const oct17 = Date.parse('2026-10-17T12:00:00Z');
+const oct18 = Date.parse('2026-10-18T12:00:00Z');
+check('a day-old English age is Oct 17', D.ageLine(oct17, 'en', oct18) === 'Oct 17', D.ageLine(oct17, 'en', oct18));
+check('a day-old Hebrew age is 17 באוק׳', D.ageLine(oct17, 'he', oct18) === '17 באוק׳', D.ageLine(oct17, 'he', oct18));
+check('names-pending is English on an English UI', D.namesPendingLine('en') === 'Waiting for your name');
+check('names-pending is Hebrew on a Hebrew UI', D.namesPendingLine('he') === 'ממתין לשם' && D.whyNotShownLine('names-pending') === 'ממתין לשם');
 
 const holdCtx = {
   glanceChain: 'calendar-hold',
@@ -54,6 +64,7 @@ check('Outlook reads the host page language through the helper', outlook.indexOf
 check('Gmail reads the host page language through the same helper', gmail.indexOf('hostLanguage') >= 0 && gmail.indexOf('FlowDisplay.uiLangFrom') >= 0);
 check('Outlook and Gmail put the hold line in the card title', outlook.indexOf('FlowDisplay.cardTitle') >= 0 || host.indexOf('FlowDisplay.cardTitle') >= 0);
 check('Gmail puts the hold line in the card title', gmail.indexOf('FlowDisplay.cardTitle') >= 0);
+check('Gmail ages a row with the same locale helper', gmail.indexOf('FlowDisplay.ageLine') >= 0);
 
 console.log('\n--- Activity is one language ---\n');
 const quiet = 'Trusted closes 1 this week · Undo 0 · Silence this week 1 · family 1';
@@ -68,6 +79,7 @@ check('a still-open line follows the helper', D.activityMetric('he', 'Still open
 
 const popupJs = fs.readFileSync(path.join(ROOT, 'popup', 'popup.js'), 'utf8');
 check('Activity paints through the same helper', popupJs.indexOf('FlowDisplay.activityMetric') >= 0 && popupJs.indexOf('function uiLang()') >= 0);
+check('the popup ages a row with the same locale helper', popupJs.indexOf('FlowDisplay.ageLine') >= 0);
 
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }

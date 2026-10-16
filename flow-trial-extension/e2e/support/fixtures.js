@@ -54,7 +54,8 @@ function gmailHtml(opts) {
   const inbox = o.threadBesideInbox
     ? '<div role="list"><div role="listitem" data-legacy-thread-id="inbox-other"><span class="y2">older snippet</span></div></div>'
     : '';
-  return '<!doctype html><html><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
+  const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
     '<div role="main">' +
     inbox +
     '<h2 class="hP">' + esc(subject) + '</h2>' +

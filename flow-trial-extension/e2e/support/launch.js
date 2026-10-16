@@ -481,9 +481,21 @@ async function boot() {
     await route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
   });
 
+  const consoleErrors = [];
+  function noteError(source, text) {
+    const line = source + ': ' + String(text || '').slice(0, 500);
+    consoleErrors.push(line);
+  }
+  function watchWorker(sw) {
+    if (!sw || sw.__glanceWatched) return;
+    sw.__glanceWatched = true;
+    sw.on('console', (msg) => { if (msg.type() === 'error') noteError('worker', msg.text()); });
+    sw.on('pageerror', (err) => noteError('worker-pageerror', err && err.message ? err.message : err));
+  }
+  context.on('serviceworker', (next) => { worker = next; watchWorker(next); });
   let worker = context.serviceWorkers()[0];
   if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 30000 });
-  context.on('serviceworker', (next) => { worker = next; });
+  watchWorker(worker);
 
   async function currentWorker() {
     const live = context.serviceWorkers();
@@ -498,7 +510,8 @@ async function boot() {
     documents,
     worker: null,
     page: null,
-    keepPopup: false
+    keepPopup: false,
+    consoleErrors
   };
 
   async function evalWorker(fn, arg) {
@@ -615,7 +628,8 @@ async function boot() {
   async function openDocument(url, html) {
     documents.set(url.split('#')[0], html);
     const page = await context.newPage();
-    page.on('pageerror', () => {});
+    page.on('pageerror', (err) => noteError('page', err && err.message ? err.message : err));
+    page.on('console', (msg) => { if (msg.type() === 'error') noteError('page', msg.text()); });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     harness.page = page;
     return page;
@@ -646,7 +660,8 @@ async function boot() {
   harness.openFixture = async function openFixture(search) {
     const url = 'chrome-extension://' + extensionId + '/dev/messenger-fixture.html' + (search || '');
     const page = await context.newPage();
-    page.on('pageerror', () => {});
+    page.on('pageerror', (err) => noteError('page', err && err.message ? err.message : err));
+    page.on('console', (msg) => { if (msg.type() === 'error') noteError('page', msg.text()); });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     harness.page = page;
     return page;

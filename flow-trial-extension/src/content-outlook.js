@@ -3610,7 +3610,7 @@
       quote: holdTextOf(pane) || (hold.params && hold.params.quote) || null
     });
     const holdLine = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function')
-      ? FlowDisplay.holdWhenLine(params.dateIso, params.hour, params.minute)
+      ? FlowDisplay.holdWhenLine(params.dateIso, params.hour, params.minute, pageUiLang())
       : '';
     if (!holdLine) {
       await pageReason('page:hold-without-clock', pane);

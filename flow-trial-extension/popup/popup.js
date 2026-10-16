@@ -3024,6 +3024,7 @@
   }
 
   function when(ts) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.ageLine === 'function') return FlowDisplay.ageLine(ts, uiLang());
     const mins = Math.round((Date.now() - ts) / 60000);
     const Lw = words();
     if (mins < 1) return Lw.justNow;

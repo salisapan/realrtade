@@ -13,10 +13,11 @@
 // a wrong write, because judgment only ever reads text and the write path
 // only ever adds a record.
 
-// Chip and header lines follow the browser UI language. A stored Hebrew
-// label must not appear in an English UI, and the reverse is the same rule.
-// FlowDisplay.uiLangFrom is the one picker. This fallback is that same
-// order (setting, host, UI, navigator) when the shared file has not loaded.
+// Chip and header lines follow the Gmail UI language. A stored setting
+// wins, then the host page language, then the browser UI, then
+// navigator.language. An English Gmail UI stays English. A Hebrew Gmail
+// UI (he, he-*, iw, iw-*) is Hebrew. FlowDisplay.uiLangFrom is that
+// picker. This fallback is the same order when the shared file has not loaded.
 function glancePickLang(sources) {
   const s = sources || {};
   if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
@@ -77,6 +78,17 @@ function glanceUiCopy(kind) {
   // new files run. The service worker removes leftover chips first.
   if (typeof globalThis !== 'undefined' && globalThis.__glanceGmailGuard === true) return;
   if (typeof globalThis !== 'undefined') globalThis.__glanceGmailGuard = true;
+  // A content-script throw does not reach the page console on its own.
+  // Logging it is what the Gmail path test fails on.
+  try {
+    self.addEventListener('error', (ev) => {
+      console.error('[Glance] content error', ev && (ev.message || ev.error) || ev);
+    });
+    self.addEventListener('unhandledrejection', (ev) => {
+      const reason = ev && ev.reason;
+      console.error('[Glance] unhandled rejection', reason && reason.message ? reason.message : reason);
+    });
+  } catch (e) { /* the page test still watches pageerror */ }
   // Every FlowStorage.appendLog() call this file makes is tagged with this
   // one constant — see core/README.md's "Adding a new inbox host" section.
   // A future content-outlook.js defines its own SOURCE_APP ('outlook') and
@@ -693,7 +705,7 @@ function glanceUiCopy(kind) {
       maybeScanInbox()
         .catch((e) => console.error('[Glance] inbox scan failed', e))
         .then(() => scanReadingPane())
-        .catch(() => { tearDownOrphan(); });
+        .catch((e) => { console.error('[Glance] reading pane scan failed', e && e.message ? e.message : e); tearDownOrphan(); });
     }, 400);
     const onMutate = () => {
       if (!chromeLive()) return;
@@ -1530,8 +1542,12 @@ function glanceUiCopy(kind) {
     // nothing, times out, or the backend isn't configured — same "just
     // don't show a chip" contract the local path already follows.
     // Names are not cached yet. No card, and this is not a quiet. The
-    // storage listener judges the open mail again once they land.
-    if (intent && intent.namesPending) return;
+    // line on the mail is names-pending. The storage listener judges
+    // the open mail again once userinfo or the me chip lands a name.
+    if (intent && intent.namesPending) {
+      paintNamesPending(message, messageId, subject);
+      return;
+    }
     const localFired = Boolean(intent.type);
     // A local 'low' is a decision to stay quiet, not a miss. A named quiet
     // (noise, hedge, family, calibrated, google) is the same decision.
@@ -1551,6 +1567,7 @@ function glanceUiCopy(kind) {
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
     if (!FlowIntent.shouldShowChip(intent)) {
+      clearGmailWhy(message);
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
       const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
@@ -1573,14 +1590,18 @@ function glanceUiCopy(kind) {
     // left alone — this only stops a REQUEST chip that would otherwise
     // offer to attach or draft around an unclear file.
     const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
-    if (fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
+    // A file asked onto an invite that already exists is the attach card
+    // (task + short draft). The receipt chain does not own that ask.
+    // The shared judge skips this silence when intent.inviteFile is set.
+    const inviteAsked = Boolean(intent && intent.inviteFile);
+    if (!inviteAsked && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
       recordSilence(messageId, fileGate.reason === 'third-party' ? 'third-party' : 'file');
       return;
     }
     // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
     // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
     // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
-    if (!deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
       recordSilence(messageId, 'file');
       return;
     }
@@ -2275,9 +2296,81 @@ function glanceUiCopy(kind) {
     mountGoogleDetail(host, ctx);
   }
 
+  function clearGmailWhy(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return;
+    const nodes = messageNode.querySelectorAll('.flow-why-not');
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      try { nodes[i].remove(); } catch (e) { /* already gone */ }
+    }
+  }
+
+  function paintGmailWhy(messageNode, reason, text) {
+    if (!messageNode || (messageNode.querySelector && messageNode.querySelector('.flow-chip-host'))) return;
+    let line = messageNode.querySelector ? messageNode.querySelector('.flow-why-not') : null;
+    if (line && line.getAttribute('data-glance-why') === reason && line.textContent === text) return;
+    if (!line) {
+      line = document.createElement('p');
+      line.className = 'flow-why-not';
+      messageNode.appendChild(line);
+    }
+    line.className = 'flow-why-not';
+    line.textContent = text;
+    line.setAttribute('data-glance-why', reason || 'names-pending');
+  }
+
+  function paintNamesPending(messageNode, messageId, subject) {
+    const lang = glanceUiLang();
+    const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.namesPendingLine === 'function')
+      ? FlowDisplay.namesPendingLine(lang)
+      : (lang === 'he' ? 'ממתין לשם' : 'Waiting for your name');
+    paintGmailWhy(messageNode, 'names-pending', line);
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.set({
+      glanceWhyCurrent: {
+        reason: 'names-pending',
+        subject: subject || '',
+        messageId: messageId || null,
+        at: Date.now()
+      }
+    }).catch(() => {});
+  }
+
+  function stampInviteDraft(host, ctx) {
+    if (!host || !ctx || !ctx.intent || !ctx.intent.inviteFile) return;
+    const steps = (ctx.process && ctx.process.steps) || [];
+    let body = '';
+    let title = '';
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      if (!step || !step.params) continue;
+      if ((step.kind === 'gmailDraft' || step.kind === 'outlookDraft') && step.params.body) body = String(step.params.body);
+      if ((step.kind === 'googleTask' || step.kind === 'googleTasks' || step.kind === 'task') && step.params.title) title = String(step.params.title);
+    }
+    if (title) host.setAttribute('data-glance-task', title);
+    if (!body) return;
+    host.setAttribute('data-glance-draft', body);
+    const note = el('p', 'flow-chip-draft', body);
+    host.appendChild(note);
+  }
+
+  function appendCardWhen(host, ctx, lang) {
+    if (!host || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.holdClockFrom !== 'function') return;
+    const clock = FlowDisplay.holdClockFrom(ctx);
+    if (!clock || !clock.dateIso) return;
+    const hold = ctx.process && (ctx.process.id === 'hold' || ctx.process.id === 'schedule' || ctx.process.id === 'schedule-confirm' || ctx.process.id === 'clear-it' || ctx.process.id === 'move-it');
+    let line = '';
+    if (hold && typeof FlowDisplay.holdWhenLine === 'function') line = FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang);
+    else if (typeof FlowDisplay.cardDateLine === 'function') line = FlowDisplay.cardDateLine(clock.dateIso, lang);
+    if (!line) return;
+    const node = el('p', 'flow-chip-when', line);
+    node.setAttribute('data-glance-when', line);
+    host.appendChild(node);
+  }
+
   function injectChip(messageNode, ctx) {
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
+    clearGmailWhy(messageNode);
 
     const lang = glanceUiLang();
     const host = el('div', 'flow-chip-host');
@@ -2426,6 +2519,8 @@ function glanceUiCopy(kind) {
       const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
       if (draft) host.appendChild(buildAttachChooser(draft, ctx));
       mountGoogleDetail(host, ctx);
+      stampInviteDraft(host, ctx);
+      appendCardWhen(host, ctx, lang);
       messageNode.insertBefore(host, messageNode.firstChild);
       return;
     }
@@ -2445,6 +2540,8 @@ function glanceUiCopy(kind) {
       if (draft) host.appendChild(buildAttachChooser(draft, ctx));
     }
     mountGoogleDetail(host, ctx);
+    stampInviteDraft(host, ctx);
+    appendCardWhen(host, ctx, lang);
 
     messageNode.insertBefore(host, messageNode.firstChild);
   }
@@ -4054,6 +4151,7 @@ function glanceUiCopy(kind) {
   // a process open for three weeks used to look identical, in this same
   // Brief panel, to one from ten minutes ago.
   function relativeAge(ts) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.ageLine === 'function') return FlowDisplay.ageLine(ts, glanceUiLang());
     const mins = Math.round((Date.now() - ts) / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return mins + 'm ago';

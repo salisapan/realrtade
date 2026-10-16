@@ -128,8 +128,9 @@ const FlowChipHost = (() => {
     const dateWaiting = ctx.process.needsDateChoice === true && Array.isArray(ctx.process.dateChoices) && ctx.process.dateChoices.length >= 2;
     if (holdCard(ctx)) {
       const clock = clockOf(ctx);
+      const lang = cardLang(ctx);
       const line = clock && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function'
-        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
+        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang)
         : '';
       if (!line && !dateWaiting) return null;
     }
