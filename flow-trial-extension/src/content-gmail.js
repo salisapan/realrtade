@@ -1498,6 +1498,7 @@ function glanceUiCopy(kind) {
           knownNames: state && state.glanceOwnNames
         })
         : ((state && state.glanceOwnNames) || null),
+      namesPending: readerNamesNotCached(audience.userName),
       inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
     });
     // Reply-with-facts. Only when Google is already connected, so the chip
@@ -1528,6 +1529,9 @@ function glanceUiCopy(kind) {
     // ensureRemoteClassification). Silent either way if it also finds
     // nothing, times out, or the backend isn't configured — same "just
     // don't show a chip" contract the local path already follows.
+    // Names are not cached yet. No card, and this is not a quiet. The
+    // storage listener judges the open mail again once they land.
+    if (intent && intent.namesPending) return;
     const localFired = Boolean(intent.type);
     // A local 'low' is a decision to stay quiet, not a miss. A named quiet
     // (noise, hedge, family, calibrated, google) is the same decision.
@@ -4458,10 +4462,36 @@ function glanceUiCopy(kind) {
 
   if (typeof globalThis !== 'undefined') globalThis.glanceUndoStoredLane = undoStoredLane;
 
+  // glanceOwnNames is written after the first userinfo read. Until that
+  // list or a real display name exists, a greeting stays unjudged.
+  function readerNamesNotCached(userName) {
+    const known = state && Array.isArray(state.glanceOwnNames) ? state.glanceOwnNames : [];
+    for (let i = 0; i < known.length; i++) {
+      const name = String(known[i] || '').trim().toLowerCase();
+      if (name && name !== 'glance' && name !== 'me') return false;
+    }
+    const profile = state && state.googleProfile;
+    if (profile) {
+      const given = String(profile.givenName || profile.given_name || '').trim();
+      const surname = String(profile.surname || profile.familyName || profile.family_name || '').trim();
+      const display = String(profile.displayName || profile.name || '').trim().toLowerCase();
+      if (given || surname || (display && display !== 'glance' && display !== 'me')) return false;
+    }
+    const shown = String(userName || '').trim().toLowerCase();
+    if (shown && shown !== 'glance' && shown !== 'me') return false;
+    return true;
+  }
+
   if (chromeLive()) chrome.storage.onChanged.addListener((changes) => {
     if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
     else if (changes.proLicense) applyProState();
+    else if (changes.glanceOwnNames || changes.googleProfile) {
+      FlowStorage.get().then((next) => {
+        state = next || state;
+        scanReadingPane();
+      }).catch(() => {});
+    }
   });
 
   globalThis.__glanceGmailPage = {

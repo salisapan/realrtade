@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '4bd0c451973071010094b1d611c7a9b5368db36529c69ec6a28696774b36ffc6';
+const FIXTURE_SHA = '8bf84ed5b58a8a8c068fdc96980212b2a5126bcb3fd309e221b647de0c9430ee';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -453,7 +453,7 @@ for (const id of ['v2syn-4672', 'v2syn-4676']) {
     process.exit(1);
   }
 }
-for (const id of ['v2syn-2019', 'v2syn-2024', 'v2syn-14861', 'v2syn-13337', 'v2syn-3328', 'v2syn-12553', 'v2syn-13797']) {
+for (const id of ['v2syn-2019', 'v2syn-2024', 'v2syn-14861']) {
   const row = byId[id];
   const ctx = contextOf(row);
   for (const surface of ['gmail', 'outlook']) {
@@ -505,6 +505,20 @@ for (const id of ['v2syn-3400', 'v2syn-3401', 'v2syn-3406']) {
     }
   }
 }
+for (const id of ['v2syn-13337', 'v2syn-3328', 'v2syn-12553', 'v2syn-13797']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const draft = steps.some((s) => s && (s.kind === 'gmailDraft' || s.kind === 'outlookDraft'));
+    const label = String((out.intent && out.intent.label) || '');
+    if (!shown(out) || !taskOnly(out) || draft || !label || /^Log commitment\b/.test(label) || /^Reply requested\b/.test(label) || label !== row.expectLabel) {
+      console.log('FAIL: self ask title ' + id + ' ' + surface + ' ' + describe(out) + ' ' + label);
+      process.exit(1);
+    }
+  }
+}
 for (const id of ['v2syn-3398', 'v2syn-3411', 'v2syn-3415', 'v2syn-3434']) {
   const row = byId[id];
   const ctx = contextOf(row);
@@ -513,7 +527,7 @@ for (const id of ['v2syn-3398', 'v2syn-3411', 'v2syn-3415', 'v2syn-3434']) {
     const steps = (out.process && out.process.steps) || [];
     const draft = steps.some((s) => s && (s.kind === 'gmailDraft' || s.kind === 'outlookDraft'));
     const label = String((out.intent && out.intent.label) || '');
-    if (!shown(out) || !taskOnly(out) || draft || (out.process && out.process.id) === 'attach-invite' || /^Attach /.test(label)) {
+    if (!shown(out) || !taskOnly(out) || draft || (out.process && out.process.id) === 'attach-invite' || !/^Attach /.test(label) || (row.expectLabel && label !== row.expectLabel)) {
       console.log('FAIL: self attach ' + id + ' ' + surface + ' ' + describe(out) + ' ' + ((out.process && out.process.id) || '') + ' ' + label);
       process.exit(1);
     }
@@ -558,6 +572,53 @@ for (const id of ['v2syn-2054', 'v2syn-2057', 'v2syn-2060', 'v2syn-2086', 'v2syn
   }
   if (Intent.nameIsReader('Dana', glance) || Intent.nameIsReader('דנה', glance)) {
     console.log('FAIL: a different name matched Sali');
+    process.exit(1);
+  }
+}
+{
+  const hi = {
+    id: 'hi-sali-hold',
+    subject: 'Pilot proposal',
+    body: 'Hi Sali,\n\nCould you review the pilot proposal and confirm by Wednesday?\n',
+    from: 'Dana Levi <dana@acme.io>',
+    to: ['ai.local.flow@gmail.com'],
+    cc: [],
+    expected: 'offer'
+  };
+  const held = J.judge({
+    text: hi.body,
+    subject: hi.subject,
+    sender: { name: 'Dana Levi', email: 'dana@acme.io' },
+    surface: 'gmail',
+    to: hi.to,
+    cc: [],
+    ownAddresses: [OWN_GMAIL],
+    userName: 'Glance',
+    ownNames: ['Glance'],
+    namesPending: true,
+    direction: 'inbound',
+    inbound: true
+  });
+  const offered = J.judge({
+    text: hi.body,
+    subject: hi.subject,
+    sender: { name: 'Dana Levi', email: 'dana@acme.io' },
+    surface: 'gmail',
+    to: hi.to,
+    cc: [],
+    ownAddresses: [OWN_GMAIL],
+    userName: 'Glance',
+    ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
+    namesPending: false,
+    direction: 'inbound',
+    inbound: true
+  });
+  if (shown(held) || held.reason !== 'names-pending' || (held.intent && held.intent.quiet)) {
+    console.log('FAIL: Hi Sali before the profile loaded ' + describe(held) + ' ' + (held.reason || ''));
+    process.exit(1);
+  }
+  if (!shown(offered)) {
+    console.log('FAIL: Hi Sali after the profile loaded ' + describe(offered));
     process.exit(1);
   }
 }

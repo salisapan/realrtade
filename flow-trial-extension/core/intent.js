@@ -784,6 +784,30 @@ const FlowIntent = (() => {
   // one of ownNames (סאלי beside Sali). Any other name stays quiet, even
   // when this person is on To. "סאלי שלום," and "Sali, could you" are the
   // reader. "נועה שלום," and "Lior, could you" are not.
+  // A personal greeting cannot be judged until this person's names are
+  // known. An empty list used to treat every greeting as theirs. A
+  // profile that has not been cached yet is the same hold: no card, and
+  // not a quiet. The host passes namesPending until that cache exists.
+  function greetedPerson(text) {
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i], text);
+      if (who && personToken(who)) return true;
+    }
+    const inline = /[:：]\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,40})\s*[,،]\s*([^\n]{0,180})/g;
+    const raw = String(text || '');
+    let m;
+    while ((m = inline.exec(raw))) {
+      if (personToken(m[1]) && restIsAsk(m[2])) return true;
+    }
+    return false;
+  }
+  function greetingAwaitingNames(text, ctx) {
+    const c = ctx || {};
+    const unresolved = c.namesPending === true || !readerNameList(c).length;
+    if (!unresolved) return false;
+    return greetedPerson(text);
+  }
   function vocativeIsOther(text, ctx) {
     const names = readerNameList(ctx);
     if (!names.length) return false;
@@ -1176,12 +1200,23 @@ const FlowIntent = (() => {
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
         if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
       }
-      // A note to self is that task. The label is the log, not Reply requested.
-      if (addressedToSelf(ctx) && type === TYPES.REQUEST && !intent.inviteFile) {
+      // A note to self is that task. Log commitment is only this person's
+      // own first-person promise. Any other self-sent ask is titled from
+      // the action: Attach <file> to invite, Pay, Review, Call, or the
+      // verb in the mail. The file plan's process stays off this note.
+      if (intent.selfTask && type !== TYPES.SCHEDULED_EVENT && !intent.inviteFile) {
         intent.noReplyDraft = true;
-        const iso = intent.entities && intent.entities.dateIso;
-        const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-        intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
+        const promise = ownFirstPersonPromise(text);
+        // A file save already named its title. The action title is the ask
+        // and the decision. Anything else keeps the label it already had.
+        const ask = type === TYPES.REQUEST || type === TYPES.DECISION_TO_LOG;
+        const titled = (promise || intent.googleClose || !ask) ? '' : selfAskTitle(text);
+        if (titled) intent.label = titled;
+        else if (!intent.googleClose && (type === TYPES.REQUEST || promise)) {
+          const iso = intent.entities && intent.entities.dateIso;
+          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+          intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
+        }
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -1356,6 +1391,11 @@ const FlowIntent = (() => {
     // Own outbound, a note to self, or a vocative that names someone else
     // is not this person's Do It. "אבי שלום," plus an ask is that vocative.
     // A hold does not get past that by not being a reply ask.
+    // A greeting with no cached name is not that quiet and not an offer.
+    // The host judges the same mail again once the profile names are stored.
+    if (greetingAwaitingNames(text, ctx)) {
+      return { type: null, namesPending: true, signals: signals, facts: facts };
+    }
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
@@ -1901,6 +1941,96 @@ const FlowIntent = (() => {
       draft: attached ? (he ? 'מצורף.' : 'Attached.') : (he ? 'אצרף בהקדם.' : "I'll attach it shortly."),
       banner: false
     };
+  }
+
+  // The user's own "I'll send" / "אשלח" / "I'll call you". That task stays
+  // Log commitment. "I need" and "could you" are the ask, not this promise.
+  function ownFirstPersonPromise(text) {
+    const src = String(text || '');
+    if (/\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(src)) return true;
+    if (/\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    if (/\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(src)) return true;
+    return false;
+  }
+  function payAsk(src) {
+    if (/\b(?:pay|wire)\b/i.test(src)) return true;
+    if (/\bprocess\b/i.test(src) && /\bpayment\b/i.test(src)) return true;
+    if (/\bclear\b/i.test(src) && /\bbalance\b/i.test(src)) return true;
+    if (/\btransfer\b/i.test(src) && /(?:\$|₪|€|£|\b(?:deposit|balance|vendor|payment|invoice)\b)/i.test(src)) return true;
+    if (/לשלם|תשלם|תשלמי|לסגור את היתרה/.test(src)) return true;
+    if (/להעביר את התשלום|תעביר(?:י|ו)? את התשלום/.test(src)) return true;
+    return false;
+  }
+  function reviewAsk(src) {
+    if (/\b(?:review|double-?check)\b/i.test(src)) return true;
+    if (/לבדוק|תבדוק|תבדקי|תבדקו/.test(src)) return true;
+    return false;
+  }
+  function callAsk(src) {
+    if (/להחזיר(?:י|ו)? לי טלפון/.test(src)) return true;
+    if (/\bcall\b/i.test(src) && /\b(?:reminder|remember)\b/i.test(src) && !/\bto the call\b/i.test(src)) return true;
+    return false;
+  }
+  function earliestTitle(src, rows) {
+    let best = '';
+    let at = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const m = src.match(rows[i][0]);
+      if (!m || m.index == null) continue;
+      if (at < 0 || m.index < at) {
+        at = m.index;
+        best = rows[i][1];
+      }
+    }
+    return best;
+  }
+  // Self-sent, and not this person's own promise. The title is the action.
+  const SELF_EN_VERBS = [
+    [/\bshoot me\b/i, 'Send'],
+    [/\bfill out\b/i, 'Fill out'],
+    [/\bfill in\b/i, 'Fill out'],
+    [/\bloop in\b/i, 'Loop in'],
+    [/\bsign-?off\b/i, 'Sign-off'],
+    [/\bresend\b/i, 'Resend'],
+    [/\bupload\b/i, 'Upload'],
+    [/\bprepare\b/i, 'Prepare'],
+    [/\bconfirm\b/i, 'Confirm'],
+    [/\bapprove\b/i, 'Approve'],
+    [/\bupdate\b/i, 'Update'],
+    [/\breply\b/i, 'Reply'],
+    [/\bsend\b/i, 'Send'],
+    [/\bsign\b/i, 'Sign'],
+    [/\bscan\b/i, 'Scan'],
+    [/\bfile\b/i, 'File']
+  ];
+  const SELF_HE_VERBS = [
+    [/אני צריך(?:ה|ים)? ממך/, 'לשלוח'],
+    [/לשלוח|תשלח(?:י|ו)?(?![\u0590-\u05FF])/, 'לשלוח'],
+    [/להעביר|תעביר(?:י|ו)?(?![\u0590-\u05FF])|מעביר(?:ה|ים|ות)?(?![\u0590-\u05FF])/, 'להעביר'],
+    [/להכין|תכינ(?:י|ו)?(?![\u0590-\u05FF])|תכין(?![\u0590-\u05FF])/, 'להכין'],
+    [/למלא|תמלא(?:י|ו)?(?![\u0590-\u05FF])/, 'למלא'],
+    [/לחזור|תחזור(?![\u0590-\u05FF])|תחזרי(?![\u0590-\u05FF])|תחזרו(?![\u0590-\u05FF])/, 'לחזור'],
+    [/להעלות|תעלה(?![\u0590-\u05FF])|תעלי(?![\u0590-\u05FF])|תעלו(?![\u0590-\u05FF])/, 'להעלות'],
+    [/לאשר|תאשר(?:י|ו)?(?![\u0590-\u05FF])/, 'לאשר'],
+    [/להגיש|תגיש(?![\u0590-\u05FF])/, 'להגיש'],
+    [/לעדכן|תעדכנ(?:י|ו)?(?![\u0590-\u05FF])/, 'לעדכן'],
+    [/להשלים|יש להשלים/, 'להשלים'],
+    [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק']
+  ];
+  function selfAskTitle(text) {
+    const raw = String(text || '');
+    const invite = attachToInvitePlan(raw);
+    if (invite) return invite.label;
+    const src = raw
+      .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
+      .replace(/\bper our (?:call|chat)\b/ig, ' ')
+      .replace(/בהמשך לשיחתנו/g, ' ');
+    const he = /[\u0590-\u05FF]/.test(src);
+    if (payAsk(src)) return he ? 'לשלם' : 'Pay';
+    if (reviewAsk(src)) return he ? 'לבדוק' : 'Review';
+    if (callAsk(src)) return he ? 'שיחה' : 'Call';
+    return earliestTitle(src, he ? SELF_HE_VERBS.concat(SELF_EN_VERBS) : SELF_EN_VERBS);
   }
 
   return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };

@@ -113,8 +113,12 @@ const FlowIncomingJudge = (() => {
       inSent: i.inSent === true,
       onBehalfOf: i.onBehalfOf || null,
       graphSender: i.graphSender || null,
-      forwarded: i.forwarded === true
+      forwarded: i.forwarded === true,
+      namesPending: i.namesPending === true
     });
+    // The profile names are not cached yet. No card, and not a quiet.
+    // The host judges this mail again when the names land.
+    if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
     }

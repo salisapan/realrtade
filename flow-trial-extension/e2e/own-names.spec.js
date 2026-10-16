@@ -36,6 +36,28 @@ test('Gmail offers היי סאלי from display name Glance plus Google given_na
   await expect(page.locator('div[role="main"] .flow-chip-host button.flow-chip')).toBeVisible();
 });
 
+test('Gmail holds Hi Sali until the profile names arrive, then offers', async ({ glance }) => {
+  await glance.seedGmail({ glanceOwnNames: [], googleProfile: null });
+  const page = await glance.openGmail({
+    messageId: 'm-own-hold',
+    threadId: 't-own-hold',
+    subject: 'Pilot proposal',
+    senderEmail: S.SENDER,
+    senderName: 'flow',
+    userName: 'Glance',
+    to: [S.GMAIL_ME],
+    body: SALI_ASK
+  });
+  const chip = page.locator('div[role="main"] .flow-chip-host button.flow-chip');
+  await page.waitForTimeout(1500);
+  await expect(chip).toHaveCount(0);
+  await glance.seedGmail({
+    glanceOwnNames: ['Sali', 'Sali Sapan', 'סאלי'],
+    googleProfile: { displayName: 'Sali Sapan', givenName: 'Sali', surname: 'Sapan' }
+  });
+  await expect(chip).toBeVisible();
+});
+
 test('Gmail stays quiet on Hi Dana when the given name is Sali', async ({ glance }) => {
   await glance.seedGmail(GIVEN_SALI);
   const page = await glance.openGmail({

@@ -627,8 +627,8 @@ const FlowActions = (() => {
     if (/\b(?:please\s+)?create a task\b|\badd this to my tasks\b|\bremember to\b/i.test(src)) return true;
     if (soloPhoneTask(src)) return true;
     if (/\bi(?:'|’)ll call\b|\bi will call\b/i.test(src)) return true;
-    if (/\byou(?:'|’)ll\s+(?:book|update|call|send)\b|\byou will\s+(?:book|update|call|send)\b/i.test(src)) return true;
-    if (/אתה\s*מעב[יר]+/.test(src)) return true;
+    if (/\byou(?:'|’)ll\s+(?:book|update|call|send)\b|\byou will\s+(?:book|update|call|send)\b|\byou(?:'|’)?re\s+sending\b/i.test(src)) return true;
+    if (/אתה\s*מעב[יר]+/.test(src) || /אתם\s+מעבירים/.test(src)) return true;
     return false;
   }
 
@@ -680,14 +680,21 @@ const FlowActions = (() => {
     // The word call there is not a reminder to phone someone.
     const callBody = untimedSrc
       .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
-      .replace(/\bper our call\b/ig, ' ');
+      .replace(/\bper our call\b/ig, ' ')
+      .replace(/\bper our chat\b/ig, ' ');
     // The sender is the one calling. That promise is Log commitment.
     // "I'll join the call" at a clock stays a Meeting. "I will call the
     // bank" stays the call reminder. A subject line "Reminder" must not
     // retitle either of those two sentences as Call.
     const senderCallYou = /\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(untimedSrc);
     const senderJoinCall = /\b(?:i|we)(?:'|’)?ll\s+join\s+(?:the\s+)?call\b|\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(untimedSrc);
-    const readerWill = /\byou(?:'|’)?ll\b|\byou will\b/i.test(untimedSrc) || /אתה\s*מעב/.test(untimedSrc);
+    // "Per our call, you'll …" is this person's commitment. "Per our chat,
+    // you're sending …" and "לפי מה שסגרנו, אתם מעבירים" are that same
+    // commitment. The chat or the call already happened.
+    const readerWill = /\byou(?:'|’)?ll\b|\byou will\b|\byou(?:'|’)?re\s+sending\b|\byou are sending\b/i.test(untimedSrc)
+      || /אתה\s*מעב/.test(untimedSrc)
+      || /אתם\s+מעבירים/.test(untimedSrc)
+      || /לפי מה שסגרנו,?\s*אתם מעבירים/.test(untimedSrc);
     const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
     // Call is a reminder to phone someone. "I'll call you" is the sender's
     // own promise, and "you would call the bank" is the reader's commitment.

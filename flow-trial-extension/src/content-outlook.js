@@ -715,6 +715,7 @@
       ownAddresses: ownAddresses || null,
       userName: pane.userName || null,
       ownNames: pane.ownNames || null,
+      namesPending: pane.namesPending === true,
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true,
       inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
@@ -743,6 +744,26 @@
       });
     }
     return Array.isArray(known) ? known : null;
+  }
+
+  // Graph /me names are cached on glanceOwnNames. Until that cache or a
+  // real account name exists, a greeting stays unjudged.
+  function outlookNamesNotCached(st, userName) {
+    const known = st && Array.isArray(st.glanceOwnNames) ? st.glanceOwnNames : [];
+    for (let i = 0; i < known.length; i++) {
+      const name = String(known[i] || '').trim().toLowerCase();
+      if (name && name !== 'glance' && name !== 'me') return false;
+    }
+    const profile = st && st.outlookAuth && st.outlookAuth.profile;
+    if (profile) {
+      const given = String(profile.givenName || profile.given_name || '').trim();
+      const surname = String(profile.surname || profile.familyName || '').trim();
+      const display = String(profile.displayName || profile.name || '').trim().toLowerCase();
+      if (given || surname || (display && display !== 'glance' && display !== 'me')) return false;
+    }
+    const shown = String(userName || '').trim().toLowerCase();
+    if (shown && shown !== 'glance' && shown !== 'me') return false;
+    return true;
   }
 
   function ownAddressesOf(st) {
@@ -3736,6 +3757,7 @@
     const own = ownAddressesOf(st);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
     if (pane) pane.ownNames = ownNamesOf(st);
+    if (pane) pane.namesPending = outlookNamesNotCached(st, userNameOf(st));
     if (pane) {
       pane.text = stripGlanceLines(pane.text);
       pane.__epoch = mailEpoch;
@@ -4049,6 +4071,10 @@
               tracedSig = sig;
             }
           }
+          return;
+        }
+        if (decided && decided.reason === 'names-pending') {
+          dropStuckCard(pane);
           return;
         }
         if (!decided || decided.none) {
@@ -5452,7 +5478,7 @@
         // A Do It / Undo from the panel changes what this card should say; this page's own "shown" row does not.
         const logChanged = area === 'local' && changes.log && Array.isArray(changes.log.newValue)
           && (changes.log.newValue[0] || {}).kind !== 'shown'; // the log is newest first
-        if (area === 'local' && (changes.outlookPending || changes.outlookAuth || changes.outlookSync || logChanged)) { lastSig = ''; schedule(); }
+        if (area === 'local' && (changes.outlookPending || changes.outlookAuth || changes.outlookSync || changes.glanceOwnNames || logChanged)) { lastSig = ''; schedule(); }
       };
       chrome.storage.onChanged.addListener(onStorageChanged);
     }
