@@ -134,6 +134,11 @@ const FlowIncomingJudge = (() => {
     if (typeof intentApi.phishingOrNegative === 'function' && intentApi.phishingOrNegative(vetoText)) {
       return { show: false, reason: 'quiet:family', intent };
     }
+    // "No need to send" stands the ask down before the untimed-reply rule
+    // can turn "Following up on our call" into a draft.
+    if (/\b(?:do not|don't|no need to)\s+(?:send|attach|forward|share|resend|provide)\b/i.test(text)) {
+      return { show: false, reason: 'quiet:hedge', intent };
+    }
     const gate = fileAttach && typeof fileAttach.gate === 'function' ? fileAttach.gate(text) : { kind: 'ignore' };
     // "Following up on our call" is not the event. The ask under it, with
     // no parsed clock, is the reply. A file ask that does not use that

@@ -60,7 +60,7 @@ const FlowIntent = (() => {
   // these reads as "the [artifact] of X", not "let's have X" — narrow and
   // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
   // rather than a blanket reordering of which gate wins.
-  const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
+  const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion|quick chat)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
   // פגישת is the construct (פגישת תכנון = a planning meeting). It is not
   // the absolute פגישה, so a note that only uses the construct used to
   // stay silent. The artifact lookahead still refuses "the recording of
@@ -1042,6 +1042,8 @@ const FlowIntent = (() => {
       if (googleClose) intent.googleClose = googleClose;
       // "No need to reply, just get it done" still does the work. The draft stays off.
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
+      // A note the user sent to themselves is the task. The draft stays off.
+      if (addressedToSelf(ctx) && type === TYPES.REQUEST && !intent.inviteFile) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
       if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
@@ -1078,6 +1080,13 @@ const FlowIntent = (() => {
         const iso = intent.entities && intent.entities.dateIso;
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
         if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
+      }
+      // A note to self is that task. The label is the log, not Reply requested.
+      if (addressedToSelf(ctx) && type === TYPES.REQUEST && !intent.inviteFile) {
+        intent.noReplyDraft = true;
+        const iso = intent.entities && intent.entities.dateIso;
+        const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+        intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -1603,8 +1612,11 @@ const FlowIntent = (() => {
         (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text) && /(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(text));
       const laneOnlyBet = /ב-\s*\d{1,2}:\d{2}/.test(rawClock) && !baseSeesClock;
       // "I'll send the report tomorrow 14:30" is a log, dated from the mail.
-      // Other sender-promise clocks stay quiet.
+      // "I will send the deck tomorrow at 10:00" is the same log. A clock
+      // on a different promise stays quiet.
       const sendReportTomorrow = /\bi(?:'|’)?ll send the report tomorrow\b/i.test(text);
+      const ownTimedSend = /\bfollowing up on (?:our|the|that) call\b/i.test(text)
+        && (/\b(?:i|we)(?:'|’)?ll\s+send\b|\b(?:i|we)\s+will\s+send\b/i.test(text));
       if (sendReportTomorrow && !committed.hour) {
         const hm = String(text || '').match(/\b(\d{1,2}):(\d{2})\b/);
         if (hm) {
@@ -1612,8 +1624,17 @@ const FlowIntent = (() => {
           committed.minute = +hm[2];
         }
       }
-      if (clock && s.flags.senderPromise && !laneOnlyBet && !sendReportTomorrow) return stayQuiet('hedge');
-      return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
+      if (ownTimedSend && clock) {
+        committed.hour = clock.hour;
+        committed.minute = clock.minute;
+      }
+      if (clock && s.flags.senderPromise && !laneOnlyBet && !sendReportTomorrow && !ownTimedSend) return stayQuiet('hedge');
+      const logged = finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
+      if (ownTimedSend && logged && clock) {
+        const stamp = clock.hour + ':' + String(clock.minute).padStart(2, '0');
+        if (logged.label && logged.label.indexOf(stamp) < 0) logged.label = logged.label + ' ' + stamp;
+      }
+      return logged;
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {

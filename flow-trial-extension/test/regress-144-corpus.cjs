@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'c4417a87f4f2256c79cc4dc4f00ea7bf86b9d4931c8e811a5b4898563eeec1d9';
+const FIXTURE_SHA = 'a55bf90ea78c4d861e4e5e32eec9fd9e0bb7f6a47a58c88d72236ee7764b92d7';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -161,7 +161,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 558) {
+if (rows.length !== 565) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -388,7 +388,7 @@ for (const row of rows) {
     process.exit(1);
   }
 }
-const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-2557','v2syn-3315','v2syn-3317','v2syn-3328','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12553','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787','v2syn-13797','v2syn-12060','v2syn-12219','v2syn-13338','v2syn-13339','v2syn-1506'];
+const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-2557','v2syn-3315','v2syn-3317','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787','v2syn-12060','v2syn-12219','v2syn-13338','v2syn-13339','v2syn-1506'];
 for (const id of REPLY_TRACK) {
   const row = byId[id];
   if (!row || row.expected !== 'offer' || row.expectKind !== 'request') {
@@ -441,6 +441,45 @@ for (const id of ['v2syn-1797', 'v2syn-1806']) {
   if (!shown(he) || !taskOnly(he) || !he.intent || he.intent.label !== 'לתאם פגישה') {
     console.log('FAIL: Hebrew schedule ' + describe(he) + ' ' + ((he.intent && he.intent.label) || ''));
     process.exit(1);
+  }
+}
+for (const id of ['v2syn-4672', 'v2syn-4676']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  const g = judge(row, 'gmail', ctx);
+  const o = judge(row, 'outlook', ctx);
+  if (!row || row.expected !== 'quiet' || shown(g) || shown(o)) {
+    console.log('FAIL: negation ' + id + ' gmail ' + describe(g) + ' outlook ' + describe(o));
+    process.exit(1);
+  }
+}
+for (const id of ['v2syn-2019', 'v2syn-2024', 'v2syn-14861', 'v2syn-13337', 'v2syn-3328', 'v2syn-12553', 'v2syn-13797']) {
+  const row = byId[id];
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const draft = steps.some((s) => s && (s.kind === 'gmailDraft' || s.kind === 'outlookDraft'));
+    const cal = steps.some((s) => s && s.kind === 'calendar');
+    const label = out.intent && out.intent.label;
+    if (!shown(out) || !taskOnly(out) || draft || cal || !label || !/^Log commitment\b/.test(label) || /^Reply requested\b/.test(label)) {
+      console.log('FAIL: log task ' + id + ' ' + surface + ' ' + describe(out) + ' ' + (label || ''));
+      process.exit(1);
+    }
+  }
+}
+{
+  const row = byId['v2syn-1917'];
+  const ctx = contextOf(row);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(row, surface, ctx);
+    const steps = (out.process && out.process.steps) || [];
+    const cal = steps.filter((s) => s && s.kind === 'calendar');
+    const hour = out.intent && out.intent.entities && out.intent.entities.hour;
+    if (!shown(out) || !out.intent || out.intent.type !== 'event' || hour !== 16 || cal.length !== 1 || cal[0].params.hour !== 16) {
+      console.log('FAIL: 1917 calendar ' + surface + ' ' + describe(out) + ' hour ' + hour);
+      process.exit(1);
+    }
   }
 }
 console.log('offer pass ' + counts.offerPass + ' fail ' + counts.offerFail);
