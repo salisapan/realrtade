@@ -519,11 +519,16 @@ const FlowActions = (() => {
   // contradicts the calendar day even when no clock was written. Every
   // other mail keeps processFor, the plan from before this override.
   // A weekday contradiction is a hold with both dates and no chosen one.
-  // meetingPlanVeto (cancel report, negation, out-of-office, past tense)
-  // removes the meeting plan. The Outlook judge calls that same function.
+  // meetingPlanVeto removes the meeting plan. The Outlook judge calls
+  // that same function. A written day number (22/10) plus a clock is the
+  // hold. A weekday alone stays the schedule process.
   function meetingClock(intent) {
     const e = intent && intent.entities;
     return Boolean(e && Number.isInteger(e.hour) && Number.isInteger(e.minute));
+  }
+  function writtenDayNumber(intent) {
+    const raw = intent && intent.facts && intent.facts.date && intent.facts.date.raw;
+    return /\d/.test(String(raw || ''));
   }
   function meetingNarrow(intent) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return false;
@@ -534,6 +539,7 @@ const FlowActions = (() => {
     const choices = dateChoicesOf(intent);
     const hasDate = Boolean(e.dateIso) || Boolean(choices);
     if (!hasDate || !meetingClock(intent)) return false;
+    if (close !== 'calendar-hold' && !choices && !writtenDayNumber(intent)) return false;
     return Boolean(sig.hasMeetingNoun || close === 'calendar-hold' || choices);
   }
   function meetingConflictNoTime(intent) {
@@ -559,6 +565,7 @@ const FlowActions = (() => {
     if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
     if (!timed) return proc;
+    if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
     return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
 
