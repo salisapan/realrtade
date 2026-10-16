@@ -6244,7 +6244,7 @@ const FlowIntent = (() => {
     s = s.replace(EN_DATE_TAIL, '').replace(AT_CLOCK, '').replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
     s = s.replace(/\s+(?:and\s+get\s+back|and\s+send|so\s+(?:we|i)\s+can)\b[\s\S]*$/i, '');
     s = s.replace(/\s+as\s+an\s+attachment\b[\s\S]*$/i, '');
-    s = s.split(/[.!?]/)[0];
+    s = s.split(/(?<!\d)[.!?](?!\d)/)[0];
     s = s.replace(/\s+to\s+(?:my\s+)?(?:the\s+)?(?:portal|drive)\b[\s\S]*$/i, '');
     s = s.replace(/\s+from\s+you\b[\s\S]*$/i, '');
     s = s.replace(/^(?:and\s+(?:send|email)\s+)/i, '');
@@ -6296,6 +6296,10 @@ const FlowIntent = (() => {
     }
     if (!object && opts && opts.pay) object = moneyPhrase(opts.src || '');
     if (object && /(?:\$|₪|€|£)/.test(object)) object = object.replace(/\s+payments?\b/ig, ' ').replace(/\s+/g, ' ').trim();
+    if (verb === 'לשלם' && /תשלום/.test(object)) {
+      const money = moneyPhrase((opts && opts.src) || '');
+      if (money) object = money;
+    }
     if (verb === 'Reply' && object && !/^(?:about|to|with|on)\b/i.test(object)) object = 'about ' + object;
     if (verb === 'Sign off' && object && !/^on\b/i.test(object)) object = 'on ' + object;
     if (object) {
@@ -6304,7 +6308,7 @@ const FlowIntent = (() => {
     }
     if (opts && opts.phoneHe) {
       const topic = heTopic(subject);
-      if (topic) return clipTitle('להתקשר בנושא ' + topic);
+      if (topic) return clipTitle('שיחה בנושא ' + topic);
     }
     if (verb === 'לחזור') {
       const topic = heTopic(subject);
@@ -7152,7 +7156,14 @@ const FlowActions = (() => {
     const logIt = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
     // A note the user sent is a task. An attach on that note keeps its
     // title and drops the draft. It is not the inbound file track.
-    if (intent.selfTask) proc = logIt;
+    // "gimme a call October 19 at 9am" and "Shall we hop on a call
+    // October 19 at 3pm" keep the base plan, calendar included.
+    // A hold stays a hold. The other dated call stays schedule.
+    const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
+    if (intent.selfTask && !(callNamesADate && intent.type === 'event')) proc = logIt;
+    else if (intent.selfTask && intent.personalClose !== 'calendar-hold') {
+      proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+    }
     // "I'll call you" is already the task. The untimed block would retitle
     // it Call when the subject says Reminder, and would return null when
     // the day has no clock ("I will call you on Friday.").
@@ -7198,8 +7209,7 @@ const FlowActions = (() => {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       // "call October 19" named the month as a person. A dated call with
-      // no person keeps the meeting title. Shall we hop on a call is that meeting.
-      const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
+      // no person keeps the meeting title, and the calendar step stays.
       if (!callNamesADate) {
         const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
         const dateText = when || null;

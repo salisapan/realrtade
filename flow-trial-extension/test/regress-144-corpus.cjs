@@ -528,8 +528,11 @@ const SELF_TITLE = [
   { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Log commitment' },
   { subject: 'בהמשך להקמפיין', body: 'בבקשה תחזור אליי עד מחר בבוקר', label: 'לחזור בנושא הקמפיין' },
   { subject: 'בהמשך להתקציב', body: 'בבקשה תחזרי אליי עד יום ראשון', label: 'לחזור בנושא התקציב' },
-  { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'להתקשר בנושא קליטת העובד החדש' },
-  { subject: 'בהמשך לחידוש החוזה', body: 'נשמח אם תוכלו להחזיר לי טלפון ביום ראשון?', label: 'להתקשר בנושא חידוש החוזה' },
+  { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'שיחה בנושא קליטת העובד החדש' },
+  { subject: 'בהמשך לחידוש החוזה', body: 'נשמח אם תוכלו להחזיר לי טלפון ביום ראשון?', label: 'שיחה בנושא חידוש החוזה' },
+  { subject: 'תזכורת תשלום', body: 'תוכל להעביר את התשלום של ₪89.90 עד סוף היום?', label: 'לשלם ₪89.90' },
+  { subject: 'תזכורת תשלום', body: 'תוכל להעביר את התשלום של ₪89.90 עד סוף הום?', label: 'לשלם ₪89.90' },
+  { subject: 'תזכורת תשלום', body: 'שבוע טוב! נשמח אם תוכלו להעביר את התשלום של ₪1,200 עד יום חמישי?', label: 'לשלם ₪1,200' },
   { subject: 'Need the signed contract', body: 'Please reply with the tax form attached by Friday.', label: 'Reply about tax form' },
   { subject: 'בהמשך לה-onboarding', body: 'צריך sign-off שלך על ה-PO עד 20/10', label: 'Sign off on PO' },
   { subject: 'RE: W-9 form', body: "I'd appreciate it if you could fill out the lease tomorrow?", label: 'Fill out the lease' },
@@ -541,8 +544,13 @@ const SELF_TITLE = [
   { subject: 'RE: Re: the budget', body: 'Confirming €750 for the the Q4 plan work.', label: 'Log €750 agreed' },
   { subject: 'FW: Payment reminder', body: 'Could you process the ₪1,200 payment next Tuesday?', label: 'Pay ₪1,200' },
   { subject: 'Payment reminder', body: 'Please process the $4,850 payment for the pilot tomorrow.', label: 'Pay $4,850 for the pilot' },
-  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Meeting Oct 19 09:00' },
-  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Meeting Oct 19 15:00' }
+  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Meeting Oct 19 09:00', face: 'Schedule It', proc: 'schedule', steps: [
+    { kind: 'calendar', hour: 9, minute: 0, dateIso: '2026-10-19', title: 'Meeting Oct 19 09:00' },
+    { kind: 'googleTask', dateIso: '2026-10-19', title: 'Meeting Oct 19 09:00' }
+  ] },
+  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Meeting Oct 19 15:00', face: 'Meeting', proc: 'hold', steps: [
+    { kind: 'calendar', hour: 15, minute: 0, dateIso: '2026-10-19', title: 'Shall we hop on a call October 19 at 3pm' }
+  ] }
 ];
 for (const sample of SELF_TITLE) {
   const out = J.judge({
@@ -562,8 +570,15 @@ for (const sample of SELF_TITLE) {
   const label = String((out.intent && out.intent.label) || '');
   const face = shown(out) && out.process ? Display.cardFace(out.process, out.intent, { bodyText: sample.body }).title : '';
   const fault = titleGrammarFault(label);
-  if (!shown(out) || oneWordTitle(label) || fault || label !== sample.label || face !== sample.label || (sample.label === 'Log commitment' && face !== 'Log commitment')) {
-    console.log('FAIL: title grammar ' + JSON.stringify(fault) + ' got ' + JSON.stringify(label) + ' face ' + JSON.stringify(face) + ' wanted ' + sample.label);
+  const wantFace = sample.face || sample.label;
+  const steps = (out.process && out.process.steps) || [];
+  const stepOk = !sample.steps || (out.process && out.process.id === sample.proc && steps.length === sample.steps.length && sample.steps.every((want, i) => {
+    const got = steps[i] && steps[i].params;
+    return steps[i] && steps[i].kind === want.kind && got && got.dateIso === want.dateIso && got.title === want.title
+      && (want.hour == null || got.hour === want.hour) && (want.minute == null || got.minute === want.minute);
+  }));
+  if (!shown(out) || oneWordTitle(label) || fault || label !== sample.label || face !== wantFace || !stepOk || (sample.label === 'Log commitment' && face !== 'Log commitment')) {
+    console.log('FAIL: title grammar ' + JSON.stringify(fault) + ' got ' + JSON.stringify(label) + ' face ' + JSON.stringify(face) + ' wanted ' + sample.label + ' steps ' + JSON.stringify(steps.map((s) => s && { kind: s.kind, params: s.params && { title: s.params.title, dateIso: s.params.dateIso, hour: s.params.hour, minute: s.params.minute } })));
     process.exit(1);
   }
 }

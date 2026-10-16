@@ -2068,7 +2068,7 @@ const FlowIntent = (() => {
     s = s.replace(EN_DATE_TAIL, '').replace(AT_CLOCK, '').replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
     s = s.replace(/\s+(?:and\s+get\s+back|and\s+send|so\s+(?:we|i)\s+can)\b[\s\S]*$/i, '');
     s = s.replace(/\s+as\s+an\s+attachment\b[\s\S]*$/i, '');
-    s = s.split(/[.!?]/)[0];
+    s = s.split(/(?<!\d)[.!?](?!\d)/)[0];
     s = s.replace(/\s+to\s+(?:my\s+)?(?:the\s+)?(?:portal|drive)\b[\s\S]*$/i, '');
     s = s.replace(/\s+from\s+you\b[\s\S]*$/i, '');
     s = s.replace(/^(?:and\s+(?:send|email)\s+)/i, '');
@@ -2120,6 +2120,10 @@ const FlowIntent = (() => {
     }
     if (!object && opts && opts.pay) object = moneyPhrase(opts.src || '');
     if (object && /(?:\$|₪|€|£)/.test(object)) object = object.replace(/\s+payments?\b/ig, ' ').replace(/\s+/g, ' ').trim();
+    if (verb === 'לשלם' && /תשלום/.test(object)) {
+      const money = moneyPhrase((opts && opts.src) || '');
+      if (money) object = money;
+    }
     if (verb === 'Reply' && object && !/^(?:about|to|with|on)\b/i.test(object)) object = 'about ' + object;
     if (verb === 'Sign off' && object && !/^on\b/i.test(object)) object = 'on ' + object;
     if (object) {
@@ -2128,7 +2132,7 @@ const FlowIntent = (() => {
     }
     if (opts && opts.phoneHe) {
       const topic = heTopic(subject);
-      if (topic) return clipTitle('להתקשר בנושא ' + topic);
+      if (topic) return clipTitle('שיחה בנושא ' + topic);
     }
     if (verb === 'לחזור') {
       const topic = heTopic(subject);
