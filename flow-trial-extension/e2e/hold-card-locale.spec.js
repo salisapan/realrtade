@@ -51,10 +51,17 @@ test('hold card text follows the UI language in light and dark', async ({ page }
       const en = page.locator('#en .gs-intent');
       const he = page.locator('#he .gs-intent');
       await expect(en).toHaveText('Hold Mon 10:00');
-      await expect(he).toHaveText('השהה ב׳ 10:00');
+      await expect(he).toHaveText('שריין ב׳ 10:00');
+      await expect(page.locator('#en .chip-hold')).toHaveText('Hold It');
+      await expect(page.locator('#he .chip-hold')).toHaveText('השהה');
       await expect(page.locator('#en')).not.toContainText('השהה');
+      await expect(page.locator('#en')).not.toContainText('שריין');
       await expect(page.locator('#he')).not.toContainText('Do It');
       await expect(page.locator('#he')).not.toContainText('Hold It');
+      if (width === 1280) {
+        const heName = 'hold-card-he-' + (dark ? 'dark' : 'light') + '.png';
+        await page.locator('#he .flow-chip-host').screenshot({ path: path.join(SHOTS, heName) });
+      }
       const name = 'hold-card-' + (dark ? 'dark' : 'light') + '-' + width + '.png';
       await page.screenshot({ path: path.join(SHOTS, name), fullPage: true });
     }

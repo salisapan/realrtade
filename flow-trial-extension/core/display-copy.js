@@ -438,7 +438,7 @@ const FlowDisplay = (() => {
       justNow: 'עכשיו', minsAgo: 'לפני {n} דק׳', hrsAgo: 'לפני {n} שע׳', writtenTo: 'נכתב אל ',
       queued: 'בתור', preparing: 'מכין', verifying: 'מאמת', verified: 'אומת',
       seeOpen: 'מה פתוח',
-      holdAt: 'השהה',
+      holdAt: 'שריין',
       steps: '{n} צעדים', hideSteps: 'הסתר צעדים',
       saveAsk: 'לשמור {on} מתוך {all} קבצים ב-{target}?', pickFile: 'בחר לפחות קובץ אחד',
       weekLogged: ' נרשמו השבוע', weekAll: '{n} בסך הכל',
@@ -525,14 +525,14 @@ const FlowDisplay = (() => {
     return day + ' ' + clock;
   }
 
-  // The card text itself: "Hold Mon 10:00", or the Hebrew equivalent.
-  // A missing day or clock is an empty string, so there is no hold to show.
+  // The card text itself: "Hold Mon 10:00", or "שריין ב׳ 10:00".
+  // השהה is the Hold It button only. A missing day or clock is empty.
   function holdCardText(lang, iso, hour, minute) {
     const day = ymd(iso);
     const clock = clockPad(hour, minute);
     if (!day || !clock) return '';
     const which = uiLangFrom({ setting: lang });
-    const word = (chrome(which).holdAt) || (which === 'he' ? 'השהה' : 'Hold');
+    const word = (chrome(which).holdAt) || (which === 'he' ? 'שריין' : 'Hold');
     const wd = which === 'he' ? HE_WD[day.wd] : EN_WD[day.wd];
     return word + ' ' + wd + ' ' + clock;
   }

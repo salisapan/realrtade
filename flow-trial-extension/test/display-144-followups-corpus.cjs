@@ -22,8 +22,9 @@ const D = sandbox.FlowDisplay;
 
 console.log('\n--- hold card text ---\n');
 check('an English hold card says Hold Mon 10:00', D.holdCardText('en', '2026-10-19', 10, 0) === 'Hold Mon 10:00', D.holdCardText('en', '2026-10-19', 10, 0));
-check('a Hebrew hold card says the Hebrew equivalent', D.holdCardText('he', '2026-10-19', 10, 0) === 'השהה ב׳ 10:00', D.holdCardText('he', '2026-10-19', 10, 0));
-check('Sunday is Sun / א׳', D.holdCardText('en', '2026-10-18', 11, 0) === 'Hold Sun 11:00' && D.holdCardText('he', '2026-10-18', 11, 0) === 'השהה א׳ 11:00');
+check('a Hebrew hold card says שריין and the weekday', D.holdCardText('he', '2026-10-19', 10, 0) === 'שריין ב׳ 10:00', D.holdCardText('he', '2026-10-19', 10, 0));
+check('Sunday is Sun / א׳', D.holdCardText('en', '2026-10-18', 11, 0) === 'Hold Sun 11:00' && D.holdCardText('he', '2026-10-18', 11, 0) === 'שריין א׳ 11:00');
+check('השהה stays the Hold It button, not the card line', D.chrome('he').hold === 'השהה' && D.chrome('he').holdAt === 'שריין' && D.chrome('en').hold === 'Hold It');
 check('a hold with no clock is not a card line', D.holdCardText('en', '2026-10-19', null, null) === '' && D.holdCardText('he', '2026-10-19', 10, null) === '');
 check('the Hebrew chip date stays the calendar day', D.holdWhenLine('2026-10-18', 11, 0) === '18 באוק׳ 11:00');
 check('an English chip date is English', D.holdWhenLine('2026-10-18', 11, 0, 'en') === 'Oct 18 11:00', D.holdWhenLine('2026-10-18', 11, 0, 'en'));
@@ -36,7 +37,7 @@ const holdCtx = {
   intent: { label: 'Hold the slot' }
 };
 check('the card title is the hold line, not only a chip', D.cardTitle('en', holdCtx, 'Hold It') === 'Hold Mon 10:00');
-check('a Hebrew card title is the Hebrew hold line', D.cardTitle('he', holdCtx, 'Hold It') === 'השהה ב׳ 10:00');
+check('a Hebrew card title is the Hebrew hold line', D.cardTitle('he', holdCtx, 'Hold It') === 'שריין ב׳ 10:00');
 check('a hold without a clock keeps the process name', D.cardTitle('en', { process: { id: 'hold', name: 'Hold It' } }, 'Hold It') === 'Hold It');
 check('a reply card keeps its own title', D.cardTitle('en', { process: { id: 'reply-track', name: 'Reply & Track' } }, 'Reply & Track') === 'Reply & Track');
 
@@ -103,11 +104,13 @@ if (!JSDOM) {
   check('the English card text itself is Hold Mon 10:00', enTitle && enTitle.textContent === 'Hold Mon 10:00', enTitle && enTitle.textContent);
   const enWhen = enCard && enCard.querySelector('.flow-chip-when');
   check('the English chip is not the only place, and it is English', !enWhen || (enWhen.textContent.indexOf('10:00') >= 0 && enWhen.textContent.indexOf('באוק') < 0), enWhen && enWhen.textContent);
-  check('an English card does not mix Hebrew chrome', enCard && !/בצע|הסתר|מוצע|השהה/.test(enCard.textContent), enCard && enCard.textContent);
+  check('an English card does not mix Hebrew chrome', enCard && !/בצע|הסתר|מוצע|השהה|שריין/.test(enCard.textContent), enCard && enCard.textContent);
 
   const heCard = mount('he', 'he');
   const heTitle = heCard && heCard.querySelector('.gs-intent, .flow-chip-process-name');
-  check('the Hebrew card text itself is the Hebrew hold line', heTitle && heTitle.textContent === 'השהה ב׳ 10:00', heTitle && heTitle.textContent);
+  const heHold = heCard && heCard.querySelector('.chip-hold');
+  check('the Hebrew card text itself is שריין plus the time', heTitle && heTitle.textContent === 'שריין ב׳ 10:00', heTitle && heTitle.textContent);
+  check('the Hebrew Hold It button stays השהה', heHold && heHold.textContent === 'השהה', heHold && heHold.textContent);
   const heText = heCard ? heCard.textContent : '';
   check('a Hebrew card does not mix English chrome', heCard && !/\bDo It\b/.test(heText) && !/\bDismiss\b/.test(heText) && !/\bSuggested\b/.test(heText) && !/\bHold It\b/.test(heText) && !/\bQueued\b/.test(heText), heText);
   const dismiss = heCard && heCard.querySelector('.chip-x');
