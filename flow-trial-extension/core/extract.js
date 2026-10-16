@@ -145,7 +145,7 @@ const FlowExtract = (() => {
     const src = String(text || '');
     const dayName = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
     const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
-    const clock = src.match(/(?:בשעה|בשעות)\s*\d{1,2}:\d{2}(?!\d)/);
+    const clock = src.match(/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/);
     if (!dayName || !slash || !clock || !now) return null;
     const weekday = DAYS_HE.indexOf(dayName[1]);
     const day = +slash[1];
@@ -211,7 +211,7 @@ const FlowExtract = (() => {
     if (/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(window)) return true;
     if (/יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window)) return true;
     if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(window)) return true;
-    if (/(?:בשעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
+    if (/(?:בשעה|(?<![\u0590-\u05FF])בעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
     return false;
   }
   // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
@@ -247,7 +247,7 @@ const FlowExtract = (() => {
   // A clock, however it is written. בשעה, ב-14:00, at 14:00, and a bare HH:MM
   // are the same hour. The conflict check must not depend on one spelling.
   function hasStatedClock(src) {
-    if (/(?:בשעה|בשעות)\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
     if (/(?:^|[^\u0590-\u05FF\d])ב-\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
     if (/\bat\s+\d{1,2}(?::\d{2})?\b/i.test(src)) return true;
     if (/(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
@@ -608,7 +608,8 @@ const FlowExtract = (() => {
     // there, has the same Hebrew boundary: it must not be a prefix of a
     // longer word.
     const hePart = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    m = text.match(new RegExp('(?:בשעה|בשעות)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
+    // בעה is the typo of בשעה. It is the same "at the hour of" marker.
+    m = text.match(new RegExp('(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
     if (m) {
       const rawPart = (m[3] || '').replace(/["״׳']/g, '');
       const marker = rawPart === 'בבוקר' ? 'in the morning'

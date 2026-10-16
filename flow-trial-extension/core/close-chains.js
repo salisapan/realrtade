@@ -33,7 +33,7 @@ const FlowCloseChains = (() => {
   const ANSWER_EN = /\b(?:confirm|let me know|get back to me|reply with|your answer|who will|what is the name)\b/i;
   const ANSWER_HE = /(?:תעדכן|תודיע|תגיב|מי\s+(?:יהיה|יגיע|מטפל))/;
   const CLOCK_EN = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
-  const CLOCK_HE = /(?:בשעה|ב-)\s*(\d{1,2})(?::(\d{2}))?/;
+  const CLOCK_HE = /(?:בשעה|(?<![\u0590-\u05FF])בעה|ב-)\s*(\d{1,2})(?::(\d{2}))?/;
   const HOLDING_EN = /\b(?:i(?:'| wi)ll|i will|we(?:'| wi)ll|we will)\s+(?:send|reply|get back|confirm)\b/i;
   const HOLDING_HE = /(?:אשלח|נשלח|אחזור|אעדכן|אשיב)/;
   const TEMPLATE = /template|תבנית/i;

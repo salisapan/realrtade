@@ -424,6 +424,7 @@ const FlowActions = (() => {
     if (!g) return null;
     const e = intent.entities || {};
     if (g.personalClose === 'file-on-hold') {
+      if (!Number.isInteger(e.hour) || !Number.isInteger(e.minute)) return null;
       return {
         id: 'file-on-hold',
         name: 'Hold it',
@@ -506,7 +507,7 @@ const FlowActions = (() => {
       dependsOn: null,
       params: { googleClose: g }
     }];
-    if (g.destination === 'calendar') {
+    if (g.destination === 'calendar' && Number.isInteger(e.hour) && Number.isInteger(e.minute)) {
       steps.push(withThread({
         id: 'calendar',
         kind: 'calendar',
@@ -650,23 +651,34 @@ const FlowActions = (() => {
     const hedged = /\b(?:perhaps|possibly|not sure|maybe|might)\b/i.test(String(vetoText || ''));
     const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent, vetoText);
     const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
+    let proc = useMeeting
+      ? meetingPlan(intent, processFor(intent))
+      : taskInstead
+        ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
+        : processFor(intent);
+    // A calendar step needs a clock the time parser actually resolved.
+    // A date with no parsed time is a task. A delete or a move of a named
+    // slot is still that calendar write.
+    const calendarOp = e.calendarOp;
+    const untimedCalendar = proc && Array.isArray(proc.stepKinds) && proc.stepKinds.indexOf('calendar') !== -1
+      && !meetingClock(intent)
+      && calendarOp !== 'delete' && calendarOp !== 'update'
+      && intent.personalClose !== 'calendar-cancel'
+      && intent.personalClose !== 'calendar-move';
+    if (untimedCalendar) proc = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
+    const taskPlan = taskInstead || untimedCalendar;
     // The card and the task title follow the plan that will actually run.
     // A Meeting label on a task-only plan is the copy bug: the date was
     // copied off the event classifier after the calendar step was dropped.
-    if (taskInstead && soloPhoneTask(vetoText)) {
+    if (taskPlan && soloPhoneTask(vetoText)) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
-    } else if (taskInstead && /^Meeting\b/.test(String(intent.label || ''))) {
+    } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
       const dateText = when || null;
       intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
         ? FlowJudgment.neutralTitle({ dateText: dateText })
         : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
     }
-    const proc = useMeeting
-      ? meetingPlan(intent, processFor(intent))
-      : taskInstead
-        ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
-        : processFor(intent);
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 

@@ -71,39 +71,24 @@ function noGmail(calls) {
   return calls.every((c) => !/gmail/i.test(c.url) && c.method !== 'SEND');
 }
 
-console.log('\n--- allowlist, key, full-flavor manifest ---\n');
+console.log('\n--- allowlist, key, the one manifest ---\n');
 {
-  const full = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.full.json'), 'utf8'));
   const live = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
-  const der = Buffer.from(full.key, 'base64');
-  const hash = crypto.createHash('sha256').update(der).digest();
-  const id = hash.slice(0, 16).toString('hex').split('').map((c) => String.fromCharCode(parseInt(c, 16) + 97)).join('');
-  check('full flavor key hashes to the store id', id === 'lbihckfmoffgjjlnneoeaehbhoonfenh' && id === Cfg.EXTENSION_ID, id);
-  check('full flavor client is the lane client', full.oauth2.client_id === Cfg.CLIENT_ID);
-  check('full flavor scopes are the allowlist', JSON.stringify(full.oauth2.scopes) === JSON.stringify(Cfg.SCOPES));
-  check('live manifest is still the current worker', live.background.service_worker === 'src/background.js' && live.key !== full.key);
-  check('full flavor worker is the wrapper', full.background.service_worker === 'src/google-lane-sw.js');
-  check('docs, sheets, and people hosts are on the full flavor',
-    full.host_permissions.indexOf('https://docs.googleapis.com/*') >= 0 &&
-    full.host_permissions.indexOf('https://sheets.googleapis.com/*') >= 0 &&
-    full.host_permissions.indexOf('https://people.googleapis.com/*') >= 0);
+  check('manifest.json is the only manifest', !fs.existsSync(path.join(EXT, 'manifest.full.json')));
+  check('options_ui is the enable page', live.options_ui && live.options_ui.page === 'lane-chat/enable.html' && live.options_ui.open_in_tab === true);
+  check('the manifest worker is background.js', live.background.service_worker === 'src/background.js');
   const refused = ['https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/spreadsheets'];
   check('gmail, wide drive, documents, and spreadsheets are refused', refused.every((s) => Cfg.assertAllowed([s]).ok === false));
   check('the allowlist itself is accepted', Cfg.assertAllowed(Cfg.SCOPES).ok === true);
   const sw = fs.readFileSync(path.join(EXT, 'src', 'google-lane-sw.js'), 'utf8');
-  check('the wrapper imports the current worker and the lane', sw.indexOf("import './background.js'") >= 0 && sw.indexOf("import './google-lane.js'") >= 0);
+  check('the lane wrapper imports the current worker and the lane', sw.indexOf("import './background.js'") >= 0 && sw.indexOf("import './google-lane.js'") >= 0 && sw.indexOf('manifest.full.json') < 0);
   const pageSrc = fs.readFileSync(path.join(EXT, 'src', 'google-compose-page.js'), 'utf8');
   check('the compose page never activates a control', pageSrc.indexOf('.click(') < 0 && pageSrc.indexOf('MutationObserver') < 0);
   const gmailScripts = live.content_scripts[0].js;
-  const fullGmail = (full.content_scripts[0] && full.content_scripts[0].js) || [];
-  check('the live manifest does not load the compose filler',
+  check('the manifest does not load the compose filler',
     gmailScripts.indexOf('core/google-compose.js') < 0 &&
     gmailScripts.indexOf('src/google-compose-page.js') < 0 &&
     gmailScripts.indexOf('core/draft-reply.js') < 0);
-  check('the full flavor still orders the compose filler before the card',
-    fullGmail.indexOf('core/google-compose.js') >= 0 &&
-    fullGmail.indexOf('src/google-compose-page.js') > fullGmail.indexOf('core/google-compose.js') &&
-    fullGmail.indexOf('src/google-compose-page.js') < fullGmail.indexOf('src/content-gmail.js'));
   const gmailSrc = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
   const composeSlice = gmailSrc.slice(gmailSrc.indexOf('async function sendGmailCompose'), gmailSrc.indexOf('function sendLaneUndo'));
   check('a filled receipt is the compose DOM, not the in-memory fill',

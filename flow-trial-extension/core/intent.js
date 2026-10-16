@@ -601,7 +601,7 @@ const FlowIntent = (() => {
   // not the reader's name. The reader's names are the account display
   // name and ownNames, in either script. A name in the other script is
   // still someone else.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
@@ -694,7 +694,59 @@ const FlowIntent = (() => {
       if (names.indexOf(who.toLowerCase()) !== -1) continue;
       return true;
     }
+    // "היי, רק משהו קטן: מאיה, בבקשה …" names מאיה after the colon.
+    // A comma later in "צהריים טובים," is not a person. A weekday or a
+    // month is not one either. The reader's own name is not someone else.
+    const inline = /[:：]\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,40})\s*[,،]\s*([^\n]{0,180})/g;
+    const raw = String(text || '');
+    let m;
+    while ((m = inline.exec(raw))) {
+      const name = m[1];
+      if (!personToken(name) || !restIsAsk(m[2])) continue;
+      if (names.indexOf(name.toLowerCase()) !== -1) continue;
+      return true;
+    }
     return false;
+  }
+  // The reader is only in Cc, and the mail does not greet them by name.
+  // That is quiet for every kind: a file, a task, a log, a hold. A greeting
+  // of their own name, while they sit on Cc, is still theirs. No To and no
+  // Cc is not this fact.
+  function ccOnlyWithoutGreeting(text, ctx) {
+    const c = ctx || {};
+    const to = addressList(c.to || c.toRecipients);
+    const cc = addressList(c.cc || c.ccRecipients);
+    const own = addressList(c.ownAddresses || c.own);
+    if (!own.length || !cc.length) return false;
+    const onTo = to.some((a) => own.indexOf(a) !== -1);
+    const onCc = cc.some((a) => own.indexOf(a) !== -1);
+    if (onTo || !onCc) return false;
+    const names = readerNameList(c);
+    if (!names.length) return true;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i], text);
+      if (who && names.indexOf(who.toLowerCase()) !== -1) return false;
+    }
+    const inline = /[:：]\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,40})\s*[,،]\s*([^\n]{0,180})/g;
+    let m;
+    const raw = String(text || '');
+    while ((m = inline.exec(raw))) {
+      if (!personToken(m[1]) || !restIsAsk(m[2])) continue;
+      if (names.indexOf(m[1].toLowerCase()) !== -1) return false;
+    }
+    return true;
+  }
+  // The person sent this, including a note addressed to their own alias.
+  // mailIsOwn treats that note as incoming. The attach track does not.
+  function sentByReader(ctx) {
+    const c = ctx || {};
+    if (c.noteToSelf === true || c.senderIsUser === true || c.inSent === true) return true;
+    if (c.direction === 'outbound' || c.direction === 'self') return true;
+    if (c.inbound === false) return true;
+    const sender = String(c.senderEmail || '').trim().toLowerCase();
+    const own = addressList(c.ownAddresses || c.own);
+    return Boolean(sender && own.length && own.indexOf(sender) !== -1);
   }
   // From and every To/Cc are the user, including an alias. A delegate
   // (a sender that is not the from) and a mail to anyone else are not this.
@@ -1184,7 +1236,7 @@ const FlowIntent = (() => {
     // Own outbound, a note to self, or a vocative that names someone else
     // is not this person's Do It. "אבי שלום," plus an ask is that vocative.
     // A hold does not get past that by not being a reply ask.
-    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
+    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {
@@ -1220,6 +1272,10 @@ const FlowIntent = (() => {
     // The file track does not wait for a family to name the object. A
     // missing file stays the card, never a banner and never silence.
     const attachToInvite = Boolean(attachToInvitePlan(text));
+    // The file track is an inbound ask aimed at this person. A mail they
+    // sent, including a note to their own address, is not that ask. The
+    // meeting noun in it is the existing invite, not a new event.
+    if (!blocked && attachToInvite && sentByReader(ctx)) return stayQuiet('hedge');
     if (!blocked && !replyMisaddressed && attachToInvite) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
@@ -1523,7 +1579,7 @@ const FlowIntent = (() => {
       // invisible clock keeps a dated promise (v2syn-8473). Every other
       // sender-promise clock stays quiet, the same as the base judge.
       const rawClock = String(clock && clock.raw || '');
-      const baseSeesClock = /(?:בשעה|בשעות)|\bat\s+\d/i.test(text) ||
+      const baseSeesClock = /(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)|\bat\s+\d/i.test(text) ||
         (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text) && /(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(text));
       const laneOnlyBet = /ב-\s*\d{1,2}:\d{2}/.test(rawClock) && !baseSeesClock;
       // "I'll send the report tomorrow 14:30" is a log, dated from the mail.

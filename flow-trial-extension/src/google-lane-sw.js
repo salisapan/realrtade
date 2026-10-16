@@ -1,6 +1,6 @@
-// Full-flavor service worker. Chrome loads this only when manifest.full.json
-// is the manifest. background.js stays the file PR #144 edits; this wrapper
-// imports it and then the lane, which adds its own listener for lane messages.
+// Lane wrapper. Chrome loads src/background.js from manifest.json. This file
+// imports that worker and then the lane, which adds its own listener for
+// lane messages. There is no second manifest.
 import './background.js';
 import '../core/google-config.js';
 import '../core/google-calendar.js';

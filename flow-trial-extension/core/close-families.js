@@ -298,7 +298,7 @@ const FlowCloseFamilies = (() => {
   function hebrewWordClock(text) {
     const part = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
     const m = String(text || '').match(new RegExp(
-      '(?:בשעה|בשעות)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
+      '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
     ));
     if (!m) return null;
     const hour = HE_HOUR_WORDS.find((pair) => pair[0] === m[1]);
@@ -337,7 +337,7 @@ const FlowCloseFamilies = (() => {
   function bareAmbiguousHour(text) {
     if (clockOf(text)) return false;
     if (/\bat\s+(?:1[0-2]|0?[1-7])(?::[0-5]\d)?\b/i.test(text)) return true;
-    if (/(?:בשעה|בשעות)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
     return false;
   }
   function shiftWeekday(now, target, mode) {
@@ -359,7 +359,7 @@ const FlowCloseFamilies = (() => {
     const letter = '([אבגדהו])';
     const tail = '(?:[\'׳\u05F3])?(?:\\s+הבא(?![\\u0590-\\u05FF]))?(?![\\u0590-\\u05FF])';
     const led = String(text || '').match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+' + letter + tail));
-    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+בשעה)'));
+    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+(?:בשעה|בעה))'));
     const m = led || clocked;
     if (!m) return null;
     const target = 'אבגדהו'.indexOf(m[1]);
@@ -731,7 +731,7 @@ const FlowCloseFamilies = (() => {
     if (MOVE_EN.test(text) || MOVE_HE.test(text) || CANCEL_EN.test(text) || CANCEL_HE.test(text)) return false;
     if (replacementCue(text)) return false;
     const clockRe = new RegExp(
-      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|בשעה\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
+      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|(?:בשעה|(?<![\\u0590-\\u05FF])בעה)\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
       'gi'
     );
     const clocks = [];

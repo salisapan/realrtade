@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'f179852b2eb118d73384c349d0aea76b77b3b71485437b4e6c9d478389c6e8f2';
+const FIXTURE_SHA = '26acfd3d383a2ca9ab89d5879cf27af867976311acb685f2c77f6937516c7812';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -161,7 +161,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 523) {
+if (rows.length !== 529) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -209,6 +209,41 @@ for (const id of Object.keys(NEW_VOC)) {
     console.log('FAIL: vocative label ' + id);
     process.exit(1);
   }
+}
+const AIM_QUIET = {
+  'v2syn-3411': 'self',
+  'v2syn-3398': 'self',
+  'v2syn-3434': 'self',
+  'v2syn-9401': 'cc',
+  'v2syn-9403': 'cc',
+  'v2syn-9404': 'cc',
+  'v2syn-3412': 'cc',
+  'v2syn-9387': 'cc',
+  'v2syn-8472': 'cc',
+  'v2syn-23104': 'cc'
+};
+for (const id of Object.keys(AIM_QUIET)) {
+  const row = byId[id];
+  const own = [OWN_GMAIL, OWN_OUTLOOK];
+  const from = row ? parseFrom(row.from).email.toLowerCase() : '';
+  const to = row ? (row.to || []).map((a) => String(a).toLowerCase()) : [];
+  const cc = row ? (row.cc || []).map((a) => String(a).toLowerCase()) : [];
+  const self = AIM_QUIET[id] === 'self' && own.indexOf(from) >= 0 && to.some((a) => own.indexOf(a) >= 0);
+  const ccOnly = AIM_QUIET[id] === 'cc' && to.every((a) => own.indexOf(a) < 0) && cc.some((a) => own.indexOf(a) >= 0);
+  if (!row || row.expected !== 'quiet' || row.expectTrack || row.expectLabel || !(self || ccOnly)) {
+    console.log('FAIL: aim label ' + id);
+    process.exit(1);
+  }
+}
+const aimed = byId['v2syn-9391'];
+if (!aimed || aimed.expected !== 'offer' || aimed.expectTrack !== 'file' || aimed.expectLabel !== 'לצרף הסכם הסודיות לזימון' || aimed.to.indexOf(OWN_GMAIL) < 0) {
+  console.log('FAIL: 9391 stays the file track');
+  process.exit(1);
+}
+const typoClock = byId['v2syn-23409'];
+if (!typoClock || typoClock.expected !== 'offer' || typoClock.expectKind !== 'event' || typoClock.body.indexOf('בעה 10:00') < 0) {
+  console.log('FAIL: 23409 label');
+  process.exit(1);
 }
 const dated = byId[DATED_ID];
 if (!dated || dated.expected !== 'offer' || dated.expectKind !== 'task/dated-commitment' || dated.expectDate !== '2026-10-19' || dated.reason !== DATED_REASON) {
@@ -328,6 +363,21 @@ for (const row of rows) {
   if (!ok) fails.push(row.id + ' expected ' + row.expected + (row.expectKind ? '/' + row.expectKind : '') + ' — ' + why);
 }
 
+{
+  const row = byId['v2syn-23409'];
+  const ctx = contextOf(row);
+  const g = judge(row, 'gmail', ctx);
+  const o = judge(row, 'outlook', ctx);
+  const steps = (g.process && g.process.steps) || [];
+  const cal = steps.filter((s) => s && s.kind === 'calendar');
+  const hour = g.intent && g.intent.entities && g.intent.entities.hour;
+  const minute = g.intent && g.intent.entities && g.intent.entities.minute;
+  const outlookOk = shown(o) ? (o.intent && o.intent.entities && o.intent.entities.hour === 10) : connectorQuiet('outlook', o);
+  if (!shown(g) || g.intent.type !== 'event' || hour !== 10 || minute !== 0 || cal.length !== 1 || cal[0].params.hour !== 10 || !outlookOk) {
+    console.log('FAIL: 23409 calendar gmail ' + describe(g) + ' outlook ' + describe(o) + ' hour ' + hour);
+    process.exit(1);
+  }
+}
 console.log('offer pass ' + counts.offerPass + ' fail ' + counts.offerFail);
 console.log('quiet pass ' + counts.quietPass + ' fail ' + counts.quietFail);
 console.log('either ' + counts.either + ' allowed ' + counts.allowed);

@@ -134,6 +134,15 @@ check('a team meeting noun the base does not know stays quiet',
 for (const row of fix.plans) {
   const got = both(row.text);
   const g = shape(got.g && got.g.process);
+  const o = shape(got.o && got.o.process);
+  if (row.id === 'log-it') {
+    const noCalendar = !(got.g.process && got.g.process.steps || []).some((s) => s && s.kind === 'calendar');
+    check('no parsed time is a task, never a calendar step: ' + row.text,
+      got.g && got.g.show === true && g && g.id === 'log-it' && g.steps === 'task' && noCalendar &&
+      got.o && got.o.show === true && o && o.id === 'log-it' && o.steps === 'task',
+      { g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason] });
+    continue;
+  }
   check('gmail plan, outlook quiet: ' + row.text,
     got.g && got.g.show === true && got.o && got.o.show === false && got.o.reason === 'no-draft-close' &&
     g && g.id === row.id,
@@ -155,10 +164,10 @@ for (const text of fix.replies) {
 const bare = fix.noTimeConflict;
 const bareGot = both(bare.text);
 const bareG = shape(bareGot.g && bareGot.g.process);
-check('a weekday that is not 22/10, with no clock, stays the base schedule and outlook stays quiet',
-  bareGot.g && bareGot.g.show === true && bareGot.o && bareGot.o.show === false && bareGot.o.reason === 'no-draft-close' &&
-  bareG && bareG.id === 'schedule' &&
-  !(bareGot.g.process.steps || []).some((s) => s && s.params && s.params.dateIso === bare.forbiddenIso && s.kind === 'calendar' && bareGot.g.process.id === 'hold'),
+check('a weekday that is not 22/10, with no clock, is a task and does not book either day',
+  bareGot.g && bareGot.g.show === true &&
+  bareG && bareG.id === 'log-it' && bareG.steps === 'task' &&
+  !(bareGot.g.process.steps || []).some((s) => s && s.kind === 'calendar'),
   { bareG: bareG, reason: [bareGot.g && bareGot.g.reason, bareGot.o && bareGot.o.reason] });
 
 for (const text of fix.deadlines) {
