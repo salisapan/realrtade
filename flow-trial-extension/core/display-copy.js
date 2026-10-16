@@ -137,6 +137,14 @@ const FlowDisplay = (() => {
       const title = titled || ((intent && intent.label && !genericLabel(intent.label)) ? intent.label : '') || (intent && intent.label) || name || 'Log It';
       return { title: title, sentence: p.closingLine || '', fileCard: false, logIt: true };
     }
+    if (id === 'attach-invite' || (intent && intent.inviteFile)) {
+      return { title: (intent && intent.label) || name, sentence: null, fileCard: false, logIt: false };
+    }
+    // A calendar hold is a meeting. The button stays Hold It / השהה.
+    if (id === 'hold') {
+      const blob = String((extra && (extra.bodyText || extra.text)) || '');
+      return { title: /[\u0590-\u05FF]/.test(blob) ? 'פגישה' : 'Meeting', sentence: null, fileCard: false, logIt: false };
+    }
     return { title: name, sentence: null, fileCard: false, logIt: false };
   }
 
@@ -391,9 +399,10 @@ const FlowDisplay = (() => {
   function uiLangFrom(sources) {
     const s = sources || {};
     const setting = s.setting == null ? '' : String(s.setting).trim();
+    const host = s.hostLanguage == null ? '' : String(s.hostLanguage).trim();
     const ui = s.uiLanguage == null ? '' : String(s.uiLanguage).trim();
     const nav = s.navigatorLanguage == null ? '' : String(s.navigatorLanguage).trim();
-    const raw = (setting || ui || nav).toLowerCase();
+    const raw = (setting || host || ui || nav).toLowerCase();
     if (raw === 'he' || raw.indexOf('he-') === 0 || raw === 'iw' || raw.indexOf('iw-') === 0) return 'he';
     return 'en';
   }

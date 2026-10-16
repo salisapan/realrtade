@@ -1,5 +1,5 @@
-// Permanent #144 regression list. 474 rows, sha256
-// 6065f00dd2a9d66de9706e7a4a19d2b46df4e98e86284914284e0098e2b7f26c.
+// Permanent #144 regression list. 479 rows, sha256
+// 9bf4b82f477ed192cc7ea39b44f5dfa419cca46e3718512a434cc8f3a50b900d.
 // Each row goes through the real judge on the Gmail path and the Outlook
 // path. offer and quiet are asserted. either is skipped. expectKind is the
 // intent type, except task, which is a task-only close, and
@@ -16,7 +16,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '6065f00dd2a9d66de9706e7a4a19d2b46df4e98e86284914284e0098e2b7f26c';
+const FIXTURE_SHA = '9bf4b82f477ed192cc7ea39b44f5dfa419cca46e3718512a434cc8f3a50b900d';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js']) {
@@ -123,6 +123,15 @@ function connectorQuiet(surface, out) {
 
 function shown(out) { return out && out.show === true; }
 
+function fileTrack(out) {
+  if (!shown(out)) return true;
+  const kinds = ((out.process && out.process.steps) || []).map((s) => s && s.kind);
+  const taskAt = kinds.findIndex((k) => k === 'googleTask' || k === 'outlookTask' || k === 'googleTasks');
+  const draftAt = kinds.findIndex((k) => k === 'gmailDraft' || k === 'outlookDraft');
+  const label = out.intent && out.intent.label;
+  return taskAt !== -1 && draftAt > taskAt && label !== 'Reply requested' && !/^Reply requested by\b/.test(String(label || ''));
+}
+
 function describe(out) {
   if (shown(out)) {
     const t = out.intent && out.intent.type;
@@ -138,7 +147,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 474) {
+if (rows.length !== 479) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -202,10 +211,14 @@ for (const row of rows) {
     const oOk = shown(o) || connectorQuiet('outlook', o);
     const oneShows = shown(g) || shown(o);
     const kind = (!row.expectKind) || (( !shown(g) || kindOk(g, row)) && (!shown(o) || kindOk(o, row)) && oneShows);
-    ok = gOk && oOk && oneShows && kind;
+    const label = !row.expectLabel || ((!shown(g) || (g.intent && g.intent.label === row.expectLabel)) && (!shown(o) || (o.intent && o.intent.label === row.expectLabel)));
+    const track = row.expectTrack !== 'file' || (fileTrack(g) && fileTrack(o));
+    ok = gOk && oOk && oneShows && kind && label && track;
     if (!ok) {
       why = 'gmail ' + describe(g) + ' outlook ' + describe(o);
       if (row.expectKind && !kind) why += ' expectKind ' + row.expectKind + (row.expectDate ? ' ' + row.expectDate : '');
+      if (row.expectLabel && !label) why += ' label gmail ' + ((g.intent && g.intent.label) || '') + ' outlook ' + ((o.intent && o.intent.label) || '');
+      if (row.expectTrack === 'file' && !track) why += ' track';
     }
   } else {
     ok = !shown(g) && !shown(o);

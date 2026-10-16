@@ -184,8 +184,10 @@
     try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
     let nav = '';
     try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    let host = '';
+    try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
     const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
-      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, uiLanguage: ui, navigatorLanguage: nav })
+      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav })
       : 'en';
     if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.setUiLang === 'function') FlowChipHost.setUiLang(lang);
     return lang;
@@ -3881,7 +3883,9 @@
       // A stored schedule process used to skip this and leave the old card up
       // while Why not shown already said drive-search-failed.
       const fileNow = (decided && (filePendingReason(decided.reason) || fileSilenceReason(decided.reason))) || (planned && fileSilenceReason(planned.reason));
-      if (fileNow) {
+      const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
+        ? FlowIntent.attachToInvitePlan(pane.text || '') : null;
+      if (fileNow && !invitePlan) {
           const tracing = traceArmed || localFileTrace();
           graphTrace = { attempts: [] };
           const askPrepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)

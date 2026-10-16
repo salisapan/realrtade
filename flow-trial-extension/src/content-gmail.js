@@ -17,6 +17,10 @@
 // label must not appear in an English UI, and the reverse is the same rule.
 function glanceUiLanguage() {
   try {
+    const host = document.documentElement && document.documentElement.lang;
+    if (host && String(host).trim()) return String(host).trim();
+  } catch (e) { /* the browser locale is next */ }
+  try {
     const i18n = typeof chrome !== 'undefined' && chrome.i18n;
     if (i18n && typeof i18n.getUILanguage === 'function') {
       const lang = i18n.getUILanguage();
@@ -85,7 +89,9 @@ function glanceUiCopy(kind) {
     let nav = '';
     try { nav = (navigator && navigator.language) || ''; } catch (e) {}
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
-      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+      let host = '';
+      try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
+      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
     }
     return 'en';
   }
@@ -693,11 +699,31 @@ function glanceUiCopy(kind) {
   // uses for the first one. Passed to FlowGoogleCloses.messageToJudge.
   function addressesOn(messageNode) {
     if (!messageNode || !messageNode.querySelectorAll) return [];
-    const out = [];
+    const all = [];
     const els = messageNode.querySelectorAll('[email]');
     for (const el of els) {
       const email = el.getAttribute('email');
-      if (email) out.push(email);
+      if (email) all.push(el);
+    }
+    if (!all.length) return [];
+    // messageToJudge treats the first address as the sender. A Hebrew
+    // message can paint "me" before the sender. The sender is the address
+    // that is not the "me" chip and not inside a To or Cc line.
+    let sender = '';
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      if (String(el.textContent || '').trim().toLowerCase() === 'me') continue;
+      const block = el.closest ? el.closest('div, p, li') : null;
+      const head = block ? String(block.innerText || '').trim() : '';
+      if (/^(to|cc|אל|עותק)\b/i.test(head)) continue;
+      sender = el.getAttribute('email') || '';
+      break;
+    }
+    const out = [];
+    if (sender) out.push(sender);
+    for (let i = 0; i < all.length; i++) {
+      const email = all[i].getAttribute('email');
+      if (email && out.indexOf(email) < 0) out.push(email);
     }
     return out;
   }
@@ -1062,10 +1088,36 @@ function glanceUiCopy(kind) {
   // A thread is usually a list of listitems. An opened message can also be
   // only the .adn row, with the legacy id and no listitem. That row is
   // still the mail the receipt was stored against.
+  // The open message is the node that contains the body (.a3s). An inbox
+  // row is also a listitem, and it stays in the page when a thread opens.
+  // Judging that row misses the mail that was just opened. A subject with
+  // no body yet waits for the next mutation instead of judging the inbox.
   function openMailNodes(main) {
+    if (!main || !main.querySelectorAll) return [];
+    const nodes = [];
+    function add(node) {
+      if (!node) return;
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i] === node || (nodes[i].contains && nodes[i].contains(node))) return;
+        if (node.contains && node.contains(nodes[i])) nodes.splice(i, 1);
+      }
+      nodes.push(node);
+    }
+    function hasBody(node) {
+      return !!(node && node.querySelector && node.querySelector('.a3s'));
+    }
+    const marked = main.querySelectorAll('[data-legacy-message-id]');
+    for (let i = 0; i < marked.length; i++) {
+      if (hasBody(marked[i])) add(marked[i]);
+    }
+    if (nodes.length) return nodes;
     const listed = main.querySelectorAll('div[role="listitem"]');
-    if (listed && listed.length) return listed;
-    return main.querySelectorAll('[data-legacy-message-id]');
+    for (let i = 0; i < listed.length; i++) {
+      if (hasBody(listed[i])) add(listed[i]);
+    }
+    if (nodes.length) return nodes;
+    if (main.querySelector('h2.hP')) return [];
+    return listed;
   }
 
   async function scanReadingPane() {
@@ -1491,7 +1543,11 @@ function glanceUiCopy(kind) {
     if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
 
     let attachFile = null;
-    if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
+    const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
+      ? FlowIntent.attachToInvitePlan(text) : null;
+    // A file onto an existing invite is the file-track card (task + short
+    // draft) even when the file was not found. Never the needs-you banner.
+    if (!invitePlan && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });

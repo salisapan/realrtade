@@ -986,8 +986,15 @@ const FlowIntent = (() => {
           }
         }
       }
+      // "לצרף … לזימון" is the file track even when a family returned the request.
+      const invitePlan = attachToInvitePlan(text);
+      if (invitePlan && type === TYPES.REQUEST) {
+        intent.inviteFile = true;
+        intent.label = invitePlan.label;
+        intent.inviteDraft = invitePlan.draft;
+      }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft) {
+      if (intent.noReplyDraft && !intent.inviteFile) {
         const what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
         const iso = intent.entities && intent.entities.dateIso;
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
@@ -1192,6 +1199,16 @@ const FlowIntent = (() => {
     // "לצרף … לזימון" asks to put a file on an invite that already exists.
     // The meeting noun is that invite, not a new event to schedule.
     const attachToInvite = /לצרר?ף[\s\S]{0,160}?לזימון/.test(String(text || ''));
+    // The file track does not wait for a family to name the object. "בבקשה
+    // לצרף את טופס 101 לזימון" is that request. A missing file stays the card.
+    if (!blocked && !replyMisaddressed && attachToInvite) {
+      return finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+    }
     if (!replyMisaddressed && !attachToInvite && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);
@@ -1216,7 +1233,12 @@ const FlowIntent = (() => {
     // deadline of the request, not evidence of a meeting to schedule. A
     // schedule close still needs an explicit proposal to meet, or a time
     // offered for choice (family D / the explicit-ask gate below).
-    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast && !attachToInvite;
+    // "Call Tom October 19 at 10:00" phones a person. It is a task, not a
+    // meeting. A weekday ("Call Maya Tuesday") is still the meeting.
+    // "a call" / "the call" / "schedule a call" still is.
+    const phoneSomeone = /(?:^|[\n\r])\s*Call\s+[A-Z][a-zA-Z'’-]{1,40}\b/.test(String(text || ''))
+      && !/\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/.test(String(text || ''));
+    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone;
     // A clock time the extractor actually resolved. Missing either field is
     // not a time we may invent — date-only meetings stay all-day events on
     // the existing schedule process, and date-only commitments stay tasks.
@@ -1227,7 +1249,7 @@ const FlowIntent = (() => {
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
     const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי/i.test(text);
-    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite &&
+    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
@@ -1295,6 +1317,19 @@ const FlowIntent = (() => {
         minute: facts.time.minute
       };
     }
+    // Phoning a named person at a clock is the task. The meeting noun
+    // "call" is that verb, not an event to schedule.
+    if (!blocked && !replyMisaddressed && phoneSomeone && hasResolvedDate && clock && !isPast && !calledOff) {
+      return finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: String(text || '').split(/\n/)[0].replace(/\s+/g, ' ').trim(),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso,
+        hour: clock.hour,
+        minute: clock.minute
+      }, 'dated-commitment');
+    }
+
     if (!blocked && !replyMisaddressed && eventEvidence) {
       // A meeting that is also a timed commitment, or an explicit ask to
       // meet at that clock time, is the calendar-hold personal close: one
@@ -1386,6 +1421,8 @@ const FlowIntent = (() => {
     } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyOk) {
+      // "בבקשה לצרף … לזימון" stays a request. The card is the file track,
+      // not "Reply requested by …". The meeting path already stood down.
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
@@ -1523,7 +1560,24 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto };
+  // A file asked onto an invite that already exists. One plan, reused by
+  // both lanes: a task, then a short attached draft. The title replaces
+  // "Reply requested". A missing file is still this card, never a banner.
+  function attachToInvitePlan(text) {
+    const raw = String(text || '');
+    if (!/לצרר?ף[\s\S]{0,160}?לזימון/.test(raw)) return null;
+    const he = /[\u0590-\u05FF]/.test(raw);
+    return {
+      inviteFile: true,
+      label: he ? 'לצרף קובץ לזימון' : 'Attach file to invite',
+      processId: 'attach-invite',
+      stepKinds: ['task', 'draft'],
+      draft: he ? 'מצורף.' : 'Attached.',
+      banner: false
+    };
+  }
+
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

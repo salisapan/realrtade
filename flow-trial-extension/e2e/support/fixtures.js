@@ -42,16 +42,23 @@ function gmailHtml(opts) {
       ? ('<form><textarea name="to"></textarea><input name="subjectbox" value="">' +
         '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></form>')
       : '');
-  return '<!doctype html><html><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
-    '<div role="main">' +
-    '<h2 class="hP">' + esc(subject) + '</h2>' +
-    '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
+  const message = '<div class="' + (o.threadBesideInbox ? 'adn' : '') + '" role="' + (o.threadBesideInbox ? 'article' : 'listitem') + '" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
     '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
     '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
     toLine + ccLine + chips +
     '<div class="a3s">' + esc(body) + '</div>' +
     file +
-    '</div>' + compose + '</div></body></html>';
+    '</div>';
+  // The inbox list stays in the page when a thread opens. Those rows are
+  // listitems and they have no message body. The open mail is not one of them.
+  const inbox = o.threadBesideInbox
+    ? '<div role="list"><div role="listitem" data-legacy-thread-id="inbox-other"><span class="y2">older snippet</span></div></div>'
+    : '';
+  return '<!doctype html><html><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
+    '<div role="main">' +
+    inbox +
+    '<h2 class="hP">' + esc(subject) + '</h2>' +
+    message + compose + '</div></body></html>';
 }
 
 function outlookHtml(opts) {
@@ -100,7 +107,7 @@ function outlookHtml(opts) {
       : (o.hebrewTo
         ? ('<div class="to"><span>אל</span> <span title="' + esc(toList[0] || '') + '">' + esc(o.toName || 'sali sapan') + '</span></div>')
         : ('<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>')));
-  return '<!doctype html><html lang="en"><head><title>Mail - Glance - Outlook</title></head><body>' +
+  return '<!doctype html><html lang="' + esc(o.lang || 'en') + '"><head><title>Mail - Glance - Outlook</title></head><body>' +
     '<div id="app"><div role="main">' +
     unread +
     '<div id="ReadingPaneContainerId">' +

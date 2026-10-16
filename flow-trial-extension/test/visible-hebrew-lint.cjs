@@ -61,7 +61,12 @@ check('a hold with no time is not a line', D.holdWhenLine('2026-10-18', null, nu
 });
 
 check('a stored UI language wins over the browser', D.uiLangFrom({ setting: 'he', uiLanguage: 'en-US', navigatorLanguage: 'en' }) === 'he');
+check('a stored UI language wins over the page', D.uiLangFrom({ setting: 'en', hostLanguage: 'he', uiLanguage: 'he' }) === 'en');
+check('the page language wins over the browser UI', D.uiLangFrom({ setting: '', hostLanguage: 'he', uiLanguage: 'en-US', navigatorLanguage: 'en' }) === 'he');
 check('the browser UI language wins over navigator', D.uiLangFrom({ setting: '', uiLanguage: 'he-IL', navigatorLanguage: 'en' }) === 'he');
+check('a Hebrew meeting is titled פגישה', D.cardFace({ id: 'hold', name: 'Hold It' }, { label: 'Hold It' }, { bodyText: 'פגישת סנכרון ביום חמישי ב-11:00' }).title === 'פגישה');
+check('an English meeting is titled Meeting', D.cardFace({ id: 'hold', name: 'Hold It' }, { label: 'Hold It' }, { bodyText: 'Sync on Thursday at 11:00' }).title === 'Meeting');
+check('an invite file card uses its title', D.cardFace({ id: 'attach-invite', name: 'Attach it' }, { inviteFile: true, label: 'לצרף קובץ לזימון' }, {}).title === 'לצרף קובץ לזימון');
 check('navigator.language is the last source', D.uiLangFrom({ setting: null, uiLanguage: '', navigatorLanguage: 'iw' }) === 'he');
 check('an empty locale stays English', D.uiLangFrom({}) === 'en' && D.uiLangFrom({ navigatorLanguage: 'fr' }) === 'en');
 const heChrome = D.chrome('he');
