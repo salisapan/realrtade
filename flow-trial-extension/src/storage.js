@@ -282,18 +282,72 @@ const FlowStorage = (() => {
   // touches the keys named in its patch, so concurrent writes to different
   // keys never collide — only same-key, same-function concurrency does.
   //
-  // This only serializes calls made from within one script's own execution
-  // context. It does not protect against two Gmail tabs open at once, each
-  // running an independent copy of this file against the same underlying
-  // storage — that cross-tab race is real but far narrower (it needs
-  // near-simultaneous activity in two tabs) and closing it fully would mean
-  // routing every write through the single background service worker
-  // instead of writing directly from content scripts, a larger change left
-  // for a follow-up.
+  // Two open mails are two copies of this file. Each queue is local to its
+  // page, so Undo on the task mail and Undo on the file mail can both read
+  // the same log and the later set() puts the other row back to Handled.
+  // The service worker is the one shared queue: flow:log-lock is granted to
+  // one caller, and flow:log-unlock lets the next through. A page with no
+  // extension id (a corpus sandbox) keeps the in-page queue only.
+  function logLockAvailable() {
+    try {
+      return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && typeof chrome.runtime.sendMessage === 'function';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function releaseLogLock(token) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'flow:log-unlock', token: token }, () => {
+          try { if (chrome.runtime) void chrome.runtime.lastError; } catch (e) { /* the worker is gone */ }
+          resolve();
+        });
+      } catch (e) { resolve(); }
+    });
+  }
+
+  function acquireLogLock() {
+    if (!logLockAvailable()) return Promise.resolve(null);
+    let token = '';
+    try { token = crypto.randomUUID ? crypto.randomUUID() : ''; } catch (e) { token = ''; }
+    if (!token) token = String(Date.now()) + Math.random().toString(16).slice(2);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (held) => {
+        if (settled) {
+          if (held) releaseLogLock(token);
+          return;
+        }
+        settled = true;
+        resolve(held ? token : null);
+      };
+      const timer = setTimeout(() => {
+        finish(false);
+        releaseLogLock(token);
+      }, 8000);
+      try {
+        chrome.runtime.sendMessage({ type: 'flow:log-lock', token: token }, (res) => {
+          clearTimeout(timer);
+          let err = null;
+          try { err = chrome.runtime && chrome.runtime.lastError; } catch (e) { err = e; }
+          finish(!err && res && res.ok === true);
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        finish(false);
+      }
+    });
+  }
+
   function serialize(fn) {
     let queue = Promise.resolve();
     return (...args) => {
-      const run = queue.then(() => fn(...args));
+      const run = queue.then(async () => {
+        const token = await acquireLogLock();
+        try { return await fn(...args); }
+        finally { if (token) await releaseLogLock(token); }
+      });
       queue = run.catch(() => {}); // one failure must not wedge later calls
       return run;
     };
@@ -1678,8 +1732,8 @@ const FlowStorage = (() => {
       const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
       const taskRow = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
       if (!taskRow) continue;
-      if (ext && rowExt && rowExt !== ext) continue;
       const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      if (ext && rowExt && rowExt !== ext && !idHit) continue;
       const extHit = ext && rowExt === ext;
       const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
       if (!idHit && !extHit && !threadHit) continue;
@@ -1772,10 +1826,12 @@ const FlowStorage = (() => {
       const e = log[i];
       if (!e || e.kind !== 'written') continue;
       const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.fileId || e.ref.itemId)) || '';
-      const fileRow = e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive';
+      const fileRow = e.connectorId === 'onedriveFile' || e.connectorId === 'attachmentSave' || e.system === 'microsoft/onedrive';
       if (!fileRow) continue;
-      if (ext && rowExt && rowExt !== ext) continue;
       const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      // The chip's undo ref is the save wrapper. Its file id can differ from
+      // the id stored on the written row. The message is still that file.
+      if (ext && rowExt && rowExt !== ext && !idHit) continue;
       const extHit = ext && rowExt === ext;
       const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
       if (!idHit && !extHit && !threadHit) continue;

@@ -4913,8 +4913,49 @@ function reply(sendResponse, promise) {
   return true;
 }
 
+// One grant at a time for log read-modify-write. Two open mails each run
+// storage.js, and chrome.storage.local.set keeps whichever log lands last.
+// A dead holder is released so the next Undo is not stuck behind it.
+const glanceLogLockState = { held: null, waiters: [] };
+
+function glanceLogLockGrant() {
+  if (glanceLogLockState.held || !glanceLogLockState.waiters.length) return;
+  const next = glanceLogLockState.waiters.shift();
+  const timer = setTimeout(() => {
+    if (glanceLogLockState.held && glanceLogLockState.held.token === next.token) {
+      glanceLogLockState.held = null;
+      glanceLogLockGrant();
+    }
+  }, 20000);
+  glanceLogLockState.held = { token: next.token, timer: timer };
+  try { next.sendResponse({ ok: true }); } catch (e) { /* the page closed while it waited */ }
+}
+
+function glanceLogLock(msg, sendResponse) {
+  const token = String((msg && msg.token) || '');
+  if (msg.type === 'flow:log-lock') {
+    if (!token) {
+      try { sendResponse({ ok: false }); } catch (e) { /* caller gone */ }
+      return true;
+    }
+    glanceLogLockState.waiters.push({ token: token, sendResponse: sendResponse });
+    glanceLogLockGrant();
+    return true;
+  }
+  if (glanceLogLockState.held && glanceLogLockState.held.token === token) {
+    clearTimeout(glanceLogLockState.held.timer);
+    glanceLogLockState.held = null;
+    glanceLogLockGrant();
+  } else {
+    glanceLogLockState.waiters = glanceLogLockState.waiters.filter((w) => w.token !== token);
+  }
+  try { sendResponse({ ok: true }); } catch (e) { /* caller gone */ }
+  return true;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  if (msg.type === 'flow:log-lock' || msg.type === 'flow:log-unlock') return glanceLogLock(msg, sendResponse);
   // The person pressed רענן. Recovery never reloads a tab on its own.
   if (msg.type === 'flow:outlook-refresh-tab') {
     const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
