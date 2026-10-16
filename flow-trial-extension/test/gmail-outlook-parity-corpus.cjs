@@ -223,6 +223,14 @@ const CASES = [
           { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind) });
         continue;
       }
+      // planFor is one decision. A schedule (calendar plus a task, no reply) is the same card on both lanes.
+      if (oShown && g.process && entry && entry.process && g.process.id === entry.process.id) {
+        const oSteps = entry.process.steps || [];
+        const norm = (s) => (s.kind === 'outlookTask' || s.kind === 'googleTasks' ? 'googleTask' : s.kind === 'outlookDraft' ? 'gmailDraft' : s.kind);
+        const same = steps.map((s) => norm(s)).join(',') === oSteps.map(norm).join(',') && !oSteps.some((s) => /draft|send/i.test(s.kind));
+        check(m.name + ': both lanes plan the same close and neither invents a reply', same, { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind), id: g.process.id });
+        continue;
+      }
       const why = (r.diagnostics || []).map((d) => d.reason);
       check(m.name + ': Gmail ' + (g.show === 'drive' ? 'searches Drive first' : 'closes it with ' + g.process.steps.map((s) => s.kind).join('+')) + '; Outlook stays quiet and says why', !oShown && why.some((x) => x === 'file-chain-not-run' || x === 'no-draft-close'), { gmail: g.show, outlook: oShown, why });
       continue;

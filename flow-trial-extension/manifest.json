@@ -105,10 +105,6 @@
         "src/receipt-copy.js",
         "src/native-edit.js",
         "src/follow.js",
-        "core/draft-reply.js",
-        "core/google-config.js",
-        "core/google-compose.js",
-        "src/google-compose-page.js",
         "src/content-gmail.js"
       ],
       "css": [
@@ -118,6 +114,23 @@
         "src/brief.css",
         "src/weekly.css",
         "src/follow.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ],
+      "js": [
+        "core/outlook-contacts.js",
+        "core/outlook-word.js",
+        "core/outlook-excel.js",
+        "core/teams-chat.js",
+        "core/outlook-send.js",
+        "src/lane-ms-page.js",
+        "src/content-outlook-lane-ms.js"
       ],
       "run_at": "document_idle"
     }

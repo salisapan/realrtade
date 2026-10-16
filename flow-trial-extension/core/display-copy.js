@@ -155,6 +155,9 @@ const FlowDisplay = (() => {
     if (fileCard) return { title: SAVE_TITLE, sentence: '', fileCard: true, logIt: false };
     const logIt = id === 'log-it' || /^log it$/i.test(name);
     if (logIt) {
+      if (intent && (intent.label === 'Call' || intent.label === 'שיחה')) {
+        return { title: intent.label, sentence: p.closingLine || '', fileCard: false, logIt: true };
+      }
       const titled = commitmentTitle({ text: extra && (extra.bodyText || extra.text), intent: intent });
       const title = titled || ((intent && intent.label && !genericLabel(intent.label)) ? intent.label : '') || (intent && intent.label) || name || 'Log It';
       return { title: title, sentence: p.closingLine || '', fileCard: false, logIt: true };
@@ -525,6 +528,19 @@ const FlowDisplay = (() => {
     return CHROME[uiLangFrom({ setting: lang })] || CHROME.en;
   }
 
+  // The primary button follows the plan and the UI language. A To Do
+  // task says Do It. A calendar hold says Hold It.
+  function actionLabel(process, lang) {
+    const L = chrome(lang);
+    const steps = (process && process.steps) || [];
+    const taskOnly = steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'task'));
+    if (taskOnly) return L.doIt;
+    const id = process && process.id;
+    if (id === 'hold' || id === 'schedule' || id === 'schedule-confirm' || id === 'clear-it' || id === 'move-it') return L.hold;
+    if (steps.some((s) => s && s.kind === 'calendar')) return L.hold;
+    return L.doIt;
+  }
+
   // Stored receipts keep the English sentence. The paint reads it back in
   // the UI language. A mail-language title is not in the table, so it stays.
   function showChrome(lang, text) {
@@ -688,6 +704,7 @@ const FlowDisplay = (() => {
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,
     chrome: chrome,
+    actionLabel: actionLabel,
     fillChrome: fillChrome,
     showChrome: showChrome
   };

@@ -6,6 +6,8 @@ const S = require('./support/sentences');
 
 const Q3 = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
 const DANA = 'Dana, can you reply and confirm whether the Q3 summary will include the October numbers?';
+// Conversation ids are at least 11 characters. A shorter id has no OWA
+// subject tail, so the open mail stays unconfirmed and Save the file never runs.
 const SEPT = '2026-09-30T14:01:00.000Z';
 const OCT = '2026-10-08T09:12:00.000Z';
 const V1 = '2026-10-02T11:00:00.000Z';
@@ -44,6 +46,7 @@ async function openPair(glance, open, other, fileOpen, fileOther) {
     conversation: []
   });
   return glance.openOutlook({
+    confirmConversation: true,
     id: open.conv,
     subject: open.subject,
     senderEmail: S.SENDER,
@@ -56,8 +59,8 @@ async function openPair(glance, open, other, fileOpen, fileOther) {
 test('September invoice does not save the October file', async ({ glance }) => {
   const page = await openPair(
     glance,
-    { id: 'AQMkSept', conv: 'AQQkSept', subject: 'Invoice', when: SEPT },
-    { id: 'AQMkOct', conv: 'AQQkOct', subject: 'Invoice', when: OCT },
+    { id: 'AQMkSept', conv: 'AQQkGlanceE2ESeptInv', subject: 'Invoice', when: SEPT },
+    { id: 'AQMkOct', conv: 'AQQkGlanceE2EOctInv', subject: 'Invoice', when: OCT },
     file('invoice-sept.pdf', 3072),
     file('invoice-oct.pdf', 4096)
   );
@@ -83,8 +86,8 @@ test('contract v1 does not save contract v2', async ({ glance }) => {
 test('an RE: thread does not save the newer file', async ({ glance }) => {
   const page = await openPair(
     glance,
-    { id: 'AQMkOld', conv: 'AQQkThread', subject: 'RE: Scope', when: V1 },
-    { id: 'AQMkNew', conv: 'AQQkThread', subject: 'RE: Scope', when: V2 },
+    { id: 'AQMkOld', conv: 'AQQkGlanceE2EThread', subject: 'RE: Scope', when: V1 },
+    { id: 'AQMkNew', conv: 'AQQkGlanceE2EThread', subject: 'RE: Scope', when: V2 },
     file('scope-v1.pdf', 3072),
     file('scope-v2.pdf', 5120)
   );
@@ -97,8 +100,8 @@ test('two matching files stay unresolved', async ({ glance }) => {
   const same = file('scope-v1.pdf', 3072);
   const page = await openPair(
     glance,
-    { id: 'AQMkTwinA', conv: 'AQQkTwin', subject: 'RE: Scope', when: V1 },
-    { id: 'AQMkTwinB', conv: 'AQQkTwin', subject: 'RE: Scope', when: V1 },
+    { id: 'AQMkTwinA', conv: 'AQQkGlanceE2ETwin', subject: 'RE: Scope', when: V1 },
+    { id: 'AQMkTwinB', conv: 'AQQkGlanceE2ETwin', subject: 'RE: Scope', when: V1 },
     same,
     same
   );

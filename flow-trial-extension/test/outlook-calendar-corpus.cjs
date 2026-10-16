@@ -206,5 +206,82 @@ check('needsSignIn is expired', Cal.microsoftConnection({ token: mailToken }, { 
 check('mail missing from the token is missing-scope', Cal.microsoftConnection({ token: { accessToken: 'AT', expiresAt: now + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, now) === 'missing-scope');
 check('no token is missing', Cal.microsoftConnection(null, {}, now) === 'missing');
 
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'close-families.js'), 'utf8'), sandbox, { filename: 'close-families.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'incoming-judge.js'), 'utf8'), sandbox, { filename: 'incoming-judge.js' });
+const heHold = vm.runInContext(`
+  const now = new Date(2026, 9, 15, 12, 0, 0);
+  const TEXT = 'פגישה ביום חמישי 22/10 בשעה 14:00';
+  const QUIET = 'פגישה ביום ראשון 22/10 בשעה 14:00';
+  const facts = FlowExtract.extract(TEXT, { now: now });
+  const classified = FlowIntent.classify(TEXT, { now: now, senderName: 'flow' });
+  const plan = FlowActions.planFor(classified, {});
+  const quiet = FlowIntent.classify(QUIET, { now: now, senderName: 'flow' });
+  const quietPlan = FlowActions.planFor(quiet, {});
+  const judged = FlowIncomingJudge.judge({
+    text: TEXT,
+    subject: '',
+    surface: 'outlook',
+    sender: { name: 'flow', email: 'flow@example.com' },
+    now: now,
+    inbound: true
+  });
+  const body = FlowOutlookCalendar.meetingBody({
+    dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', quote: TEXT, timeZone: 'Asia/Jerusalem'
+  });
+  const read = {
+    subject: 'פגישה',
+    body: { contentType: 'Text', content: TEXT },
+    start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' },
+    end: { dateTime: '2026-10-22T14:30:00', timeZone: 'Asia/Jerusalem' }
+  };
+  const readClock = String(read.start.dateTime).slice(11, 16);
+  ({
+    date: facts.date,
+    time: facts.time,
+    type: classified && classified.type,
+    personalClose: classified && classified.personalClose,
+    explicitHold: classified && classified.explicitHold,
+    planId: plan && plan.id,
+    steps: plan && plan.steps && plan.steps.map((s) => s.kind),
+    quietType: quiet && quiet.type,
+    quiet: quiet && quiet.quiet,
+    quietPlan: quietPlan && quietPlan.id,
+    quietNeeds: quietPlan && quietPlan.needsDateChoice,
+    quietIso: quiet && quiet.entities && quiet.entities.dateIso,
+    quietChoices: quietPlan && quietPlan.dateChoices,
+    readBack: readClock,
+    readZone: read.start.timeZone,
+    readHash: FlowOutlookCalendar.contentHash(read) === FlowOutlookCalendar.contentHash(read),
+    show: judged && judged.show,
+    reason: judged && judged.reason,
+    judgedId: judged && judged.process && judged.process.id,
+    body: body
+  });
+`, sandbox);
+check('weekday and 22/10 and בשעה 14:00 is Thu 22 Oct 2026 at 14:00',
+  heHold.date && heHold.date.iso === '2026-10-22' && heHold.date.statedWeekday === true &&
+  heHold.time && heHold.time.hour === 14 && heHold.time.minute === 0, heHold.date);
+check('the meeting plan is a hold with no file step, and it is not an explicit hold',
+  heHold.type === 'event' && heHold.personalClose !== 'calendar-hold' && heHold.explicitHold !== true &&
+  heHold.planId === 'hold' && heHold.steps && heHold.steps.length === 1 && heHold.steps[0] === 'calendar', heHold);
+check('Outlook stays quiet: the base judge does not offer this hold',
+  heHold.show === false && heHold.reason === 'no-draft-close', heHold);
+check('a weekday that contradicts 22/10 stays a schedule and does not book one day',
+  heHold.quietType === 'event' && heHold.quietPlan === 'schedule' && heHold.quietNeeds !== true &&
+  heHold.quietIso == null, heHold);
+check('14:00 Asia/Jerusalem is local 14:00 with no Z, no attendees, and no file',
+  heHold.body && heHold.body.start.dateTime === '2026-10-22T14:00:00' &&
+  heHold.body.end.dateTime === '2026-10-22T14:30:00' &&
+  !/Z$/i.test(heHold.body.start.dateTime) &&
+  heHold.body.start.timeZone === 'Asia/Jerusalem' &&
+  Array.isArray(heHold.body.attendees) && heHold.body.attendees.length === 0 &&
+  heHold.body.subject === 'פגישה' && !/File:/.test(heHold.body.body.content || ''), heHold.body);
+check('a read-back in Asia/Jerusalem is 14:00',
+  heHold.readBack === '14:00' && heHold.readZone === 'Asia/Jerusalem');
+check('an unknown zone is not written',
+  Cal.meetingBody({ dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', timeZone: 'Not/AZone' }) === null);
+check('a meeting body hashes the subject, the text, and the start',
+  Cal.contentHash(heHold.body) === Cal.contentHash(heHold.body) && Cal.contentHash(heHold.body) !== Cal.contentHash(Object.assign({}, heHold.body, { subject: 'other' })));
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

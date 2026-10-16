@@ -16,20 +16,18 @@
 // Chip and header lines follow the browser UI language. A stored Hebrew
 // label must not appear in an English UI, and the reverse is the same rule.
 function glanceUiLanguage() {
-  try {
-    const host = document.documentElement && document.documentElement.lang;
-    if (host && String(host).trim()) return String(host).trim();
-  } catch (e) { /* the browser locale is next */ }
+  let host = '';
+  let ui = '';
+  let nav = '';
+  try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
   try {
     const i18n = typeof chrome !== 'undefined' && chrome.i18n;
-    if (i18n && typeof i18n.getUILanguage === 'function') {
-      const lang = i18n.getUILanguage();
-      if (lang) return String(lang);
-    }
-  } catch (e) { /* the browser locale is next */ }
-  try {
-    if (typeof navigator !== 'undefined' && navigator.language) return String(navigator.language);
-  } catch (e) { /* English */ }
+    if (i18n && typeof i18n.getUILanguage === 'function') ui = i18n.getUILanguage() || '';
+  } catch (e) {}
+  try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+  if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+    return FlowDisplay.uiLangFrom({ hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav });
+  }
   return 'en';
 }
 
@@ -577,6 +575,36 @@ function glanceUiCopy(kind) {
     return 'https://mail.google.com/mail/u/' + accountIndex() + '/#inbox/' + threadId;
   }
 
+  // The chip's plan. The inbox scan and the reading pane both call this,
+  // then only the surface differs. Outlook's judge calls the same planFor.
+  function planOpenMail(text, ctx) {
+    ctx = ctx || {};
+    let intent = ctx.intent || null;
+    if (!intent || !intent.type) {
+      const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
+        ? FlowIncomingJudge.prepareForJudge(text)
+        : text;
+      intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, ctx) : null;
+    }
+    if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.shouldShowChip === 'function' && !FlowIntent.shouldShowChip(intent)) {
+      return { show: false, reason: 'chip-low-confidence', intent: intent };
+    }
+    const process = (typeof FlowActions !== 'undefined') ? FlowActions.planFor(intent, {
+      threadUrl: ctx.threadUrl || null,
+      hasThreadAttachment: Boolean(ctx.hasThreadAttachment),
+      executionMemory: ctx.executionMemory || null,
+      attachFile: ctx.attachFile || null,
+      text: text
+    }) : null;
+    if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
+    return { show: true, intent: intent, process: process };
+  }
+
+  function deadlineWasDropped(intent) {
+    return Boolean(intent && intent.facts && intent.facts.date && intent.facts.date.dropped);
+  }
+
   async function considerInboxRow(row, executionMemory, freshState) {
     const threadId = row.getAttribute('data-legacy-thread-id') || row.getAttribute('data-thread-id');
     if (!threadId) return false;
@@ -615,11 +643,13 @@ function glanceUiCopy(kind) {
     if (!FlowStillOpen.scoreOf(probe, Date.now())) return false;
     if (await personalCloseSaysSilence(intent, threadId, subject)) return false;
     const threadLink = inboxThreadUrl(threadId);
-    const process = FlowActions.planFor(intent, {
+    const planned = planOpenMail(text, {
+      intent: intent,
       threadUrl: threadLink,
       hasThreadAttachment: false,
       executionMemory: executionMemory
     });
+    const process = planned && planned.process;
     if (!process) return false;
     await FlowStorage.upsertStillOpenScan({
       messageId: 'scan:' + threadId,
@@ -1534,7 +1564,7 @@ function glanceUiCopy(kind) {
     // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
     // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
     // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
-    if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+    if (!deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
       recordSilence(messageId, 'file');
       return;
     }
@@ -1567,7 +1597,7 @@ function glanceUiCopy(kind) {
       ? FlowIntent.attachToInvitePlan(text) : null;
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
-    if (!invitePlan && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
+    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
@@ -1632,12 +1662,14 @@ function glanceUiCopy(kind) {
       }
     }
 
-    const process = FlowActions.planFor(intent, {
+    const planned = planOpenMail(text, {
+      intent: intent,
       threadUrl: threadUrl(legacyId),
       hasThreadAttachment: Boolean(chosenAttachment) || Boolean(attachFile),
-      executionMemory,
-      attachFile
+      executionMemory: executionMemory,
+      attachFile: attachFile
     });
+    const process = planned && planned.process;
     if (!process) { void flushSuggest(false); return; }
 
     injectChip(message, {
@@ -2355,7 +2387,18 @@ function glanceUiCopy(kind) {
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
         uiLang: lang,
         surface: 'gmail',
-        onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
+        dateChoices: ctx.process.dateChoices || null,
+        onDateChoice: (iso) => {
+          if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
+          liveSteps.forEach((step) => {
+            if (step && step.kind === 'calendar' && step.params) step.params.dateIso = iso;
+          });
+        },
+        onDoIt: (button) => {
+          if (button && button.disabled) return;
+          if (ctx.process.needsDateChoice) return;
+          onDoIt(host, button, ctx, liveSteps);
+        },
         onDismiss: () => onDismiss(host, ctx),
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, 'gmail');

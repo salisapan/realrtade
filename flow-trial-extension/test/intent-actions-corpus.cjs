@@ -45,15 +45,15 @@ function stepKinds(process) {
 
 console.log('--- intent.js: type + entity checks ---\n');
 
-// 1. A meeting invite alone -> SCHEDULED_EVENT, the plain "Schedule It"
-//    process: [Calendar, Task], no draft.
+// 1. A meeting invite alone -> SCHEDULED_EVENT. A meeting noun, a date, and
+//    a time, with no request to send a reply, is one hold: [Calendar].
 {
   const intent = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
   check('meeting alone classifies as SCHEDULED_EVENT', intent.type === FlowIntent.TYPES.SCHEDULED_EVENT, intent.type);
   const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('meeting alone proposes the "schedule" process', process.id === 'schedule', process && process.id);
-  check('meeting alone proposes exactly [calendar, task] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar', 'task']), stepIds(process));
-  check('meeting alone proposes exactly [Calendar, Task] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar', 'googleTask']), stepKinds(process));
+  check('meeting alone proposes the "hold" process', process.id === 'hold', process && process.id);
+  check('meeting alone proposes exactly [calendar] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar']), stepIds(process));
+  check('meeting alone proposes exactly [Calendar] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar']), stepKinds(process));
   const calendar = process.steps.find((s) => s.id === 'calendar');
   check('the calendar step carries the meeting sentence, not only the short title',
     calendar && /review the contract/i.test(calendar.params.quote) && calendar.params.title !== calendar.params.quote,
@@ -613,7 +613,7 @@ console.log('\n--- actions.js: labels are short and collision-free ---\n');
 console.log('\n--- actions.js: every process names its anchor and its closure copy ---\n');
 {
   const cases = [
-    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'schedule', 'calendar'],
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'hold', 'calendar'],
     ['Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?', 'schedule-confirm', 'calendar'],
     ['Could you please send me the signed contract by Friday, September 18?', 'reply-track', 'draft'],
     ['Confirming you’ll send the signed report by Friday, September 18, as agreed.', 'follow-through', 'task']
@@ -715,7 +715,7 @@ console.log('\n--- actions.js: an explicit pin overrides automatic demotion ---\
 console.log('\n--- actions.js: PROCESS_CATALOG is the same table processFor() actually uses ---\n');
 {
   const cases = [
-    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'schedule'],
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'hold'],
     ['Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?', 'schedule-confirm'],
     ['Could you please send me the signed contract by Friday, September 18?', 'reply-track'],
     ['Confirming you’ll send the signed report by Friday, September 18, as agreed.', 'follow-through']
@@ -1250,8 +1250,9 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     dateOnly.intent.personalClose);
 
   const announced = planOf('Let’s do a call Friday, September 18 at 3pm to review the contract.');
-  check('a bare meeting announcement is still schedule, not a personal hold',
-    announced.intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && !announced.intent.personalClose && announced.process.id === 'schedule',
+  check('a bare meeting announcement with a clock is a hold, with no reply',
+    announced.intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && announced.process.id === 'hold' &&
+    announced.process.steps.length === 1 && announced.process.steps[0].kind === 'calendar',
     { personalClose: announced.intent.personalClose, id: announced.process && announced.process.id });
 
   const confirm = planOf('Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?');

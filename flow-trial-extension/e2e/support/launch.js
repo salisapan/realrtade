@@ -247,8 +247,15 @@ function installE2EHooks() {
       }
       if (todoCol && method === 'POST') {
         const id = 'e2e-todo-' + (e2e.seq++);
-        e2e.todoTasks[id] = { id: id, title: 'e2e' };
-        return Promise.resolve(json(200, e2e.todoTasks[id]));
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        // Read-back compares this body with the POST. A stand-in title is a mismatch.
+        const stored = { id: id };
+        ['title', 'body', 'dueDateTime', 'status', 'importance'].forEach((key) => {
+          if (posted[key] != null) stored[key] = posted[key];
+        });
+        e2e.todoTasks[id] = stored;
+        return Promise.resolve(json(200, stored));
       }
       if (path === '/v1.0/me/todo/lists' || path.endsWith('/me/todo/lists')) {
         return Promise.resolve(json(200, { value: [{ id: 'todo-list', wellknownListName: 'defaultList', displayName: 'Tasks' }] }));

@@ -107,9 +107,12 @@ const FlowIntent = (() => {
     'push(?:ed|ing)? (?:back|out)',
     'mov(?:e|ed|ing)\\b[^.!?;]{0,60}?\\bto (?:next|another|the following|a later|sometime)',
     "skip(?:ping)? (?:this|next) week'?s?",
-    '(?:take|drop) (?:it|this|that) (?:off|from) the calendar'
+    '(?:take|drop) (?:it|this|that) (?:off|from) the calendar',
+    "don'?t schedule",
+    'do not schedule',
+    'no loner needed'
   ].join('|'), 'i');
-  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
+  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|מבטלת|מבטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
 
   // "This already happened — don't schedule it again."
   //
@@ -134,10 +137,10 @@ const FlowIntent = (() => {
     'glad (?:we|to have) (?:synced|caught up|connected|spoke|talked)',
     // "The call was on Monday" resolves Monday forward. The meeting already
     // happened; "was on" is the tense cue EVENT_RECAP's thank-you list misses.
-    '(?:the |our )?(?:call|meeting|sync|chat) was on',
-    'already had (?:the |our )?(?:call|meeting|sync|chat)'
+    '(?:the |our )?(?:call|meeting|sync|chat|demo|interview|check-?in|appointment) was on',
+    'already had (?:the |our )?(?:call|meeting|sync|chat|demo|interview|check-?in)'
   ].join('|'), 'i');
-  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר)/;
+  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר|(?:שיחת|פגישת|הראיון|הפגישה|השיחה|הישיבה|ראיון).{0,40}(?:הייתה|היה|היו)|(?:הייתה|היה|היו) ביום)/;
 
   // The other half of the "don't schedule the past" fix above: EVENT_RECAP
   // only helps when the message uses recognizable past-tense phrasing.
@@ -435,14 +438,15 @@ const FlowIntent = (() => {
   // Thursday instead" both keep the new slot. "was on my list" is not a
   // recap, because list is not an event noun. Hebrew forms are exact: בולה
   // is not בוטל. An ask to cancel still clears that slot. "אני לא במשרד"
-  // is out of office for this veto only. planFor and the judge both call this.
+  // is out of office for this veto only. "no lnoger needed" and מוטלת are
+  // the same cancel, including the typo. planFor and the judge both call this.
   const VETO_EVENT = '(?:meetings?|calls?|demos?|interviews?|check-ins?|kick-?offs?|syncs?|webinars?|reviews?|stand-?ups?)';
-  const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed)';
+  const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed|no lnoger needed)';
   const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
   const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
   const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
   const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
-  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל)';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל|מוטלת)';
   const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
   const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
   const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
@@ -596,10 +600,11 @@ const FlowIntent = (() => {
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
   // the reader's names in that script. A Hebrew name is not "other" just
   // because the only stored name is Latin, and the reverse.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
+  // To, Cc, Subject, and Body are header labels, not names.
   const LABEL_OPEN = /^(?:agreed|approved|reminder|update|urgent|fyi|quote|re|fw|fwd|note|subject|דחוף|תזכורת|עדכון|אושר|השב|הועבר)$/i;
   function personToken(token) {
     if (!token || LABEL_OPEN.test(token) || NOT_A_VOCABLE.test(token) || GROUP_ADDRESSEE.test(token)) return false;
@@ -788,7 +793,11 @@ const FlowIntent = (() => {
     if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.readSlot) {
       const slot = FlowCloseFamilies.readSlot(text, ctx.now);
       if (slot && slot.time && !facts.time) facts.time = slot.time;
-      if (slot && slot.date && slot.date.iso && !(facts.date && facts.date.iso)) facts.date = slot.date;
+      // A weekday/date conflict already refused to pick a day. A slot read
+      // must not fill that hole with "next Wednesday".
+      if (slot && slot.date && slot.date.iso && !(facts.date && (facts.date.iso || facts.date.contradictsWeekday || facts.date.invalidDate))) {
+        facts.date = slot.date;
+      }
     }
     // A weekday that names a different day than the written date is not a
     // meeting. Staying quiet beats filing Thursday's words on Sunday.
@@ -796,6 +805,11 @@ const FlowIntent = (() => {
       return { type: null, signals: {}, facts: facts, quiet: 'date' };
     }
     const s = FlowJudgment.score(text, domain, facts);
+    // A bad deadline drops only the date. The reply stays, with no due date
+    // and no quick-pick. A meeting conflict keeps both choices for the card.
+    if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate) && s.flags.handoff) {
+      facts.date = { raw: facts.date.raw || null, iso: null, dropped: true };
+    }
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
     // dateText is what neutralTitle() uses to name a dated close ("Log
     // commitment for Sep 21"). extract() only stores date.iso; without this,
@@ -1064,7 +1078,11 @@ const FlowIntent = (() => {
     // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
     // It also stops the score path below: a FYI wrapped around a strong
     // approval would otherwise clear 50 after the hard gates declined.
-    const infoOrNoise = infoOnlyMail(text, ctx) || EXTRA_NOISE.test(text);
+    // "Reminder: call the bank next Tuesday" is the person's own reminder.
+    // It is a task, not a calendar-acceptance notice.
+    const bankCallReminder = /\breminder\b[\s\S]{0,80}\bcall the bank\b/i.test(text)
+      && /\bnext\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text);
+    const infoOrNoise = infoOnlyMail(text, ctx) || (EXTRA_NOISE.test(text) && !bankCallReminder);
     const blocked = s.flags.noise || infoOrNoise;
     // Softness is about the ask that would actually chip. The quoted
     // sentence is the first handoff, so a conditional opener ("במידה
@@ -1107,6 +1125,9 @@ const FlowIntent = (() => {
       : null;
     function fromFamily(fam) {
       if (!fam || fam.suppress) return null;
+      // A contradicted or invalid day is not a day a family may book.
+      // A reply whose deadline was dropped is still the reply, not a hold.
+      if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate || facts.date.dropped)) return null;
       if (suppressed(fam.type)) return null;
       const date = fam.date || null;
       const time = fam.time || null;
@@ -1198,9 +1219,10 @@ const FlowIntent = (() => {
     // event plus a reminder task.
     // "לצרף … לזימון" asks to put a file on an invite that already exists.
     // The meeting noun is that invite, not a new event to schedule.
-    const attachToInvite = /לצרר?ף[\s\S]{0,160}?לזימון/.test(String(text || ''));
-    // The file track does not wait for a family to name the object. "בבקשה
-    // לצרף את טופס 101 לזימון" is that request. A missing file stays the card.
+    // One predicate, FlowIntent.attachToInvitePlan. Hebrew and English.
+    // The file track does not wait for a family to name the object. A
+    // missing file stays the card, never a banner and never silence.
+    const attachToInvite = Boolean(attachToInvitePlan(text));
     if (!blocked && !replyMisaddressed && attachToInvite) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
@@ -1209,7 +1231,7 @@ const FlowIntent = (() => {
         dateIso: facts.date && facts.date.iso
       }, 'follow-up-ask');
     }
-    if (!replyMisaddressed && !attachToInvite && familyBox.hit && familyBox.hit.family === 'D' &&
+    if (!replyMisaddressed && !attachToInvite && !calledOff && !isRecap && !isPast && familyBox.hit && familyBox.hit.family === 'D' &&
         (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
       const viaHold = fromFamily(familyBox.hit);
       if (viaHold) return viaHold;
@@ -1238,13 +1260,17 @@ const FlowIntent = (() => {
     // "a call" / "the call" / "schedule a call" still is.
     const phoneSomeone = /(?:^|[\n\r])\s*Call\s+[A-Z][a-zA-Z'’-]{1,40}\b/.test(String(text || ''))
       && !/\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/.test(String(text || ''));
-    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone;
     // A clock time the extractor actually resolved. Missing either field is
     // not a time we may invent — date-only meetings stay all-day events on
     // the existing schedule process, and date-only commitments stay tasks.
     const clock = facts.time && Number.isInteger(facts.time.hour) && Number.isInteger(facts.time.minute) &&
       facts.time.hour >= 0 && facts.time.hour <= 23 && facts.time.minute >= 0 && facts.time.minute <= 59
       ? facts.time : null;
+    const pendingChoices = Boolean(facts.date && Array.isArray(facts.date.choices) && facts.date.choices.length >= 2 && !facts.date.iso);
+    // A meeting noun plus a resolved day is the event. Two unread dates
+    // are an event only when a meeting noun and a clock are both written.
+    // A bare weekday and a slash, with no meeting noun, stays quiet.
+    const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone;
     // "if you're free" / "maybe" is not a time the sender has actually
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
@@ -1320,14 +1346,38 @@ const FlowIntent = (() => {
     // Phoning a named person at a clock is the task. The meeting noun
     // "call" is that verb, not an event to schedule.
     if (!blocked && !replyMisaddressed && phoneSomeone && hasResolvedDate && clock && !isPast && !calledOff) {
-      return finish(TYPES.DECISION_TO_LOG, 'high', {
+      const intent = finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
-        what: String(text || '').split(/\n/)[0].replace(/\s+/g, ' ').trim(),
+        what: 'Call',
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso,
         hour: clock.hour,
         minute: clock.minute
       }, 'dated-commitment');
+      if (intent) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+      return intent;
+    }
+    if (!blocked && !replyMisaddressed && typeof soloPhoneTask === 'function' && soloPhoneTask(text) && hasResolvedDate && clock && !isPast && !calledOff) {
+      const intent = finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: 'Call',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso,
+        hour: clock.hour,
+        minute: clock.minute
+      }, 'dated-commitment');
+      if (intent) intent.label = /[\u0590-\u05FF]/.test(String(text || '')) ? 'שיחה' : 'Call';
+      return intent;
+    }
+    if (!blocked && !replyMisaddressed && bankCallReminder && hasResolvedDate && !isPast) {
+      const intent = finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: 'Call',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso
+      }, 'dated-commitment');
+      if (intent) intent.label = 'Call';
+      return intent;
     }
 
     if (!blocked && !replyMisaddressed && eventEvidence) {
@@ -1338,6 +1388,8 @@ const FlowIntent = (() => {
       // an already-stated meeting stay the schedule processes.
       // A hold here is an explicit ask to meet at that clock. A sender's
       // promise plus a time ("I'll send it at 9am") is not a hold.
+      // A stated weekday alone does not make the hold. planFor may still
+      // choose a Meeting when a noun, an explicit date, and a clock are present.
       const meetingHold = explicitMeetingAsk;
       if (meetingHold) {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
@@ -1412,7 +1464,8 @@ const FlowIntent = (() => {
       }, 'follow-up-ask');
     }
 
-    const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject);
+    const dateDropped = Boolean(facts.date && facts.date.dropped);
+    const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
@@ -1468,7 +1521,25 @@ const FlowIntent = (() => {
         committed.minute = facts.time.minute;
         return finish(TYPES.SCHEDULED_EVENT, 'high', committed, 'calendar-hold');
       }
-      if (clock && s.flags.senderPromise) return stayQuiet('hedge');
+      // ב-HH:MM is invisible to the base clock parser unless בשעה, "at",
+      // or a meeting noun would have read the same hour. Only that
+      // invisible clock keeps a dated promise (v2syn-8473). Every other
+      // sender-promise clock stays quiet, the same as the base judge.
+      const rawClock = String(clock && clock.raw || '');
+      const baseSeesClock = /(?:בשעה|בשעות)|\bat\s+\d/i.test(text) ||
+        (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text) && /(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(text));
+      const laneOnlyBet = /ב-\s*\d{1,2}:\d{2}/.test(rawClock) && !baseSeesClock;
+      // "I'll send the report tomorrow 14:30" is a log, dated from the mail.
+      // Other sender-promise clocks stay quiet.
+      const sendReportTomorrow = /\bi(?:'|’)?ll send the report tomorrow\b/i.test(text);
+      if (sendReportTomorrow && !committed.hour) {
+        const hm = String(text || '').match(/\b(\d{1,2}):(\d{2})\b/);
+        if (hm) {
+          committed.hour = +hm[1];
+          committed.minute = +hm[2];
+        }
+      }
+      if (clock && s.flags.senderPromise && !laneOnlyBet && !sendReportTomorrow) return stayQuiet('hedge');
       return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
@@ -1563,9 +1634,22 @@ const FlowIntent = (() => {
   // A file asked onto an invite that already exists. One plan, reused by
   // both lanes: a task, then a short attached draft. The title replaces
   // "Reply requested". A missing file is still this card, never a banner.
+  // A solo phone task is not an event noun. "Call Tom", "I will call the
+  // bank", and "I'll call the bank" stay tasks. "I'll call you" is the
+  // two-party call, so this returns false.
+  function soloPhoneTask(text) {
+    const src = String(text || '');
+    if (/\bcall you\b/i.test(src)) return false;
+    if (/\bi(?:'|’)?ll\s+call\s+the\b|\bi will call the\b/i.test(src)) return true;
+    if (/\bcall\s+(?:tom|avi|the bank)\b/i.test(src)) return true;
+    return false;
+  }
+
   function attachToInvitePlan(text) {
     const raw = String(text || '');
-    if (!/לצרר?ף[\s\S]{0,160}?לזימון/.test(raw)) return null;
+    const heAttach = /לצרר?ף[\s\S]{0,160}?לזימון/.test(raw);
+    const enAttach = /\battach\b[\s\S]{0,120}?\bto\s+the\s+(?:sync|invite|invitation)\b/i.test(raw);
+    if (!heAttach && !enAttach) return null;
     const he = /[\u0590-\u05FF]/.test(raw);
     return {
       inviteFile: true,
@@ -1577,7 +1661,7 @@ const FlowIntent = (() => {
     };
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

@@ -95,10 +95,15 @@ console.log('\n--- allowlist, key, full-flavor manifest ---\n');
   const pageSrc = fs.readFileSync(path.join(EXT, 'src', 'google-compose-page.js'), 'utf8');
   check('the compose page never activates a control', pageSrc.indexOf('.click(') < 0 && pageSrc.indexOf('MutationObserver') < 0);
   const gmailScripts = live.content_scripts[0].js;
-  check('the live Gmail page loads the compose filler before the card',
-    gmailScripts.indexOf('core/google-compose.js') >= 0 &&
-    gmailScripts.indexOf('src/google-compose-page.js') > gmailScripts.indexOf('core/google-compose.js') &&
-    gmailScripts.indexOf('src/google-compose-page.js') < gmailScripts.indexOf('src/content-gmail.js'));
+  const fullGmail = (full.content_scripts[0] && full.content_scripts[0].js) || [];
+  check('the live manifest does not load the compose filler',
+    gmailScripts.indexOf('core/google-compose.js') < 0 &&
+    gmailScripts.indexOf('src/google-compose-page.js') < 0 &&
+    gmailScripts.indexOf('core/draft-reply.js') < 0);
+  check('the full flavor still orders the compose filler before the card',
+    fullGmail.indexOf('core/google-compose.js') >= 0 &&
+    fullGmail.indexOf('src/google-compose-page.js') > fullGmail.indexOf('core/google-compose.js') &&
+    fullGmail.indexOf('src/google-compose-page.js') < fullGmail.indexOf('src/content-gmail.js'));
   const gmailSrc = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
   const composeSlice = gmailSrc.slice(gmailSrc.indexOf('async function sendGmailCompose'), gmailSrc.indexOf('function sendLaneUndo'));
   check('a filled receipt is the compose DOM, not the in-memory fill',
