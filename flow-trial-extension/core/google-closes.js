@@ -82,12 +82,15 @@ const FlowGoogleCloses = (() => {
     return SAVE_EN.test(clause) || SAVE_HE.test(clause);
   }
 
-  // Quiet only when every save clause in the mail is itself negated.
-  // A clean save in another clause still files.
+  // Quiet when a save clause is itself negated. A "no need" that does not
+  // govern save, in another clause, leaves a real save in place. A later
+  // "don't save" still refuses the whole mail.
   function refusesSave(text) {
-    const clauses = saveClauses(text).filter(clauseSaves);
-    if (!clauses.length) return SAVE_NO.test(String(text || '')) && (SAVE_EN.test(String(text || '')) || SAVE_HE.test(String(text || '')));
-    return clauses.every((clause) => SAVE_NO.test(clause));
+    const raw = String(text || '');
+    const clauses = saveClauses(raw);
+    if (clauses.some((clause) => clauseSaves(clause) && SAVE_NO.test(clause))) return true;
+    if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return SAVE_NO.test(raw);
+    return false;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;

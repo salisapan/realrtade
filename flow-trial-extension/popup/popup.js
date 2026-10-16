@@ -1495,7 +1495,7 @@
         : '';
       if (line) {
         const subject = String(currentWhy.subject || '').trim();
-        const item = el('div', 'wait-note', subject ? (subject + ' — ' + line) : line);
+        const item = el('div', 'wait-note', subject ? (line + ' — ' + subject) : line);
         item.setAttribute('data-glance-why-line', line);
         if (subject) item.setAttribute('data-glance-why-subject', subject);
         item.setAttribute('data-glance-why', String(currentWhy.reason));
