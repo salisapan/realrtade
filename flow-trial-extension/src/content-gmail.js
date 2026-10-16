@@ -582,7 +582,8 @@ function glanceUiCopy(kind) {
       senderEmail: sender.email,
       senderName: sender.name,
       calibration: freshState.calibration,
-      calibrationByType: freshState.calibrationByType
+      calibrationByType: freshState.calibrationByType,
+      now: new Date()
     });
     if (!intent || !intent.type || typeof FlowStillOpen === 'undefined') return false;
     // A fact ask is not a morning card. The cell has not been checked.
@@ -955,7 +956,7 @@ function glanceUiCopy(kind) {
       ? FlowIncomingJudge.prepareForJudge(text)
       : text;
     const template = await readCompanyTemplate();
-    const ctx = Object.assign({}, base, { companyTemplate: template });
+    const ctx = Object.assign({ now: new Date() }, base, { companyTemplate: template });
     let intent = FlowIntent.classify(prepared, ctx);
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';

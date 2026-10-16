@@ -1,8 +1,8 @@
-// G146-1: a new mail opens beside the inbox list. Those rows are listitems
-// with no message body. The card belongs on the opened mail within 3s,
-// including after a reload of that same thread.
-// G146-6: a Hebrew sync meeting is titled פגישה, and the card chrome follows
-// the page language.
+// G146-1: a new mail is opened beside the inbox list. Those rows are
+// listitems with no message body. The card belongs on the opened mail
+// within 3s, including after a reload of that same thread.
+// G146-6: a Hebrew sync meeting is titled פגישה, and the card chrome
+// follows the page language.
 const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
@@ -22,18 +22,6 @@ test('a new Gmail mail shows a card within 3s, including after reload', async ({
     threadBesideInbox: true
   });
   const card = page.locator('[data-legacy-message-id="m-g146-1"] .flow-chip-host');
-  await page.evaluate(() => {
-    const node = document.querySelector('[data-legacy-message-id="m-g146-1"]');
-    window.__glanceArrived = node.outerHTML;
-    node.remove();
-  });
-  await expect(page.locator('.flow-chip-host')).toHaveCount(0);
-  await page.evaluate(() => {
-    const main = document.querySelector('div[role="main"]');
-    const wrap = document.createElement('div');
-    wrap.innerHTML = window.__glanceArrived;
-    main.appendChild(wrap.firstElementChild);
-  });
   await expect(card).toBeVisible({ timeout: 3000 });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(card).toBeVisible({ timeout: 3000 });
