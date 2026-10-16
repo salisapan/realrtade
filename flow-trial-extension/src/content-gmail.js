@@ -2855,7 +2855,13 @@ function glanceUiCopy(kind) {
 
   function laneRefuseLine(result, connectorId) {
     const reason = result && result.reason;
-    if (laneEditedReason(reason)) return glanceUiCopy('edited');
+    // Hebrew uses the shared edited line. English keeps the connector's
+    // own refusal ("Undo stopped…") when it sent one. No Try again.
+    if (laneEditedReason(reason)) {
+      if (glanceUiHebrew()) return glanceUiCopy('edited');
+      if (result && result.error) return String(result.error);
+      return glanceUiCopy('edited');
+    }
     if (result && result.error) return String(result.error);
     if (result && result.written && result.ok !== false) return String(result.written);
     return laneFailLine(connectorId);
@@ -3155,6 +3161,21 @@ function glanceUiCopy(kind) {
 
   // Every step of this message's Do It, after a reload. The lines are the
   // ones stored with the ids. Undo runs last-written first.
+  // A reload shows this receipt instead of the task-proof banner. Undo
+  // still has to flip that task's Activity row from Handled to Undone.
+  function noteLaneTaskUndone(messageNode, messageId, record) {
+    if (!messageId || typeof FlowStorage === 'undefined' || typeof FlowStorage.markGoogleTaskUndone !== 'function') return;
+    const steps = (record && record.steps) || [];
+    const tasks = steps.filter((step) => {
+      const id = step && step.connectorId;
+      return id === 'googleLaneTask' || id === 'googleTask' || id === 'googleTasks';
+    });
+    if (!tasks.length) return;
+    const threadId = messageNode && messageNode.getAttribute && messageNode.getAttribute('data-legacy-thread-id');
+    Promise.all(tasks.map((step) => FlowStorage.markGoogleTaskUndone(messageId, step && step.ref, threadId)))
+      .catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
+  }
+
   function mountLaneReceipt(messageNode, record, messageId) {
     if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
     const steps = (record && record.steps) || [];
@@ -3201,6 +3222,7 @@ function glanceUiCopy(kind) {
         undoStoredLane(messageId).then((next) => {
           if (next && next.ok) {
             if (done.replaceChildren) done.replaceChildren(el('span', 'flow-chip-label', next.written || ''));
+            noteLaneTaskUndone(messageNode, messageId, record);
             return;
           }
           if (next && next.partial) {
@@ -3226,6 +3248,7 @@ function glanceUiCopy(kind) {
       undoStoredLane(messageId).then((result) => {
         if (result && result.ok) {
           if (done.replaceChildren) done.replaceChildren(el('span', 'flow-chip-label', result.written || ''));
+          noteLaneTaskUndone(messageNode, messageId, record);
           return;
         }
         if (result && result.partial) {
