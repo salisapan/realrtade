@@ -181,6 +181,24 @@
     "http://localhost/*",
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
-    "https://outlook.office365.com/*"
-  ]
+    "https://outlook.office365.com/*",
+    "https://www.messenger.com/*",
+    "https://messenger.com/*",
+    "https://www.facebook.com/messages",
+    "https://www.facebook.com/messages/*",
+    "https://facebook.com/messages",
+    "https://facebook.com/messages/*",
+    "https://business.facebook.com/latest/inbox",
+    "https://business.facebook.com/latest/inbox/*",
+    "https://www.business.facebook.com/latest/inbox",
+    "https://www.business.facebook.com/latest/inbox/*",
+    "https://www.instagram.com/direct",
+    "https://www.instagram.com/direct/*",
+    "https://instagram.com/direct",
+    "https://instagram.com/direct/*"
+  ],
+  "options_ui": {
+    "page": "lane-chat/enable.html",
+    "open_in_tab": true
+  }
 }

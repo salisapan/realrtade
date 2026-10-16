@@ -8,7 +8,7 @@ const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
 
-function copyExtension() {
+function copyExtension(opts) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-ext-'));
   fs.cpSync(EXT_ROOT, dest, {
     recursive: true,
@@ -20,6 +20,7 @@ function copyExtension() {
     }
   });
   const manifestPath = path.join(dest, 'manifest.json');
+  if (opts && opts.bare) return dest;
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const extra = [
     'https://outlook.live.com/*',
@@ -28,7 +29,16 @@ function copyExtension() {
     'https://graph.microsoft.com/*',
     'https://login.microsoftonline.com/*',
     'http://127.0.0.1/*',
-    'http://localhost/*'
+    'http://localhost/*',
+    // This copy only. The repo manifest does not list Messenger. The lane
+    // spec registers the chat scripts against a fixture on this host.
+    'https://www.messenger.com/*',
+    'https://messenger.com/*',
+    // This copy only. The repo manifest already lists these as optional hosts.
+    'https://business.facebook.com/latest/inbox',
+    'https://business.facebook.com/latest/inbox/*',
+    'https://www.business.facebook.com/latest/inbox',
+    'https://www.business.facebook.com/latest/inbox/*'
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
@@ -112,7 +122,17 @@ function installE2EHooks() {
       return Promise.resolve(json(200, {}));
     }
     if (host === 'www.googleapis.com') {
-      if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0 || path.indexOf('/calendar/') >= 0) {
+      if (path.indexOf('/calendar/') >= 0) {
+        const loc = scenario.chatGoogleLocation || '';
+        const start = parsed.searchParams.get('timeMin');
+        if (!loc || !start || !Number.isFinite(Date.parse(start))) return Promise.resolve(json(200, { items: [] }));
+        const pinned = scenario.chatEventIso && Number.isFinite(Date.parse(scenario.chatEventIso)) ? scenario.chatEventIso : null;
+        const when = pinned || new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+        return Promise.resolve(json(200, {
+          items: [{ id: 'e2e-gcal-1', status: 'confirmed', location: loc, start: { dateTime: when } }]
+        }));
+      }
+      if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0) {
         return Promise.resolve(json(200, { files: [], items: [] }));
       }
       return Promise.resolve(json(200, {}));
@@ -317,6 +337,21 @@ function installE2EHooks() {
         const me = scenario.me || { mail: 'glance.salisapan@outlook.com', userPrincipalName: 'glance.salisapan@outlook.com', displayName: 'Glance' };
         return Promise.resolve(json(200, me));
       }
+      if (path.indexOf('/me/calendarView') >= 0 && method === 'GET') {
+        const start = parsed.searchParams.get('startDateTime');
+        const loc = scenario.chatLocation || '';
+        if (!loc || !start || !Number.isFinite(Date.parse(start))) return Promise.resolve(json(200, { value: [] }));
+        const pinned = scenario.chatEventIso && Number.isFinite(Date.parse(scenario.chatEventIso)) ? scenario.chatEventIso : null;
+        const when = pinned || new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+        return Promise.resolve(json(200, {
+          value: [{
+            id: 'e2e-cal-1',
+            isCancelled: false,
+            location: { displayName: loc },
+            start: { dateTime: when, timeZone: 'UTC' }
+          }]
+        }));
+      }
       return Promise.resolve(json(404, { error: { message: 'e2e-unmocked', path: path } }));
     }
     return Promise.resolve(json(599, { error: 'e2e-unmocked' }));
@@ -399,7 +434,7 @@ async function boot() {
   });
 
   const documents = new Map();
-  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com)\//, async (route) => {
+  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com)\//, async (route) => {
     const req = route.request();
     const bare = req.url().split('#')[0];
     if (req.resourceType() === 'document' && documents.has(bare)) {
@@ -519,7 +554,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }
@@ -558,6 +593,35 @@ async function boot() {
     const id = o.id;
     const url = outlookUrl(id);
     return openDocument(url, outlookHtml(o));
+  };
+
+  function watchSend() {
+    return context.addInitScript(() => {
+      window.__glanceSendClicks = 0;
+      document.addEventListener('click', (ev) => {
+        const label = ev.target && ev.target.getAttribute && (ev.target.getAttribute('aria-label') || '');
+        if (/^send$/i.test(String(label || ''))) window.__glanceSendClicks += 1;
+      }, true);
+    });
+  }
+
+  harness.openMessenger = async function openMessenger(html) {
+    await watchSend();
+    return openDocument('https://www.messenger.com/t/100012345678', html);
+  };
+
+  harness.openFixture = async function openFixture(search) {
+    const url = 'chrome-extension://' + extensionId + '/dev/messenger-fixture.html' + (search || '');
+    const page = await context.newPage();
+    page.on('pageerror', () => {});
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    harness.page = page;
+    return page;
+  };
+
+  harness.openBusiness = async function openBusiness(html) {
+    await watchSend();
+    return openDocument('https://business.facebook.com/latest/inbox/all/?selected_item_id=bs-existing', html);
   };
 
   harness.openGmail = async function openGmail(opts) {

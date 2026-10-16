@@ -17,7 +17,7 @@ const IMPORT_LINE = /^import \{ OAUTH_PUBLIC, publicClientId(?:, WEB_OAUTH_CLIEN
 const WEB_AUTH_IMPORT = /^import \{[^}]+\} from '\.\/google-web-auth\.js';\r?\n/m;
 const LADDER_IMPORT = /^import \{ LADDER \} from '\.\.\/config\/ladder\.public\.js';\r?\n/m;
 const LANE_HOST_IMPORT = /^import '\.\/google-lane-host\.js';\r?\n/m;
-const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
+const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
 const HYBRID_IMPORTS = /^import \{ HYBRID \} from '\.\.\/config\/hybrid\.public\.js';\r?\nimport '\.\/hybrid-sw\.js';[^\n]*\r?\n/m;
 
 function backgroundScript() {

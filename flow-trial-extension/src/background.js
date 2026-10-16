@@ -55,6 +55,13 @@ import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same 
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
+import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+// The worker cannot call import(). These are the helpers imported at the top of this file.
+globalThis.__glanceGoogleAuth = {
+  GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
+  webTokenUsable: webTokenUsable
+};
 import { LADDER } from '../config/ladder.public.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
@@ -220,8 +227,8 @@ if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
 // Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
 // site's permission (an OPTIONAL host permission: the install itself asks for nothing new) and then registers the content scripts for
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
+// WhatsApp Web is not its own row. It turns on with the one Meta consent.
 const SURFACES = {
-  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
   slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
   telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
@@ -510,9 +517,146 @@ async function restoreSurfaces() {
     }
   } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
 }
+// Builds from before the one Meta consent registered WhatsApp Web as
+// flow-whatsapp when that row was on. That registration can still be in
+// the browser after an update, and it would run beside glance-lane-whatsapp.
+// One wake-up removes it, only for a profile whose old WhatsApp row was on.
+// A missing id is the usual case and is remembered so later wakes do not
+// ask again. A profile that never turned that row on is left alone.
+const LEGACY_WHATSAPP_SCRIPT = 'flow-whatsapp';
+const LEGACY_WHATSAPP_FLAG = 'glanceLegacyWhatsAppCleared';
+
+function legacyWhatsAppAlreadyGone(err) {
+  const msg = String((err && err.message) || err || '').toLowerCase();
+  return msg.indexOf('not found') >= 0 || msg.indexOf('does not exist') >= 0 || msg.indexOf('nonexistent') >= 0;
+}
+
+async function dropLegacyWhatsApp() {
+  if (!chrome.scripting || !chrome.scripting.unregisterContentScripts || !chrome.storage || !chrome.storage.local) return;
+  let bag = {};
+  try { bag = await chrome.storage.local.get({ [LEGACY_WHATSAPP_FLAG]: false, surfaces: {} }); } catch (e) { return; }
+  if (bag[LEGACY_WHATSAPP_FLAG]) return;
+  const surfaces = bag.surfaces || {};
+  if (!surfaces.whatsapp || !surfaces.whatsapp.enabled) return;
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [LEGACY_WHATSAPP_SCRIPT] });
+  } catch (e) {
+    if (!legacyWhatsAppAlreadyGone(e)) return;
+  }
+  try { await chrome.storage.local.set({ [LEGACY_WHATSAPP_FLAG]: true }); } catch (e) { /* the next wake tries again */ }
+}
+
+// Chat drafts are registered from the options page. An update keeps the old
+// list, and Chrome does not inject into a tab that is already open. When the
+// person already allowed the host, register again and inject into that tab.
+const LANE_CHAT = [
+  {
+    id: 'glance-lane-whatsapp',
+    origins: ['https://web.whatsapp.com/*'],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
+  },
+  {
+    id: 'glance-lane-messenger',
+    origins: [
+      'https://www.messenger.com/*',
+      'https://messenger.com/*',
+      'https://www.facebook.com/messages',
+      'https://www.facebook.com/messages/*',
+      'https://facebook.com/messages',
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*'
+    ],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
+  },
+  {
+    id: 'glance-lane-instagram',
+    origins: [
+      'https://www.instagram.com/direct',
+      'https://www.instagram.com/direct/*',
+      'https://instagram.com/direct',
+      'https://instagram.com/direct/*'
+    ],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
+  }
+];
+
+async function clearLaneChats() {
+  if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
+  for (const lane of LANE_CHAT) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered */ }
+  }
+}
+
+async function restoreLaneChats() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  const metaOrigins = (typeof FlowMetaConsent !== 'undefined' && Array.isArray(FlowMetaConsent.ORIGINS)) ? FlowMetaConsent.ORIGINS.slice() : [];
+  let on = false;
+  let known = false;
+  try {
+    on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    known = true;
+  } catch (e) { on = false; known = false; }
+  if (!on) {
+    if (known) await clearLaneChats();
+    if (chrome.tabs && chrome.tabs.query) {
+      const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
+      const urls = messenger ? messenger.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) : [];
+      let open = [];
+      try { open = urls.length ? await chrome.tabs.query({ url: urls }) : []; } catch (e) { open = []; }
+      if (open.length) console.info('[Glance] whyNotShown: messenger-not-granted');
+    }
+    return;
+  }
+  for (const lane of LANE_CHAT) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
+    try {
+      await chrome.scripting.registerContentScripts([{
+        id: lane.id,
+        matches: lane.origins,
+        js: lane.js,
+        runAt: 'document_idle',
+        persistAcrossSessions: true
+      }]);
+    } catch (e) {
+      console.info('[Glance] whyNotShown: lane-not-registered');
+      continue;
+    }
+    if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) continue;
+    let tabs = [];
+    try { tabs = await chrome.tabs.query({ url: lane.origins }); } catch (e) { tabs = []; }
+    for (const tab of tabs || []) {
+      if (!tab || typeof tab.id !== 'number') continue;
+      let alive = false;
+      try {
+        const reply = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => Boolean(window.__glanceLaneChat)
+        });
+        alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
+      } catch (e) { alive = false; }
+      if (alive) continue;
+      try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: lane.js }); }
+      catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
+    }
+  }
+}
+
+dropLegacyWhatsApp();
 restoreSurfaces();
-chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { restoreSurfaces(); });
+restoreLaneChats();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+try {
+  if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
+    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+  }
+  if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
+    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+  }
+} catch (e) { /* the next wake reads the grant again */ }
 
 async function surfaceStatus() {
   const surfaces = await readSurfaces();
@@ -4949,6 +5093,15 @@ if (chrome.runtime.onConnect && typeof chrome.runtime.onConnect.addListener === 
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  // Signup, later, opens the one Meta consent page. The prompt stays on that page.
+  if (msg.type === 'flow:open-meta-chats') {
+    const page = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.PAGE) || 'lane-chat/enable.html';
+    try {
+      if (chrome.tabs && typeof chrome.tabs.create === 'function') chrome.tabs.create({ url: chrome.runtime.getURL(page) });
+    } catch (e) { /* the signup page can open the link itself */ }
+    try { sendResponse({ ok: true, page: page }); } catch (e) { /* the caller closed */ }
+    return true;
+  }
   // The person pressed רענן. Recovery never reloads a tab on its own.
   if (msg.type === 'flow:outlook-refresh-tab') {
     const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);

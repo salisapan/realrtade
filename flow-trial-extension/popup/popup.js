@@ -66,6 +66,18 @@
     }
     return 'en';
   }
+  function metaLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    const panel = document.documentElement && document.documentElement.lang;
+    const stored = state && state.glanceUiLanguage;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: stored || panel || '', uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return uiLang();
+  }
   function words() {
     return FlowDisplay.chrome(uiLang());
   }
@@ -157,6 +169,7 @@
         if (rev !== whyRev) return;
         return Promise.all([
           renderSurfaces().catch(() => {}),
+          renderMetaChats().catch(() => {}),
           renderOutlookCards().catch(() => {}),
           renderWaiting().catch(() => {}),
           renderOpen().catch(() => {}),
@@ -183,6 +196,15 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderMetaChats().catch(() => {});
+  try {
+    if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
+      chrome.permissions.onAdded.addListener(() => { renderMetaChats().catch(() => {}); });
+    }
+    if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
+      chrome.permissions.onRemoved.addListener(() => { renderMetaChats().catch(() => {}); });
+    }
+  } catch (e) { /* the row still refreshes the next time the popup opens */ }
   renderOutlookCards().catch(() => {});
   outlookAutoSync().catch(() => {});
   renderBuildStamp().catch(() => {});
@@ -2116,10 +2138,21 @@
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
   // with a property for its wiring, not a let: it runs during init.
   const SURFACE_COPY = {
-    whatsapp: 'קורא שיחות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, רשימות וערוצים לא נקראים. ניסיוני: WhatsApp יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
   };
+  async function renderMetaChats() {
+    const block = document.getElementById('metaChatsBlock');
+    const host = document.getElementById('meta-chats');
+    if (!block || !host || typeof FlowMetaConsent === 'undefined' || typeof FlowMetaConsent.paintLink !== 'function') return;
+    let on = false;
+    try {
+      if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
+    } catch (e) { on = false; }
+    FlowMetaConsent.paintLink(host, { granted: on, lang: metaLang(), chrome: chrome });
+    block.hidden = false;
+  }
+
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
     if (!host) return;
@@ -2135,6 +2168,7 @@
     try {
     for (const id of Object.keys(st.surfaces || {})) {
       if (id === 'outlook') continue; // managed by the Outlook row (connect registers the OWA chip)
+      if (id === 'whatsapp') continue; // WhatsApp Web turns on with the one Meta consent
       const s = st.surfaces[id];
       const row = el('div', 'wait-item');
       const top = el('div', 'wait-top');
