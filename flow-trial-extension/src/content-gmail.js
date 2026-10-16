@@ -35,14 +35,27 @@ function glanceUiHebrew() {
 }
 
 function glanceUiCopy(kind) {
+  try {
+    if (typeof FlowDisplay !== 'undefined' && FlowDisplay && typeof FlowDisplay.chrome === 'function') {
+      const table = FlowDisplay.chrome(glanceUiHebrew() ? 'he' : 'en') || {};
+      if (table[kind]) return table[kind];
+    }
+  } catch (e) { /* the lines below are the same table when the shared one is absent */ }
   const he = glanceUiHebrew();
   if (kind === 'reconnect') return he ? 'התחבר מחדש ל-Google' : 'Reconnect Google';
   if (kind === 'connect') return he ? 'התחבר ל-Google בחלון Glance קודם.' : 'Connect Google in the Glance popup first.';
   if (kind === 'edited') return he ? 'שינית את זה. Undo השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
   if (kind === 'still') return he ? 'עדיין שם — משימת Google לא הוסרה.' : 'Still there — the Google Task was not removed.';
   if (kind === 'calendar') return he ? 'אין מועד אחד לאירוע הזה.' : 'No single time for this event.';
+  if (kind === 'calendarFailed') return he ? 'היומן נכשל.' : 'Calendar failed.';
+  if (kind === 'stepFailed') return he ? 'השלב נכשל.' : 'This step failed.';
   if (kind === 'taskRemoved') return he ? 'משימת Google הוסרה.' : 'Google Task removed.';
   if (kind === 'calendarRemoved') return he ? 'אירוע היומן הוסר.' : 'Calendar event removed.';
+  if (kind === 'handled') return he ? 'טופל.' : 'Handled.';
+  if (kind === 'undo') return he ? 'בטל' : 'Undo';
+  if (kind === 'undoAll') return he ? 'בטל הכל' : 'Undo all';
+  if (kind === 'undoing') return he ? 'מבטל…' : 'Undoing…';
+  if (kind === 'tryAgain') return he ? 'נסה שוב' : 'Try again';
   return '';
 }
 
@@ -154,16 +167,17 @@ function glanceUiCopy(kind) {
     });
   }
 
-  function guardChromeMethod(obj, name) {
+  function guardChromeMethod(obj, name, sync) {
     if (!obj || typeof obj[name] !== 'function' || obj[name].__glanceGuarded) return;
     const orig = obj[name];
     function guarded() {
-      if (!chromeLive()) return Promise.resolve(null);
+      if (!chromeLive()) return sync ? '' : Promise.resolve(null);
       try {
-        return catchChrome(orig.apply(obj, arguments));
+        const out = orig.apply(obj, arguments);
+        return sync ? out : catchChrome(out);
       } catch (e) {
         tearDownOrphan();
-        return Promise.resolve(null);
+        return sync ? '' : Promise.resolve(null);
       }
     }
     guarded.__glanceGuarded = true;
@@ -180,6 +194,10 @@ function glanceUiCopy(kind) {
         if (chrome.runtime.onMessage) guardChromeMethod(chrome.runtime.onMessage, 'addListener');
       }
       if (chrome.storage && chrome.storage.onChanged) guardChromeMethod(chrome.storage.onChanged, 'addListener');
+      if (chrome.i18n) {
+        guardChromeMethod(chrome.i18n, 'getUILanguage', true);
+        guardChromeMethod(chrome.i18n, 'getMessage', true);
+      }
     } catch (e) { tearDownOrphan(); }
   }
   guardChromeSurface();
@@ -2718,10 +2736,38 @@ function glanceUiCopy(kind) {
       .catch(() => null);
   }
 
-  function laneRefuseLine(result) {
+  function laneFailLine(connectorId) {
+    if (connectorId === 'googleHold' || connectorId === 'calendar') return glanceUiCopy('calendarFailed');
+    if (connectorId === 'googleLaneTask' || connectorId === 'googleTask' || connectorId === 'googleTasks') return glanceUiCopy('still');
+    const name = laneStepLine(connectorId);
+    if (name && name !== connectorId) return glanceUiHebrew() ? (name + ' נכשל.') : (name + ' failed.');
+    return glanceUiCopy('stepFailed');
+  }
+
+  function laneRefuseLine(result, connectorId) {
     const reason = result && result.reason;
     if ((reason === 'user-edited' || reason === 'range-edited') && glanceUiHebrew()) return glanceUiCopy('edited');
-    return (result && (result.error || result.written)) || glanceUiCopy('still');
+    if (result && result.error) return String(result.error);
+    if (result && result.written && result.ok !== false) return String(result.written);
+    return laneFailLine(connectorId);
+  }
+
+  function writeLaneUndoRow(messageId, steps) {
+    if (!messageId || !chromeLive()) return Promise.resolve();
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
+    return Promise.resolve()
+      .then(() => store.get(LANE_UNDO_KEY))
+      .then((bag) => {
+        const all = bag && bag[LANE_UNDO_KEY] && typeof bag[LANE_UNDO_KEY] === 'object' ? bag[LANE_UNDO_KEY] : {};
+        if (!steps || !steps.length) delete all[messageId];
+        else {
+          const prev = all[messageId] || {};
+          all[messageId] = { expires: prev.expires || (Date.now() + LANE_UNDO_TTL_MS), steps: steps };
+        }
+        return store.set({ [LANE_UNDO_KEY]: all });
+      })
+      .catch(() => {});
   }
 
   // Stored steps are undone last-written first, so a task that landed after
@@ -2742,7 +2788,7 @@ function glanceUiCopy(kind) {
         chain = chain.then((outcomes) => {
           return sendLaneUndo(step.connectorId, step.ref).then((result) => {
             const ok = !!(result && result.ok);
-            const line = ok ? (laneUndoLine(step.connectorId) || (result && result.written) || step.undoLine || '') : laneRefuseLine(result);
+            const line = ok ? (laneUndoLine(step.connectorId) || (result && result.written) || step.undoLine || '') : laneRefuseLine(result, step.connectorId);
             outcomes.push({
               ok: ok,
               connectorId: step.connectorId,
@@ -2753,7 +2799,7 @@ function glanceUiCopy(kind) {
             });
             return outcomes;
           }, () => {
-            const line = glanceUiCopy('still');
+            const line = laneFailLine(step.connectorId);
             outcomes.push({ ok: false, connectorId: step.connectorId, line: step.line || '', error: line, written: line });
             return outcomes;
           });
@@ -2765,14 +2811,21 @@ function glanceUiCopy(kind) {
         const refused = list.filter((row) => !row.ok);
         const written = list.map((row) => row.written).filter(Boolean).join(' ');
         const firstFail = refused[0] || null;
-        return {
+        const reversed = record && record.steps ? record.steps.slice().reverse() : [];
+        const kept = [];
+        list.forEach((row, i) => { if (!row.ok && reversed[i]) kept.push(reversed[i]); });
+        const remaining = kept.slice().reverse();
+        const result = {
           ok: list.length > 0 && refused.length === 0,
           partial: removed.length > 0 && refused.length > 0,
           outcomes: list,
           written: written,
+          remaining: remaining,
           reason: firstFail ? firstFail.reason : '',
           error: refused.length ? (removed.length ? written : (firstFail && firstFail.error)) : ''
         };
+        if (!record || !messageId) return result;
+        return writeLaneUndoRow(messageId, remaining).then(() => result);
       });
     });
   }
@@ -2998,29 +3051,67 @@ function glanceUiCopy(kind) {
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', 'Handled.'));
+    done.appendChild(el('span', 'flow-chip-handled', glanceUiCopy('handled')));
     steps.forEach((step) => {
       if (step && step.line) done.appendChild(el('span', 'flow-chip-written', step.line));
     });
-    const undo = el('button', 'flow-chip-undo', steps.length > 1 ? 'Undo all' : 'Undo');
+    const undoLabel = steps.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo');
+    const undo = el('button', 'flow-chip-undo', undoLabel);
     undo.type = 'button';
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
+    function paintLaneRetry(result) {
+      if (done.replaceChildren) done.replaceChildren();
+      else done.textContent = '';
+      (result && result.outcomes || []).forEach((row) => {
+        if (row && row.written) done.appendChild(el('span', 'flow-chip-written', row.written));
+      });
+      const again = el('button', 'flow-chip-undo', glanceUiCopy('tryAgain'));
+      again.type = 'button';
+      again.addEventListener('click', () => {
+        again.textContent = glanceUiCopy('undoing');
+        again.disabled = true;
+        undoStoredLane(messageId).then((next) => {
+          if (next && next.ok) {
+            if (done.replaceChildren) done.replaceChildren(el('span', 'flow-chip-label', next.written || ''));
+            return;
+          }
+          if (next && next.partial) {
+            paintLaneRetry(next);
+            return;
+          }
+          again.textContent = glanceUiCopy('tryAgain');
+          again.disabled = false;
+          hint.hidden = false;
+          hint.textContent = (next && (next.error || next.written)) || glanceUiCopy('stepFailed');
+          hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+          if (!hint.parentNode) done.appendChild(hint);
+        }).catch(() => { tearDownOrphan(); });
+      });
+      const retryRow = el('span', 'flow-chip-actions');
+      retryRow.appendChild(again);
+      done.appendChild(retryRow);
+      done.appendChild(hint);
+    }
     undo.addEventListener('click', () => {
-      undo.textContent = 'Undoing…';
+      undo.textContent = glanceUiCopy('undoing');
       undo.disabled = true;
       undoStoredLane(messageId).then((result) => {
-        if (result && (result.ok || result.partial)) {
-          done.replaceChildren(el('span', 'flow-chip-label', result.written || 'Undone.'));
+        if (result && result.ok) {
+          if (done.replaceChildren) done.replaceChildren(el('span', 'flow-chip-label', result.written || ''));
           return;
         }
-        undo.textContent = steps.length > 1 ? 'Undo all' : 'Undo';
+        if (result && result.partial) {
+          paintLaneRetry(result);
+          return;
+        }
+        undo.textContent = undoLabel;
         undo.disabled = false;
         hint.hidden = false;
         const edited = result && (result.reason === 'user-edited' || result.reason === 'range-edited') && glanceUiHebrew();
-        hint.textContent = edited ? glanceUiCopy('edited') : ((result && (result.error || result.written)) || glanceUiCopy('still'));
+        hint.textContent = edited ? glanceUiCopy('edited') : ((result && (result.error || result.written)) || laneFailLine(''));
         hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
       }).catch(() => { tearDownOrphan(); });
     });

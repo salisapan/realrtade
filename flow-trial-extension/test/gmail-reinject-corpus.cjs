@@ -19,7 +19,7 @@ const background = fs.readFileSync(path.join(EXT, 'src', 'background.js'), 'utf8
 const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
 const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
 
-check('install, update, and startup inject open Gmail tabs', /onInstalled\.addListener\(\(details\) => \{\s*const reason = details && details\.reason;\s*if \(reason !== 'install' && reason !== 'update'\) return;\s*injectOpenGmailTabs\(\);/.test(background) && /onStartup\.addListener\(\(\) => \{\s*injectOpenGmailTabs\(\);/.test(background));
+check('install, update, and startup inject open Gmail tabs and migrate a prior Google connection once', /onInstalled\.addListener\(\(details\) => \{\s*const reason = details && details\.reason;\s*if \(reason !== 'install' && reason !== 'update'\) return;\s*migrateGoogleEverConnected\(\);\s*injectOpenGmailTabs\(\);/.test(background) && /onStartup\.addListener\(\(\) => \{\s*migrateGoogleEverConnected\(\);\s*injectOpenGmailTabs\(\);/.test(background));
 check('injectSurfaceIntoOpenTabs sends Gmail through the no-reload reinject', /id === 'gmail'/.test(background) && /mail\.google\.com/.test(background) && /injectSurfaceIntoOpenTabs\('gmail'/.test(background) && /reload:\s*false/.test(background));
 const surfaceFn = background.slice(background.indexOf('async function injectSurfaceIntoOpenTabs'), background.indexOf('async function readSurfaces'));
 check('the Gmail branch returns before any tab reload', surfaceFn.indexOf("id === 'gmail'") >= 0 && surfaceFn.indexOf('reinjectGmailTabs') >= 0 && surfaceFn.indexOf('reinjectGmailTabs') < surfaceFn.indexOf('tabs.reload'));
@@ -241,6 +241,7 @@ sandbox.reinjectGmailTabs().then((first) => {
         return out;
       }
     };
+    let dead = false;
     const page = {
       console,
       document: doc,
@@ -261,7 +262,7 @@ sandbox.reinjectGmailTabs().then((first) => {
       },
       clearInterval() {},
       location: { pathname: '/mail/u/0/' },
-      navigator: { language: 'en' },
+      navigator: { language: opts.lang || 'en' },
       Intl: Intl,
       Date: Date,
       Promise: Promise,
@@ -276,7 +277,10 @@ sandbox.reinjectGmailTabs().then((first) => {
       },
       chrome: {
         runtime: {
-          id: 'ext',
+          get id() {
+            if (dead) throw new Error('Extension context invalidated');
+            return 'ext';
+          },
           lastError: null,
           sendMessage(msg, cb) { if (typeof cb === 'function') cb({ ok: true }); },
           onMessage: { addListener() {} }
@@ -302,7 +306,16 @@ sandbox.reinjectGmailTabs().then((first) => {
           },
           onChanged: { addListener() {} }
         },
-        i18n: { getUILanguage: () => 'en' }
+        i18n: {
+          getUILanguage() {
+            if (dead) throw new Error('Extension context invalidated');
+            return opts.lang || 'en';
+          },
+          getMessage() {
+            if (dead) throw new Error('Extension context invalidated');
+            return '';
+          }
+        }
       }
     };
     page.MutationObserver.prototype.observe = function () { this.connected = true; };
@@ -314,6 +327,7 @@ sandbox.reinjectGmailTabs().then((first) => {
     vm.runInContext(gmail, page, { filename: 'content-gmail.js' });
     return {
       page: page,
+      kill() { dead = true; },
       flush(ms) {
         now += ms;
         const due = timers.filter((t) => t.at <= now);
@@ -355,7 +369,52 @@ sandbox.reinjectGmailTabs().then((first) => {
       check('the new copy drops the previous card and paints the open mail',
         live.page.stale.removed === true && written.indexOf('Calendar · Thursday') >= 0 && written.indexOf('Google Task · Prepare') >= 0 && rejections.length === 0,
         { removed: live.page.stale.removed, written, rejections });
-      process.off('unhandledRejection', onRejection);
+      const he = bootPage({
+        lang: 'he',
+        lane: {
+          'm-live': {
+            expires: Date.now() + 86400000,
+            steps: [
+              { connectorId: 'googleHold', ref: { eventId: 'e1', contentHash: 'h', calendarId: 'primary' }, line: 'Calendar · Thursday', undoLine: 'Calendar event removed.' },
+              { connectorId: 'googleLaneTask', ref: { taskId: 't1', taskListId: 'glance-list', contentHash: 'h2' }, line: 'Google Task · Prepare', undoLine: 'Google Task removed.' }
+            ]
+          }
+        }
+      });
+      return new Promise((resolve) => setImmediate(resolve)).then(() => {
+        he.flush(500);
+        return new Promise((resolve) => setImmediate(resolve));
+      }).then(() => {
+        const handled = he.page.document.querySelector('.flow-chip-handled');
+        const undo = he.page.document.querySelector('.flow-chip-undo');
+        check('a Hebrew UI reload shows Hebrew Handled and Undo all',
+          handled && handled.textContent === 'טופל.' && undo && undo.textContent === 'בטל הכל',
+          { handled: handled && handled.textContent, undo: undo && undo.textContent });
+        const ALLOW = new Set(['glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo']);
+        const kinds = ['handled', 'undo', 'undoAll', 'undoing', 'tryAgain', 'calendarFailed'];
+        const bad = [];
+        kinds.forEach((kind) => {
+          const line = he.page.glanceUiCopy(kind);
+          const words = String(line || '').match(/[A-Za-z][A-Za-z'’]{3,}/g) || [];
+          words.forEach((word) => {
+            if (!ALLOW.has(word.toLowerCase().replace(/[’']/g, ''))) bad.push(kind + ':' + word);
+          });
+          if (!line) bad.push(kind + ':empty');
+        });
+        check('visible Hebrew lint keeps Handled, Undo all, and Try again free of English',
+          bad.length === 0 && he.page.glanceUiCopy('tryAgain') === 'נסה שוב' && he.page.glanceUiCopy('handled') === 'טופל.',
+          bad);
+        const before = rejections.length;
+        let caught = 0;
+        he.kill();
+        try { he.page.chrome.i18n.getUILanguage(); } catch (e) { caught += 1; }
+        try { he.page.chrome.i18n.getMessage('handled'); } catch (e) { caught += 1; }
+        try { he.page.glanceUiCopy('handled'); } catch (e) { caught += 1; }
+        return new Promise((resolve) => setImmediate(resolve)).then(() => {
+          check('a dead context plus an i18n call throws nothing', caught === 0 && rejections.length === before && he.page.chrome.i18n.getUILanguage() === '', { caught, rejections: rejections.slice(before) });
+          process.off('unhandledRejection', onRejection);
+        });
+      });
     });
   });
 }).then(() => {

@@ -96,12 +96,31 @@ function everConnectedRecord(value) {
   return value === true || !!(value && value.connected);
 }
 
-function laneGoogleStatus(auth, reconnect, token, ever) {
+function priorGoogleRecord(bag) {
+  if (!bag) return false;
+  if (everConnectedRecord(bag[EVER_KEY]) || everConnectedRecord(bag.everConnected)) return true;
+  if (bag.googleTasksAuth || bag.tasksAuth) return true;
+  const web = bag.googleWebAuth || bag.webAuth;
+  if (web && (web.accessToken || web.refreshToken)) return true;
+  const undo = bag.glanceLaneUndo || bag.laneUndo;
+  if (undo && typeof undo === 'object') {
+    const keys = Object.keys(undo);
+    for (let i = 0; i < keys.length; i++) {
+      const row = undo[keys[i]];
+      if (row && Array.isArray(row.steps) && row.steps.length) return true;
+    }
+  }
+  return false;
+}
+
+function laneGoogleStatus(auth, reconnect, token, ever, extras) {
   const had = Boolean(auth);
-  const previous = had || everConnectedRecord(ever);
+  const extra = extras || {};
+  const previous = had || everConnectedRecord(ever) || priorGoogleRecord(extra);
   const usable = typeof token === 'string' && token.length > 0;
-  const needs = previous && Boolean(reconnect && reconnect.needed);
-  const connected = had && usable && !needs;
+  const flagged = Boolean(reconnect && reconnect.needed);
+  const connected = had && usable && !flagged;
+  const needs = previous && !connected;
   const label = reconnectWords();
   return {
     connected: connected,
@@ -114,11 +133,10 @@ function laneGoogleStatus(auth, reconnect, token, ever) {
 function noteGoogleAuthFailure(reason) {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve();
   return Promise.resolve()
-    .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth']))
+    .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth', 'googleWebAuth', 'glanceLaneUndo']))
     .then((bag) => {
+      if (!priorGoogleRecord(bag)) return null;
       const ever = bag && everConnectedRecord(bag[EVER_KEY]);
-      const grant = Boolean(bag && bag.googleTasksAuth);
-      if (!ever && !grant) return null;
       const patch = { [RECONNECT_KEY]: { needed: true, reason: String(reason || 'auth') } };
       if (!ever) patch[EVER_KEY] = { connected: true };
       return chrome.storage.local.set(patch);

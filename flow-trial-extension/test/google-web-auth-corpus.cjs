@@ -33,7 +33,7 @@ function loadPure() {
   const src = stripModuleSyntax(fs.readFileSync(path.join(__dirname, '..', 'src', 'google-web-auth.js'), 'utf8'));
   const sandbox = { URL, URLSearchParams, decodeURIComponent, Date };
   vm.createContext(sandbox);
-  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_CONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
+  vm.runInContext(src + '\nthis.__api = { isUserCancelMessage, shouldFallbackFromGetAuthToken, googleRedirectUriForExtension, googleOAuthScopesFrom, googleImplicitAuthUrl, parseGoogleImplicitRedirect, webTokenUsable, googleConnectErrorMessage, GOOGLE_OAUTH_SCOPES, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_RECONNECT_LABEL, GOOGLE_CONNECT_LABEL, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, unconfirmedRefusal, googleConnectionState, googleEverConnectedPatch, laneCredential };', sandbox, { filename: 'google-web-auth.js' });
   return sandbox.__api;
 }
 
@@ -264,6 +264,18 @@ async function run() {
     check('never connected shows Connect', noGrant.connected === false && noGrant.needsReconnect === false && noGrant.headerLabel === 'Connect Google', noGrant);
     check('a previous Connect shows Reconnect', afterConnect.connected === false && afterConnect.needsReconnect === true && afterConnect.headerLabel === 'Reconnect Google', afterConnect);
     check('Hebrew Connect and Reconnect follow the UI', neverHe.headerLabel === api.GOOGLE_CONNECT_LABEL && afterConnectHe.headerLabel === api.GOOGLE_RECONNECT_LABEL, { neverHe, afterConnectHe });
+    const oldWeb = api.googleConnectionState(null, null, { lang: 'en', webAuth: { accessToken: 'ya29.old' } });
+    const oldTasks = api.googleConnectionState(null, null, { lang: 'en', tasksAuth: { taskListId: 'glance-list' } });
+    const oldSuccess = api.googleConnectionState(null, null, { lang: 'en', laneUndo: { m1: { steps: [{ connectorId: 'googleHold' }] } } });
+    const clean = api.googleConnectionState(null, null, { lang: 'en' });
+    check('an old web token with no marker shows Reconnect', oldWeb.connected === false && oldWeb.needsReconnect === true && oldWeb.headerLabel === 'Reconnect Google', oldWeb);
+    check('an old Tasks grant with no marker shows Reconnect', oldTasks.connected === false && oldTasks.needsReconnect === true && oldTasks.headerLabel === 'Reconnect Google', oldTasks);
+    check('a past success with no marker shows Reconnect', oldSuccess.connected === false && oldSuccess.needsReconnect === true && oldSuccess.headerLabel === 'Reconnect Google', oldSuccess);
+    check('a clean state shows Connect', clean.connected === false && clean.needsReconnect === false && clean.headerLabel === 'Connect Google', clean);
+    const patch = api.googleEverConnectedPatch({ googleWebAuth: { accessToken: 'ya29.old' } });
+    const againPatch = api.googleEverConnectedPatch({ googleEverConnected: { connected: true }, googleWebAuth: { accessToken: 'ya29.old' } });
+    const cleanPatch = api.googleEverConnectedPatch({});
+    check('migration writes the marker once for an old token', patch && patch[api.GOOGLE_EVER_CONNECTED_STORAGE_KEY] && patch[api.GOOGLE_EVER_CONNECTED_STORAGE_KEY].connected === true && againPatch == null && cleanPatch == null, { patch, againPatch, cleanPatch });
   }
 
   console.log('\n--- redirect URI and authorize URL ---\n');

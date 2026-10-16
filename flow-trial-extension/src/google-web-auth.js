@@ -152,14 +152,43 @@ function everConnectedRecord(value) {
   return value === true || !!(value && value.connected);
 }
 
+function priorGoogleBag(bag) {
+  const b = bag || {};
+  if (b.googleTasksAuth || b.tasksAuth) return true;
+  const web = b.googleWebAuth || b.webAuth;
+  if (web && (web.accessToken || web.refreshToken)) return true;
+  const undo = b.glanceLaneUndo || b.laneUndo;
+  if (undo && typeof undo === 'object') {
+    const keys = Object.keys(undo);
+    for (let i = 0; i < keys.length; i++) {
+      const row = undo[keys[i]];
+      if (row && Array.isArray(row.steps) && row.steps.length) return true;
+    }
+  }
+  return false;
+}
+
+// One write, the first time an older profile is opened. A marker already
+// stored is left alone. An empty profile stays unmarked.
+export function googleEverConnectedPatch(bag) {
+  const b = bag || {};
+  const marker = b[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || b.googleEverConnected;
+  if (everConnectedRecord(marker)) return null;
+  if (!priorGoogleBag(b)) return null;
+  return { [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true } };
+}
+
 export function googleConnectionState(auth, reconnect, extras) {
   const had = Boolean(auth);
   const extra = extras || {};
-  // Reconnect only after a successful Connect. A grant still on disk counts.
-  // A person who never connected sees Connect, even if a stale flag is set.
-  const previous = had || everConnectedRecord(extra.everConnected);
-  const needs = previous && Boolean(reconnect && reconnect.needed);
-  const warn = !needs && Boolean(extra.warning && extra.warning.needed);
+  // Reconnect after any earlier connection: the marker, a stored token,
+  // a Tasks grant, or a Do It that already landed. A person who never
+  // connected sees Connect, even if a stale flag is set.
+  const previous = had || everConnectedRecord(extra.everConnected) || priorGoogleBag(extra);
+  const flagged = Boolean(reconnect && reconnect.needed);
+  const warnOn = Boolean(extra.warning && extra.warning.needed);
+  const needs = (previous && flagged) || (previous && !had && !warnOn);
+  const warn = !needs && warnOn;
   const english = statusEnglish(extra.lang);
   const reconnectLabel = english ? 'Reconnect Google' : GOOGLE_RECONNECT_LABEL;
   const connectLabel = english ? 'Connect Google' : GOOGLE_CONNECT_LABEL;

@@ -302,6 +302,8 @@ async function main() {
   delete stored.googleTasksAuth;
   delete stored.googleReconnect;
   delete stored.googleEverConnected;
+  delete stored.googleWebAuth;
+  delete stored.glanceLaneUndo;
   resetFetches();
   const noGrant = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
   const noGrantView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED, stored.googleEverConnected);
@@ -315,6 +317,7 @@ async function main() {
   check('a 401 after a successful Connect is Reconnect', again && again.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && againView.needsReconnect === true && againView.label === 'Reconnect Google', { again, againView });
 
   console.log('\n--- Hebrew refusal ---\n');
+  stored.googleWebAuth = { accessToken: STORED, expiresAt: Date.now() + 60 * 60 * 1000 };
   sandbox.fetch = async () => jsonResponse(200, { id: 'file-he', modifiedTime: '2026-10-15T00:00:00.000Z' });
   sandbox.chrome.i18n.getUILanguage = () => 'he';
   const HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';

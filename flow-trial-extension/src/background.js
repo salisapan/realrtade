@@ -42,7 +42,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -193,12 +193,26 @@ try {
   });
 } catch (e) { console.error('[Glance] right-click menu unavailable', e); }
 chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
+async function migrateGoogleEverConnected() {
+  try {
+    const bag = await chrome.storage.local.get([
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      'glanceLaneUndo'
+    ]);
+    const patch = googleEverConnectedPatch(bag);
+    if (patch) await chrome.storage.local.set(patch);
+  } catch (e) { /* storage can close during a restart */ }
+}
 chrome.runtime.onInstalled.addListener((details) => {
   const reason = details && details.reason;
   if (reason !== 'install' && reason !== 'update') return;
+  migrateGoogleEverConnected();
   injectOpenGmailTabs();
 });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
+  migrateGoogleEverConnected();
   injectOpenGmailTabs();
 });
 
@@ -4847,7 +4861,7 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, 'googleLaneWarning']);
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, 'googleLaneWarning', 'glanceLaneUndo']);
   let uiLang = '';
   try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
@@ -4855,7 +4869,9 @@ async function connectorStatus() {
     detail: GLANCE_TASK_LIST_TITLE + ' list',
     warning: reconnectBag.googleLaneWarning || null,
     lang: uiLang,
-    everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null
+    everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
+    webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
+    laneUndo: reconnectBag.glanceLaneUndo || null
   });
   return {
     googleTasks: googleTasks,

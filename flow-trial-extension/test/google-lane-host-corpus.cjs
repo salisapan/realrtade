@@ -295,6 +295,8 @@ async function main() {
   delete stored.googleTasksAuth;
   delete stored.googleReconnect;
   delete stored.googleEverConnected;
+  delete stored.googleWebAuth;
+  delete stored.glanceLaneUndo;
   const noGrant = await new Promise((resolve) => {
     listeners[0]({
       type: 'flow:google-write',
@@ -372,6 +374,17 @@ async function main() {
   const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
   check('panel, Setup, and popup render the shared reconnect label', popup.indexOf('st.needsReconnect') > 0 && popup.indexOf('st.reconnectLabel') > 0 && popup.indexOf('needsReconnect') < popup.indexOf("badge on', 'Connected'"));
   check('a lane warning is not the Connected header', popup.indexOf('status[k].warning') > 0 && popup.indexOf('warningLabel') > 0 && popup.indexOf('googleLaneWarning') > 0);
+
+  delete stored.googleTasksAuth;
+  delete stored.googleEverConnected;
+  delete stored.googleReconnect;
+  delete stored.glanceLaneUndo;
+  stored.googleWebAuth = { accessToken: 'ya29.old', expiresAt: Date.now() + 60 * 60 * 1000 };
+  const oldView = vm.runInContext('laneGoogleStatus', sandbox)(null, null, '', null, { webAuth: stored.googleWebAuth });
+  check('an old web token with no marker shows Reconnect', oldView.connected === false && oldView.needsReconnect === true && oldView.label === 'Reconnect Google', oldView);
+  delete stored.googleWebAuth;
+  const cleanView = vm.runInContext('laneGoogleStatus', sandbox)(null, null, '', null, {});
+  check('a clean state shows Connect', cleanView.connected === false && cleanView.needsReconnect === false && cleanView.label === 'Connect Google', cleanView);
 
   if (failures) {
     console.log('\n' + failures + ' failed');

@@ -333,7 +333,6 @@ console.log('\n--- wiring stays a scaffold ---\n');
   const block = start > 0 && send > start ? gmail.slice(start, send) : '';
   check('the thread Undo rewrites the computer Activity row and does not call a writer first',
     block.indexOf('markComputerUndone') > 0 && block.indexOf('Mail.Send') === -1, { start: start, send: send });
-  check('Google Task undo still records the task as undone', gmail.indexOf('markGoogleTaskUndone') > 0 && gmail.indexOf('glanceUndoStoredLane') > 0);
   check('Activity Undo rewrites a computer row',
     storage.indexOf('markComputerUndone') > 0 && popup.indexOf('markComputerUndone') > 0);
   check('the computer close is not registered as an API writer',
@@ -374,8 +373,10 @@ function bootLaneUndo() {
         if (!msg || msg.type !== 'flow:google-undo') { done({ ok: true }); return; }
         const api = msg.connectorId === 'googleHold' ? page.FlowGoogleCalendar : page.FlowGoogleTasks;
         Promise.resolve(api.undo(msg.ref, async (req) => {
-          http.push({ method: req.method, url: req.url, connectorId: msg.connectorId });
-          if (req.method === 'DELETE') return { status: 204, ok: true, json: null };
+          const fail = page.__failDelete && page.__failDelete[msg.connectorId];
+          const status = req.method === 'DELETE' && fail ? fail : (req.method === 'DELETE' ? 204 : 200);
+          http.push({ method: req.method, url: req.url, connectorId: msg.connectorId, status: status });
+          if (req.method === 'DELETE') return { status: status, ok: status >= 200 && status < 300, json: null };
           if (msg.connectorId === 'googleLaneTask') {
             return { status: 200, ok: true, json: { id: 'task_1', title: 'Pay the invoice', status: 'needsAction' } };
           }
@@ -392,7 +393,10 @@ function bootLaneUndo() {
           }
           return Promise.resolve({});
         },
-        set() { return Promise.resolve(); },
+        set(patch) {
+          if (patch && Object.prototype.hasOwnProperty.call(patch, 'glanceLaneUndo')) store.glanceLaneUndo = patch.glanceLaneUndo;
+          return Promise.resolve();
+        },
         remove() { return Promise.resolve(); }
       },
       onChanged: { addListener() {} }
@@ -457,6 +461,48 @@ async function checkStoredUndo() {
     partial && partial.ok === false && partial.partial === true && taskDelete < 0 && calendarDelete >= 0 &&
     partial.written.indexOf('שינית את זה') >= 0 && partial.written.indexOf('אירוע היומן הוסר') >= 0,
     { methods, partial });
+
+  const taskBody = { title: 'Pay the invoice', status: 'needsAction' };
+  const taskHash = boot.page.FlowGoogleTasks.contentHash(taskBody);
+  const calBody = { summary: 'Call', description: '', start: { dateTime: '2026-10-22T11:00:00Z' } };
+  const calHash = boot.page.FlowGoogleCalendar.contentHash(calBody);
+  boot.page.__lang = 'en';
+  boot.page.__failDelete = { googleHold: 500 };
+  boot.http.length = 0;
+  boot.store.glanceLaneUndo = {
+    m3: {
+      expires: Date.now() + 86400000,
+      steps: [
+        {
+          connectorId: 'googleHold',
+          ref: { eventId: 'evt_1', externalId: 'evt_1', calendarId: 'primary', contentHash: calHash },
+          line: 'Calendar · Call',
+          undoLine: 'Calendar event removed.'
+        },
+        {
+          connectorId: 'googleLaneTask',
+          ref: { taskId: 'task_1', externalId: 'task_1', taskListId: 'glance-list', contentHash: taskHash },
+          line: 'Google Task · Pay the invoice',
+          undoLine: 'Google Task removed.'
+        }
+      ]
+    }
+  };
+  const failed = await boot.page.glanceUndoStoredLane('m3');
+  const taskDeletes = () => boot.http.filter((call) => call.method === 'DELETE' && call.connectorId === 'googleLaneTask').length;
+  check('a Calendar 500 names Calendar and still says the Task was removed',
+    failed && failed.ok === false && failed.partial === true &&
+    failed.written.indexOf('Calendar failed') >= 0 && failed.written.indexOf('Google Task removed') >= 0 &&
+    failed.written.indexOf('Google Task was not removed') < 0 && taskDeletes() === 1,
+    { written: failed && failed.written, http: boot.http });
+  boot.page.__failDelete = null;
+  const beforeRetry = taskDeletes();
+  const retried = await boot.page.glanceUndoStoredLane('m3');
+  const calendarDeletes = boot.http.filter((call) => call.method === 'DELETE' && call.connectorId === 'googleHold' && call.status === 204).length;
+  check('a retry deletes the remaining step and does not call the step already removed',
+    retried && retried.ok === true && calendarDeletes === 1 && taskDeletes() === beforeRetry &&
+    retried.written.indexOf('Calendar event removed') >= 0,
+    { retried, http: boot.http, taskDeletes: taskDeletes() });
 }
 
 checkStoredUndo().then(() => {
