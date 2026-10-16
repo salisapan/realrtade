@@ -1,7 +1,8 @@
 // Outlook Family B: one named file placed on the calendar at one clock.
-// Portable: no chrome.*, no DOM, no network. The host searches Drive, checks
-// the token, and posts the body this file builds. A meeting with no file
-// is not this close. OneDrive is not searched here.
+// A meeting hold with a stated clock and no file is meetingBody: one
+// event, nobody invited. Portable: no chrome.*, no DOM, no network. The
+// host checks the token and posts the body this file builds. OneDrive is
+// not searched here.
 //
 // Creating the event needs delegated Calendars.ReadWrite. The Calendar box
 // on the one Connect screen asks for that scope. The default mail sign-in
@@ -295,6 +296,108 @@ const FlowOutlookCalendar = (() => {
     };
   }
 
+  // The person's zone, never a silent UTC default. An explicit zone wins.
+  // Otherwise the host zone (Intl). An empty result means the hold stays quiet.
+  function zoneName(explicit) {
+    const given = String(explicit || '').trim().slice(0, 80);
+    if (given) return given;
+    try {
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (zone) return String(zone).trim().slice(0, 80);
+    } catch (e) { /* no host zone */ }
+    return '';
+  }
+
+  function zoneWallUtc(timeZone, utcMs) {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    const bag = {};
+    fmt.formatToParts(new Date(utcMs)).forEach((part) => {
+      if (part.type !== 'literal') bag[part.type] = part.value;
+    });
+    let hour = Number(bag.hour);
+    if (hour === 24) hour = 0;
+    return Date.UTC(Number(bag.year), Number(bag.month) - 1, Number(bag.day), hour, Number(bag.minute), Number(bag.second));
+  }
+
+  // Wall clock in the person's zone. Graph must not receive a Z instant
+  // together with timeZone Asia/Jerusalem. 14:00 is 2026-10-22T14:00:00
+  // and the zone travels in timeZone.
+  function zoneOk(zone) {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: zone }).format(0);
+      return true;
+    } catch (e) { return false; }
+  }
+  function wallIso(dateIso, hour, minute, addMinutes) {
+    const parts = dateIso.split('-').map(Number);
+    const ms = Date.UTC(parts[0], parts[1] - 1, parts[2], hour, minute + (addMinutes || 0), 0);
+    const d = new Date(ms);
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) +
+      'T' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }
+  // Kept so a caller can still name the UTC instant of a wall clock. The
+  // event body does not send that instant.
+  function instantIso(dateIso, hour, minute, addMinutes, timeZone) {
+    const parts = dateIso.split('-').map(Number);
+    const wall = Date.UTC(parts[0], parts[1] - 1, parts[2], hour, minute + (addMinutes || 0), 0);
+    const offset = zoneWallUtc(timeZone, wall) - wall;
+    let utc = wall - offset;
+    const offset2 = zoneWallUtc(timeZone, utc) - utc;
+    if (offset2 !== offset) utc = wall - offset2;
+    return new Date(utc).toISOString().replace(/\.000Z$/, 'Z');
+  }
+
+  // One meeting, no file, nobody invited. dateTime is the local wall
+  // clock with no Z. timeZone is the person's zone.
+  function meetingBody(input) {
+    const i = input || {};
+    const date = isoDate(i.dateIso);
+    const hour = clockPart(i.hour, 23);
+    const minute = clockPart(i.minute, 59);
+    if (!date || hour == null || minute == null) return null;
+    if (String(i.fileUrl || i.fileName || i.fileTerm || '').trim()) return null;
+    const title = String(i.title || i.quote || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
+    if (!title) return null;
+    const zone = zoneName(i.timeZone);
+    if (!zone || !zoneOk(zone)) return null;
+    const startIso = wallIso(date, hour, minute, 0);
+    const endIso = wallIso(date, hour, minute, DURATION_MIN);
+    if (!startIso || !endIso || /Z$/i.test(startIso)) return null;
+    const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
+    return {
+      subject: title,
+      body: { contentType: 'Text', content: quote && quote !== title ? quote : title },
+      start: { dateTime: startIso, timeZone: zone },
+      end: { dateTime: endIso, timeZone: zone },
+      showAs: 'busy',
+      attendees: []
+    };
+  }
+
+  function hashText(text) {
+    let h = 5381;
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  function contentHash(ev) {
+    const subject = ev && (ev.subject || ev.summary) ? String(ev.subject || ev.summary) : '';
+    const description = ev && ev.body ? String(ev.body.content || '') : (ev && ev.description ? String(ev.description) : '');
+    const start = ev && ev.start ? String(ev.start.dateTime || ev.start.date || '') : '';
+    return hashText(subject + '\n' + description + '\n' + start);
+  }
+
   return {
     WRITE_SCOPE: WRITE_SCOPE,
     DURATION_MIN: DURATION_MIN,
@@ -307,6 +410,9 @@ const FlowOutlookCalendar = (() => {
     namesCalendar: namesCalendar,
     fileLink: fileLink,
     eventBody: eventBody,
+    meetingBody: meetingBody,
+    contentHash: contentHash,
+    zoneName: zoneName,
     whenLabel: whenLabel,
     undoRequest: undoRequest,
     decide: decide

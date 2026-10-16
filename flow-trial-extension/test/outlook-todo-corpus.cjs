@@ -33,6 +33,7 @@ function background(opts) {
     },
     outlookSync: {}
   };
+  if (opts.store) Object.assign(stored, opts.store);
   const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
   const routes = opts.routes || [];
   const sandbox = {
@@ -41,11 +42,22 @@ function background(opts) {
     atob: (s) => Buffer.from(String(s), 'base64').toString('binary'),
     setTimeout: opts.clock || setTimeout,
     clearTimeout: opts.clearClock || clearTimeout,
+    AbortController: AbortController,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
       try { body = init && init.body ? JSON.parse(init.body) : null; } catch (e) { body = init && init.body; }
-      calls.push({ method, url: String(url), body });
+      calls.push({ method, url: String(url), body, headers: (init && init.headers) || null });
+      if (opts.hangGet && method === 'GET' && /\/me\/events\//.test(String(url))) {
+        return new Promise((resolve, reject) => {
+          const signal = init && init.signal;
+          if (signal) signal.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      }
       for (const route of routes) {
         if (route.method === method && route.test.test(String(url))) return route.reply(body);
       }
@@ -392,6 +404,116 @@ console.log('\n--- no Tasks.ReadWrite means no write and no Handled ---\n');
   check('a 401 after the scope is present is an expired token, not a missing scope',
     expiredOut.ok === false && expiredOut.reason === 'token-expired', expiredOut);
 }
+
+console.log('\n--- a late To Do read-back still counts, and the fields have to match ---\n');
+{
+  let gets = 0;
+  const late = background({ routes: [
+    { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: true, status: 200, json: async () => LISTS, text: async () => '' }) },
+    { method: 'POST', test: /\/me\/todo\/lists\/DEF\/tasks$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'TASK9', title: 'File the amendment', listId: 'DEF' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => {
+      gets += 1;
+      if (gets < 3) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({
+        id: 'TASK9',
+        title: 'File the amendment',
+        dueDateTime: { dateTime: '2026-10-10T00:00:00.0000000', timeZone: 'Etc/UTC' }
+      }), text: async () => '' };
+    } }
+  ] });
+  const out = await late.fn('outlookTaskWrite')(PAYLOAD);
+  const post = late.calls.find((c) => c.method === 'POST');
+  const taskGets = late.calls.filter((c) => c.method === 'GET' && /\/tasks\/TASK9$/.test(c.url));
+  check('a 404 then a matching title and dueDateTime timeZone is verified on the same list',
+    out.ok === true && out.proof && out.proof.fetchedBack === true && out.ref.taskListId === 'DEF' &&
+    taskGets.length >= 3 && taskGets.every((c) => /\/lists\/DEF\/tasks\/TASK9$/.test(c.url)) &&
+    post && post.body.dueDateTime.timeZone === 'UTC',
+    { ok: out.ok, reason: out.reason, gets: taskGets.length });
+  const wrong = background({ routes: happyRoutes(200, {
+    id: 'TASK9', title: 'A different task', status: 'notStarted',
+    dueDateTime: { dateTime: '2026-10-10T00:00:00.0000000', timeZone: 'UTC' }
+  }) });
+  const missed = await wrong.fn('outlookTaskWrite')(PAYLOAD);
+  check('a read-back whose title differs is not verified',
+    missed.ok === false && missed.fetchedBack === false && missed.written === "Created, couldn't verify", missed);
+}
+
+console.log('\n--- a Jerusalem hold is one event at local 14:00 ---\n');
+{
+  const posted = background({
+    scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite', 'offline_access'],
+    store: { glanceTimeZone: 'Asia/Jerusalem' },
+    routes: [
+      { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => Object.assign({ id: 'EVT1', webLink: 'https://outlook.office.com/calendar/item/EVT1' }, body), text: async () => '' }) },
+      { method: 'GET', test: /\/me\/events\/EVT1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+        id: 'EVT1',
+        subject: 'פגישה',
+        body: { contentType: 'Text', content: 'פגישה ביום חמישי 22/10 בשעה 14:00' },
+        start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' },
+        end: { dateTime: '2026-10-22T14:30:00', timeZone: 'Asia/Jerusalem' },
+        attendees: []
+      }), text: async () => '' }) }
+    ]
+  });
+  const wrote = await posted.fn('outlookMeetingWrite')({
+    params: { meeting: true, dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', quote: 'פגישה ביום חמישי 22/10 בשעה 14:00' }
+  });
+  const post = posted.calls.find((c) => c.method === 'POST');
+  const get = posted.calls.find((c) => c.method === 'GET' && /\/me\/events\/EVT1/.test(c.url));
+  const read = get && { subject: 'פגישה', body: { content: 'פגישה ביום חמישי 22/10 בשעה 14:00' }, start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' } };
+  check('one POST /me/events at local 14:00 with no Z, Prefer outlook.timezone, no attendees, GET proof and contentHash',
+    wrote && wrote.ok === true && wrote.fetchedBack === true && wrote.ref && wrote.ref.eventId === 'EVT1' && wrote.ref.contentHash &&
+    post && post.body && post.body.start.dateTime === '2026-10-22T14:00:00' && !/Z$/i.test(post.body.start.dateTime) &&
+    post.body.end.dateTime === '2026-10-22T14:30:00' && post.body.start.timeZone === 'Asia/Jerusalem' &&
+    Array.isArray(post.body.attendees) && post.body.attendees.length === 0 && !post.body.isOnlineMeeting &&
+    post.headers && String(post.headers.Prefer).indexOf('Asia/Jerusalem') >= 0 &&
+    posted.calls.filter((c) => c.method === 'POST').length === 1 && get &&
+    String(read.start.dateTime).slice(11, 16) === '14:00',
+    { wrote: wrote && { ok: wrote.ok, reason: wrote.reason, ref: wrote.ref }, start: post && post.body && post.body.start, headers: post && post.headers });
+  const bare = await posted.fn('outlookCalendarUndo')({ eventId: 'EVT1' });
+  check('Undo with no snapshot refuses and does not delete',
+    bare && bare.ok === false && bare.reason === 'unconfirmed' && !posted.calls.some((c) => c.method === 'DELETE'), bare);
+  const edited = background({
+    scopes: ['Mail.ReadWrite', 'Calendars.ReadWrite'],
+    routes: [
+      { method: 'GET', test: /\/me\/events\/EVT1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+        id: 'EVT1', subject: 'Changed', body: { contentType: 'Text', content: 'פגישה' },
+        start: { dateTime: '2026-10-22T11:00:00Z', timeZone: 'Asia/Jerusalem' }
+      }), text: async () => '' }) }
+    ]
+  });
+  const refused = await edited.fn('outlookCalendarUndo')({
+    eventId: 'EVT1',
+    created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T11:00:00' }
+  }, { created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T11:00:00' } });
+  check('Undo after an edit refuses and does not delete',
+    refused && refused.ok === false && refused.reason === 'user-edited' && !edited.calls.some((c) => c.method === 'DELETE'), refused);
+  const hung = background({
+    hangGet: true,
+    scopes: ['Mail.ReadWrite', 'Calendars.ReadWrite'],
+    routes: []
+  });
+  const timed = await hung.fn('outlookCalendarUndo')({
+    eventId: 'EVT1',
+    created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T14:00:00' }
+  }, { created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T14:00:00' } });
+  check('a read-back that times out refuses and deletes nothing',
+    timed && timed.ok === false && (timed.reason === 'unconfirmed' || timed.reason === 'verify-timeout') &&
+    !hung.calls.some((c) => c.method === 'DELETE') && hung.calls.filter((c) => c.method === 'DELETE').length === 0,
+    timed);
+}
+
+const { FlowDisplay } = require('../core/display-copy.js');
+check('a To Do plan says Do It in English and בצע in Hebrew',
+  FlowDisplay.actionLabel({ id: 'log-it', steps: [{ kind: 'outlookTask' }] }, 'en') === 'Do It' &&
+  FlowDisplay.actionLabel({ id: 'log-it', steps: [{ kind: 'outlookTask' }] }, 'he') === 'בצע');
+check('a hold plan says Hold It in English and השהה in Hebrew',
+  FlowDisplay.actionLabel({ id: 'hold', steps: [{ kind: 'calendar' }] }, 'en') === 'Hold It' &&
+  FlowDisplay.actionLabel({ id: 'hold', steps: [{ kind: 'calendar' }] }, 'he') === 'השהה');
+const chip = fs.readFileSync(path.join(__dirname, '..', 'src', 'chip-host.js'), 'utf8');
+const stepsView = fs.readFileSync(path.join(__dirname, '..', 'src', 'step-list-view.js'), 'utf8');
+check('a To Do card does not paint the Hold It button',
+  chip.indexOf('noHold: taskOnly') > 0 && stepsView.indexOf('noHold: o.noHold === true') > 0);
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

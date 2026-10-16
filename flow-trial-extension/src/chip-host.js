@@ -50,6 +50,7 @@ const FlowChipHost = (() => {
   }
 
   function clockOf(ctx) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdClockFrom === 'function') return FlowDisplay.holdClockFrom(ctx);
     const bags = [];
     if (ctx.holdClock) bags.push(ctx.holdClock);
     if (ctx.calendarHold && ctx.calendarHold.params) bags.push(ctx.calendarHold.params);
@@ -68,6 +69,19 @@ const FlowChipHost = (() => {
     return null;
   }
 
+  function cardLang(ctx) {
+    const raw = (ctx && ctx.uiLang) || uiLang;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') return FlowDisplay.uiLangFrom({ setting: raw });
+    return raw === 'he' ? 'he' : 'en';
+  }
+
+  function cardTitle(ctx, face) {
+    const lang = cardLang(ctx);
+    const fallback = (face && face.title) || (ctx.process && ctx.process.name) || 'Reply';
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.cardTitle === 'function') return FlowDisplay.cardTitle(lang, ctx, fallback);
+    return fallback;
+  }
+
   function holdCard(ctx) {
     if (!ctx) return false;
     if (ctx.glanceChain === 'calendar-hold') return true;
@@ -77,18 +91,19 @@ const FlowChipHost = (() => {
   function paintWhen(host, ctx) {
     if (!host || typeof FlowDisplay === 'undefined') return;
     const clock = clockOf(ctx);
+    const lang = cardLang(ctx);
     let line = '';
     if (holdCard(ctx)) {
       line = clock && typeof FlowDisplay.holdWhenLine === 'function'
-        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
+        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang)
         : '';
     } else if (clock && clock.dateIso && typeof FlowDisplay.cardDateLine === 'function') {
-      line = FlowDisplay.cardDateLine(clock.dateIso);
+      line = FlowDisplay.cardDateLine(clock.dateIso, lang);
     }
     if (!line) return;
     const node = el('p', 'flow-chip-when', line);
     node.setAttribute('data-glance-when', line);
-    node.setAttribute('dir', 'rtl');
+    node.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
     host.appendChild(node);
   }
 
@@ -110,32 +125,51 @@ const FlowChipHost = (() => {
   // handlers: { onDoIt(host, chip, ctx, liveSteps), onDismiss(host, ctx) }
   function inject(mountNode, ctx, handlers) {
     if (!mountNode || !ctx || !ctx.process) return null;
+    const dateWaiting = ctx.process.needsDateChoice === true && Array.isArray(ctx.process.dateChoices) && ctx.process.dateChoices.length >= 2;
     if (holdCard(ctx)) {
       const clock = clockOf(ctx);
+      const lang = cardLang(ctx);
       const line = clock && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function'
-        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute)
+        ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang)
         : '';
-      if (!line) return null;
+      if (!line && !dateWaiting) return null;
     }
     if (ctx && ctx.uiLang) setUiLang(ctx.uiLang);
     if (mountNode.querySelector('.flow-chip-host')) return mountNode.querySelector('.flow-chip-host');
 
+    const lang = cardLang(ctx);
     const host = el('div', 'flow-chip-host');
-    host.setAttribute('dir', 'ltr');
+    host.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    host.setAttribute('lang', lang);
     const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
       ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || ctx.text || '', fileCard: ctx.fileCard === true })
       : { title: ctx.process.name || 'Reply', sentence: null, fileCard: false };
+    const title = cardTitle(ctx, face);
+    const taskOnly = ((ctx.process && ctx.process.steps) || []).length > 0 &&
+      (ctx.process.steps || []).every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'task'));
     const kitReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && typeof FlowStepKit !== 'undefined' && (ctx.process.steps || []).length;
     if (kitReady) {
       const liveSteps = (ctx.process.steps || []).slice();
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
-        intent: face.title || ctx.process.name || 'Reply',
+        intent: title,
         lang: ctx.intent && ctx.intent.lang,
-        uiLang: ctx.uiLang || 'en',
+        uiLang: lang,
+        noHold: taskOnly,
         fileCard: face.fileCard === true || ctx.fileCard === true,
         surface: ctx.app || 'outlook',
-        onDoIt: function (button) { if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps); },
+        dateChoices: ctx.process.dateChoices || null,
+        onDateChoice: function (iso) {
+          if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
+          liveSteps.forEach(function (step) {
+            if (step && step.kind === 'calendar' && step.params) step.params.dateIso = iso;
+          });
+        },
+        onDoIt: function (button) {
+          if (button && button.disabled) return;
+          if (ctx.process.needsDateChoice) return;
+          if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps);
+        },
         onDismiss: function () {
           if (handlers && handlers.onDismiss) handlers.onDismiss(host, ctx);
           else host.remove();
@@ -162,13 +196,19 @@ const FlowChipHost = (() => {
       else mountNode.appendChild(host);
       return host;
     }
-    host.appendChild(el('span', 'flow-chip-process-name', face.title || ctx.process.name || 'Reply'));
+    const nameEl = el('span', 'flow-chip-process-name', title);
+    nameEl.setAttribute('data-glance-user', 'title');
+    host.appendChild(nameEl);
 
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
     const sentence = face.fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
-    if (sentence) textEl.appendChild(document.createTextNode(' ' + sentence));
+    if (sentence) {
+      const sent = el('span', null, ' ' + sentence);
+      sent.setAttribute('data-glance-user', 'draft');
+      textEl.appendChild(sent);
+    }
     host.appendChild(textEl);
 
     const liveSteps = (ctx.process.steps || []).slice();
@@ -178,7 +218,7 @@ const FlowChipHost = (() => {
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
     const uiWords = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
-      ? FlowDisplay.chrome(ctx.uiLang || 'en')
+      ? FlowDisplay.chrome(lang)
       : { dismiss: 'Dismiss', doIt: 'Do It' };
     dismiss.setAttribute('aria-label', uiWords.dismiss || 'Dismiss');
     dismiss.addEventListener('click', (e) => {
@@ -194,7 +234,10 @@ const FlowChipHost = (() => {
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
     let doText = (ctx.doLabel && ctx.doLabel !== 'Do It') ? ctx.doLabel : (uiWords.doIt || ctx.doLabel || 'Do It');
-    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') doText = FlowDisplay.showChrome(ctx.uiLang || uiLang, doText);
+    if (taskOnly && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.actionLabel === 'function') {
+      doText = FlowDisplay.actionLabel(ctx.process, lang);
+    }
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') doText = FlowDisplay.showChrome(lang, doText);
     chip.appendChild(el('span', 'flow-chip-do-label', doText));
     chip.addEventListener('click', () => {
       if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
@@ -205,7 +248,8 @@ const FlowChipHost = (() => {
     if (typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && (ctx.process.steps || []).length) {
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       const view = FlowStepListView.mount(host, rows, {
-        uiLang: ctx.uiLang || uiLang,
+        uiLang: lang,
+        noHold: taskOnly,
         onChange: (next) => {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;

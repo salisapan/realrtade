@@ -279,7 +279,7 @@ const ROWS = [
   { id: 'self-sent-save', expect: 'self-file', surface: 'gmail', direction: 'self', attachmentCount: 1,
     from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
     body: 'please save the report to Drive by 20/10' },
-  { id: 'self-sent-hold', expect: 'cal', close: 'calendar-hold', process: 'hold', explicit: true, date: '2026-10-20', hour: 14,
+  { id: 'self-sent-hold', expect: TASK, date: '2026-10-20', hour: 14,
     surface: 'gmail', direction: 'self', attachmentCount: 0,
     from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
     body: 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00' }
@@ -378,6 +378,21 @@ const hold = judge({
   subject: 'פגישה 18/10 11:00 רוטשילד 12',
   body: 'תשמור לי את הזמן'
 });
+const sendShaped = judge({
+  surface: 'outlook', direction: 'inbound', attachmentCount: 0,
+  from: { name: 'Dana Cohen', email: 'dana.cohen@gmail.com' }, to: [OWN.outlook],
+  subject: 'Send',
+  body: 'Could you confirm the transfer by Friday?\nPlease send this email\nTo: dana@acme.com\nCc: ada@acme.com\nSubject: Pricing\nBody: The numbers are ready.'
+});
+check('a To line is not a name, so the ask still shows', sendShaped.show === true, summarise(sendShaped));
+const stillOther = judge({
+  surface: 'outlook', direction: 'inbound', attachmentCount: 0,
+  from: { name: 'Billing', email: 'billing@initech.com' }, to: [OWN.outlook],
+  subject: 'Re: the budget',
+  body: 'Michael, can you schedule the review meeting with Acme on next Monday at 9am?'
+});
+check('Michael, still stays quiet', stillOther.show !== true, summarise(stillOther));
+
 check('Hebrew hold is a Hold at 18/10 11:00',
   hold.show === true && hold.intent && hold.intent.personalClose === 'calendar-hold' && hold.intent.explicitHold === true &&
     hold.intent.entities && hold.intent.entities.dateIso === '2026-10-18' && hold.intent.entities.hour === 11 && hold.intent.entities.minute === 0 &&

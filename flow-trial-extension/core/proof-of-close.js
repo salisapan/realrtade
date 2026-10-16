@@ -428,12 +428,19 @@ const FlowProofOfClose = (() => {
     if (isComputerSystem(clean(row.system).toLowerCase())) return computerRemountCopy(row, externalId);
     if (isOnedriveRow(row)) return onedriveRemountCopy(row, externalId);
     const ref = { taskId: externalId, externalId: externalId };
-    const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
+    const saved = row.ref && typeof row.ref === 'object' ? row.ref : null;
+    const listId = saved ? clean(saved.taskListId || saved.listId) : '';
     if (listId) ref.taskListId = listId;
     // The ids alone cannot tell an edit from the original. The snapshot
     // stored with the write has to ride on the ref Undo sends.
     const snap = storedSnapshot(row);
     if (snap) ref.created = snap;
+    if (saved) {
+      ['contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'snapshot'].forEach((key) => {
+        const value = saved[key];
+        if (value != null && value !== '') ref[key] = value;
+      });
+    }
     const microsoft = isMicrosoftTodoRow(row);
     const deleted = row.glanceDeleted === true || row.deleted === true;
     const refusedLine = deleted ? '' : clip(row.undoLine, 180);

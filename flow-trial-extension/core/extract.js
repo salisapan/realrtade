@@ -138,6 +138,40 @@ const FlowExtract = (() => {
   // not in doubt. Two candidates in the window, or none, means the message
   // genuinely did not say — and per this file's rule, no date beats a
   // confidently wrong one, so it returns the sender's own words and no ISO.
+  // Weekday + a day-first date + בשעה HH:MM is one clock. 22/10 is 22 October,
+  // not October 22. The weekday has to be that calendar day. A mismatch is
+  // not a date: the caller stays quiet instead of picking one of the two.
+  function weekdayDayFirst(text, now) {
+    const src = String(text || '');
+    const dayName = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
+    const clock = src.match(/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/);
+    if (!dayName || !slash || !clock || !now) return null;
+    const weekday = DAYS_HE.indexOf(dayName[1]);
+    const day = +slash[1];
+    const month = +slash[2];
+    const raw = dayName[0] + ' ' + slash[1] + '/' + slash[2] + (slash[3] ? '/' + slash[3] : '');
+    if (weekday < 0 || month < 1 || month > 12 || day < 1 || day > 31) {
+      return { raw: raw, iso: null, contradictsWeekday: true };
+    }
+    let year = null;
+    if (slash[3]) {
+      year = +slash[3];
+      if (year < 100) year += 2000;
+    }
+    if (year) {
+      const dated = buildDate(year, month - 1, day);
+      if (!dated || dated.getDay() !== weekday) return { raw: raw, iso: null, contradictsWeekday: true };
+      return { raw: raw, iso: iso(dated) };
+    }
+    const y = now.getFullYear();
+    const candidates = [y - 1, y, y + 1]
+      .map((yy) => buildDate(yy, month - 1, day))
+      .filter((d) => d && d.getDay() === weekday && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+    if (candidates.length !== 1) return { raw: raw, iso: null, contradictsWeekday: true };
+    return { raw: raw, iso: iso(candidates[0]) };
+  }
+
   function monthDay(raw, monthIdx, day, explicitYear, now) {
     if (explicitYear) {
       const d = buildDate(+explicitYear, monthIdx, day);
@@ -177,7 +211,7 @@ const FlowExtract = (() => {
     if (/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(window)) return true;
     if (/יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window)) return true;
     if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(window)) return true;
-    if (/(?:בשעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
+    if (/(?:בשעה|(?<![\u0590-\u05FF])בעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
     return false;
   }
   // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
@@ -208,6 +242,106 @@ const FlowExtract = (() => {
       return built;
     }
     return ambiguous;
+  }
+
+  // A clock, however it is written. בשעה, ב-14:00, at 14:00, and a bare HH:MM
+  // are the same hour. The conflict check must not depend on one spelling.
+  function hasStatedClock(src) {
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/(?:^|[^\u0590-\u05FF\d])ב-\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/\bat\s+\d{1,2}(?::\d{2})?\b/i.test(src)) return true;
+    if (/(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    return false;
+  }
+  function numericDayMonth(src) {
+    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
+    const dotted = src.match(/(?:^|[^\d])(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?(?!\d)/);
+    const m = slash || dotted;
+    if (!m) return null;
+    const a = +m[1];
+    const b = +m[2];
+    let day = null;
+    let month = null;
+    if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; month = b; }
+    else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; month = a; }
+    else return null;
+    return { day: day, month: month, yearRaw: m[3] || null, token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '') };
+  }
+  function namedWeekday(src) {
+    const he = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    const en = src.match(new RegExp('\\b(' + DAYS.join('|') + ')\\b', 'i'));
+    if (he && (!en || he.index <= en.index)) return { index: DAYS_HE.indexOf(he[1]), he: true, raw: he[0] };
+    if (en) return { index: DAYS.indexOf(en[1].toLowerCase()), he: false, raw: en[0] };
+    return null;
+  }
+  function choiceLabel(date, he) {
+    const name = he
+      ? DAYS_HE[date.getDay()]
+      : DAYS[date.getDay()].charAt(0).toUpperCase() + DAYS[date.getDay()].slice(1);
+    return name + ' ' + date.getDate() + '/' + (date.getMonth() + 1);
+  }
+  function nearestWeekday(anchor, weekday) {
+    for (let delta = 1; delta <= 3; delta++) {
+      const before = new Date(anchor.getTime());
+      before.setDate(anchor.getDate() - delta);
+      if (before.getDay() === weekday) return before;
+      const after = new Date(anchor.getTime());
+      after.setDate(anchor.getDate() + delta);
+      if (after.getDay() === weekday) return after;
+    }
+    return null;
+  }
+  // Weekday + a day-first date is one statement. 22/10 and 22.10 are 22
+  // October. When the weekday is that calendar day and a clock was written,
+  // the date stands. When it is not, and a clock was written, neither
+  // reading is chosen: both dates come back as choices and iso stays empty.
+  // No clock keeps the older read, so a conflict does not become a new event.
+  function weekdayDayFirst(text, now) {
+    const src = String(text || '');
+    const dayName = namedWeekday(src);
+    const num = numericDayMonth(src);
+    if (!dayName || !num || !now) return null;
+    const clock = hasStatedClock(src);
+    const raw = dayName.raw + ' ' + num.token;
+    if (dayName.index < 0 || num.month < 1 || num.month > 12 || num.day < 1 || num.day > 31) {
+      if (!clock) return null;
+      return { raw: raw, iso: null, invalidDate: true };
+    }
+    let year = null;
+    if (num.yearRaw) {
+      year = +num.yearRaw;
+      if (year < 100) year += 2000;
+    }
+    let written = null;
+    if (year) {
+      written = buildDate(year, num.month - 1, num.day);
+      if (!written) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
+    } else {
+      const y = now.getFullYear();
+      const inWindow = [y - 1, y, y + 1]
+        .map((yy) => buildDate(yy, num.month - 1, num.day))
+        .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+      if (inWindow.length !== 1) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
+      written = inWindow[0];
+    }
+    if (written.getDay() === dayName.index) {
+      if (!clock) return null;
+      return { raw: raw, iso: iso(written), statedWeekday: true };
+    }
+    // No clock: leave the day to the older parser. A conflict with no
+    // clock must not become a new event the base judge does not make.
+    if (!clock) return null;
+    const other = nearestWeekday(written, dayName.index);
+    if (!other) return { raw: raw, iso: null, contradictsWeekday: true };
+    return {
+      raw: raw,
+      iso: null,
+      contradictsWeekday: true,
+      choices: [
+        { iso: iso(other), label: choiceLabel(other, dayName.he) },
+        { iso: iso(written), label: choiceLabel(written, dayName.he) }
+      ]
+    };
   }
 
   // Only dates the message states outright. A date guessed from context is worse
@@ -256,6 +390,11 @@ const FlowExtract = (() => {
     // after the month name ("בספטמבראי") is not that month.
     m = text.match(new RegExp('(?:^|[^\\d\\u0590-\\u05FF])(\\d{1,2})\\s+ב-?(' + MONTHS_HE.join('|') + ')(?![\\u0590-\\u05FF])(?:\\s+(\\d{4}))?'));
     if (m) return monthDay(m[0].replace(/^[^\d]+/, ''), MONTHS_HE.indexOf(m[2]), +m[1], m[3], now);
+
+    // Weekday + numeric day + any clock spelling. A conflict returns both
+    // dates and no iso, before a bare "ביום רביעי" can book a different day.
+    const stated = weekdayDayFirst(text, now);
+    if (stated) return stated;
 
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
@@ -407,10 +546,11 @@ const FlowExtract = (() => {
   // would be the same mistake parseDate() above already refuses to make for
   // an ambiguous year.
   //
-  // An hour that could be either half of the day is not a time. "at 3" and
-  // "בשעה 3" both used to be readable as 03:00; English already refused
-  // that, Hebrew did not, and a 03:00 Calendar event is a wrong close.
-  // A day-part word is the sender stating which half, so that hour is kept.
+  // An hour that could be either half of the day is not a time. English
+  // "at 3" stays unresolved, and a written ":00" with no half of the day
+  // stays unresolved: both used to become a 03:00 event. Hebrew "בשעה 3"
+  // names the hour and no minutes. That hour is the workday clock, the
+  // same as the word "שלוש", so the meeting keeps a calendar step.
   function resolveClock(hour, minute, marker) {
     let h = hour;
     if (h > 23 || minute > 59 || h < 0 || minute < 0) return null;
@@ -469,7 +609,8 @@ const FlowExtract = (() => {
     // there, has the same Hebrew boundary: it must not be a prefix of a
     // longer word.
     const hePart = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    m = text.match(new RegExp('(?:בשעה|בשעות)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
+    // בעה is the typo of בשעה. It is the same "at the hour of" marker.
+    m = text.match(new RegExp('(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
     if (m) {
       const rawPart = (m[3] || '').replace(/["״׳']/g, '');
       const marker = rawPart === 'בבוקר' ? 'in the morning'
@@ -478,7 +619,50 @@ const FlowExtract = (() => {
         : rawPart === 'בערב' ? 'in the evening'
         : rawPart === 'בלילה' ? 'at night'
         : '';
-      const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
+      const minuteWritten = Boolean(m[2]);
+      let clock = resolveClock(+m[1], minuteWritten ? +m[2] : 0, marker);
+      // "בשעה 3" is an hour with no minutes. 1–7 with no day-part is the
+      // workday hour (15:00), not 03:00 and not an unresolved day.
+      if (!clock && !marker && !minuteWritten && +m[1] >= 1 && +m[1] <= 7) {
+        clock = resolveClock(+m[1], 0, 'pm');
+      }
+      if (!clock) return null;
+      return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // בשלוש / בארבע is the same workday hour as בשעה 3. Longest first, so
+    // באחת עשרה is eleven and not one. A longer Hebrew word does not match.
+    // English "at 3" and "בשעה 3:00" stay unresolved.
+    const heHourWords = [
+      ['אחת עשרה', 11], ['אחד עשרה', 11],
+      ['שתיים עשרה', 12], ['שתים עשרה', 12],
+      ['שתיים', 2], ['שתים', 2],
+      ['שלוש', 3], ['ארבע', 4], ['חמש', 5], ['שש', 6],
+      ['שבע', 7], ['שמונה', 8], ['תשע', 9], ['עשר', 10], ['אחת', 1]
+    ];
+    const heHourAlt = heHourWords.map((pair) => pair[0]).join('|');
+    m = text.match(new RegExp('(?:^|[^\\u0590-\\u05FF])ב(' + heHourAlt + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + hePart + '))?(?![\\u0590-\\u05FF])'));
+    if (m) {
+      const spokenHour = heHourWords.find((pair) => pair[0] === m[1]);
+      const rawPart = (m[3] || '').replace(/["״׳']/g, '');
+      const marker = rawPart === 'בבוקר' ? 'in the morning'
+        : rawPart === 'בצהריים' ? 'noon-window'
+        : (rawPart === 'אחר הצהריים' || rawPart === 'אחר הצהרים' || rawPart === 'אחהצ') ? 'in the afternoon'
+        : rawPart === 'בערב' ? 'in the evening'
+        : rawPart === 'בלילה' ? 'at night'
+        : '';
+      const extra = m[2] && m[2].indexOf('חצי') !== -1 ? 30 : (m[2] && m[2].indexOf('רבע') !== -1 ? 15 : 0);
+      let clock = spokenHour ? resolveClock(spokenHour[1], extra, marker) : null;
+      if (!clock && spokenHour && !marker && spokenHour[1] >= 1 && spokenHour[1] <= 7) {
+        clock = resolveClock(spokenHour[1], extra, 'pm');
+      }
+      if (clock) return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // "ב-14:00" is the same hour as "בשעה 14:00". A date ("ב-22/10") has no colon.
+    m = text.match(/(?:^|[^\u0590-\u05FF\d])ב-\s*(\d{1,2}):(\d{2})(?!\d)/);
+    if (m) {
+      const clock = resolveClock(+m[1], +m[2], '');
       if (!clock) return null;
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
     }

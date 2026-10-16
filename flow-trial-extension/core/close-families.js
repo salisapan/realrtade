@@ -57,7 +57,7 @@ const FlowCloseFamilies = (() => {
   const ASK_EN = /\b(?:please (?:send|forward|share|attach|email|resend|provide|enclose)|(?:can|could|would) you (?:please )?(?:send|forward|share|attach|email|resend|provide)|would you mind (?:sending|forwarding|sharing|emailing|attaching)|kindly (?:send|forward|share|attach|email|resend|provide)|(?:i|we) (?:still |also )?need (?:you to (?:send|forward|attach|share|email) )?(?:a copy of )?(?:the|your|our|a|an)|(?:can|could) i (?:please )?(?:get|have) (?:a copy of )?(?:the|your|a|an)|send me (?:the|your|a)|attach (?:the|your)|mind (?:sending|forwarding|emailing|sharing)|be able to (?:send|forward|share|attach|email|resend|provide)|if you could (?:please )?(?:send|forward|share|attach|email|resend|provide)|pass along (?:the|your|a|an))\b/i;
   // שלח / להעביר need a non-letter before them so אשלח and אעביר (a promise)
   // are not read as an ask to find a file.
-  const ASK_HE = /(?:אפשר\s+(?:לשלוח|לקבל|לצרף)|בבקשה\s+תשלח|תשלח(?:י|ו)?(?:\s+לי|\s+את)|תעביר(?:י|ו)?(?:\s+לי|\s+את)|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי|\s+את)|תצר(?:ף|פי|פו)|(?:^|[^\u0590-\u05FF])לצרף|(?:צריך|צריכה|צריכים)\s+את|אשמח\s+לקבל|אבקש\s+לקבל|נשמח\s+לקבל|נא\s+(?:לשלוח|לצרף)|מבקש(?:ת|ים)?\s+ל(?:שלוח|קבל|צרף)|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרף)|(?:^|[^\u0590-\u05FF])להעביר)/;
+  const ASK_HE = /(?:אפשר\s+(?:לשלוח|לקבל|לצרר?ף)|בבקשה\s+תשלח|תשלח(?:י|ו)?(?:\s+לי|\s+את)|תעביר(?:י|ו)?(?:\s+לי|\s+את)|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי|\s+את)|תצר(?:ף|פי|פו)|(?:^|[^\u0590-\u05FF])לצרר?ף|(?:צריך|צריכה|צריכים)\s+את|אשמח\s+לקבל|אבקש\s+לקבל|נשמח\s+לקבל|נא\s+(?:לשלוח|לצרר?ף)|מבקש(?:ת|ים)?\s+ל(?:שלוח|קבל|צרף)|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרר?ף)|(?:^|[^\u0590-\u05FF])להעביר)/;
 
   const CREATE_EN = /\b(?:create|draft|draw up|prepare|put together|spin up)\b/i;
   const CREATE_HE = /(?:תיצור|תכין|ליצור|להכין|לנסח|תנסח|תכתוב|לכתוב)/;
@@ -277,9 +277,9 @@ const FlowCloseFamilies = (() => {
   }
 
   // Hebrew clock words, longest first so "אחת עשרה" is not clipped to "אחת".
-  // A word with no day-part is the workday hour (שלוש → 15:00). A bare digit
-  // ("בשעה 3", "at 3") stays unresolved: that form is not a stated half of
-  // the day, and writing 03:00 was the wrong close.
+  // A word with no day-part is the workday hour (שלוש → 15:00, בשלוש → 15:00).
+  // Hebrew "בשעה 3" is that same hour with no minutes, so it is 15:00. English
+  // "at 3" stays unresolved.
   const HE_HOUR_WORDS = [
     ['אחת עשרה', 11], ['אחד עשרה', 11],
     ['שתיים עשרה', 12], ['שתים עשרה', 12],
@@ -297,9 +297,10 @@ const FlowCloseFamilies = (() => {
   }
   function hebrewWordClock(text) {
     const part = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    const m = String(text || '').match(new RegExp(
-      '(?:בשעה|בשעות)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
-    ));
+    const src = String(text || '');
+    const marked = '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const bare = '(?:^|[^\\u0590-\\u05FF])ב(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const m = src.match(new RegExp(marked)) || src.match(new RegExp(bare));
     if (!m) return null;
     const hour = HE_HOUR_WORDS.find((pair) => pair[0] === m[1]);
     if (!hour) return null;
@@ -337,7 +338,7 @@ const FlowCloseFamilies = (() => {
   function bareAmbiguousHour(text) {
     if (clockOf(text)) return false;
     if (/\bat\s+(?:1[0-2]|0?[1-7])(?::[0-5]\d)?\b/i.test(text)) return true;
-    if (/(?:בשעה|בשעות)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
     return false;
   }
   function shiftWeekday(now, target, mode) {
@@ -359,7 +360,7 @@ const FlowCloseFamilies = (() => {
     const letter = '([אבגדהו])';
     const tail = '(?:[\'׳\u05F3])?(?:\\s+הבא(?![\\u0590-\\u05FF]))?(?![\\u0590-\\u05FF])';
     const led = String(text || '').match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+' + letter + tail));
-    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+בשעה)'));
+    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+(?:בשעה|בעה))'));
     const m = led || clocked;
     if (!m) return null;
     const target = 'אבגדהו'.indexOf(m[1]);
@@ -575,8 +576,9 @@ const FlowCloseFamilies = (() => {
         time: time
       });
     }
-    // "at 3" / "בשעה 3" named an hour we will not invent. A commitment
+    // English "at 3" named an hour we will not invent. A commitment
     // still has its day. A meet does not become an all-day hold here.
+    // Hebrew "בשעה 3" is already a workday clock, so it is not this case.
     if (bareAmbiguousHour(sentence)) {
       if (!commit) return null;
       return hit({
@@ -731,7 +733,7 @@ const FlowCloseFamilies = (() => {
     if (MOVE_EN.test(text) || MOVE_HE.test(text) || CANCEL_EN.test(text) || CANCEL_HE.test(text)) return false;
     if (replacementCue(text)) return false;
     const clockRe = new RegExp(
-      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|בשעה\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
+      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|(?:בשעה|(?<![\\u0590-\\u05FF])בעה)\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
       'gi'
     );
     const clocks = [];

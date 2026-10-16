@@ -27,6 +27,7 @@
         <p class="label">לאן Glance רושם?</p>
         <p class="hint">הרשאה, לא כלל. Glance רק מוסיף רשומה, וכל כתיבה ניתנת לביטול.</p>
         <div id="connector-list" class="conn-list"></div>
+        <p id="namesDiag" class="hint" data-glance-names-diag></p>
       </div>
 
       <button id="save" class="primary"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label">שמור והתחל</span></button>
@@ -47,6 +48,10 @@
           <button type="button" class="ghost sm" id="proActivate">הפעל</button>
         </div>
         <p id="proNote" class="saved-note" hidden></p>
+      </div>
+
+      <div class="block" id="metaChatsBlock" hidden>
+        <div id="meta-chats"></div>
       </div>
 
       <div class="block" id="surfacesBlock">
@@ -143,7 +148,7 @@
         <button type="button" class="ghost sm" id="ledgerReset">אפס את מה ש-Glance למד</button>
       </div>
       <div class="sense" id="sense" hidden>
-        <span class="sense-label">רגישות</span>
+        <span class="sense-label" id="senseLabel">רגישות</span>
         <span class="sense-bar"><i id="senseFill"></i></span>
         <span class="sense-note" id="senseNote"></span>
       </div>
@@ -159,7 +164,7 @@
       <p id="log-empty" class="hint" hidden>עדיין אין. Glance שותק עד שלולאה באמת נסגרת.</p>
 
       <div class="close-memory">
-        <p class="hint">זיכרון הסגירה וכרטיסי Outlook נשארים על המכשיר. ניקוי נותן ל-Glance לדבר שוב על מה שכבר נסגר, ומוריד קבלות טיוטה שנשארו.</p>
+        <p class="hint">זיכרון הסגירה וכרטיסי הדואר נשארים על המכשיר. ניקוי נותן ל-Glance לדבר שוב על מה שכבר נסגר, ומוריד קבלות טיוטה שנשארו.</p>
         <button type="button" class="ghost sm" id="clearCloseMemory">נקה זיכרון סגירה</button>
       </div>
 
@@ -258,6 +263,7 @@
   <script src="../design/step-states-v1/glyphs.js"></script>
   <script src="../src/step-kit.js"></script>
   <script src="../src/step-list-view.js"></script>
+  <script src="../lane-chat/meta-consent.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

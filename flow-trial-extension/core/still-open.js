@@ -574,12 +574,40 @@ const FlowStillOpen = (() => {
     return months[dt.getMonth()] + ' ' + dt.getDate() + (sameYear ? '' : ', ' + dt.getFullYear());
   }
 
+  function uiWhich(lang) {
+    const raw = String(lang || '').toLowerCase();
+    if (raw === 'he' || raw.indexOf('he-') === 0 || raw === 'iw' || raw.indexOf('iw-') === 0) return 'he';
+    if (raw === 'en' || raw.indexOf('en-') === 0) return 'en';
+    return '';
+  }
+
+  // The day in the UI locale. Hebrew is 17 באוק׳. English is Oct 17.
+  function localeWhen(iso, lang, now) {
+    if (!iso) return '';
+    const parts = String(iso).split('-');
+    if (parts.length < 3) return '';
+    const dt = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    if (Number.isNaN(dt.getTime())) return '';
+    if (dt.getFullYear() !== +parts[0] || dt.getMonth() !== +parts[1] - 1 || dt.getDate() !== +parts[2]) return '';
+    const which = uiWhich(lang) || 'en';
+    const clock = now == null ? new Date() : new Date(now);
+    const sameYear = dt.getFullYear() === clock.getFullYear();
+    const opts = { day: 'numeric', month: 'short' };
+    if (!sameYear) opts.year = 'numeric';
+    return new Intl.DateTimeFormat(which === 'he' ? 'he' : 'en', opts).format(dt);
+  }
+
   // One line. The source thread is the row subtitle, not this sentence.
-  function whyLine(item, now) {
+  // A lang argument is the UI locale and wins over the mail's language.
+  // With no lang, the mail's language picks the sentence and the day stays
+  // the English form this file already tested.
+  function whyLine(item, now, lang) {
     const kind = closeKind(item && item.intent);
     if (!kind || !item) return '';
-    const he = hasHebrew(item);
-    const when = humanDate(item.intent && item.intent.facts && item.intent.facts.date && item.intent.facts.date.iso, now);
+    const forced = arguments.length >= 3 ? uiWhich(lang) : '';
+    const he = forced ? forced === 'he' : hasHebrew(item);
+    const iso = item.intent && item.intent.facts && item.intent.facts.date && item.intent.facts.date.iso;
+    const when = forced ? localeWhen(iso, forced, now) : humanDate(iso, now);
     if (kind === 'dated-commitment') {
       if (he) return when ? 'התחייבת עד ' + when : 'התחייבות עם תאריך עדיין פתוחה';
       return when ? 'You promised this by ' + when : 'A dated promise is still open';

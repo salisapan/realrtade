@@ -184,11 +184,37 @@
     try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
     let nav = '';
     try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    let host = '';
+    try { host = (document.documentElement && document.documentElement.lang) || ''; } catch (e) {}
     const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
-      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, uiLanguage: ui, navigatorLanguage: nav })
+      ? FlowDisplay.uiLangFrom({ setting: pageUiSetting, hostLanguage: host, uiLanguage: ui, navigatorLanguage: nav })
       : 'en';
     if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.setUiLang === 'function') FlowChipHost.setUiLang(lang);
+    rememberHostLanguage(host);
     return lang;
+  }
+
+  // Two Outlook pages can Undo at once. Each mark reads the whole log and
+  // writes it back, so the later write would drop the earlier Undo. The
+  // lock is held across that read and write. Same-origin pages share it.
+  function withActivityLogLock(fn) {
+    const locks = (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function')
+      ? navigator.locks : null;
+    if (!locks) return Promise.resolve().then(fn);
+    return locks.request('glance-activity-log', fn);
+  }
+
+  function rememberHostLanguage(host) {
+    const raw = String(host || '').trim();
+    if (!raw) return;
+    const key = raw.toLowerCase();
+    if (rememberHostLanguage.last === key) return;
+    rememberHostLanguage.last = key;
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.get().then(function (st) {
+      if (st && st.glanceHostLanguage === raw) return null;
+      return FlowStorage.set({ glanceHostLanguage: raw });
+    }).catch(function () {});
   }
 
   function pageChrome() {
@@ -688,6 +714,8 @@
       cc: pane.cc || null,
       ownAddresses: ownAddresses || null,
       userName: pane.userName || null,
+      ownNames: pane.ownNames || null,
+      namesPending: pane.namesPending === true,
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true,
       inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
@@ -701,6 +729,41 @@
     const account = auth && auth.account;
     const profile = auth && auth.profile;
     return String((account && (account.name || account.displayName)) || (profile && profile.displayName) || '').trim();
+  }
+
+  // Display name, profile names, and the names stored for this person.
+  // Latin and Hebrew both stay on the list the judge compares.
+  function ownNamesOf(st) {
+    const auth = st && st.outlookAuth;
+    const known = st && st.glanceOwnNames;
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.readerNamesFrom === 'function') {
+      return FlowIntent.readerNamesFrom({
+        displayName: userNameOf(st),
+        profile: auth && auth.profile,
+        knownNames: known
+      });
+    }
+    return Array.isArray(known) ? known : null;
+  }
+
+  // Graph /me names are cached on glanceOwnNames. Until that cache or a
+  // real account name exists, a greeting stays unjudged.
+  function outlookNamesNotCached(st, userName) {
+    const known = st && Array.isArray(st.glanceOwnNames) ? st.glanceOwnNames : [];
+    for (let i = 0; i < known.length; i++) {
+      const name = String(known[i] || '').trim().toLowerCase();
+      if (name && name !== 'glance' && name !== 'me') return false;
+    }
+    const profile = st && st.outlookAuth && st.outlookAuth.profile;
+    if (profile) {
+      const given = String(profile.givenName || profile.given_name || '').trim();
+      const surname = String(profile.surname || profile.familyName || '').trim();
+      const display = String(profile.displayName || profile.name || '').trim().toLowerCase();
+      if (given || surname || (display && display !== 'glance' && display !== 'me')) return false;
+    }
+    const shown = String(userName || '').trim().toLowerCase();
+    if (shown && shown !== 'glance' && shown !== 'me') return false;
+    return true;
   }
 
   function ownAddressesOf(st) {
@@ -998,9 +1061,9 @@
     let process = (decided && decided.process) || entry.process;
     if (!intent || !process) return null;
     // In-page Do It writes the Outlook draft only (same as popup). Drop non-draft steps from the chip.
-    // A OneDrive file step is the close. The draft beside it is the share-link step, and dropping the file
-    // would turn that Do It into a reply draft.
-    const hasOnedrive = (process.steps || []).some((s) => s && s.kind === 'onedriveFile');
+    // A file step is the close (OneDrive, Drive, or a saved attachment). The draft beside it is the
+    // share-link step, and dropping the file would turn that Do It into a reply draft.
+    const hasOnedrive = (process.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
     const draftSteps = (process.steps || []).filter((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft');
     if (draftSteps.length && !hasOnedrive) {
       process = Object.assign({}, process, {
@@ -1120,15 +1183,31 @@
       paintIfCurrent(token, function () { paintRemove(host); });
       return;
     }
-    const fileStep = steps.find((s) => s && s.kind === 'onedriveFile');
+    const fileStep = steps.find((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
     if (fileStep) {
       await onOnedriveDoIt(host, chip, ctx, fileStep, token);
       return;
     }
     const hasDraft = steps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
+    const calendarStep = steps.find((s) => s && s.kind === 'calendar');
     const taskStep = steps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    // The card already rendered this plan. Do It writes those steps. It does
+    // not classify the mail again, and it does not invent a reply draft.
+    if (calendarStep && !hasDraft) {
+      const preset = calendarParamsFromStep(calendarStep, ctx);
+      if (!preset) {
+        paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', pageChrome().couldntFind); });
+        return;
+      }
+      await finishMeetingHold(host, ctx, token, preset);
+      return;
+    }
     if (taskStep && !hasDraft) {
       await onOutlookTodoDoIt(host, chip, ctx, taskStep, token);
+      return;
+    }
+    if (!hasDraft) {
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', pageChrome().somethingWrong); });
       return;
     }
     const askText = ctx.bodyText || ctx.text || '';
@@ -1768,13 +1847,24 @@
       if (ignoreStaleClick(host)) return;
       undo.textContent = pageChrome().undoing;
       undo.disabled = true;
-      readBackOrTimeout(send({
+      const sent = send({
         type: 'flow:undo-action',
         connectorId: copy.connectorId,
         ref: copy.ref,
         created: (copy.ref && copy.ref.created) || null
-      })).then(async (result) => {
+      });
+      readBackOrTimeout(sent).then(async function applyUndo(result) {
         const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
+        // The 8s clock can fire after Graph already deleted the row. Keep
+        // the late success so Activity does not stay Handled.
+        if (result && result.reason === 'verify-timeout' && !applyUndo.late) {
+          sent.then((late) => {
+            if (!late || !late.ok || late.reason === 'verify-timeout') return;
+            if (todoUndo && late.fetchedBack !== true) return;
+            applyUndo.late = true;
+            return applyUndo(late);
+          }).catch(() => {});
+        }
         if (result && (result.reason === 'verify-timeout' || result.reason === 'user-edited' || result.reason === 'unconfirmed')) {
           undo.textContent = pageChrome().undo;
           undo.disabled = false;
@@ -1803,9 +1893,9 @@
         const messageId = row.messageId;
         const threadKey = row.threadId || row.outlookConversationId;
         if ((copy.connectorId === 'onedriveFile' || copy.connectorId === 'attachmentSave') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
-          await FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey);
+          await withActivityLogLock(() => FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey));
         } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
-          await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
+          await withActivityLogLock(() => FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey));
           await reopenTaskScan(row);
           if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
           try { host.remove(); } catch (e) { /* already gone */ }
@@ -2574,6 +2664,7 @@
       text,
       origin: 'outlook',
       now: Date.now(),
+      lang: pageUiLang(),
       watching,
       evidence: FlowCloseChains.fileEvidence({
         driveOk: Boolean(searched && searched.ok),
@@ -2708,7 +2799,7 @@
     const old = mount.querySelector('.flow-chip-host');
     if (old) paintIfCurrent(token, function () { paintRemove(old); });
     const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch(ctx, pane), {
-      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+      onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     }); });
     if (!host) return { shown: false, why: 'inject-failed' };
@@ -2909,15 +3000,6 @@
     const steps = (ctx && ctx.process && ctx.process.steps) || [];
     steps.forEach((step) => { if (step && step.params) bags.push(step.params); });
     if (ctx && ctx.intent) bags.push(ctx.intent.entities, ctx.intent.facts, ctx.intent);
-    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.classify === 'function' && ctx) {
-      const text = String(ctx.bodyText || ctx.text || '').trim();
-      if (text) {
-        try {
-          const again = FlowIntent.classify(text, { subject: ctx.subject || '', now: new Date() });
-          if (again) bags.push(again.entities, again.facts, again);
-        } catch (e) { /* the card's own clock is enough */ }
-      }
-    }
     for (let i = 0; i < bags.length; i++) {
       const found = clockFrom(bags[i]);
       if (!found) continue;
@@ -3235,7 +3317,33 @@
     await finishMeetingHold(host, ctx, token);
   }
 
-  async function finishMeetingHold(host, ctx, token) {
+  function calendarParamsFromStep(step, ctx) {
+    const p = (step && step.params) || {};
+    const dateIso = p.dateIso || null;
+    const hour = p.hour != null ? p.hour : null;
+    const minute = p.minute != null ? p.minute : null;
+    if (dateIso == null || hour == null || minute == null) return null;
+    const params = {
+      dateIso: dateIso,
+      hour: hour,
+      minute: minute,
+      title: p.title || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Meeting',
+      quote: p.quote || null,
+      threadUrl: p.threadUrl || (ctx && ctx.threadUrl) || null,
+      requireTime: p.requireTime === true
+    };
+    if (p.calendarOp) params.calendarOp = p.calendarOp;
+    if (p.fileTerm || p.fileName || p.fileUrl) {
+      if (p.fileTerm) params.fileTerm = p.fileTerm;
+      if (p.fileName) params.fileName = p.fileName;
+      if (p.fileUrl) params.fileUrl = p.fileUrl;
+    } else if (!p.calendarOp) {
+      params.meeting = true;
+    }
+    return params;
+  }
+
+  async function finishMeetingHold(host, ctx, token, preset) {
     if (!token) token = captureMailToken();
     if (!host || ignoreStaleClick(host)) return;
     let st = null;
@@ -3249,7 +3357,7 @@
       paintIfCurrent(token, function () { paintCalendarConsent(host, ctx); });
       return;
     }
-    const params = meetingClock(ctx);
+    const params = preset || meetingClock(ctx);
     if (!params) {
       await holdAsTodo(host, ctx);
       return;
@@ -3503,7 +3611,7 @@
       quote: holdTextOf(pane) || (hold.params && hold.params.quote) || null
     });
     const holdLine = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.holdWhenLine === 'function')
-      ? FlowDisplay.holdWhenLine(params.dateIso, params.hour, params.minute)
+      ? FlowDisplay.holdWhenLine(params.dateIso, params.hour, params.minute, pageUiLang())
       : '';
     if (!holdLine) {
       await pageReason('page:hold-without-clock', pane);
@@ -3649,6 +3757,8 @@
     if (!mailTokenLive(token)) return;
     const own = ownAddressesOf(st);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
+    if (pane) pane.ownNames = ownNamesOf(st);
+    if (pane) pane.namesPending = outlookNamesNotCached(st, userNameOf(st));
     if (pane) {
       pane.text = stripGlanceLines(pane.text);
       pane.__epoch = mailEpoch;
@@ -3881,7 +3991,9 @@
       // A stored schedule process used to skip this and leave the old card up
       // while Why not shown already said drive-search-failed.
       const fileNow = (decided && (filePendingReason(decided.reason) || fileSilenceReason(decided.reason))) || (planned && fileSilenceReason(planned.reason));
-      if (fileNow) {
+      const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
+        ? FlowIntent.attachToInvitePlan(pane.text || '') : null;
+      if (fileNow && !invitePlan) {
           const tracing = traceArmed || localFileTrace();
           graphTrace = { attempts: [] };
           const askPrepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
@@ -3960,6 +4072,10 @@
               tracedSig = sig;
             }
           }
+          return;
+        }
+        if (decided && decided.reason === 'names-pending') {
+          dropStuckCard(pane);
           return;
         }
         if (!decided || decided.none) {
@@ -4161,7 +4277,7 @@
 
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
-        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
       if (painted) paintMissingScope(painted, ctx, st);
@@ -4369,6 +4485,7 @@
     if (log[0] && log[0].key === key) return;
     log.unshift({
       key: key, at: Date.now(), messageId: entry.messageId || null, reason: entry.reason,
+      detail: entry.detail || '',
       fileCount: entry.fileCount || 0, target: entry.target || null, surface: entry.surface || 'outlook'
     });
     await FlowStorage.set({ suggestLog: log.slice(0, 40) });
@@ -4999,7 +5116,7 @@
       } else files = read;
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
-      await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
+      await appendSuggestLog({ messageId: messageId, reason: stageReason, detail: (read && read.detail) || '', surface: 'outlook' });
       if (!pageAlreadyDecided(pane) || genericTextQuiet(pane)) {
         await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
       }
@@ -5187,7 +5304,8 @@
     if (!ctx || !ctx.messageId) return false;
     let loopSt = null;
     try { loopSt = await FlowStorage.get(); } catch (e) { loopSt = null; }
-    if ((ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold') && !meetingClock(ctx)) return false;
+    const dateWaiting = ctx.process.needsDateChoice === true && Array.isArray(ctx.process.dateChoices) && ctx.process.dateChoices.length >= 2;
+    if ((ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold') && !meetingClock(ctx) && !dateWaiting) return false;
     if (taskOnlyProcess(ctx.process) && todoAsk(loopSt)) {
       const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
       if (!asked) return false;
@@ -5200,7 +5318,7 @@
     }
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
-        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
       if (painted) paintMissingScope(painted, ctx, loopSt);
@@ -5307,6 +5425,19 @@
   } catch (e) { /* history is sealed */ }
   globalThis.__glanceOutlookPage = {
     rescan: () => { lastKey = ''; lastSig = ''; schedule(); },
+    paintShownPlan: (ctx) => {
+      const mount = mountPoint();
+      if (!mount || !ctx || !ctx.process) return null;
+      const token = captureMailToken();
+      return paintIfCurrent(token, function () {
+        const old = mount.querySelector('.flow-chip-host');
+        if (old) paintRemove(old);
+        return injectCard(mount, ctx, {
+          onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
+          onDismiss: (h, c) => { onDismiss(h, c); }
+        });
+      });
+    },
     openMailToken: () => openMailTokenNow(),
     hydratePane: (pane) => hydratePane(pane),
     bumpMailEpoch: (why) => bumpMailEpoch(why),
@@ -5348,7 +5479,7 @@
         // A Do It / Undo from the panel changes what this card should say; this page's own "shown" row does not.
         const logChanged = area === 'local' && changes.log && Array.isArray(changes.log.newValue)
           && (changes.log.newValue[0] || {}).kind !== 'shown'; // the log is newest first
-        if (area === 'local' && (changes.outlookPending || changes.outlookAuth || changes.outlookSync || logChanged)) { lastSig = ''; schedule(); }
+        if (area === 'local' && (changes.outlookPending || changes.outlookAuth || changes.outlookSync || changes.glanceOwnNames || logChanged)) { lastSig = ''; schedule(); }
       };
       chrome.storage.onChanged.addListener(onStorageChanged);
     }

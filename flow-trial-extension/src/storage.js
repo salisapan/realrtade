@@ -244,6 +244,21 @@ const FlowStorage = (() => {
     // UI language for card and panel chrome. Null follows the browser
     // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
     glanceUiLanguage: null,
+    // The Gmail page language. The side panel reads it through get().
+    glanceHostLanguage: null,
+    // Names this person is called, beside the account display name.
+    // Filled from the Google userinfo and Graph profile already granted.
+    // No settings field. Empty until that profile read succeeds.
+    glanceOwnNames: [],
+    // Google userinfo name, given_name, and family_name on the existing
+    // token. Hosts pass this as profile. Null until that read succeeds.
+    googleProfile: null,
+    // Side-panel line. names and source (profile, aria-label, or none).
+    // The aria name is not copied into glanceOwnNames.
+    glanceNamesDiag: null,
+    // Off in production. The Names line is console.info either way.
+    // The popup paints it only when a dev fixture turns this on.
+    glanceDevFixture: false,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
@@ -282,18 +297,63 @@ const FlowStorage = (() => {
   // touches the keys named in its patch, so concurrent writes to different
   // keys never collide — only same-key, same-function concurrency does.
   //
-  // This only serializes calls made from within one script's own execution
-  // context. It does not protect against two Gmail tabs open at once, each
-  // running an independent copy of this file against the same underlying
-  // storage — that cross-tab race is real but far narrower (it needs
-  // near-simultaneous activity in two tabs) and closing it fully would mean
-  // routing every write through the single background service worker
-  // instead of writing directly from content scripts, a larger change left
-  // for a follow-up.
+  // Two open mails are two copies of this file. Each queue is local to its
+  // page, so Undo on the task mail and Undo on the file mail can both read
+  // the same log and the later set() puts the other row back to Handled.
+  // The service worker grants one glance-log-lock port at a time. Disconnect
+  // (the write finished, or the page closed) lets the next writer through.
+  // A page with no extension id keeps the in-page queue only.
+  function logLockAvailable() {
+    try {
+      return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && typeof chrome.runtime.connect === 'function';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function withLogLock(fn) {
+    if (!logLockAvailable()) return Promise.resolve().then(fn);
+    return new Promise((resolve, reject) => {
+      let port = null;
+      let ran = false;
+      const run = () => {
+        if (ran) return;
+        ran = true;
+        clearTimeout(timer);
+        Promise.resolve().then(fn).then((value) => {
+          try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+          resolve(value);
+        }, (err) => {
+          try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+          reject(err);
+        });
+      };
+      const timer = setTimeout(() => {
+        if (ran) return;
+        try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+        run();
+      }, 1500);
+      try {
+        port = chrome.runtime.connect({ name: 'glance-log-lock' });
+        port.onDisconnect.addListener(() => {
+          try { if (chrome.runtime) void chrome.runtime.lastError; } catch (e) { /* worker gone */ }
+        });
+        port.onMessage.addListener((msg) => {
+          if (!msg || msg.ok !== true) return;
+          clearTimeout(timer);
+          run();
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        run();
+      }
+    });
+  }
+
   function serialize(fn) {
     let queue = Promise.resolve();
     return (...args) => {
-      const run = queue.then(() => fn(...args));
+      const run = queue.then(() => withLogLock(() => fn(...args)));
       queue = run.catch(() => {}); // one failure must not wedge later calls
       return run;
     };
@@ -1678,8 +1738,8 @@ const FlowStorage = (() => {
       const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
       const taskRow = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
       if (!taskRow) continue;
-      if (ext && rowExt && rowExt !== ext) continue;
       const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      if (ext && rowExt && rowExt !== ext && !idHit) continue;
       const extHit = ext && rowExt === ext;
       const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
       if (!idHit && !extHit && !threadHit) continue;
@@ -1772,10 +1832,12 @@ const FlowStorage = (() => {
       const e = log[i];
       if (!e || e.kind !== 'written') continue;
       const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.fileId || e.ref.itemId)) || '';
-      const fileRow = e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive';
+      const fileRow = e.connectorId === 'onedriveFile' || e.connectorId === 'attachmentSave' || e.system === 'microsoft/onedrive';
       if (!fileRow) continue;
-      if (ext && rowExt && rowExt !== ext) continue;
       const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      // The chip's undo ref is the save wrapper. Its file id can differ from
+      // the id stored on the written row. The message is still that file.
+      if (ext && rowExt && rowExt !== ext && !idHit) continue;
       const extHit = ext && rowExt === ext;
       const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
       if (!idHit && !extHit && !threadHit) continue;

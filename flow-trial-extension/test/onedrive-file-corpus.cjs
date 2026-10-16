@@ -247,9 +247,19 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
     outlook(signedNo, 1).show === false && gmail(signedNo, 1).show === false,
     { outlook: outlook(signedNo, 1).reason, gmail: gmail(signedNo, 1).reason });
   const form = 'בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00';
-  check('attaching a form to a demo invite stays quiet',
-    outlook(form, 1).show === false && gmail(form, 1).show === false,
-    { outlook: outlook(form, 1).reason, gmail: gmail(form, 1).reason });
+  const formOutlook = outlook(form, 1);
+  const formGmail = gmail(form, 1);
+  function inviteTrack(row) {
+    const kinds = row.process && row.process.steps && row.process.steps.map((s) => s.kind);
+    const taskAt = kinds ? kinds.findIndex((k) => k === 'googleTask' || k === 'outlookTask') : -1;
+    const draftAt = kinds ? kinds.findIndex((k) => k === 'gmailDraft' || k === 'outlookDraft') : -1;
+    const draft = row.process && row.process.steps && row.process.steps[draftAt] && row.process.steps[draftAt].params && row.process.steps[draftAt].params.body;
+    return row.show === true && row.intent && row.intent.label === 'לצרף טופס 101 לזימון' && draft === 'אצרף בהקדם.' && !/מצורף/.test(String(draft || '')) && taskAt !== -1 && draftAt > taskAt;
+  }
+  check('attaching a form to a demo invite is the file track',
+    inviteTrack(formOutlook) && inviteTrack(formGmail),
+    { outlook: { show: formOutlook.show, reason: formOutlook.reason, label: formOutlook.intent && formOutlook.intent.label },
+      gmail: { show: formGmail.show, reason: formGmail.reason, label: formGmail.intent && formGmail.intent.label } });
 }
 
 (async () => {

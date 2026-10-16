@@ -16,11 +16,12 @@ const vm = require('vm');
 
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js']) {
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'draft-reply.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
 const FlowActions = vm.runInContext('FlowActions', sandbox);
+const FlowDraftReply = vm.runInContext('FlowDraftReply', sandbox);
 const FlowJudgment = vm.runInContext('FlowJudgment', sandbox);
 const FLOW_DOMAINS = vm.runInContext('FLOW_DOMAINS', sandbox);
 
@@ -45,15 +46,15 @@ function stepKinds(process) {
 
 console.log('--- intent.js: type + entity checks ---\n');
 
-// 1. A meeting invite alone -> SCHEDULED_EVENT, the plain "Schedule It"
-//    process: [Calendar, Task], no draft.
+// 1. A meeting invite alone -> SCHEDULED_EVENT. A meeting noun, a date, and
+//    a time, with no request to send a reply, is one hold: [Calendar].
 {
   const intent = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
   check('meeting alone classifies as SCHEDULED_EVENT', intent.type === FlowIntent.TYPES.SCHEDULED_EVENT, intent.type);
   const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('meeting alone proposes the "schedule" process', process.id === 'schedule', process && process.id);
-  check('meeting alone proposes exactly [calendar, task] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar', 'task']), stepIds(process));
-  check('meeting alone proposes exactly [Calendar, Task] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar', 'googleTask']), stepKinds(process));
+  check('meeting alone proposes the "hold" process', process.id === 'hold', process && process.id);
+  check('meeting alone proposes exactly [calendar] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar']), stepIds(process));
+  check('meeting alone proposes exactly [Calendar] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar']), stepKinds(process));
   const calendar = process.steps.find((s) => s.id === 'calendar');
   check('the calendar step carries the meeting sentence, not only the short title',
     calendar && /review the contract/i.test(calendar.params.quote) && calendar.params.title !== calendar.params.quote,
@@ -258,9 +259,13 @@ console.log('--- intent.js: type + entity checks ---\n');
     heMonth && heMonth.entities);
 
   const heBareHour = classify('נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.', { now });
-  check('Hebrew "בשעה 3" does not schedule 03:00',
-    heBareHour && heBareHour.type === FlowIntent.TYPES.SCHEDULED_EVENT && heBareHour.entities.hour === null && heBareHour.entities.dateIso === '2026-09-21',
+  check('Hebrew "בשעה 3" is a meeting at 15:00, not 03:00',
+    heBareHour && heBareHour.type === FlowIntent.TYPES.SCHEDULED_EVENT && heBareHour.entities.hour === 15 && heBareHour.entities.minute === 0 && heBareHour.entities.dateIso === '2026-09-21',
     heBareHour && heBareHour.entities);
+  const heBarePlan = FlowActions.planFor(heBareHour, { threadUrl: 'x', text: 'נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.' });
+  check('Hebrew "בשעה 3" keeps a calendar step',
+    heBarePlan && heBarePlan.steps.some((s) => s.kind === 'calendar') && /^Meeting\b/.test(heBareHour.label),
+    heBarePlan && { id: heBarePlan.id, steps: heBarePlan.steps.map((s) => s.kind), label: heBareHour.label });
   const heAfternoon = classify('נקבע פגישה ביום שני בשעה 3 אחר הצהריים לסקירת החוזה.', { now });
   check('Hebrew "בשעה 3 אחר הצהריים" is 15:00 that Monday',
     heAfternoon && heAfternoon.type === FlowIntent.TYPES.SCHEDULED_EVENT && heAfternoon.entities.hour === 15 && heAfternoon.entities.minute === 0 && heAfternoon.entities.dateIso === '2026-09-21',
@@ -613,7 +618,7 @@ console.log('\n--- actions.js: labels are short and collision-free ---\n');
 console.log('\n--- actions.js: every process names its anchor and its closure copy ---\n');
 {
   const cases = [
-    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'schedule', 'calendar'],
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'hold', 'calendar'],
     ['Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?', 'schedule-confirm', 'calendar'],
     ['Could you please send me the signed contract by Friday, September 18?', 'reply-track', 'draft'],
     ['Confirming you’ll send the signed report by Friday, September 18, as agreed.', 'follow-through', 'task']
@@ -715,7 +720,7 @@ console.log('\n--- actions.js: an explicit pin overrides automatic demotion ---\
 console.log('\n--- actions.js: PROCESS_CATALOG is the same table processFor() actually uses ---\n');
 {
   const cases = [
-    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'schedule'],
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'hold'],
     ['Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?', 'schedule-confirm'],
     ['Could you please send me the signed contract by Friday, September 18?', 'reply-track'],
     ['Confirming you’ll send the signed report by Friday, September 18, as agreed.', 'follow-through']
@@ -1250,8 +1255,9 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     dateOnly.intent.personalClose);
 
   const announced = planOf('Let’s do a call Friday, September 18 at 3pm to review the contract.');
-  check('a bare meeting announcement is still schedule, not a personal hold',
-    announced.intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && !announced.intent.personalClose && announced.process.id === 'schedule',
+  check('a bare meeting announcement with a clock is a hold, with no reply',
+    announced.intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && announced.process.id === 'hold' &&
+    announced.process.steps.length === 1 && announced.process.steps[0].kind === 'calendar',
     { personalClose: announced.intent.personalClose, id: announced.process && announced.process.id });
 
   const confirm = planOf('Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?');
@@ -1366,6 +1372,28 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   });
   check('Hebrew Cc-only reply addressed to Avi stays quiet:hedge', !heCc.type && heCc.quiet === 'hedge', { type: heCc.type, quiet: heCc.quiet });
   check('שלום אבי names אבי', FlowIntent.openingAddressee(heBody) === 'אבי');
+  const aviMeet = 'אבי שלום, רוצה לעשות פגישת סטטוס קצרה ביום ראשון ב-11:15? תודה, הילה';
+  const aviCc = classify(aviMeet, {
+    to: ['avi.mizrahi@northwind.example'],
+    cc: ['dana.cohen@northwind.example'],
+    ownAddresses: ['dana.cohen@northwind.example'],
+    ownNames: ['Dana Cohen', 'דנה'],
+    userName: 'Dana Cohen',
+    senderEmail: 'hila@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('אבי שלום plus an ask on Cc only stays quiet:hedge', !aviCc.type && aviCc.quiet === 'hedge', { type: aviCc.type, quiet: aviCc.quiet });
+  const saliMeet = classify('סאלי שלום, רוצה לעשות פגישת סטטוס קצרה ביום ראשון ב-11:15?', {
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    ownNames: ['Sali', 'סאלי'],
+    userName: 'Sali',
+    senderEmail: 'hila@northwind.example',
+    inbound: true,
+    now: heWhen
+  });
+  check('סאלי שלום plus a status meeting still offers', saliMeet.type === FlowIntent.TYPES.SCHEDULED_EVENT && saliMeet.quiet !== 'hedge', { type: saliMeet.type, quiet: saliMeet.quiet });
   const heSend = classify('תוכל לשלוח לי את החוזה עד יום חמישי?', {
     to: ['dana.cohen@northwind.example'],
     ownAddresses: ['dana.cohen@northwind.example'],
@@ -1522,6 +1550,55 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
     const wire = classify('Please send 0.2 BTC to wallet bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh by Monday.', { now: parkCtx.now, senderEmail: email, to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
     check('a wire from a list sender stays quiet: ' + email, wire && !wire.type, wire && wire.type);
   });
+}
+
+{
+  const en = 'Please attach the CV to the meeting on Wednesday at 10:00.';
+  const he = 'בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00';
+  const bare = FlowIntent.attachToInvitePlan(en);
+  const held = FlowIntent.attachToInvitePlan(en, { attached: true });
+  const heBare = FlowIntent.attachToInvitePlan(he);
+  const heHeld = FlowIntent.attachToInvitePlan(he, { attached: true });
+  const call = FlowIntent.attachToInvitePlan('Please attach the deck to the call on Thursday at 2pm.');
+  check('a meeting attach with no file does not say Attached',
+    bare && bare.label === 'Attach CV to invite' && bare.draft === "I'll attach it shortly." && !/Attached/.test(bare.draft), bare);
+  check('a call attach names the file and does not say Attached',
+    call && call.label === 'Attach deck to invite' && !/Attached/.test(call.draft), call);
+  check('a file on the draft may say Attached',
+    held && held.draft === 'Attached.' && held.attached === true, held);
+  check('a Hebrew invite with no file does not say מצורף',
+    heBare && heBare.label === 'לצרף טופס 101 לזימון' && heBare.draft === 'אצרף בהקדם.' && !/מצורף/.test(heBare.draft), heBare);
+  check('a Hebrew file on the draft may say מצורף',
+    heHeld && heHeld.draft === 'מצורף.', heHeld);
+  const ctx = {
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'Sali Sapan',
+    ownNames: ['Sali', 'Sali Sapan', 'סאלי'],
+    senderEmail: 'rachel@acme.io',
+    inbound: true,
+    now: NOW
+  };
+  const plan = FlowActions.planFor(classify(en, ctx), { text: en, threadUrl: 'https://example.invalid/t' });
+  const draftStep = plan && plan.steps && plan.steps.find((s) => s.kind === 'gmailDraft');
+  const taskStep = plan && plan.steps && plan.steps.find((s) => s.kind === 'googleTask');
+  const body = draftStep && FlowDraftReply.draftBodyText(draftStep, null, null, null);
+  check('the shared plan draft has no Attached without a file',
+    body === "I'll attach it shortly." && !/Attached/.test(body) && taskStep && taskStep.params.title === 'Attach CV to invite',
+    { body: body, title: taskStep && taskStep.params.title });
+  const missingBody = FlowDraftReply.draftBodyText({ params: { inviteFile: true, lang: 'en' } }, null, null, null);
+  const missingHe = FlowDraftReply.draftBodyText({ params: { inviteFile: true, lang: 'he' } }, null, null, null);
+  check('a draft with no body and no file does not say Attached or מצורף',
+    missingBody === "I'll attach it shortly." && !/Attached/.test(missingBody) && missingHe === 'אצרף בהקדם.' && !/מצורף/.test(missingHe),
+    { en: missingBody, he: missingHe });
+  const ownHe = classify('סאלי שלום, תוכל בבקשה להשיב ולאשר אם מעבר המשרד עדיין נקבע ל-20 באוקטובר?', ctx);
+  const otherHe = classify('נועה שלום, תוכל בבקשה להשיב ולאשר אם מעבר המשרד עדיין נקבע ל-20 באוקטובר?', ctx);
+  const ownEn = classify('Sali, could you reply and confirm whether the Q3 summary will include the October numbers?', ctx);
+  const otherEn = classify('Lior, could you reply and confirm whether the Q3 summary will include the October numbers?', ctx);
+  check('סאלי שלום is an offer when that name is the user', ownHe && ownHe.type && ownHe.quiet !== 'hedge', { type: ownHe && ownHe.type, quiet: ownHe && ownHe.quiet });
+  check('נועה שלום stays quiet even when the user is in To', otherHe && !otherHe.type && otherHe.quiet === 'hedge', { type: otherHe && otherHe.type, quiet: otherHe && otherHe.quiet });
+  check('Sali, could you is an offer when that name is the user', ownEn && ownEn.type && ownEn.quiet !== 'hedge', { type: ownEn && ownEn.type, quiet: ownEn && ownEn.quiet });
+  check('Lior, could you stays quiet even when the user is in To', otherEn && !otherEn.type && otherEn.quiet === 'hedge', { type: otherEn && otherEn.type, quiet: otherEn && otherEn.quiet });
 }
 
 console.log('\nTOTAL FAILURES:', failures);

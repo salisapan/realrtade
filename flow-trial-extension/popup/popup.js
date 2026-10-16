@@ -34,6 +34,7 @@
   // finally had something to say, rather than the first time anyone opened
   // the popup.
   const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
+  const STEP_NOUNS_HE = { calendar: 'את צעד היומן', draft: 'את צעד הטיוטה', task: 'את צעד המשימה' };
 
   // Declared up here for the same temporal-dead-zone reason as the two above:
   // wirePro() runs a few lines below, long before this function's body would
@@ -45,6 +46,8 @@
   const tabScroll = { setup: 0, open: 0, log: 0 };
   let scrollLock = false;
   let renderDepth = 0;
+  let openPaintGen = 0;
+  let connectorPaintGen = 0;
   let surfaceGen = 0;
   // Bumps on every glanceWhyCurrent write. A refresh that started earlier
   // must not paint over the value this listener already applied.
@@ -55,15 +58,44 @@
     let nav = '';
     try { nav = (navigator && navigator.language) || ''; } catch (e) {}
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
-      return FlowDisplay.uiLangFrom({ setting: state && state.glanceUiLanguage, uiLanguage: ui, navigatorLanguage: nav });
+      return FlowDisplay.uiLangFrom({
+        setting: state && state.glanceUiLanguage,
+        hostLanguage: state && state.glanceHostLanguage,
+        uiLanguage: ui,
+        navigatorLanguage: nav
+      });
     }
     return 'en';
+  }
+  function googleChromeLabel(kind) {
+    const he = uiLang() === 'he';
+    if (kind === 'reconnect') return he ? 'חבר מחדש את Google' : 'Reconnect Google';
+    if (kind === 'warning') return he ? 'שלב אחד לא הושלם' : 'A step did not finish';
+    if (kind === 'busy') return he ? 'מתחבר…' : 'Connecting…';
+    if (kind === 'failed') return he ? 'החיבור נכשל.' : 'Connection failed.';
+    return he ? 'התחבר ל-Google' : 'Connect Google';
+  }
+  function metaLang() {
+    let ui = '';
+    try { if (chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (navigator && navigator.language) || ''; } catch (e) {}
+    const panel = document.documentElement && document.documentElement.lang;
+    const stored = state && state.glanceUiLanguage;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function') {
+      return FlowDisplay.uiLangFrom({ setting: stored || panel || '', uiLanguage: ui, navigatorLanguage: nav });
+    }
+    return uiLang();
   }
   function words() {
     return FlowDisplay.chrome(uiLang());
   }
   function showWords(text) {
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.showChrome === 'function') return FlowDisplay.showChrome(uiLang(), text);
+    return text == null ? '' : String(text);
+  }
+  function metricLine(text) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.activityMetric === 'function') return FlowDisplay.activityMetric(uiLang(), text);
     return text == null ? '' : String(text);
   }
   function fillWords(template, map) {
@@ -81,6 +113,10 @@
     if (!scroller) return;
     tabScroll[activeTabId()] = scroller.scrollTop;
   }
+  function nameStorageOnly(ch) {
+    const keys = Object.keys(ch || {});
+    return keys.length > 0 && keys.every((k) => k === 'googleProfile' || k === 'glanceOwnNames');
+  }
   function restoreScroll() {
     const scroller = panelScroller();
     if (!scroller) return;
@@ -89,22 +125,57 @@
     scroller.scrollTop = y;
     scrollLock = false;
   }
+  let scrollAtRender = 0;
   function beginRender() {
     if (renderDepth === 0) {
       rememberScroll();
+      const scroller = panelScroller();
+      scrollAtRender = scroller ? scroller.scrollTop : 0;
       scrollLock = true;
     }
     renderDepth += 1;
   }
   function endRender() {
     renderDepth = Math.max(0, renderDepth - 1);
-    if (renderDepth === 0) restoreScroll();
+    if (renderDepth !== 0) return;
+    const scroller = panelScroller();
+    const now = scroller ? scroller.scrollTop : 0;
+    // A paint can reset the scroller to 0. A non-zero spot at the end of
+    // the paint is the person. The scroll listener keeps a non-zero move
+    // that the paint then clears.
+    if (now > 0 && now !== scrollAtRender) tabScroll[activeTabId()] = now;
+    restoreScroll();
   }
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local' || !ch.log) return;
+      if (area !== 'local' || !ch.glanceNamesDiag) return;
+      if (state) state.glanceNamesDiag = ch.glanceNamesDiag.newValue || null;
+      paintNamesDiag();
+    });
+  } catch (e) { /* the line paints on the next open */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || nameStorageOnly(ch) || (!ch.glanceHostLanguage && !ch.glanceUiLanguage)) return;
+      const before = uiLang();
+      if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
+      if (ch.glanceUiLanguage) state.glanceUiLanguage = ch.glanceUiLanguage.newValue;
+      if (uiLang() === before) return;
+      const panel = document.querySelector && document.querySelector('.panel[data-panel="log"]');
+      if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
+      else paintActivityShell();
+    });
+  } catch (e) { /* the open panel keeps the language it painted */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || nameStorageOnly(ch) || (!ch.googleReconnect && !ch.googleLaneWarning)) return;
+      refresh().catch(() => {});
+    });
+  } catch (e) { /* the pill refreshes the next time the popup opens */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || nameStorageOnly(ch) || !ch.log) return;
       const panel = document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
       renderOpen().catch(() => {});
@@ -112,7 +183,7 @@
   } catch (e) { /* panel is already showing the last render */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local') return;
+      if (area !== 'local' || nameStorageOnly(ch)) return;
       if (ch.glanceWhyCurrent || ch.glanceWhyByConv) {
         whyRev += 1;
         if (state && ch.glanceWhyCurrent) state.glanceWhyCurrent = ch.glanceWhyCurrent.newValue || null;
@@ -128,6 +199,7 @@
         if (rev !== whyRev) return;
         return Promise.all([
           renderSurfaces().catch(() => {}),
+          renderMetaChats().catch(() => {}),
           renderOutlookCards().catch(() => {}),
           renderWaiting().catch(() => {}),
           renderOpen().catch(() => {}),
@@ -137,7 +209,16 @@
     });
   } catch (e) { /* the open panel keeps the last status until the next open */ }
   const scroller = panelScroller();
-  if (scroller) scroller.addEventListener('scroll', rememberScroll, { passive: true });
+  if (scroller) scroller.addEventListener('scroll', () => {
+    const y = scroller.scrollTop;
+    // The lock means a paint is replacing the list. A move to 0 is that
+    // paint. Any other spot is the person, and the restore puts it back.
+    if (scrollLock) {
+      if (y > 0) tabScroll[activeTabId()] = y;
+      return;
+    }
+    rememberScroll();
+  }, { passive: true });
   wireTabs();
   wireSave();
   wireRecipe();
@@ -145,6 +226,7 @@
   wireLoopView();
   await renderConnectors();
   await renderStatusPill();
+  paintNamesDiag();
   await renderLog();
   await renderOpen();
   await renderWaiting();
@@ -154,6 +236,15 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderMetaChats().catch(() => {});
+  try {
+    if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
+      chrome.permissions.onAdded.addListener(() => { renderMetaChats().catch(() => {}); });
+    }
+    if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
+      chrome.permissions.onRemoved.addListener(() => { renderMetaChats().catch(() => {}); });
+    }
+  } catch (e) { /* the row still refreshes the next time the popup opens */ }
   renderOutlookCards().catch(() => {});
   outlookAutoSync().catch(() => {});
   renderBuildStamp().catch(() => {});
@@ -258,6 +349,30 @@
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
   }
 
+  // Activity Undo for a lane write. Card kinds map onto the lane connector.
+  // Outlook and the other writers stay on flow:undo-action.
+  function laneUndoMessage(connectorId, ref, created) {
+    const map = {
+      calendar: 'googleHold',
+      googleTask: 'googleLaneTask',
+      googleTasks: 'googleLaneTask',
+      driveFile: 'googleDriveSave',
+      attachmentSave: 'googleDriveSave',
+      driveDoc: 'googleDoc',
+      driveSheet: 'googleSheetAppend',
+      gmailDraft: 'gmailCompose',
+      googleHold: 'googleHold',
+      googleLaneTask: 'googleLaneTask',
+      googleDriveSave: 'googleDriveSave',
+      googleDoc: 'googleDoc',
+      googleSheetAppend: 'googleSheetAppend',
+      gmailCompose: 'gmailCompose'
+    };
+    const lane = map[connectorId];
+    if (!lane) return null;
+    return { type: 'flow:google-undo', connectorId: lane, ref: ref, created: created };
+  }
+
   // The popup loads this package's stamp. The worker answers with the stamp
   // of the registration that is actually running. They differ when that
   // registration is still the previous build.
@@ -310,6 +425,7 @@
     }
     await renderConnectors();
     await renderStatusPill();
+    paintNamesDiag();
     renderSetupDone();
   }
 
@@ -338,7 +454,7 @@
     if (!svc) return '';
     if (svc.id === 'calendar') return 'שמירת זמן ביומן';
     if (svc.id === 'mail') return 'דואר';
-    if (svc.id === 'todo') return 'To Do';
+    if (svc.id === 'todo') return uiLang() === 'he' ? 'משימות' : 'To Do';
     if (svc.id === 'onedrive') return 'OneDrive';
     if (svc.id === 'contacts') return 'אנשי קשר';
     if (svc.id === 'teams') return 'Teams';
@@ -361,10 +477,24 @@
       pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
       return;
     }
+    const reconnecting = Object.keys(status || {}).filter((k) => status[k] && status[k].needsReconnect);
+    const warning = Object.keys(status || {}).filter((k) => status[k] && status[k].warning);
+    if (reconnecting.length) {
+      pill.textContent = googleChromeLabel('reconnect');
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
+      return;
+    }
+    if (warning.length) {
+      pill.textContent = googleChromeLabel('warning');
+      pill.className = 'ver';
+      pill.setAttribute('dir', 'auto');
+      return;
+    }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
-      pill.textContent = (conn ? conn.label : live[0]) + ' connected';
+      pill.textContent = uiLang() === 'he' ? 'מחובר' : ((conn ? conn.label : live[0]) + ' connected');
       pill.className = 'ver on';
       return;
     }
@@ -378,17 +508,33 @@
 
   function renderConnectors() {
     const host = document.getElementById('connector-list');
-    host.replaceChildren();
+    const gen = ++connectorPaintGen;
     return outlookHostOpen().then((onOutlook) => {
-      if (onOutlook) {
-        host.appendChild(microsoftConnectCard());
-        return renderOutlookRefresh(host);
-      }
-      // MVP surface is one connector, one decision: sign in, or don't. The rest
-      // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
-      // them wired) but showing four more cards here is exactly the setup
-      // friction the MVP is supposed to have zero of.
-      FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
+      if (gen !== connectorPaintGen || !host) return;
+      const catalog = onOutlook
+        ? [{ id: 'microsoft' }]
+        : FLOW_CONNECTORS.filter((c) => c.mvp);
+      const extra = [];
+      Object.keys(status || {}).forEach((id) => {
+        if (id === 'googleTasks' || id === 'googleTask' || id === 'google') extra.push({ id: id });
+      });
+      const providers = (typeof connectionProviders === 'function')
+        ? connectionProviders(catalog.concat(extra))
+        : catalog;
+      host.replaceChildren();
+      providers.forEach((row) => {
+        const id = (typeof providerIdOf === 'function') ? providerIdOf(row) : row.id;
+        if (id === 'microsoft') {
+          host.appendChild(microsoftConnectCard());
+          return;
+        }
+        const full = FLOW_CONNECTORS.find((c) => c.id === row.id) || FLOW_CONNECTORS.find((c) => c.mvp && c.id === 'googleTasks');
+        if (full) host.appendChild(connectorCard(full));
+      });
+      if (onOutlook) return renderOutlookRefresh(host);
+    }).then(() => {
+      if (gen !== connectorPaintGen) return;
+      return renderMetaChats();
     });
   }
 
@@ -451,6 +597,7 @@
   }
 
   function missingScopeSentence(scope, service) {
+    if (uiLang() === 'he') return 'ההרשאה לא כלולה בכניסה. בהגדרות, סמן ' + service + '.';
     if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) return FlowReceipt.missingScopeLine(scope, service);
     return scope + ' לא כלול בכניסה. בהגדרות, סמן ' + service + '.';
   }
@@ -497,6 +644,7 @@
     const tokenStatus = microsoftTokenStatus();
     const card = el('div', 'conn');
     card.setAttribute('data-glance-connect', 'microsoft');
+    card.setAttribute('data-provider', 'microsoft');
     card.setAttribute('data-glance-microsoft', tokenStatus);
     const head = el('div', 'conn-head');
     const name = el('div', 'conn-name');
@@ -642,21 +790,45 @@
   function connectorCard(c) {
     const st = (status && status[c.id]) || {};
     const card = el('div', 'conn' + (c.status === 'planned' ? ' planned' : '') + (st.connected ? ' on' : ''));
+    const providerId = (typeof providerIdOf === 'function') ? providerIdOf(c) : c.id;
+    card.setAttribute('data-glance-connect', providerId);
+    card.setAttribute('data-provider', providerId);
 
     const head = el('div', 'conn-head');
+    const heGoogle = uiLang() === 'he' && c.id === 'googleTasks';
     const name = el('div', 'conn-name');
     name.appendChild(el('b', null, c.label));
-    name.appendChild(el('i', null, c.kind));
+    name.appendChild(el('i', null, heGoogle ? 'משימות, יומן וטיוטות' : c.kind));
     head.appendChild(name);
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'מתוכנן'));
-    else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
+    else if (st.needsReconnect) {
+      const badge = el('span', 'badge', c.id === 'googleTasks' ? googleChromeLabel('reconnect') : (st.headerLabel || st.reconnectLabel || 'התחבר מחדש'));
+      badge.setAttribute('dir', 'auto');
+      head.appendChild(badge);
+    } else if (st.warning) {
+      const badge = el('span', 'badge', c.id === 'googleTasks' ? googleChromeLabel('warning') : (st.headerLabel || st.warningLabel));
+      badge.setAttribute('dir', 'auto');
+      head.appendChild(badge);
+    } else if (st.connected) head.appendChild(el('span', 'badge on', 'מחובר'));
     else if (c.status === 'live' || st.configured === true) head.appendChild(el('span', 'badge live', 'עובד'));
     else head.appendChild(el('span', 'badge', 'צריך הגדרה'));
     card.appendChild(head);
 
-    if (c.note) card.appendChild(el('p', 'conn-note', c.note));
-    if (st.connected && st.detail) card.appendChild(el('p', 'conn-detail', 'Writing to: ' + st.detail));
+    if (c.note) {
+      const note = heGoogle
+        ? 'כניסה אחת ל-Google. משימות, יומן, טיוטות Gmail, וקבצים ב-Drive ש-Glance יוצר. Glance לא שולח.'
+        : c.note;
+      card.appendChild(el('p', 'conn-note', note));
+    }
+    if (st.connected && st.detail) {
+      const line = el('p', 'conn-detail');
+      line.appendChild(document.createTextNode(uiLang() === 'he' ? 'נכתב אל ' : 'Writing to: '));
+      const named = el('span', null, st.detail);
+      named.setAttribute('data-glance-user', 'list');
+      line.appendChild(named);
+      card.appendChild(line);
+    }
 
     if (c.status === 'planned') return card;
 
@@ -664,7 +836,7 @@
     err.hidden = true;
 
     if (st.connected) {
-      const off = el('button', 'ghost', 'Disconnect');
+      const off = el('button', 'ghost', uiLang() === 'he' ? 'נתק' : 'Disconnect');
       off.type = 'button';
       off.addEventListener('click', async () => {
         await send({ type: 'flow:disconnect', connectorId: c.id });
@@ -700,6 +872,9 @@
     }
 
     const ready = st.configured !== false;
+    const connectLabel = (c.id === 'googleTasks' && st.needsReconnect)
+      ? googleChromeLabel('reconnect')
+      : (st.needsReconnect && st.reconnectLabel ? st.reconnectLabel : ('התחבר ל-' + c.label));
     // Only the ready (primary/.doit-style) button gets the shell/ring/shine
     // spans — .ghost.wide (missing OAuth config, MVP-inert) stays a plain
     // outlined pill, same distinction the marketing site draws between its
@@ -709,13 +884,15 @@
       btn.appendChild(el('span', 'shell'));
       btn.appendChild(el('span', 'ring'));
       btn.appendChild(el('span', 'shine'));
-      btn.appendChild(el('span', 'btn-label', 'התחבר ל-' + c.label));
+      const label = el('span', 'btn-label', connectLabel);
+      if (st.needsReconnect) label.setAttribute('dir', 'auto');
+      btn.appendChild(label);
     } else {
-      btn.textContent = 'התחבר ל-' + c.label;
+      btn.textContent = connectLabel;
     }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
-      btn.disabled = true; setBtnLabel(btn, 'Connecting…'); err.hidden = true;
+      btn.disabled = true; setBtnLabel(btn, googleChromeLabel('busy')); err.hidden = true;
       const msg = { type: 'flow:connect', connectorId: c.id };
       Object.keys(inputs).forEach((k) => { msg[k] = inputs[k].value; });
       const res = await send(msg);
@@ -726,8 +903,8 @@
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
-        btn.disabled = false; setBtnLabel(btn, 'התחבר ל-' + c.label);
-        err.textContent = (res && res.error) || 'Connection failed.';
+        btn.disabled = false; setBtnLabel(btn, connectLabel);
+        err.textContent = (res && res.error) || googleChromeLabel('failed');
         err.hidden = false;
       }
     });
@@ -1133,7 +1310,7 @@
     const host = el('div', 'glance-panel-steps');
     item.appendChild(host);
     return FlowStepListView.mount(host, rows, {
-      intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
+      intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), uiLang())) || (entry.process && entry.process.name) || '',
       lang: entry.intent && entry.intent.lang,
       uiLang: uiLang(),
       surface: entry.app || 'gmail',
@@ -1151,7 +1328,7 @@
   function openRow(entry) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || entry.process.name;
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), uiLang())) || entry.process.name;
     top.appendChild(el('span', 'log-label', why));
     // 'app' only exists on entries logged after this was added — every
     // entry from before falls back to 'gmail', the only source that has
@@ -1237,7 +1414,7 @@
     const item = el('div', 'log-item');
     item.setAttribute('data-glance-status', 'expired');
     const top = el('div', 'log-top');
-    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '';
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry, Date.now(), uiLang())) || (entry.process && entry.process.name) || '';
     top.appendChild(el('span', 'log-label', why));
     top.appendChild(el('span', 'log-kind', 'expired'));
     item.appendChild(top);
@@ -1265,7 +1442,8 @@
   // opened in Gmail.
   function dayShort(iso) {
     const d = new Date(iso + 'T00:00:00');
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat(uiLang() === 'he' ? 'he' : 'en', { month: 'short', day: 'numeric' }).format(d);
   }
 
   function whoLabel(w) {
@@ -1635,9 +1813,18 @@
         if (required) { box.checked = true; box.disabled = true; }
         boxes[svc.id] = box;
         const copy = el('span', null, serviceLabel(svc));
-        if (svc.detail) {
+        const heDetail = {
+          mail: 'קורא דואר וכותב טיוטת תשובה. לא שולח.',
+          todo: 'מוסיף משימה אחת. Glance קורא אותה לפני שהיא מטופלת. ביטול מוחק את המשימה.',
+          calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
+          onedrive: 'כותב קובץ אחד, קורא אותו, ומבטל את הכתיבה. מייל לא מחפש בקבצים.',
+          contacts: 'קורא אנשי קשר.',
+          teams: 'קורא צ׳אטים שאתה בהם.'
+        };
+        const detail = uiLang() === 'he' ? (heDetail[svc.id] || '') : svc.detail;
+        if (detail) {
           const small = document.createElement('small');
-          small.textContent = svc.detail;
+          small.textContent = detail;
           copy.appendChild(small);
         }
         if (!required && !box.checked) appendMissingScopeLine(copy, svc);
@@ -2038,10 +2225,32 @@
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
   // with a property for its wiring, not a let: it runs during init.
   const SURFACE_COPY = {
-    whatsapp: 'קורא שיחות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, רשימות וערוצים לא נקראים. ניסיוני: WhatsApp יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
     telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
   };
+  function paintNamesDiag() {
+    const node = document.getElementById('namesDiag');
+    if (!node || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.namesDiagLine !== 'function') return;
+    const diag = (state && state.glanceNamesDiag) || { names: [], source: 'none' };
+    const line = FlowDisplay.namesDiagLine(diag);
+    const dev = !!(state && state.glanceDevFixture === true);
+    node.hidden = !dev;
+    node.textContent = dev ? line : '';
+    try { console.info(line); } catch (e) { /* the dev line is the same text */ }
+  }
+
+  async function renderMetaChats() {
+    const block = document.getElementById('metaChatsBlock');
+    if (block) block.hidden = true;
+    const host = document.getElementById('connector-list');
+    if (!host || typeof FlowMetaConsent === 'undefined' || typeof FlowMetaConsent.paintConnection !== 'function') return;
+    let on = false;
+    try {
+      if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
+    } catch (e) { on = false; }
+    FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
+  }
+
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
     if (!host) return;
@@ -2057,6 +2266,7 @@
     try {
     for (const id of Object.keys(st.surfaces || {})) {
       if (id === 'outlook') continue; // managed by the Outlook row (connect registers the OWA chip)
+      if (id === 'whatsapp') continue; // WhatsApp Web turns on with the one Meta consent
       const s = st.surfaces[id];
       const row = el('div', 'wait-item');
       const top = el('div', 'wait-top');
@@ -2686,7 +2896,7 @@
       if (r && (r.reason === 'user-edited' || r.reason === 'unconfirmed')) {
         u.disabled = false;
         u.textContent = L.undo;
-        note.textContent = showWords(r.written) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
+        note.textContent = showWords(r.written) || showWords(r.error) || (r.reason === 'unconfirmed' ? showWords("Couldn't confirm it's unchanged. Undo left it alone.") : showWords('You edited this. Undo left it alone.'));
         note.hidden = false;
         if (r.reason === 'user-edited' && entry.messageId && typeof FlowStorage.patchGlanceProof === 'function') {
           await FlowStorage.patchGlanceProof(entry.messageId, { undoRefused: 'user-edited', undoLine: note.textContent });
@@ -2776,13 +2986,16 @@
     return { openOnly: openOnly, receipts: receipts };
   }
 
-  async function renderOpen() {
+  async function renderOpen(reconcile) {
+    const followUp = reconcile !== false;
+    const gen = ++openPaintGen;
     beginRender();
     let loops;
     try {
     await ensureOutlookMigrated();
-    await reconcileOutlookReceiptsSafe();
+    if (gen !== openPaintGen) return;
     loops = await visibleLoops();
+    if (gen !== openPaintGen) return;
     const openOnly = loops.openOnly;
     const receipts = loops.receipts;
     const expired = Array.isArray(loops.expired) ? loops.expired : [];
@@ -2878,10 +3091,15 @@
         else parent.appendChild(box);
       } else host.appendChild(box);
     }
+    // Reconcile after the paint. A slow Graph call must not hold the scroll
+    // lock, and it must not paint again on its own: a log write already
+    // re-renders, and a second paint here resets a scroll the person made.
+    if (followUp) reconcileOutlookReceiptsSafe().catch(() => {});
     } finally { endRender(); }
   }
 
   function when(ts) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.ageLine === 'function') return FlowDisplay.ageLine(ts, uiLang());
     const mins = Math.round((Date.now() - ts) / 60000);
     const Lw = words();
     if (mins < 1) return Lw.justNow;
@@ -2901,10 +3119,11 @@
     const span = FlowJudgment.MAX_THRESHOLD - FlowJudgment.MIN_THRESHOLD;
     const talkative = 1 - (t - FlowJudgment.MIN_THRESHOLD) / span;
     document.getElementById('senseFill').style.width = Math.round(talkative * 100) + '%';
+    const sense = words();
     document.getElementById('senseNote').textContent =
-      t <= FlowJudgment.BASE_THRESHOLD - 4 ? 'Speaking up more — you keep clicking'
-      : t >= FlowJudgment.BASE_THRESHOLD + 6 ? 'Holding back — you keep dismissing'
-      : 'Balanced';
+      t <= FlowJudgment.BASE_THRESHOLD - 4 ? sense.senseMore
+      : t >= FlowJudgment.BASE_THRESHOLD + 6 ? sense.senseLess
+      : sense.senseEven;
     wrap.hidden = false;
   }
 
@@ -2923,9 +3142,10 @@
     const wrap = document.getElementById('weekStat');
     const counts = FlowStorage.writeCountsFrom(s);
     if (!counts.total) { wrap.hidden = true; return; }
+    const weekWords = words();
     document.getElementById('weekCount').textContent = counts.week;
-    document.getElementById('weekLabel').textContent = ' logged this week';
-    document.getElementById('weekTotal').textContent = counts.total + ' all-time';
+    document.getElementById('weekLabel').textContent = weekWords.weekLogged;
+    document.getElementById('weekTotal').textContent = fillWords(weekWords.weekAll, { n: counts.total });
     wrap.hidden = false;
   }
 
@@ -2952,9 +3172,10 @@
     if (!wrap || !FlowStorage.getLocalLm) return;
     const st = await FlowStorage.getLocalLm();
     if (!st || !st.checkedAt) { wrap.hidden = true; return; }
-    const on = [st.en && st.en.ok ? 'English' : null, st.he && st.he.ok ? 'Hebrew' : null].filter(Boolean);
-    if (on.length) wrap.textContent = 'The model built into this browser also reads wording nothing else recognises, for ' + on.join(' and ') + ' (it passed a precision check on this device). It only suggests; you decide.';
-    else if (st.reason === 'failed') wrap.textContent = 'The model built into this browser did not pass the precision check on this device, so it stays off.';
+    const lm = words();
+    const on = [st.en && st.en.ok ? lm.langEn : null, st.he && st.he.ok ? lm.langHe : null].filter(Boolean);
+    if (on.length) wrap.textContent = fillWords(lm.lmOn, { langs: on.join(lm.lmAnd) });
+    else if (st.reason === 'failed') wrap.textContent = lm.lmOff;
     else { wrap.hidden = true; return; }
     wrap.hidden = false;
   }
@@ -2998,7 +3219,8 @@
       }
     }
     if (!count) { wrap.hidden = true; return; }
-    wrap.textContent = 'Glance has adjusted ' + count + (count === 1 ? ' thing' : ' things') + ' about how it works for you.';
+    const learned = words();
+    wrap.textContent = fillWords(learned.learned, { n: count, noun: count === 1 ? learned.learnedOne : learned.learnedMany });
     wrap.hidden = false;
   }
 
@@ -3039,9 +3261,12 @@
 
     if (!currentInsight) { wrap.hidden = true; return; }
 
-    document.getElementById('memoryInsightText').textContent =
-      'Glance noticed you usually remove ' + (STEP_NOUNS[currentInsight.stepKind] || 'a step') +
-      ' in ' + currentInsight.processName + ' processes — keep it that way?';
+    const insight = words();
+    const nouns = uiLang() === 'he' ? STEP_NOUNS_HE : STEP_NOUNS;
+    document.getElementById('memoryInsightText').textContent = fillWords(insight.insight, {
+      step: nouns[currentInsight.stepKind] || insight.learnedOne,
+      process: currentInsight.processName
+    });
     wrap.hidden = false;
   }
 
@@ -3097,7 +3322,7 @@
         const code = await FlowStorage.getInstallId();
         await navigator.clipboard.writeText('https://theflow-ai.com/trial.html?ref=' + code);
         const original = btn.textContent;
-        btn.textContent = 'Copied';
+        btn.textContent = words().copied;
         setTimeout(() => { btn.textContent = original; }, 1800);
       } catch (e) {
         btn.textContent = 'https://theflow-ai.com/trial.html';
@@ -3114,7 +3339,7 @@
       const btn = document.getElementById('referralExportRecipe');
       exportRecipe();
       const original = btn.textContent;
-      btn.textContent = 'Exported';
+      btn.textContent = words().exported;
       setTimeout(() => { btn.textContent = original; }, 1800);
     });
   }
@@ -3125,7 +3350,7 @@
     const btn = document.getElementById('clearCloseMemory');
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      const ok = window.confirm('Clear personal close memory and Outlook loop cards on this device? Draft receipts and From Outlook offers will be removed. This cannot be undone.');
+      const ok = window.confirm(words().clearMemConfirm);
       if (!ok) return;
       btn.disabled = true;
       if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.clear();
@@ -3147,7 +3372,7 @@
     if (typeof FlowCloseQuality === 'undefined') { node.hidden = true; return; }
     const line = FlowCloseQuality.activityLine(FlowCloseQuality.computeSnapshot(s.closeQuality));
     if (!line) { node.hidden = true; return; }
-    node.textContent = line;
+    node.textContent = metricLine(line);
     node.hidden = false;
   }
 
@@ -3157,7 +3382,7 @@
     if (typeof FlowQuietMetrics === 'undefined') { node.hidden = true; return; }
     const line = FlowQuietMetrics.activityLine(FlowQuietMetrics.snapshot(s.quietMetrics));
     if (!line) { node.hidden = true; return; }
-    node.textContent = line;
+    node.textContent = metricLine(line);
     node.hidden = false;
   }
 
@@ -3172,14 +3397,52 @@
     const line = FlowStillOpen.activityLine(metrics);
     if (!line && !metrics.shown && !metrics.doIt && !metrics.undo && !metrics.falseClose) { node.hidden = true; return; }
     if (!line) { node.hidden = true; return; }
-    node.textContent = line;
+    node.textContent = metricLine(line);
     node.hidden = false;
+  }
+
+  function paintActivityShell() {
+    const L = words();
+    const lang = uiLang();
+    const tab = document.querySelector && document.querySelector('button[data-tab="log"]');
+    if (tab) tab.textContent = L.activityTab;
+    const panel = document.querySelector && document.querySelector('[data-panel="log"]');
+    if (panel && panel.setAttribute) {
+      panel.setAttribute('lang', lang);
+      panel.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    }
+    function put(id, text, attr) {
+      const node = document.getElementById(id);
+      if (!node || text == null) return;
+      if (attr) node.setAttribute(attr, text);
+      else node.textContent = text;
+    }
+    put('log-empty', L.logEmpty);
+    put('closeQuality', L.closeQualityTitle, 'title');
+    put('quietMetrics', L.quietTitle, 'title');
+    put('stillOpenQuality', L.stillTitle, 'title');
+    put('senseLabel', L.senseLabel);
+    const ledgerLabel = document.querySelector && document.querySelector('#ledgerBlock .label');
+    if (ledgerLabel) ledgerLabel.textContent = L.ledgerTitle;
+    const ledgerHint = document.querySelector && document.querySelector('#ledgerBlock .hint');
+    if (ledgerHint) ledgerHint.textContent = L.ledgerHint;
+    put('ledgerReset', L.ledgerReset);
+    put('memoryInsightConfirm', L.insightYes);
+    put('memoryInsightReject', L.insightNo);
+    const memHint = document.querySelector && document.querySelector('.close-memory .hint');
+    if (memHint) memHint.textContent = L.closeMemHint;
+    put('clearCloseMemory', L.closeMem);
+    put('referralCopy', L.referralCopy);
+    put('referralExportRecipe', L.referralExport);
+    const referralTxt = document.querySelector && document.querySelector('.referral-txt');
+    if (referralTxt) referralTxt.textContent = L.referralTxt;
   }
 
   async function renderLog() {
     beginRender();
     const revAtLog = whyRev;
     try {
+    paintActivityShell();
     await ensureOutlookMigrated();
     const s = await FlowStorage.get();
     renderWeekStat(s);
@@ -3253,11 +3516,29 @@
     return false;
   }
 
+  function undoNoteFor(e) {
+    const Lw = words();
+    if (uiLang() !== 'he') {
+      if (typeof FlowReceipt !== 'undefined' && FlowReceipt.undoHint) return FlowReceipt.undoHint(e && e.where ? [e.where] : []);
+      return Lw.undoWritten;
+    }
+    const id = e && e.connectorId;
+    if (id === 'outlookCalendar' || id === 'calendar') return Lw.undoCalendar;
+    if (id === 'outlookTask' || id === 'microsoftTodo' || id === 'googleTask' || id === 'googleTasks') return Lw.undoTodo;
+    if (id === 'onedriveFile' || id === 'attachmentSave' || id === 'driveFile' || id === 'googleDriveFile') return Lw.undoFile;
+    if (id === 'gmailDraft') return Lw.undoGmail;
+    return Lw.undoWritten;
+  }
+
   function logRow(e) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    const rowTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle) ? FlowDisplay.activityTitle(e) : (e.actionTitle || e.label || '-');
-    top.appendChild(el('span', 'log-label', rowTitle));
+    const rowTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle) ? FlowDisplay.activityTitle(e, uiLang()) : (e.actionTitle || e.label || '-');
+    const titleNode = el('span', 'log-label', rowTitle);
+    const generated = typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.localizeHeading === 'function'
+      && FlowDisplay.localizeHeading('he', e.label || e.actionTitle || '') !== String(e.label || e.actionTitle || '');
+    if (!generated && /[A-Za-z]/.test(rowTitle)) titleNode.setAttribute('data-glance-user', '1');
+    top.appendChild(titleNode);
     // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
     const Lw = words();
@@ -3282,7 +3563,7 @@
         acts.appendChild(a);
       }
       if (e.ref) {
-        const hintLine = FlowReceipt.undoHint(e.where ? [e.where] : []);
+        const hintLine = undoNoteFor(e);
         const u = el('button', 'ghost sm', Lw.undo);
         u.type = 'button';
         u.setAttribute('aria-label', hintLine);
@@ -3313,7 +3594,10 @@
           }
           u.textContent = Lw.undoing;
           u.disabled = true;
-          const r = await readBackOrTimeout(send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
+          // Keep both: a computer-use row returns above via markComputerUndone.
+          // A Google lane row uses flow:google-undo. Every other writer stays
+          // on flow:undo-action, including the creation snapshot #144 reads.
+          const r = await readBackOrTimeout(send(laneUndoMessage(e.connectorId, e.ref, e.created) || { type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref, created: e.created }));
           const todoUndo = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
           if (r && r.ok && (!todoUndo || r.fetchedBack === true)) {
             const isOutlookDraft = e.connectorId === 'outlookDraft';
@@ -3347,8 +3631,9 @@
             await renderLog();
             if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            const line = (r && r.written && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
-              ? r.written
+            const refusal = r && (r.written || r.error);
+            const line = (refusal && (r.reason === 'verify-timeout' || r.reason === 'user-edited' || r.reason === 'unconfirmed'))
+              ? refusal
               : FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = Lw.undo;
             u.disabled = false;

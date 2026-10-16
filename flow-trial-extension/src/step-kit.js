@@ -53,9 +53,18 @@ const FlowStepKit = (() => {
     return Object.assign({}, base, FlowDisplay.chrome(ui));
   }
 
-  function doItHTML(label) {
+  function doItHTML(label, disabled) {
     const name = label || 'Do It';
-    return '<button type="button" class="do-halo flow-chip" aria-label="' + esc(name) + '"><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt=""><span class="doit-dark" role="img" aria-label="' + esc(name) + '">' + esc(name) + '</span></button>';
+    const off = disabled ? ' disabled aria-disabled="true"' : '';
+    return '<button type="button" class="do-halo flow-chip" aria-label="' + esc(name) + '"' + off + '><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt=""><span class="doit-dark" role="img" aria-label="' + esc(name) + '">' + esc(name) + '</span></button>';
+  }
+
+  function dateChoicesHTML(choices, selected) {
+    if (!choices || !choices.length) return '';
+    return '<span class="chip-dates" role="group">' + choices.map(function (c) {
+      const on = selected && c && c.iso === selected;
+      return '<button type="button" class="chip-date" data-date-iso="' + esc(c && c.iso) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(c && c.label) + '</button>';
+    }).join('') + '</span>';
   }
 
   function appB(app) { return '<b class="act-app"><bdi>' + esc(app) + '</bdi></b>'; }
@@ -119,7 +128,7 @@ const FlowStepKit = (() => {
       '<span class="act-box" aria-hidden="true"></span>' +
       '<span class="act-glyph" data-glyph="' + esc(a.tool || '') + '">' + glyph(a.tool) + '</span>' +
       '<span class="act-body">' +
-        (text ? '<span class="act-text">' + text + '</span>' : '') +
+        (text ? '<span class="act-text"' + (a.user ? ' data-glance-user="1"' : '') + '>' + text + '</span>' : '') +
         (a.out ? '<span class="act-out">' + appB(a.app) + ' · ' + a.out + '</span>' : '') +
         (res ? '<span class="act-res">' + appB(a.app) + ' · <span class="act-res-txt">' + res + '</span></span>' : '') +
       '</span>' +
@@ -132,10 +141,12 @@ const FlowStepKit = (() => {
   function chipHTML(cfg, L) {
     const c = cfg.chip || { mode: 'count' };
     const hold = c.noHold ? '' : '<button type="button" class="chip-hold">' + L.hold + '</button>';
+    const waiting = c.needsDateChoice === true;
     return '<div class="chip chip-invoice">' + hold +
       (c.icon ? '<span class="ss-chip-glyph" aria-hidden="true">' + glyph(c.icon) + '</span>' : '') +
       '<span class="chip-txt">' + (c.q || '') + '</span>' +
-      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + doItHTML(L.doIt) + '</span></div>';
+      dateChoicesHTML(waiting || c.selectedIso ? c.dateChoices : null, c.selectedIso) +
+      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + doItHTML(L.doIt, waiting) + '</span></div>';
   }
 
   function addHTML(L) {
@@ -201,7 +212,7 @@ const FlowStepKit = (() => {
 
   function syncChip(stage, cfg) {
     if (!stage || !cfg || !cfg.chip) return;
-    const L = langOf(cfg.he);
+    const L = labelsFor(cfg);
     const txt = stage.querySelector('.chip-txt');
     if (!txt) return;
     if (cfg.chip.mode === 'count') {
@@ -228,8 +239,10 @@ const FlowStepKit = (() => {
       const target = cfg.chip.target || 'Drive';
       stage.classList.toggle('no-actions', !(on > 0 && cb && cb.checked));
       txt.innerHTML = on
-        ? 'Save <b class="file">' + on + ' of ' + files.length + '</b> attachments to ' + esc(target) + '?'
-        : 'Pick at least one file';
+        ? ((typeof FlowDisplay !== 'undefined' && FlowDisplay.fillChrome)
+          ? FlowDisplay.fillChrome(L.saveAsk || 'Save {on} of {all} attachments to {target}?', { on: '<b class="file">' + on + '</b>', all: files.length, target: esc(target) })
+          : ('Save <b class="file">' + on + ' of ' + files.length + '</b> attachments to ' + esc(target) + '?'))
+        : (L.pickFile || 'Pick at least one file');
     } else {
       txt.innerHTML = cfg.chip.q || '';
     }

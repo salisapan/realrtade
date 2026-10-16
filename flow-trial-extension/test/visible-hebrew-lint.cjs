@@ -12,15 +12,21 @@ function check(name, cond, extra) {
 }
 
 const ALLOW = new Set([
-  'glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo'
+  'glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo',
+  'meta', 'slack', 'telegram'
 ]);
+const BRAND_PHRASES = ['glance pro', 'telegram web', 'google', 'meta', 'slack'];
 
 function latinWords(text) {
   return String(text || '').match(/[A-Za-z][A-Za-z'’]{3,}/g) || [];
 }
 
 function offenders(text) {
-  return latinWords(text).filter((word) => !ALLOW.has(word.toLowerCase().replace(/[’']/g, '')));
+  let raw = String(text || '');
+  BRAND_PHRASES.forEach((phrase) => {
+    raw = raw.replace(new RegExp(phrase.replace(/ /g, '\\s+'), 'ig'), ' ');
+  });
+  return latinWords(raw).filter((word) => !ALLOW.has(word.toLowerCase().replace(/[’']/g, '')));
 }
 
 const html = fs.readFileSync(path.join(ROOT, 'popup', 'popup.html'), 'utf8');
@@ -37,6 +43,9 @@ banned.forEach((phrase) => {
   check('popup.js does not paint ' + phrase, popupJs.indexOf(phrase) < 0);
 });
 check('the calendar row is שמירת זמן ביומן', popupJs.indexOf("svc.id === 'calendar') return 'שמירת זמן ביומן'") >= 0);
+check('Hebrew reconnect is חבר מחדש את Google', popupJs.indexOf('חבר מחדש את Google') >= 0 && popupJs.indexOf('התחבר מחדש ל-Google') < 0);
+check('Connections dedupes providers before paint', popupJs.indexOf('connectionProviders(') >= 0);
+check('a Hebrew connect click does not hard-code Connecting', popupJs.indexOf("setBtnLabel(btn, 'Connecting…')") < 0 && popupJs.indexOf("googleChromeLabel('busy')") >= 0);
 check('a connected sign-in can add a scope without turning off', popupJs.indexOf('flow:outlook-consent-scope') >= 0 && popupJs.indexOf('הוסף הרשאה') >= 0);
 
 const page = fs.readFileSync(path.join(ROOT, 'src', 'content-outlook.js'), 'utf8');
@@ -45,7 +54,7 @@ check('paintIfCurrent clears the why line', /function paintIfCurrent\(token, fn\
 check('a mail switch clears the current why', page.indexOf('glanceWhyCurrent: null') >= 0);
 check('consent buttons stay אפשר פעם אחת / אפשר תמיד / לא עכשיו', page.indexOf("['אפשר פעם אחת', 'once']") >= 0 && page.indexOf('אין הרשאת To Do') >= 0);
 const kit = fs.readFileSync(path.join(ROOT, 'src', 'step-kit.js'), 'utf8');
-check('the step kit takes its button from the UI-language table', kit.indexOf('FlowDisplay.chrome') >= 0 && kit.indexOf('doItHTML(L.doIt)') >= 0);
+check('the step kit takes its button from the UI-language table', kit.indexOf('FlowDisplay.chrome') >= 0 && kit.indexOf('doItHTML(L.doIt') >= 0);
 
 const sandbox = { console: console, globalThis: {} };
 sandbox.globalThis = sandbox;
@@ -61,7 +70,12 @@ check('a hold with no time is not a line', D.holdWhenLine('2026-10-18', null, nu
 });
 
 check('a stored UI language wins over the browser', D.uiLangFrom({ setting: 'he', uiLanguage: 'en-US', navigatorLanguage: 'en' }) === 'he');
+check('a stored UI language wins over the page', D.uiLangFrom({ setting: 'en', hostLanguage: 'he', uiLanguage: 'he' }) === 'en');
+check('the page language wins over the browser UI', D.uiLangFrom({ setting: '', hostLanguage: 'he', uiLanguage: 'en-US', navigatorLanguage: 'en' }) === 'he');
 check('the browser UI language wins over navigator', D.uiLangFrom({ setting: '', uiLanguage: 'he-IL', navigatorLanguage: 'en' }) === 'he');
+check('a Hebrew meeting is titled פגישה', D.cardFace({ id: 'hold', name: 'Hold It' }, { label: 'Hold It' }, { bodyText: 'פגישת סנכרון ביום חמישי ב-11:00' }).title === 'פגישה');
+check('an English meeting is titled Meeting', D.cardFace({ id: 'hold', name: 'Hold It' }, { label: 'Hold It' }, { bodyText: 'Sync on Thursday at 11:00' }).title === 'Meeting');
+check('an invite file card uses its title', D.cardFace({ id: 'attach-invite', name: 'Attach it' }, { inviteFile: true, label: 'לצרף קובץ לזימון' }, {}).title === 'לצרף קובץ לזימון');
 check('navigator.language is the last source', D.uiLangFrom({ setting: null, uiLanguage: '', navigatorLanguage: 'iw' }) === 'he');
 check('an empty locale stays English', D.uiLangFrom({}) === 'en' && D.uiLangFrom({ navigatorLanguage: 'fr' }) === 'en');
 const heChrome = D.chrome('he');
@@ -71,6 +85,12 @@ Object.keys(heChrome).forEach((key) => {
   if (bad.length) heBad.push(key + ':' + bad.join(','));
 });
 check('Hebrew chrome has no English besides brand names', heBad.length === 0, heBad);
+check('a Hebrew UI day is 17 באוק׳', D.localeDay('2026-10-17', 'he') === '17 באוק׳', D.localeDay('2026-10-17', 'he'));
+check('an English UI day is Oct 17', D.localeDay('2026-10-17', 'en') === 'Oct 17', D.localeDay('2026-10-17', 'en'));
+const ariaDiag = D.namesDiagFrom([], 'Sali Sapan');
+check('an aria name is labelled aria-label', D.namesDiagLine(ariaDiag) === 'Names: Sali Sapan, source: aria-label', D.namesDiagLine(ariaDiag));
+check('a profile name wins over the aria label', D.namesDiagLine(D.namesDiagFrom(['Sali Sapan'], 'Other')) === 'Names: Sali Sapan, source: profile');
+check('no name is source none', D.namesDiagLine(D.namesDiagFrom(['Glance', 'me'], '')) === 'Names: —, source: none');
 check('Hebrew chrome names the card buttons', heChrome.doIt === 'בצע' && heChrome.dismiss === 'הסתר' && heChrome.suggested === 'מוצע' && heChrome.added === 'נוסף' && heChrome.view === 'הצג' && heChrome.undo === 'בטל');
 check('English chrome keeps the English buttons', D.chrome('en').doIt === 'Do It' && D.chrome('en').dismiss === 'Dismiss' && D.chrome('en').suggested === 'Suggested');
 

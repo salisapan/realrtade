@@ -499,6 +499,8 @@ console.log('\n--- Path A gate: named pdf on my calendar, file lives in Drive --
     FlowGoogleCloses.messageToJudge([[OWN, 'dana@meridian.com']], OWN) === -1);
   check('an incoming message still wins over a later reply of yours',
     FlowGoogleCloses.messageToJudge([['dana@meridian.com', OWN], [OWN, 'dana@meridian.com']], OWN) === 0);
+  check('a newest note to yourself is judged even when an older message is incoming',
+    FlowGoogleCloses.messageToJudge([['dana@meridian.com', OWN], [OWN, OWN]], OWN) === 1);
   check('no own address stays quiet',
     FlowGoogleCloses.messageToJudge([[OWN, OWN]], '') === -1);
 }

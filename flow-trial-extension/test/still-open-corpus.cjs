@@ -233,6 +233,11 @@ console.log('\n--- still open: the why line is one sentence, Hebrew when the thr
   const he = candidate('אני אשלח לך את החוזה עד יום שישי.', 'he');
   const heWhy = FlowStillOpen.whyLine(he, NOW);
   check('Hebrew why is the Hebrew line', heWhy.indexOf('התחייבת') === 0 || heWhy.indexOf('התחייבות') === 0, heWhy);
+  const uiHe = FlowStillOpen.whyLine(en, NOW, 'he');
+  check('a Hebrew UI names the promise in Hebrew', uiHe.indexOf('התחייבת עד ') === 0, uiHe);
+  check('a Hebrew UI does not use an English month', !/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(uiHe), uiHe);
+  const uiEn = FlowStillOpen.whyLine(he, NOW, 'en');
+  check('an English UI keeps You promised this by', /^You promised this by /.test(uiEn), uiEn);
 }
 
 console.log('\n--- still open: one morning notification line, never per item ---\n');

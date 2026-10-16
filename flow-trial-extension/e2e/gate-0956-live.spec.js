@@ -64,7 +64,7 @@ test('the popup shell has no leftover English status words', async ({ glance }) 
   expect(text).toMatch(/מחובר|לא מחובר|הגדרות/);
 });
 
-test('a hold card shows the Hebrew day and clock, and a dateless hold is not a card', async ({ glance }) => {
+test('a hold card shows the time in the card text, and a dateless hold is not a card', async ({ glance }) => {
   test.setTimeout(60000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
@@ -74,9 +74,11 @@ test('a hold card shows the Hebrew day and clock, and a dateless hold is not a c
     senderName: 'flow',
     body: HOLD_BODY
   });
+  const title = page.locator('#ReadingPaneContainerId .gs-intent, #ReadingPaneContainerId .flow-chip-process-name').first();
+  await expect(title).toHaveText('Hold Sun 11:00');
   const when = page.locator('#ReadingPaneContainerId [data-glance-when]');
   await expect(when).toBeVisible();
-  await expect(when).toContainText('18 באוק׳');
+  await expect(when).toContainText('Oct 18');
   await expect(when).toContainText('11:00');
 
   const quiet = await glance.openOutlook({
@@ -114,7 +116,7 @@ test('the why line is one line for the current mail and hides when a card shows'
   await expect(show.locator('#ReadingPaneContainerId .flow-why-not')).toHaveCount(0);
 });
 
-test('Hebrew UI chrome on an English mail keeps the English title', async ({ glance }) => {
+test('Hebrew UI chrome on an English mail localizes the why line', async ({ glance }) => {
   test.setTimeout(60000);
   await glance.seedOutlook({ glanceUiLanguage: 'he' });
   const page = await glance.openOutlook({
@@ -149,7 +151,10 @@ test('Hebrew UI chrome on an English mail keeps the English title', async ({ gla
   const list = popup.locator('#open-list');
   await expect(list.locator('[data-glance-section="suggested"]')).toHaveText('מוצע');
   await expect(list.getByRole('button', { name: 'הסתר' }).first()).toBeVisible();
-  await expect(list.locator('.log-label, .gs-intent, .flow-chip-process-name').first()).toContainText(/[A-Za-z]/);
+  // The why line is chrome and follows the UI locale. The card title above
+  // stays the mail's own words.
+  await expect(list.locator('.log-label').first()).toHaveText('עדיין חייבים תשובה');
+  await expect(list.locator('.log-label').first()).not.toContainText(/[A-Za-z]/);
   const loops = await list.innerText();
   expect(loops).not.toMatch(/\bSuggested\b/i);
   expect(loops).not.toMatch(/\bDismiss\b/i);

@@ -124,7 +124,7 @@ function load(stored, opts) {
           });
           return;
         }
-        if (msg && msg.type === 'flow:undo-action') {
+        if (msg && (msg.type === 'flow:undo-action' || msg.type === 'flow:google-undo')) {
           if (cb) cb({ ok: opts.undoOk !== false });
           return;
         }

@@ -113,8 +113,13 @@ const FlowIncomingJudge = (() => {
       inSent: i.inSent === true,
       onBehalfOf: i.onBehalfOf || null,
       graphSender: i.graphSender || null,
-      forwarded: i.forwarded === true
+      forwarded: i.forwarded === true,
+      namesPending: i.namesPending === true,
+      namesWaitDone: i.namesWaitDone === true
     });
+    // The profile names are not cached yet. No card, and not a quiet.
+    // The host judges this mail again when the names land.
+    if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
     }
@@ -128,35 +133,62 @@ const FlowIncomingJudge = (() => {
       return { show: false, reason: 'fact-reply-block', intent };
     }
     const isRequest = intentApi.TYPES ? intent.type === intentApi.TYPES.REQUEST : intent.type === 'request';
+    const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
+    // Phishing and a bank-change payment stay quiet before any plan.
+    // The Outlook task path and the Gmail path both stop here.
+    if (typeof intentApi.phishingOrNegative === 'function' && intentApi.phishingOrNegative(vetoText)) {
+      return { show: false, reason: 'quiet:family', intent };
+    }
+    // "No need to send" stands the ask down before the untimed-reply rule
+    // can turn "Following up on our call" into a draft.
+    if (/\b(?:do not|don't|no need to)\s+(?:send|attach|forward|share|resend|provide)\b/i.test(text)) {
+      return { show: false, reason: 'quiet:hedge', intent };
+    }
     const gate = fileAttach && typeof fileAttach.gate === 'function' ? fileAttach.gate(text) : { kind: 'ignore' };
-    if (isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
-    if (isRequest && gate.kind === 'clear') {
+    // "Following up on our call" is not the event. The ask under it, with
+    // no parsed clock, is the reply. A file ask that does not use that
+    // frame stays on the file chain.
+    const noParsedClock = !(intent.entities && Number.isInteger(intent.entities.hour) && Number.isInteger(intent.entities.minute));
+    const followUpCall = /\bfollowing up on (?:our|the|that) call\b/i.test(text);
+    const replyInsteadOfFile = isRequest && noParsedClock && intent.personalClose === 'follow-up-ask' && !intent.inviteFile && followUpCall;
+    // A self-sent attach is a task. Other file asks stay on the file chain.
+    const selfAttachTask = Boolean(intent && intent.selfAttachTask);
+    if (!selfAttachTask && !replyInsteadOfFile && isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
+    // A deadline whose day was dropped (31/2, or a weekday that is not that
+    // calendar day) is still the reply. The file chain is not that close.
+    const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
+    if (!selfAttachTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
       if (resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
-      if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-chain-not-run', intent };
+      // Putting a file on an invite that already exists is the file track
+      // (task + short attached draft), on Outlook as well as Gmail.
+      if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile)) return { show: false, reason: 'file-chain-not-run', intent };
     }
-    const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
-    const process = actionsApi.planFor(intent, {
+    // Same classifier as planFor. A meeting that was cancelled, postponed,
+    // already held, or an out-of-office note does not show. A marketing
+    // webinar with no personal ask does not show. A second event that is
+    // still on, together with an ask, does show. These gates run before
+    // any plan, so a plan cannot create an offer they withhold.
+    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+      return { show: false, reason: 'meeting-veto', intent };
+    }
+    const planCtx = {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
       text: vetoText
-    });
-    // Same classifier as planFor. A meeting that was cancelled, postponed,
-    // already held, or an out-of-office note does not show. A marketing
-    // webinar with no personal ask does not show. A second event that is
-    // still on, together with an ask, does show.
-    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
-      return { show: false, reason: 'meeting-veto', intent };
-    }
-    if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
+    };
+    // The show decision uses the unrewritten plan. A later Meeting or task
+    // rewrite must not open a surface this plan leaves quiet.
+    const baseProcess = actionsApi.planFor(intent, Object.assign({ baseOnly: true }, planCtx));
+    if (!baseProcess || !baseProcess.steps || !baseProcess.steps.length) return { show: false, reason: 'no-process', intent };
     // Outlook's Do It writes a reply draft when the process has one. A task-only
     // close writes Microsoft To Do. A calendar event with no draft and no task
     // stays quiet rather than offering a reply in its place.
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process) && !calendarHold) {
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
@@ -164,6 +196,11 @@ const FlowIncomingJudge = (() => {
     if ((i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
       return { show: false, reason: 'onedrive-target-on-gmail', intent };
     }
+    // The judge has already said offer. planFor may change the kind:
+    // a Meeting only with a noun, an explicit date, and a clock; a
+    // commitment or a task keeps that kind.
+    const process = actionsApi.planFor(intent, planCtx);
+    if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 

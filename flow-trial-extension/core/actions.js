@@ -112,6 +112,31 @@ const FlowActions = (() => {
     // already see is the other honest case. Anything else stays a plain
     // reply draft — promising "+ file" before that match exists is how a
     // wrong file gets onto a sendable draft.
+    if (intent.inviteFile) {
+      const fileOnDraft = Boolean(ctx.attachFile && ctx.attachFile.id);
+      const plan = (typeof FlowIntent !== 'undefined' && FlowIntent.attachToInvitePlan)
+        ? FlowIntent.attachToInvitePlan(ctx.text || '', { attached: fileOnDraft })
+        : null;
+      const he = /[\u0590-\u05FF]/.test(String((plan && plan.label) || intent.label || ctx.text || ''));
+      const honest = he ? 'אצרף בהקדם.' : "I'll attach it shortly.";
+      return {
+        id: 'draft',
+        kind: 'gmailDraft',
+        label: 'Draft',
+        hint: fileOnDraft ? 'Short note that the file is attached' : 'Short note that the file is still to attach',
+        params: {
+          intentType: intent.type,
+          what: (plan && plan.label) || intent.label || null,
+          inviteFile: true,
+          body: (plan && plan.draft) || intent.inviteDraft || honest,
+          lang: he ? 'he' : 'en',
+          threadUrl: ctx.threadUrl,
+          includeAttachment: fileOnDraft,
+          fileAttached: fileOnDraft,
+          requestedObjectTerm: null
+        }
+      };
+    }
     const found = ctx.attachFile && ctx.attachFile.id ? ctx.attachFile : null;
     const mayFindFile = hasAttachment || Boolean(found);
     return {
@@ -185,12 +210,9 @@ const FlowActions = (() => {
   // table processFor() selects from, instead of a second, hand-copied list
   // that could quietly drift out of sync with it.
   const PROCESS_CATALOG = {
-    // personalClose `calendar-hold` only. One Google Calendar event.
-    // A commitment with a resolved date and a clock time, or an explicit
-    // ask to meet at a clock time. A date with no clock time stays log-it
-    // (a Google Task). An ask that is not a meeting stays reply-track
-    // (a Gmail draft, plus a follow-up task). A bare meeting announcement
-    // stays schedule / schedule-confirm.
+    // One event, no reminder. planFor chooses this when a meeting noun, a
+    // date, and a time are present and the mail does not ask for a reply.
+    // A meeting noun and a date with no time stays schedule.
     'hold': {
       name: 'Hold It',
       closingLine: 'Putting this on your calendar.',
@@ -244,6 +266,15 @@ const FlowActions = (() => {
       closedLine: 'Drafted and tracked.',
       anchor: 'draft',
       stepKinds: ['draft', 'task']
+    },
+    // A file asked onto an invite that already exists. The task is the
+    // work. The draft says the file is attached only when a file is on it.
+    'attach-invite': {
+      name: 'Attach it',
+      closingLine: 'Tracking the file on the invite, with a short draft.',
+      closedLine: 'Drafted and tracked.',
+      anchor: 'task',
+      stepKinds: ['task', 'draft']
     },
     'follow-through': {
       name: 'Follow Through',
@@ -322,7 +353,8 @@ const FlowActions = (() => {
       id = sig.handoff ? 'schedule-confirm' : 'schedule';
     } else if (intent.type === FlowIntent.TYPES.REQUEST) {
       // "No need to reply" is the task, not Reply & Track.
-      id = intent.noReplyDraft ? 'log-it' : 'reply-track';
+      // A file onto an existing invite is the task plus the short draft.
+      id = intent.inviteFile ? 'attach-invite' : (intent.noReplyDraft ? 'log-it' : 'reply-track');
     } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
       id = 'follow-through';
     } else {
@@ -392,6 +424,7 @@ const FlowActions = (() => {
     if (!g) return null;
     const e = intent.entities || {};
     if (g.personalClose === 'file-on-hold') {
+      if (!Number.isInteger(e.hour) || !Number.isInteger(e.minute)) return null;
       return {
         id: 'file-on-hold',
         name: 'Hold it',
@@ -474,7 +507,7 @@ const FlowActions = (() => {
       dependsOn: null,
       params: { googleClose: g }
     }];
-    if (g.destination === 'calendar') {
+    if (g.destination === 'calendar' && Number.isInteger(e.hour) && Number.isInteger(e.minute)) {
       steps.push(withThread({
         id: 'calendar',
         kind: 'calendar',
@@ -509,6 +542,96 @@ const FlowActions = (() => {
     };
   }
 
+  function dateChoicesOf(intent) {
+    const e = intent && intent.entities;
+    if (e && Array.isArray(e.dateChoices) && e.dateChoices.length >= 2) return e.dateChoices;
+    const d = intent && intent.facts && intent.facts.date;
+    if (d && Array.isArray(d.choices) && d.choices.length >= 2) return d.choices;
+    return null;
+  }
+
+  // The only hold-versus-schedule decision. It runs only after the judge
+  // has already decided to offer, and only for a meeting noun plus an
+  // explicit date and a clock. A weekday alone stays the schedule process.
+  // An absolute date does not decide the calendar. "Call Tom" and
+  // "I will call the bank" stay tasks. "I'll call you" is the two-party
+  // call. meetingPlanVeto removes the meeting plan. The judge calls that
+  // same function before this one runs.
+  function meetingClock(intent) {
+    const e = intent && intent.entities;
+    return Boolean(e && Number.isInteger(e.hour) && Number.isInteger(e.minute));
+  }
+  function writtenDayNumber(intent) {
+    const raw = intent && intent.facts && intent.facts.date && intent.facts.date.raw;
+    return /\d/.test(String(raw || ''));
+  }
+  // A solo phone task is not an event noun. "Call Tom October 19 at 10:00"
+  // and "I will call the bank October 19 at 3pm" stay tasks even when the
+  // date is absolute. "I'll call you" is the two-party call, so this
+  // returns false and the meeting noun can still hold that slot.
+  function soloPhoneTask(text) {
+    if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.soloPhoneTask === 'function') return FlowIntent.soloPhoneTask(text);
+    return false;
+  }
+  function meetingNarrow(intent, text) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    if (soloPhoneTask(text)) return false;
+    const close = intent.personalClose;
+    if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
+    const sig = intent.signals || {};
+    const e = intent.entities || {};
+    if (!e.dateIso || !meetingClock(intent)) return false;
+    if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return false;
+    return Boolean(sig.hasMeetingNoun || close === 'calendar-hold');
+  }
+  function meetingPlan(intent, proc) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
+    const close = intent.personalClose;
+    if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return proc;
+    const sig = intent.signals || {};
+    if (sig.handoff) return proc;
+    const e = intent.entities || {};
+    const choices = dateChoicesOf(intent);
+    const openChoice = Boolean(choices && !e.dateIso);
+    const hasDate = Boolean(e.dateIso) || openChoice;
+    if (!hasDate) return proc;
+    const timed = meetingClock(intent);
+    if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    if (!sig.hasMeetingNoun) return proc;
+    if (!timed) return proc;
+    if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
+    return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+  }
+
+  // The person's tap. Only one of the two offered dates is accepted, and
+  // until that happens the plan still has no date.
+  function chooseDate(plan, iso) {
+    const want = String(iso || '');
+    const choices = plan && plan.dateChoices;
+    if (!want || !Array.isArray(choices) || !choices.some((c) => c && c.iso === want)) return false;
+    (plan.steps || []).forEach((step) => {
+      if (step && step.kind === 'calendar' && step.params) step.params.dateIso = want;
+    });
+    plan.needsDateChoice = false;
+    return true;
+  }
+
+  // A task ask or a commitment that only borrowed a meeting word
+  // ("call the accountant", "book the venue", "אתה מעביר את ה-deck")
+  // is not a Meeting. A Meeting needs a noun, an explicit date, and a clock.
+  function taskNotMeeting(intent, text) {
+    if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    const close = intent.personalClose;
+    if (close === 'calendar-hold' || close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
+    const src = String(text || '');
+    if (/\b(?:please\s+)?create a task\b|\badd this to my tasks\b|\bremember to\b/i.test(src)) return true;
+    if (soloPhoneTask(src)) return true;
+    if (/\bi(?:'|’)ll call\b|\bi will call\b/i.test(src)) return true;
+    if (/\byou(?:'|’)ll\s+(?:book|update|call|send)\b|\byou will\s+(?:book|update|call|send)\b|\byou(?:'|’)?re\s+sending\b/i.test(src)) return true;
+    if (/אתה\s*מעב[יר]+/.test(src) || /אתם\s+מעבירים/.test(src)) return true;
+    return false;
+  }
+
   function planFor(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
@@ -522,7 +645,146 @@ const FlowActions = (() => {
 
     const e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
-    const proc = processFor(intent);
+    // baseOnly is the plan the base judge would build. The show decision
+    // uses it. A hedge ("perhaps", "possibly") stays that plan. A Meeting
+    // hold needs a noun, an explicit date, and a clock. A task keeps a task.
+    const hedged = /\b(?:perhaps|possibly|not sure|maybe|might)\b/i.test(String(vetoText || ''));
+    const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent, vetoText);
+    const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
+    let proc = useMeeting
+      ? meetingPlan(intent, processFor(intent))
+      : taskInstead
+        ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
+        : processFor(intent);
+    // A calendar step needs a clock the time parser actually resolved.
+    // A date with no parsed time is a task. A delete or a move of a named
+    // slot is still that calendar write.
+    const calendarOp = e.calendarOp;
+    const untimedCalendar = proc && Array.isArray(proc.stepKinds) && proc.stepKinds.indexOf('calendar') !== -1
+      && !meetingClock(intent)
+      && calendarOp !== 'delete' && calendarOp !== 'update'
+      && intent.personalClose !== 'calendar-cancel'
+      && intent.personalClose !== 'calendar-move';
+    // No parsed clock. The order is the CTO's:
+    // a first-person send promise is Log commitment, and an untimed
+    // statement is quiet; "Please create a task:" is a task ahead of
+    // a reply; coordinating a meeting is Schedule meeting, and a
+    // request for an answer is the reply; a call reminder is Call.
+    const untimedSrc = String(vetoText || '');
+    const heMail = /[\u0590-\u05FF]/.test(untimedSrc);
+    const ownPromise = /\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
+      || /\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(untimedSrc)
+      || /(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(untimedSrc);
+    const createTaskAsk = /\bplease\s+create\s+a\s+task\b/i.test(untimedSrc) || /\badd this to my tasks\b/i.test(untimedSrc);
+    // "Per our call" and "following up on our call" name the conversation.
+    // The word call there is not a reminder to phone someone.
+    const callBody = untimedSrc
+      .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
+      .replace(/\bper our call\b/ig, ' ')
+      .replace(/\bper our chat\b/ig, ' ');
+    // The sender is the one calling. That promise is Log commitment.
+    // "I'll join the call" at a clock stays a Meeting. "I will call the
+    // bank" stays the call reminder. A subject line "Reminder" must not
+    // retitle either of those two sentences as Call.
+    const senderCallYou = /\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(untimedSrc);
+    const senderJoinCall = /\b(?:i|we)(?:'|’)?ll\s+join\s+(?:the\s+)?call\b|\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(untimedSrc);
+    // "Per our call, you'll …" is this person's commitment. "Per our chat,
+    // you're sending …" and "לפי מה שסגרנו, אתם מעבירים" are that same
+    // commitment. The chat or the call already happened.
+    const readerWill = /\byou(?:'|’)?ll\b|\byou will\b|\byou(?:'|’)?re\s+sending\b|\byou are sending\b/i.test(untimedSrc)
+      || /אתה\s*מעב/.test(untimedSrc)
+      || /אתם\s+מעבירים/.test(untimedSrc)
+      || /לפי מה שסגרנו,?\s*אתם מעבירים/.test(untimedSrc);
+    const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
+    // Call is a reminder to phone someone. "I'll call you" is the sender's
+    // own promise, and "you would call the bank" is the reader's commitment.
+    // "I'll join the call" names the meeting they are attending.
+    const callReminder = !senderCallYou && !senderJoinCall && (
+      (/\bcall\b/i.test(callBody) && /\b(?:task|reminder|remember|day after tomorrow)\b/i.test(callBody) && !readerSaid)
+      || /^\s*call the day after tomorrow\b/i.test(callBody)
+      || (/\b(?:i|we)(?:'|’)?ll\s+call\b|\b(?:i|we)\s+will\s+call\b/i.test(callBody))
+    );
+    // "Let me know if you have any questions" offers help. It is not an ask.
+    // "Let me know by Friday who will" still is.
+    const helpOffer = /\blet me know if you (?:have|need|want)\b/i.test(untimedSrc)
+      || /\blet me know if (?:i|we) can\b/i.test(untimedSrc);
+    const answerAsk = !helpOffer && (/\b(?:let me know|who will|will you be|are you (?:free|available)|confirm the|please confirm)\b/i.test(untimedSrc)
+      || /פנוי|מי יגיע/.test(untimedSrc));
+    const letsMeet = /\blet'?s\s+meet\b/i.test(untimedSrc) || /(?:בואו|בוא)\s+ניפגש|נתאם\s+פגישה|נקבע\s+פגישה/.test(untimedSrc);
+    const coordinate = letsMeet
+      || /\blet'?s\s+(?:do|set up|schedule|book)\b/i.test(untimedSrc)
+      || /\b(?:can|could|would)\s+(?:you|we)\s+(?:schedule|set up|book)\b/i.test(untimedSrc)
+      || /\bbook a time\b/i.test(untimedSrc)
+      || /\b(?:schedule|set up)\s+a\b/i.test(untimedSrc)
+      || /(?:בואו|בוא)\s+(?:ניפגש|נקבע)|(?:^|[^\u0590-\u05FF])(?:נתאם|נקבע|לתאם|לקבוע)(?![\u0590-\u05FF])|אפשר\s+לתאם/.test(untimedSrc)
+      || (/\?/.test(untimedSrc) && !answerAsk && !/\b(?:send|attach|forward|share|pay)\b/i.test(untimedSrc));
+    const handoff = Boolean(intent.signals && intent.signals.handoff);
+    let replyInstead = false;
+    const logIt = Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it']);
+    // A note the user sent is a task. An attach on that note keeps its
+    // title and drops the draft. It is not the inbound file track.
+    // "gimme a call October 19 at 9am" and "Shall we hop on a call
+    // October 19 at 3pm" keep the base plan, calendar included.
+    // A hold stays a hold. The other dated call stays schedule.
+    const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
+    if (intent.selfTask && !(callNamesADate && intent.type === 'event')) proc = logIt;
+    else if (intent.selfTask && intent.personalClose !== 'calendar-hold') {
+      proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+    }
+    // "I'll call you" is already the task. The untimed block would retitle
+    // it Call when the subject says Reminder, and would return null when
+    // the day has no clock ("I will call you on Friday.").
+    if (!senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
+      if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
+        proc = logIt;
+      } else if ((createTaskAsk || callReminder) && !readerSaid) {
+        proc = logIt;
+        if (callReminder && !intent.selfTask) intent.label = heMail ? 'שיחה' : 'Call';
+        else if (/^Reply requested\b/.test(String(intent.label || ''))) {
+          const named = untimedSrc.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n.]+)/i);
+          const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+          intent.label = named ? named[1].replace(/\s+/g, ' ').trim() : (when ? ('Log commitment for ' + when) : 'Log this decision');
+        }
+      } else if (coordinate) {
+        proc = logIt;
+        intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
+      } else if ((readerWill || readerSaid) && !intent.selfTask) {
+        proc = logIt;
+      } else if ((answerAsk || handoff) && !intent.selfTask) {
+        proc = Object.assign({ id: 'reply-track' }, PROCESS_CATALOG['reply-track']);
+        replyInstead = true;
+        const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+        intent.label = 'Reply requested' + (when ? ' by ' + when : '');
+      } else if (untimedCalendar && !intent.selfTask) {
+        return null;
+      } else if (untimedCalendar) {
+        proc = logIt;
+      }
+    }
+    if (senderCallYou && !intent.inviteFile) {
+      proc = logIt;
+      const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+      intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
+    }
+    const taskPlan = taskInstead || senderCallYou || (intent.selfTask && !intent.inviteFile) || (untimedCalendar && !replyInstead);
+    // The card and the task title follow the plan that will actually run.
+    // A Meeting label on a task-only plan is the copy bug: the date was
+    // copied off the event classifier after the calendar step was dropped.
+    // A self-sent phone task already named the person. Putting Call back
+    // would drop that object. Inbound "add this to my tasks: call …" stays Call.
+    if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
+      intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
+    } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
+      // "call October 19" named the month as a person. A dated call with
+      // no person keeps the meeting title, and the calendar step stays.
+      if (!callNamesADate) {
+        const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
+        const dateText = when || null;
+        intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
+          ? FlowJudgment.neutralTitle({ dateText: dateText })
+          : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
+      }
+    }
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 
@@ -533,7 +795,26 @@ const FlowActions = (() => {
     if (intent.noReplyDraft) steps = steps.filter((s) => s && s.kind !== 'gmailDraft' && s.kind !== 'outlookDraft');
     if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
 
-    return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };
+    const choices = useMeeting ? dateChoicesOf(intent) : null;
+    const needsDateChoice = Boolean(choices && !e.dateIso);
+    if (needsDateChoice) {
+      steps.forEach((step) => {
+        if (step && step.kind === 'calendar' && step.params) {
+          step.params.dateIso = null;
+          step.params.dateChoices = choices;
+        }
+      });
+    }
+
+    return {
+      id: proc.id,
+      name: proc.name,
+      closingLine: proc.closingLine,
+      closedLine: proc.closedLine,
+      needsDateChoice: needsDateChoice,
+      dateChoices: needsDateChoice ? choices : null,
+      steps: steps
+    };
   }
 
   // The receipt lines for writes that actually landed. A failed step can
@@ -551,7 +832,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
