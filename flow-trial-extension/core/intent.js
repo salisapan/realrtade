@@ -1230,22 +1230,6 @@ const FlowIntent = (() => {
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
 
-    // Cc-only is not this meeting. replyAimedElsewhere is the check the
-    // reply path already uses; a פגישת line is not a reply ask, so the
-    // reply gate never reached it. A vocative that names the reader
-    // (סאלי שלום,) is still their meeting. "אבי שלום," already returned
-    // above, through vocativeIsOther.
-    if ((eventEvidence || explicitMeetingAsk) && replyAimedElsewhere(text, ctx)) {
-      let namedReader = false;
-      const readerNames = readerNameList(ctx);
-      const pieces = String(text || '').split(/\n+|(?<=[.!?])\s+/);
-      for (let i = 0; i < pieces.length; i++) {
-        const who = vocativeAt(pieces[i], text);
-        if (who && readerNames.indexOf(who.toLowerCase()) !== -1) namedReader = true;
-      }
-      if (!namedReader) return stayQuiet('hedge');
-    }
-
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
     // the remote fallback must not turn it into a different chip. A wait
     // means the language is clear and the host still has to check Drive
