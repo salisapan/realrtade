@@ -127,7 +127,7 @@ const FlowIntent = (() => {
     'do not schedule',
     'no loner needed'
   ].join('|'), 'i');
-  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|מבטלת|מבטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
+  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|מבוטתל|בוטל|מבטלת|מבטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
 
   // "This already happened — don't schedule it again."
   //
@@ -143,9 +143,9 @@ const FlowIntent = (() => {
   // phantom future meeting for something that's already over is actively
   // wrong, so recap language wins over an otherwise-complete gate.
   const EVENT_RECAP = new RegExp([
-    'thanks? for (?:the |our )?(?:call|meeting|chat|time)',
-    'thank you for (?:the |our )?(?:call|meeting|chat|time)',
-    'great (?:meeting|call|chat|talking to you|speaking with you)',
+    'thanks? for (?:the |our )?(?:call|meeting|chat|time|interview)',
+    'thank you for (?:the |our )?(?:call|meeting|chat|time|interview)',
+    'great (?:meeting|call|chat|catting|talking to you|speaking with you)',
     'good (?:speaking|talking|chatting) with you',
     "it was (?:great|good|nice) (?:to (?:meet|speak|talk|chat)|meeting you|speaking with you|chatting)",
     'enjoyed (?:our|the) (?:call|meeting|chat|conversation)',
@@ -334,7 +334,7 @@ const FlowIntent = (() => {
   // agreed…" chipped at 17.
   // "No need to reply" cancels the draft. It does not cancel the work.
   // fyi / no action needed / no need to do anything / לידיעתך still quiet the whole mail.
-  const INFO_FULL = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no need to do anything|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה)|לא נדרש(?:ת|ים)?\s+(?:ממך\s+)?(?:פעולה|דבר|כלום|ממך)/i;
+  const INFO_FULL = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no need to do anything|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה)|לא נדרש(?:ת|ים)?\s+(?:ממך\s+)?(?:פעולה|דבר|כלום|ממך)|לא נדר(?:שת|ת)\s+פעולה/i;
   const REPLY_CANCEL = /\b(?:no reply needed|no need to (?:reply|respond))\b|(?:^|\s)אין צורך להגיב/i;
   const ACTION_PLEASE = /\bplease\s+[a-z]{2,}\b/i;
   const JUST_DO = /\bjust get it done\b/i;
@@ -463,7 +463,7 @@ const FlowIntent = (() => {
   const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
   const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
   const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
-  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל|מוטלת)';
+  const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבוטתל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל|מוטלת)';
   const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
   const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
   const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
@@ -843,7 +843,36 @@ const FlowIntent = (() => {
       if (nameIsReader(name, ctx)) continue;
       return true;
     }
+    if (otherCommaName(text, ctx)) return true;
     return false;
+  }
+  // "בהמשך לשיחתנו, עומר, תוכל…" names עומר after a comma, not on the
+  // first token. A discourse word (בבקשה, Please) is not that name.
+  // The reader's own name in the same mail keeps the ask.
+  const NOT_COMMA_NAME = /^(?:please|kindly|thanks|thank|regards|best|cheers|hi|hey|hello|dear|good|morning|afternoon|evening|following|quick|also|separately|and|but|so|yes|no|ok|okay|re|fw|fwd|sent|from|subject|בבקשה|נא|אנא|אפשר|תוכל|תוכלי|תוכלו|תשלח|תשלחי|שלום|היי|הי|תודה|בברכה|בתודה|בהמשך|צהריים|בוקר|ערב|רבה|שבוע|נשלח|יום|המשך|טובים|טוב|רב|שיחתנו|לשיחתנו|נעים|המשך)$/i;
+  function restStartsAsk(rest) {
+    const r = String(rest || '');
+    if (/^(?:can|could|would|will|please|kindly)\b/i.test(r)) return true;
+    if (/^(?:תוכל|תוכלי|תוכלו|תשלח|תשלחי|נא|בבקשה|אפשר)/.test(r)) return true;
+    return false;
+  }
+  function otherCommaName(text, ctx) {
+    const raw = String(text || '');
+    const re = /([A-Z][a-zA-Z'’-]{1,40}|[\u0590-\u05FF]{2,20})\s*[,،]/g;
+    let m;
+    let sawReader = false;
+    let sawOther = false;
+    while ((m = re.exec(raw))) {
+      const name = m[1];
+      const rest = raw.slice(m.index + m[0].length).replace(/^[\s\u00a0\u200f]+/, '');
+      // The ask has to start at the name. A signature or a noun with a
+      // prefix (הספק, לשיחתנו) is not a person being addressed.
+      if (/^[\u0590-\u05FF]/.test(name) && /^[הבלמוכ]/.test(name)) continue;
+      if (!personToken(name) || NOT_COMMA_NAME.test(name) || !restStartsAsk(rest)) continue;
+      if (nameIsReader(name, ctx)) sawReader = true;
+      else sawOther = true;
+    }
+    return sawOther && !sawReader;
   }
   // The reader is only in Cc, and the mail does not greet them by name.
   // That is quiet for every kind: a file, a task, a log, a hold. A greeting
@@ -1437,6 +1466,22 @@ const FlowIntent = (() => {
     if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge');
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
+    // A negated or conditional ask stays quiet. A sentence that still asks
+    // (please pay, if you can send, let's meet) is the close.
+    if (!blocked && typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.commitmentHeldBack === 'function' && FlowCloseFamilies.commitmentHeldBack(text)) {
+      return stayQuiet('hedge');
+    }
+    // A past-dated "we agreed to" the user sent themself is still the
+    // promise. The dated gate requires a future day, so October 14 on the
+    // 16th never reached a title. The title is Log commitment.
+    if (!blocked && addressedToSelf(ctx) && weAgreedPromise(text) && isPast) {
+      return finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: 'Log commitment',
+        when: null,
+        dateIso: null
+      });
+    }
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {
         let matched = familyBox.hit.matched || null;
@@ -2196,6 +2241,27 @@ const FlowIntent = (() => {
     else if (name.charAt(0) === name.charAt(0).toLowerCase()) name = name.charAt(0).toUpperCase() + name.slice(1);
     return 'Call' + (article ? ' ' + article : '') + ' ' + name;
   }
+  // "Need to call tomorrow" names no person and no place. The subject is
+  // the object: Call about the Q4 plan, or שיחה בנושא plus that topic.
+  // "Call the bank" and "Call Yossi" already returned from callTitle.
+  // "I'll call you" and "per our call" are not this reminder.
+  function callAboutSubject(src, subject) {
+    const raw = String(src || '');
+    if (/\bcall you\b/i.test(raw)) return '';
+    if (/\b(?:i|we)(?:'|’)?ll\s+join\s+(?:the\s+)?call\b/i.test(raw)) return '';
+    if (/\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(raw)) return '';
+    if (/\bper our (?:call|chat)\b/i.test(raw)) return '';
+    const bare = /\b(?:need to|have to|remember to|reminder to|please|gotta|time to|must)\s+call\b/i.test(raw)
+      || /^(?:please\s+)?call(?:\s+(?:tomorrow|today|tonight|back|soon|asap))?(?:[.!]|$)/i.test(raw.trim());
+    if (!bare) return '';
+    const sub = cleanSubject(subject);
+    if (!sub || weakSubject(sub)) return '';
+    if (/[\u0590-\u05FF]/.test(raw) || /[\u0590-\u05FF]/.test(sub)) {
+      const topic = heTopic(subject);
+      return topic ? clipTitle('שיחה בנושא ' + topic) : '';
+    }
+    return clipTitle('Call about ' + sub);
+  }
   // Self-sent, and not this person's own promise. The title is the action.
   const SELF_EN_VERBS = [
     [/\bshoot me\b/i, 'Send'],
@@ -2253,6 +2319,8 @@ const FlowIntent = (() => {
     }
     const phone = callTitle(src, subject);
     if (phone) return phone;
+    const about = callAboutSubject(src, subject);
+    if (about) return about;
     if (callAsk(src)) {
       const titled = he
         ? joinTitle('להתקשר', '', subject, { phoneHe: true, src: src })

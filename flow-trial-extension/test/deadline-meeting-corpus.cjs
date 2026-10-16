@@ -55,7 +55,7 @@ function gmail(text, from) {
   const intent = classify(text, who);
   if (!intent || !intent.type || !FlowIntent.shouldShowChip(intent)) return { show: false, reason: 'quiet', intent };
   const gate = FlowFileAttach.gate(text);
-  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent, gate };
+  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent, gate };
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST) return { show: 'drive', reason: 'drive-search', intent, gate };
   const process = proc(intent);
   return { show: true, intent, process, gate };
@@ -99,22 +99,20 @@ function fileCase(name, text, objectId) {
   const gate = FlowFileAttach.gate(text);
   const g = gmail(text);
   const o = outlook(text);
-  const owned = FlowResolution && FlowResolution.owns(objectId);
+  const payment = FlowResolution && FlowResolution.attestsPayment(objectId);
   check(name + ': not a scheduled event', intent && intent.type === 'request' && (!process || process.id !== 'schedule-confirm'), { type: intent && intent.type, proc: process && process.id, family: intent && intent.closeFamily });
   check(name + ': file gate is ' + objectId, gate.kind === 'clear' && gate.ask && gate.ask.id === objectId, gate);
-  if (owned) {
-    // A contract is already the resolution file path (the loop card), the same
-    // close as "send the contract" with no meeting in it. It must not become
-    // a schedule card, and it must not grow a second Drive chip.
-    check(name + ': both surfaces keep the resolution file path', g.show === false && g.reason === 'file' && !o.entry && o.why.indexOf('file') !== -1, { gmail: g, outlook: o.why });
+  if (payment) {
+    // A receipt attests a payment. The shared judge silences that chip.
+    // A contract is a file to send, not that silence.
+    check(name + ': both surfaces keep the receipt silence', g.show === false && g.reason === 'file' && !o.entry && o.why.indexOf('file') !== -1, { gmail: g, outlook: o.why });
   } else {
     check(name + ': Gmail searches Drive before a chip', g.show === 'drive', g);
     check(name + ': Outlook stays on the file, not a schedule card', !o.entry && o.why.indexOf('file-chain-not-run') !== -1, o.why);
   }
   const jg = judge(text, 'gmail');
   const jo = judge(text, 'outlook');
-  const fileReason = owned ? 'file' : 'file-chain-not-run';
-  check(name + ': both judges refuse schedule-confirm', jg.intent && jg.intent.type !== 'event' && (owned ? (jg.reason === 'file' && jo.reason === 'file') : jo.reason === fileReason), { gmail: jg.reason || (jg.process && jg.process.id), outlook: jo.reason });
+  check(name + ': both judges refuse schedule-confirm', jg.intent && jg.intent.type !== 'event' && (payment ? (jg.reason === 'file' && jo.reason === 'file') : jo.reason === 'file-chain-not-run'), { gmail: jg.reason || (jg.process && jg.process.id), outlook: jo.reason });
 }
 
 console.log('\n--- a meeting used as a deadline is the file, not a schedule ---\n');

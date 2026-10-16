@@ -202,6 +202,8 @@ const FlowCloseFamilies = (() => {
   }
 
   function hedged(sentence) {
+    // "אם אפשר, תשלח" is the ask. Bare "אם אפשר" stays a hedge.
+    if (sentenceLiveAsk(sentence)) return false;
     return HEDGE_EN.test(sentence) || HEDGE_HE.test(sentence);
   }
   function negated(sentence) {
@@ -269,8 +271,64 @@ const FlowCloseFamilies = (() => {
     }
     return found.length + he.length >= 2;
   }
+  function normHold(raw) {
+    return String(raw || '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u2060\u200E\u200F]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // A real ask that is still on. A hypothetical, an "if we approve", and
+  // "nothing has been decided" are not this, even when "could you" follows.
+  function sentenceLiveAsk(raw) {
+    const t = normHold(raw);
+    if (!t) return false;
+    if (/\bhypothetical/i.test(t) || /\bif\s+we\s+approv/i.test(t) || /באופן תיאורטי/.test(t)) return false;
+    if (/אם נאשר/.test(t) && !/אם אפשר/.test(t)) return false;
+    if (/\bnothing has been decided\b/i.test(t) && !/\bwe confirmed it\b/i.test(t)) return false;
+    if (/\b(?:do not|don'?t)\b/i.test(t) && !/\bwe confirmed it\b/i.test(t)) return false;
+    if (/\bno\s+ne+d\s+to\b/i.test(t)) return false;
+    if (/\b(?:please|kindly)\b/i.test(t) && /\b(?:pay|send|wire|process|schedule|remit|reply|confirm)\b/i.test(t)) return true;
+    if (/\bif you can\b/i.test(t) && /\b(?:send|pay|attach|forward|share)\b/i.test(t)) return true;
+    if (/\bwe confirmed it\b/i.test(t) && /\bplease\s+pay\b/i.test(t)) return true;
+    if (/אם אפשר/.test(t) && /(?:תשלח|שלח|תעביר|העבר|לשלוח)/.test(t)) return true;
+    if (/נא\s+לשלם/.test(t)) return true;
+    if (/\b(?:can|could)\s+we\s+meet\b/i.test(t) || /\blet'?s\s+meet\b/i.test(t)) return true;
+    if (/אפשר\s+לקבוע\s+פגישה/.test(t) || /אפשר\s+לשלוח/.test(t)) return true;
+    if (/אשמח אם תוכל/.test(t)) return true;
+    if (/\b(?:can|could|would)\s+you\b/i.test(t) && /\b(?:send|pay|schedule|forward|attach|deliver|meet|confirm|review)\b/i.test(t)) return true;
+    if (/תוכל/.test(t) && /(?:לקבוע|לשלוח|להעביר|לשלם)/.test(t)) return true;
+    return false;
+  }
+  // Negated or still conditional. "No ned" and "utnil we confirm" are the
+  // same hold as the spelled words. A live ask in this sentence is not a hold.
+  function sentenceHeldBack(raw) {
+    const t = normHold(raw);
+    if (!t || sentenceLiveAsk(t)) return false;
+    if (/\b(?:do not|don'?t)\b/i.test(t)) return true;
+    if (/\bno\s+ne+d\s+to\b/i.test(t)) return true;
+    if (/\b(?:until|utnil)\s+we\s+confirm\b/i.test(t)) return true;
+    if (/\bif\s+we\s+approv/i.test(t)) return true;
+    if (/\bhypothetical/i.test(t)) return true;
+    if (/\bnothing has been decided\b/i.test(t)) return true;
+    if (/באופן תיאורטי/.test(t)) return true;
+    if (/אם נאשר/.test(t)) return true;
+    if (/אל\s*תשל/.test(t)) return true;
+    if (/אין צורך/.test(t)) return true;
+    if (/לא נדר(?:שת|ת)?\s+פעולה/.test(t)) return true;
+    if (/\b(?:possibly|tentatively)\b/i.test(t) && /\b(?:meet|confirm)\b/i.test(t)) return true;
+    return false;
+  }
+  // Quiet only when a hold is present and no sentence still asks.
+  function commitmentHeldBack(text) {
+    const parts = splitSentences(normHold(text));
+    if (!parts.length) return false;
+    let held = false;
+    for (let i = 0; i < parts.length; i++) {
+      if (sentenceLiveAsk(parts[i])) return false;
+      if (sentenceHeldBack(parts[i])) held = true;
+    }
+    return held;
+  }
   function skipSentence(sentence) {
     if (hedged(sentence) || pastDone(sentence) || statusQuestion(sentence)) return true;
+    if (sentenceHeldBack(sentence)) return true;
     // "We don't have a quote" names a missing asset. "Please don't send" does not.
     if (negated(sentence) && !notFound(sentence)) return true;
     return false;
@@ -600,6 +658,7 @@ const FlowCloseFamilies = (() => {
 
   function matchMoney(sentence, facts, now) {
     if (pastDone(sentence)) return null;
+    if (sentenceHeldBack(sentence)) return null;
     // "Has the fee been confirmed?" is a question, not an approval.
     if (/\?\s*$/.test(sentence)) return null;
     // "Nothing is confirmed yet" names the word in order to withdraw it.
@@ -960,7 +1019,7 @@ const FlowCloseFamilies = (() => {
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, parkingPermitAsk, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
+  return { assess, askBlocked, parkingPermitAsk, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE, commitmentHeldBack, sentenceHeldBack, sentenceLiveAsk };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

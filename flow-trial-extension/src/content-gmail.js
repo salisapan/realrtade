@@ -1652,10 +1652,10 @@ function glanceUiCopy(kind) {
       recordSilence(messageId, fileGate.reason === 'third-party' ? 'third-party' : 'file');
       return;
     }
-    // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
-    // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
-    // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
-    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+    // A request that attests a payment (a receipt) takes more than one step.
+    // The shared judge is the only receipt check on this page. A contract,
+    // a quote, or a signed copy is a file to send, not that silence.
+    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
       recordSilence(messageId, 'file');
       return;
     }
