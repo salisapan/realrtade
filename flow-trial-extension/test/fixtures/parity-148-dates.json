@@ -56,14 +56,28 @@
     { "id": "v2syn-26338", "subject": "בוטל", "body": "היי לכולם, מבטלת את השיחה של ביום ראשון יום נעים, נועה" },
     { "id": "v2syn-26354", "subject": "השב: שינוי", "body": "שלום רב, מבטלת את הפגישה של ביום רביעי הבא תודה רבה, דנה" },
     { "id": "v2syn-4719", "subject": "Hold off", "body": "Following up on our call. Don't schedule the demo on Sunday at 14:30." },
-    { "id": "v2syn-6221", "subject": "Out of office", "body": "I am out of the office until October 20 with limited access to email." },
-    { "id": "v2syn-6224", "subject": "Fwd: Automatic reply", "body": "I am out of the office until October 20 with limited access to email." },
+    { "id": "v2syn-6221", "subject": "Out of office", "body": "Following up on our call. I am out of the office until October 20 with limited access to email." },
+    { "id": "v2syn-6224", "subject": "Fwd: Automatic reply", "body": "Following up on our call. I am out of the office until October 20 with limited access to email." },
+    { "id": "v2syn-6193", "subject": "Automatic reply", "body": "Following up on our call. I am out of the office until October 20 with limited access to email." },
     { "id": "v2syn-17029", "subject": "Automatic reply", "body": "I am out of the office until next Monday with limited access to email." },
     { "id": "v2syn-26154", "subject": "RE: סיכום", "body": "השיחת זום הייתה ביום ראשון ב-10:00, תודה שוב" },
     { "id": "v2syn-26182", "subject": "סיכום", "body": "הראיון הייתה ביום ראשון ב-10:00, תודה שוב" },
     { "id": "v2syn-5616", "subject": "Thanks", "body": "The demo was on Monday at 2pm, thanks again." },
     { "id": "v2syn-16630", "subject": "Change of plans", "body": "The check-in Sunday at 11:15 is no loner needed." },
-    { "id": "v2syn-15670", "subject": "", "body": "You don't ned to save the attachmment to Drive." }
+    { "id": "v2syn-5784", "subject": "Change of plans", "body": "The kickoff tomorrow at 9am is cancelled." },
+    { "id": "v2syn-5749", "subject": "Change of plans", "body": "The review meeting next Monday at 10:00 is cancelled." },
+    { "id": "v2syn-26311", "subject": "הועבר: שינוי", "body": "סאלי שלום, הפגישה ביום חמישי לא תתקיים יום נעים, דנה" }
+  ],
+  "offer8473": {
+    "id": "v2syn-8473",
+    "subject": "תגובה: תזכורת",
+    "body": "אשלח את גיליון התמחור ב-19 באוקטובר ב-13:00.",
+    "date": "2026-10-19",
+    "plan": "log-it"
+  },
+  "pending144": [
+    { "id": "v2syn-15670", "subject": "", "body": "You don't ned to save the attachmment to Drive.", "pending": "#144" },
+    { "id": "v2syn-24499", "subject": "", "body": "לא צרךי לשמור את הקובץ המצורף ל-Drive", "pending": "#144" }
   ],
   "replies": [
     "בבקשה תשיב לי ביום ראשון 22/10 בשעה 14:00 לגבי ההצעה",

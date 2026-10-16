@@ -1452,12 +1452,14 @@ const FlowIntent = (() => {
       // An explicit meet at this clock is the hold. A sender's own promise
       // plus a clock ("I'll send the form tomorrow at 9am", "אחזור אליך ב-11")
       // is quiet. "We agreed … at 3pm" stays a task, not a new event.
+      // ב-HH:MM is the meeting clock. It does not silence a dated promise.
       if (clock && explicitMeetingAsk) {
         committed.hour = facts.time.hour;
         committed.minute = facts.time.minute;
         return finish(TYPES.SCHEDULED_EVENT, 'high', committed, 'calendar-hold');
       }
-      if (clock && s.flags.senderPromise) return stayQuiet('hedge');
+      const meetingPrefixClock = /ב-\s*\d{1,2}:\d{2}/.test(String(clock && clock.raw || ''));
+      if (clock && s.flags.senderPromise && !meetingPrefixClock) return stayQuiet('hedge');
       return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {

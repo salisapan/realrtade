@@ -381,7 +381,8 @@
       threadUrl: ctx.threadUrl || null,
       hasThreadAttachment: Boolean(ctx.hasThreadAttachment),
       executionMemory: ctx.executionMemory || null,
-      attachFile: ctx.attachFile || null
+      attachFile: ctx.attachFile || null,
+      text: text
     }) : null;
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
     return { show: true, intent: intent, process: process };

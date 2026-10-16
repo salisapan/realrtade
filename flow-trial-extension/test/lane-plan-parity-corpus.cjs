@@ -214,7 +214,47 @@ for (const row of fix.quiet) {
   });
 }
 check('quiet fixtures: 0 wrong shows', quietWrong === 0, quietWrong);
-check('quiet fixtures are the set of ' + fix.quiet.length, fix.quiet.length === 12, fix.quiet.length);
+check('quiet fixtures are the set of ' + fix.quiet.length, fix.quiet.length === 15, fix.quiet.length);
+
+{
+  const row = fix.offer8473;
+  const got = both(row.body, { subject: row.subject });
+  const g = shape(got.g && got.g.process);
+  const o = shape(got.o && got.o.process);
+  check(row.id + ' offers the dated commitment as a track',
+    got.g && got.g.show === true && got.o && got.o.show === true &&
+    g && o && g.id === row.plan && o.id === row.plan &&
+    got.intent && got.intent.personalClose === 'dated-commitment' &&
+    got.intent.entities && got.intent.entities.dateIso === row.date &&
+    g.id !== 'hold' && o.id !== 'hold',
+    { g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason], close: got.intent && got.intent.personalClose, date: got.intent && got.intent.entities && got.intent.entities.dateIso });
+}
+
+const relativePromises = [
+  ['v2syn-14842', "I'll send the tax form over tomorrow at 9am."],
+  ['v2syn-2047', 'I will send the W-9 Monday at 16:00.']
+];
+for (const row of relativePromises) {
+  const got = both(row[1]);
+  const showed = (got.g && got.g.show === true) || (got.o && got.o.show === true);
+  check(row[0] + ' sender promise with a relative clock stays quiet', !showed, {
+    g: got.g && (got.g.reason || (got.g.process && got.g.process.id)),
+    o: got.o && (got.o.reason || (got.o.process && got.o.process.id))
+  });
+}
+
+let pendingWrong = 0;
+for (const row of fix.pending144) {
+  const got = both(row.body, { subject: row.subject });
+  const showed = (got.g && got.g.show === true) || (got.o && got.o.show === true);
+  if (showed) pendingWrong++;
+  check(row.id + ' expected quiet, pending-' + row.pending, !showed && row.pending === '#144', {
+    pending: row.pending,
+    g: got.g && (got.g.reason || (got.g.process && got.g.process.id)),
+    o: got.o && (got.o.reason || (got.o.process && got.o.process.id))
+  });
+}
+check('pending-#144 save negations: 0 wrong shows', pendingWrong === 0, pendingWrong);
 
 const html = FlowStepKit.stageHTML({
   intent: 'Meeting',

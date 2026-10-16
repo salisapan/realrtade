@@ -519,6 +519,8 @@ const FlowActions = (() => {
   // contradicts the calendar day even when no clock was written. Every
   // other mail keeps processFor, the plan from before this override.
   // A weekday contradiction is a hold with both dates and no chosen one.
+  // meetingPlanVeto (cancel report, negation, out-of-office, past tense)
+  // removes the meeting plan. The Outlook judge calls that same function.
   function meetingClock(intent) {
     const e = intent && intent.entities;
     return Boolean(e && Number.isInteger(e.hour) && Number.isInteger(e.minute));
