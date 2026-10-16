@@ -131,13 +131,60 @@ const ROWS = [
     from: { name: 'יוסי אברהם', email: 'yossi@initech.co.il' }, to: [OWN.outlook], subject: 'השב: הצעת המחיר מצורף',
     body: 'בוקר טוב, מצורף גיליון התמחור. נא לשמור אותו ל-Drive עד 20/10. המשך יום טוב' },
   labeled(QUIET, '{"id":"v2syn-15670","lang":"en","surface":"gmail","from":{"name":"Billing","email":"billing@initech.com"},"to":["ai.local.flow@gmail.com"],"cc":[],"subject":"Hold off","body":"You don\'t ned to save the attachmment to Drive.\\r\\n\\r\\nSent from my iPhone","attachmentCount":1}'),
-  labeled(QUIET, '{"id":"v2syn-24499","lang":"he","surface":"outlook","from":{"name":"דנה לוי","email":"dana@acme.co.il"},"to":["glance.salisapan@outlook.com"],"cc":[],"subject":"Re: לא לשמור","body":"\u200fהיי לכולם,\\n\\n\u200fלא צרכי לשמור את הקובץ המצורף ל-Drive\\n\\n\u200fתודה,\\n\u200fדנה\\n\\n\u200f--\\n\u200fדנה לוי\\n\u200fיועצת משפטית | גלובקס\\n\u200f054-1055433\\n\u200fwww.acme.co.il","attachmentCount":1}'),
+  labeled(QUIET, '{"id":"v2syn-24499","lang":"he","surface":"outlook","from":{"name":"דנה לוי","email":"dana@acme.co.il"},"to":["glance.salisapan@outlook.com"],"cc":[],"subject":"Re: לא לשמור","body":"\u200fהיי לכולם,\\n\\n\u200fלא צרךי לשמור את הקובץ המצורף ל-Drive\\n\\n\u200fתודה,\\n\u200fדנה\\n\\n\u200f--\\n\u200fדנה לוי\\n\u200fיועצת משפטית | גלובקס\\n\u200f054-1055433\\n\u200fwww.acme.co.il","attachmentCount":1}'),
   { id: 'v2syn-7321', expect: QUIET, surface: 'gmail', direction: 'outbound', attachmentCount: 0,
     from: { name: 'Sali Sapan', email: OWN.gmail }, to: ['sarah@northwind.co.il'], subject: 'חשבונית ₪450',
     body: 'נא להסדיר את היתרה של ₪450 עד 20/10. תודה רבה' },
   { id: 'v2syn-22027', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'יוסי אברהם', email: 'yossi@initech.co.il' }, to: ['colleague4@initech.co.il', OWN.gmail], subject: 'Re: חשבונית ₪500',
-    body: 'בוקר טוב שירן,\nתוכל לסגור את היתרה של ₪15,000 עד 20/10?\nתודה רבה,\nיוסי' }
+    body: 'בוקר טוב שירן,\nתוכל לסגור את היתרה של ₪15,000 עד 20/10?\nתודה רבה,\nיוסי' },
+  // A cancelled, postponed, or marketing meeting is not a calendar offer.
+  { id: 'v2syn-26281', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'שינוי',
+    body: 'הפגישה ביום שני לא תתקיים' },
+  { id: 'v2syn-10902', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'RE: שינוי',
+    body: 'הcall ביום שלישי בשעה 9:00 בולה.' },
+  { id: 'v2syn-16571', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Ethan Hunt', email: 'ethan@initech.com' }, to: [OWN.gmail], subject: 'FW: Cancelled',
+    body: 'We nede to postone the kickoff on tomorrow at 2pm.' },
+  { id: 'v2syn-26412', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'השב: ניוזלטר',
+    body: 'הצטרפו לוובינר מחר בשעה 9:00 – ההרשמה פתוחה' },
+  { id: 'v2syn-26413', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'השב: ניוזלטר',
+    body: 'הצטרפו לוובינר מחר בעה 9:00 – ההרשמה פתוחה' },
+  { id: 'v2syn-26433', expect: 'veto', surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'מבצע!',
+    body: 'הצטרפו לוובינר מחר ב-11:15 – ההרשמה פתוחה' },
+  { id: 'v2syn-6465', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'price quote',
+    body: 'Tom \u2014 could you review the price quote next Tuesday?' },
+  { id: 'v2syn-10146', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 1,
+    from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'שמירה',
+    body: 'אין צרך לשמור את הקובץ המצורף בדרייב.' },
+  // A label and a colon is not a name. Newline is the form that went quiet.
+  // v2syn-9656 is an offer: confirmed amount, a To Do, no calendar.
+  { id: 'v2syn-568', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-16', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Reminder',
+    body: 'Dear Sali,\nReminder: the payment of \u20aa3,400 is due by EOD. Please process it.' },
+  { id: 'v2syn-14070', expect: 'as', type: 'commitment', date: '2026-10-27', process: 'follow-through', task: true,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Reminder',
+    body: 'Hey Sali,\nReminder: you committed to send the invoice next Tuesday.' },
+  { id: 'v2syn-14076', expect: 'as', type: 'commitment', date: null, process: 'follow-through', task: true,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'Dana Levi', email: 'dana@acme.io' }, to: [OWN.gmail], subject: 'Reminder',
+    body: 'Reminder: you committed to send the quarterly report today.' },
+  { id: 'v2syn-7357', expect: 'as', type: 'request', close: 'follow-up-ask', date: '2026-10-16', process: 'reply-track',
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'נועה פרץ', email: 'noa@monday-partner.co.il' }, to: [OWN.gmail], subject: 'תזכורת',
+    body: 'שלום,\nתזכורת: תשלום של \u20aa18,500 עד סוף היום. נא לטפל.' },
+  { id: 'v2syn-9656', expect: 'as', type: 'decision', close: 'confirmed-amount', date: null, process: 'log-it', task: true,
+    surface: 'gmail', direction: 'inbound', attachmentCount: 0,
+    from: { name: 'נועה פרץ', email: 'noa@monday-partner.co.il' }, to: [OWN.gmail], subject: 'אושר',
+    body: 'שלום סאלי,\nאושר: \u20aa450 עבור המעבר לענן.' }
 ];
 
 function summarise(out) {
@@ -171,6 +218,15 @@ for (const row of ROWS) {
     ok = out.show === true && out.intent && out.intent.personalClose === 'drive-file' &&
       out.process && out.process.id === 'file-it' &&
       k.some((kind) => kind === 'driveFile' || kind === 'onedriveFile');
+  } else if (row.expect === 'veto') {
+    ok = out.show !== true && out.reason === 'meeting-veto' && !k.some((kind) => kind === 'calendar');
+  } else if (row.expect === 'as') {
+    const date = out.intent && out.intent.entities ? out.intent.entities.dateIso : undefined;
+    const closeOk = !row.close || (out.intent && out.intent.personalClose === row.close);
+    ok = out.show === true && out.intent && out.intent.type === row.type && closeOk &&
+      date === row.date && !k.some((kind) => kind === 'calendar') &&
+      (!row.task || k.some(taskKind)) &&
+      (!row.process || (out.process && out.process.id === row.process));
   } else {
     ok = out.show === true && out.intent && out.intent.entities && out.intent.entities.dateIso === '2026-10-20' && !k.some((kind) => kind === 'calendar');
   }

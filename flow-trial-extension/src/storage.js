@@ -238,6 +238,9 @@ const FlowStorage = (() => {
     // list reads it through get(); a key absent from DEFAULTS never arrives.
     outlookPageDiag: [],
     glanceWhyCurrent: null,
+    // One why per conversation. A tab writes its own key and never clears
+    // another conversation by storing an empty current why.
+    glanceWhyByConv: {},
     // UI language for card and panel chrome. Null follows the browser
     // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
     glanceUiLanguage: null,

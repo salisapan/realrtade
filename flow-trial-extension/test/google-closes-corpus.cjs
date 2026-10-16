@@ -317,7 +317,9 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
     'לא צריך לשמור את הקובץ המצורף ל-Drive',
     'אל תשמור את הקובץ המצורף ל-Drive',
     'לא לשמור את הקובץ המצורף ל-Drive',
-    'אין צורך לשמור את הקובץ המצורף ל-Drive'
+    'אין צורך לשמור את הקובץ המצורף ל-Drive',
+    'אין צרך לשמור את הקובץ המצורף בדרייב.',
+    'לא צרךי לשמור את הקובץ המצורף ל-Drive'
   ];
   heTypos.forEach((text) => {
     const row = plan(text, { attachmentCount: 1 });

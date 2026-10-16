@@ -337,7 +337,12 @@
     if (record.extra) Object.assign(stored, record.extra);
     rememberDecision(stored);
     try {
-      const bag = await new Promise((resolve) => storageGet({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
+      const bag = await new Promise((resolve) => storageGet({
+        [PAGE_DIAG_KEY]: [],
+        outlookSync: {},
+        glanceWhyCurrent: null,
+        glanceWhyByConv: {}
+      }, resolve));
       if (stored.epoch !== mailEpoch) return;
       const ids = recordIds(stored);
       let list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => {
@@ -348,12 +353,28 @@
       });
       list.unshift(stored);
       const patch = { [PAGE_DIAG_KEY]: list.slice(0, 40) };
-      patch.glanceWhyCurrent = stored.verdict === 'show' ? null : {
+      const whyKey = String(stored.conversationId || stored.messageId || '');
+      const map = Object.assign({}, bag.glanceWhyByConv || {});
+      const entry = {
         reason: stored.reason,
         subject: stored.subject || '',
         messageId: stored.messageId || null,
+        conversationId: stored.conversationId || stored.messageId || null,
         at: stored.at
       };
+      if (stored.verdict === 'show') {
+        if (whyKey && map[whyKey]) delete map[whyKey];
+      } else if (whyKey && stored.reason) {
+        map[whyKey] = entry;
+      }
+      patch.glanceWhyByConv = map;
+      const current = bag.glanceWhyCurrent;
+      const currentKey = current && String(current.conversationId || current.messageId || '');
+      if (stored.verdict === 'show') {
+        if (!current || !currentKey || currentKey === whyKey) patch.glanceWhyCurrent = null;
+      } else if (whyKey && stored.reason) {
+        patch.glanceWhyCurrent = entry;
+      }
       const sync = bag.outlookSync || {};
       if (Array.isArray(sync.diagnostics)) {
         const diagnostics = sync.diagnostics.filter((d) => {
@@ -1340,13 +1361,38 @@
     lastKey = '';
   }
 
-  function bumpMailEpoch(why, keepCard) {
+  function openTokenKey(token) {
+    const t = String(token || '');
+    if (t.indexOf('msg|') === 0) return t.slice(4).split('|')[0];
+    if (t.indexOf('conv|') === 0) return t.slice(5).split('|')[0];
+    return '';
+  }
+
+  // Drop this tab's why when the mail it left is the one stored. Another
+  // tab's why stays. An empty write never replaces a different conversation.
+  function releaseStoredWhy(token) {
+    const mine = openTokenKey(token);
+    if (!mine) return;
+    try {
+      chrome.storage.local.get({ glanceWhyCurrent: null, glanceWhyByConv: {} }, (bag) => {
+        const map = Object.assign({}, (bag && bag.glanceWhyByConv) || {});
+        if (map[mine]) delete map[mine];
+        const current = bag && bag.glanceWhyCurrent;
+        const curKey = current && String(current.conversationId || current.messageId || '');
+        const patch = { glanceWhyByConv: map };
+        if (!current || !curKey || curKey === mine) patch.glanceWhyCurrent = null;
+        try { chrome.storage.local.set(patch); } catch (e) { /* storage gone */ }
+      });
+    } catch (e) { /* storage gone */ }
+  }
+
+  function bumpMailEpoch(why, keepCard, leftToken) {
     mailEpoch += 1;
     if (!keepCard) {
       clearOpenCards();
       lastOutcome = '';
       try { clearWhyNot(mountPoint()); } catch (e) { /* no pane */ }
-      try { chrome.storage.local.set({ glanceWhyCurrent: null }); } catch (e) { /* storage gone */ }
+      if (leftToken) releaseStoredWhy(leftToken);
     }
     lastSig = '';
     try { console.info('Glance: stale card cleared', why || '', String(mailEpoch)); } catch (e) { /* console gone */ }
@@ -1365,10 +1411,11 @@
     if (!token || token === '|||') return false;
     if (!openMailToken) { openMailToken = token; return false; }
     if (token === openMailToken) return false;
+    const left = openMailToken;
     openMailToken = token;
     switchPending = true;
     markMailOpened();
-    bumpMailEpoch('open-mail');
+    bumpMailEpoch('open-mail', false, left);
     return true;
   }
 

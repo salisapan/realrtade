@@ -124,3 +124,39 @@ test('Why-not-shown drops the message once its card is showing', async ({ glance
   await expect(why).toContainText('לא זוהתה בקשה');
   await expect(quietList.getByText('Show me')).toHaveCount(0);
 });
+
+test('two quiet tabs each keep a why line in the popup', async ({ glance }) => {
+  const first = await glance.openOutlook({
+    id: S.MSG_A,
+    subject: 'Quiet one',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(first.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const row = bag.glanceWhyByConv && bag.glanceWhyByConv[S.MSG_A];
+    return Boolean(row && row.reason && row.subject === 'Quiet one');
+  }).toBe(true);
+
+  const second = await glance.openOutlook({
+    id: S.MSG_B,
+    subject: 'Quiet two',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(second.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const map = bag.glanceWhyByConv || {};
+    const one = map[S.MSG_A];
+    const two = map[S.MSG_B];
+    return Boolean(one && one.reason && one.subject === 'Quiet one' && two && two.reason && two.subject === 'Quiet two');
+  }).toBe(true);
+
+  const popup = await glance.openPopup();
+  const list = popup.locator('#surface-list');
+  await expect(list.locator('[data-glance-why-line]')).toHaveCount(2);
+  await expect(list.getByText('Quiet one')).toBeVisible();
+  await expect(list.getByText('Quiet two')).toBeVisible();
+});

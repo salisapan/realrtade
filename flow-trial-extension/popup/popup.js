@@ -113,15 +113,16 @@
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local') return;
-      if (ch.glanceWhyCurrent) {
+      if (ch.glanceWhyCurrent || ch.glanceWhyByConv) {
         whyRev += 1;
-        if (state) state.glanceWhyCurrent = ch.glanceWhyCurrent.newValue || null;
+        if (state && ch.glanceWhyCurrent) state.glanceWhyCurrent = ch.glanceWhyCurrent.newValue || null;
+        if (state && ch.glanceWhyByConv) state.glanceWhyByConv = ch.glanceWhyByConv.newValue || {};
         // The row already on screen updates now. A rebuild still in flight
         // reads this same value when it appends, so a late snapshot cannot
         // leave the line off after the write has landed.
         syncWhyLine(whyRev).catch(() => {});
       }
-      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceUiLanguage)) return;
+      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceWhyByConv || ch.glanceUiLanguage)) return;
       const rev = whyRev;
       refresh().then(() => {
         if (rev !== whyRev) return;
@@ -298,8 +299,12 @@
     const next = await FlowStorage.get();
     if (rev !== whyRev && state) {
       const latest = state.glanceWhyCurrent;
+      const map = state.glanceWhyByConv;
+      const list = state.glanceWhyList;
       state = next;
       state.glanceWhyCurrent = latest;
+      if (map) state.glanceWhyByConv = map;
+      if (list) state.glanceWhyList = list;
     } else {
       state = next;
     }
@@ -1481,11 +1486,24 @@
     }
   }
 
-  function mountWhyLine(row, why) {
-    if (!row) return;
-    dropWhyLine(row);
+  function whyRowsFrom(bag) {
+    const map = bag && bag.glanceWhyByConv;
+    const rows = [];
+    if (map && typeof map === 'object') {
+      Object.keys(map).forEach((key) => {
+        const row = map[key];
+        if (row && row.reason) rows.push(row);
+      });
+    }
+    rows.sort((a, b) => (a.at || 0) - (b.at || 0));
+    if (rows.length) return rows;
+    const one = bag && bag.glanceWhyCurrent;
+    return one && one.reason ? [one] : [];
+  }
+
+  function appendWhyLine(row, why) {
     const copy = whyCopy(why);
-    if (!copy) return;
+    if (!copy || !row) return;
     const item = el('div', 'wait-note', copy.text);
     item.setAttribute('data-glance-why-line', copy.line);
     if (copy.subject) item.setAttribute('data-glance-why-subject', copy.subject);
@@ -1495,24 +1513,39 @@
     else row.appendChild(item);
   }
 
-  function paintWhyHosts(why) {
-    mountWhyLine(document.getElementById('surface-list'), why);
-    mountWhyLine(document.getElementById('log-list'), why);
+  function mountWhyLine(row, why) {
+    paintWhyList(row, why && why.reason ? [why] : []);
+  }
+
+  function paintWhyList(row, rows) {
+    if (!row) return;
+    dropWhyLine(row);
+    const list = (rows || []).slice().reverse();
+    list.forEach((why) => appendWhyLine(row, why));
+  }
+
+  function paintWhyHosts(rows) {
+    paintWhyList(document.getElementById('surface-list'), rows);
+    paintWhyList(document.getElementById('log-list'), rows);
   }
 
   // Paint the current quiet mail on Settings and on Activity.
   // A newer glanceWhyCurrent write bumps whyRev and this read is dropped.
   async function syncWhyLine(rev) {
     const seen = rev == null ? whyRev : rev;
-    let why = state && state.glanceWhyCurrent;
+    let rows = whyRowsFrom(state);
     try {
       const fresh = await FlowStorage.get();
       if (seen !== whyRev) return;
-      why = fresh && fresh.glanceWhyCurrent;
-      if (state) state.glanceWhyCurrent = why || null;
+      rows = whyRowsFrom(fresh);
+      if (state) {
+        state.glanceWhyCurrent = (fresh && fresh.glanceWhyCurrent) || null;
+        state.glanceWhyByConv = (fresh && fresh.glanceWhyByConv) || {};
+        state.glanceWhyList = rows;
+      }
     } catch (e) { /* the value the change applied still paints */ }
     if (seen !== whyRev) return;
-    paintWhyHosts(why);
+    paintWhyHosts(rows);
   }
 
   async function renderOutlookRow(host, gen) {
@@ -2018,7 +2051,7 @@
     host.replaceChildren();
     function paintWhy() {
       if (gen !== surfaceGen) return;
-      mountWhyLine(host, state && state.glanceWhyCurrent);
+      paintWhyList(host, (state && state.glanceWhyList) || whyRowsFrom(state));
     }
     if (!st || !st.ok) { paintWhy(); return; }
     try {
@@ -3166,8 +3199,8 @@
     const rows = activityRows(s.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
-    const whyNow = (revAtLog !== whyRev && state) ? state.glanceWhyCurrent : (s && s.glanceWhyCurrent);
-    mountWhyLine(host, whyNow);
+    const whyNow = (revAtLog !== whyRev && state) ? ((state.glanceWhyList) || whyRowsFrom(state)) : whyRowsFrom(s);
+    paintWhyList(host, whyNow);
     } finally { endRender(); }
   }
 

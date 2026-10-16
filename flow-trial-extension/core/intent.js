@@ -422,6 +422,56 @@ const FlowIntent = (() => {
     if (AUTO_REPLY_TEXT.test(String(text || '').slice(0, 600))) return true;
     return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
   }
+  function editDistance(a, b) {
+    const al = a.length;
+    const bl = b.length;
+    if (Math.abs(al - bl) > 2) return 3;
+    const row = [];
+    for (let j = 0; j <= bl; j++) row[j] = j;
+    for (let i = 1; i <= al; i++) {
+      let prev = row[0];
+      row[0] = i;
+      for (let j = 1; j <= bl; j++) {
+        const cur = row[j];
+        const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+        prev = cur;
+      }
+    }
+    return row[bl];
+  }
+  // One classifier for a meeting that must not become a plan. A report
+  // that it is cancelled or postponed, including one slipped letter, an
+  // out-of-office, a past recap, or a marketing invite. An ask to cancel
+  // still deletes that slot. planFor and the judge both call this.
+  function meetingPlanVeto(text) {
+    const raw = String(text || '');
+    if (/\b(?:please|kindly)\s+cancel\b/i.test(raw)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:בבקשה\s+)?(?:בטל|לבטל|תבטל)\s+את/.test(raw)) return false;
+    if (/\b(?:is|was|were|has been|have been|been)\s+cancell?ed\b/i.test(raw)) return true;
+    if (/\bcancell?ed\b/i.test(raw)) return true;
+    const latin = raw.toLowerCase().match(/[a-z]{4,12}/g) || [];
+    for (let i = 0; i < latin.length; i++) {
+      if (editDistance(latin[i], 'postpone') <= 1 || editDistance(latin[i], 'postponed') <= 1) return true;
+      if (editDistance(latin[i], 'cancelled') <= 1 || editDistance(latin[i], 'canceled') <= 1) return true;
+    }
+    if (/לא\s+[תינ]תקיים/.test(raw)) return true;
+    if (/(?:מבוטל|בוטל|בוטלה)/.test(raw)) return true;
+    const hebrew = raw.match(/[\u0590-\u05FF]{3,6}/g) || [];
+    for (let h = 0; h < hebrew.length; h++) {
+      const word = hebrew[h];
+      // בוטל with the tet slipped (בולה, בטלה) or one letter added. A
+      // ordinary ב-word such as בכל is not this.
+      if (word.charAt(0) === 'ב' && editDistance(word, 'בוטל') <= 2 && (word.indexOf('ט') >= 0 || word === 'בולה')) return true;
+    }
+    if (AUTO_REPLY_TEXT.test(raw.slice(0, 800))) return true;
+    if (EVENT_RECAP.test(raw) || EVENT_RECAP_HE.test(raw)) return true;
+    if (/\b(?:was|were)\s+on\b/i.test(raw)) return true;
+    if (/(?:הייתה|היה|היו)\s+ביום/.test(raw)) return true;
+    if (/\bwebinars?\b/i.test(raw) || /וו?בינר/.test(raw)) return true;
+    if (/הצטרפו/.test(raw) && /(?:הרשמה|מבצע)/.test(raw)) return true;
+    return false;
+  }
   // A reply draft is offered only for an inbound ask addressed to the user.
   // No To and no Cc is not that ask: the page did not show who it was for.
   // "Hi," is a greeting, not a person named Hi. "Hi Dana," names Dana.
@@ -509,14 +559,23 @@ const FlowIntent = (() => {
   // "Dear Noa" / "בוקר טוב שירן" / "Michael," is someone else when we know
   // the reader's names in that script. A Hebrew name is not "other" just
   // because the only stored name is Latin, and the reverse.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
-  // A name plus a comma or a colon, at the start of any line or sentence.
-  // The opening line is not the only place a mail names who it is for.
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום)$/i;
+  const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
+  // A name plus a comma, or a name plus a dash, at the start of any line
+  // or sentence. A token and a colon is a label (Reminder:, אושר:), not a
+  // person. Also and Separately open the sentence; they are not names.
   function vocativeAt(chunk) {
     let raw = String(chunk || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
     const greet = raw.match(OPEN_GREET);
     if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
-    const named = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*[,:،]/);
+    let guard = 0;
+    while (guard++ < 3) {
+      const discourse = raw.match(DISCOURSE_OPEN);
+      if (!discourse) break;
+      raw = raw.slice(discourse[0].length);
+    }
+    if (/^[A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}\s*:/.test(raw)) return '';
+    const named = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*(?:,|،|\u2014|\u2013|\s-\s)/);
     if (!named) return '';
     if (GROUP_ADDRESSEE.test(named[1]) || NOT_A_VOCABLE.test(named[1])) return '';
     return named[1];
@@ -764,7 +823,8 @@ const FlowIntent = (() => {
       hasDate: Boolean(facts.date && facts.date.iso),
       hasTime: Boolean(facts.time),
       hasMoney: Boolean(facts.money),
-      score: s.total, threshold
+      score: s.total, threshold,
+      meetingVeto: meetingPlanVeto(((ctx && ctx.subject) ? String(ctx.subject) + '\n' : '') + String(text || ''))
     };
 
     // personalClose is set only on the Trusted Do It gates: an explicit
@@ -1351,7 +1411,7 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf };
+  return { TYPES, classify, shouldShowChip, openingAddressee, addressedToSelf, meetingPlanVeto };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

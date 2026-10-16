@@ -135,11 +135,19 @@ const FlowIncomingJudge = (() => {
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-chain-not-run', intent };
     }
+    const vetoText = ((i.subject ? String(i.subject) + '\n' : '') + text);
     const process = actionsApi.planFor(intent, {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
-      executionMemory: i.executionMemory || null
+      executionMemory: i.executionMemory || null,
+      text: vetoText
     });
+    // Same classifier as planFor. A cancelled, postponed, out-of-office,
+    // past, or marketing meeting does not show, including when the plan
+    // would have been a hold or a schedule.
+    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+      return { show: false, reason: 'meeting-veto', intent };
+    }
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     // Outlook's Do It writes a reply draft when the process has one. A task-only
     // close writes Microsoft To Do. A calendar event with no draft and no task

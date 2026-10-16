@@ -65,7 +65,20 @@ const FlowGoogleCloses = (() => {
   // in the same clause, so a different "no need to" does not hide a real save.
   // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
   // is not a refusal: forget sits where need would.
-  const SAVE_NO = /\b(?:(?:do not|don't|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)|no\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צ(?:ריך|רכי)\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  const SAVE_NO = /\b(?:(?:do not|don't|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)|no\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  // אין / לא / אל, then a need-word, then the save verb. The need-word is
+  // צריך or צורך with י or ו slipped or dropped (צרך, צרכי, צרךי). The
+  // letters are the shape, not a list of spellings.
+  function hebrewNeedRefusal(text) {
+    const raw = String(text || '');
+    const re = /(?:^|[^\u0590-\u05FF])(?:אין|לא|אל)\s+(צ[וריכך]{2,4})\s+ל?(?:שמור|שמרי|לשמור|תתייק|תשמור)/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const word = m[1];
+      if (word.length >= 3 && word.length <= 5 && word.indexOf('ר') >= 0) return true;
+    }
+    return false;
+  }
 
   // Save-shaped only. The open Outlook page counts file attachments for
   // this sentence and for no other, so the rest of show and silence stay put.
@@ -89,17 +102,20 @@ const FlowGoogleCloses = (() => {
   // govern save, in another clause, leaves a real save in place. A later
   // "don't save" still refuses the whole mail, including when that later
   // clause only says "it" / "this" / "that" / אותו / את זה.
+  function saveRefused(clause) {
+    return SAVE_NO.test(clause) || hebrewNeedRefusal(clause);
+  }
   function refusesSave(text) {
     const raw = String(text || '');
     const clauses = saveClauses(raw);
-    if (clauses.some((clause) => clauseSaves(clause) && SAVE_NO.test(clause))) return true;
+    if (clauses.some((clause) => clauseSaves(clause) && saveRefused(clause))) return true;
     let seenSave = false;
     for (let i = 0; i < clauses.length; i++) {
       const clause = clauses[i];
-      if (seenSave && SAVE_NO.test(clause) && SAVE_BACK.test(clause)) return true;
+      if (seenSave && saveRefused(clause) && SAVE_BACK.test(clause)) return true;
       if (clauseSaves(clause)) seenSave = true;
     }
-    if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return SAVE_NO.test(raw);
+    if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return saveRefused(raw);
     return false;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
