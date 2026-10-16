@@ -635,7 +635,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
       page.releaseReconcile();
       await sleep(400);
       const text = chipText(page.doc);
-      const leaked = text.indexOf('Deleted in To Do') >= 0 || text.indexOf('A-ONLY-RECEIPT') >= 0 || text.indexOf("couldn't verify") >= 0;
+      const leaked = text.indexOf('Deleted in To Do') >= 0 || text.indexOf('נמחק ב-To Do') >= 0 || text.indexOf('A-ONLY-RECEIPT') >= 0 || text.indexOf("couldn't verify") >= 0;
       check('a slow ' + status + ' reconcile does not paint Q3 onto Office move after a ' + mode + ' switch',
         !leaked, { text: text, fetches: page.sent.filter((m) => m.type === 'flow:outlook-fetch').length });
       page.w.close();
@@ -665,7 +665,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
     const ids = raw.split('|').filter(Boolean);
     const badId = previousIds.some((id) => ids.indexOf(id) >= 0);
     const badLine = previousLines.some((line) => line && text.indexOf(line) >= 0);
-    const badState = text.indexOf('Deleted in To Do') >= 0 || text.indexOf("couldn't verify") >= 0;
+    const badState = text.indexOf('Deleted in To Do') >= 0 || text.indexOf('נמחק ב-To Do') >= 0 || text.indexOf("couldn't verify") >= 0;
     return badId || badLine || badState ? { text: text, raw: raw } : null;
   }
 
@@ -814,7 +814,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
   });
   const stillThere = legacyPage.store.glanceProofs && legacyPage.store.glanceProofs.records && legacyPage.store.glanceProofs.records['legacy-row'];
   check("Undo on a legacy case match says Couldn't confirm and deletes nothing",
-    Boolean(legacyUndo) && legacyText.indexOf("Couldn't confirm") >= 0 &&
+    Boolean(legacyUndo) && (legacyText.indexOf("Couldn't confirm") >= 0 || legacyText.indexOf('לא אומת') >= 0) &&
     legacyDeletes.length === legacyUndosBefore &&
     stillThere && stillThere.undone !== true,
     { text: legacyText, deletes: legacyDeletes.length, still: Boolean(stillThere) });

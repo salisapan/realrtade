@@ -1117,6 +1117,10 @@ function glanceUiCopy(kind) {
       if (hasBody(listed[i])) add(listed[i]);
     }
     if (nodes.length) return nodes;
+    // A handled receipt is stored on the .adn row. That row has the legacy
+    // id before the body is painted, and an inbox row does not.
+    for (let i = 0; i < marked.length; i++) add(marked[i]);
+    if (nodes.length) return nodes;
     if (main.querySelector('h2.hP')) return [];
     return listed;
   }
