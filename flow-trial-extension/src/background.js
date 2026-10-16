@@ -471,6 +471,32 @@ async function restoreSurfaces() {
     }
   } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
 }
+// Builds from before the one Meta consent registered WhatsApp Web as
+// flow-whatsapp. That registration can still be in the browser after an
+// update, and it would run beside glance-lane-whatsapp. One wake-up removes
+// it. A missing id is the usual case and is remembered so later wakes do
+// not ask again.
+const LEGACY_WHATSAPP_SCRIPT = 'flow-whatsapp';
+const LEGACY_WHATSAPP_FLAG = 'glanceLegacyWhatsAppCleared';
+
+function legacyWhatsAppAlreadyGone(err) {
+  const msg = String((err && err.message) || err || '').toLowerCase();
+  return msg.indexOf('not found') >= 0 || msg.indexOf('does not exist') >= 0 || msg.indexOf('nonexistent') >= 0;
+}
+
+async function dropLegacyWhatsApp() {
+  if (!chrome.scripting || !chrome.scripting.unregisterContentScripts || !chrome.storage || !chrome.storage.local) return;
+  let bag = {};
+  try { bag = await chrome.storage.local.get({ [LEGACY_WHATSAPP_FLAG]: false }); } catch (e) { return; }
+  if (bag[LEGACY_WHATSAPP_FLAG]) return;
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [LEGACY_WHATSAPP_SCRIPT] });
+  } catch (e) {
+    if (!legacyWhatsAppAlreadyGone(e)) return;
+  }
+  try { await chrome.storage.local.set({ [LEGACY_WHATSAPP_FLAG]: true }); } catch (e) { /* the next wake tries again */ }
+}
+
 // Chat drafts are registered from the options page. An update keeps the old
 // list, and Chrome does not inject into a tab that is already open. When the
 // person already allowed the host, register again and inject into that tab.
@@ -557,10 +583,11 @@ async function restoreLaneChats() {
   }
 }
 
+dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();
-chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); restoreLaneChats(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { restoreSurfaces(); restoreLaneChats(); });
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
 
 async function surfaceStatus() {
   const surfaces = await readSurfaces();
