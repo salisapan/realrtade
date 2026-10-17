@@ -1292,7 +1292,7 @@ const FlowIntent = (() => {
         } else {
           let titled = selfAskTitle(text, subject);
           if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
-          const callTitled = haveACallTitle(text, subject);
+          const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
           if (usableSelfTitle(callTitled)) titled = callTitled;
           if (usableSelfTitle(titled)) intent.label = titled;
         }
@@ -1435,7 +1435,7 @@ const FlowIntent = (() => {
       if (/(?:^|\s)אולי|אם יוצא|מתישהו|אם יש לך זמן|כשיהיה לך|מתי שנוח|נראה לי|יכול להיות ש/.test(blob)) return 'hedge';
       if (/,\s*מקווה|מקווה\s*[.!]?\s*$/.test(blob)) return 'hedge';
       const negBlob = blob.replace(/\bdon'?t\s+forget\b/ig, ' ').replace(/\bno\s+ne+d\s+to\s+reply\b/ig, ' ');
-      if (/\b(?:do not|don'?t|no need to|never mind|won'?t|will not)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob)) return 'negative';
+      if (/\b(?:do not|don'?t|no need to|never mind|won'?t|will not)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob) || /לא\s+(?:נקיים|תהיה|נעשה)/.test(negBlob) || /(?:^|[^\u0590-\u05FF])בוטל(?:ה)?(?:[^\u0590-\u05FF]|$)/.test(negBlob)) return 'negative';
       if (/\blast\s+(?:week|night|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob) || /\bfollowing (?:our|the|that) call last\b/i.test(blob)) return 'past';
       if (/\byesterday\b/i.test(blob) && /\b(?:meeting|met|chat|chatting|speaking|spoke|call)\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
@@ -1467,7 +1467,7 @@ const FlowIntent = (() => {
       const subject = ctx && ctx.subject;
       let titled = selfAskTitle(text, subject);
       if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
-      const callTitled = haveACallTitle(text, subject);
+      const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
       if (usableSelfTitle(callTitled)) titled = callTitled;
       if (!usableSelfTitle(titled)) return null;
       const made = finish(TYPES.REQUEST, 'high', { what: titled });
@@ -1844,7 +1844,7 @@ const FlowIntent = (() => {
       // "Let's have a call Tuesday at 15:00 about the pilot" keeps the
       // calendar and the task. The card title is Call about the subject.
       if (scheduled && scheduled.type) {
-        const titled = haveACallTitle(text, ctx && ctx.subject);
+        const titled = haveACallTitle(text, ctx, humanWhen(facts.date, facts.time));
         if (titled) scheduled.label = titled;
       }
       return scheduled;
@@ -2440,25 +2440,83 @@ const FlowIntent = (() => {
       || /\b(?:gimme|give me)\s+a\s+call\b/i.test(raw)
       || /\bhop on a call\b/i.test(raw);
     if (!bare) return '';
-    const sub = cleanSubject(subject);
-    if (!sub || weakSubject(sub)) return '';
-    if (/[\u0590-\u05FF]/.test(raw) || /[\u0590-\u05FF]/.test(sub)) {
-      const topic = heTopic(subject);
-      return topic ? clipTitle('שיחה בנושא ' + topic) : '';
+    const topic = callTopicPhrase(raw, subject);
+    if (!topic) return '';
+    if (/[\u0590-\u05FF]/.test(raw) || /[\u0590-\u05FF]/.test(topic)) {
+      return clipTitle('שיחה בנושא ' + topic);
     }
-    return clipTitle('Call about ' + sub);
+    return clipTitle('Call about ' + topic);
   }
-  // A have-a-call mail is titled from the whole subject. Trailing
-  // punctuation stays off the label. Hebrew is applied later, to the
-  // frame only, so a brand in the subject stays as written.
+  // A have-a-call topic is the body's "about X" / "בנושא X" / "על X".
+  // The subject is used only when it is a clean noun phrase. Hello, an
+  // address, and "Let's meet" are not topics. With none, the title names
+  // the sender, or on a self note it is Call plus the time.
   function callSubjectPhrase(subject) {
     return cleanSubject(subject).replace(/[.?!,]+$/g, '').replace(/\s+/g, ' ').trim();
   }
-  function haveACallTitle(text, subject) {
+  function dirtyCallTopic(phrase) {
+    const s = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (!s || weakSubject(s) || genericFollowSubject(s)) return true;
+    if (/@/.test(s) || /\b[a-z0-9-]+\.[a-z]{2,}\b/i.test(s)) return true;
+    if (/^(?:let'?s|let us|please|could you|can we|shall we)\b/i.test(s)) return true;
+    if (/^(?:hello|hi|hey|dear)\b/i.test(s)) return true;
+    if (/^invoice\b/i.test(s)) return true;
+    return false;
+  }
+  function tidyCallTopic(phrase) {
+    return String(phrase || '')
+      .replace(EN_DATE_TAIL, '')
+      .replace(AT_CLOCK, '')
+      .replace(HE_DATE_TAIL, '')
+      .replace(/[.?!,]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function topicFromBody(text) {
+    const raw = String(text || '');
+    // על is a topic only when it names a thing. "על call" is the call itself.
+    const patterns = [
+      /\babout\s+([^.\n?!]+)/gi,
+      /בנושא\s+([^.\n?!]+)/g,
+      /(?:^|[^\u0590-\u05FF])על\s+(?!call\b|שיחה|פגישה)([^.\n?!]+)/g
+    ];
+    let picked = '';
+    for (let i = 0; i < patterns.length; i++) {
+      const re = patterns[i];
+      let m;
+      while ((m = re.exec(raw))) {
+        const phrase = tidyCallTopic(m[1]);
+        if (!dirtyCallTopic(phrase)) picked = phrase;
+      }
+    }
+    return picked;
+  }
+  function topicFromSubject(subject) {
+    let sub = callSubjectPhrase(subject);
+    if (/[\u0590-\u05FF]/.test(sub)) sub = heTopic(sub);
+    if (dirtyCallTopic(sub)) return '';
+    return sub;
+  }
+  function callClockPhrase(text) {
+    const m = String(text || '').match(/\b((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (!m) return '';
+    const day = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    return day + ' ' + m[2].replace(/\s+/g, '');
+  }
+  function callTopicPhrase(text, subject) {
+    return topicFromBody(text) || topicFromSubject(subject);
+  }
+  function haveACallTitle(text, ctx, whenText) {
     if (!/\bhave a call\b/i.test(String(text || ''))) return '';
-    const sub = callSubjectPhrase(subject);
-    if (!sub || weakSubject(sub)) return '';
-    return clipTitle('Call about ' + sub);
+    const box = ctx && typeof ctx === 'object' ? ctx : { subject: ctx };
+    const topic = callTopicPhrase(text, box.subject);
+    if (topic) return clipTitle('Call about ' + topic);
+    if (!addressedToSelf(box)) {
+      const name = String(box.senderName || '').trim();
+      if (name && name.indexOf('@') < 0 && !/^me$/i.test(name)) return clipTitle('Call with ' + name);
+    }
+    const when = String(whenText || '').replace(/\s+/g, ' ').trim();
+    return clipTitle(when ? ('Call ' + when) : 'Call');
   }
   // Self-sent, and not this person's own promise. The title is the action.
   const SELF_EN_VERBS = [
@@ -2674,14 +2732,14 @@ const FlowIntent = (() => {
     const raw = String(src || '');
     const meet = /(?:\b(?:call|meeting|sync|chat|demo|kickoff)\b|שיחה|פגישה|ראיון|הדגמה|זום|אתקשר|נתראה|להיפגש|היפגש|לדבר)/i.test(raw);
     if (!meet) return '';
-    const sub = cleanSubject(subject);
-    if (!sub || weakSubject(sub) || genericFollowSubject(sub) || sub === 'לעצמי' || /^call$/i.test(sub) || /^let'?s meet$/i.test(sub)) return '';
-    if (/[\u0590-\u05FF]/.test(raw) || /[\u0590-\u05FF]/.test(sub)) {
-      const topic = heTopic(subject);
-      if (!topic || weakSubject(topic) || genericFollowSubject(topic)) return '';
-      return clipTitle('שיחה בנושא ' + topic);
+    const topic = callTopicPhrase(raw, subject);
+    if (topic && topic !== 'לעצמי' && !/^call$/i.test(topic)) {
+      if (/[\u0590-\u05FF]/.test(raw) || /[\u0590-\u05FF]/.test(topic)) return clipTitle('שיחה בנושא ' + topic);
+      return clipTitle('Call about ' + topic);
     }
-    return clipTitle('Call about ' + sub);
+    const when = callClockPhrase(raw);
+    if (!when) return '';
+    return clipTitle((/[\u0590-\u05FF]/.test(raw) ? 'שיחה ' : 'Call ') + when);
   }
   // The words of the note, once the ask frame and the date are off.
   // Used when the verb table has no row for this sentence. Not a verb list.
@@ -2747,7 +2805,7 @@ const FlowIntent = (() => {
     clause = clause.replace(/\s+ב-\d[\s\S]*$/, '').replace(/\s+בשעה[\s\S]*$/, '').replace(/\s+/g, ' ').trim();
     if (/^[a-z]/.test(clause)) clause = clause.charAt(0).toUpperCase() + clause.slice(1);
     if (/^(?:a\s+)?quick\s+chat$/i.test(clause)) return 'Set up a quick chat';
-    if (/^(?:a\s+)?quick\s+call$/i.test(clause)) {
+    if (/^(?:a\s+)?quick\s+call$/i.test(clause) || /\b(?:hop on a call|have a call|jump on a call)\b/i.test(clause)) {
       const about = selfMeetingAbout(s, subject);
       if (about) return about;
     }

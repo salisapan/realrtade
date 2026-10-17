@@ -2,8 +2,8 @@
 // A self-sent note whose recipient chip is the collapsed "to me" span
 // (no email attribute) is the task Renew the domain, due Friday.
 // A call at a clock about a topic keeps the calendar and the task.
-// The card title is Call about the subject. A Hebrew UI says
-// שיחה בנושא plus that phrase. The phrase stays as written.
+// The card title is Call about the topic in the body. A Hebrew UI
+// translates that topic. A brand, a product, and a person's name stay.
 const { test, expect } = require('./support/harness');
 
 const SELF = 'ai.local.flow@gmail.com';
@@ -83,9 +83,9 @@ test('a call about the pilot follows a Hebrew UI', async ({ glance }) => {
   });
   const card = page.locator('[data-legacy-message-id="m-live-call-he"] .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 4000 });
-  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא the pilot');
+  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא הפילוט');
   await expect(card.locator('.gs-intent')).not.toHaveText('Schedule It');
-  await expect(card.locator('.gs-intent')).not.toHaveText('שיחה בנושא הפילוט');
+  await expect(card.locator('.gs-intent')).not.toHaveText('שיחה בנושא the pilot');
   const when = card.locator('[data-glance-when]');
   await expect(when).toContainText('15:00');
   await expect(when).toContainText(nextNamedDay('tuesday'));
@@ -108,7 +108,58 @@ test('a call about the Q4 budget uses the full subject', async ({ glance }) => {
   });
   const card = page.locator('[data-legacy-message-id="m-live-call-q4"] .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 4000 });
-  await expect(card.locator('.gs-intent')).toHaveText('Call about Q4 budget');
+  await expect(card.locator('.gs-intent')).toHaveText('Call about the Q4 budget');
+});
+
+test('a greeting subject uses the topic in the body', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    messageId: 'm-live-call-hello',
+    threadId: 't-live-call-hello',
+    subject: 'Hello',
+    senderEmail: 'dana@acme.io',
+    senderName: 'Dana',
+    ownEmail: SELF,
+    to: [SELF],
+    body: "Let's have a call Tuesday at 15:00 about the Q4 budget"
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-call-hello"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 4000 });
+  await expect(card.locator('.gs-intent')).toHaveText('Call about the Q4 budget');
+});
+
+test('an address subject is Call with the sender', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    messageId: 'm-live-call-invoice',
+    threadId: 't-live-call-invoice',
+    subject: 'Invoice from billing@vendor.io',
+    senderEmail: 'billing@vendor.io',
+    senderName: 'Billing',
+    ownEmail: SELF,
+    to: [SELF],
+    body: "Let's have a call Tuesday at 15:00"
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-call-invoice"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 4000 });
+  await expect(card.locator('.gs-intent')).toHaveText('Call with Billing');
+});
+
+test("Let's meet is not the call topic", async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    messageId: 'm-live-call-lets',
+    threadId: 't-live-call-lets',
+    subject: "Let's meet",
+    senderEmail: 'dana@acme.io',
+    senderName: 'Dana',
+    ownEmail: SELF,
+    to: [SELF],
+    body: "Let's have a call Tuesday at 15:00"
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-call-lets"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 4000 });
+  await expect(card.locator('.gs-intent')).toHaveText('Call with Dana');
 });
 
 test('a Hebrew subject stays untranslated inside the call frame', async ({ glance }) => {
@@ -122,7 +173,7 @@ test('a Hebrew subject stays untranslated inside the call frame', async ({ glanc
     ownEmail: SELF,
     to: [SELF],
     lang: 'he',
-    body: CALL
+    body: "Let's have a call Tuesday at 15:00"
   });
   const card = page.locator('[data-legacy-message-id="m-live-call-he-subject"] .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 4000 });
@@ -142,6 +193,23 @@ test('a self-sent negation stays quiet', async ({ glance }) => {
     accountLabel: 'Google Account: Sali Sapan (' + SELF + ')'
   });
   const card = page.locator('[data-legacy-message-id="m-live-self-wont"] .flow-chip-host');
+  await page.waitForTimeout(2500);
+  await expect(card).toHaveCount(0);
+});
+
+test('a Hebrew self negation stays quiet', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    liveSelf: true,
+    messageId: 'm-live-self-he-wont',
+    threadId: 't-live-self-he-wont',
+    ownEmail: SELF,
+    senderName: 'Sali Sapan',
+    subject: 'הפיילוט',
+    body: 'לא נעשה שיחה ביום שלישי ב-15:00 על הפיילוט',
+    accountLabel: 'Google Account: Sali Sapan (' + SELF + ')'
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-self-he-wont"] .flow-chip-host');
   await page.waitForTimeout(2500);
   await expect(card).toHaveCount(0);
 });

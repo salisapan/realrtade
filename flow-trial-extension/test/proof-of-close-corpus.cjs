@@ -271,10 +271,15 @@ console.log('\n--- Handled survives a thread reload ---\n');
       log: [stored], messageIds: [newHash], threadIds: [threadId], hasHost: true, terminal: true
     }) === 'keep');
 
-  const ownAt = gmail.indexOf('if (!ownEmail) return');
-  const earlyAt = gmail.indexOf('remountProvedTaskReceipts');
-  check('remount runs before the scan can return for a missing own-email or a quiet classification',
-    earlyAt > 0 && ownAt > earlyAt, { earlyAt: earlyAt, ownAt: ownAt });
+  const scanAt = gmail.indexOf('async function scanReadingPane');
+  const scan = scanAt >= 0 ? gmail.slice(scanAt, scanAt + 12000) : '';
+  const remountAt = scan.indexOf('await remountProvedTaskReceipts');
+  const missingAt = scan.indexOf('if (!ownEmail)');
+  const paintAt = scan.indexOf('paintNamesPending', missingAt);
+  const returnAt = paintAt >= 0 ? scan.indexOf('return', paintAt) : -1;
+  check('a missing address remounts a proved task, then waits for a name',
+    remountAt >= 0 && missingAt > remountAt && paintAt > missingAt && returnAt > paintAt,
+    { remountAt: remountAt, missingAt: missingAt, paintAt: paintAt, returnAt: returnAt });
   check('a successful task undo rewrites the HANDLED row instead of leaving it',
     gmail.indexOf('markGoogleTaskUndone') > 0 &&
     fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8').indexOf('markGoogleTaskUndone') > 0);

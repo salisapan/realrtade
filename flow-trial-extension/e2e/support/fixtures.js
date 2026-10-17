@@ -166,8 +166,9 @@ function outlookUrl(id) {
   return 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(id);
 }
 
-function gmailUrl(messageId) {
-  return 'https://mail.google.com/mail/u/0/#inbox/' + encodeURIComponent(messageId || 'm-1');
+function gmailUrl(messageId, accountIndex) {
+  const n = accountIndex == null || accountIndex === '' ? '0' : String(accountIndex);
+  return 'https://mail.google.com/mail/u/' + n + '/#inbox/' + encodeURIComponent(messageId || 'm-1');
 }
 
 // The day the date-bound fixtures live on: today, local time. Fixtures that said 2026-10-08 stopped matching the extension's own

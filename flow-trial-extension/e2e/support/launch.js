@@ -694,7 +694,7 @@ async function boot() {
 
   harness.openGmail = async function openGmail(opts) {
     const o = opts || {};
-    const url = gmailUrl(o.messageId);
+    const url = gmailUrl(o.messageId, o.accountIndex);
     return openDocument(url, gmailHtml(o));
   };
 

@@ -1345,10 +1345,14 @@ function glanceUiCopy(kind) {
     // A message you sent to someone else still stays quiet.
     const storedOwn = await readStoredOwnEmail();
     if (!chromeLive()) return;
-    let ownEmail = storedOwn || ownEmailFromThread() || '';
+    // The account button is this tab. userinfo is one address for the
+    // whole extension, so it is used only when this tab has no button.
+    // A stored address is not replaced by the other account.
+    const buttonOwn = ownEmailFromThread() || '';
+    let ownEmail = buttonOwn || storedOwn || '';
     if (!storedOwn && ownEmail) rememberOwnEmail(ownEmail);
     if (!chromeLive()) return;
-    // No stored userinfo or openid email, and no account button. That is
+    // No account button and no stored userinfo or openid email. That is
     // names-pending. It is not a self task, and the page title is not used.
     if (!ownEmail) {
       const pending = messages[messages.length - 1];

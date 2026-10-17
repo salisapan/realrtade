@@ -112,8 +112,70 @@ const FlowDisplay = (() => {
     if (/^log it$/i.test(raw)) return 'רשום';
     if (raw === 'Save the file?') return 'לשמור את הקובץ?';
     matched = raw.match(/^Call about (.+)$/);
-    if (matched) return 'שיחה בנושא ' + matched[1];
+    if (matched) return 'שיחה בנושא ' + translateCallTopic(matched[1]);
+    matched = raw.match(/^Call with (.+)$/);
+    if (matched) return 'שיחה עם ' + matched[1];
+    matched = raw.match(/^Call (.+)$/);
+    if (matched) return 'שיחה ' + matched[1];
+    if (raw === 'Call') return 'שיחה';
     return raw;
+  }
+
+  // Common topic words follow the UI language. A token that is not in
+  // this lexicon is a brand, a product, or a person's name and stays.
+  const CALL_TOPIC_PHRASE_HE = [
+    ['the launch checklist', 'רשימת ההשקה'],
+    ['launch checklist', 'רשימת ההשקה'],
+    ['new pricing plan', 'תוכנית התמחור החדשה'],
+    ['the pricing plan', 'תוכנית התמחור'],
+    ['pricing plan', 'תוכנית התמחור'],
+    ['the q4 budget', 'תקציב Q4'],
+    ['q4 budget', 'תקציב Q4'],
+    ['meeting request', 'בקשת פגישה'],
+    ['the campaign', 'הקמפיין'],
+    ['the pilot', 'הפילוט'],
+    ['the contract', 'החוזה']
+  ];
+  const CALL_TOPIC_WORD_HE = {
+    campaign: 'קמפיין',
+    pilot: 'פיילוט',
+    contract: 'חוזה',
+    budget: 'תקציב',
+    renewal: 'חידוש',
+    onboarding: 'קליטה',
+    checklist: 'רשימה',
+    launch: 'השקה',
+    pricing: 'תמחור',
+    plan: 'תוכנית',
+    meeting: 'פגישה',
+    request: 'בקשה',
+    new: 'חדש'
+  };
+  function translateCallTopic(phrase) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (!raw || /[\u0590-\u05FF]/.test(raw)) return raw;
+    const lower = raw.toLowerCase();
+    for (let i = 0; i < CALL_TOPIC_PHRASE_HE.length; i++) {
+      if (lower === CALL_TOPIC_PHRASE_HE[i][0]) return CALL_TOPIC_PHRASE_HE[i][1];
+    }
+    const words = raw.split(' ');
+    const out = [];
+    for (let i = 0; i < words.length; i++) {
+      const key = words[i].toLowerCase().replace(/[.,!?]+$/g, '');
+      if (key === 'the' || key === 'a' || key === 'an') {
+        const next = words[i + 1];
+        const nextKey = next ? next.toLowerCase().replace(/[.,!?]+$/g, '') : '';
+        const nextHe = CALL_TOPIC_WORD_HE[nextKey];
+        if (nextHe) {
+          out.push((key === 'the' ? 'ה' : '') + nextHe);
+          i++;
+        }
+        continue;
+      }
+      if (CALL_TOPIC_WORD_HE[key]) out.push(CALL_TOPIC_WORD_HE[key]);
+      else out.push(words[i]);
+    }
+    return out.join(' ').replace(/\s+/g, ' ').trim();
   }
 
   function activityTitle(entry, lang) {
@@ -179,7 +241,7 @@ const FlowDisplay = (() => {
     // that title. Other schedule cards still use the process name.
     if (id === 'schedule') {
       const titled = intent && String(intent.label || '').trim();
-      if (/^Call about\b/.test(titled) || /^שיחה בנושא\b/.test(titled)) {
+      if (/^Call about\b/.test(titled) || /^Call with\b/.test(titled) || /^Call\s+\S/.test(titled) || /^שיחה\b/.test(titled)) {
         return { title: titled.replace(/[.,\s]+$/g, ''), sentence: null, fileCard: false, logIt: false };
       }
     }
