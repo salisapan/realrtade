@@ -48,7 +48,11 @@ const BANNED = [
   /לעקוב אחרי לעצמי/,
   /לעקוב אחרי בהמשך/,
   /^Follow up on this$/i,
-  /^Follow up on\b/i
+  /^Follow up on\b/i,
+  // A title is the verb plus the object. A quoted sentence, or a request
+  // phrase copied from the mail, is not that title.
+  /^["“”'«„]/,
+  /^(?:תזכורת|בבקשה|אפשר|מחכים ל|מחכה ל|עדיין חסר|יש מצב|אני אגיע|אנחנו בפנים|לזכור |סיכמנו |הבטחתי |רק משהו|מה דעתך|can i get\b)/i
 ];
 function prepFault(title) {
   const t = String(title || '').trim();
@@ -123,7 +127,7 @@ cases.forEach(function (row) {
   check(row[0], out.show !== true && !/Follow up on/i.test(label) && !/לעקוב אחרי/.test(label), { show: out.show, label: label, reason: out.reason });
 });
 
-['את גבי', 'להתקשר את גיא', 'לבדוק ל-PR', 'לעקוב אחרי זה', 'לעקוב אחרי לעצמי', 'לעקוב אחרי בהמשך לה-onboarding', 'Follow up on this'].forEach(function (title) {
+['את גבי', 'להתקשר את גיא', 'לבדוק ל-PR', 'לעקוב אחרי זה', 'לעקוב אחרי לעצמי', 'לעקוב אחרי בהמשך לה-onboarding', 'Follow up on this', '"Send the file tomorrow"', '“לשלוח את הקובץ”', 'תזכורת לעצמי: להגיש את הדוח', 'בבקשה לשלוח את הקובץ', 'אפשר לאשר את המעבר', 'מחכים להצעת המחיר', 'עדיין חסר לנו האסמכתא', 'Can I get the file from you'].forEach(function (title) {
   check('table rejects ' + title, prepFault(title) !== '', prepFault(title));
 });
 ['להתקשר לרו״ח', 'לעדכן לגבי הפיילוט', 'לעדכן את הפיילוט', 'לבדוק את ה-PR', 'לשלוח את החוזה', 'לשלוח לרו״ח', 'לצרף את הקובץ', 'לשלם ₪89.90', 'לקבוע עם דנה', 'לעקוב אחרי הקבלות', 'שיחה עם דנה', 'שיחה בנושא הקמפיין'].forEach(function (title) {
@@ -162,7 +166,7 @@ function agreedLog(body) {
   ['v2syn-1205', 'We agreed to book the venue by Wednesday, October 14. Thanks!', 'Book the venue'],
   ['v2syn-1231', 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali', 'Renew the passport application'],
   ['v2syn-1237', 'We agreed to file the tax return by Wednesday, October 14. Regards', 'File tax return'],
-  ['garbled verb is still the task', 'אני צריך לחשד את הדררכון עד סוף השבוע.', 'לחשד את הדררכון'],
+  ['garbled verb is still the task', 'אני צריך לחשד את הדררכון עד סוף השבוע.', 'לחדש את הדרכון'],
   ['call at a time uses the subject', 'Would next Monday at 3pm work for a quick call?', 'Call about Meeting request']
 ].forEach(function (row) {
   const got = row[0] === 'call at a time uses the subject'
@@ -180,6 +184,26 @@ notAgreed.forEach(function (row) {
   const got = agreedLog(row[0]);
   const generic = got.label === 'Log commitment' && !/\bwe\s+agreed\s+to\b/i.test(row[0]);
   check('no generic Log commitment: ' + row[1], !generic && got.label === row[1], got);
+});
+
+// A request phrase is not the title. The verb and the object are.
+[
+  ['v2syn-7038', 'עדיין חסר לנו האסמכתא להעברה ממך מחר.', 'לשלוח את האסמכתא להעברה'],
+  ['v2syn-18433', 'מחכים להצעת המחיר שלכם ביום שלישי הבא כדי להתקדם', 'לשלוח את הצעת המחיר'],
+  ['v2syn-21682', 'אפשר להסדיר את התשלום של ₪15,000 עד 20/10?', 'לשלם ₪15,000'],
+  ['v2syn-9426', 'בבקשה להפיק חשבונית למונדיי על סך ₪7,250.', 'להפיק חשבונית למונדיי על סך ₪7,250'],
+  ['v2syn-12134', 'Can I get the insurance certificate from you by end of week?', 'Send the insurance certificate'],
+  ['v2syn-23006', 'אפשר לדבר מחר בשעה 9:00 על ה-onboarding?', 'שיחה בנושא ה-onboarding'],
+  ['v2syn-23335', 'אני אגיע מחר בשעה 15:00', 'להגיע מחר 15:00'],
+  ['v2syn-23874', 'אנחנו בפנים – ₪89.90 לההשקה', 'Log ₪89.90 agreed'],
+  ['v2syn-27836', 'תזכורת לעצמי: לגיש את הדוח השנתי עד סוף היום', 'להגיש את הדוח השנתי'],
+  ['v2syn-7345', 'תזכורת: תשלום של ₪89 עד ה-15.10.', 'לשלם ₪89'],
+  ['v2syn-13455', 'lmk today if the launch checklist works', 'Reply about the launch checklist'],
+  ['v2syn-15129', 'We aproved ₪3,400 for the launch checklist tis morning.', 'Log ₪3,400 agreed']
+].forEach(function (row) {
+  const out = selfJudge(row[1], 'תזכורת');
+  const label = labelOf(out);
+  check(row[0] + ' is the verb plus the object', out.show === true && label === row[2] && !prepFault(label), { label: label, show: out.show, reason: out.reason });
 });
 
 if (failed) {

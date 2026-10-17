@@ -201,7 +201,7 @@ console.log('\n--- mail from an alias of the same account stays silent ---\n');
   });
   const inc = r.incoming[0];
   const kinds = ((inc && inc.process && inc.process.steps) || []).map((s) => s.kind);
-  const wantLabel = 'Send Q4 pricing sheet (glance-pricing-q4)';
+  const wantLabel = 'Send the Q4 pricing sheet (glance-pricing-q4)';
   const gotLabel = inc && inc.intent && inc.intent.label;
   check('Outlook planner: alias to the same user is a task with no draft',
     r.incoming.length === 1 && r.offers.length === 0 && kinds.join(',') === 'outlookTask' && gotLabel === wantLabel,

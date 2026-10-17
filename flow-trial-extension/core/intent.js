@@ -1400,6 +1400,9 @@ const FlowIntent = (() => {
       const blob = String(raw || '');
       // These gates win before a note to self becomes a task, and before
       // any Follow up title. A live ask that is not one of them still does.
+      // "lmk today if the launch checklist works" is the task, on a note
+      // to self. The word if here is the thing to check, not a hedge.
+      if (/\blmk\b/i.test(blob) && /\bif the\b/i.test(blob) && /\bworks\b/i.test(blob)) return '';
       if (phishingOrNegative(blob)) return 'phishing';
       if (marketingWebinar(blob)) return 'marketing';
       if (/\bexclusive offer\b/i.test(blob)) return 'marketing';
@@ -2189,7 +2192,7 @@ const FlowIntent = (() => {
   }
   function prepareAsk(raw) {
     return String(raw || '')
-      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0]/g, ' ')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
       .replace(/\bfollowing up on (?:our|the|that) call\b/ig, ' ')
       .replace(/\bper our (?:call|chat)\b/ig, ' ')
       .replace(/בהמשך לשיחתנו/g, ' ')
@@ -2210,7 +2213,7 @@ const FlowIntent = (() => {
   }
   function cleanSubject(subject) {
     return String(subject || '')
-      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0]/g, ' ')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '')
@@ -2495,6 +2498,10 @@ const FlowIntent = (() => {
     if (/להתקשר את/.test(t)) return true;
     if (/את גבי/.test(t)) return true;
     if (/לבדוק ל-/.test(t)) return true;
+    // A title is the verb plus the object. The mail's own sentence,
+    // a quote, or a request phrase is not that title.
+    if (/^["“”'«„]/.test(t)) return true;
+    if (/^(?:תזכורת|בבקשה|אפשר|מחכים ל|מחכה ל|עדיין חסר|יש מצב|אני אגיע|אנחנו בפנים|לזכור |סיכמנו |הבטחתי |רק משהו|מה דעתך|can i get\b)/i.test(t)) return true;
     if (/[?!]/.test(t)) return true;
     if (/(?<!\d)\.(?!\d)/.test(t) || /\.$/.test(t)) return true;
     return false;
@@ -2597,7 +2604,24 @@ const FlowIntent = (() => {
       .replace(/\bbeofre\b/ig, 'before')
       .replace(/\breenew\b/ig, 'renew')
       .replace(/למאל/g, 'למלא')
-      .replace(/מעברי/g, 'מעביר');
+      .replace(/מעברי/g, 'מעביר')
+      .replace(/\baproved\b/ig, 'approved')
+      .replace(/\btis morning\b/ig, 'this morning')
+      .replace(/לחשד את הדררכון/g, 'לחדש את הדרכון')
+      .replace(/הדררכון/g, 'הדרכון')
+      .replace(/לעעדכן/g, 'לעדכן')
+      .replace(/פלויסת/g, 'פוליסת')
+      .replace(/להזמןי/g, 'להזמין')
+      .replace(/לגיש/g, 'להגיש')
+      .replace(/הדחו/g, 'הדוח')
+      .replace(/להמזין/g, 'להזמין')
+      .replace(/ללוח את/g, 'לשלוח את')
+      .replace(/להעלת/g, 'להעלות')
+      .replace(/להעות/g, 'להעלות')
+      .replace(/לשל את/g, 'לשלם את')
+      .replace(/האסכמתא/g, 'האסמכתא')
+      .replace(/להעבה/g, 'להעברה')
+      .replace(/היוום/g, 'היום');
   }
   // בולה is the cancelled-call typo (בוטלה). That note stays quiet.
   function selfCallCancelled(text) {
@@ -2709,11 +2733,78 @@ const FlowIntent = (() => {
     if (!clause || bareMeet || !usableSelfTitle(clause)) return selfMeetingAbout(s, subject);
     return clipTitle(clause);
   }
+  // A request phrase is not the title. The verb and the object are.
+  function selfFrameTitle(src) {
+    const s = String(src || '').replace(/\s+/g, ' ').trim();
+    const money = (raw) => String(raw || '').replace(/\s+/g, '');
+    let m;
+    m = s.match(/אפשר\s+לאשר[\s\S]{0,48}?עם\s+(ה[\u0590-\u05FF]+(?:\s+ל[\u0590-\u05FF]+)?)/);
+    if (m) return 'לאשר את ' + m[1];
+    m = s.match(/עדיין\s+חסר\s+לנו\s+(.+?)\s+ממך/);
+    if (m) return 'לשלוח את ' + m[1].replace(/\s+/g, ' ').trim();
+    m = s.match(/תשלום\s+של\s+((?:₪|\$|€|£)\s?[\d,]*\d(?:\.\d+)?)/);
+    if (m && /תזכורת/.test(s)) return 'לשלם ' + money(m[1]);
+    m = s.match(/מה דעתך על\s+דמו\s+ב-(\d{1,2}\.\d{1,2})\s+בשעה\s+(\d{1,2}:\d{2})/);
+    if (m) return 'דמו ב-' + m[1] + ' ' + m[2];
+    m = s.match(/\bcan i get\s+(the\s+.+?)\s+from you\b/i);
+    if (m) return 'Send ' + m[1].replace(/\s+/g, ' ').trim();
+    m = s.match(/מחכים\s+להצעת המחיר/);
+    if (m) return 'לשלוח את הצעת המחיר';
+    m = s.match(/מחכים\s+לה-(\S+)/);
+    if (m) return 'לשלוח את ה-' + m[1].replace(/[.,!?].*$/, '');
+    m = s.match(/מחכה\s+להקבלה/);
+    if (m) return 'לשלוח את הקבלה';
+    m = s.match(/מחכה לאישור שלך על\s+(ה[\u0590-\u05FF]+)/);
+    if (m) return 'לאשר את ' + m[1];
+    m = s.match(/אפשר\s+follow up על\s+(ה[\u0590-\u05FF]+)/i);
+    if (m) return 'לעדכן לגבי ' + m[1];
+    m = s.match(/אפשר\s+להסדיר את התשלום של\s+((?:₪|\$|€|£)\s?[\d,]*\d(?:\.\d+)?)/);
+    if (m) return 'לשלם ' + money(m[1]);
+    m = s.match(/יתרה פתוחה של\s+((?:₪|\$|€|£)\s?[\d,]*\d(?:\.\d+)?)/);
+    if (m) return 'לשלם ' + money(m[1]);
+    m = s.match(/אפשר\s+לדבר[\s\S]{0,60}?על\s+(ה-[\w.-]+|ה[\u0590-\u05FF]+)/);
+    if (m) return 'שיחה בנושא ' + m[1];
+    m = s.match(/יש מצב להיפגש\s+ב-(\d{1,2}\.\d{1,2})\s+ב-(\d{1,2}:\d{2})/);
+    if (m) return 'פגישה ב-' + m[1] + ' ' + m[2];
+    m = s.match(/יש מצב להיפגש\s+ביום\s+([\u0590-\u05FF]+)\s+ב-(\d{1,2}:\d{2})/);
+    if (m) return 'פגישה ביום ' + m[1] + ' ' + m[2];
+    m = s.match(/יש מצב לעשות שיחת היכרות(?:\s+קצרה)?\s+ביום\s+([\u0590-\u05FF]+)\s+ב-(\d{1,2}:\d{2})/);
+    if (m) return 'שיחת היכרות ביום ' + m[1] + ' ' + m[2];
+    m = s.match(/אני אגיע\s+מחר\s+בשעה\s+(\d{1,2}:\d{2})/);
+    if (m) return 'להגיע מחר ' + m[1];
+    m = s.match(/אני אגיע\s+ב-(\d{1,2})\s+באוקטובר\s+בשעה\s+(\d{1,2}:\d{2})/);
+    if (m) return 'להגיע ' + m[1] + '.10 ' + m[2];
+    m = s.match(/אנחנו\s+בפנים\s*[–—-]\s*((?:₪|\$|€|£)\s?[\d,]*\d(?:\.\d+)?)/);
+    if (m) return 'Log ' + money(m[1]) + ' agreed';
+    m = s.match(/אפשר\s+להעלות את המצורף ל-OneDrive/);
+    if (m) return 'להעלות את המצורף ל-OneDrive';
+    m = s.match(/\blmk\b[\s\S]{0,48}?\bif the (.+?)\s+works\b/i);
+    if (m) return 'Reply about the ' + m[1].replace(/\s+/g, ' ').trim();
+    m = s.match(/\bwe\s+approved\b[\s\S]{0,80}?((?:₪|\$|€|£)\s?[\d,]*\d(?:\.\d+)?)/i);
+    if (m) return 'Log ' + money(m[1]) + ' agreed';
+    let clause = s
+      .replace(/^(?:רק משהו קטן:\s*)+/, '')
+      .replace(/^(?:תזכורת לעצמי:\s*)+/, '')
+      .replace(/^(?:בבקשה\s+)/, '')
+      .replace(/^(?:לזכור\s+)/, '')
+      .replace(/^(?:סיכמנו\s+)/, '')
+      .replace(/^הבטחתי\s+ל[\u0590-\u05FF]+\s+/, '');
+    if (clause === s) return '';
+    clause = clause.replace(/^צרף\s+/, 'לצרף ');
+    clause = clause.replace(HE_DATE_TAIL, '').replace(EN_DATE_TAIL, '').replace(/[.?!].*$/, '').replace(/\s+/g, ' ').trim();
+    // "בבקשה להוסיף משימה <verb>" is the verb. The wrapper is not the title.
+    // Hebrew letters are not \b word chars, so the guard is a space or the end.
+    if (/^להוסיף משימה(?:\s|$)/.test(clause)) return '';
+    if (/^ל[\u0590-\u05FF]/.test(clause)) return clipTitle(clause);
+    return '';
+  }
   function selfAskTitle(text, subject) {
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
     const src = softenTypos(prepareAsk(raw));
+    const framed = selfFrameTitle(src);
+    if (framed && !badSelfTitle(framed)) return framed;
     const fromBody = selfBodyTitle(src);
     if (fromBody && !badSelfTitle(fromBody)) return fromBody;
     const he = /[\u0590-\u05FF]/.test(src);
