@@ -170,6 +170,9 @@ const FlowIncomingJudge = (() => {
       // Putting a file on an invite that already exists is the file track
       // (task + short attached draft), on Outlook as well as Gmail.
       if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile)) return { show: false, reason: 'file-chain-not-run', intent };
+      // A contract, a quote, a proposal, or a signed copy is not a reply.
+      // The page still searches Drive. The judge stays quiet until that search runs.
+      if ((i.surface || 'gmail') === 'gmail' && resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
     }
     // Same classifier as planFor. A meeting that was cancelled, postponed,
     // already held, or an out-of-office note does not show. A marketing

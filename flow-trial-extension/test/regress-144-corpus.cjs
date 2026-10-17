@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'f406736fcb42e4765d71f69e5cb36e453e44e141b35168cbd51b73959d0e135e';
+const FIXTURE_SHA = 'd5c86e9f7367e7a9ae1845661b30db077041f01a08d11edb35599b7c0b2eb8f9';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {

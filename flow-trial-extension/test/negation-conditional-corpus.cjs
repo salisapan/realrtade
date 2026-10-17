@@ -6,6 +6,7 @@
 // v2syn-3328 is self-sent. The title is Send the tax form, a task, no draft.
 // A call with no person uses the subject.
 // A receipt silence is only a payment attestation, through the shared judge.
+// A signed contract on Gmail is the file chain, not a reply.
 // With no profile, an aria-label name is the known name. names-pending is
 // not a quiet. After the wait, known names judge the greeting.
 // Run: node test/negation-conditional-corpus.cjs

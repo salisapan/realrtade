@@ -301,6 +301,8 @@ const FlowCloseFamilies = (() => {
   function sentenceHeldBack(raw) {
     const t = normHold(raw);
     if (!t || sentenceLiveAsk(t)) return false;
+    // "We don't have a quote" names the missing file. It is not a hold.
+    if (notFound(t)) return false;
     if (/\b(?:do not|don'?t)\b/i.test(t)) return true;
     if (/\bno\s+ne+d\s+to\b/i.test(t)) return true;
     if (/\b(?:until|utnil)\s+we\s+confirm\b/i.test(t)) return true;
