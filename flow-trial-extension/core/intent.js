@@ -1451,6 +1451,10 @@ const FlowIntent = (() => {
       const year = blob.match(/\b(19\d{2}|20\d{2})\b/);
       const nowYear = ctx.now ? new Date(ctx.now).getFullYear() : 2026;
       if (year && +year[1] < nowYear && /\b(?:meeting|call|sync|review|interview|invoice|due|paid)\b/i.test(blob)) return 'past';
+      // A modal main clause, or an undecided line anywhere in the mail,
+      // is not a task. An if-clause is never the title.
+      if (undecidedAnywhere(blob)) return 'conditional';
+      if (conditionalMainIsNotAction(blob, main)) return 'conditional';
       if (/\bno decision yet\b/i.test(main) || /\bnot decided yet\b/i.test(main)) return 'conditional';
       if (/\bsuppose we\b/i.test(main) || /\bwould th?a?t work\b/i.test(main) || /\bwould tht work\b/i.test(main)) return 'conditional';
       if (/נניח ש|זה יעבוד אצלכם|טרם הוחלט|עוד לא סגרנו/.test(main)) return 'conditional';
@@ -2515,6 +2519,27 @@ const FlowIntent = (() => {
       : m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
     return day + ' ' + m[2].replace(/\s+/g, '');
   }
+  function shortMonth(name) {
+    const key = String(name || '').toLowerCase();
+    const map = {
+      january: 'Jan', jan: 'Jan', february: 'Feb', feb: 'Feb', march: 'Mar', mar: 'Mar',
+      april: 'Apr', apr: 'Apr', may: 'May', june: 'Jun', jun: 'Jun', july: 'Jul', jul: 'Jul',
+      august: 'Aug', aug: 'Aug', september: 'Sep', sep: 'Sep', sept: 'Sep',
+      october: 'Oct', oct: 'Oct', november: 'Nov', nov: 'Nov', december: 'Dec', dec: 'Dec'
+    };
+    return map[key] || '';
+  }
+  // Month and day stay on the pronoun fallback only. The short month is
+  // the form Hebrew already turns into באוק׳.
+  function callMonthPhrase(text) {
+    const raw = String(text || '');
+    const mon = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec';
+    const m = raw.match(new RegExp('\\b(' + mon + ')\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+at)?\\s+(\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?)', 'i'));
+    if (!m) return '';
+    const short = shortMonth(m[1]);
+    if (!short) return '';
+    return short + ' ' + String(m[2]) + ' ' + m[3].replace(/\s+/g, '');
+  }
   // A negation inside an if-clause does not silence the note. The main
   // clause does. "If we won't hear back, call Dana" stays a task.
   function withoutIfClause(blob) {
@@ -2524,9 +2549,49 @@ const FlowIntent = (() => {
     s = s.replace(/(^|[^\n,])\s+\bif\b[^,\n]*/gi, '$1 ');
     return s;
   }
+  function undecidedAnywhere(blob) {
+    const s = String(blob || '');
+    if (/עוד לא הוחלט/.test(s)) return true;
+    if (/\bnothing (?:has been |was |is )?decided\b/i.test(s)) return true;
+    if (/\bno decision yet\b/i.test(s)) return true;
+    if (/\bnot decided yet\b/i.test(s)) return true;
+    if (/\bTBD\b/i.test(s)) return true;
+    return false;
+  }
+  function mainIsModal(main) {
+    let s = String(main || '').replace(/^[\s,.:;–—-]+/, '');
+    s = s.replace(/^\d[\d.,]*\s*,\s*/, '').replace(/^[\s,.:;–—-]+/, '');
+    if (/^נוכל(?![\u0590-\u05FF])/.test(s)) return true;
+    if (/^(?:we|i|you|they)\s+(?:could|can|might)\b/i.test(s)) return true;
+    if (/^might\b/i.test(s)) return true;
+    return false;
+  }
+  function mainIsExplicitAction(main) {
+    const s = String(main || '');
+    if (/\b(?:call|ring|send|pay|review|book|file|share|forward|attach|reply|confirm|approve|sign|email|upload|prepare|order|renew|notify|wire|transfer)\b/i.test(s)) return true;
+    if (/להתקשר|לשלוח|לשלם|לחתום|לאשר|להעביר|להכין|למלא|לבדוק|לעדכן|לצרף|להגיש|לשמור|לחדש|להעלות|לחזור|להזמין|לסגור|לסרוק|להחזיר|לקבוע|תשלח|תתקשר/.test(s)) return true;
+    return false;
+  }
+  // A conditional stays a task only when the main clause is an imperative
+  // or an explicit action. A modal main clause stays quiet.
+  function conditionalMainIsNotAction(blob) {
+    const lines = String(blob || '').split(/\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].replace(/^[\s\u00a0]+/, '');
+      if (!line) continue;
+      if (/^if you have received\b/i.test(line) || /^אם קיבלת/.test(line)) continue;
+      if (!(/^(?:if|when|unless)\b/i.test(line) || /^אם/.test(line))) continue;
+      const main = withoutIfClause(line);
+      if (mainIsModal(main)) return true;
+      if (!mainIsExplicitAction(main)) return true;
+    }
+    return false;
+  }
   function callWhenPhrase(text) {
     const clock = callClockPhrase(text);
     if (clock) return clock;
+    const month = callMonthPhrase(text);
+    if (month) return month;
     const raw = String(text || '');
     let m = raw.match(/\b(tomorrow|today|tonight)\b/i);
     if (m) return m[1].toLowerCase();
@@ -2551,30 +2616,40 @@ const FlowIntent = (() => {
     }
     return set;
   }
-  const CALLEE_SKIP = /^(?:her|him|them|you|me|us|she|he|they|if|when|call|ring|please|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|thank|thanks|best|regards|sent|from|image|logo|account|manager|confidentiality|notice|dear|hello|hi|hey|re|fwd|subject|northwind)$/i;
-  function calleeFromBody(text, ctx) {
+  const CALLEE_SKIP = /^(?:her|him|them|you|me|us|she|he|they|if|when|unless|call|ring|please|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|thank|thanks|best|regards|sent|from|image|logo|account|manager|confidentiality|notice|dear|hello|hi|hey|re|fwd|subject|northwind)$/i;
+  function personNamesIn(text, ctx) {
     const own = ownCalleeTokens(ctx);
     const head = String(text || '').split(/\n\s*(?:thank you|thanks|best regards|best,|regards,|cheers|sent from|many thanks|\[image)/i)[0];
     const re = /\b([A-Z][a-z][A-Za-z'’-]{0,40})\b/g;
-    let found = '';
+    const names = [];
+    const seen = {};
     let m;
     while ((m = re.exec(head))) {
       const word = m[1];
       if (CALLEE_SKIP.test(word) || own[word.toLowerCase()]) continue;
       if (/^(?:I'll|I've|I'm|I'd|We're|We'll|Don't|Let's|Can't|Won't)$/.test(word)) continue;
-      found = word;
+      const key = word.toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = 1;
+      names.push(word);
     }
-    return found;
+    return names;
   }
-  // A pronoun is not the person to call. A name in the body is. With no
-  // name, the title is Call plus the time on the main clause. The account
-  // owner's own name is not the callee.
+  function calleeFromBody(text, ctx) {
+    const names = personNamesIn(text, ctx);
+    return names.length ? names[names.length - 1] : '';
+  }
+  // Her and him name the person only when the body has exactly one name.
+  // Two names, or them, you, me, and us, are Call plus the time. The
+  // account owner's own name is not a name here. Ring is a call.
   function pronounCalleeTitle(src, ctx) {
     const full = String(src || '');
     const main = withoutIfClause(full);
-    if (!/\b(?:call|ring)\s+(?:her|him|them|you|me|us)\b/i.test(main)) return '';
-    const name = calleeFromBody(full, ctx);
-    if (name) return 'Call ' + name;
+    const hit = main.match(/\b(?:call|ring)\s+(her|him|them|you|me|us)\b/i);
+    if (!hit) return '';
+    const pronoun = hit[1].toLowerCase();
+    const names = personNamesIn(full, ctx);
+    if ((pronoun === 'her' || pronoun === 'him') && names.length === 1) return 'Call ' + names[0];
     const when = callWhenPhrase(main);
     if (when) return clipTitle('Call ' + when);
     return '';
@@ -2798,6 +2873,7 @@ const FlowIntent = (() => {
     if (/[?]/.test(t)) return false;
     if (/^(?:could you|would you|can you|please |need )\b/i.test(t)) return false;
     if (/תוכל|אשמח אם|האם תוכל|נשמח לקבוע/.test(t)) return false;
+    if (/^(?:if|when|unless)\b/i.test(t) || /^אם/.test(t)) return false;
     if (/^Log commitment\b/i.test(t)) return false;
     if (/^Log this decision$/i.test(t)) return false;
     if (/^Reply requested\b/.test(t) || /^Saving\b/i.test(t)) return false;

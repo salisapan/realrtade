@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'a0a09a2543776455abca22cd481f1c9ad71a1a20e17348adff7e1747daffcbc9';
+const FIXTURE_SHA = '71ae262d8807e0f3fd13902a6a5227fe7be7c160fc918c720f9cd99870ec2af9';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -171,7 +171,9 @@ const HE_LOCK = {
   'v2syn-14652': 'שיחה מחר 10:00',
   'v2syn-1824': 'שיחה ביום שני 15:00',
   'v2syn-1988': 'שיחה ביום חמישי 16:00',
-  'v2syn-1990': 'שיחה ביום שני 14:30'
+  'v2syn-1990': 'שיחה ביום שני 14:30',
+  'v2syn-14749': 'שיחה ב-12 באוק׳ 16:00',
+  'v2syn-14781': 'שיחה ב-19 באוק׳ 14:00'
 };
 const HE_BAD = ['החדש תמחור', 'Globex חידוש', 'הפילוט', 'חוזה חידוש', 'שיחה the ', 'שיחה Yossi', 'שיחה you'];
 function callVerbEnglish(label) {
@@ -241,7 +243,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 1931) {
+if (rows.length !== 1935) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -906,6 +908,30 @@ fails.forEach((line) => console.log('FAIL:', line));
     console.log('FAIL: negated main clause stays quiet ' + describe(mainHe) + ' ' + describe(mainEn));
     fails.push('if-clause-main');
   }
+  const modal = selfNote('אם נאשר את ה-₪18,500, נוכל לחתום ביום שני, אבל עוד לא הוחלט כלום');
+  const modal89 = selfNote('אם נאשר את ה-₪89, נוכל לחתום ביום שני, אבל עוד לא הוחלט כלום');
+  if (shown(modal) || shown(modal89)) {
+    console.log('FAIL: a modal undecided conditional stays quiet ' + describe(modal) + ' ' + describe(modal89));
+    fails.push('if-clause-modal');
+  }
+  const two = selfNote("If Dana doesn't answer Ori, call her Monday at 14:30");
+  const twoLabel = String((two.intent && two.intent.label) || '');
+  if (!shown(two) || twoLabel !== 'Call Monday 14:30') {
+    console.log('FAIL: two names stay Call plus the time ' + describe(two) + ' ' + twoLabel);
+    fails.push('pronoun-two');
+  }
+  const them = selfNote("If Dana and Ori don't answer, call them Monday");
+  const themLabel = String((them.intent && them.intent.label) || '');
+  if (!shown(them) || themLabel !== 'Call Monday') {
+    console.log('FAIL: them stays Call plus the time ' + describe(them) + ' ' + themLabel);
+    fails.push('pronoun-them');
+  }
+  const ringDate = selfNote("I'll ring you October 12 at 16:00.");
+  const ringLabel = String((ringDate.intent && ringDate.intent.label) || '');
+  if (!shown(ringDate) || ringLabel !== 'Call Oct 12 16:00') {
+    console.log('FAIL: ring you on a date ' + describe(ringDate) + ' ' + ringLabel);
+    fails.push('ring-date');
+  }
 }
 const mixed = hebrewUiFault('שיחה בנושא security audit', 'Call about security audit', { id: 'latin-probe', from: 'Dana <dana@acme.io>' });
 const verbProbe = hebrewUiFault('שיחה the bank', 'Call the bank', { id: 'verb-probe', from: 'Sali Sapan <' + OWN_GMAIL + '>' });
@@ -914,6 +940,6 @@ if (mixed.indexOf('latin') !== 0 || verbProbe !== 'verb-as-sicha' || nameProbe) 
   console.log('FAIL: Hebrew UI rule probe ' + JSON.stringify([mixed, verbProbe, nameProbe]));
   fails.push('he-ui-probe');
 }
-console.log('HE-UI scan: fixtureRows=1931 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
+console.log('HE-UI scan: fixtureRows=1935 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
 console.log('FAILURES: ' + fails.length);
 process.exit(fails.length ? 1 : 0);
