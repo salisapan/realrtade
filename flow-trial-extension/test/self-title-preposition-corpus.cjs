@@ -116,9 +116,7 @@ cases.forEach(function (row) {
 });
 
 [
-  ['no object stays quiet', 'Thanks', 'See you then.'],
-  ['garbled verb stays quiet', 'לעצמי', 'אני צריך לחשד את הדררכון עד סוף השבוע.'],
-  ['floated call stays quiet', 'Meeting request', 'Would next Monday at 3pm work for a quick call?']
+  ['no object stays quiet', 'Thanks', 'See you then.']
 ].forEach(function (row) {
   const out = selfJudge(row[2], row[1]);
   const label = labelOf(out);
@@ -153,19 +151,24 @@ check('maybe is a live-ask hedge', Families.commitmentHeldBack("Maybe let's meet
 const greet = inboundType('Greetings,\n\nCould you send me the Q3 report by Thursday?');
 check('Greetings is not a name', greet.type === 'request' && greet.quiet !== 'hedge', { type: greet.type, quiet: greet.quiet });
 
-// "Log commitment" is the We agreed title. A send, including a typo,
-// keeps the object. v2syn-1205, v2syn-1231, and v2syn-1237 stay the exception.
+// A self-sent "I will" and a self-sent "We agreed to <verb>" are the verb
+// plus the object. Log commitment is a promise sent to someone else.
+// A typo still names the task. A call at a time with no object uses the subject.
 function agreedLog(body) {
   const out = selfJudge(body, 'Note to self');
   return { show: out.show, label: labelOf(out) };
 }
 [
-  ['v2syn-1205', 'We agreed to book the venue by Wednesday, October 14. Thanks!'],
-  ['v2syn-1231', 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali'],
-  ['v2syn-1237', 'We agreed to file the tax return by Wednesday, October 14. Regards']
+  ['v2syn-1205', 'We agreed to book the venue by Wednesday, October 14. Thanks!', 'Book the venue'],
+  ['v2syn-1231', 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali', 'Renew the passport application'],
+  ['v2syn-1237', 'We agreed to file the tax return by Wednesday, October 14. Regards', 'File tax return'],
+  ['garbled verb is still the task', 'אני צריך לחשד את הדררכון עד סוף השבוע.', 'לחשד את הדררכון'],
+  ['call at a time uses the subject', 'Would next Monday at 3pm work for a quick call?', 'Call about Meeting request']
 ].forEach(function (row) {
-  const got = agreedLog(row[1]);
-  check(row[0] + ' is Log commitment', got.show === true && got.label === 'Log commitment', got);
+  const got = row[0] === 'call at a time uses the subject'
+    ? (function () { const out = selfJudge(row[1], 'Meeting request'); return { show: out.show, label: labelOf(out) }; })()
+    : agreedLog(row[1]);
+  check(row[0] + ' is ' + row[2], got.show === true && got.label === row[2] && !prepFault(got.label), got);
 });
 const notAgreed = [
   ['I promsed Omer to sedn the quarterly report by EOD. Thanks', 'Send the quarterly report by EOD'],

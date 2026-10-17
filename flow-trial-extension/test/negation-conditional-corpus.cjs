@@ -2,7 +2,7 @@
 // The stream fixture is the attached rows. Two of them name a live meeting
 // but the reader is only in Cc: that locked rule stays quiet.
 // v2syn-1205, v2syn-1231, and v2syn-1237 are a past "we agreed to" the
-// user sent themself. The title is Log commitment.
+// user sent themself. The title is the verb plus the object.
 // v2syn-3328 is self-sent. The title is Send the tax form, a task, no draft.
 // A call with no person uses the subject.
 // A receipt silence is only a payment attestation, through the shared judge.
@@ -111,14 +111,14 @@ if (Families.commitmentHeldBack('We confirmed it, so please pay the 1,200 ILS in
 if (Families.commitmentHeldBack('If you can, send me the signed contract today.') !== false) fail('if you can was held');
 
 const AGREED = [
-  { id: 'v2syn-1205', subject: 'FW: Note to self', body: 'We agreed to book the venue by Wednesday, October 14. Thanks!', from: { name: 'Sali Sapan', email: OWN_GMAIL }, to: [OWN_GMAIL] },
-  { id: 'v2syn-1231', subject: 'Note to self', body: 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali', from: { name: 'Sali Sapan', email: OWN_GMAIL }, to: [OWN_GMAIL] },
-  { id: 'v2syn-1237', subject: 'todo', body: 'We agreed to file the tax return by Wednesday, October 14. Regards', from: { name: 'Sali Sapan', email: OWN_GMAIL }, to: [OWN_GMAIL] }
+  { id: 'v2syn-1205', subject: 'FW: Note to self', body: 'We agreed to book the venue by Wednesday, October 14. Thanks!', from: { name: 'Sali Sapan', email: OWN_GMAIL }, to: [OWN_GMAIL], label: 'Book the venue' },
+  { id: 'v2syn-1231', subject: 'Note to self', body: 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali', from: { name: 'Sali Sapan', email: OWN_GMAIL }, to: [OWN_GMAIL], label: 'Renew the passport application' },
+  { id: 'v2syn-1237', subject: 'todo', body: 'We agreed to file the tax return by Wednesday, October 14. Regards', from: { name: 'Sali Sapan', email: OWN_GMAIL }, to: [OWN_GMAIL], label: 'File tax return' }
 ];
 for (const row of AGREED) {
   const out = selfJudge(row);
   const label = out && out.intent && out.intent.label;
-  if (!out || out.show !== true || label !== 'Log commitment') fail(row.id + ' label ' + label + ' ' + (out && out.reason));
+  if (!out || out.show !== true || label !== row.label) fail(row.id + ' label ' + label + ' ' + (out && out.reason));
 }
 
 const future = selfJudge({
@@ -128,7 +128,7 @@ const future = selfJudge({
   to: [OWN_GMAIL]
 });
 const futureSteps = ((future && future.process && future.process.steps) || []).map((s) => s.kind);
-if (!future || future.show !== true || !future.intent || future.intent.label !== 'Log commitment' || futureSteps.join(',') !== 'googleTask') {
+if (!future || future.show !== true || !future.intent || future.intent.label !== 'Call the bank' || futureSteps.join(',') !== 'googleTask') {
   fail('v2syn-1216 self-sent we agreed is a task, got ' + (future && future.intent && future.intent.type) + ' ' + (future && future.intent && future.intent.label) + ' ' + futureSteps.join(','));
 }
 

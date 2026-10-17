@@ -761,7 +761,9 @@ const FlowActions = (() => {
         proc = logIt;
       }
     }
-    if (senderCallYou && !intent.inviteFile) {
+    // A note to self is verb plus object. Log commitment is the promise
+    // sent to someone else.
+    if (senderCallYou && !intent.inviteFile && !intent.selfTask) {
       proc = logIt;
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
       intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
@@ -774,7 +776,7 @@ const FlowActions = (() => {
     // would drop that object. Inbound "add this to my tasks: call …" stays Call.
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
-    } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
+    } else if (taskPlan && !intent.selfTask && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       // "call October 19" named the month as a person. A dated call with
       // no person keeps the meeting title, and the calendar step stays.
       if (!callNamesADate || intent.selfTask) {

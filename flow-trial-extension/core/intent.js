@@ -1272,65 +1272,31 @@ const FlowIntent = (() => {
         const dateText = iso ? humanDateFallback({ iso: iso }) : '';
         if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
       }
-      // A note to self is that task. "We agreed to …" is this person's
-      // promise, titled Log commitment with no date glued on. I'll send
-      // and I'll call you stay Log commitment for that day. Any other
-      // self-sent ask is the verb plus the object, or the verb plus the
-      // subject when the mail names no object. A file save already named
-      // its title. A real meeting keeps the label it had. A self-sent
-      // "call" that the event noun swallowed is still the phone task.
+      // A note to self is that task. "I will <verb> X" is verb plus object.
+      // Log commitment is a promise in a mail to someone else, never this note.
+      // A call or a meeting at a fixed time with no object in the body is
+      // Call about the subject, or שיחה בנושא. A cancelled call (בולה) stays quiet.
+      // The single step is a task, so the kind is not an event.
       if (intent.selfTask && !intent.inviteFile) {
         intent.noReplyDraft = true;
+        if (selfCallCancelled(text) || meetingPlanVeto(text)) return stayQuiet('hedge', { noRescue: true });
+        if (type === TYPES.SCHEDULED_EVENT) intent.type = TYPES.REQUEST;
         const subject = ctx && ctx.subject;
         const pay = payAsk(prepareAsk(text));
-        const promise = ownFirstPersonPromise(text) && !pay;
-        const agreed = weAgreedPromise(text);
-        const titled = (agreed || promise) ? '' : selfAskTitle(text, subject);
-        const words = titled ? titled.split(/\s+/).filter(Boolean).length : 0;
-        if (agreed) {
-          intent.label = 'Log commitment';
-        } else if (words >= 2) {
-          intent.label = titled;
-        } else if (promise) {
-          const iso = intent.entities && intent.entities.dateIso;
-          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-          intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
-        } else if (type === TYPES.DECISION_TO_LOG && facts && facts.moneyText && !pay) {
-          // "We agreed on $1,200 for the the migration work" is the amount
-          // that was agreed. The sentence is not the title.
+        // A figure that was agreed is Log $X agreed. "We agreed to <verb>"
+        // has no figure, so that note stays the verb plus the object.
+        if (type === TYPES.DECISION_TO_LOG && facts && facts.moneyText && !pay) {
           const iso = intent.entities && intent.entities.dateIso;
           const dateText = iso ? humanDateFallback({ iso: iso }) : '';
           intent.label = FlowJudgment.neutralTitle({ moneyText: facts.moneyText, dateText: dateText || null });
-        } else if (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה') {
-          const iso = intent.entities && intent.entities.dateIso;
-          const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-          intent.label = dateText ? ('Log commitment for ' + dateText) : 'Log this decision';
-        } else if (/^Reply requested\b/.test(String(intent.label || '')) || /^Saving\b/i.test(String(intent.label || '')) || /^Log commitment for\b/.test(String(intent.label || ''))) {
-          const fallback = selfFollowTitle(text, subject);
-          if (fallback) intent.label = fallback;
-        }
-        if (intent.selfTask && String(intent.label || '').split(/\s+/).filter(Boolean).length < 2) {
-          const fallback = selfFollowTitle(text, subject);
-          if (fallback) intent.label = fallback;
-        }
-        // A leftover question is not a title. The subject carries the object.
-        if (intent.selfTask && (/[?]/.test(String(intent.label || '')) || /^(?:could you|would you|can you|please |need )\b/i.test(String(intent.label || '')) || /תוכל/.test(String(intent.label || '')))) {
-          const fallback = selfFollowTitle(text, subject);
-          if (fallback) intent.label = fallback;
+        } else {
+          let titled = selfAskTitle(text, subject);
+          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
+          if (usableSelfTitle(titled)) intent.label = titled;
         }
         const labelNow = String(intent.label || '').trim();
-        const labelWords = labelNow.split(/\s+/).filter(Boolean).length;
-        // No verb and no real object: stay quiet. "Follow up on Decision"
-        // and a one-word label are not titles.
-        const unusable = labelWords < 2
-          || /[?]/.test(labelNow)
-          || /^(?:could you|would you|can you|please |need )\b/i.test(labelNow)
-          || /תוכל/.test(labelNow)
-          || /^Reply requested\b/.test(labelNow)
-          || /^Saving\b/i.test(labelNow)
-          || badSelfTitle(labelNow);
-        if (unusable) return stayQuiet('hedge', { noRescue: true });
-        if (intent.confidence === 'low' && labelWords >= 2) intent.confidence = 'high';
+        if (!usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
+        if (intent.confidence === 'low') intent.confidence = 'high';
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -1487,13 +1453,11 @@ const FlowIntent = (() => {
       if (!addressedToSelf(ctx)) return null;
       const blob = ((ctx && ctx.subject) ? String(ctx.subject) + '\n' : '') + String(text || '');
       if (selfContentStaysQuiet(blob)) return null;
+      if (selfCallCancelled(text) || meetingPlanVeto(text)) return null;
       const subject = ctx && ctx.subject;
-      const pay = payAsk(prepareAsk(text));
-      let titled = '';
-      if (weAgreedPromise(text) || (ownFirstPersonPromise(text) && !pay)) titled = 'Log commitment';
-      else titled = selfAskTitle(text, subject);
-      if (!titled || titled.split(/\s+/).filter(Boolean).length < 2) titled = selfFollowTitle(text, subject);
-      if (!titled || titled.split(/\s+/).filter(Boolean).length < 2) return null;
+      let titled = selfAskTitle(text, subject);
+      if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
+      if (!usableSelfTitle(titled)) return null;
       const made = finish(TYPES.REQUEST, 'high', { what: titled });
       if (!made || !made.type) return null;
       made.label = titled;
@@ -2402,7 +2366,7 @@ const FlowIntent = (() => {
   function titleAfter(verb, match, src, subject, opts) {
     const rest = src.slice(match.index + match[0].length);
     let useVerb = verb;
-    let keepThe = Boolean(opts && opts.keepThe) || verb === 'Fill out' || verb === 'Confirm' || verb === 'Save' || verb === 'לשמור' || verb === 'Book' || verb === 'Order' || verb === 'Renew' || verb === 'Notify' || verb === 'Create' || verb === 'Keep' || verb === 'Store' || verb === 'Share' || verb === 'Forward' || verb === 'Email' || verb === 'להזמין' || verb === 'להחזיר' || verb === 'לחדש' || verb === 'לשלוח' || verb === 'לקבל' || verb === 'לצרף';
+    let keepThe = Boolean(opts && opts.keepThe) || verb === 'Fill out' || verb === 'Confirm' || verb === 'Save' || verb === 'לשמור' || verb === 'Book' || verb === 'Order' || verb === 'Renew' || verb === 'Notify' || verb === 'Create' || verb === 'Keep' || verb === 'Store' || verb === 'Share' || verb === 'Forward' || verb === 'Email' || verb === 'Send' || verb === 'להזמין' || verb === 'להחזיר' || verb === 'לחדש' || verb === 'לשלוח' || verb === 'לקבל' || verb === 'לצרף';
     // "Reply with the tax form" is the file. The title is Send, and the
     // object keeps its article.
     if (verb === 'Reply' && /^\s*with\b/i.test(rest)) {
@@ -2410,7 +2374,7 @@ const FlowIntent = (() => {
       keepThe = true;
     }
     let obj = shapeHeObject(useVerb, takeObject(rest, keepThe));
-    if (weakObject(obj)) obj = shapeHeObject(useVerb, takeObject(earlierNoun(src, match.index), keepThe));
+    if (!obj || weakObject(obj)) obj = shapeHeObject(useVerb, takeObject(earlierNoun(src, match.index), keepThe));
     if (opts && opts.pay && (weakObject(obj) || /^payment of\b/i.test(obj))) obj = moneyPhrase(src) || obj;
     return joinTitle(useVerb, obj, subject, Object.assign({ src: src }, opts || {}));
   }
@@ -2509,7 +2473,7 @@ const FlowIntent = (() => {
     [/לאשר|תאשר(?:י|ו)?(?![\u0590-\u05FF])|(?<![\u0590-\u05FF])אשר(?![\u0590-\u05FF])/, 'לאשר'],
     [/לדכן(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להגיש|תגיש(?![\u0590-\u05FF])/, 'להגיש'],
-    [/לעדכן|תעדכנ(?:י|ו)?(?![\u0590-\u05FF])/, 'לעדכן'],
+    [/לעדכן|תעדכ(?:ן|נ(?:י|ו)?)(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להשלים|יש להשלים/, 'להשלים'],
     [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק'],
     [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
@@ -2550,7 +2514,7 @@ const FlowIntent = (() => {
     const t = String(src || '');
     const call = t.match(/להתקשר\s+ל([^\s.,!?]{1,24})/);
     if (call) return 'להתקשר ל' + call[1];
-    const about = t.match(/(?:לעדכן|תעדכנ[ייו]?|לדכן)\s+(?:אותי\s+)?לגבי\s+(ה[\u0590-\u05FF]+)/);
+    const about = t.match(/(?:לעדכן|תעדכ[נן][ייו]?|לדכן)\s+(?:אותי\s+)?לגבי\s+(ה[\u0590-\u05FF]+)/);
     if (about) return 'לעדכן לגבי ' + about[1];
     const review = t.match(/\breview\s+ל-([A-Za-z][\w-]*)/i);
     if (review) return 'לבדוק את ה-' + review[1];
@@ -2568,6 +2532,9 @@ const FlowIntent = (() => {
     if (shareOrder) return 'Share ' + shareOrder[1].replace(/\s+/g, ' ') + ' ' + shareOrder[2].replace(/\s+/g, ' ');
     // snd / sned / sedn is send. The object is the noun, and a "by …"
     // deadline stays. A date alone is not the object.
+    // "send the purchase order by Friday" — order is the noun.
+    const sendOrder = t.match(/\bsend\s+(?:(?:me|him|her|them|you|us|tom)\s+)?(the\s+(?:purchase|sales|work)\s+order)(?:\s+(by\s+[A-Za-z]+(?:\s+\d{1,2})?))?/i);
+    if (sendOrder) return 'Send ' + sendOrder[1].replace(/\s+/g, ' ') + (sendOrder[2] ? ' ' + sendOrder[2].replace(/\s+/g, ' ') : '');
     const typoSend = t.match(/\b(?:sedn|sned|snd)\s+(?:(?:me|him|her|them|you|us)\s+)?(.+)/i);
     if (typoSend && !/\blattest\b/i.test(typoSend[1])) {
       let rest = typoSend[1].replace(/[.!?].*$/, ' ').replace(/\s+/g, ' ').trim();
@@ -2577,10 +2544,23 @@ const FlowIntent = (() => {
       const when = by ? by[2].replace(/\s+/g, ' ').trim() : '';
       if (obj && !/^(?:the|a|an|to)$/i.test(obj)) return 'Send ' + obj + (when ? ' ' + when : '');
     }
-    const order = t.match(/(?<!\bin\s)\border\s+(.+?)(?:\s+(?:before|by|on|until|till|tomorrow|today|next|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|[.?!]|$)/i);
+    // "loop in finance on the purchase order" — order is the noun.
+    if (/\bset up a sync\b/i.test(t) && !/\babout\b/i.test(t)) return 'Set up a sync';
+    const setup = t.match(/\bset\s+up\s+((?:a|the)\s+)?(.+)/i);
+    if (setup) {
+      let obj = setup[2].replace(EN_DATE_TAIL, '').replace(AT_CLOCK, '').replace(/[.?!].*$/, '').replace(/\s+\b(?:for|at|on|by|about|with|before|until)\b$/i, '').replace(/\s+/g, ' ').trim();
+      if (obj && !/^(?:a|the|an)$/i.test(obj)) return 'Set up ' + (setup[1] ? setup[1].toLowerCase() : '') + obj;
+    }
+    const loopIn = t.match(/\bloop\s+in\s+([A-Za-z]+)\s+on\s+(the\s+\S+\s+order)\b/i);
+    if (loopIn) return 'Loop in ' + loopIn[1].toLowerCase() + ' on ' + loopIn[2].replace(/\s+/g, ' ');
+    // "moving forward with Initech at $1,200" is the vendor and the amount.
+    // The word forward in that phrase is not the verb.
+    const moved = t.match(/\bmoving\s+forward\s+with\s+([A-Za-z][\w.&'-]*)\s+at\s+(\$\s?[\d,]+(?:\.\d+)?)/i);
+    if (moved) return 'Log ' + moved[1] + ' at ' + moved[2].replace(/\s+/g, '');
+    const order = t.match(/(?<!\b(?:purchase|sales|work|the|an|a|in)\s)\border\s+(.+?)(?:\s+(?:before|by|on|until|till|tomorrow|today|next|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|[.?!]|$)/i);
     if (order) {
       const obj = order[1].replace(/\s+/g, ' ').trim();
-      if (obj && !/^(?:to|the|a|an)$/i.test(obj)) return 'Order ' + obj;
+      if (obj && !/^(?:to|the|a|an|by|for|on|at)$/i.test(obj)) return 'Order ' + obj;
     }
     const over = t.match(/\bto go over\s+(the\s+[A-Za-z0-9][\w]*(?:\s+[A-Za-z0-9][\w]*){0,4})/i);
     if (over && /\bmeet\b/i.test(t)) return 'Meet about ' + over[1].replace(/\s+/g, ' ').trim();
@@ -2596,9 +2576,11 @@ const FlowIntent = (() => {
       if (placed[3].toLowerCase() === 'task') return 'Add the ' + noun + ' to the task';
       return 'Put ' + noun + ' on calendar';
     }
-    const syncAbout = t.match(/\bsync about\s+(the\s+[A-Za-z0-9][\w]*(?:\s+[A-Za-z0-9][\w]*){0,5})/i);
-    if (syncAbout) return 'Sync about ' + syncAbout[1].replace(/\s+is\b[\s\S]*$/i, '').replace(/\s+/g, ' ').trim();
-    if (/\bset up a sync\b/i.test(t)) return 'Set up a sync';
+    const syncAbout = t.match(/\bsync\b[\s\S]{0,80}?\babout\s+((?:the\s+)?[A-Za-z0-9][\w-]*(?:\s+[A-Za-z0-9][\w-]*){0,4})/i);
+    if (syncAbout) {
+      const obj = syncAbout[1].replace(/\s+(?:cheers|thanks|thank\s+you|best|regards|many\s+thanks)\b[\s\S]*$/i, '').replace(/\s+is\b[\s\S]*$/i, '').replace(/\s+/g, ' ').trim();
+      if (obj) return 'Sync about ' + obj;
+    }
     const approve = t.match(/(?<![\u0590-\u05FF])אשר\s+את\s+([\u0590-\u05FF]+(?:\s+[\u0590-\u05FF]+){0,4})/);
     if (approve) {
       const obj = approve[1].replace(/\s+עד(?:\s|$).*$/, '').trim();
@@ -2606,11 +2588,132 @@ const FlowIntent = (() => {
     }
     return '';
   }
+  // A few slipped letters still name the same verb. This is not a new verb list.
+  function softenTypos(src) {
+    return String(src || '')
+      .replace(/\bpepare\b/ig, 'prepare')
+      .replace(/\breivew\b/ig, 'review')
+      .replace(/\btranser\b/ig, 'transfer')
+      .replace(/\bbeofre\b/ig, 'before')
+      .replace(/\breenew\b/ig, 'renew')
+      .replace(/למאל/g, 'למלא')
+      .replace(/מעברי/g, 'מעביר');
+  }
+  // בולה is the cancelled-call typo (בוטלה). That note stays quiet.
+  function selfCallCancelled(text) {
+    return /בולה/.test(String(text || '')) && /(?:call|שיחה|פגישה)/i.test(String(text || ''));
+  }
+  function usableSelfTitle(label) {
+    const t = String(label || '').trim();
+    if (!t) return false;
+    if (t.split(/\s+/).filter(Boolean).length < 2) return false;
+    if (badSelfTitle(t)) return false;
+    if (/[?]/.test(t)) return false;
+    if (/^(?:could you|would you|can you|please |need )\b/i.test(t)) return false;
+    if (/תוכל|אשמח אם|האם תוכל|נשמח לקבוע/.test(t)) return false;
+    if (/^Log commitment\b/i.test(t)) return false;
+    if (/^Log this decision$/i.test(t)) return false;
+    if (/^Reply requested\b/.test(t) || /^Saving\b/i.test(t)) return false;
+    if (/^(?:see you|talk soon|sounds good|got it)\b/i.test(t)) return false;
+    return true;
+  }
+  // A timed call or meeting whose body names no object. The subject is the object.
+  function selfMeetingAbout(src, subject) {
+    const raw = String(src || '');
+    const meet = /(?:\b(?:call|meeting|sync|chat|demo|kickoff)\b|שיחה|פגישה|ראיון|הדגמה|זום|אתקשר|נתראה|להיפגש|היפגש|לדבר)/i.test(raw);
+    if (!meet) return '';
+    const sub = cleanSubject(subject);
+    if (!sub || weakSubject(sub) || genericFollowSubject(sub) || sub === 'לעצמי' || /^call$/i.test(sub) || /^let'?s meet$/i.test(sub)) return '';
+    if (/[\u0590-\u05FF]/.test(raw) || /[\u0590-\u05FF]/.test(sub)) {
+      const topic = heTopic(subject);
+      if (!topic || weakSubject(topic) || genericFollowSubject(topic)) return '';
+      return clipTitle('שיחה בנושא ' + topic);
+    }
+    return clipTitle('Call about ' + sub);
+  }
+  // The words of the note, once the ask frame and the date are off.
+  // Used when the verb table has no row for this sentence. Not a verb list.
+  function selfRecoverTitle(text, subject) {
+    if (selfCallCancelled(text)) return '';
+    const s = softenTypos(prepareAsk(text))
+      .replace(/מקווה שאת\/?ה בטוב[.!]?\s*/g, ' ')
+      .replace(/מקווה שהכל טוב[.!]?\s*/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const heAbout = s.match(/(?:לגבי|בנושא|על)\s+((?:ה|ל)?[\u0590-\u05FF]{2,20}(?:\s+ל[\u0590-\u05FF]{2,20})?)/);
+    if (heAbout) {
+      const topic = heAbout[1];
+      if (/תעדכ[נן]|לעדכן|לדכן/.test(s)) return clipTitle('לעדכן לגבי ' + topic);
+      if (/אתקשר|להתקשר|לדבר|היפגש|נתראה|שיחה|פגישה|call|meeting/i.test(s)) return clipTitle('שיחה בנושא ' + topic);
+    }
+    let clause = s;
+    const lead = [
+      /^(?:quick one:\s*)+/i,
+      /^(?:note to self:\s*)+/i,
+      /^(?:final decision:\s*)+/i,
+      /^(?:as discussed,?\s*(?:you will\s+)?)/i,
+      /^(?:just confirming\s+(?:that\s+)?)(?:you(?:'|’)?ll|you will\s+)?/i,
+      /^(?:i(?:'|’)?ll|i will|we(?:'|’)?ll|we will)\s+/i,
+      /^(?:we agreed to)\s+/i,
+      /^אני צריך\s+/,
+      /^(?:please\s+)?(?:can|could|would)\s+you\s+(?:please\s+)?/i,
+      /^(?:can|could|would)\s+we\s+/i,
+      /^please\s+/i,
+      /^need\s+/i,
+      /^(?:would|does)\s+(?:(?!work\s+for\b)[\s\S]){0,80}?work\s+for\s+/i,
+      /^כמו שסיכמ(?:נו|ו) בשיחה,?\s*/,
+      /^(?:אתה|אתם)\s+/,
+      /^אשמח אם תוכל(?:י|ו)?\s+/,
+      /^האם תוכל(?:י|ו)?\s+/,
+      /^נשמח\s+ל?/,
+      /^תוכלו\s+/,
+      /^תקבע(?:י|ו)? לנו\s+/,
+      /^רוצה\s+/,
+      /^נוכל לעשות\s+/,
+      /^יש לך זמן ל/,
+      /^מה דעתך על\s+/,
+      /^נקבע\s+/,
+      /^קבעתי לנו\s+/,
+      /^בהמשך לשיחתנו,?\s*/,
+      /^פעולה נדרשת מצדך:\s*/
+    ];
+    for (let guard = 0; guard < 6; guard++) {
+      let next = clause;
+      for (let i = 0; i < lead.length; i++) next = next.replace(lead[i], '');
+      next = next.replace(/\s+/g, ' ').trim();
+      if (next === clause) break;
+      clause = next;
+    }
+    clause = clause.replace(/[?].*$/, ' ').replace(/[.!]+$/g, '').replace(/\s+/g, ' ').trim();
+    clause = clause.replace(/^מקווה[\s\S]*?[.]\s*/, '').trim();
+    if (/\b(?:swing|stop|come|drop|pass)\s+by\b/i.test(clause)) {
+      clause = clause.replace(/\s+(?:on\s+)?(?:next\s+|this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b[\s\S]*$/i, '');
+    } else {
+      clause = clause.replace(EN_DATE_TAIL, '').replace(AT_CLOCK, '');
+    }
+    clause = clause.replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
+    clause = clause.replace(/\s+ב-\d[\s\S]*$/, '').replace(/\s+בשעה[\s\S]*$/, '').replace(/\s+/g, ' ').trim();
+    if (/^[a-z]/.test(clause)) clause = clause.charAt(0).toUpperCase() + clause.slice(1);
+    if (/^(?:a\s+)?quick\s+chat$/i.test(clause)) return 'Set up a quick chat';
+    if (/^(?:a\s+)?quick\s+call$/i.test(clause)) {
+      const about = selfMeetingAbout(s, subject);
+      if (about) return about;
+    }
+    if (/^(?:call|meeting)$/i.test(clause) && /תקבע|לקבוע|נקבע|set up/i.test(s)) {
+      const about = selfMeetingAbout(s, subject);
+      if (about) return about;
+      return /[\u0590-\u05FF]/.test(s) ? 'לקבוע שיחה' : 'Set up a meeting';
+    }
+    const bareMeet = /^(?:a\s+|the\s+)?(?:quick\s+|short\s+)?(?:call|chat|meeting|sync|demo)$/i.test(clause)
+      || /^(?:שיחה|פגישה|שיחת זום)$/.test(clause);
+    if (!clause || bareMeet || !usableSelfTitle(clause)) return selfMeetingAbout(s, subject);
+    return clipTitle(clause);
+  }
   function selfAskTitle(text, subject) {
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
-    const src = prepareAsk(raw);
+    const src = softenTypos(prepareAsk(raw));
     const fromBody = selfBodyTitle(src);
     if (fromBody && !badSelfTitle(fromBody)) return fromBody;
     const he = /[\u0590-\u05FF]/.test(src);

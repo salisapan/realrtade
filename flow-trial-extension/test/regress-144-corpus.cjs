@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'f60dbb42ea828494c44bd37c079db777581e6b72c01145096fda09638bedf576';
+const FIXTURE_SHA = '1cdfd72847c94aaa689cb632186e6367765b1dbeaf3aaa525612b09f05a637a3';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -538,7 +538,7 @@ const SELF_TITLE = [
   { subject: 'Fwd: pricing sheet', body: 'Action needed from you: approve onboarding before Sunday. Best regards', label: 'Approve onboarding' },
   { subject: 'Note to self', body: 'Call Yossi tomorrow at 10:00.', label: 'Call Yossi' },
   { subject: 'Reminder', body: 'Need to call the bank tomorrow.', label: 'Call the bank' },
-  { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Log commitment' },
+  { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Send the signed lease back' },
   { subject: 'בהמשך להקמפיין', body: 'בבקשה תחזור אליי עד מחר בבוקר', label: 'לחזור בנושא הקמפיין' },
   { subject: 'בהמשך להתקציב', body: 'בבקשה תחזרי אליי עד יום ראשון', label: 'לחזור בנושא התקציב' },
   { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'שיחה בנושא קליטת העובד החדש' },
