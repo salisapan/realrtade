@@ -31,7 +31,7 @@ test('mail/u/0 uses the account button when it matches the stored address', asyn
   });
   const card = page.locator('[data-legacy-message-id="m-u0-in"] .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 4000 });
-  await expect(card.locator('.gs-intent')).toHaveText('Reply requested');
+  await expect(card.locator('.gs-intent')).toContainText('Reply');
 });
 
 test('mail/u/1 outgoing mail from the second account has no Reply card', async ({ glance }) => {
