@@ -1643,7 +1643,10 @@ function glanceUiCopy(kind) {
     // hedge, a "don't send") must not become a Do It. Other closes are
     // left alone — this only stops a REQUEST chip that would otherwise
     // offer to attach or draft around an unclear file.
-    const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
+    // A note the user sent to themself is already a task, with no draft
+    // and no attach-to-invite track. The file chain does not take it.
+    const selfSentTask = Boolean(intent && intent.selfTask);
+    const fileGate = selfSentTask ? { kind: 'ignore' } : (typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' });
     // A file asked onto an invite that already exists is the attach card
     // (task + short draft). The receipt chain does not own that ask.
     // The shared judge skips this silence when intent.inviteFile is set.

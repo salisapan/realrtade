@@ -1,11 +1,12 @@
 ---
 tags: [decisions]
-updated: 2026-10-16
+updated: 2026-10-17
 ---
 # Decisions log (newest first)
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-17 · A quiet gate wins before a Follow up title on a self-sent mail. An acknowledgement, a thank-you, a recap, a quoted forward, and a cancelled note stay quiet, with the hedge, the negation, phishing, marketing, the FYI, the out-of-office note, and the conditional. Follow up on Thanks, Follow up on Recap, and Follow up on Decision are not titles. With no real object the mail stays quiet. A self-sent לצרף את … למייל is a plain task with that title, no draft, and not the attach-to-invite track. The manifest is unchanged. · CTO · [[open-tasks]]
 - 2026-10-16 · A contract, a quote, or a signed copy on Gmail is the file chain, not a reply. Outlook stays on the file chain until the search runs. A missing quote that names a template is still the follow-up. The manifest is unchanged. · CTO · [[open-tasks]]
 - 2026-10-16 · A quiet gate runs before a self-sent mail becomes a task. Hedge, negation, phishing, marketing, FYI, out of office, a third party, a past recap, and a conditional stay quiet. A self-sent mail those gates leave open is a task. The title is a verb plus an object, or Follow up on the subject when the mail names no verb. It is never one word and never Log commitment plus a date. A contract, a quote, and a signed copy stay on the file chain. The manifest is unchanged. · CTO · [[open-tasks]]
 - 2026-10-16 · A self-sent mail (from the user's own address, every recipient that same person) is a task with no draft. The title is the verb plus the object: Send the tax form, Call the bank, שיחה בנושא plus the subject, full amounts with decimals. v2syn-3328 is that task. Negative, phishing, and marketing stay quiet, including אין צרך. A save-to-Drive on that mail is the task, not a Drive file and not a draft. A mail to someone else stays quiet. Names are unchanged. The manifest is unchanged. · CTO · [[open-tasks]]
