@@ -169,7 +169,7 @@ test('a supplier address in the subject is not self when the stored address diff
   const card = page.locator('[data-legacy-message-id="m-supplier-stored"] .flow-chip-host');
   await page.waitForTimeout(2500);
   await expect(card).toHaveCount(0);
-  await expect(page.locator('.gs-intent')).not.toHaveText('Book the venue');
+  await expect(page.locator('.gs-intent')).toHaveCount(0);
 });
 
 test('a supplier address in the subject is not self when only the account button is known', async ({ glance }) => {

@@ -35,7 +35,10 @@ function gmailLiveSelf(o) {
 
 function accountButton(o, ownEmail, name) {
   if (o.accountLabel === false || o.omitAccount === true) return '';
-  const label = o.accountLabel || ('Google Account: ' + (name || 'Glance') + ' (' + ownEmail + ')');
+  const who = String(name || '').trim();
+  // An address with no person. "Glance" is not a loaded name, so a
+  // greeting with no profile still waits. Callers that have a name pass it.
+  const label = o.accountLabel || ('Google Account: ' + (who ? who + ' ' : '') + '(' + ownEmail + ')');
   return '<a class="gb_d" aria-label="' + esc(label) + '" href="https://accounts.google.com/SignOutOptions"></a>';
 }
 
