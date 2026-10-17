@@ -83,7 +83,7 @@ test('a call about the pilot follows a Hebrew UI', async ({ glance }) => {
   });
   const card = page.locator('[data-legacy-message-id="m-live-call-he"] .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 4000 });
-  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא הפילוט');
+  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא הפיילוט');
   await expect(card.locator('.gs-intent')).not.toHaveText('Schedule It');
   await expect(card.locator('.gs-intent')).not.toHaveText('שיחה בנושא the pilot');
   const when = card.locator('[data-glance-when]');

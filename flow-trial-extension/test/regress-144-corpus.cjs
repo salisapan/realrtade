@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '1e56d327da7e6fbabfbb18419682a29c81cf563ce89dee7ff9d5146a3bb31a82';
+const FIXTURE_SHA = '914b6db5bf04dd926a8f1b55cfee5419755fce5919c28ca5a4e6c84b1a3927c6';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -155,6 +155,64 @@ function describe(out) {
     return 'offer' + (t ? '(' + t + ')' : '');
   }
   return 'quiet:' + ((out && out.reason) || 'none');
+}
+
+const HE_BRANDS = {
+  Globex: 1, Initech: 1, Glance: 1, Northwind: 1, Q4: 1, OneDrive: 1,
+  Google: 1, Microsoft: 1, Outlook: 1, Gmail: 1, WhatsApp: 1, Acme: 1,
+  Umbrella: 1, Meta: 1, Slack: 1, Zoom: 1, Dana: 1
+};
+const HE_LOCK = {
+  'v2syn-1115': 'להתקשר לרואה החשבון',
+  'v2syn-1216': 'להתקשר לבנק',
+  'v2syn-1330': 'להתקשר ל-Yossi',
+  'v2syn-14500': 'שיחה יום חמישי 14:30',
+  'v2syn-14508': 'שיחה יום חמישי 9:00',
+  'v2syn-14652': 'שיחה מחר 10:00',
+  'v2syn-1824': 'שיחה יום שני 15:00',
+  'v2syn-1988': 'Call you'
+};
+const HE_BAD = ['החדש תמחור', 'Globex חידוש', 'הפילוט', 'חוזה חידוש', 'שיחה the ', 'שיחה Yossi', 'שיחה you'];
+function callVerbEnglish(label) {
+  if (!/^Call\s+\S/.test(label)) return false;
+  if (/^Call about\b/.test(label) || /^Call with\b/.test(label)) return false;
+  if (/^Call (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|tomorrow|today|tonight)\b/.test(label)) return false;
+  if (/^Call (?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b/.test(label)) return false;
+  return true;
+}
+function verbBand(id) {
+  const n = parseInt((String(id).match(/(\d+)$/) || [])[1], 10);
+  return (n >= 1115 && n <= 1283) || (n >= 1330 && n <= 1370) || n === 1988;
+}
+function hebrewUiFault(he, en, row) {
+  const title = String(he || '');
+  const label = String(en || '');
+  if (HE_LOCK[row.id] && title !== HE_LOCK[row.id]) return 'locked ' + JSON.stringify(title);
+  if (!/^Call\b/.test(label)) return '';
+  const topic = label.match(/^Call about (.+)$/);
+  if (topic) {
+    const phrase = topic[1];
+    if (/^(?:it|this|that|these|those|them|זה|זאת|זו|אותו|אותה)$/i.test(phrase)) return 'pronoun';
+    if (/[,.!?;]/.test(phrase)) return 'punct';
+  }
+  if (callVerbEnglish(label) && /^שיחה/.test(title)) return 'verb-as-sicha';
+  for (let i = 0; i < HE_BAD.length; i++) {
+    if (title.indexOf(HE_BAD[i]) >= 0) return 'word-by-word';
+  }
+  if (!/[\u0590-\u05FF]/.test(title)) return '';
+  const kept = {};
+  const runs = title.match(/(?:ל-|עם |של )([A-Z][A-Za-z0-9'’.-]*(?:\s+[A-Z][A-Za-z0-9'’.-]*)*)/g) || [];
+  runs.forEach(function (run) {
+    run.replace(/^(?:ל-|עם |של )/, '').split(/\s+/).forEach(function (word) { if (word) kept[word] = 1; });
+  });
+  parseFrom(row.from).name.split(/\s+/).forEach(function (word) { if (word) kept[word] = 1; });
+  const latin = title.match(/[A-Za-z][A-Za-z0-9'’.-]*/g) || [];
+  for (let i = 0; i < latin.length; i++) {
+    const word = latin[i];
+    if (HE_BRANDS[word] || kept[word] || /^Q\d+$/.test(word)) continue;
+    return 'latin ' + word;
+  }
+  return '';
 }
 
 const bytes = fs.readFileSync(FIXTURE);
@@ -321,6 +379,7 @@ if (extraKnown.length) {
 }
 
 const counts = { offerPass: 0, offerFail: 0, quietPass: 0, quietFail: 0, either: 0, allowed: 0 };
+const heStats = { shown: 0, clean: 0, hebrew: 0, englishLeft: 0, verb: 0, verbBand: 0, faults: 0 };
 const fails = [];
 for (const row of rows) {
   if (row.expected === 'either') { counts.either++; continue; }
@@ -344,7 +403,20 @@ for (const row of rows) {
     const label = !row.expectLabel || ((!shown(g) || (g.intent && g.intent.label === row.expectLabel)) && (!shown(o) || (o.intent && o.intent.label === row.expectLabel)));
     const track = row.expectTrack !== 'file' || (fileTrack(g) && fileTrack(o));
     const draftClaim = row.expectTrack === 'file' ? (draftClaimsAttached(g) || draftClaimsAttached(o)) : '';
-    ok = gOk && oOk && oneShows && kind && !labelWhy && label && track && !draftClaim;
+    const shownLabel = (shown(g) && g.intent && g.intent.label) || (shown(o) && o.intent && o.intent.label) || '';
+    let heWhy = '';
+    if (shownLabel) {
+      heStats.shown++;
+      if (callVerbEnglish(shownLabel)) heStats.verb++;
+      if (verbBand(row.id) && /^Call\b/.test(shownLabel)) heStats.verbBand++;
+      const heTitle = Display.localizeHeading('he', shownLabel, { senderName: parseFrom(row.from).name });
+      heWhy = hebrewUiFault(heTitle, shownLabel, row);
+      if (heWhy) heStats.faults++;
+      else heStats.clean++;
+      if (/[\u0590-\u05FF]/.test(heTitle)) heStats.hebrew++;
+      else heStats.englishLeft++;
+    }
+    ok = gOk && oOk && oneShows && kind && !labelWhy && label && track && !draftClaim && !heWhy;
     if (!ok) {
       why = 'gmail ' + describe(g) + ' outlook ' + describe(o);
       if (row.expectKind && !kind) why += ' expectKind ' + row.expectKind + (row.expectDate ? ' ' + row.expectDate : '');
@@ -352,6 +424,7 @@ for (const row of rows) {
       if (row.expectLabel && !label) why += ' label gmail ' + ((g.intent && g.intent.label) || '') + ' outlook ' + ((o.intent && o.intent.label) || '');
       if (row.expectTrack === 'file' && !track) why += ' track';
       if (draftClaim) why += ' draft ' + draftClaim;
+      if (heWhy) why += ' he-ui ' + heWhy + ' ' + JSON.stringify(Display.localizeHeading('he', shownLabel, { senderName: parseFrom(row.from).name }));
     }
   } else {
     ok = !shown(g) && !shown(o);
@@ -774,5 +847,42 @@ console.log('offer pass ' + counts.offerPass + ' fail ' + counts.offerFail);
 console.log('quiet pass ' + counts.quietPass + ' fail ' + counts.quietFail);
 console.log('either ' + counts.either + ' allowed ' + counts.allowed);
 fails.forEach((line) => console.log('FAIL:', line));
+{
+  function selfNote(body) {
+    return judge({
+      from: 'Sali Sapan <' + OWN_GMAIL + '>',
+      to: [OWN_GMAIL],
+      cc: [],
+      subject: 'note',
+      body: body
+    }, 'gmail', { own: [OWN_GMAIL, OWN_OUTLOOK], attachmentCount: 0 });
+  }
+  const ifOnly = selfNote('אם לא תהיה תשובה עד מחר, להתקשר לדנה');
+  const ifEn = selfNote("If we won't hear back by tomorrow, call Dana");
+  const mainHe = selfNote('לא תהיה שיחה ביום שלישי, אם דנה תאשר');
+  const mainEn = selfNote("We won't have a call Tuesday, if Dana confirms");
+  const ifLabel = String((ifOnly.intent && ifOnly.intent.label) || '');
+  const enLabel = String((ifEn.intent && ifEn.intent.label) || '');
+  if (!shown(ifOnly) || ifLabel.indexOf('דנה') < 0) {
+    console.log('FAIL: if-clause Hebrew stays a task ' + describe(ifOnly) + ' ' + ifLabel);
+    fails.push('if-clause-he');
+  }
+  if (!shown(ifEn) || !/^Call Dana$/.test(enLabel)) {
+    console.log('FAIL: if-clause English stays Call Dana ' + describe(ifEn) + ' ' + enLabel);
+    fails.push('if-clause-en');
+  }
+  if (shown(mainHe) || shown(mainEn)) {
+    console.log('FAIL: negated main clause stays quiet ' + describe(mainHe) + ' ' + describe(mainEn));
+    fails.push('if-clause-main');
+  }
+}
+const mixed = hebrewUiFault('שיחה בנושא security audit', 'Call about security audit', { id: 'latin-probe', from: 'Dana <dana@acme.io>' });
+const verbProbe = hebrewUiFault('שיחה the bank', 'Call the bank', { id: 'verb-probe', from: 'Sali Sapan <' + OWN_GMAIL + '>' });
+const nameProbe = hebrewUiFault('להתקשר ל-Yossi', 'Call Yossi', { id: 'name-probe', from: 'Sali Sapan <' + OWN_GMAIL + '>' });
+if (mixed.indexOf('latin') !== 0 || verbProbe !== 'verb-as-sicha' || nameProbe) {
+  console.log('FAIL: Hebrew UI rule probe ' + JSON.stringify([mixed, verbProbe, nameProbe]));
+  fails.push('he-ui-probe');
+}
+console.log('HE-UI scan: fixtureRows=1931 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
 console.log('FAILURES: ' + fails.length);
 process.exit(fails.length ? 1 : 0);

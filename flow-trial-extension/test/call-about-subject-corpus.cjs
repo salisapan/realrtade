@@ -53,13 +53,32 @@ check('a trailing comma is not part of the call title', classify(CALL, { subject
 
 const heSubject = classify("Let's have a call Tuesday at 15:00", { subject: 'תקציב הרבעון', senderName: 'Dana' });
 check('a clean Hebrew subject is the topic when the body has none', heSubject && heSubject.label === 'Call about תקציב הרבעון', heSubject && heSubject.label);
-check('Hebrew UI translates the topic and keeps a brand',
+check('Hebrew UI translates a whole phrase and keeps a brand',
   FlowDisplay.localizeHeading('he', 'Call about the campaign') === 'שיחה בנושא הקמפיין' &&
-  FlowDisplay.localizeHeading('he', 'Call about the pilot') === 'שיחה בנושא הפילוט' &&
+  FlowDisplay.localizeHeading('he', 'Call about the pilot') === 'שיחה בנושא הפיילוט' &&
   FlowDisplay.localizeHeading('he', 'Call about Q4 budget') === 'שיחה בנושא תקציב Q4' &&
-  FlowDisplay.localizeHeading('he', 'Call about Globex renewal') === 'שיחה בנושא Globex חידוש' &&
+  FlowDisplay.localizeHeading('he', 'Call about Globex renewal') === 'שיחה בנושא חידוש Globex' &&
+  FlowDisplay.localizeHeading('he', 'Call about the new pricing plan') === 'שיחה בנושא תוכנית התמחור החדשה' &&
+  FlowDisplay.localizeHeading('he', "Call about Dana's contract renewal") === 'שיחה בנושא חידוש החוזה של Dana' &&
   FlowDisplay.localizeHeading('he', 'Call about תקציב הרבעון') === 'שיחה בנושא תקציב הרבעון' &&
   FlowDisplay.localizeHeading('he', 'Call with Dana') === 'שיחה עם Dana');
+check('an unknown topic falls back to the sender, with no mixed title',
+  FlowDisplay.localizeHeading('he', 'Call about security audit', { senderName: 'Dana' }) === 'שיחה עם Dana' &&
+  FlowDisplay.localizeHeading('he', 'Call about security audit').indexOf('שיחה בנושא') < 0);
+check('a call verb is להתקשר, and a Latin name takes a hyphen',
+  FlowDisplay.localizeHeading('he', 'Call the bank') === 'להתקשר לבנק' &&
+  FlowDisplay.localizeHeading('he', 'Call the accountant') === 'להתקשר לרואה החשבון' &&
+  FlowDisplay.localizeHeading('he', 'Call Yossi') === 'להתקשר ל-Yossi' &&
+  FlowDisplay.localizeHeading('he', 'Call the bak') === 'Call the bak' &&
+  FlowDisplay.localizeHeading('he', 'Call you') === 'Call you' &&
+  FlowDisplay.localizeHeading('he', 'Call Thursday 14:30') === 'שיחה יום חמישי 14:30' &&
+  FlowDisplay.localizeHeading('he', 'Call Monday 3pm') === 'שיחה יום שני 15:00');
+check('a topic stops at the comma', classify("Let's have a call Tuesday at 15:00 about the pilot, please confirm", { subject: 'Hello', senderName: 'Dana' }).label === 'Call about the pilot');
+check('a pronoun is not a topic', classify("Let's have a call Tuesday at 15:00 about it", { subject: 'Re: Fwd: Q4 budget!!', senderName: 'Dana' }).label === 'Call about Q4 budget');
+const meetingAsk = classify('Would next Monday at 3pm work for a quick call?', { subject: 'Meeting request', senderEmail: ME, to: [ME], inbound: false });
+check('Meeting request is not a topic on a self note', meetingAsk && meetingAsk.selfTask === true && meetingAsk.label === 'Call Monday 3pm', meetingAsk && meetingAsk.label);
+const hop = classify('Shall we hop on a call tomorrow at 10:00', { subject: 'Meeting request', senderEmail: ME, to: [ME], inbound: false });
+check('a generic subject with a time is Call plus the time', hop && hop.label === 'Call tomorrow 10:00', hop && hop.label);
 check('Schedule & Confirm does not take the call label',
   FlowDisplay.cardFace({ id: 'schedule-confirm', name: 'Schedule & Confirm' }, { label: 'Call about the pilot,' }, {}).title === 'Schedule & Confirm');
 check('a schedule card drops a trailing comma from the call label',
@@ -72,6 +91,14 @@ const wont = classify("We won't have a call Tuesday at 15:00", { subject: 'the p
 check('self plus negation stays quiet', !wont.type && wont.selfTask !== true, wont);
 const heWont = classify('לא נעשה שיחה ביום שלישי ב-15:00 על הפיילוט', { subject: 'הפיילוט', senderEmail: ME, to: [ME], inbound: false });
 check('Hebrew self לא נעשה stays quiet', !heWont.type && heWont.selfTask !== true, heWont && { type: heWont.type, label: heWont.label });
+const ifHe = classify('אם לא תהיה תשובה עד מחר, להתקשר לדנה', { subject: 'note', senderEmail: ME, to: [ME], inbound: false });
+check('a negation only inside the if stays a task', ifHe && ifHe.type && ifHe.label.indexOf('דנה') >= 0, ifHe && ifHe.label);
+const ifEn = classify("If we won't hear back by tomorrow, call Dana", { subject: 'note', senderEmail: ME, to: [ME], inbound: false });
+check('an English if-clause stays Call Dana', ifEn && ifEn.type && ifEn.label === 'Call Dana', ifEn && ifEn.label);
+const mainHe = classify('לא תהיה שיחה ביום שלישי, אם דנה תאשר', { subject: 'note', senderEmail: ME, to: [ME], inbound: false });
+check('a negated main clause stays quiet', !mainHe.type, mainHe && mainHe.label);
+const mainEn = classify("We won't have a call Tuesday, if Dana confirms", { subject: 'note', senderEmail: ME, to: [ME], inbound: false });
+check('an English negated main clause stays quiet', !mainEn.type, mainEn && mainEn.label);
 ['לא נקיים שיחה מחר', 'לא תהיה שיחה ביום שלישי', 'השיחה בוטלה'].forEach(function (line) {
   const row = classify(line, { subject: 'הפיילוט', senderEmail: ME, to: [ME], inbound: false });
   check('Hebrew self negation stays quiet: ' + line, !row.type, row && row.label);

@@ -1434,7 +1434,7 @@ const FlowIntent = (() => {
       if (/\b(?:maybe|perhaps|possibly|if you get a chance|if you have time|if it(?:'|’)s not too much trouble|at some point|eventually|when convenient|whenever you|i might|hoping to|might be worth|tentatively|we might need|i(?:'|’)ll let you know)\b/i.test(blob)) return 'hedge';
       if (/(?:^|\s)אולי|אם יוצא|מתישהו|אם יש לך זמן|כשיהיה לך|מתי שנוח|נראה לי|יכול להיות ש/.test(blob)) return 'hedge';
       if (/,\s*מקווה|מקווה\s*[.!]?\s*$/.test(blob)) return 'hedge';
-      const negBlob = blob.replace(/\bdon'?t\s+forget\b/ig, ' ').replace(/\bno\s+ne+d\s+to\s+reply\b/ig, ' ');
+      const negBlob = withoutIfClause(blob.replace(/\bdon'?t\s+forget\b/ig, ' ').replace(/\bno\s+ne+d\s+to\s+reply\b/ig, ' '));
       if (/\b(?:do not|don'?t|no need to|never mind|won'?t|will not)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob) || /לא\s+(?:נקיים|תהיה|נעשה)/.test(negBlob) || /(?:^|[^\u0590-\u05FF])בוטל(?:ה)?(?:[^\u0590-\u05FF]|$)/.test(negBlob)) return 'negative';
       if (/\blast\s+(?:week|night|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob) || /\bfollowing (?:our|the|that) call last\b/i.test(blob)) return 'past';
       if (/\byesterday\b/i.test(blob) && /\b(?:meeting|met|chat|chatting|speaking|spoke|call)\b/i.test(blob)) return 'past';
@@ -2459,6 +2459,8 @@ const FlowIntent = (() => {
     if (!s || weakSubject(s) || genericFollowSubject(s)) return true;
     if (/@/.test(s) || /\b[a-z0-9-]+\.[a-z]{2,}\b/i.test(s)) return true;
     if (/^(?:let'?s|let us|please|could you|can we|shall we)\b/i.test(s)) return true;
+    if (/^(?:it|this|that|these|those|them|him|her|זה|זאת|זו|אותו|אותה|את זה|הזה)$/i.test(s)) return true;
+    if (/^(?:meeting request)$/i.test(s)) return true;
     if (/^(?:hello|hi|hey|dear)\b/i.test(s)) return true;
     if (/^invoice\b/i.test(s)) return true;
     return false;
@@ -2476,9 +2478,9 @@ const FlowIntent = (() => {
     const raw = String(text || '');
     // על is a topic only when it names a thing. "על call" is the call itself.
     const patterns = [
-      /\babout\s+([^.\n?!]+)/gi,
-      /בנושא\s+([^.\n?!]+)/g,
-      /(?:^|[^\u0590-\u05FF])על\s+(?!call\b|שיחה|פגישה)([^.\n?!]+)/g
+      /\babout\s+([^.\n?!,]+)/gi,
+      /בנושא\s+([^.\n?!,]+)/g,
+      /(?:^|[^\u0590-\u05FF])על\s+(?!call\b|שיחה|פגישה)([^.\n?!,]+)/g
     ];
     let picked = '';
     for (let i = 0; i < patterns.length; i++) {
@@ -2498,10 +2500,23 @@ const FlowIntent = (() => {
     return sub;
   }
   function callClockPhrase(text) {
-    const m = String(text || '').match(/\b((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    const raw = String(text || '');
+    let m = raw.match(/\b(tomorrow|today|tonight)\b(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (!m) m = raw.match(/\b((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
     if (!m) return '';
-    const day = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    const day = /^(?:tomorrow|today|tonight)$/i.test(m[1])
+      ? m[1].toLowerCase()
+      : m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
     return day + ' ' + m[2].replace(/\s+/g, '');
+  }
+  // A negation inside an if-clause does not silence the note. The main
+  // clause does. "If we won't hear back, call Dana" stays a task.
+  function withoutIfClause(blob) {
+    let s = String(blob || '');
+    s = s.replace(/(?:^|[\n,])\s*אם(?:\s[^,\n]*)?/g, ' ');
+    s = s.replace(/(?:^|[\n,])\s*\b(?:if|when)\b[^,\n]*/gi, ' ');
+    s = s.replace(/(^|[^\n,])\s+\bif\b[^,\n]*/gi, '$1 ');
+    return s;
   }
   function callTopicPhrase(text, subject) {
     return topicFromBody(text) || topicFromSubject(subject);

@@ -96,7 +96,7 @@ const FlowDisplay = (() => {
   }
 
   // One entry, one title. A shared chip label is not this entry's action.
-  function localizeHeading(lang, title) {
+  function localizeHeading(lang, title, extra) {
     const raw = String(title == null ? '' : title);
     if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
     let matched = raw.match(/^Log (.+) agreed$/);
@@ -112,70 +112,146 @@ const FlowDisplay = (() => {
     if (/^log it$/i.test(raw)) return 'רשום';
     if (raw === 'Save the file?') return 'לשמור את הקובץ?';
     matched = raw.match(/^Call about (.+)$/);
-    if (matched) return 'שיחה בנושא ' + translateCallTopic(matched[1]);
+    if (matched) return hebrewCallAbout(matched[1], extra);
     matched = raw.match(/^Call with (.+)$/);
     if (matched) return 'שיחה עם ' + matched[1];
-    matched = raw.match(/^Call (.+)$/);
-    if (matched) return 'שיחה ' + matched[1];
+    const when = hebrewCallWhen(raw);
+    if (when) return 'שיחה ' + when;
     if (raw === 'Call') return 'שיחה';
+    matched = raw.match(/^Call (.+)$/);
+    if (matched) {
+      const verb = hebrewCallVerb(matched[1]);
+      return verb || raw;
+    }
     return raw;
   }
 
-  // Common topic words follow the UI language. A token that is not in
-  // this lexicon is a brand, a product, or a person's name and stays.
+  // A topic is one whole phrase, in Hebrew word order, or it is not
+  // translated. A name or a brand inside that phrase stays as written.
+  // There is no word-by-word pass.
   const CALL_TOPIC_PHRASE_HE = [
-    ['the launch checklist', 'רשימת ההשקה'],
-    ['launch checklist', 'רשימת ההשקה'],
+    ['the new pricing plan', 'תוכנית התמחור החדשה'],
     ['new pricing plan', 'תוכנית התמחור החדשה'],
     ['the pricing plan', 'תוכנית התמחור'],
     ['pricing plan', 'תוכנית התמחור'],
+    ['the q4 budget plan', 'תוכנית תקציב Q4'],
     ['the q4 budget', 'תקציב Q4'],
     ['q4 budget', 'תקציב Q4'],
-    ['meeting request', 'בקשת פגישה'],
+    ["dana's contract renewal", 'חידוש החוזה של Dana'],
+    ['the globex renewal', 'חידוש Globex'],
+    ['globex renewal', 'חידוש Globex'],
+    ['the contract with initech', 'החוזה עם Initech'],
+    ['the hiring plan for glance', 'תוכנית הגיוס של Glance'],
+    ['initech onboarding', 'קליטת Initech'],
+    ['the new website', 'האתר החדש'],
+    ['new website', 'האתר החדש'],
+    ['the launch checklist', 'רשימת ההשקה'],
+    ['launch checklist', 'רשימת ההשקה'],
     ['the campaign', 'הקמפיין'],
-    ['the pilot', 'הפילוט'],
-    ['the contract', 'החוזה']
+    ['the pilot', 'הפיילוט'],
+    ['the contract', 'החוזה'],
+    ['the renewal', 'החידוש'],
+    ['the invoice', 'החשבונית'],
+    ['onboarding', 'קליטה'],
+    ['campaign', 'הקמפיין'],
+    ['pilot', 'הפיילוט'],
+    ['contract', 'החוזה'],
+    ['renewal', 'החידוש'],
+    ['invoice', 'החשבונית']
   ];
-  const CALL_TOPIC_WORD_HE = {
-    campaign: 'קמפיין',
-    pilot: 'פיילוט',
-    contract: 'חוזה',
-    budget: 'תקציב',
-    renewal: 'חידוש',
-    onboarding: 'קליטה',
-    checklist: 'רשימה',
-    launch: 'השקה',
-    pricing: 'תמחור',
-    plan: 'תוכנית',
-    meeting: 'פגישה',
-    request: 'בקשה',
-    new: 'חדש'
+  const CALL_VERB_HE = {
+    'the bank': 'לבנק',
+    'a bank': 'לבנק',
+    bank: 'לבנק',
+    'the accountant': 'לרואה החשבון',
+    'an accountant': 'לרואה החשבון',
+    accountant: 'לרואה החשבון'
   };
+  const CALL_DAY_HE = {
+    monday: 'יום שני',
+    tuesday: 'יום שלישי',
+    wednesday: 'יום רביעי',
+    thursday: 'יום חמישי',
+    friday: 'יום שישי',
+    saturday: 'יום שבת',
+    sunday: 'יום ראשון',
+    tomorrow: 'מחר',
+    today: 'היום',
+    tonight: 'הלילה'
+  };
+  const CALL_MONTH_HE = {
+    january: 'בינואר', jan: 'בינו׳',
+    february: 'בפברואר', feb: 'בפבר׳',
+    march: 'במרץ', mar: 'במרץ',
+    april: 'באפריל', apr: 'באפר׳',
+    may: 'במאי',
+    june: 'ביוני', jun: 'ביוני',
+    july: 'ביולי', jul: 'ביולי',
+    august: 'באוגוסט', aug: 'באוג׳',
+    september: 'בספטמבר', sep: 'בספט׳', sept: 'בספט׳',
+    october: 'באוקטובר', oct: 'באוק׳',
+    november: 'בנובמבר', nov: 'בנוב׳',
+    december: 'בדצמבר', dec: 'בדצ׳'
+  };
+
+  function personName(extra) {
+    if (!extra || typeof extra !== 'object') return '';
+    const raw = extra.senderName || (extra.sender && extra.sender.name) || '';
+    const name = String(raw).replace(/\s+/g, ' ').trim();
+    if (!name || name.indexOf('@') >= 0 || /^me$/i.test(name)) return '';
+    return name;
+  }
+
   function translateCallTopic(phrase) {
-    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
-    if (!raw || /[\u0590-\u05FF]/.test(raw)) return raw;
+    const raw = String(phrase || '').replace(/\s+/g, ' ').replace(/[’']/g, "'").trim();
+    if (!raw || /[\u0590-\u05FF]/.test(raw)) return '';
     const lower = raw.toLowerCase();
     for (let i = 0; i < CALL_TOPIC_PHRASE_HE.length; i++) {
       if (lower === CALL_TOPIC_PHRASE_HE[i][0]) return CALL_TOPIC_PHRASE_HE[i][1];
     }
-    const words = raw.split(' ');
-    const out = [];
-    for (let i = 0; i < words.length; i++) {
-      const key = words[i].toLowerCase().replace(/[.,!?]+$/g, '');
-      if (key === 'the' || key === 'a' || key === 'an') {
-        const next = words[i + 1];
-        const nextKey = next ? next.toLowerCase().replace(/[.,!?]+$/g, '') : '';
-        const nextHe = CALL_TOPIC_WORD_HE[nextKey];
-        if (nextHe) {
-          out.push((key === 'the' ? 'ה' : '') + nextHe);
-          i++;
-        }
-        continue;
-      }
-      if (CALL_TOPIC_WORD_HE[key]) out.push(CALL_TOPIC_WORD_HE[key]);
-      else out.push(words[i]);
-    }
-    return out.join(' ').replace(/\s+/g, ' ').trim();
+    return '';
+  }
+
+  function hebrewCallAbout(phrase, extra) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (/[\u0590-\u05FF]/.test(raw)) return 'שיחה בנושא ' + raw;
+    const he = translateCallTopic(raw);
+    if (he) return 'שיחה בנושא ' + he;
+    const who = personName(extra);
+    if (who) return 'שיחה עם ' + who;
+    return 'Call about ' + raw;
+  }
+
+  function hebrewClockToken(token) {
+    const t = String(token || '').replace(/\s+/g, '').toLowerCase();
+    const am = /am$/.test(t);
+    const pm = /pm$/.test(t);
+    if (!am && !pm) return t;
+    const num = t.replace(/am$|pm$/, '');
+    const bits = num.split(':');
+    let hour = parseInt(bits[0], 10);
+    const minute = bits.length > 1 ? bits[1] : '00';
+    if (!isFinite(hour)) return t;
+    if (pm && hour < 12) hour += 12;
+    if (am && hour === 12) hour = 0;
+    return hour + ':' + (minute.length === 1 ? '0' + minute : minute);
+  }
+
+  function hebrewCallWhen(title) {
+    let m = String(title || '').match(/^Call (monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight) (\d{1,2}(?::\d{2})?(?:am|pm)?)$/i);
+    if (m) return CALL_DAY_HE[m[1].toLowerCase()] + ' ' + hebrewClockToken(m[2]);
+    m = String(title || '').match(/^Call (january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec) (\d{1,2}) (\d{1,2}(?::\d{2})?(?:am|pm)?)$/i);
+    if (!m) return '';
+    return m[2] + ' ' + CALL_MONTH_HE[m[1].toLowerCase()] + ' ' + hebrewClockToken(m[3]);
+  }
+
+  function hebrewCallVerb(object) {
+    const raw = String(object || '').replace(/\s+/g, ' ').replace(/[.,!?]+$/g, '').trim();
+    const known = CALL_VERB_HE[raw.toLowerCase()];
+    if (known) return 'להתקשר ' + known;
+    if (/^[\u0590-\u05FF][\u0590-\u05FF'’.-]{1,40}$/.test(raw)) return 'להתקשר ל' + raw;
+    if (/^[A-Z][A-Za-z'’.-]{1,40}(?:\s+[A-Z][A-Za-z'’.-]{1,40})?$/.test(raw)) return 'להתקשר ל-' + raw;
+    return '';
   }
 
   function activityTitle(entry, lang) {
@@ -771,7 +847,7 @@ const FlowDisplay = (() => {
       const line = clock ? holdCardText(lang, clock.dateIso, clock.hour, clock.minute) : '';
       if (line) return line;
     }
-    return localizeHeading(lang, fallback == null ? '' : String(fallback));
+    return localizeHeading(lang, fallback == null ? '' : String(fallback), ctx);
   }
 
   function activityMetric(lang, text) {

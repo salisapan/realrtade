@@ -167,9 +167,9 @@ function agreedLog(body) {
   ['v2syn-1231', 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali', 'Renew the passport application'],
   ['v2syn-1237', 'We agreed to file the tax return by Wednesday, October 14. Regards', 'File tax return'],
   ['garbled verb is still the task', 'אני צריך לחשד את הדררכון עד סוף השבוע.', 'לחדש את הדרכון'],
-  ['call at a time uses the subject', 'Would next Monday at 3pm work for a quick call?', 'Call about Meeting request']
+  ['call at a time uses the clock', 'Would next Monday at 3pm work for a quick call?', 'Call Monday 3pm']
 ].forEach(function (row) {
-  const got = row[0] === 'call at a time uses the subject'
+  const got = row[0] === 'call at a time uses the clock'
     ? (function () { const out = selfJudge(row[1], 'Meeting request'); return { show: out.show, label: labelOf(out) }; })()
     : agreedLog(row[1]);
   check(row[0] + ' is ' + row[2], got.show === true && got.label === row[2] && !prepFault(got.label), got);
