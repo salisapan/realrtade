@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '914b6db5bf04dd926a8f1b55cfee5419755fce5919c28ca5a4e6c84b1a3927c6';
+const FIXTURE_SHA = 'a0a09a2543776455abca22cd481f1c9ad71a1a20e17348adff7e1747daffcbc9';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -166,11 +166,12 @@ const HE_LOCK = {
   'v2syn-1115': 'להתקשר לרואה החשבון',
   'v2syn-1216': 'להתקשר לבנק',
   'v2syn-1330': 'להתקשר ל-Yossi',
-  'v2syn-14500': 'שיחה יום חמישי 14:30',
-  'v2syn-14508': 'שיחה יום חמישי 9:00',
+  'v2syn-14500': 'שיחה ביום חמישי 14:30',
+  'v2syn-14508': 'שיחה ביום חמישי 9:00',
   'v2syn-14652': 'שיחה מחר 10:00',
-  'v2syn-1824': 'שיחה יום שני 15:00',
-  'v2syn-1988': 'Call you'
+  'v2syn-1824': 'שיחה ביום שני 15:00',
+  'v2syn-1988': 'שיחה ביום חמישי 16:00',
+  'v2syn-1990': 'שיחה ביום שני 14:30'
 };
 const HE_BAD = ['החדש תמחור', 'Globex חידוש', 'הפילוט', 'חוזה חידוש', 'שיחה the ', 'שיחה Yossi', 'שיחה you'];
 function callVerbEnglish(label) {
@@ -179,6 +180,20 @@ function callVerbEnglish(label) {
   if (/^Call (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|tomorrow|today|tonight)\b/.test(label)) return false;
   if (/^Call (?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b/.test(label)) return false;
   return true;
+}
+function rowIsSelf(row) {
+  const email = parseFrom(row && row.from).email.toLowerCase();
+  return email === OWN_GMAIL || email === OWN_OUTLOOK;
+}
+function heExtra(row) {
+  const from = parseFrom(row && row.from);
+  return {
+    senderName: from.name,
+    bodyText: row && row.body,
+    ownNames: NAMES,
+    userName: (row && row.userName) || 'Sali',
+    self: rowIsSelf(row)
+  };
 }
 function verbBand(id) {
   const n = parseInt((String(id).match(/(\d+)$/) || [])[1], 10);
@@ -206,6 +221,10 @@ function hebrewUiFault(he, en, row) {
     run.replace(/^(?:ל-|עם |של )/, '').split(/\s+/).forEach(function (word) { if (word) kept[word] = 1; });
   });
   parseFrom(row.from).name.split(/\s+/).forEach(function (word) { if (word) kept[word] = 1; });
+  if (rowIsSelf(row) && /^שיחה עם\b/.test(title)) {
+    const who = title.replace(/^שיחה עם\s+/, '').trim();
+    if (/^(?:Sali(?:\s+Sapan)?|Sapan|סאלי)$/i.test(who)) return 'own-name';
+  }
   const latin = title.match(/[A-Za-z][A-Za-z0-9'’.-]*/g) || [];
   for (let i = 0; i < latin.length; i++) {
     const word = latin[i];
@@ -409,7 +428,7 @@ for (const row of rows) {
       heStats.shown++;
       if (callVerbEnglish(shownLabel)) heStats.verb++;
       if (verbBand(row.id) && /^Call\b/.test(shownLabel)) heStats.verbBand++;
-      const heTitle = Display.localizeHeading('he', shownLabel, { senderName: parseFrom(row.from).name });
+      const heTitle = Display.localizeHeading('he', shownLabel, heExtra(row));
       heWhy = hebrewUiFault(heTitle, shownLabel, row);
       if (heWhy) heStats.faults++;
       else heStats.clean++;
@@ -424,7 +443,7 @@ for (const row of rows) {
       if (row.expectLabel && !label) why += ' label gmail ' + ((g.intent && g.intent.label) || '') + ' outlook ' + ((o.intent && o.intent.label) || '');
       if (row.expectTrack === 'file' && !track) why += ' track';
       if (draftClaim) why += ' draft ' + draftClaim;
-      if (heWhy) why += ' he-ui ' + heWhy + ' ' + JSON.stringify(Display.localizeHeading('he', shownLabel, { senderName: parseFrom(row.from).name }));
+      if (heWhy) why += ' he-ui ' + heWhy + ' ' + JSON.stringify(Display.localizeHeading('he', shownLabel, heExtra(row)));
     }
   } else {
     ok = !shown(g) && !shown(o);
@@ -848,17 +867,19 @@ console.log('quiet pass ' + counts.quietPass + ' fail ' + counts.quietFail);
 console.log('either ' + counts.either + ' allowed ' + counts.allowed);
 fails.forEach((line) => console.log('FAIL:', line));
 {
-  function selfNote(body) {
+  function selfNote(body, subject) {
     return judge({
       from: 'Sali Sapan <' + OWN_GMAIL + '>',
       to: [OWN_GMAIL],
       cc: [],
-      subject: 'note',
+      subject: subject || 'note',
       body: body
     }, 'gmail', { own: [OWN_GMAIL, OWN_OUTLOOK], attachmentCount: 0 });
   }
   const ifOnly = selfNote('אם לא תהיה תשובה עד מחר, להתקשר לדנה');
   const ifEn = selfNote("If we won't hear back by tomorrow, call Dana");
+  const ifDont = selfNote("If they don't reply by Friday, call Dana");
+  const ifSend = selfNote("If we don't have a call Tuesday, send the deck to Ori", 'Call');
   const mainHe = selfNote('לא תהיה שיחה ביום שלישי, אם דנה תאשר');
   const mainEn = selfNote("We won't have a call Tuesday, if Dana confirms");
   const ifLabel = String((ifOnly.intent && ifOnly.intent.label) || '');
@@ -870,6 +891,16 @@ fails.forEach((line) => console.log('FAIL:', line));
   if (!shown(ifEn) || !/^Call Dana$/.test(enLabel)) {
     console.log('FAIL: if-clause English stays Call Dana ' + describe(ifEn) + ' ' + enLabel);
     fails.push('if-clause-en');
+  }
+  const dontLabel = String((ifDont.intent && ifDont.intent.label) || '');
+  if (!shown(ifDont) || dontLabel !== 'Call Dana') {
+    console.log("FAIL: If they don't reply stays Call Dana " + describe(ifDont) + ' ' + dontLabel);
+    fails.push('if-clause-dont');
+  }
+  const sendLabel = String((ifSend.intent && ifSend.intent.label) || '');
+  if (!shown(ifSend) || sendLabel !== 'Send the deck to Ori' || sendLabel === 'Call about Call') {
+    console.log('FAIL: call inside the if stays Send the deck to Ori ' + describe(ifSend) + ' ' + sendLabel);
+    fails.push('if-clause-send');
   }
   if (shown(mainHe) || shown(mainEn)) {
     console.log('FAIL: negated main clause stays quiet ' + describe(mainHe) + ' ' + describe(mainEn));

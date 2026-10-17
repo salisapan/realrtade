@@ -114,7 +114,10 @@ const FlowDisplay = (() => {
     matched = raw.match(/^Call about (.+)$/);
     if (matched) return hebrewCallAbout(matched[1], extra);
     matched = raw.match(/^Call with (.+)$/);
-    if (matched) return 'שיחה עם ' + matched[1];
+    if (matched) {
+      if (ownNote(extra) && isOwnPerson(matched[1], extra)) return hebrewSelfCall(extra);
+      return 'שיחה עם ' + matched[1];
+    }
     const when = hebrewCallWhen(raw);
     if (when) return 'שיחה ' + when;
     if (raw === 'Call') return 'שיחה';
@@ -202,6 +205,46 @@ const FlowDisplay = (() => {
     return name;
   }
 
+  // A note the person sent to their own address. The sender is then
+  // themselves, and the Hebrew title does not say שיחה עם that name.
+  function ownNote(extra) {
+    if (!extra || typeof extra !== 'object') return false;
+    if (extra.self === true) return true;
+    if (extra.intent && extra.intent.selfTask) return true;
+    const who = personName(extra).toLowerCase();
+    if (!who) return false;
+    const names = [];
+    if (extra.userName) names.push(String(extra.userName));
+    if (Array.isArray(extra.ownNames)) {
+      for (let i = 0; i < extra.ownNames.length; i++) names.push(String(extra.ownNames[i] || ''));
+    }
+    for (let i = 0; i < names.length; i++) {
+      const n = names[i].replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!n) continue;
+      if (who === n) return true;
+      const first = n.split(' ')[0];
+      if (first.length > 1 && who.split(' ')[0] === first) return true;
+    }
+    return false;
+  }
+
+  function isOwnPerson(name, extra) {
+    const who = String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!who) return false;
+    const sender = personName(extra).toLowerCase();
+    if (ownNote(extra) && sender && (who === sender || sender.indexOf(who) >= 0 || who.indexOf(sender) >= 0)) return true;
+    const names = [];
+    if (extra && extra.userName) names.push(String(extra.userName));
+    if (extra && Array.isArray(extra.ownNames)) {
+      for (let i = 0; i < extra.ownNames.length; i++) names.push(String(extra.ownNames[i] || ''));
+    }
+    for (let i = 0; i < names.length; i++) {
+      const n = String(names[i] || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (n && who === n) return true;
+    }
+    return false;
+  }
+
   function translateCallTopic(phrase) {
     const raw = String(phrase || '').replace(/\s+/g, ' ').replace(/[’']/g, "'").trim();
     if (!raw || /[\u0590-\u05FF]/.test(raw)) return '';
@@ -217,9 +260,16 @@ const FlowDisplay = (() => {
     if (/[\u0590-\u05FF]/.test(raw)) return 'שיחה בנושא ' + raw;
     const he = translateCallTopic(raw);
     if (he) return 'שיחה בנושא ' + he;
+    if (ownNote(extra)) return hebrewSelfCall(extra);
     const who = personName(extra);
     if (who) return 'שיחה עם ' + who;
     return 'Call about ' + raw;
+  }
+
+  function hebrewSelfCall(extra) {
+    const body = extra && (extra.bodyText || extra.text || extra.body || '');
+    const when = hebrewWhenFromText(body);
+    return when ? ('שיחה ' + when) : 'שיחה';
   }
 
   function hebrewClockToken(token) {
@@ -238,15 +288,35 @@ const FlowDisplay = (() => {
   }
 
   function hebrewCallWhen(title) {
-    let m = String(title || '').match(/^Call (monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight) (\d{1,2}(?::\d{2})?(?:am|pm)?)$/i);
-    if (m) return CALL_DAY_HE[m[1].toLowerCase()] + ' ' + hebrewClockToken(m[2]);
-    m = String(title || '').match(/^Call (january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec) (\d{1,2}) (\d{1,2}(?::\d{2})?(?:am|pm)?)$/i);
+    let m = String(title || '').match(/^Call (monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight)(?: (\d{1,2}(?::\d{2})?(?:am|pm)?))?$/i);
+    if (m) {
+      const day = m[1].toLowerCase();
+      const clock = m[2] ? hebrewClockToken(m[2]) : '';
+      const bare = (day === 'tomorrow' || day === 'today' || day === 'tonight')
+        ? CALL_DAY_HE[day]
+        : ('ב' + CALL_DAY_HE[day]);
+      return clock ? (bare + ' ' + clock) : bare;
+    }
+    m = String(title || '').match(/^Call (january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec) (\d{1,2})(?: (\d{1,2}(?::\d{2})?(?:am|pm)?))?$/i);
     if (!m) return '';
-    return m[2] + ' ' + CALL_MONTH_HE[m[1].toLowerCase()] + ' ' + hebrewClockToken(m[3]);
+    const clock = m[3] ? hebrewClockToken(m[3]) : '';
+    const dated = 'ב-' + m[2] + ' ' + CALL_MONTH_HE[m[1].toLowerCase()];
+    return clock ? (dated + ' ' + clock) : dated;
+  }
+
+  function hebrewWhenFromText(text) {
+    const raw = String(text || '');
+    let m = raw.match(/\b(tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (m) return hebrewCallWhen('Call ' + m[1] + ' ' + m[2].replace(/\s+/g, ''));
+    m = raw.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (!m) return '';
+    return hebrewCallWhen('Call ' + m[1] + ' ' + m[2] + ' ' + m[3].replace(/\s+/g, ''));
   }
 
   function hebrewCallVerb(object) {
     const raw = String(object || '').replace(/\s+/g, ' ').replace(/[.,!?]+$/g, '').trim();
+    if (/^(?:her|him|them|you|me|us|she|he|they)$/i.test(raw)) return '';
+    if (/^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight)$/i.test(raw)) return '';
     const known = CALL_VERB_HE[raw.toLowerCase()];
     if (known) return 'להתקשר ' + known;
     if (/^[\u0590-\u05FF][\u0590-\u05FF'’.-]{1,40}$/.test(raw)) return 'להתקשר ל' + raw;

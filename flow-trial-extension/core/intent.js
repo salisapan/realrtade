@@ -1290,8 +1290,8 @@ const FlowIntent = (() => {
           const dateText = iso ? humanDateFallback({ iso: iso }) : '';
           intent.label = FlowJudgment.neutralTitle({ moneyText: facts.moneyText, dateText: dateText || null });
         } else {
-          let titled = selfAskTitle(text, subject);
-          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
+          let titled = selfAskTitle(text, subject, ctx);
+          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
           const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
           if (usableSelfTitle(callTitled)) titled = callTitled;
           if (usableSelfTitle(titled)) intent.label = titled;
@@ -1405,6 +1405,10 @@ const FlowIntent = (() => {
     // object stays quiet too: one word is not a title.
     function selfContentStaysQuiet(raw) {
       const blob = String(raw || '');
+      // A hedge or a hold inside the if-clause does not silence the note.
+      // The main clause does. "If they don't reply by Friday, call Dana"
+      // is the task Call Dana.
+      const main = withoutIfClause(blob);
       // These gates win before a note to self becomes a task, and before
       // any Follow up title. A live ask that is not one of them still does.
       // "lmk today if the launch checklist works" is the task, on a note
@@ -1431,9 +1435,9 @@ const FlowIntent = (() => {
       if (selfAckNote(blob)) return 'ack';
       if (/\bforwarding for visibility\b/i.test(blob) || /-----Original Message-----/i.test(blob) || /Begin forwarded message/i.test(blob)) return 'quoted_forward';
       if (vocativeIsOther(blob, ctx)) return 'third_party';
-      if (/\b(?:maybe|perhaps|possibly|if you get a chance|if you have time|if it(?:'|’)s not too much trouble|at some point|eventually|when convenient|whenever you|i might|hoping to|might be worth|tentatively|we might need|i(?:'|’)ll let you know)\b/i.test(blob)) return 'hedge';
-      if (/(?:^|\s)אולי|אם יוצא|מתישהו|אם יש לך זמן|כשיהיה לך|מתי שנוח|נראה לי|יכול להיות ש/.test(blob)) return 'hedge';
-      if (/,\s*מקווה|מקווה\s*[.!]?\s*$/.test(blob)) return 'hedge';
+      if (/\b(?:maybe|perhaps|possibly|if you get a chance|if you have time|if it(?:'|’)s not too much trouble|at some point|eventually|when convenient|whenever you|i might|hoping to|might be worth|tentatively|we might need|i(?:'|’)ll let you know)\b/i.test(main)) return 'hedge';
+      if (/(?:^|\s)אולי|אם יוצא|מתישהו|אם יש לך זמן|כשיהיה לך|מתי שנוח|נראה לי|יכול להיות ש/.test(main)) return 'hedge';
+      if (/,\s*מקווה|מקווה\s*[.!]?\s*$/.test(main)) return 'hedge';
       const negBlob = withoutIfClause(blob.replace(/\bdon'?t\s+forget\b/ig, ' ').replace(/\bno\s+ne+d\s+to\s+reply\b/ig, ' '));
       if (/\b(?:do not|don'?t|no need to|never mind|won'?t|will not)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob) || /לא\s+(?:נקיים|תהיה|נעשה)/.test(negBlob) || /(?:^|[^\u0590-\u05FF])בוטל(?:ה)?(?:[^\u0590-\u05FF]|$)/.test(negBlob)) return 'negative';
       if (/\blast\s+(?:week|night|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob) || /\bfollowing (?:our|the|that) call last\b/i.test(blob)) return 'past';
@@ -1447,13 +1451,13 @@ const FlowIntent = (() => {
       const year = blob.match(/\b(19\d{2}|20\d{2})\b/);
       const nowYear = ctx.now ? new Date(ctx.now).getFullYear() : 2026;
       if (year && +year[1] < nowYear && /\b(?:meeting|call|sync|review|interview|invoice|due|paid)\b/i.test(blob)) return 'past';
-      if (/\bno decision yet\b/i.test(blob) || /\bnot decided yet\b/i.test(blob)) return 'conditional';
-      if (/\bsuppose we\b/i.test(blob) || /\bwould th?a?t work\b/i.test(blob) || /\bwould tht work\b/i.test(blob)) return 'conditional';
-      if (/נניח ש|זה יעבוד אצלכם|טרם הוחלט|עוד לא סגרנו/.test(blob)) return 'conditional';
+      if (/\bno decision yet\b/i.test(main) || /\bnot decided yet\b/i.test(main)) return 'conditional';
+      if (/\bsuppose we\b/i.test(main) || /\bwould th?a?t work\b/i.test(main) || /\bwould tht work\b/i.test(main)) return 'conditional';
+      if (/נניח ש|זה יעבוד אצלכם|טרם הוחלט|עוד לא סגרנו/.test(main)) return 'conditional';
       if (/\bno longer needed\b/i.test(blob)) return 'cancelled';
       const families = typeof FlowCloseFamilies !== 'undefined' ? FlowCloseFamilies : null;
-      if (families && typeof families.commitmentHeldBack === 'function' && families.commitmentHeldBack(blob)) return 'conditional';
-      if (families && typeof families.sentenceLiveAsk === 'function' && families.sentenceLiveAsk(blob)) return '';
+      if (families && typeof families.commitmentHeldBack === 'function' && families.commitmentHeldBack(main)) return 'conditional';
+      if (families && typeof families.sentenceLiveAsk === 'function' && families.sentenceLiveAsk(main)) return '';
       if (EVENT_CALLED_OFF_HE.test(blob)) return 'negative';
       if (/\b(?:postpon(?:e|ed|ing)|cancel(?:led|ed|ing)?|called off|won'?t happen|will not happen|isn'?t happening)\b/i.test(blob)) return 'negative';
       return '';
@@ -1465,8 +1469,8 @@ const FlowIntent = (() => {
       if (selfContentStaysQuiet(blob)) return null;
       if (selfCallCancelled(text) || meetingPlanVeto(text)) return null;
       const subject = ctx && ctx.subject;
-      let titled = selfAskTitle(text, subject);
-      if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
+      let titled = selfAskTitle(text, subject, ctx);
+      if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
       const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
       if (usableSelfTitle(callTitled)) titled = callTitled;
       if (!usableSelfTitle(titled)) return null;
@@ -2406,15 +2410,16 @@ const FlowIntent = (() => {
     }
     return best;
   }
-  const NOT_CALLEE = /^(?:you|me|us|it|the|a|an|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|eod|asap|next|this|on|at|by|for|and|back|please|day|week|time|morning|afternoon|evening|is|was|last|following|our|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)$/i;
+  const NOT_CALLEE = /^(?:you|me|us|her|him|them|she|he|they|it|the|a|an|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|eod|asap|next|this|on|at|by|for|and|back|please|day|week|time|morning|afternoon|evening|is|was|last|following|our|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)$/i;
   function callTitle(src, subject) {
-    if (/להחזיר(?:י|ו)?\s+לי\s+טלפון/.test(src)) {
-      return joinTitle('להתקשר', '', subject, { phoneHe: true, src: src });
+    const main = withoutIfClause(src);
+    if (/להחזיר(?:י|ו)?\s+לי\s+טלפון/.test(main)) {
+      return joinTitle('להתקשר', '', subject, { phoneHe: true, src: main });
     }
     const re = /\bcal(?:l)?\s+(?:(the|a|an)\s+)?([A-Za-z][A-Za-z'’-]{1,40})\b/gi;
     let m;
     let picked = null;
-    while ((m = re.exec(src))) {
+    while ((m = re.exec(main))) {
       if (NOT_CALLEE.test(m[2])) continue;
       picked = m;
     }
@@ -2430,7 +2435,7 @@ const FlowIntent = (() => {
   // "Call the bank" and "Call Yossi" already returned from callTitle.
   // "I'll call you" and "per our call" are not this reminder.
   function callAboutSubject(src, subject) {
-    const raw = String(src || '');
+    const raw = withoutIfClause(String(src || ''));
     if (/\bcall you\b/i.test(raw)) return '';
     if (/\b(?:i|we)(?:'|’)?ll\s+join\s+(?:the\s+)?call\b/i.test(raw)) return '';
     if (/\b(?:i|we)\s+will\s+join\s+(?:the\s+)?call\b/i.test(raw)) return '';
@@ -2461,6 +2466,7 @@ const FlowIntent = (() => {
     if (/^(?:let'?s|let us|please|could you|can we|shall we)\b/i.test(s)) return true;
     if (/^(?:it|this|that|these|those|them|him|her|זה|זאת|זו|אותו|אותה|את זה|הזה)$/i.test(s)) return true;
     if (/^(?:meeting request)$/i.test(s)) return true;
+    if (/^call$/i.test(s)) return true;
     if (/^(?:hello|hi|hey|dear)\b/i.test(s)) return true;
     if (/^invoice\b/i.test(s)) return true;
     return false;
@@ -2518,13 +2524,69 @@ const FlowIntent = (() => {
     s = s.replace(/(^|[^\n,])\s+\bif\b[^,\n]*/gi, '$1 ');
     return s;
   }
+  function callWhenPhrase(text) {
+    const clock = callClockPhrase(text);
+    if (clock) return clock;
+    const raw = String(text || '');
+    let m = raw.match(/\b(tomorrow|today|tonight)\b/i);
+    if (m) return m[1].toLowerCase();
+    m = raw.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+    if (!m) return '';
+    const day = m[1];
+    return day.charAt(0).toUpperCase() + day.slice(1).toLowerCase();
+  }
+  function ownCalleeTokens(ctx) {
+    const set = { sali: 1, sapan: 1 };
+    function add(name) {
+      String(name || '').split(/[\s,|]+/).forEach(function (word) {
+        const key = word.toLowerCase().replace(/[^a-z\u0590-\u05FF'-]/g, '');
+        if (key) set[key] = 1;
+      });
+    }
+    if (ctx && typeof ctx === 'object') {
+      add(ctx.userName);
+      if (Array.isArray(ctx.ownNames)) ctx.ownNames.forEach(add);
+      if (ctx.sender && ctx.sender.name) add(ctx.sender.name);
+      add(ctx.senderName);
+    }
+    return set;
+  }
+  const CALLEE_SKIP = /^(?:her|him|them|you|me|us|she|he|they|if|when|call|ring|please|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|thank|thanks|best|regards|sent|from|image|logo|account|manager|confidentiality|notice|dear|hello|hi|hey|re|fwd|subject|northwind)$/i;
+  function calleeFromBody(text, ctx) {
+    const own = ownCalleeTokens(ctx);
+    const head = String(text || '').split(/\n\s*(?:thank you|thanks|best regards|best,|regards,|cheers|sent from|many thanks|\[image)/i)[0];
+    const re = /\b([A-Z][a-z][A-Za-z'’-]{0,40})\b/g;
+    let found = '';
+    let m;
+    while ((m = re.exec(head))) {
+      const word = m[1];
+      if (CALLEE_SKIP.test(word) || own[word.toLowerCase()]) continue;
+      if (/^(?:I'll|I've|I'm|I'd|We're|We'll|Don't|Let's|Can't|Won't)$/.test(word)) continue;
+      found = word;
+    }
+    return found;
+  }
+  // A pronoun is not the person to call. A name in the body is. With no
+  // name, the title is Call plus the time on the main clause. The account
+  // owner's own name is not the callee.
+  function pronounCalleeTitle(src, ctx) {
+    const full = String(src || '');
+    const main = withoutIfClause(full);
+    if (!/\b(?:call|ring)\s+(?:her|him|them|you|me|us)\b/i.test(main)) return '';
+    const name = calleeFromBody(full, ctx);
+    if (name) return 'Call ' + name;
+    const when = callWhenPhrase(main);
+    if (when) return clipTitle('Call ' + when);
+    return '';
+  }
   function callTopicPhrase(text, subject) {
     return topicFromBody(text) || topicFromSubject(subject);
   }
   function haveACallTitle(text, ctx, whenText) {
-    if (!/\bhave a call\b/i.test(String(text || ''))) return '';
+    const main = withoutIfClause(String(text || ''));
+    if (!/\bhave a call\b/i.test(main)) return '';
     const box = ctx && typeof ctx === 'object' ? ctx : { subject: ctx };
-    const topic = callTopicPhrase(text, box.subject);
+    const topic = callTopicPhrase(main, box.subject);
     if (topic) return clipTitle('Call about ' + topic);
     if (!addressedToSelf(box)) {
       const name = String(box.senderName || '').trim();
@@ -2744,7 +2806,7 @@ const FlowIntent = (() => {
   }
   // A timed call or meeting whose body names no object. The subject is the object.
   function selfMeetingAbout(src, subject) {
-    const raw = String(src || '');
+    const raw = withoutIfClause(String(src || ''));
     const meet = /(?:\b(?:call|meeting|sync|chat|demo|kickoff)\b|שיחה|פגישה|ראיון|הדגמה|זום|אתקשר|נתראה|להיפגש|היפגש|לדבר)/i.test(raw);
     if (!meet) return '';
     const topic = callTopicPhrase(raw, subject);
@@ -2758,7 +2820,7 @@ const FlowIntent = (() => {
   }
   // The words of the note, once the ask frame and the date are off.
   // Used when the verb table has no row for this sentence. Not a verb list.
-  function selfRecoverTitle(text, subject) {
+  function selfRecoverTitle(text, subject, ctx) {
     if (selfCallCancelled(text)) return '';
     const s = softenTypos(prepareAsk(text))
       .replace(/מקווה שאת\/?ה בטוב[.!]?\s*/g, ' ')
@@ -2819,6 +2881,10 @@ const FlowIntent = (() => {
     clause = clause.replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
     clause = clause.replace(/\s+ב-\d[\s\S]*$/, '').replace(/\s+בשעה[\s\S]*$/, '').replace(/\s+/g, ' ').trim();
     if (/^[a-z]/.test(clause)) clause = clause.charAt(0).toUpperCase() + clause.slice(1);
+    if (/^(?:call|ring)\s+(?:her|him|them|you|me|us)$/i.test(clause)) {
+      const named = pronounCalleeTitle(s, ctx);
+      if (named) return named;
+    }
     if (/^(?:a\s+)?quick\s+chat$/i.test(clause)) return 'Set up a quick chat';
     if (/^(?:a\s+)?quick\s+call$/i.test(clause) || /\b(?:hop on a call|have a call|jump on a call)\b/i.test(clause)) {
       const about = selfMeetingAbout(s, subject);
@@ -2903,7 +2969,7 @@ const FlowIntent = (() => {
     if (/^ל[\u0590-\u05FF]/.test(clause)) return clipTitle(clause);
     return '';
   }
-  function selfAskTitle(text, subject) {
+  function selfAskTitle(text, subject, ctx) {
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
@@ -2931,6 +2997,8 @@ const FlowIntent = (() => {
     }
     const phone = callTitle(src, subject);
     if (phone) return phone;
+    const pronoun = pronounCalleeTitle(src, ctx);
+    if (pronoun) return pronoun;
     const about = callAboutSubject(src, subject);
     if (about) return about;
     if (callAsk(src)) {

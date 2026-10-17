@@ -71,8 +71,10 @@ check('a call verb is להתקשר, and a Latin name takes a hyphen',
   FlowDisplay.localizeHeading('he', 'Call Yossi') === 'להתקשר ל-Yossi' &&
   FlowDisplay.localizeHeading('he', 'Call the bak') === 'Call the bak' &&
   FlowDisplay.localizeHeading('he', 'Call you') === 'Call you' &&
-  FlowDisplay.localizeHeading('he', 'Call Thursday 14:30') === 'שיחה יום חמישי 14:30' &&
-  FlowDisplay.localizeHeading('he', 'Call Monday 3pm') === 'שיחה יום שני 15:00');
+  FlowDisplay.localizeHeading('he', 'Call Thursday 14:30') === 'שיחה ביום חמישי 14:30' &&
+  FlowDisplay.localizeHeading('he', 'Call Monday 3pm') === 'שיחה ביום שני 15:00' &&
+  FlowDisplay.localizeHeading('he', 'Call tomorrow 10:00') === 'שיחה מחר 10:00' &&
+  FlowDisplay.localizeHeading('he', 'Call Oct 20 15:00') === 'שיחה ב-20 באוק׳ 15:00');
 check('a topic stops at the comma', classify("Let's have a call Tuesday at 15:00 about the pilot, please confirm", { subject: 'Hello', senderName: 'Dana' }).label === 'Call about the pilot');
 check('a pronoun is not a topic', classify("Let's have a call Tuesday at 15:00 about it", { subject: 'Re: Fwd: Q4 budget!!', senderName: 'Dana' }).label === 'Call about Q4 budget');
 const meetingAsk = classify('Would next Monday at 3pm work for a quick call?', { subject: 'Meeting request', senderEmail: ME, to: [ME], inbound: false });
@@ -84,6 +86,29 @@ check('Schedule & Confirm does not take the call label',
 check('a schedule card drops a trailing comma from the call label',
   FlowDisplay.cardFace({ id: 'schedule', name: 'Schedule It' }, { label: 'Call about the pilot,' }, {}).title === 'Call about the pilot');
 
+const auditBody = "Let's have a call Tuesday at 15:00 about the security audit";
+const audit = classify(auditBody, { subject: 'Security audit', senderEmail: ME, senderName: 'Sali Sapan', to: [ME], inbound: false, userName: 'Sali', ownNames: ['Sali', 'Sali Sapan'] });
+check('a self note keeps Call about the security audit', audit && audit.selfTask === true && audit.label === 'Call about the security audit', audit && audit.label);
+check('a self Hebrew title does not say with the owner',
+  FlowDisplay.localizeHeading('he', 'Call about the security audit', { self: true, senderName: 'Sali Sapan', bodyText: auditBody, intent: { selfTask: true } }) === 'שיחה ביום שלישי 15:00' &&
+  FlowDisplay.localizeHeading('he', 'Call about the pricing', { self: true, senderName: 'Sali Sapan', ownNames: ['Sali', 'Sali Sapan'] }) === 'שיחה' &&
+  FlowDisplay.localizeHeading('he', 'Call about Security audit', { intent: { selfTask: true }, senderName: 'Sali Sapan' }) === 'שיחה');
+const ifDont = classify("If they don't reply by Friday, call Dana", { subject: 'note', senderEmail: ME, to: [ME], inbound: false });
+check("If they don't reply stays Call Dana", ifDont && ifDont.type && ifDont.label === 'Call Dana', ifDont && { label: ifDont && ifDont.label, type: ifDont && ifDont.type, quiet: ifDont && ifDont.quiet });
+const ifSend = classify("If we don't have a call Tuesday, send the deck to Ori", { subject: 'Call', senderEmail: ME, to: [ME], inbound: false });
+check('a call inside the if stays Send the deck to Ori', ifSend && ifSend.label === 'Send the deck to Ori' && ifSend.label !== 'Call about Call', ifSend && ifSend.label);
+const ifPilot = classify("If we don't have a call Tuesday, send the deck to Ori", { subject: 'the pilot', senderEmail: ME, to: [ME], inbound: false });
+check('a topic subject does not turn that send into a call', ifPilot && ifPilot.label === 'Send the deck to Ori', ifPilot && ifPilot.label);
+const her = classify("When Dana doesn't answer, call her on Monday", { subject: 'note', senderEmail: ME, senderName: 'Sali Sapan', to: [ME], inbound: false, userName: 'Sali', ownNames: ['Sali', 'Sali Sapan'] });
+check('her resolves to Dana', her && her.label === 'Call Dana', her && her.label);
+check('Hebrew does not say Call Her', her && FlowDisplay.localizeHeading('he', her.label, { self: true, senderName: 'Sali Sapan' }) === 'להתקשר ל-Dana');
+const youThu = classify("I'll call you Thursday at 16:00.", { subject: 'Re: onboarding', senderEmail: ME, senderName: 'Sali Sapan', to: [ME], inbound: false, userName: 'Sali', ownNames: ['Sali', 'Sali Sapan'] });
+check('you with a clock is Call plus the time', youThu && youThu.label === 'Call Thursday 16:00', youThu && youThu.label);
+check('that Hebrew title is שיחה plus the day', youThu && FlowDisplay.localizeHeading('he', youThu.label, { self: true, bodyText: "I'll call you Thursday at 16:00." }) === 'שיחה ביום חמישי 16:00');
+const youMon = classify("I'll call you Monday at 14:30.", { subject: 'Re: the renewal', senderEmail: ME, senderName: 'Sali Sapan', to: [ME], inbound: false, userName: 'Sali', ownNames: ['Sali', 'Sali Sapan'] });
+check('Monday you is Call Monday 14:30', youMon && youMon.label === 'Call Monday 14:30', youMon && youMon.label);
+const ring = classify('Ring you Thursday at 9am.', { subject: 'note', senderEmail: ME, senderName: 'Sali Sapan', to: [ME], inbound: false, userName: 'Sali', ownNames: ['Sali', 'Sali Sapan'] });
+check('ring you is Call plus the time', ring && ring.label === 'Call Thursday 9am', ring && ring.label);
 const selfCall = classify(CALL, { subject: 'the pilot', senderEmail: ME, inbound: false });
 check('a self-sent have-a-call is Call about the subject', selfCall && selfCall.label === 'Call about the pilot' && selfCall.selfTask === true, selfCall && { label: selfCall.label, selfTask: selfCall.selfTask, type: selfCall.type });
 
