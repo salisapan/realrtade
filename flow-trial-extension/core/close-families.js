@@ -201,13 +201,37 @@ const FlowCloseFamilies = (() => {
     return true;
   }
 
+  // "don't forget to save" is the ask. "no need to reply" declines a draft.
+  // Neither phrase negates the work in the same mail.
+  function askPhraseIsNotTheNegation(raw) {
+    const t = String(raw || '');
+    if (/\bdon'?t\s+forget\b/i.test(t)) return true;
+    if (/\bno\s+ne+d\s+to\s+reply\b/i.test(t)) return true;
+    return false;
+  }
+  // "don't save" / "no need to save" is the file gate's own quiet.
+  // That reason stays quiet:google. It is not this hold.
+  function saveRefusal(raw) {
+    const t = String(raw || '');
+    if (/\bdon'?t\s+forget\b/i.test(t)) return false;
+    if (/\b(?:do not|don'?t|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)\b/i.test(t)) return true;
+    if (/\bno\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)\b/i.test(t)) return true;
+    if (/(?:אל\s*תשמור|לא\s+צריך\s+לשמור|אין\s+צורך\s+לשמור|לא\s+לשמור)/.test(t)) return true;
+    return false;
+  }
   function hedged(sentence) {
-    // "אם אפשר, תשלח" is the ask. Bare "אם אפשר" stays a hedge.
-    if (sentenceLiveAsk(sentence)) return false;
-    return HEDGE_EN.test(sentence) || HEDGE_HE.test(sentence);
+    // An English hedge, maybe, if you're free, and אולי win before a live ask.
+    // "אם אפשר, תשלח" is still the ask. אם אפשר is not this hedge.
+    const t = String(sentence || '');
+    if (HEDGE_EN.test(t)) return true;
+    if (/(?:^|[^\u0590-\u05FF])אולי/.test(t)) return true;
+    if (sentenceLiveAsk(t)) return false;
+    return HEDGE_HE.test(t);
   }
   function negated(sentence) {
-    return NEG_EN.test(sentence) || NEG_HE.test(sentence);
+    const t = String(sentence || '');
+    if (askPhraseIsNotTheNegation(t)) return false;
+    return NEG_EN.test(t) || NEG_HE.test(t);
   }
   function pastDone(sentence) {
     return PAST_EN.test(sentence) || PAST_HE.test(sentence);
@@ -282,8 +306,8 @@ const FlowCloseFamilies = (() => {
     if (/\bhypothetical/i.test(t) || /\bif\s+we\s+approv/i.test(t) || /באופן תיאורטי/.test(t)) return false;
     if (/אם נאשר/.test(t) && !/אם אפשר/.test(t)) return false;
     if (/\bnothing has been decided\b/i.test(t) && !/\bwe confirmed it\b/i.test(t)) return false;
-    if (/\b(?:do not|don'?t)\b/i.test(t) && !/\bwe confirmed it\b/i.test(t)) return false;
-    if (/\bno\s+ne+d\s+to\b/i.test(t)) return false;
+    if (/\b(?:do not|don'?t)\b/i.test(t) && !/\bwe confirmed it\b/i.test(t) && !/\bdon'?t\s+forget\b/i.test(t)) return false;
+    if (/\bno\s+ne+d\s+to\b/i.test(t) && !/\bno\s+ne+d\s+to\s+reply\b/i.test(t)) return false;
     if (/\b(?:please|kindly)\b/i.test(t) && /\b(?:pay|send|wire|process|schedule|remit|reply|confirm)\b/i.test(t)) return true;
     if (/\bif you can\b/i.test(t) && /\b(?:send|pay|attach|forward|share)\b/i.test(t)) return true;
     if (/\bwe confirmed it\b/i.test(t) && /\bplease\s+pay\b/i.test(t)) return true;
@@ -303,6 +327,8 @@ const FlowCloseFamilies = (() => {
     if (!t || sentenceLiveAsk(t)) return false;
     // "We don't have a quote" names the missing file. It is not a hold.
     if (notFound(t)) return false;
+    // These two are not a hold of the ask. A save refusal is the file gate.
+    if (askPhraseIsNotTheNegation(t) || saveRefusal(t)) return false;
     if (/\b(?:do not|don'?t)\b/i.test(t)) return true;
     if (/\bno\s+ne+d\s+to\b/i.test(t)) return true;
     if (/\b(?:until|utnil)\s+we\s+confirm\b/i.test(t)) return true;

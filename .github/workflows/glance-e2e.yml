@@ -40,6 +40,7 @@ jobs:
           node test/outlook-calendar-corpus.cjs
           node test/regress-144-corpus.cjs
           node test/negation-conditional-corpus.cjs
+          node test/self-title-preposition-corpus.cjs
           node test/display-144-followups-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension

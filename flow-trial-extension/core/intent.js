@@ -712,7 +712,7 @@ const FlowIntent = (() => {
   // not the reader's name. The reader's names are the account display
   // name and ownNames, in either script. A name in the other script is
   // still someone else.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|greetings|greeting|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
   const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
@@ -862,7 +862,7 @@ const FlowIntent = (() => {
   // "בהמשך לשיחתנו, עומר, תוכל…" names עומר after a comma, not on the
   // first token. A discourse word (בבקשה, Please) is not that name.
   // The reader's own name in the same mail keeps the ask.
-  const NOT_COMMA_NAME = /^(?:please|kindly|thanks|thank|regards|best|cheers|hi|hey|hello|dear|good|morning|afternoon|evening|following|quick|also|separately|and|but|so|yes|no|ok|okay|re|fw|fwd|sent|from|subject|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|fiday|eod|asap|בבקשה|נא|אנא|אפשר|תוכל|תוכלי|תוכלו|תשלח|תשלחי|שלום|היי|הי|תודה|בברכה|בתודה|בהמשך|צהריים|בוקר|ערב|רבה|שבוע|נשלח|יום|המשך|טובים|טוב|רב|שיחתנו|לשיחתנו|נעים|המשך|שגוי|שגויה|נכון|נכונה|חשוב|דחוף|מצורף)$/i;
+  const NOT_COMMA_NAME = /^(?:please|kindly|thanks|thank|regards|best|cheers|hi|hey|hello|dear|greetings|greeting|good|morning|afternoon|evening|following|quick|also|separately|and|but|so|yes|no|ok|okay|re|fw|fwd|sent|from|subject|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|fiday|eod|asap|בבקשה|נא|אנא|אפשר|תוכל|תוכלי|תוכלו|תשלח|תשלחי|שלום|היי|הי|תודה|בברכה|בתודה|בהמשך|צהריים|בוקר|ערב|רבה|שבוע|נשלח|יום|המשך|טובים|טוב|רב|שיחתנו|לשיחתנו|נעים|המשך|שגוי|שגויה|נכון|נכונה|חשוב|דחוף|מצורף)$/i;
   function restStartsAsk(rest) {
     const r = String(rest || '');
     if (/^(?:can|could|would|will|please|kindly)\b/i.test(r)) return true;
@@ -1327,8 +1327,9 @@ const FlowIntent = (() => {
           || /^(?:could you|would you|can you|please |need )\b/i.test(labelNow)
           || /תוכל/.test(labelNow)
           || /^Reply requested\b/.test(labelNow)
-          || /^Saving\b/i.test(labelNow);
-        if (unusable) return stayQuiet('hedge');
+          || /^Saving\b/i.test(labelNow)
+          || badSelfTitle(labelNow);
+        if (unusable) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low' && labelWords >= 2) intent.confidence = 'high';
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
@@ -1457,7 +1458,8 @@ const FlowIntent = (() => {
       if (/\b(?:maybe|perhaps|possibly|if you get a chance|if you have time|if it(?:'|’)s not too much trouble|at some point|eventually|when convenient|whenever you|i might|hoping to|might be worth|tentatively|we might need|i(?:'|’)ll let you know)\b/i.test(blob)) return 'hedge';
       if (/(?:^|\s)אולי|אם יוצא|מתישהו|אם יש לך זמן|כשיהיה לך|מתי שנוח|נראה לי|יכול להיות ש/.test(blob)) return 'hedge';
       if (/,\s*מקווה|מקווה\s*[.!]?\s*$/.test(blob)) return 'hedge';
-      if (/\b(?:do not|don'?t|no need to|never mind)\b/i.test(blob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(blob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(blob)) return 'negative';
+      const negBlob = blob.replace(/\bdon'?t\s+forget\b/ig, ' ').replace(/\bno\s+ne+d\s+to\s+reply\b/ig, ' ');
+      if (/\b(?:do not|don'?t|no need to|never mind)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob)) return 'negative';
       if (/\blast\s+(?:week|night|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob) || /\bfollowing (?:our|the|that) call last\b/i.test(blob)) return 'past';
       if (/\byesterday\b/i.test(blob) && /\b(?:meeting|met|chat|chatting|speaking|spoke|call)\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
@@ -1712,11 +1714,12 @@ const FlowIntent = (() => {
     // A meeting noun plus a resolved day is the event. Two unread dates
     // are an event only when a meeting noun and a clock are both written.
     // A bare weekday and a slash, with no meeting noun, stays quiet.
-    const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone;
-    // "if you're free" / "maybe" is not a time the sender has actually
-    // asked to hold. A missed chip costs one click; an event at a time
-    // that was only floated costs a wrong hour on the calendar.
-    const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי/i.test(text);
+    // "if you're free" / "maybe" / אולי is not a time the sender has
+    // actually asked to hold. That hedge wins before a live ask and
+    // before this event. A missed chip costs one click; an event at a
+    // time that was only floated costs a wrong hour on the calendar.
+    const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי|(?:^|[^\u0590-\u05FF])אולי/.test(text);
+    const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone && !meetingAskHedge;
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
 
@@ -2173,8 +2176,9 @@ const FlowIntent = (() => {
   function ownFirstPersonPromise(text) {
     const src = String(text || '');
     if (/\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(src)) return true;
-    if (/\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
-    if (/\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    if (/\b(?:i|we)(?:'|’)?ll\s+(?:send|snd|sned|sedn|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    if (/\b(?:i|we)\s+will\s+(?:send|snd|sned|sedn|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    if (/\b(?:promsed|promised)\b/i.test(src) && /\b(?:snd|sned|sedn|send)\b/i.test(src)) return true;
     if (/(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(src)) return true;
     return false;
   }
@@ -2310,14 +2314,31 @@ const FlowIntent = (() => {
     s = s.replace(/^(?:(?:שלך|אליי|אלי|לי|לך|לכם|אותי|בבקשה|נא|ממך|מכם)\s+)+/, '');
     s = s.replace(HE_DATE_LEAD, '').replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
     s = s.replace(/^ו\S+\s+(?=את\s)/, '');
-    if (/^ל[\u0590-\u05FF]/.test(s) && !/^ל[השמב]/.test(s)) s = 'את ' + s.slice(1);
+    // לגבי is one preposition. Splitting it makes "את גבי".
+    if (!/^לגבי/.test(s) && /^ל[\u0590-\u05FF]/.test(s) && !/^ל[השמב]/.test(s)) s = 'את ' + s.slice(1);
     s = s.replace(/^על\s+ה-(\S+)/, '$1').replace(/^על\s+ה\s+(\S+)/, '$1');
     s = s.replace(/^on\s+the\s+(\S+)$/i, '$1');
     s = s.replace(/\s+attached$/i, '');
     s = s.replace(/\s+is$/i, '');
     s = s.replace(/\b([A-Za-z]{2,})\s+\1\b/gi, '$1');
-    s = s.replace(/[,\s]+$/g, '').replace(/\s+/g, ' ').trim();
+    s = s.replace(/[.?!]+$/g, '').replace(/[,\s]+$/g, '').replace(/\s+/g, ' ').trim();
     return s;
+  }
+  // The verb picks the preposition. להתקשר takes ל-. לעדכן takes את or לגבי.
+  // לבדוק takes את, including את ה-PR. "את גבי" and "לבדוק ל-" are not titles.
+  function shapeHeObject(verb, obj) {
+    let object = String(obj || '').replace(/[.?!]+$/g, '').replace(/\s+/g, ' ').trim();
+    if (verb === 'להתקשר') {
+      object = object.replace(/^את\s+/, '');
+      if (/^(?:זה|לעצמי|בהמשך)$/.test(object)) return '';
+      if (object && !/^ל/.test(object)) object = 'ל' + object;
+    }
+    if (verb === 'לעדכן') object = object.replace(/^את גבי\b/, 'לגבי');
+    if (verb === 'לבדוק') {
+      const latin = object.match(/^ל-([A-Za-z][\w-]*)/);
+      if (latin) object = 'את ה-' + latin[1];
+    }
+    return object;
   }
   function earlierNoun(src, index) {
     const before = String(src || '').slice(0, index);
@@ -2370,7 +2391,7 @@ const FlowIntent = (() => {
       if (topic) return clipTitle('לחזור בנושא ' + topic);
     }
     const sub = cleanSubject(subject);
-    if (sub && !weakSubject(sub)) {
+    if (sub && !weakSubject(sub) && !genericFollowSubject(sub) && !/^בהמשך\b/.test(sub) && sub !== 'לעצמי') {
       const title = clipTitle(verb + ' ' + sub);
       if (title.split(/\s+/).length >= 2) return title;
     }
@@ -2386,8 +2407,8 @@ const FlowIntent = (() => {
       useVerb = 'Send';
       keepThe = true;
     }
-    let obj = takeObject(rest, keepThe);
-    if (weakObject(obj)) obj = takeObject(earlierNoun(src, match.index), keepThe);
+    let obj = shapeHeObject(useVerb, takeObject(rest, keepThe));
+    if (weakObject(obj)) obj = shapeHeObject(useVerb, takeObject(earlierNoun(src, match.index), keepThe));
     if (opts && opts.pay && (weakObject(obj) || /^payment of\b/i.test(obj))) obj = moneyPhrase(src) || obj;
     return joinTitle(useVerb, obj, subject, Object.assign({ src: src }, opts || {}));
   }
@@ -2405,7 +2426,7 @@ const FlowIntent = (() => {
     if (/להחזיר(?:י|ו)?\s+לי\s+טלפון/.test(src)) {
       return joinTitle('להתקשר', '', subject, { phoneHe: true, src: src });
     }
-    const re = /\bcall\s+(?:(the|a|an)\s+)?([A-Za-z][A-Za-z'’-]{1,40})\b/gi;
+    const re = /\bcal(?:l)?\s+(?:(the|a|an)\s+)?([A-Za-z][A-Za-z'’-]{1,40})\b/gi;
     let m;
     let picked = null;
     while ((m = re.exec(src))) {
@@ -2457,6 +2478,9 @@ const FlowIntent = (() => {
     [/\bupdate\b/i, 'Update'],
     [/\breply\b/i, 'Reply'],
     [/\bsave\b/i, 'Save'],
+    [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+bo+k[o]?\b/i, 'Book'],
+    [/\bbook\b/i, 'Book'],
+    [/\border\b/i, 'Order'],
     [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+order\b/i, 'Order'],
     [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+renew\b/i, 'Renew'],
     [/\b(?:need to|have to|remember to|please|i will|we'll|i'll|we will)\s+book\b/i, 'Book'],
@@ -2480,7 +2504,8 @@ const FlowIntent = (() => {
     [/למלא|תמלא(?:י|ו)?(?![\u0590-\u05FF])/, 'למלא'],
     [/לחזור|תחזור(?![\u0590-\u05FF])|תחזרי(?![\u0590-\u05FF])|תחזרו(?![\u0590-\u05FF])/, 'לחזור'],
     [/להעלות|תעלה(?![\u0590-\u05FF])|תעלי(?![\u0590-\u05FF])|תעלו(?![\u0590-\u05FF])/, 'להעלות'],
-    [/לאשר|תאשר(?:י|ו)?(?![\u0590-\u05FF])/, 'לאשר'],
+    [/לאשר|תאשר(?:י|ו)?(?![\u0590-\u05FF])|(?<![\u0590-\u05FF])אשר(?![\u0590-\u05FF])/, 'לאשר'],
+    [/לדכן(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להגיש|תגיש(?![\u0590-\u05FF])/, 'להגיש'],
     [/לעדכן|תעדכנ(?:י|ו)?(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להשלים|יש להשלים/, 'להשלים'],
@@ -2495,26 +2520,82 @@ const FlowIntent = (() => {
     [/לסגור|תסגור(?:י|ו)?(?![\u0590-\u05FF])/, 'לסגור'],
     [/לחדש|תחדש(?:י|ו)?(?![\u0590-\u05FF])/, 'לחדש']
   ];
-  // A self-sent note with no verb can take the subject as the object.
-  // Thanks, Recap, and Decision are not objects. With no real object the
-  // note stays quiet. "Follow up on this" is not a title.
-  function selfFollowTitle(text, subject) {
-    const sub = cleanSubject(subject);
-    const he = /[\u0590-\u05FF]/.test(sub + String(text || ''));
-    // Thanks, Recap, and Decision are not objects. A weak subject on a
-    // real ask still gets a task. With no object at all, stay quiet.
-    if (genericFollowSubject(sub)) return '';
-    if (sub && !weakSubject(sub) && !/^(?:re|fw|fwd|let's meet|lets meet)$/i.test(sub)) {
-      const title = clipTitle((he ? 'לעקוב אחרי ' : 'Follow up on ') + sub);
-      if (title.split(/\s+/).filter(Boolean).length >= 2) return title;
+  // "Follow up on this", "לעקוב אחרי זה", and a subject pasted after לעקוב
+  // are not titles. The body has the verb and the object, or the note is quiet.
+  function badSelfTitle(label) {
+    const t = String(label || '').trim();
+    if (/^Follow up on\b/i.test(t)) return true;
+    if (/לעקוב אחרי\s+(?:זה|לעצמי|בהמשך)\b/.test(t)) return true;
+    if (/להתקשר את/.test(t)) return true;
+    if (/את גבי/.test(t)) return true;
+    if (/לבדוק ל-/.test(t)) return true;
+    if (/[?!]/.test(t)) return true;
+    if (/(?<!\d)\.(?!\d)/.test(t) || /\.$/.test(t)) return true;
+    return false;
+  }
+  function selfFollowTitle() {
+    return '';
+  }
+  // A clock phrase on a meeting title: "ביום שני ב-13:00" / "בשעה 15:00".
+  function heWhenPhrase(src) {
+    const day = String(src || '').match(/ביום\s+([\u0590-\u05FF]+)/);
+    const clock = String(src || '').match(/(?:בשעה\s+|ב-)(\d{1,2}:\d{2})/);
+    if (!day) return '';
+    return 'ביום ' + day[1] + (clock ? ' ' + clock[1] : '');
+  }
+  // The title is the body's verb and its object. The subject is not the object.
+  function selfBodyTitle(src) {
+    const t = String(src || '');
+    const call = t.match(/להתקשר\s+ל([^\s.,!?]{1,24})/);
+    if (call) return 'להתקשר ל' + call[1];
+    const about = t.match(/(?:לעדכן|תעדכנ[ייו]?|לדכן)\s+(?:אותי\s+)?לגבי\s+(ה[\u0590-\u05FF]+)/);
+    if (about) return 'לעדכן לגבי ' + about[1];
+    const review = t.match(/\breview\s+ל-([A-Za-z][\w-]*)/i);
+    if (review) return 'לבדוק את ה-' + review[1];
+    const status = t.match(/פגישת\s+([\u0590-\u05FF]{2,20})(?:\s+קצרה)?/);
+    if (status && heWhenPhrase(t)) return 'פגישת ' + status[1] + ' ' + heWhenPhrase(t);
+    const meet = t.match(/(?:לפגישה|פגישה)(?!\s+סטטוס)/);
+    if (meet && /ביום/.test(t) && heWhenPhrase(t) && !/פגישת/.test(t)) return 'פגישה ' + heWhenPhrase(t);
+    const demo = t.match(/לדמו/);
+    if (demo && heWhenPhrase(t)) return 'דמו ' + heWhenPhrase(t);
+    const book = t.match(/\b(?:need to\s+)?bo+k[o]?\s+(?:the\s+)?(venue|room|hall)\b/i);
+    if (book) return 'Book the ' + book[1].toLowerCase();
+    const order = t.match(/(?<!\bin\s)\border\s+(.+?)(?:\s+(?:before|by|on|until|till|tomorrow|today|next|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|[.?!]|$)/i);
+    if (order) {
+      const obj = order[1].replace(/\s+/g, ' ').trim();
+      if (obj && !/^(?:to|the|a|an)$/i.test(obj)) return 'Order ' + obj;
     }
-    return he ? 'לעקוב אחרי זה' : 'Follow up on this';
+    const over = t.match(/\bto go over\s+(the\s+[A-Za-z0-9][\w]*(?:\s+[A-Za-z0-9][\w]*){0,4})/i);
+    if (over && /\bmeet\b/i.test(t)) return 'Meet about ' + over[1].replace(/\s+/g, ' ').trim();
+    const interview = t.match(/\binterview\b(?:\s+[a-z]+){0,4}?\s+((?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+\d{1,2})?)\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (interview) return 'Interview ' + interview[1].replace(/^next\s+/i, '') + ' ' + interview[2].replace(/\s+/g, '');
+    if (/\bsve\b/i.test(t) && /\battachment\b/i.test(t) && /\bdrive\b/i.test(t)) return 'Save attachment to Drive';
+    const sent = t.match(/\b(?:sedn|send)\s+(?:me\s+)?(?:the\s+)?lattest\s+([a-z][\w]*)/i);
+    if (sent) return 'Send the latest ' + sent[1].toLowerCase();
+    const placed = t.match(/\b(put|add)\s+(?:the\s+)?([a-z][\w]*(?:\s+[a-z][\w]*)?)\s+(?:on|to)\s+(?:my\s+|the\s+)?(calendar|task)\b/i);
+    if (placed) {
+      const noun = placed[2].replace(/\s+/g, ' ').trim();
+      if (placed[3].toLowerCase() === 'calendar' && /^put$/i.test(placed[1])) return 'Put ' + noun + ' on calendar';
+      if (placed[3].toLowerCase() === 'task') return 'Add the ' + noun + ' to the task';
+      return 'Put ' + noun + ' on calendar';
+    }
+    const syncAbout = t.match(/\bsync about\s+(the\s+[A-Za-z0-9][\w]*(?:\s+[A-Za-z0-9][\w]*){0,5})/i);
+    if (syncAbout) return 'Sync about ' + syncAbout[1].replace(/\s+is\b[\s\S]*$/i, '').replace(/\s+/g, ' ').trim();
+    if (/\bset up a sync\b/i.test(t)) return 'Set up a sync';
+    const approve = t.match(/(?<![\u0590-\u05FF])אשר\s+את\s+([\u0590-\u05FF]+(?:\s+[\u0590-\u05FF]+){0,4})/);
+    if (approve) {
+      const obj = approve[1].replace(/\s+עד(?:\s|$).*$/, '').trim();
+      if (obj) return 'לאשר את ' + obj;
+    }
+    return '';
   }
   function selfAskTitle(text, subject) {
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
     const src = prepareAsk(raw);
+    const fromBody = selfBodyTitle(src);
+    if (fromBody && !badSelfTitle(fromBody)) return fromBody;
     const he = /[\u0590-\u05FF]/.test(src);
     if (payAsk(src)) {
         const m = firstOf(src, [/לשלם|תשלמ(?:י|ו)?/, /להעביר|תעביר(?:י|ו)?/, /לסגור/, /\bpay\b/i, /\bneeds to be paid\b/i, /\bwire\b/i, /\bprocess\b/i, /\btransfer\b/i, /\bclear\b/i]);
