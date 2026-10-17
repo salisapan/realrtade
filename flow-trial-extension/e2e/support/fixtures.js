@@ -8,8 +8,43 @@ function esc(value) {
     .replace(/"/g, '&quot;');
 }
 
+// The live Gmail self-sent shape. The address is on the sender chip
+// (email and data-hovercard-id). The recipient is a span whose text is
+// "to me" or אליי, and that chip has no email attribute. The page title
+// is not an address. The account button is.
+function gmailLiveSelf(o) {
+  const own = o.ownEmail || 'ai.local.flow@gmail.com';
+  const name = o.senderName || 'Sali Sapan';
+  const subject = o.subject || 'Reminder';
+  const body = o.body || '';
+  const messageId = o.messageId || 'm-live-self';
+  const threadId = o.threadId || 't-live-self';
+  const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
+  const account = accountButton(o, own, name);
+  const titleEmail = o.titleEmail || own;
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
+    account +
+    '<div role="main">' +
+    '<h2 class="hP">' + esc(subject) + '</h2>' +
+    '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
+    '<h3 class="iw"><span class="gD" email="' + esc(own) + '" name="' + esc(name) + '" data-hovercard-id="' + esc(own) + '">' + esc(name) + '</span></h3>' +
+    '<span class="hb">' + (o.toSelfText === 'אליי' ? '' : 'to ') + '<span class="g2">' + esc(o.toSelfText || 'me') + '</span></span>' +
+    '<div class="a3s">' + esc(body) + '</div>' +
+    '</div></div></body></html>';
+}
+
+function accountButton(o, ownEmail, name) {
+  if (o.accountLabel === false || o.omitAccount === true) return '';
+  const who = String(name || '').trim();
+  // An address with no person. "Glance" is not a loaded name, so a
+  // greeting with no profile still waits. Callers that have a name pass it.
+  const label = o.accountLabel || ('Google Account: ' + (who ? who + ' ' : '') + '(' + ownEmail + ')');
+  return '<a class="gb_d" aria-label="' + esc(label) + '" href="https://accounts.google.com/SignOutOptions"></a>';
+}
+
 function gmailHtml(opts) {
   const o = opts || {};
+  if (o.liveSelf) return gmailLiveSelf(o);
   const senderEmail = o.senderEmail || 'dana@acme.com';
   const senderName = o.senderName || 'Dana';
   const subject = o.subject || 'Hello';
@@ -55,10 +90,9 @@ function gmailHtml(opts) {
     ? '<div role="list"><div role="listitem" data-legacy-thread-id="inbox-other"><span class="y2">older snippet</span></div></div>'
     : '';
   const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
-  const account = o.accountLabel
-    ? ('<a class="gb_d" aria-label="' + esc(o.accountLabel) + '" href="https://accounts.google.com/SignOutOptions"></a>')
-    : '';
-  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
+  const account = accountButton(o, ownEmail, o.accountName || '');
+  const titleEmail = o.titleEmail || ownEmail;
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
     account +
     '<div role="main">' +
     inbox +
@@ -132,8 +166,9 @@ function outlookUrl(id) {
   return 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(id);
 }
 
-function gmailUrl(messageId) {
-  return 'https://mail.google.com/mail/u/0/#inbox/' + encodeURIComponent(messageId || 'm-1');
+function gmailUrl(messageId, accountIndex) {
+  const n = accountIndex == null || accountIndex === '' ? '0' : String(accountIndex);
+  return 'https://mail.google.com/mail/u/' + n + '/#inbox/' + encodeURIComponent(messageId || 'm-1');
 }
 
 // The day the date-bound fixtures live on: today, local time. Fixtures that said 2026-10-08 stopped matching the extension's own

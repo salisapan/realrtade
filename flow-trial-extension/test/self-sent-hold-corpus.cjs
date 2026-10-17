@@ -50,12 +50,12 @@ function selfTask(body) {
 }
 const sha = selfTask(BODY);
 check('פגישת תכנון on Monday 19/10 at 11:00 is a task with no draft',
-  sha.classified && sha.classified.type === 'event' && sha.classified.entities && sha.classified.entities.dateIso === '2026-10-19' &&
+  sha.classified && sha.classified.type === 'request' && sha.classified.entities && sha.classified.entities.dateIso === '2026-10-19' &&
   sha.classified.entities.hour === 11 && sha.classified.entities.minute === 0 && sha.task,
   { type: sha.classified && sha.classified.type, steps: sha.steps, entities: sha.classified && sha.classified.entities });
 const bet = selfTask(BODY_BET);
 check('פגישת תכנון on Monday 19/10 at ב-11:00 is a task with no draft',
-  bet.classified && bet.classified.type === 'event' && bet.classified.entities && bet.classified.entities.dateIso === '2026-10-19' &&
+  bet.classified && bet.classified.type === 'request' && bet.classified.entities && bet.classified.entities.dateIso === '2026-10-19' &&
   bet.classified.entities.hour === 11 && bet.classified.entities.minute === 0 && bet.task,
   { type: bet.classified && bet.classified.type, steps: bet.steps, entities: bet.classified && bet.classified.entities });
 
@@ -152,6 +152,7 @@ function page(html, store, lang) {
 function gmailFixture(body) {
   const text = body || BODY;
   return `<!doctype html><html><body>
+    <a aria-label="Google Account: Me (${ME})" href="https://accounts.google.com/SignOutOptions"></a>
     <h2 class="hP">${text}</h2>
     <div role="main">
       <div role="listitem" data-legacy-thread-id="thread-plan" data-legacy-message-id="m-old" data-rfc822msgid="&lt;m-old@mail.gmail.com&gt;">

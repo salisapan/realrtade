@@ -167,7 +167,13 @@ sandbox.reinjectGmailTabs().then((first) => {
   process.on('unhandledRejection', onRejection);
   function matchSel(node, sel) {
     if (!node || !sel) return false;
-    if (sel === '.flow-chip-host, .flow-chip') return matchSel(node, '.flow-chip-host') || matchSel(node, '.flow-chip');
+    if (sel.indexOf(',') >= 0) {
+      const parts = sel.split(',');
+      for (let i = 0; i < parts.length; i++) {
+        if (matchSel(node, parts[i].trim())) return true;
+      }
+      return false;
+    }
     if (sel.charAt(0) === '.') return (' ' + (node.className || '') + ' ').indexOf(' ' + sel.slice(1) + ' ') >= 0;
     const attr = /^([a-z0-9]+)?\[([a-z0-9-]+)(?:="([^"]*)")?\]$/i.exec(sel);
     if (!attr) return false;
@@ -223,6 +229,9 @@ sandbox.reinjectGmailTabs().then((first) => {
     let timerSeq = 1;
     let now = 0;
     const body = makeNode('body');
+    const account = makeNode('a');
+    account.setAttribute('aria-label', 'Google Account: Glance (me@example.com)');
+    body.appendChild(account);
     const main = makeNode('div');
     main.setAttribute('role', 'main');
     body.appendChild(main);

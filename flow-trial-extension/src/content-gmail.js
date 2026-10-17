@@ -722,10 +722,23 @@ function glanceUiCopy(kind) {
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   }
 
+  // Gmail puts the address on email, or only on data-hovercard-id when the
+  // visible chip is the display name. A name with no @ is not an address.
+  function addressFrom(el) {
+    if (!el || !el.getAttribute) return '';
+    const email = String(el.getAttribute('email') || '').trim();
+    if (email.indexOf('@') >= 0) return email;
+    const hover = String(el.getAttribute('data-hovercard-id') || '').trim();
+    if (hover.indexOf('@') >= 0) return hover;
+    return email;
+  }
+
   function extractSender(messageNode) {
-    const el = messageNode.querySelector('[email]');
+    if (!messageNode || !messageNode.querySelector) return { email: null, name: null };
+    const el = messageNode.querySelector('[email], [data-hovercard-id]');
     if (!el) return { email: null, name: null };
-    return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
+    const email = addressFrom(el);
+    return { email: email || null, name: el.getAttribute('name') || el.textContent.trim() };
   }
 
   // The Gmail account button, for example
@@ -792,10 +805,10 @@ function glanceUiCopy(kind) {
       if (!t || t.length > 400) continue;
       const bucket = /^(to|אל)\b/i.test(t) ? to : (/^(cc|עותק)\b/i.test(t) ? cc : null);
       if (!bucket) continue;
-      const marked = n.querySelectorAll('[email]');
+      const marked = n.querySelectorAll('[email], [data-hovercard-id]');
       for (let j = 0; j < marked.length; j++) {
-        const email = String(marked[j].getAttribute('email') || '').trim().toLowerCase();
-        if (email && bucket.indexOf(email) < 0) bucket.push(email);
+        const email = addressFrom(marked[j]).toLowerCase();
+        if (email && email.indexOf('@') >= 0 && bucket.indexOf(email) < 0) bucket.push(email);
       }
       const found = t.toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
       found.forEach((email) => { if (bucket.indexOf(email) < 0) bucket.push(email); });
@@ -809,15 +822,45 @@ function glanceUiCopy(kind) {
     return { to: to, cc: cc, userName: userName };
   }
 
+  // Collapsed Gmail header: "to me", and the me chip has no email attribute.
+  // The body is not this header. "Remind me" in the message is not "to me".
+  function headerToSelf(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return false;
+    const nodes = messageNode.querySelectorAll('span, div, p');
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.closest && n.closest(BODY_SELECTOR)) continue;
+      const t = String(n.textContent || '').replace(/[\u00a0\u202f]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 24) continue;
+      if (/^(?:to|אל)\s+me$/i.test(t)) return true;
+      if (t === 'אליי') return true;
+    }
+    return false;
+  }
+
+  // A note from the account to itself. The collapsed header names no
+  // address, and a mail that also names someone else is not this note.
+  function noteAddressedToSelf(messageNode, senderEmail, ownEmail, audience) {
+    const bag = audience || { to: [], cc: [], userName: '' };
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (!own || !from || from !== own || !headerToSelf(messageNode)) return bag;
+    const cc = (bag.cc || []).map((a) => String(a || '').trim().toLowerCase());
+    if (cc.some((a) => a && a !== own)) return bag;
+    const to = (bag.to || []).map((a) => String(a || '').trim().toLowerCase());
+    if (to.some((a) => a && a !== own && a !== 'me')) return bag;
+    bag.to = [own];
+    return bag;
+  }
+
   // Every [email] on the message, sender first. Same order extractSender
   // uses for the first one. Passed to FlowGoogleCloses.messageToJudge.
   function addressesOn(messageNode) {
     if (!messageNode || !messageNode.querySelectorAll) return [];
     const all = [];
-    const els = messageNode.querySelectorAll('[email]');
+    const els = messageNode.querySelectorAll('[email], [data-hovercard-id]');
     for (const el of els) {
-      const email = el.getAttribute('email');
-      if (email) all.push(el);
+      if (addressFrom(el)) all.push(el);
     }
     if (!all.length) return [];
     // messageToJudge treats the first address as the sender. A Hebrew
@@ -830,13 +873,13 @@ function glanceUiCopy(kind) {
       const block = el.closest ? el.closest('div, p, li') : null;
       const head = block ? String(block.innerText || '').trim() : '';
       if (/^(to|cc|אל|עותק)\b/i.test(head)) continue;
-      sender = el.getAttribute('email') || '';
+      sender = addressFrom(el);
       break;
     }
     const out = [];
     if (sender) out.push(sender);
     for (let i = 0; i < all.length; i++) {
-      const email = all[i].getAttribute('email');
+      const email = addressFrom(all[i]);
       if (email && out.indexOf(email) < 0) out.push(email);
     }
     return out;
@@ -931,18 +974,53 @@ function glanceUiCopy(kind) {
     return plain;
   }
 
-  // Gmail renders any recipient who is the signed-in account as the literal
-  // text "me" rather than their name, on every message that arrived TO them.
-  // That gives a way to read the account's own address without any
-  // account-detection hack: scan the thread for a "me"-labeled [email] node.
-  function ownEmailFromThread(messages) {
-    for (const m of messages) {
-      const els = m.querySelectorAll('[email]');
-      for (const el of els) {
-        if ((el.textContent || '').trim() === 'me') return el.getAttribute('email');
-      }
+  // Own address is the stored userinfo email, then the openid login hint,
+  // then the Gmail account button. The page title, the subject, and a
+  // "me" chip are not an address. A stored address is never replaced.
+  function accountEmailFromLabel(label) {
+    const raw = String(label || '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const prefixed = raw.match(/^(?:Google Account|חשבון Google)\s*:\s*(.+)$/i);
+    if (!prefixed) return '';
+    const email = prefixed[1].match(/\(([^)]*@[^)]+)\)\s*$/);
+    return email ? email[1].trim() : '';
+  }
+
+  function ownEmailFromAccount() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) return '';
+    const nodes = document.querySelectorAll('a[aria-label], button[aria-label], [role="button"][aria-label]');
+    for (let i = 0; i < nodes.length; i++) {
+      const email = accountEmailFromLabel(nodes[i].getAttribute('aria-label'));
+      if (email) return email;
     }
-    return null;
+    return '';
+  }
+
+  function ownEmailFromThread() {
+    return ownEmailFromAccount() || null;
+  }
+
+  function emailish(value) {
+    const raw = String(value || '').trim();
+    return raw.indexOf('@') > 0 ? raw : '';
+  }
+
+  function storedOwnEmailFromBag(bag) {
+    const profile = bag && bag.googleProfile;
+    const fromProfile = emailish(profile && profile.email);
+    if (fromProfile) return fromProfile;
+    const web = bag && bag.googleWebAuth;
+    return emailish(web && web.loginHint);
+  }
+
+  async function readStoredOwnEmail() {
+    if (!chromeLive()) return '';
+    try {
+      const bag = await chrome.storage.local.get(['googleProfile', 'googleWebAuth']);
+      return storedOwnEmailFromBag(bag);
+    } catch (e) {
+      tearDownOrphan();
+      return '';
+    }
   }
 
   function currentSubject() {
@@ -1265,22 +1343,26 @@ function glanceUiCopy(kind) {
     // A note addressed only to yourself is the exception: there is no other
     // sender, and the note is the ask (a file on your calendar, a hold).
     // A message you sent to someone else still stays quiet.
-    let ownEmail = ownEmailFromThread(messages);
-    if (ownEmail) {
-      rememberOwnEmail(ownEmail);
-      if (!chromeLive()) return;
-    } else {
-      ownEmail = await getCachedOwnEmail();
-      if (!chromeLive()) return;
+    const storedOwn = await readStoredOwnEmail();
+    if (!chromeLive()) return;
+    // The account button is this tab. userinfo is one address for the
+    // whole extension, so it is used only when this tab has no button.
+    // A stored address is not replaced by the other account.
+    const buttonOwn = ownEmailFromThread() || '';
+    let ownEmail = buttonOwn || storedOwn || '';
+    if (!storedOwn && ownEmail) rememberOwnEmail(ownEmail);
+    if (!chromeLive()) return;
+    // No account button and no stored userinfo or openid email. That is
+    // names-pending. It is not a self task, and the page title is not used.
+    if (!ownEmail) {
+      const pending = messages[messages.length - 1];
+      if (pending && pending.getAttribute && pending.getAttribute('data-glance-names') === 'pending') return;
+      const stablePending = pending ? stableMessageKey(pending) : null;
+      if (pending && pending.setAttribute) pending.setAttribute('data-glance-names', 'pending');
+      paintNamesPending(pending, stablePending && stablePending.messageId, currentSubject());
+      armNamesHold();
+      return;
     }
-    // Without a resolved own-email, "the last visible message" can't be told
-    // apart from "the reader's own outbound message to someone else" — and
-    // misreading something the reader asked of a third party as a request
-    // made OF the reader is a wrong classification, not just a missed one.
-    // Staying silent here is deliberate: the cache above fills in on the
-    // very next ordinary (multi-recipient) thread, so this only ever costs
-    // a missed chip once per account, never a wrong one.
-    if (!ownEmail) return;
 
     // "Waiting on" looks at the thread as a whole — whose message is newest —
     // so it runs before the incoming-mail logic below, which skips the
@@ -1505,6 +1587,7 @@ function glanceUiCopy(kind) {
     const sender = extractSender(message);
     const subject = currentSubject();
     const threadId = threadIdFrom(message);
+    const audience = noteAddressedToSelf(message, sender.email, ownEmail, audienceOf(message));
 
     // Opt-in local trace. chrome.storage.local.glanceDebug === true, unset
     // by default. One read per scan. Never sent off-device. A storage miss
@@ -1528,7 +1611,6 @@ function glanceUiCopy(kind) {
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
-    const audience = audienceOf(message);
     openSuggest = {
       messageId: messageId,
       text: text,
@@ -1643,7 +1725,10 @@ function glanceUiCopy(kind) {
     // hedge, a "don't send") must not become a Do It. Other closes are
     // left alone — this only stops a REQUEST chip that would otherwise
     // offer to attach or draft around an unclear file.
-    const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
+    // A note the user sent to themself is already a task, with no draft
+    // and no attach-to-invite track. The file chain does not take it.
+    const selfSentTask = Boolean(intent && intent.selfTask);
+    const fileGate = selfSentTask ? { kind: 'ignore' } : (typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' });
     // A file asked onto an invite that already exists is the attach card
     // (task + short draft). The receipt chain does not own that ask.
     // The shared judge skips this silence when intent.inviteFile is set.
@@ -1652,10 +1737,10 @@ function glanceUiCopy(kind) {
       recordSilence(messageId, fileGate.reason === 'third-party' ? 'third-party' : 'file');
       return;
     }
-    // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
-    // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
-    // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
-    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+    // A request that attests a payment (a receipt) takes more than one step.
+    // The shared judge is the only receipt check on this page. A contract,
+    // a quote, or a signed copy is a file to send, not that silence.
+    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
       recordSilence(messageId, 'file');
       return;
     }
@@ -4694,7 +4779,7 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
     else if (changes.proLicense) applyProState();
-    else if (changes.glanceOwnNames || changes.googleProfile) {
+    else if (changes.glanceOwnNames || changes.googleProfile || changes.googleWebAuth) {
       FlowStorage.get().then((next) => {
         state = next || state;
         scanReadingPane();

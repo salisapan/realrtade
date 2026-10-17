@@ -41,7 +41,7 @@ function html(thread) {
   </div>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Inbox - me@x.com - Gmail</title>
 ${cs.css.map((c) => `<link rel="stylesheet" href="file://${ROOT}/${c}">`).join('\n')}
-</head><body><h2 class="hP">Vendor booking</h2><div role="main">${items}</div></body></html>`;
+</head><body><a aria-label="Google Account: Me (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a><h2 class="hP">Vendor booking</h2><div role="main">${items}</div></body></html>`;
 }
 
 function stub() {
