@@ -111,6 +111,7 @@ const FlowDisplay = (() => {
     if (matched) return 'רשום ' + matched[1] + ', ' + matched[2];
     if (/^log it$/i.test(raw)) return 'רשום';
     if (raw === 'Save the file?') return 'לשמור את הקובץ?';
+    if (raw === 'Call about the pilot') return 'שיחה בנושא הפילוט';
     return raw;
   }
 
@@ -172,6 +173,14 @@ const FlowDisplay = (() => {
     if (id === 'hold') {
       const blob = String((extra && (extra.bodyText || extra.text)) || '');
       return { title: /[\u0590-\u05FF]/.test(blob) ? 'פגישה' : 'Meeting', sentence: null, fileCard: false, logIt: false };
+    }
+    // Schedule It is the process name. A call titled by the engine keeps
+    // that title. Other schedule cards still use the process name.
+    if (id === 'schedule') {
+      const titled = intent && String(intent.label || '').trim();
+      if (/^Call about\b/.test(titled) || /^שיחה בנושא\b/.test(titled)) {
+        return { title: titled, sentence: null, fileCard: false, logIt: false };
+      }
     }
     return { title: name, sentence: null, fileCard: false, logIt: false };
   }

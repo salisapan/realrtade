@@ -1297,6 +1297,11 @@ const FlowIntent = (() => {
         const labelNow = String(intent.label || '').trim();
         if (!usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low') intent.confidence = 'high';
+        // "Remind me to renew the domain on Friday" is that task, due Friday.
+        // The day is already on facts. The task step reads entities.dateIso.
+        if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
+          intent.entities.dateIso = facts.date.iso;
+        }
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -1824,7 +1829,7 @@ const FlowIntent = (() => {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
       }
-      return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
+      const scheduled = finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
         when: humanWhen(facts.date, facts.time),
@@ -1832,6 +1837,13 @@ const FlowIntent = (() => {
         hour: facts.time ? facts.time.hour : null,
         minute: facts.time ? facts.time.minute : null
       });
+      // "Let's have a call Tuesday at 15:00 about the pilot" keeps the
+      // calendar and the task. The card title is the call and the topic.
+      if (scheduled && !scheduled.selfTask) {
+        const about = String(text || '').match(/\bhave a call\b[\s\S]{0,80}?\babout\s+(the\s+\S+)/i);
+        if (about) scheduled.label = 'Call about ' + about[1].replace(/\s+/g, ' ').trim();
+      }
+      return scheduled;
     }
 
     // "Could you meet Friday at 3pm" names no meeting noun, so the event
@@ -2738,6 +2750,10 @@ const FlowIntent = (() => {
     const s = String(src || '').replace(/\s+/g, ' ').trim();
     const money = (raw) => String(raw || '').replace(/\s+/g, '');
     let m;
+    // "Remind me to renew the domain on Friday" is Renew the domain.
+    // The day stays on the task. It is not a new verb.
+    m = s.match(/\bremind me to\s+renew\s+(the\s+.+?)(?:\s+(?:on|by|before)\b|$)/i);
+    if (m) return 'Renew ' + m[1].replace(/\s+/g, ' ').trim();
     m = s.match(/אפשר\s+לאשר[\s\S]{0,48}?עם\s+(ה[\u0590-\u05FF]+(?:\s+ל[\u0590-\u05FF]+)?)/);
     if (m) return 'לאשר את ' + m[1];
     m = s.match(/עדיין\s+חסר\s+לנו\s+(.+?)\s+ממך/);

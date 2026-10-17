@@ -722,10 +722,23 @@ function glanceUiCopy(kind) {
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   }
 
+  // Gmail puts the address on email, or only on data-hovercard-id when the
+  // visible chip is the display name. A name with no @ is not an address.
+  function addressFrom(el) {
+    if (!el || !el.getAttribute) return '';
+    const email = String(el.getAttribute('email') || '').trim();
+    if (email.indexOf('@') >= 0) return email;
+    const hover = String(el.getAttribute('data-hovercard-id') || '').trim();
+    if (hover.indexOf('@') >= 0) return hover;
+    return email;
+  }
+
   function extractSender(messageNode) {
-    const el = messageNode.querySelector('[email]');
+    if (!messageNode || !messageNode.querySelector) return { email: null, name: null };
+    const el = messageNode.querySelector('[email], [data-hovercard-id]');
     if (!el) return { email: null, name: null };
-    return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
+    const email = addressFrom(el);
+    return { email: email || null, name: el.getAttribute('name') || el.textContent.trim() };
   }
 
   // The Gmail account button, for example
@@ -792,10 +805,10 @@ function glanceUiCopy(kind) {
       if (!t || t.length > 400) continue;
       const bucket = /^(to|אל)\b/i.test(t) ? to : (/^(cc|עותק)\b/i.test(t) ? cc : null);
       if (!bucket) continue;
-      const marked = n.querySelectorAll('[email]');
+      const marked = n.querySelectorAll('[email], [data-hovercard-id]');
       for (let j = 0; j < marked.length; j++) {
-        const email = String(marked[j].getAttribute('email') || '').trim().toLowerCase();
-        if (email && bucket.indexOf(email) < 0) bucket.push(email);
+        const email = addressFrom(marked[j]).toLowerCase();
+        if (email && email.indexOf('@') >= 0 && bucket.indexOf(email) < 0) bucket.push(email);
       }
       const found = t.toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
       found.forEach((email) => { if (bucket.indexOf(email) < 0) bucket.push(email); });
@@ -809,15 +822,44 @@ function glanceUiCopy(kind) {
     return { to: to, cc: cc, userName: userName };
   }
 
+  // Collapsed Gmail header: "to me", and the me chip has no email attribute.
+  // The body is not this header. "Remind me" in the message is not "to me".
+  function headerToSelf(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return false;
+    const nodes = messageNode.querySelectorAll('span, div, p');
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.closest && n.closest(BODY_SELECTOR)) continue;
+      const t = String(n.textContent || '').replace(/[\u00a0\u202f]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 24) continue;
+      if (/^(?:to|אל)\s+me$/i.test(t)) return true;
+    }
+    return false;
+  }
+
+  // A note from the account to itself. The collapsed header names no
+  // address, and a mail that also names someone else is not this note.
+  function noteAddressedToSelf(messageNode, senderEmail, ownEmail, audience) {
+    const bag = audience || { to: [], cc: [], userName: '' };
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (!own || !from || from !== own || !headerToSelf(messageNode)) return bag;
+    const cc = (bag.cc || []).map((a) => String(a || '').trim().toLowerCase());
+    if (cc.some((a) => a && a !== own)) return bag;
+    const to = (bag.to || []).map((a) => String(a || '').trim().toLowerCase());
+    if (to.some((a) => a && a !== own && a !== 'me')) return bag;
+    bag.to = [own];
+    return bag;
+  }
+
   // Every [email] on the message, sender first. Same order extractSender
   // uses for the first one. Passed to FlowGoogleCloses.messageToJudge.
   function addressesOn(messageNode) {
     if (!messageNode || !messageNode.querySelectorAll) return [];
     const all = [];
-    const els = messageNode.querySelectorAll('[email]');
+    const els = messageNode.querySelectorAll('[email], [data-hovercard-id]');
     for (const el of els) {
-      const email = el.getAttribute('email');
-      if (email) all.push(el);
+      if (addressFrom(el)) all.push(el);
     }
     if (!all.length) return [];
     // messageToJudge treats the first address as the sender. A Hebrew
@@ -830,13 +872,13 @@ function glanceUiCopy(kind) {
       const block = el.closest ? el.closest('div, p, li') : null;
       const head = block ? String(block.innerText || '').trim() : '';
       if (/^(to|cc|אל|עותק)\b/i.test(head)) continue;
-      sender = el.getAttribute('email') || '';
+      sender = addressFrom(el);
       break;
     }
     const out = [];
     if (sender) out.push(sender);
     for (let i = 0; i < all.length; i++) {
-      const email = all[i].getAttribute('email');
+      const email = addressFrom(all[i]);
       if (email && out.indexOf(email) < 0) out.push(email);
     }
     return out;
@@ -935,13 +977,44 @@ function glanceUiCopy(kind) {
   // text "me" rather than their name, on every message that arrived TO them.
   // That gives a way to read the account's own address without any
   // account-detection hack: scan the thread for a "me"-labeled [email] node.
+  function ownEmailFromTitle() {
+    const title = (typeof document !== 'undefined' && document.title) || '';
+    const found = String(title).match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i);
+    return found ? found[0] : '';
+  }
+
+  function accountEmailFromLabel(label) {
+    const raw = String(label || '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const prefixed = raw.match(/^(?:Google Account|חשבון Google)\s*:\s*(.+)$/i);
+    if (!prefixed) return '';
+    const email = prefixed[1].match(/\(([^)]*@[^)]+)\)\s*$/);
+    return email ? email[1].trim() : '';
+  }
+
+  function ownEmailFromAccount() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) return '';
+    const nodes = document.querySelectorAll('a[aria-label], button[aria-label], [role="button"][aria-label]');
+    for (let i = 0; i < nodes.length; i++) {
+      const email = accountEmailFromLabel(nodes[i].getAttribute('aria-label'));
+      if (email) return email;
+    }
+    return '';
+  }
+
   function ownEmailFromThread(messages) {
     for (const m of messages) {
-      const els = m.querySelectorAll('[email]');
+      const els = m.querySelectorAll('[email], [data-hovercard-id]');
       for (const el of els) {
-        if ((el.textContent || '').trim() === 'me') return el.getAttribute('email');
+        if ((el.textContent || '').trim() === 'me') {
+          const email = addressFrom(el);
+          if (email && email.indexOf('@') >= 0) return email;
+        }
       }
     }
+    const titled = ownEmailFromTitle();
+    if (titled) return titled;
+    const account = ownEmailFromAccount();
+    if (account) return account;
     return null;
   }
 
@@ -1505,6 +1578,7 @@ function glanceUiCopy(kind) {
     const sender = extractSender(message);
     const subject = currentSubject();
     const threadId = threadIdFrom(message);
+    const audience = noteAddressedToSelf(message, sender.email, ownEmail, audienceOf(message));
 
     // Opt-in local trace. chrome.storage.local.glanceDebug === true, unset
     // by default. One read per scan. Never sent off-device. A storage miss
@@ -1528,7 +1602,6 @@ function glanceUiCopy(kind) {
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
-    const audience = audienceOf(message);
     openSuggest = {
       messageId: messageId,
       text: text,
