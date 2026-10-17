@@ -111,7 +111,8 @@ const FlowDisplay = (() => {
     if (matched) return 'רשום ' + matched[1] + ', ' + matched[2];
     if (/^log it$/i.test(raw)) return 'רשום';
     if (raw === 'Save the file?') return 'לשמור את הקובץ?';
-    if (raw === 'Call about the pilot') return 'שיחה בנושא הפילוט';
+    matched = raw.match(/^Call about (.+)$/);
+    if (matched) return 'שיחה בנושא ' + matched[1];
     return raw;
   }
 
@@ -179,7 +180,7 @@ const FlowDisplay = (() => {
     if (id === 'schedule') {
       const titled = intent && String(intent.label || '').trim();
       if (/^Call about\b/.test(titled) || /^שיחה בנושא\b/.test(titled)) {
-        return { title: titled, sentence: null, fileCard: false, logIt: false };
+        return { title: titled.replace(/[.,\s]+$/g, ''), sentence: null, fileCard: false, logIt: false };
       }
     }
     return { title: name, sentence: null, fileCard: false, logIt: false };

@@ -152,6 +152,7 @@ function page(html, store, lang) {
 function gmailFixture(body) {
   const text = body || BODY;
   return `<!doctype html><html><body>
+    <a aria-label="Google Account: Me (${ME})" href="https://accounts.google.com/SignOutOptions"></a>
     <h2 class="hP">${text}</h2>
     <div role="main">
       <div role="listitem" data-legacy-thread-id="thread-plan" data-legacy-message-id="m-old" data-rfc822msgid="&lt;m-old@mail.gmail.com&gt;">

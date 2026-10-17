@@ -1292,6 +1292,8 @@ const FlowIntent = (() => {
         } else {
           let titled = selfAskTitle(text, subject);
           if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
+          const callTitled = haveACallTitle(text, subject);
+          if (usableSelfTitle(callTitled)) titled = callTitled;
           if (usableSelfTitle(titled)) intent.label = titled;
         }
         const labelNow = String(intent.label || '').trim();
@@ -1433,7 +1435,7 @@ const FlowIntent = (() => {
       if (/(?:^|\s)אולי|אם יוצא|מתישהו|אם יש לך זמן|כשיהיה לך|מתי שנוח|נראה לי|יכול להיות ש/.test(blob)) return 'hedge';
       if (/,\s*מקווה|מקווה\s*[.!]?\s*$/.test(blob)) return 'hedge';
       const negBlob = blob.replace(/\bdon'?t\s+forget\b/ig, ' ').replace(/\bno\s+ne+d\s+to\s+reply\b/ig, ' ');
-      if (/\b(?:do not|don'?t|no need to|never mind)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob)) return 'negative';
+      if (/\b(?:do not|don'?t|no need to|never mind|won'?t|will not)\b/i.test(negBlob) || /(?:^|[^\u0590-\u05FF])אל\s*ת/.test(negBlob) || /לא\s+צריך|אין\s+צורך|אין\s+צר[וו]?ך/.test(negBlob)) return 'negative';
       if (/\blast\s+(?:week|night|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob) || /\bfollowing (?:our|the|that) call last\b/i.test(blob)) return 'past';
       if (/\byesterday\b/i.test(blob) && /\b(?:meeting|met|chat|chatting|speaking|spoke|call)\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
@@ -1465,6 +1467,8 @@ const FlowIntent = (() => {
       const subject = ctx && ctx.subject;
       let titled = selfAskTitle(text, subject);
       if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject);
+      const callTitled = haveACallTitle(text, subject);
+      if (usableSelfTitle(callTitled)) titled = callTitled;
       if (!usableSelfTitle(titled)) return null;
       const made = finish(TYPES.REQUEST, 'high', { what: titled });
       if (!made || !made.type) return null;
@@ -1838,10 +1842,10 @@ const FlowIntent = (() => {
         minute: facts.time ? facts.time.minute : null
       });
       // "Let's have a call Tuesday at 15:00 about the pilot" keeps the
-      // calendar and the task. The card title is the call and the topic.
-      if (scheduled && !scheduled.selfTask) {
-        const about = String(text || '').match(/\bhave a call\b[\s\S]{0,80}?\babout\s+(the\s+\S+)/i);
-        if (about) scheduled.label = 'Call about ' + about[1].replace(/\s+/g, ' ').trim();
+      // calendar and the task. The card title is Call about the subject.
+      if (scheduled && scheduled.type) {
+        const titled = haveACallTitle(text, ctx && ctx.subject);
+        if (titled) scheduled.label = titled;
       }
       return scheduled;
     }
@@ -2442,6 +2446,18 @@ const FlowIntent = (() => {
       const topic = heTopic(subject);
       return topic ? clipTitle('שיחה בנושא ' + topic) : '';
     }
+    return clipTitle('Call about ' + sub);
+  }
+  // A have-a-call mail is titled from the whole subject. Trailing
+  // punctuation stays off the label. Hebrew is applied later, to the
+  // frame only, so a brand in the subject stays as written.
+  function callSubjectPhrase(subject) {
+    return cleanSubject(subject).replace(/[.?!,]+$/g, '').replace(/\s+/g, ' ').trim();
+  }
+  function haveACallTitle(text, subject) {
+    if (!/\bhave a call\b/i.test(String(text || ''))) return '';
+    const sub = callSubjectPhrase(subject);
+    if (!sub || weakSubject(sub)) return '';
     return clipTitle('Call about ' + sub);
   }
   // Self-sent, and not this person's own promise. The title is the action.

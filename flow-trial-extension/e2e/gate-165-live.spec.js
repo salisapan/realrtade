@@ -2,8 +2,8 @@
 // A self-sent note whose recipient chip is the collapsed "to me" span
 // (no email attribute) is the task Renew the domain, due Friday.
 // A call at a clock about a topic keeps the calendar and the task.
-// The card title is Call about the pilot, and a Hebrew UI says
-// שיחה בנושא הפילוט. Schedule It is not that title.
+// The card title is Call about the subject. A Hebrew UI says
+// שיחה בנושא plus that phrase. The phrase stays as written.
 const { test, expect } = require('./support/harness');
 
 const SELF = 'ai.local.flow@gmail.com';
@@ -48,7 +48,7 @@ test('a call about the pilot is titled from the topic in English', async ({ glan
   const page = await glance.openGmail({
     messageId: 'm-live-call-en',
     threadId: 't-live-call-en',
-    subject: 'Pilot',
+    subject: 'the pilot',
     senderEmail: 'dana@acme.io',
     senderName: 'Dana',
     ownEmail: SELF,
@@ -73,7 +73,7 @@ test('a call about the pilot follows a Hebrew UI', async ({ glance }) => {
   const page = await glance.openGmail({
     messageId: 'm-live-call-he',
     threadId: 't-live-call-he',
-    subject: 'Pilot',
+    subject: 'the pilot',
     senderEmail: 'dana@acme.io',
     senderName: 'Dana',
     ownEmail: SELF,
@@ -83,13 +83,129 @@ test('a call about the pilot follows a Hebrew UI', async ({ glance }) => {
   });
   const card = page.locator('[data-legacy-message-id="m-live-call-he"] .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 4000 });
-  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא הפילוט');
+  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא the pilot');
   await expect(card.locator('.gs-intent')).not.toHaveText('Schedule It');
-  await expect(card.locator('.gs-intent')).not.toHaveText('Call about the pilot');
+  await expect(card.locator('.gs-intent')).not.toHaveText('שיחה בנושא הפילוט');
   const when = card.locator('[data-glance-when]');
   await expect(when).toContainText('15:00');
   await expect(when).toContainText(nextNamedDay('tuesday'));
   const glyphs = await card.locator('[data-glyph]').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-glyph')));
   expect(glyphs).toContain('calendar');
   expect(glyphs).toContain('todo');
+});
+
+test('a call about the Q4 budget uses the full subject', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    messageId: 'm-live-call-q4',
+    threadId: 't-live-call-q4',
+    subject: 'Q4 budget',
+    senderEmail: 'dana@acme.io',
+    senderName: 'Dana',
+    ownEmail: SELF,
+    to: [SELF],
+    body: "Let's have a call Tuesday at 15:00 about the Q4 budget"
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-call-q4"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 4000 });
+  await expect(card.locator('.gs-intent')).toHaveText('Call about Q4 budget');
+});
+
+test('a Hebrew subject stays untranslated inside the call frame', async ({ glance }) => {
+  await glance.seedGmail({ glanceUiLanguage: 'he' });
+  const page = await glance.openGmail({
+    messageId: 'm-live-call-he-subject',
+    threadId: 't-live-call-he-subject',
+    subject: 'תקציב הרבעון',
+    senderEmail: 'dana@acme.io',
+    senderName: 'Dana',
+    ownEmail: SELF,
+    to: [SELF],
+    lang: 'he',
+    body: CALL
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-call-he-subject"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 4000 });
+  await expect(card.locator('.gs-intent')).toHaveText('שיחה בנושא תקציב הרבעון');
+});
+
+test('a self-sent negation stays quiet', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    liveSelf: true,
+    messageId: 'm-live-self-wont',
+    threadId: 't-live-self-wont',
+    ownEmail: SELF,
+    senderName: 'Sali Sapan',
+    subject: 'the pilot',
+    body: "We won't have a call Tuesday at 15:00",
+    accountLabel: 'Google Account: Sali Sapan (' + SELF + ')'
+  });
+  const card = page.locator('[data-legacy-message-id="m-live-self-wont"] .flow-chip-host');
+  await page.waitForTimeout(2500);
+  await expect(card).toHaveCount(0);
+});
+
+const SUPPLIER = 'billing@vendor.io';
+const SUPPLIER_BODY = 'I will book the venue tomorrow';
+
+test('a supplier address in the subject is not self when the stored address differs', async ({ glance }) => {
+  await glance.seedGmail({
+    googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000, loginHint: SELF },
+    googleProfile: { displayName: 'Sali Sapan', givenName: 'Sali', surname: 'Sapan', email: SELF }
+  });
+  const page = await glance.openGmail({
+    messageId: 'm-supplier-stored',
+    threadId: 't-supplier-stored',
+    subject: 'Invoice from ' + SUPPLIER,
+    titleEmail: SUPPLIER,
+    senderEmail: SUPPLIER,
+    senderName: 'Billing',
+    ownEmail: SELF,
+    to: [SELF],
+    accountLabel: 'Google Account: Vendor (' + SUPPLIER + ')',
+    body: SUPPLIER_BODY
+  });
+  const card = page.locator('[data-legacy-message-id="m-supplier-stored"] .flow-chip-host');
+  await page.waitForTimeout(2500);
+  await expect(card).toHaveCount(0);
+  await expect(page.locator('.gs-intent')).not.toHaveText('Book the venue');
+});
+
+test('a supplier address in the subject is not self when only the account button is known', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    messageId: 'm-supplier-button',
+    threadId: 't-supplier-button',
+    subject: 'Invoice from ' + SUPPLIER,
+    titleEmail: SUPPLIER,
+    senderEmail: SUPPLIER,
+    senderName: 'Billing',
+    ownEmail: SELF,
+    to: [SELF],
+    accountLabel: 'Google Account: Sali Sapan (' + SELF + ')',
+    body: SUPPLIER_BODY
+  });
+  const card = page.locator('[data-legacy-message-id="m-supplier-button"] .flow-chip-host');
+  await page.waitForTimeout(2500);
+  await expect(card).toHaveCount(0);
+});
+
+test('no stored address and no account button is names-pending, not self', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    messageId: 'm-supplier-none',
+    threadId: 't-supplier-none',
+    subject: 'Invoice from ' + SUPPLIER,
+    titleEmail: SUPPLIER,
+    senderEmail: SUPPLIER,
+    senderName: 'Billing',
+    ownEmail: SELF,
+    to: [SELF],
+    accountLabel: false,
+    body: SUPPLIER_BODY
+  });
+  const host = page.locator('[data-legacy-message-id="m-supplier-none"]');
+  await expect(host.locator('.flow-chip-host')).toHaveCount(0);
+  await expect(host.locator('.flow-why-not')).toHaveText('Waiting for your name');
 });

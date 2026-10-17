@@ -1626,7 +1626,8 @@ function sameGoogleProfile(a, b) {
   const right = b || {};
   return (left.displayName || null) === (right.displayName || null)
     && (left.givenName || null) === (right.givenName || null)
-    && (left.surname || null) === (right.surname || null);
+    && (left.surname || null) === (right.surname || null)
+    && (left.email || null) === (right.email || null);
 }
 function rememberGoogleProfile(token) {
   if (!token || googleNamesFilled) return Promise.resolve();
@@ -1645,6 +1646,8 @@ function rememberGoogleProfile(token) {
         givenName: info.given_name || null,
         surname: info.family_name || null
       };
+      const userEmail = String((info && info.email) || '').trim();
+      if (userEmail.indexOf('@') > 0) profile.email = userEmail;
       const bag = await chrome.storage.local.get({ glanceOwnNames: [], googleProfile: null });
       const prev = Array.isArray(bag.glanceOwnNames) ? bag.glanceOwnNames : [];
       const merged = prev.slice();

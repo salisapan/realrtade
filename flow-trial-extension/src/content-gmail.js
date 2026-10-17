@@ -833,6 +833,7 @@ function glanceUiCopy(kind) {
       const t = String(n.textContent || '').replace(/[\u00a0\u202f]+/g, ' ').replace(/\s+/g, ' ').trim();
       if (!t || t.length > 24) continue;
       if (/^(?:to|אל)\s+me$/i.test(t)) return true;
+      if (t === 'אליי') return true;
     }
     return false;
   }
@@ -973,16 +974,9 @@ function glanceUiCopy(kind) {
     return plain;
   }
 
-  // Gmail renders any recipient who is the signed-in account as the literal
-  // text "me" rather than their name, on every message that arrived TO them.
-  // That gives a way to read the account's own address without any
-  // account-detection hack: scan the thread for a "me"-labeled [email] node.
-  function ownEmailFromTitle() {
-    const title = (typeof document !== 'undefined' && document.title) || '';
-    const found = String(title).match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i);
-    return found ? found[0] : '';
-  }
-
+  // Own address is the stored userinfo email, then the openid login hint,
+  // then the Gmail account button. The page title, the subject, and a
+  // "me" chip are not an address. A stored address is never replaced.
   function accountEmailFromLabel(label) {
     const raw = String(label || '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
     const prefixed = raw.match(/^(?:Google Account|חשבון Google)\s*:\s*(.+)$/i);
@@ -1001,21 +995,32 @@ function glanceUiCopy(kind) {
     return '';
   }
 
-  function ownEmailFromThread(messages) {
-    for (const m of messages) {
-      const els = m.querySelectorAll('[email], [data-hovercard-id]');
-      for (const el of els) {
-        if ((el.textContent || '').trim() === 'me') {
-          const email = addressFrom(el);
-          if (email && email.indexOf('@') >= 0) return email;
-        }
-      }
+  function ownEmailFromThread() {
+    return ownEmailFromAccount() || null;
+  }
+
+  function emailish(value) {
+    const raw = String(value || '').trim();
+    return raw.indexOf('@') > 0 ? raw : '';
+  }
+
+  function storedOwnEmailFromBag(bag) {
+    const profile = bag && bag.googleProfile;
+    const fromProfile = emailish(profile && profile.email);
+    if (fromProfile) return fromProfile;
+    const web = bag && bag.googleWebAuth;
+    return emailish(web && web.loginHint);
+  }
+
+  async function readStoredOwnEmail() {
+    if (!chromeLive()) return '';
+    try {
+      const bag = await chrome.storage.local.get(['googleProfile', 'googleWebAuth']);
+      return storedOwnEmailFromBag(bag);
+    } catch (e) {
+      tearDownOrphan();
+      return '';
     }
-    const titled = ownEmailFromTitle();
-    if (titled) return titled;
-    const account = ownEmailFromAccount();
-    if (account) return account;
-    return null;
   }
 
   function currentSubject() {
@@ -1338,22 +1343,22 @@ function glanceUiCopy(kind) {
     // A note addressed only to yourself is the exception: there is no other
     // sender, and the note is the ask (a file on your calendar, a hold).
     // A message you sent to someone else still stays quiet.
-    let ownEmail = ownEmailFromThread(messages);
-    if (ownEmail) {
-      rememberOwnEmail(ownEmail);
-      if (!chromeLive()) return;
-    } else {
-      ownEmail = await getCachedOwnEmail();
-      if (!chromeLive()) return;
+    const storedOwn = await readStoredOwnEmail();
+    if (!chromeLive()) return;
+    let ownEmail = storedOwn || ownEmailFromThread() || '';
+    if (!storedOwn && ownEmail) rememberOwnEmail(ownEmail);
+    if (!chromeLive()) return;
+    // No stored userinfo or openid email, and no account button. That is
+    // names-pending. It is not a self task, and the page title is not used.
+    if (!ownEmail) {
+      const pending = messages[messages.length - 1];
+      if (pending && pending.getAttribute && pending.getAttribute('data-glance-names') === 'pending') return;
+      const stablePending = pending ? stableMessageKey(pending) : null;
+      if (pending && pending.setAttribute) pending.setAttribute('data-glance-names', 'pending');
+      paintNamesPending(pending, stablePending && stablePending.messageId, currentSubject());
+      armNamesHold();
+      return;
     }
-    // Without a resolved own-email, "the last visible message" can't be told
-    // apart from "the reader's own outbound message to someone else" — and
-    // misreading something the reader asked of a third party as a request
-    // made OF the reader is a wrong classification, not just a missed one.
-    // Staying silent here is deliberate: the cache above fills in on the
-    // very next ordinary (multi-recipient) thread, so this only ever costs
-    // a missed chip once per account, never a wrong one.
-    if (!ownEmail) return;
 
     // "Waiting on" looks at the thread as a whole — whose message is newest —
     // so it runs before the incoming-mail logic below, which skips the
@@ -4770,7 +4775,7 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
     else if (changes.proLicense) applyProState();
-    else if (changes.glanceOwnNames || changes.googleProfile) {
+    else if (changes.glanceOwnNames || changes.googleProfile || changes.googleWebAuth) {
       FlowStorage.get().then((next) => {
         state = next || state;
         scanReadingPane();

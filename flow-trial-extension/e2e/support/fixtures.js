@@ -10,8 +10,8 @@ function esc(value) {
 
 // The live Gmail self-sent shape. The address is on the sender chip
 // (email and data-hovercard-id). The recipient is a span whose text is
-// "to me", and that me chip has no email attribute. The page title still
-// names the account, the way Gmail does.
+// "to me" or אליי, and that chip has no email attribute. The page title
+// is not an address. The account button is.
 function gmailLiveSelf(o) {
   const own = o.ownEmail || 'ai.local.flow@gmail.com';
   const name = o.senderName || 'Sali Sapan';
@@ -20,18 +20,23 @@ function gmailLiveSelf(o) {
   const messageId = o.messageId || 'm-live-self';
   const threadId = o.threadId || 't-live-self';
   const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
-  const account = o.accountLabel
-    ? ('<a class="gb_d" aria-label="' + esc(o.accountLabel) + '" href="https://accounts.google.com/SignOutOptions"></a>')
-    : '';
-  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(own) + ' - Gmail</title></head><body>' +
+  const account = accountButton(o, own, name);
+  const titleEmail = o.titleEmail || own;
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
     account +
     '<div role="main">' +
     '<h2 class="hP">' + esc(subject) + '</h2>' +
     '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
     '<h3 class="iw"><span class="gD" email="' + esc(own) + '" name="' + esc(name) + '" data-hovercard-id="' + esc(own) + '">' + esc(name) + '</span></h3>' +
-    '<span class="hb">to <span class="g2">me</span></span>' +
+    '<span class="hb">' + (o.toSelfText === 'אליי' ? '' : 'to ') + '<span class="g2">' + esc(o.toSelfText || 'me') + '</span></span>' +
     '<div class="a3s">' + esc(body) + '</div>' +
     '</div></div></body></html>';
+}
+
+function accountButton(o, ownEmail, name) {
+  if (o.accountLabel === false || o.omitAccount === true) return '';
+  const label = o.accountLabel || ('Google Account: ' + (name || 'Glance') + ' (' + ownEmail + ')');
+  return '<a class="gb_d" aria-label="' + esc(label) + '" href="https://accounts.google.com/SignOutOptions"></a>';
 }
 
 function gmailHtml(opts) {
@@ -82,10 +87,9 @@ function gmailHtml(opts) {
     ? '<div role="list"><div role="listitem" data-legacy-thread-id="inbox-other"><span class="y2">older snippet</span></div></div>'
     : '';
   const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
-  const account = o.accountLabel
-    ? ('<a class="gb_d" aria-label="' + esc(o.accountLabel) + '" href="https://accounts.google.com/SignOutOptions"></a>')
-    : '';
-  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(ownEmail) + ' - Gmail</title></head><body>' +
+  const account = accountButton(o, ownEmail, o.accountName || '');
+  const titleEmail = o.titleEmail || ownEmail;
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
     account +
     '<div role="main">' +
     inbox +
