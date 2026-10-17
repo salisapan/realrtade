@@ -2176,9 +2176,11 @@ const FlowIntent = (() => {
   function ownFirstPersonPromise(text) {
     const src = String(text || '');
     if (/\b(?:i|we)(?:'|’)?ll\s+call\s+you\b|\b(?:i|we)\s+will\s+call\s+you\b/i.test(src)) return true;
-    if (/\b(?:i|we)(?:'|’)?ll\s+(?:send|snd|sned|sedn|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
-    if (/\b(?:i|we)\s+will\s+(?:send|snd|sned|sedn|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
-    if (/\b(?:promsed|promised)\b/i.test(src) && /\b(?:snd|sned|sedn|send)\b/i.test(src)) return true;
+    if (/\b(?:i|we)(?:'|’)?ll\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    if (/\b(?:i|we)\s+will\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i.test(src)) return true;
+    // A typo of send (snd, sned, sedn) still names the object. That title
+    // is Send plus the object. "Log commitment" is only "We agreed to".
+    if (/\bpromised\b/i.test(src) && /\bsend\b/i.test(src)) return true;
     if (/(?:^|[^\u0590-\u05FF])(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/.test(src)) return true;
     return false;
   }
@@ -2560,6 +2562,21 @@ const FlowIntent = (() => {
     if (demo && heWhenPhrase(t)) return 'דמו ' + heWhenPhrase(t);
     const book = t.match(/\b(?:need to\s+)?bo+k[o]?\s+(?:the\s+)?(venue|room|hall)\b/i);
     if (book) return 'Book the ' + book[1].toLowerCase();
+    // "share the purchase order by Oct 20" — order is the noun. The verb
+    // is share, and the date stays with the object.
+    const shareOrder = t.match(/\bshare\s+(the\s+(?:purchase|sales|work)\s+order)\s+(by\s+[A-Za-z]+\s+\d{1,2})\b/i);
+    if (shareOrder) return 'Share ' + shareOrder[1].replace(/\s+/g, ' ') + ' ' + shareOrder[2].replace(/\s+/g, ' ');
+    // snd / sned / sedn is send. The object is the noun, and a "by …"
+    // deadline stays. A date alone is not the object.
+    const typoSend = t.match(/\b(?:sedn|sned|snd)\s+(?:(?:me|him|her|them|you|us)\s+)?(.+)/i);
+    if (typoSend && !/\blattest\b/i.test(typoSend[1])) {
+      let rest = typoSend[1].replace(/[.!?].*$/, ' ').replace(/\s+/g, ' ').trim();
+      rest = rest.replace(/\s+\b(?:back|over)\b/ig, ' ').replace(/\s+/g, ' ').trim();
+      const by = rest.match(/^(.*?)\s+(by\s+\S+(?:\s+\d{1,2})?)\b/i);
+      let obj = (by ? by[1] : rest).replace(/\s+(?:next|on|before|until|tomorrow|today|eod|asap)\b[\s\S]*$/i, '').trim();
+      const when = by ? by[2].replace(/\s+/g, ' ').trim() : '';
+      if (obj && !/^(?:the|a|an|to)$/i.test(obj)) return 'Send ' + obj + (when ? ' ' + when : '');
+    }
     const order = t.match(/(?<!\bin\s)\border\s+(.+?)(?:\s+(?:before|by|on|until|till|tomorrow|today|next|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|[.?!]|$)/i);
     if (order) {
       const obj = order[1].replace(/\s+/g, ' ').trim();

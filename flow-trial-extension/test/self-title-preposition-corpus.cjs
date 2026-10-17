@@ -99,8 +99,10 @@ const cases = [
   ['פגישת סטטוס', 'בהמשך לה-onboarding', 'יש מצב לעשות פגישת סטטוס קצרה ביום שני ב-13:00?', 'פגישת סטטוס ביום שני 13:00'],
   ['פגישה ביום שלישי', 'בהמשך להתקציב', 'תוכל להגיע לפגישה ביום שלישי בשעה 15:00?', 'פגישה ביום שלישי 15:00'],
   ['דמו ביום שני', 'בהמשך לההשקה', 'אני מזמין אותך לדמו ביום שני בשעה 9:00. תודה', 'דמו ביום שני 9:00'],
-  ['Log commitment snd', 'Reminder', 'I will snd the signed lase back next Tuesday.', 'Log commitment'],
-  ['Log commitment sned', 'Note to self', 'I promised Tom to sned the W-9 by EOD.', 'Log commitment'],
+  ['Send the signed lase', 'Reminder', 'I will snd the signed lase back next Tuesday.', 'Send the signed lase'],
+  ['Send the W-9', 'Note to self', 'I promised Tom to sned the W-9 by EOD.', 'Send the W-9 by EOD'],
+  ['Share the purchase order', 'Re: Recap', 'Happy Monday!\n\nAs promised on the call, you will share the purchase order by Oct 20.\n\nMany thanks,\nSali', 'Share the purchase order by Oct 20'],
+  ['Send the quarterly report', 'Note to self', 'I promsed Omer to sedn the quarterly report by EOD. Thanks', 'Send the quarterly report by EOD'],
   ['Call about the campaign', 'Re: the campaign', 'gimme a call October 19 at 9am Thank you', 'Call about the campaign'],
   ['Call about the launch checklist', 'Re: Re: Re: the launch checklist', 'Shall we hop on a call October 19 at 3pm', 'Call about the launch checklist'],
   ['שיחה בנושא', 'בהמשך לקליטת העובד החדש', 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', 'שיחה בנושא קליטת העובד החדש']
@@ -150,6 +152,32 @@ check('no need to pay is still a hold', Families.sentenceHeldBack('No need to pa
 check('maybe is a live-ask hedge', Families.commitmentHeldBack("Maybe let's meet Tuesday at 3pm.") === false);
 const greet = inboundType('Greetings,\n\nCould you send me the Q3 report by Thursday?');
 check('Greetings is not a name', greet.type === 'request' && greet.quiet !== 'hedge', { type: greet.type, quiet: greet.quiet });
+
+// "Log commitment" is the We agreed title. A send, including a typo,
+// keeps the object. v2syn-1205, v2syn-1231, and v2syn-1237 stay the exception.
+function agreedLog(body) {
+  const out = selfJudge(body, 'Note to self');
+  return { show: out.show, label: labelOf(out) };
+}
+[
+  ['v2syn-1205', 'We agreed to book the venue by Wednesday, October 14. Thanks!'],
+  ['v2syn-1231', 'We agreed to renew the passport application by Wednesday, October 14.\n\nThank you,\nSali'],
+  ['v2syn-1237', 'We agreed to file the tax return by Wednesday, October 14. Regards']
+].forEach(function (row) {
+  const got = agreedLog(row[1]);
+  check(row[0] + ' is Log commitment', got.show === true && got.label === 'Log commitment', got);
+});
+const notAgreed = [
+  ['I promsed Omer to sedn the quarterly report by EOD. Thanks', 'Send the quarterly report by EOD'],
+  ['I will snd the signed lase back next Tuesday.', 'Send the signed lase'],
+  ['I promised Tom to sned the W-9 by EOD.', 'Send the W-9 by EOD'],
+  ['As promised on the call, you will share the purchase order by Oct 20.', 'Share the purchase order by Oct 20']
+];
+notAgreed.forEach(function (row) {
+  const got = agreedLog(row[0]);
+  const generic = got.label === 'Log commitment' && !/\bwe\s+agreed\s+to\b/i.test(row[0]);
+  check('no generic Log commitment: ' + row[1], !generic && got.label === row[1], got);
+});
 
 if (failed) {
   console.log(failed + ' failed');
