@@ -91,7 +91,10 @@ const FlowIncomingJudge = (() => {
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
     const sender = i.sender || {};
-    const now = i.now instanceof Date ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    // A Date built in another realm (a vm sandbox, an iframe) fails instanceof. Falling back to the real clock then
+    // silently turns every dated mail into a past date, so the check is on the tag.
+    const nowIsDate = Object.prototype.toString.call(i.now) === '[object Date]';
+    const now = nowIsDate ? new Date(i.now.getTime()) : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const intent = intentApi.classify(text, {
       senderEmail: sender.email || null,
       senderName: sender.name || null,

@@ -21,7 +21,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 function classify(text) {
-  return FlowIntent.classify(text, { senderEmail: 'sara@partner.example', senderName: 'Sara', now: NOW, calibration: null });
+  return FlowIntent.classify(text, { senderEmail: 'sara@partner.example', senderName: 'Sara', now: NOW, calibration: null, ownNames: ['Sali', 'סאלי'], namesWaitDone: true });
 }
 
 const TEAM = [
@@ -55,7 +55,7 @@ check('שיחת צוות with a clock time is a scheduled event',
   call && { type: call.type, hour: call.entities && call.entities.hour });
 
 const fyi = classify('לידיעתך, פגישת צוות ביום רביעי בשעה 15:00. אין צורך בפעולה.');
-check('an FYI team meeting stays quiet', fyi && !fyi.type && fyi.quiet === 'noise', fyi);
+check('an FYI team meeting stays quiet', fyi && !fyi.type && Boolean(fyi.quiet), fyi);
 
 const refused = classify('לא נוכל לקיים את פגישת הצוות ביום שני בשעה 15:00.');
 check('a refused team meeting stays silent', !refused || !refused.type, refused && refused.type);

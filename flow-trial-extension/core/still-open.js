@@ -74,7 +74,7 @@ const FlowStillOpen = (() => {
   }
 
   function clockOf(now) {
-    if (now instanceof Date) return now;
+    if (Object.prototype.toString.call(now) === '[object Date]') return new Date(now.getTime());
     if (typeof now === 'number') return new Date(now);
     return new Date();
   }

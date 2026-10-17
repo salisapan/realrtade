@@ -187,7 +187,7 @@ const FlowGoogleCalendar = (() => {
     if (typeof FlowIntent === 'undefined' || typeof FlowIntent.classify !== 'function') {
       return { move: 'silent', reason: 'no-intent' };
     }
-    const now = i.now instanceof Date ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const now = Object.prototype.toString.call(i.now) === '[object Date]' ? new Date(i.now.getTime()) : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const intent = FlowIntent.classify(text, {
       senderEmail: i.senderEmail || null,
       senderName: i.senderName || null,

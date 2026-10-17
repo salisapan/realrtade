@@ -109,7 +109,7 @@ const FlowCloseChains = (() => {
   function whenOf(body, now) {
     let iso = null;
     let label = null;
-    const clockDate = typeof now === 'number' ? new Date(now) : (now instanceof Date ? now : new Date());
+    const clockDate = typeof now === 'number' ? new Date(now) : (Object.prototype.toString.call(now) === '[object Date]' ? new Date(now.getTime()) : new Date());
     if (extract && typeof extract.parseDate === 'function') {
       try {
         const d = extract.parseDate(body, clockDate);
@@ -371,7 +371,7 @@ const FlowCloseChains = (() => {
   function resolve(input) {
     const i = input || {};
     const text = fresh(i.text);
-    const now = typeof i.now === 'number' ? i.now : (i.now instanceof Date ? i.now.getTime() : Date.now());
+    const now = typeof i.now === 'number' ? i.now : (Object.prototype.toString.call(i.now) === '[object Date]' ? i.now.getTime() : Date.now());
     if (thirdPartyAsk(text)) {
       const result = blank(null);
       result.origin = i.origin || null;
