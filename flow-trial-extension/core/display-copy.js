@@ -96,6 +96,20 @@ const FlowDisplay = (() => {
   }
 
   // One entry, one title. A shared chip label is not this entry's action.
+  // A card with no sentence of its own is titled by its process name.
+  const PROCESS_NAME_HE = {
+    'Reply & Track': 'מענה ומעקב',
+    'Schedule It': 'לתזמן',
+    'Schedule & Confirm': 'לתזמן ולאשר',
+    'Follow Through': 'לעקוב עד הסוף',
+    'Move It': 'להזיז',
+    'Clear It': 'לפנות',
+    'Attach it': 'לצרף',
+    'Reply with it': 'להשיב עם הקובץ',
+    'Draft it': 'לנסח טיוטה',
+    'Note it': 'לרשום הערה'
+  };
+
   function localizeHeading(lang, title, extra) {
     const raw = String(title == null ? '' : title);
     if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
@@ -111,6 +125,7 @@ const FlowDisplay = (() => {
     if (matched) return 'רשום ' + matched[1] + ', ' + matched[2];
     if (/^log it$/i.test(raw)) return 'רשום';
     if (raw === 'Save the file?') return 'לשמור את הקובץ?';
+    if (Object.prototype.hasOwnProperty.call(PROCESS_NAME_HE, raw)) return PROCESS_NAME_HE[raw];
     matched = raw.match(/^Call about (.+)$/);
     if (matched) return hebrewCallAbout(matched[1], extra);
     matched = raw.match(/^Call with (.+)$/);
@@ -429,6 +444,9 @@ const FlowDisplay = (() => {
     'third-party': 'משתמש חיצוני',
     'calendar-write-not-granted': 'צריך הרשאה ליומן',
     'outlook-calendar-write-not-granted': 'צריך הרשאה ליומן',
+    'suggest:no-consent': 'יש קובץ מצורף. צריך הרשאת OneDrive כדי לשמור אותו',
+    'suggest:attachments-unread': 'לא הצלחתי לקרוא את הקבצים המצורפים',
+    'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
     'names-pending': 'ממתין לשם'
   };
@@ -920,6 +938,18 @@ const FlowDisplay = (() => {
     return localizeHeading(lang, fallback == null ? '' : String(fallback), ctx);
   }
 
+  // What Glance writes (a calendar event, a Google Task, a To Do) is titled
+  // exactly as the card shows it. A hold keeps the sentence it closes.
+  function artifactTitle(lang, ctx, title) {
+    const raw = title == null ? '' : String(title);
+    if (!raw) return raw;
+    const hold = ctx && (ctx.glanceChain === 'calendar-hold' || (ctx.process && ctx.process.id === 'hold'));
+    if (hold) return raw;
+    const p = ctx && ctx.process;
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(lang, SAVE_TITLE, ctx);
+    return localizeHeading(lang, raw, ctx);
+  }
+
   function activityMetric(lang, text) {
     const raw = String(text == null ? '' : text);
     if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
@@ -997,6 +1027,7 @@ const FlowDisplay = (() => {
     holdCardText: holdCardText,
     holdClockFrom: holdClockFrom,
     cardTitle: cardTitle,
+    artifactTitle: artifactTitle,
     localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,

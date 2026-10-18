@@ -163,11 +163,30 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   console.log('\n--- one Drive file is read back, then undo trashes it ---\n');
   const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z' };
   const saved = scripted([
+    { status: 200, ok: true, json: { files: [] } },
+    { status: 200, ok: true, json: { id: 'folder1', name: 'Glance' } },
     { status: 200, ok: true, json: { id: 'file1', name: 'note.txt', trashed: false, contentHash: 'abc' } },
     { status: 200, ok: true, json: Object.assign({ id: 'file1', name: 'note.txt', trashed: false, contentHash: 'abc' }, SNAP) }
   ]);
   const drive = await Drive.write({ scopes: Cfg.SCOPES, fileName: 'note.txt', base64: Buffer.from('hi').toString('base64'), mimeType: 'text/plain' }, saved.http, CLOCK);
-  check('drive write is proved from the GET', proved(drive) && drive.proof.system === 'google/drive' && drive.ref.created === true && saved.calls[1].method === 'GET', drive);
+  check('drive write is proved from the GET', proved(drive) && drive.proof.system === 'google/drive' && drive.ref.created === true && saved.calls[3].method === 'GET', drive);
+  const upBody = Buffer.from(saved.calls[2].body).toString('utf8');
+  check('drive makes the Glance folder once and saves the file in it', saved.calls[0].method === 'GET' && /name%3D'Glance'|name%3D%27Glance%27/.test(saved.calls[0].url) && saved.calls[1].method === 'POST' && /"name":"Glance"/.test(saved.calls[1].body) && /"parents":\["folder1"\]/.test(upBody), { calls: saved.calls.map((c) => c.method + ' ' + c.url) });
+  const reused = scripted([
+    { status: 200, ok: true, json: { files: [{ id: 'folderX', name: 'Glance' }] } },
+    { status: 200, ok: true, json: { id: 'file2', name: 'note.txt', trashed: false } },
+    { status: 200, ok: true, json: { id: 'file2', name: 'note.txt', trashed: false } }
+  ]);
+  await Drive.write({ scopes: Cfg.SCOPES, fileName: 'note.txt', base64: Buffer.from('hi').toString('base64'), mimeType: 'text/plain' }, reused.http, CLOCK);
+  check('drive reuses the Glance folder it finds', reused.calls.filter((c) => c.method === 'POST').length === 1 && /"parents":\["folderX"\]/.test(Buffer.from(reused.calls[1].body).toString('utf8')), reused.calls.map((c) => c.method));
+  const noFolder = scripted([
+    { status: 500, ok: false, json: null },
+    { status: 500, ok: false, json: null },
+    { status: 200, ok: true, json: { id: 'file3', name: 'note.txt', trashed: false } },
+    { status: 200, ok: true, json: { id: 'file3', name: 'note.txt', trashed: false } }
+  ]);
+  const rooted = await Drive.write({ scopes: Cfg.SCOPES, fileName: 'note.txt', base64: Buffer.from('hi').toString('base64'), mimeType: 'text/plain' }, noFolder.http, CLOCK);
+  check('drive saves to My Drive when the folder cannot be made', proved(rooted) && !/parents/.test(Buffer.from(noFolder.calls[2].body).toString('utf8')), rooted);
   check('drive calls stay off gmail', noGmail(saved.calls));
   const trashed = scripted([
     { status: 200, ok: true, json: Object.assign({ id: 'file1', name: 'note.txt', trashed: false }, SNAP) },

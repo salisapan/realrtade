@@ -132,7 +132,7 @@ test('Hebrew UI chrome on an English mail localizes the why line', async ({ glan
   await expect(host.getByRole('button', { name: 'הסתר' })).toBeVisible();
   const title = host.locator('.gs-intent, .flow-chip-process-name').first();
   await expect(title).toBeVisible();
-  await expect(title).toHaveText(/[A-Za-z]/);
+  await expect(title).toHaveText('מענה ומעקב');
   const card = await host.innerText();
   expect(card).toMatch(/מוצע/);
   expect(card).not.toMatch(/\bSuggested\b/i);

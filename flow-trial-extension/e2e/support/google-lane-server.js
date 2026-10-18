@@ -125,8 +125,35 @@ function startGoogleLaneServer() {
         body: parsed && Object.keys(parsed).length ? parsed : null
       });
 
+      if (method === 'GET' && path === '/e2e/att/board.pdf') {
+        res.writeHead(302, { Location: '/e2e/att-final/board.pdf' });
+        res.end();
+        return;
+      }
+      if (method === 'GET' && path === '/e2e/att-final/board.pdf') {
+        res.writeHead(200, { 'Content-Type': 'application/pdf' });
+        res.end(Buffer.from('%PDF-e2e-redirected'));
+        return;
+      }
+      if (method === 'GET' && path === '/e2e/att/signin.pdf') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<html>Sign in</html>');
+        return;
+      }
+      if (method === 'GET' && path === '/e2e/att/gone.pdf') {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('gone');
+        return;
+      }
+
       if (method === 'GET' && path === '/drive/v3/files') {
         const q = url.searchParams.get('q') || '';
+        if (q.indexOf('application/vnd.google-apps.folder') >= 0) {
+          const named = /name\s*=\s*'([^']*)'/.exec(q);
+          const hits = Object.keys(state.files).map((k) => state.files[k]).filter((f) => f.mimeType === 'application/vnd.google-apps.folder' && !f.trashed && (!named || f.name === named[1]));
+          send(res, 200, { files: hits.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })) });
+          return;
+        }
         if (q.indexOf('glance-pricing-q4.pdf') >= 0) {
           send(res, 200, { files: [{ id: 'pricing-pdf', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] });
           return;
@@ -151,7 +178,7 @@ function startGoogleLaneServer() {
       if (path === '/drive/v3/files' && method === 'POST') {
         const meta = readJson(raw);
         const id = 'e2e-file-' + (state.seq++);
-        const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, contentHash: 'created' });
+        const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, contentHash: 'created', parents: meta.parents || null });
         state.files[id] = file;
         if (meta.mimeType === 'application/vnd.google-apps.document') {
           state.docs[id] = docBody('', '');
@@ -173,7 +200,8 @@ function startGoogleLaneServer() {
           name: packed.meta.name || 'upload.bin',
           mimeType: packed.meta.mimeType || 'application/octet-stream',
           trashed: false,
-          contentHash: hashBytes(packed.bytes)
+          contentHash: hashBytes(packed.bytes),
+          parents: packed.meta.parents || null
         });
         state.files[id] = file;
         state.last.file = id;
@@ -312,6 +340,7 @@ function startGoogleLaneServer() {
         task: (id) => state.tasks[id],
         event: (id) => state.events[id],
         file: (id) => state.files[id],
+        files: () => state.files,
         doc: (id) => state.docs[id],
         sheet: (id) => state.sheets[id],
         editTask: (id, patch) => Object.assign(state.tasks[id], patch),

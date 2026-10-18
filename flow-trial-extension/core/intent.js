@@ -279,6 +279,9 @@ const FlowIntent = (() => {
     'designs?', 'artwork', 'specs?', 'specifications?', 'requirements?',
     // Scheduling
     'availability', 'calendars?', 'time slots?',
+    // Logistics: a supplier asking to confirm a date, an address, or an amount
+    'delivery(?: dates?| times?| address(?:es)?| windows?| details)?', '(?:shipping|ship|due|arrival|pick-?up) dates?',
+    'dates?', 'addresses', 'amounts?', 'totals?', 'deadlines?',
     // HR
     'r[ée]sum[ée]s?', 'CVs?', 'cover letters?', 'references?', 'offer letters?', 'employment contracts?',
     'onboarding paperwork', 'background checks?',
@@ -305,7 +308,7 @@ const FlowIntent = (() => {
   // list (e.g. "חשבונית מס" needs no fix because bare "חשבונית" already
   // matches regardless), so only the handful with no such fallback needed
   // this treatment.
-  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|פרטי(?: ה(?:משלוח|אספקה))?|מועד(?: ה(?:משלוח|אספקה))?|תאריך(?: משלוח| אספקה)?|כתובת|סכום|משלוח|אספקה|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
 
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
@@ -1294,7 +1297,9 @@ const FlowIntent = (() => {
           if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
           const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
           if (usableSelfTitle(callTitled)) titled = callTitled;
-          if (usableSelfTitle(titled)) intent.label = titled;
+          // The body sentence is never the title. No verb plus object, no card.
+          if (!usableSelfTitle(titled)) return stayQuiet('hedge', { noRescue: true });
+          intent.label = titled;
         }
         const labelNow = String(intent.label || '').trim();
         if (!usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
@@ -1414,6 +1419,7 @@ const FlowIntent = (() => {
       // "lmk today if the launch checklist works" is the task, on a note
       // to self. The word if here is the thing to check, not a hedge.
       if (/\blmk\b/i.test(blob) && /\bif the\b/i.test(blob) && /\bworks\b/i.test(blob)) return '';
+      if (selfPastDone(blob)) return 'past';
       if (phishingOrNegative(blob)) return 'phishing';
       if (marketingWebinar(blob)) return 'marketing';
       if (/\bexclusive offer\b/i.test(blob)) return 'marketing';
@@ -2865,6 +2871,29 @@ const FlowIntent = (() => {
   function selfCallCancelled(text) {
     return /בולה/.test(String(text || '')) && /(?:call|שיחה|פגישה)/i.test(String(text || ''));
   }
+  // A note to self that says the thing is already done, with no future verb,
+  // is not a task. "I already renewed the insurance, delete the reminder"
+  // is a record of what happened. The word reminder is not a future verb.
+  const SELF_DONE_MARK = /\balready\b|^\s*done\b|\b(?:all|it(?:'|’)s|is|are|i(?:'|’)m|i am|i(?:'|’)ve|i have)\s+done\b|(?:^|[^\u0590-\u05FF])(?:כבר|בוצע|בוצעה|סיימתי)(?![\u0590-\u05FF])/i;
+  const SELF_FUTURE_CUE = new RegExp([
+    '\\b(?:remind me|remember to|don\'?t forget|need to|needs to|have to|has to|must|should|i(?:\'|’)ll|i will|we(?:\'|’)ll|we will|i(?:\'|’)m going to|going to|will|to-?do|tomorrow|tonight|later|please|pls)\\b',
+    '\\b(?:next|this)\\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b',
+    '\\b(?:on|by|before)\\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b',
+    '(?:^|[^\\u0590-\\u05FF])(?:תזכיר(?:י|ו)?\\s+לי|תזכור(?:י|ו)?|לא\\s+לשכוח|אל\\s+תשכח(?:י|ו)?|צריך|צריכה|חייב|חייבת|אצטרך|מחר|הערב|בשבוע הבא|בחודש הבא|אחר כך|בהמשך)(?![\\u0590-\\u05FF])',
+    '(?:^|[^\\u0590-\\u05FF])(?:אני\\s+)?א(?:שלח|חדש|שלם|תקשר|עשה|בדוק|קבע|עדכן|זכור|סגור|עביר|כין|צור|פתח|חזור|זמין|שמור)(?![\\u0590-\\u05FF])'
+  ].join('|'), 'i');
+  function selfPastDone(raw) {
+    const blob = String(raw || '');
+    if (!SELF_DONE_MARK.test(blob)) return false;
+    return !SELF_FUTURE_CUE.test(blob);
+  }
+  // "I renewed the insurance" is what happened. It is not a task title.
+  function pastSentenceTitle(t) {
+    return /^(?:i|we)\s+(?:already\s+|just\s+)?(?:\w+ed|sent|paid|did|made|got|bought|had|was|were|have|has|took|gave|wrote|booked|called)\b/i.test(t)
+      || /^(?:כבר\s+)?[\u0590-\u05FF]+תי(?![\u0590-\u05FF])/.test(t)
+      || /^(?:כבר|בוצע|בוצעה)(?![\u0590-\u05FF])/.test(t)
+      || /^(?:already|done)\b/i.test(t);
+  }
   function usableSelfTitle(label) {
     const t = String(label || '').trim();
     if (!t) return false;
@@ -2875,6 +2904,7 @@ const FlowIntent = (() => {
     if (/תוכל|אשמח אם|האם תוכל|נשמח לקבוע/.test(t)) return false;
     if (/^(?:if|when|unless)\b/i.test(t) || /^אם/.test(t)) return false;
     if (/^Log commitment\b/i.test(t)) return false;
+    if (pastSentenceTitle(t)) return false;
     if (/^Log this decision$/i.test(t)) return false;
     if (/^Reply requested\b/.test(t) || /^Saving\b/i.test(t)) return false;
     if (/^(?:see you|talk soon|sounds good|got it)\b/i.test(t)) return false;
@@ -2983,7 +3013,7 @@ const FlowIntent = (() => {
     let m;
     // "Remind me to renew the domain on Friday" is Renew the domain.
     // The day stays on the task. It is not a new verb.
-    m = s.match(/\bremind me to\s+renew\s+(the\s+.+?)(?:\s+(?:on|by|before)\b|$)/i);
+    m = s.match(/\bremind me to\s+renew\s+((?:the|my|our|your)\s+.+?)(?:\s+(?:on|by|before)\b|$)/i);
     if (m) return 'Renew ' + m[1].replace(/\s+/g, ' ').trim();
     m = s.match(/אפשר\s+לאשר[\s\S]{0,48}?עם\s+(ה[\u0590-\u05FF]+(?:\s+ל[\u0590-\u05FF]+)?)/);
     if (m) return 'לאשר את ' + m[1];

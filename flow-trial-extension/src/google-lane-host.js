@@ -465,7 +465,56 @@ function decorate(result) {
     .catch(() => value);
 }
 
+// Gmail answers an attachment link with a redirect to a Google content host.
+// The page cannot follow it across origins. The worker holds the host
+// permission and follows it, with the account's own cookies. Only a Google
+// host is fetched. The bytes go back to the page and nowhere else.
+const ATTACH_FETCH_MAX = 8 * 1024 * 1024;
+
+function trustedAttachmentHost(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return false;
+    const h = u.hostname;
+    return h === 'google.com' || h.endsWith('.google.com') || h === 'googleusercontent.com' || h.endsWith('.googleusercontent.com');
+  } catch (e) {
+    return false;
+  }
+}
+
+function bytesToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+async function fetchAttachment(msg) {
+  const url = String((msg && msg.url) || '');
+  if (!trustedAttachmentHost(url)) return { ok: false, reason: 'untrusted' };
+  const cap = Math.min(Number(msg.maxBytes) || ATTACH_FETCH_MAX, ATTACH_FETCH_MAX);
+  try {
+    const res = await fetch(laneUrl(url), { credentials: 'include', redirect: 'follow' });
+    if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+    const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    // A signed-out session answers with a sign-in page, not the file.
+    if (type === 'text/html' && String(msg.expectMime || '').toLowerCase() !== 'text/html') return { ok: false, reason: 'not-a-file' };
+    const declared = Number(res.headers.get('content-length') || 0);
+    if (declared > cap) return { ok: false, reason: 'too-big' };
+    const buf = await res.arrayBuffer();
+    if (!buf.byteLength) return { ok: false, reason: 'empty' };
+    if (buf.byteLength > cap) return { ok: false, reason: 'too-big' };
+    return { ok: true, base64: bytesToBase64(buf), mimeType: (res.headers.get('content-type') || '').split(';')[0].trim() };
+  } catch (e) {
+    return { ok: false, reason: 'unavailable' };
+  }
+}
+
 function onLaneMessage(msg, sender, sendResponse) {
+  if (msg && msg.type === 'flow:fetch-attachment') {
+    fetchAttachment(msg).then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+    return true;
+  }
   if (!msg || !Lane) return undefined;
   if (msg.type === 'flow:google-write') {
     Promise.resolve(prepareWrite(msg.connectorId, msg.input))

@@ -23,6 +23,12 @@ const FlowStepListView = (() => {
     return { tool: 'you', app: 'You' };
   }
 
+  function plainText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   function skippedLine(file) {
     if (typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.skippedLabel === 'function') {
       return FlowSuggestSave.skippedLabel(file);
@@ -152,7 +158,7 @@ const FlowStepListView = (() => {
       return base;
     }
     if (failed) {
-      base.out = (L.couldnt || 'Couldn’t confirm') + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
+      base.out = (row.why ? plainText(row.why) : (L.couldnt || 'Couldn’t confirm')) + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
       return base;
     }
     function statusWord(name) {
@@ -422,8 +428,8 @@ const FlowStepListView = (() => {
         pushState(state);
         draw();
       },
-      setRow: function (id, state) {
-        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state }) : row; });
+      setRow: function (id, state, why) {
+        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null }) : row; });
         pushState(state);
         draw();
       }

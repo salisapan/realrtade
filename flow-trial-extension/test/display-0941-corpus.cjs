@@ -177,6 +177,29 @@ console.log('\n--- page wiring ---\n');
   check('the manifest does not ask for Mail.Send', JSON.stringify(manifest).indexOf('Mail.Send') < 0);
 }
 
+{
+  const titles = ['Call about the pilot', 'Renew the domain', 'Renew my domain', 'Reply requested by Oct 23', 'Pay $4,200', 'Send the contract'];
+  const ctx = { process: { id: 'follow-up' } };
+  const hold = { glanceChain: 'calendar-hold', process: { id: 'hold' } };
+  for (const lang of ['he', 'en']) {
+    for (const t of titles) {
+      check('the written title is the card title: ' + lang + ' / ' + t,
+        FlowDisplay.artifactTitle(lang, ctx, t) === FlowDisplay.cardTitle(lang, ctx, t),
+        { artifact: FlowDisplay.artifactTitle(lang, ctx, t), card: FlowDisplay.cardTitle(lang, ctx, t) });
+    }
+  }
+  for (const name of ['Reply & Track', 'Schedule It', 'Follow Through']) {
+    check('a Hebrew card titled by its process name is Hebrew: ' + name,
+      /[\u0590-\u05FF]/.test(FlowDisplay.cardTitle('he', ctx, name)) && FlowDisplay.cardTitle('en', ctx, name) === name);
+  }
+  check('Hebrew call title is written in Hebrew', FlowDisplay.artifactTitle('he', ctx, 'Call about the pilot') === 'שיחה בנושא הפיילוט');
+  check('English call title is unchanged', FlowDisplay.artifactTitle('en', ctx, 'Call about the pilot') === 'Call about the pilot');
+  check('a hold keeps the sentence it closes', FlowDisplay.artifactTitle('he', hold, 'Hold the glance-pricing file') === 'Hold the glance-pricing file');
+  check('a file on a mail with no consent is named in the quiet line',
+    /OneDrive/.test(FlowDisplay.whyNotShownLine('suggest:no-consent')) && FlowDisplay.whyNotShownLine('suggest:no-consent') !== FlowDisplay.whyNotShownLine('intent-null'));
+  check('no request is still the line for an unrecognised ask', FlowDisplay.whyNotShownLine('intent-null') === 'לא זוהתה בקשה');
+}
+
 if (failures) {
   console.log('\n' + failures + ' failed');
   process.exit(1);

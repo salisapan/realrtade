@@ -218,7 +218,7 @@ function installE2EHooks() {
           name: row.name || 'file.bin',
           contentType: row.contentType || 'application/octet-stream',
           size: row.size || 3,
-          contentBytes: 'ZTJlLXBkZg=='
+          contentBytes: row.contentBytes || 'ZTJlLXBkZg=='
         }));
       }
       const att = path.match(/\/me\/messages\/([^/]+)\/attachments$/);

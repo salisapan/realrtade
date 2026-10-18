@@ -7,6 +7,9 @@ const FlowGoogleDrive = (() => {
   const MAX_BYTES = 4 * 1024 * 1024;
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=' + encodeURIComponent('id,name,mimeType,trashed');
   const FILES = 'https://www.googleapis.com/drive/v3/files/';
+  const FILES_ROOT = 'https://www.googleapis.com/drive/v3/files';
+  const FOLDER_NAME = 'Glance';
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
   function cfg() {
     return typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
@@ -136,6 +139,29 @@ const FlowGoogleDrive = (() => {
     }
   }
 
+  // The saved file lives in one folder named Glance, made on the first save.
+  // drive.file sees only what Glance made, so the list finds Glance's own
+  // folder and never a folder the person made with the same name. When the
+  // folder cannot be found or made the file goes to My Drive. Undo trashes
+  // the file only, never the folder.
+  async function glanceFolderId(http) {
+    const q = "mimeType='" + FOLDER_MIME + "' and name='" + FOLDER_NAME + "' and trashed=false";
+    const listed = await call(http, {
+      method: 'GET',
+      url: FILES_ROOT + '?q=' + encodeURIComponent(q) + '&pageSize=1&fields=' + encodeURIComponent('files(id,name)')
+    });
+    const hit = listed.ok && listed.json && Array.isArray(listed.json.files) ? listed.json.files[0] : null;
+    if (hit && hit.id) return String(hit.id);
+    if (listed.status === 401 || listed.status === 403) return '';
+    const made = await call(http, {
+      method: 'POST',
+      url: FILES_ROOT + '?fields=' + encodeURIComponent('id,name'),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME })
+    });
+    return made.ok && made.json && made.json.id ? String(made.json.id) : '';
+  }
+
   async function write(input, http, clock) {
     const C = cfg();
     const i = input || {};
@@ -143,7 +169,10 @@ const FlowGoogleDrive = (() => {
     if (blocked) return blocked;
     const ready = prepare(i);
     if (!ready.ok) return { ok: false, reason: ready.reason || 'unclear' };
-    const packed = multipart({ name: ready.name, mimeType: ready.mimeType }, ready.mimeType, ready.bytes);
+    const folder = i.folder === false ? '' : await glanceFolderId(http);
+    const meta = { name: ready.name, mimeType: ready.mimeType };
+    if (folder) meta.parents = [folder];
+    const packed = multipart(meta, ready.mimeType, ready.bytes);
     const posted = await call(http, {
       method: 'POST',
       url: UPLOAD,
@@ -200,6 +229,7 @@ const FlowGoogleDrive = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     MAX_BYTES: MAX_BYTES,
+    FOLDER_NAME: FOLDER_NAME,
     hasWriteScope: hasWriteScope,
     safeName: safeName,
     prepare: prepare,

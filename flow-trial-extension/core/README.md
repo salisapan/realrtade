@@ -130,7 +130,7 @@ it, not touching the module.
 | `google-config.js` | Full-flavor Google client id, extension id, and the allowlist: openid, email, profile, drive.file, calendar.events, tasks, contacts.readonly. A gmail scope, a wide Drive scope, and a documents or spreadsheets scope are refused here. |
 | `google-contacts.js` | Exact-email contact lookup with contacts.readonly. Read only: no create, edit, or delete. |
 | `google-docs.js` | Create or edit one Doc on a file Glance created or the person picked, through drive.file. Handled waits for the inserted text to be read back. Undo trashes a created file or deletes the inserted range. |
-| `google-drive.js` | Save one attachment to Drive with drive.file. Handled waits for a read-back of that file. Undo trashes it. A mail does not search Drive. |
+| `google-drive.js` | Save one attachment to Drive with drive.file, in a folder named Glance that it finds or makes (My Drive when it cannot). Handled waits for a read-back of that file. Undo trashes the file, never the folder. A mail does not search Drive. |
 | `google-proof.js` | Handled for the Google lane: lane writes count only with ProofOfClose fetchedBack. A compose preview is not a trusted close. Other kinds delegate to `proof-of-close.js`. |
 | `google-sheets.js` | Append one row to a spreadsheet Glance created or the person picked, through drive.file. Handled waits for that range to be read back. Undo clears the range, or trashes the file when this lane created it. |
 | `google-tasks.js` | One Google Task for the lane (`googleLaneTask`). Handled waits for a read-back of that task. Undo deletes it. |

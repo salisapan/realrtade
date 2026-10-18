@@ -53,11 +53,23 @@ const FlowIncomingJudge = (() => {
     return (a > 12 && a <= 31 && b >= 1 && b <= 12) || (b > 12 && b <= 31 && a >= 1 && a <= 12);
   }
 
-  function textForJudge(rawText, subject) {
+  // A note to yourself with the sentence in the subject line and little or
+  // nothing in the body. The subject is the note. Someone else's subject is not.
+  function selfSent(input) {
+    const i = input || {};
+    const from = String((i.sender && i.sender.email) || i.senderEmail || '').trim().toLowerCase();
+    const own = (i.ownAddresses || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    if (!from || own.indexOf(from) === -1) return false;
+    const rest = [].concat(i.to || [], i.cc || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    return rest.every((a) => own.indexOf(a) !== -1);
+  }
+
+  function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
     if (body.length >= MIN_TEXT || !sub) return body;
     if (body.indexOf(sub) !== -1) return body;
+    if (selfNote && sub.length >= MIN_TEXT) return (sub + '\n' + body).trim();
     if (!subjectCarriesSlot(sub)) return body;
     return (sub + '\n' + body).trim();
   }
@@ -86,7 +98,7 @@ const FlowIncomingJudge = (() => {
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
-    const text = textForJudge(i.text, i.subject);
+    const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
@@ -282,7 +294,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
   }
 
-  return { MIN_TEXT, prepareForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
+  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

@@ -1553,7 +1553,15 @@ function glanceUiCopy(kind) {
     // of the "quoted text" fix — never lets a long quoted contract sitting
     // below a one-line "Sounds good!" reply count toward "is there enough
     // new content to judge" in the first place.
-    const text = ownMessageText(message);
+    let text = ownMessageText(message);
+    // A note to yourself can be only a subject line. The subject is the note.
+    if (text.length < 20 && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.selfSent === 'function') {
+      const early = extractSender(message);
+      const noteSubject = currentSubject();
+      if (headerToSelf(message) && FlowIncomingJudge.selfSent({ sender: early, ownAddresses: ownEmail ? [ownEmail] : [], to: [], cc: [] })) {
+        text = FlowIncomingJudge.textForJudge(text, noteSubject, true);
+      }
+    }
     // A fact ask can be one short Hebrew sentence ("מה הסכום בגיליון?").
     // The 20-character floor stays for everything else — this does not
     // lower the scorer, it only lets a fully-formed fact ask through.
@@ -2711,6 +2719,26 @@ function glanceUiCopy(kind) {
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return response.needsReconnect ? glanceUiCopy('reconnect') : glanceUiCopy('connect');
+    if (response.reason === 'drive-not-granted') {
+      return glanceUiHebrew()
+        ? 'דרייב עדיין לא אושר. חבר מחדש את Google ואשר את Drive.'
+        : 'Drive is not allowed yet. Reconnect Google and allow Drive.';
+    }
+    if (response.reason === 'attachment-unreadable') {
+      return glanceUiHebrew()
+        ? 'לא הצלחתי לקרוא את הקובץ המצורף מג׳ימייל, לכן לא נשמר דבר.'
+        : 'Could not read the attachment from Gmail, so nothing was saved.';
+    }
+    if (response.reason === 'attachment-too-big') {
+      return glanceUiHebrew()
+        ? 'הקובץ גדול מ-4MB ולכן לא נשמר בדרייב.'
+        : 'That file is over 4 MB, so it was not saved to Drive.';
+    }
+    if (response.reason === 'attachment-ambiguous') {
+      return glanceUiHebrew()
+        ? 'יש כמה קבצים מצורפים. פתח אחד ונסה שוב.'
+        : 'More than one file is attached. Open one and try again.';
+    }
     if (response.reason === 'unclear' && /file and time|time for this event/i.test(response.error || '')) return glanceUiCopy('calendar');
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
@@ -2744,6 +2772,8 @@ function glanceUiCopy(kind) {
   // for however long that download takes, for an attachment that was never
   // going anywhere.
   const ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+  // core/google-drive.js refuses a file above this, so say so before the send.
+  const DRIVE_SAVE_MAX_BYTES = 4 * 1024 * 1024;
 
   // download_url is an attribute Gmail's own rendering sets on a real
   // attachment chip (see findAttachmentChips below) — not something email
@@ -2766,9 +2796,15 @@ function glanceUiCopy(kind) {
   // still created, just without the attachment — never a failed action.
   async function fetchAttachmentBase64(meta) {
     if (!isTrustedAttachmentUrl(meta.url)) return null;
+    const viaWorker = await sendRuntime({ type: 'flow:fetch-attachment', url: meta.url, maxBytes: ATTACHMENT_MAX_BYTES, expectMime: meta.mimeType }).catch(() => null);
+    if (viaWorker && viaWorker.ok === true && viaWorker.base64) {
+      return { filename: meta.filename, mimeType: meta.mimeType || viaWorker.mimeType, base64: viaWorker.base64 };
+    }
     try {
       const res = await fetch(meta.url, { credentials: 'include' });
       if (!res.ok) return null;
+      const gotType = String(res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      if (gotType === 'text/html' && String(meta.mimeType || '').toLowerCase() !== 'text/html') return null;
       const declaredLength = Number(res.headers.get('content-length') || 0);
       if (declaredLength > ATTACHMENT_MAX_BYTES) return null;
       const buf = await res.arrayBuffer();
@@ -2820,10 +2856,12 @@ function glanceUiCopy(kind) {
 
     if (action.kind === 'driveFile') {
       if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
-      const only = ctx.attachments && ctx.attachments.length === 1 ? ctx.attachments[0] : null;
-      if (!only) return null;
+      const listed = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
+      const only = listed.length === 1 ? listed[0] : null;
+      if (!only) return { fail: { reason: listed.length > 1 ? 'attachment-ambiguous' : 'attachment-unreadable' } };
       const fetched = await fetchAttachmentBase64(only);
-      if (!fetched) return null;
+      if (!fetched) return { fail: { reason: 'attachment-unreadable' } };
+      if (Math.floor(String(fetched.base64 || '').length * 3 / 4) > DRIVE_SAVE_MAX_BYTES) return { fail: { reason: 'attachment-too-big' } };
       return Object.assign(base, { attachment: fetched, params: { copyAttachment: true } });
     }
 
@@ -2839,6 +2877,7 @@ function glanceUiCopy(kind) {
         const zone = await glanceUserTimeZone();
         if (zone) params.timeZone = zone;
       }
+      if (params.title) params.title = artifactTitleFor(ctx, params.title);
       return Object.assign(base, { params: params });
     }
 
@@ -2883,7 +2922,7 @@ function glanceUiCopy(kind) {
     const taskEntities = (ctx.intent && ctx.intent.entities)
       || (action.params && action.params.what ? { what: action.params.what } : null);
     return Object.assign(base, {
-      label: action.params.title || action.label,
+      label: artifactTitleFor(ctx, action.params.title || action.label),
       params: {
         dateIso: action.params.dateIso || null,
         amount: action.params.amount || null,
@@ -3032,6 +3071,21 @@ function glanceUiCopy(kind) {
     });
   }
 
+  // The card shows the title in the UI language. The event and the task
+  // written on Do It carry that same title.
+  function artifactTitleFor(ctx, title) {
+    if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.artifactTitle !== 'function') return title;
+    return FlowDisplay.artifactTitle(glanceUiLang(), ctx, title);
+  }
+
+  // The Activity row names what the card said. A Save the file? card is not a decision.
+  function activityLabel(ctx) {
+    const raw = ctx && ctx.intent && ctx.intent.label;
+    const p = ctx && ctx.process;
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save')) return artifactTitleFor(ctx, raw);
+    return raw;
+  }
+
   function sendExecuteAction(payload) {
     const lane = laneConnectorId(payload && payload.connectorId);
     if (!lane) return sendRuntime({ type: 'flow:execute-action', payload: payload });
@@ -3056,6 +3110,7 @@ function glanceUiCopy(kind) {
       senderEmail: email,
       quote: payload && payload.params && (payload.params.what || payload.params.quote),
       body: payload && payload.params && payload.params.body,
+      shareUrl: payload && payload.params && payload.params.shareUrl,
       useDraft: true,
       draft: payload
     };
@@ -3432,7 +3487,9 @@ function glanceUiCopy(kind) {
       } else {
         const prior = action.dependsOn ? okById.get(action.dependsOn) : null;
         const payload = await buildActionPayload(action, ctx, prior && prior.response);
-        if (!payload) {
+        if (payload && payload.fail) {
+          result = { action, response: Object.assign({ ok: false }, payload.fail) };
+        } else if (!payload) {
           result = { action, response: { ok: false, reason: 'unclear' } };
         } else {
           const response = await sendExecuteAction(payload);
@@ -3843,13 +3900,14 @@ function glanceUiCopy(kind) {
         showPreviewReceipt(host, chip, preview);
         return;
       }
-      const composeTry = results.find((r) => r.action && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
+      const composeTry = results.find((r) => r.action && !(r.response && r.response.skipped) && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
       if (composeTry) {
         showPreviewReceipt(host, chip, composeTry);
         return;
       }
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
-      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
+      const firstFailed = results.find((r) => r.response && !r.response.skipped);
+      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (firstFailed && firstFailed.response) || (results[0] && results[0].response), ctx));
       return;
     }
 
@@ -3970,7 +4028,7 @@ function glanceUiCopy(kind) {
             if (taskSteps.length === succeeded.length && covered) return null;
             return FlowStorage.appendLog({
               kind: 'undone',
-              label: ctx.intent.label,
+              label: activityLabel(ctx),
               messageId: ctx.messageId,
               threadId: ctx.threadId || null,
               connectorId: taskSteps.length === succeeded.length ? 'googleTask' : undefined,
@@ -4062,7 +4120,7 @@ function glanceUiCopy(kind) {
       }
       return FlowStorage.appendLog(Object.assign({
         kind: 'written',
-        label: ctx.intent.label,
+        label: activityLabel(ctx),
         messageId: ctx.messageId,
         legacyMessageId: ctx.legacyMessageId || null,
         threadId: ctx.threadId || null,
@@ -4175,7 +4233,7 @@ function glanceUiCopy(kind) {
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     if (host.__glanceSteps) host.__glanceSteps.setAll('preparing');
-    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
+    FlowStorage.appendLog({ kind: 'clicked', label: activityLabel(ctx), messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
@@ -4201,7 +4259,7 @@ function glanceUiCopy(kind) {
       if (host.__glanceSteps && result && result.action) {
         const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
         const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
-        host.__glanceSteps.setRow(result.action.id, next);
+        host.__glanceSteps.setRow(result.action.id, next, next === 'failed' ? reasonMessage(result.response, ctx) : null);
       }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
@@ -4239,7 +4297,7 @@ function glanceUiCopy(kind) {
     // down with it via a shared Promise.all rejection, nor skip the
     // tracking/checkBrief() below that a real dismiss still deserves.
     await Promise.all([
-      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
+      FlowStorage.appendLog({ kind: 'dismissed', label: activityLabel(ctx), messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
         .catch((e) => console.error('[Glance] failed to record a dismiss in the activity log', e)),
       FlowStorage.calibrate('dismiss', ctx.intent.type)
         .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
@@ -4628,7 +4686,13 @@ function glanceUiCopy(kind) {
   }
 
   function parseDownloadUrl(raw) {
-    const parts = String(raw || '').split(':');
+    const text = String(raw || '');
+    const first = text.indexOf(':');
+    const link = text.search(/:https?:\/\//i);
+    if (first > 0 && link > first) {
+      return { mimeType: text.slice(0, first), filename: text.slice(first + 1, link), url: text.slice(link + 1) };
+    }
+    const parts = text.split(':');
     if (parts.length < 3) return null;
     return { mimeType: parts[0], filename: parts[1], url: parts.slice(2).join(':') };
   }

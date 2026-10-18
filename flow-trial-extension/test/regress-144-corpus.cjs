@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = '71ae262d8807e0f3fd13902a6a5227fe7be7c160fc918c720f9cd99870ec2af9';
+const FIXTURE_SHA = '74602baa2078e1250eb37625dd370d3ac89fe343bd037aebc7b8795187e0bd5a';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -243,7 +243,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 1935) {
+if (rows.length !== 1949) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -940,6 +940,6 @@ if (mixed.indexOf('latin') !== 0 || verbProbe !== 'verb-as-sicha' || nameProbe) 
   console.log('FAIL: Hebrew UI rule probe ' + JSON.stringify([mixed, verbProbe, nameProbe]));
   fails.push('he-ui-probe');
 }
-console.log('HE-UI scan: fixtureRows=1935 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
+console.log('HE-UI scan: fixtureRows=1949 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
 console.log('FAILURES: ' + fails.length);
 process.exit(fails.length ? 1 : 0);
