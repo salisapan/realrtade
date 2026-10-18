@@ -31,8 +31,9 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'oauth-relay', vendor: 'notion' }, { type: 'host-permission', origin: 'https://api.notion.com/*' }] },
     { id: 'asana', label: 'Asana', detail: 'Add one task to the Asana project you pick, then read it back. Undo removes it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'asana' }, { type: 'host-permission', origin: 'https://app.asana.com/*' }] },
+    { id: 'jira', label: 'Jira', detail: 'Add one issue to the Jira project you pick, then read it back. Undo removes it when your role allows deleting. Nothing else on your site is read.', group: 'tasks', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'jira' }, { type: 'host-permission', origin: 'https://api.atlassian.com/*' }] },
     // Listed so the screen can show them honestly. Select all never includes these.
-    { id: 'jira', label: 'Jira', detail: 'Create one issue and read it back.', group: 'tasks', state: 'coming', steps: [] },
     { id: 'linear', label: 'Linear', detail: 'Create one issue and read it back.', group: 'tasks', state: 'coming', steps: [] },
     { id: 'docusign', label: 'DocuSign', detail: 'Count a request closed when the envelope is signed.', group: 'sign', state: 'coming', steps: [] },
     { id: 'dropbox', label: 'Dropbox', detail: 'Save one file and read it back.', group: 'files', state: 'coming', steps: [] },

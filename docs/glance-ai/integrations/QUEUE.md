@@ -22,7 +22,7 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 | Monday | free | free | - | - | OAuth2. CoS: monday app |
 | HubSpot | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
 | Pipedrive | free | free | - | - | OAuth2 + secret (relay). CoS: Pipedrive app. Same Glance-vs-Flow question as CRM rows; confirm with owner |
-| Jira | claude | claimed | `claude/connector-2026-10-18-jira` / PR (draft, stacked on #156 Asana, which is on #138 Notion) | 2026-10-18 | OAuth2 3LO + secret (relay). CoS: Atlassian app (developer console) + client id/secret. Shares files with Cursor's ClickUp #167 (same stack base): whichever merges second resolves the registry/switch/catalog conflicts |
+| Jira | claude | built | `claude/connector-2026-10-18-jira` / #168 (draft, stacked on #156 Asana, which is on #138 Notion) | 2026-10-18 | Built and tested against a mock; not verified live; switches off. Waiting on CoS/owner: Atlassian app registration + `JIRA_CLIENT_ID`/`JIRA_CLIENT_SECRET`, relay deploy, `api.atlassian.com` manifest host, unverified vendor facts (`connectors/jira.md` §9), steps-list destination wiring (open-tasks row 75). Shares registry/switch/catalog files with Cursor's ClickUp #167 on the same base: whichever merges second resolves the conflicts |
 | Zoom | free | free | - | - | OAuth2 + secret (relay); marketplace review. CoS: Zoom app |
 | Salesforce | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
 | WhatsApp | free | free | - | - | Business Cloud API only (no scraping); needs Meta business verification by owner. Never auto-send |

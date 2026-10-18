@@ -12,8 +12,8 @@ ok('select all never includes a coming service or the contribution box', () => {
   assert.ok(C.selectAll().indexOf('notion') >= 0);
 });
 ok('a coming id ticked by hand is dropped and reported, no step', () => {
-  const r = C.stepsFor(['jira', 'contribute', 'nope']);
-  assert.deepStrictEqual(r.steps, []); assert.deepStrictEqual(r.dropped, ['jira', 'contribute', 'nope']);
+  const r = C.stepsFor(['zoom', 'contribute', 'nope']);
+  assert.deepStrictEqual(r.steps, []); assert.deepStrictEqual(r.dropped, ['zoom', 'contribute', 'nope']);
 });
 ok('notion tick = relay sign-in + its one host, nothing else', () => {
   const r = C.stepsFor(['notion']);
@@ -25,6 +25,12 @@ ok('asana tick = relay sign-in + its one host, nothing else; both connectors tog
   assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:asana', 'host-permission:https://app.asana.com/*']);
   assert.strictEqual(C.stepsFor(['asana', 'notion']).steps.length, 4);
   assert.ok(C.selectAll().indexOf('asana') >= 0);
+});
+ok('jira tick = relay sign-in + its one host (the Atlassian gateway), nothing else', () => {
+  const r = C.stepsFor(['jira']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:jira', 'host-permission:https://api.atlassian.com/*']);
+  assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira']).steps.length, 6);
+  assert.ok(C.selectAll().indexOf('jira') >= 0);
 });
 ok('microsoft ticks collapse into one sign-in listing only the ticked services', () => {
   const r = C.stepsFor(['ms-todo', 'ms-mail', 'ms-todo']);

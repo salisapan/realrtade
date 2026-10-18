@@ -144,5 +144,16 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f = mock(200, {}); const r = await relay(ev(Object.assign({}, base, { vendor: 'asana' })), { env: ENV, fetch: f, now: () => 1 });
     assert.strictEqual(r.statusCode, 503); assert.strictEqual(f.calls.length, 0);
   });
+  await t('jira: JSON body with client id and secret goes to the Atlassian token url only; refresh forwards the rotating token; secret never returned', async () => {
+    const f = mock(200, { access_token: 'j-tok', refresh_token: 'j-ref2', expires_in: 3600 });
+    const env = Object.assign({}, ENV, { JIRA_CLIENT_ID: 'jcid', JIRA_CLIENT_SECRET: 'JIRA-SECRET-1' });
+    const r = await relay(ev({ vendor: 'jira', grant: 'code', code: 'c1', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(f.calls[0].url, 'https://auth.atlassian.com/oauth/token');
+    assert.deepStrictEqual(JSON.parse(f.calls[0].init.body), { grant_type: 'authorization_code', code: 'c1', redirect_uri: REDIRECT, client_id: 'jcid', client_secret: 'JIRA-SECRET-1' });
+    assert.strictEqual(f.calls[0].init.headers['Content-Type'], 'application/json'); assert.ok(r.body.indexOf('JIRA-SECRET-1') < 0);
+    const f2 = mock(200, { access_token: 'x', refresh_token: 'y' });
+    const r2 = await relay(ev({ vendor: 'jira', grant: 'refresh', refresh_token: 'old-ref', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 });
+    assert.strictEqual(r2.statusCode, 200); assert.deepStrictEqual(JSON.parse(f2.calls[0].init.body), { grant_type: 'refresh_token', refresh_token: 'old-ref', client_id: 'jcid', client_secret: 'JIRA-SECRET-1' });
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

@@ -36,6 +36,16 @@ const VENDORS = {
     bodyFormat: 'form',
     extraHeaders: {},
     supportsRefresh: true
+  },
+  jira: {
+    tokenUrl: 'https://auth.atlassian.com/oauth/token',
+    idEnv: 'JIRA_CLIENT_ID',
+    secretEnv: 'JIRA_CLIENT_SECRET',
+    // Atlassian takes a JSON body with client_id and client_secret; a refresh needs the offline_access scope and rotates the refresh token (verify against the vendor page before go-live).
+    clientAuth: 'body',
+    bodyFormat: 'json',
+    extraHeaders: {},
+    supportsRefresh: true
   }
 };
 

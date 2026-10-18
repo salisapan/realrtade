@@ -8,8 +8,13 @@
 // notionOAuth: "Sign in with Notion" through the token relay (flow-landing/netlify/functions/token-relay). Needs the relay deployed,
 //              NOTION_CLIENT_ID / NOTION_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.notionClientId set. Off = the pasted token only.
 //
+// jiraReadBack:  the Jira write goes through core/jira-close.js (one issue in the chosen project, read back, Undo read back).
+//                Off = no Jira writer exists at all (nothing is registered under the id "jira").
+// jiraOAuth:     "Sign in with Atlassian" (OAuth 2.0 3LO) through the token relay. Needs the relay deployed, JIRA_CLIENT_ID /
+//                JIRA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.jiraClientId set.
+//
 // asanaReadBack: the Asana write goes through core/asana-close.js (one task in the chosen project, read back, Undo read back).
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false };

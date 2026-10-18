@@ -70,6 +70,7 @@ import { LADDER } from '../config/ladder.public.js';
 import { CONNECTORS } from '../config/connectors.public.js';
 import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
 import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
+import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import './google-lane-host.js';
 import './gmail-reinject.js';
@@ -1780,7 +1781,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1806,7 +1807,7 @@ async function disconnectConnector(connectorId) {
     return { ok: true };
   }
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : key);
   return { ok: true };
 }
 
@@ -3954,9 +3955,11 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const enabled = connector === 'asana' ? CONNECTORS.asanaReadBack : CONNECTORS.notionReadBack;
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue' };
+  const enabled = ON[connector];
   if (!O || !enabled) return;
-  const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: connector === 'asana' ? 'asana/task' : 'notion/page' }, e, { connector: connector });
+  const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
   const ev = O.buildEvent(input, { enabled: enabled });
   if (!ev) return;
   try {
@@ -4105,6 +4108,108 @@ async function asanaReadBackWrite(p) {
 async function asanaReadBackUndo(ref) {
   const r = await asanaCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'asana' });
+  return r;
+}
+
+/* ------------------------------------------------------ Jira, with a proof */
+// docs/glance-ai/connectors/jira.md. Everything here is behind config/connectors.public.js (jiraReadBack, jiraOAuth), both off.
+
+const JIRA_AUTH_BASE = 'https://auth.atlassian.com/authorize';
+const JIRA_SCOPES = 'read:jira-work write:jira-work offline_access';
+const JIRA_LEDGER_KEY = 'jiraLedger';
+
+async function getJiraAuth() {
+  const { jiraAuth } = await chrome.storage.local.get('jiraAuth');
+  return jiraAuth || null;
+}
+
+// "OPS", a board/project URL (.../projects/OPS/...) or an issue URL (.../browse/OPS-12). Returns { key, host } or null.
+function parseJiraProject(input) {
+  const t = String(input || '').trim();
+  if (/^[A-Z][A-Z0-9_]{1,9}$/.test(t)) return { key: t, host: '' };
+  let host = '';
+  try { host = new URL(t).hostname; } catch (e) { return null; }
+  if (!/^[a-z0-9-]+\.atlassian\.net$/.test(host)) return null;
+  const m = t.match(/\/projects\/([A-Z][A-Z0-9_]{1,9})(?:[/?#]|$)/) || t.match(/\/browse\/([A-Z][A-Z0-9_]{1,9})-\d+/);
+  return m ? { key: m[1], host: host } : null;
+}
+
+// "Sign in with Atlassian" (OAuth 2.0 3LO). The one-time code goes to the relay, which adds the secret.
+async function connectJiraOAuth(projectInput) {
+  if (!CONNECTORS.jiraOAuth) throw new Error('Sign in with Jira is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.jiraClientId);
+  if (!clientId) throw new Error('Jira sign-in isn’t configured on this build yet.');
+  const proj = parseJiraProject(projectInput);
+  if (!proj) throw new Error('Paste the Jira project key (for example OPS) or a link to the project on your atlassian.net site.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(JIRA_AUTH_BASE + '?audience=api.atlassian.com&client_id=' + encodeURIComponent(clientId) + '&scope=' + encodeURIComponent(JIRA_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&response_type=code&prompt=consent', 'Jira');
+  const got = await relayTokenRequest({ vendor: 'jira', grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Jira connection failed (' + got.error + ').');
+  const bearer = { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' };
+  const sites = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', { headers: bearer });
+  if (!sites.ok) throw new Error('Jira returned ' + sites.status + ' when listing your sites.');
+  const list = (await sites.json()) || [];
+  const usable = (Array.isArray(list) ? list : []).filter((r) => r && /^[0-9a-f-]{36}$/.test(String(r.id)) && /^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/.test(String(r.url || '')));
+  const pick = proj.host ? usable.filter((r) => new URL(r.url).hostname === proj.host) : usable;
+  if (pick.length !== 1) throw new Error(pick.length ? 'You have several Jira sites; paste a link to the project so Glance knows which one.' : 'Glance found no Jira site it can use on that account.');
+  const site = pick[0];
+  const pr = await fetch('https://api.atlassian.com/ex/jira/' + site.id + '/rest/api/3/project/' + proj.key, { headers: bearer });
+  if (pr.status === 403 || pr.status === 404) throw new Error('Jira signed you in but cannot open project ' + proj.key + ' — check the key and that you can create issues in it.');
+  if (!pr.ok) throw new Error('Jira returned ' + pr.status + '.');
+  const project = await pr.json();
+  const types = (project && Array.isArray(project.issueTypes) ? project.issueTypes : []).filter((x) => x && /^\d{1,12}$/.test(String(x.id)) && !x.subtask);
+  const type = types.find((x) => x.name === 'Task') || types[0];
+  if (!type) throw new Error('That project has no issue type Glance can create.');
+  await chrome.storage.local.set({ jiraAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, cloudId: site.id, siteUrl: site.url.replace(/\/$/, ''), projectKey: proj.key, projectName: (project && project.name) || proj.key, issueTypeId: String(type.id), issueTypeName: type.name, via: 'oauth' } });
+  return { title: (project && project.name) || proj.key };
+}
+
+// Atlassian rotates the refresh token on every refresh: both new values are returned and saved.
+async function jiraRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'jira', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function jiraCloseEngine() {
+  return globalThis.FlowJiraClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getJiraAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ jiraAuth: a }); },
+    refresh: jiraRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(JIRA_LEDGER_KEY))[JIRA_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(JIRA_LEDGER_KEY))[JIRA_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [JIRA_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function jiraReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await jiraCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'jira:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'jira', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'jira', lang: lang });
+    return { ok: true, where: 'Jira', target: 'your project', written: 'Added to Jira.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'jira', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Jira' };
+}
+
+async function jiraReadBackUndo(ref) {
+  const r = await jiraCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'jira' });
   return r;
 }
 
@@ -5768,6 +5873,7 @@ const WRITERS = {
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
+if (CONNECTORS.jiraReadBack) WRITERS.jira = jiraReadBackWrite;
 const UNDOERS = {
   hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
@@ -5779,6 +5885,7 @@ const UNDOERS = {
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
+if (CONNECTORS.jiraReadBack) UNDOERS.jira = jiraReadBackUndo;
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
@@ -5908,6 +6015,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));

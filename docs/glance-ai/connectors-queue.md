@@ -21,7 +21,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 0b | LEARNING: per-user calibration (path C), then the path D design and its dormant code, one slice per run, after the foundation | - | - | not started |
 | 1 | Notion | a task or a page row exists | OAuth2 + secret (relay) | **ready, waiting for owner** (2026-10-14): [doc](connectors/notion.md); built and tested against a mock; DRAFT PR; switches `notionReadBack`, `notionOAuth` off. Waiting: app registration, relay deploy, `api.notion.com` host, unverified vendor facts, steps-list destination wiring |
 | 2 | Asana | a task exists | OAuth2 PKCE | **ready, waiting for owner** (2026-10-15): [doc](connectors/asana.md); built and tested against a mock; DRAFT PR #156 (stacked on #138); switches `asanaReadBack`, `asanaOAuth` off. Waiting: app registration, relay deploy, `app.asana.com` host, unverified vendor facts, steps-list destination wiring |
-| 3 | Jira | an issue exists | OAuth2 3LO + secret (relay) | not started |
+| 3 | Jira | an issue exists | OAuth2 3LO + secret (relay) | **ready, waiting for owner** (2026-10-18): [doc](connectors/jira.md); built and tested against a mock; DRAFT PR #168 (stacked on #156); switches `jiraReadBack`, `jiraOAuth` off. Waiting: Atlassian app registration, relay deploy, `api.atlassian.com` host, unverified vendor facts, steps-list destination wiring |
 | 4 | Linear | an issue exists | OAuth2 | not started |
 | 5 | DocuSign | the envelope is signed | OAuth2 + secret (relay); vendor go-live review | not started |
 | 6 | Dropbox | the file is saved | OAuth2 PKCE | not started |

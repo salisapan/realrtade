@@ -120,6 +120,17 @@ const FLOW_CONNECTORS = [
       { key: 'project', label: 'Project URL or ID', placeholder: 'https://app.asana.com/0/…', type: 'text' }
     ]
   },
+  {
+    id: 'jira',
+    label: 'Jira',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one issue to the Jira project you choose and reads it back before it counts as handled. Off in this build; needs an Atlassian app Client ID (docs/glance-ai/connectors/jira.md).',
+    fields: [
+      { key: 'project', label: 'Project key or link', placeholder: 'OPS or https://….atlassian.net/…', type: 'text' }
+    ]
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 
