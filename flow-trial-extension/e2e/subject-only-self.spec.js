@@ -85,3 +85,27 @@ test('Outlook: a past tense note to self gets no card', async ({ glance }) => {
   await page.waitForTimeout(3500);
   await expect(page.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
 });
+
+test('Gmail: a bidi-marked account label still names the account, and a domain is never cut from the title', async ({ glance }) => {
+  await glance.seedGmail({ glanceUiLanguage: 'he' });
+  const page = await glance.openGmail({
+    liveSelf: true, messageId: 'm-dom-he', threadId: 't-dom-he', ownEmail: SELF, lang: 'he',
+    senderName: 'Sali Sapan', subject: 'לעצמי', body: 'תזכורת לעצמי: לחדש את הדומיין ofek.dev ביום שישי.',
+    accountLabel: '\u200fחשבון Google: Sali Sapan (' + SELF + ')\u200f'
+  });
+  const card = page.locator('[data-legacy-message-id="m-dom-he"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 8000 });
+  await expect(card.locator('.gs-intent')).toHaveText('לחדש את הדומיין ofek.dev');
+});
+
+test('Gmail: a domain is never cut from an English self-note title', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    liveSelf: true, messageId: 'm-dom-en', threadId: 't-dom-en', ownEmail: SELF,
+    senderName: 'Sali Sapan', subject: 'note', body: 'Remind me to renew ofek.dev on Friday.',
+    accountLabel: 'Google Account: Sali Sapan (' + SELF + ')'
+  });
+  const card = page.locator('[data-legacy-message-id="m-dom-en"] .flow-chip-host');
+  await expect(card).toBeVisible({ timeout: 8000 });
+  await expect(card.locator('.gs-intent')).toContainText('ofek.dev');
+});

@@ -964,6 +964,12 @@ const FlowDisplay = (() => {
       if (verbs.every(Boolean)) return 'נסגר — ' + joinHebrewList(verbs) + '.';
       return raw;
     }
+    m = raw.match(/^Partly done — (.+)\.$/);
+    if (m) {
+      const verbs = splitEnglishList(m[1]).map((v) => DONE_VERB_HE[v]);
+      if (verbs.every(Boolean)) return 'בוצע חלקית — ' + joinHebrewList(verbs) + '.';
+      return raw;
+    }
     m = raw.match(/^Closing — (.+)…$/);
     if (m) {
       if (m[1] === 'working') return 'סוגר — עובד…';

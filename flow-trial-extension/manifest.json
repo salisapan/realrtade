@@ -105,6 +105,10 @@
         "src/receipt-copy.js",
         "src/native-edit.js",
         "src/follow.js",
+        "core/draft-reply.js",
+        "core/google-config.js",
+        "core/google-compose.js",
+        "src/google-compose-page.js",
         "src/content-gmail.js"
       ],
       "css": [

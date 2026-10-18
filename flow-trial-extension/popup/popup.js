@@ -386,6 +386,11 @@
       const r = await send({ type: 'flow:build-stamp' });
       theirs = (r && r.build) || '';
     } catch (e) { theirs = ''; }
+    const text = 'גרסת Glance ' + mine + (theirs && theirs !== mine ? ' (שירות: ' + theirs + ')' : '');
+    ['glanceBuild', 'glanceBuildLog'].forEach((id) => {
+      const n = document.getElementById(id);
+      if (n) { n.textContent = text; n.setAttribute('data-glance-build', mine); }
+    });
     const stale = !theirs || theirs !== mine;
     line.hidden = !stale;
     if (stale) line.textContent = 'רענן את Glance';

@@ -2,13 +2,14 @@
 // Loading it registers the lane messages and stores a fetch function.
 // It does not call chrome.identity or fetch until a message arrives.
 import '../core/google-config.js';
+import '../core/google-account.js';
 import '../core/google-calendar.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
-import '../core/google-contacts.js';
 import '../core/google-compose.js';
+import '../core/google-drafts.js';
 import '../core/google-proof.js';
 import './google-lane.js';
 
@@ -18,64 +19,133 @@ const RECONNECT_KEY = 'googleReconnect';
 const RECONNECT_LABEL = 'חבר מחדש את Google';
 let laneSource = 'chrome';
 
-// Identity first, then the stored Connect token. Interactive stays false.
-// The stored record is googleWebAuth. No e2e hook is required.
-function laneToken() {
+// The token of the account the person consented to in Glance, and only that.
+// The stored Connect token and Chrome's own token are both read, each one's
+// account comes from the Gmail profile, and the account recorded at Connect
+// decides. Chrome's token is used only when it is the same account. Interactive
+// stays false. No e2e hook is required.
+const CONNECTED_ACCOUNT_KEY = 'googleConnectedAccount';
+const SEEN_MS = 5 * 60 * 1000;
+const seenAccounts = new Map();
+
+function Account() {
+  return typeof FlowGoogleAccount !== 'undefined' ? FlowGoogleAccount : globalThis.FlowGoogleAccount;
+}
+
+function webTokenReady(record) {
   const WEB_SKEW_MS = 60 * 1000;
-  function usable(record) {
-    if (!record || typeof record.accessToken !== 'string' || !record.accessToken) return '';
-    if (record.expiresAt == null || record.expiresAt === '') return record.accessToken;
-    const at = Number(record.expiresAt);
-    if (!Number.isFinite(at) || at - WEB_SKEW_MS <= Date.now()) return '';
-    return record.accessToken;
-  }
-  function storedConnectToken() {
-    const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
-    if (!store || typeof store.get !== 'function') return Promise.resolve('');
-    return Promise.resolve()
-      .then(() => store.get('googleWebAuth'))
-      .then((bag) => {
-        const record = bag && (bag.googleWebAuth || (typeof bag.accessToken === 'string' ? bag : null));
-        const ready = usable(record);
-        if (ready) return ready;
-        if (!record || !record.accessToken) return '';
-        const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
-        if (!bridge || typeof bridge.refreshSilent !== 'function') return '';
-        return Promise.resolve().then(() => bridge.refreshSilent()).then((next) => {
-          if (next && typeof next === 'object' && next.token) return next.token;
-          if (typeof next === 'string') return next;
-          return '';
-        }).catch(() => '');
-      })
-      .catch(() => '');
-  }
-  function identityToken() {
-    return new Promise((resolve) => {
-      const identity = typeof chrome !== 'undefined' ? chrome.identity : null;
-      if (!identity || typeof identity.getAuthToken !== 'function') {
-        resolve('');
-        return;
-      }
-      try {
-        identity.getAuthToken({ interactive: false }, (token) => {
-          const err = typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.lastError : null;
-          if (err || !token) resolve('');
-          else resolve(String(token));
-        });
-      } catch (e) {
-        resolve('');
-      }
-    });
-  }
-  return identityToken().then((token) => {
-    if (token) {
-      laneSource = 'chrome';
-      return token;
+  if (!record || typeof record.accessToken !== 'string' || !record.accessToken) return '';
+  if (record.expiresAt == null || record.expiresAt === '') return record.accessToken;
+  const at = Number(record.expiresAt);
+  if (!Number.isFinite(at) || at - WEB_SKEW_MS <= Date.now()) return '';
+  return record.accessToken;
+}
+
+function storedConnectToken() {
+  const store = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+  if (!store || typeof store.get !== 'function') return Promise.resolve('');
+  return Promise.resolve()
+    .then(() => store.get('googleWebAuth'))
+    .then((bag) => {
+      const record = bag && (bag.googleWebAuth || (typeof bag.accessToken === 'string' ? bag : null));
+      const ready = webTokenReady(record);
+      if (ready) return ready;
+      if (!record || !record.accessToken) return '';
+      const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
+      if (!bridge || typeof bridge.refreshSilent !== 'function') return '';
+      return Promise.resolve().then(() => bridge.refreshSilent()).then((next) => {
+        if (next && typeof next === 'object' && next.token) return next.token;
+        if (typeof next === 'string') return next;
+        return '';
+      }).catch(() => '');
+    })
+    .catch(() => '');
+}
+
+function identityToken() {
+  return new Promise((resolve) => {
+    const identity = typeof chrome !== 'undefined' ? chrome.identity : null;
+    if (!identity || typeof identity.getAuthToken !== 'function') {
+      resolve('');
+      return;
     }
-    laneSource = 'web';
-    return storedConnectToken();
+    try {
+      identity.getAuthToken({ interactive: false }, (token) => {
+        const err = typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.lastError : null;
+        if (err || !token) resolve('');
+        else resolve(String(token));
+      });
+    } catch (e) {
+      resolve('');
+    }
   });
 }
+
+// The address a token belongs to, from the Gmail profile (gmail.compose is
+// on the grant). A 401 here is this probe's answer: the token is kept.
+async function accountOfToken(token) {
+  const hit = seenAccounts.get(token);
+  if (hit && Date.now() - hit.at < SEEN_MS) return hit.email;
+  let email = '';
+  try {
+    const res = await fetch(laneUrl('https://gmail.googleapis.com/gmail/v1/users/me/profile'), {
+      method: 'GET',
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      email = Account().emailOfProfile(json);
+    }
+  } catch (e) { email = ''; }
+  if (email) seenAccounts.set(token, { email: email, at: Date.now() });
+  return email;
+}
+
+async function readConnectedAccount() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return '';
+    const bag = await chrome.storage.local.get(CONNECTED_ACCOUNT_KEY);
+    const rec = bag && bag[CONNECTED_ACCOUNT_KEY];
+    return rec && typeof rec.email === 'string' ? Account().norm(rec.email) : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// Called when the person connects in Glance (an interactive Connect or the
+// one consent window) and when an older install is adopted on its first write.
+async function recordConnectedAccount(token, source) {
+  if (!token) return '';
+  const email = await accountOfToken(token);
+  if (!email) return '';
+  try {
+    await chrome.storage.local.set({ [CONNECTED_ACCOUNT_KEY]: { email: email, source: source || null, at: Date.now() } });
+  } catch (e) { /* the write below still checks the account */ }
+  return email;
+}
+
+async function laneCredential() {
+  const A = Account();
+  const connected = await readConnectedAccount();
+  const stored = await storedConnectToken();
+  const chromeToken = await identityToken();
+  const candidates = [];
+  if (stored) candidates.push({ token: stored, source: 'web' });
+  if (chromeToken && chromeToken !== stored) candidates.push({ token: chromeToken, source: 'chrome' });
+  for (let i = 0; i < candidates.length; i++) candidates[i].email = await accountOfToken(candidates[i].token);
+  const picked = A.choose(connected, candidates);
+  if (picked.ok && picked.adopt) await recordConnectedAccount(picked.token, picked.source);
+  laneSource = picked.ok ? picked.source : 'web';
+  return picked;
+}
+
+globalThis.FlowGoogleLaneAccount = {
+  read: readConnectedAccount,
+  accountOf: accountOfToken,
+  record: recordConnectedAccount,
+  ensureGlanceList: ensureGlanceList,
+  forget: () => seenAccounts.clear()
+};
 
 function statusLanguage() {
   const code = String(uiLanguage() || '').trim().toLowerCase().replace(/_/g, '-');
@@ -152,8 +222,18 @@ function retryLane(cred) {
 
 // A later 2xx does not clear googleReconnect. Only Connect, which stores a
 // new token, removes the flag.
-function settleAuth(res) {
+function criticalUrl(url) {
+  const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
+  return !!(C && typeof C.isCriticalUrl === 'function' && C.isCriticalUrl(url));
+}
+
+// A 401 or 403 from an API a card does not write to is that API's answer.
+// It does not say the token is wrong, so it neither flags Reconnect nor
+// triggers a refresh. Only the Tasks, Calendar, Drive, Docs, Sheets and
+// Gmail hosts can end the grant.
+function settleAuth(res, url) {
   if (!res) return Promise.resolve(res);
+  if (url && !criticalUrl(url)) return Promise.resolve(res);
   if (res.status === 401 || res.status === 403) {
     const reason = res.status === 403 ? 'missing scope' : '401';
     return noteGoogleAuthFailure(reason).then(() => res);
@@ -261,9 +341,11 @@ function laneHttp(req) {
   const url = laneUrl(request.url);
   const gate = undoGate;
   return Promise.resolve()
-    .then(() => laneToken())
-    .then((token) => {
-      const cred = token ? { token: token, source: laneSource } : null;
+    .then(() => laneCredential())
+    .then((picked) => {
+      if (!picked.ok && picked.reason !== 'no-token') return { status: 0, ok: false, json: null, account: picked };
+      const token = picked.ok ? picked.token : '';
+      const cred = token ? { token: token, source: picked.source } : null;
       if (!token) return noteGoogleAuthFailure('not signed in').then(() => ({ status: 401, ok: false, json: null }));
       if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate)) {
         return { status: 0, ok: false, json: null };
@@ -279,11 +361,15 @@ function laneHttp(req) {
           if (signal) init.signal = signal;
           return fetch(url, init).then(readBody);
         };
+        const settle = (res) => settleAuth(res, request.url);
         return once(token).then((res) => {
-          if (!res || res.status !== 401) return settleAuth(res);
+          if (!res || res.status !== 401 || !criticalUrl(request.url)) return settle(res);
           return retryLane(cred).then((next) => {
-            if (!next || !next.token || next.token === token) return settleAuth(res);
-            return once(next.token).then(settleAuth);
+            if (!next || !next.token || next.token === token) return settle(res);
+            return accountOfToken(next.token).then((email) => {
+              if (!email || !Account().same(email, picked.email)) return settle(res);
+              return once(next.token).then(settle);
+            });
           });
         });
       };
@@ -330,6 +416,104 @@ async function storedTaskListId() {
   }
 }
 
+// The one list Glance writes to is titled Glance. It is looked up by title
+// first and made only when the account has none, once: concurrent callers
+// share one flight, and a failed read never leads to a create. The title is
+// a constant. Nothing derives a list name from the extension id, the
+// redirect address, or any page text.
+const GLANCE_LIST_TITLE = 'Glance';
+let glanceListFlight = null;
+
+async function findListByTitle(base, title) {
+  let pageToken = '';
+  for (let page = 0; page < 5; page++) {
+    const url = base + '?maxResults=100' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const res = await laneHttp({ method: 'GET', url: url });
+    if (!res || !res.ok || !res.json) return { read: false, id: '' };
+    const items = Array.isArray(res.json.items) ? res.json.items : [];
+    const hit = items.find((l) => l && l.title === title && l.id);
+    if (hit) return { read: true, id: String(hit.id) };
+    pageToken = res.json.nextPageToken ? String(res.json.nextPageToken) : '';
+    if (!pageToken) break;
+  }
+  return { read: true, id: '' };
+}
+
+function ensureGlanceList() {
+  if (!glanceListFlight) {
+    glanceListFlight = (async () => {
+      const base = 'https://tasks.googleapis.com/tasks/v1/users/@me/lists';
+      const found = await findListByTitle(base, GLANCE_LIST_TITLE);
+      if (!found.read) return '';
+      if (found.id) return found.id;
+      const made = await laneHttp({
+        method: 'POST',
+        url: base,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: GLANCE_LIST_TITLE })
+      });
+      if (made && made.ok && made.json && made.json.id && made.json.title === GLANCE_LIST_TITLE) return String(made.json.id);
+      const again = await findListByTitle(base, GLANCE_LIST_TITLE);
+      return again.id || '';
+    })().finally(() => { glanceListFlight = null; });
+  }
+  return glanceListFlight;
+}
+
+// A stored list id the API no longer knows is replaced by the list titled
+// Glance. The answer is saved so the next write starts right.
+async function resolveExistingTaskList() {
+  const id = await ensureGlanceList();
+  if (!id) return '';
+  try {
+    const bag = await chrome.storage.local.get('googleTasksAuth');
+    const prior = bag && bag.googleTasksAuth && typeof bag.googleTasksAuth === 'object' ? bag.googleTasksAuth : {};
+    await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, prior, { taskListId: id }) });
+  } catch (e) { /* the retry below still uses the id */ }
+  return id;
+}
+
+async function writeWithListRecovery(connectorId, msgInput, cred) {
+  const first = await prepareWrite(connectorId, msgInput, cred);
+  const result = await Lane.write(connectorId, first);
+  const given = msgInput && (msgInput.taskListId || (msgInput.params && msgInput.params.taskListId));
+  if (connectorId !== 'googleLaneTask' || !result || result.reason !== 'list-missing' || given) return result;
+  const fresh = await resolveExistingTaskList();
+  if (!fresh || fresh === first.taskListId) return result;
+  return Lane.write(connectorId, Object.assign({}, first, { taskListId: fresh }));
+}
+
+
+function wrongAccountResult(picked, extra) {
+  const line = Account().refusalLine(picked, uiLanguage());
+  return Object.assign({
+    ok: false,
+    reason: picked.reason === 'wrong-account' ? 'wrong-account' : 'account-unverified',
+    error: line,
+    written: line,
+    connected: picked.connected || '',
+    account: picked.found && picked.found[0] ? picked.found[0] : '',
+    proof: null
+  }, extra || {});
+}
+
+// A write goes out only on the verified token of the connected account. The
+// result names that account, so the card can say where it landed.
+async function guardedWrite(connectorId, input) {
+  const picked = await laneCredential();
+  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked);
+  const result = await writeWithListRecovery(connectorId, input, picked.ok ? picked : null);
+  if (result && picked.ok && result.ok !== undefined) result.account = picked.email;
+  return result;
+}
+
+async function guardedUndo(connectorId, ref) {
+  const picked = await laneCredential();
+  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked);
+  const prepared = await prepareUndo(connectorId, ref);
+  return Lane.undo(connectorId, prepared);
+}
+
 function csvRow(csv) {
   const line = String(csv || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '';
   if (!line) return null;
@@ -337,13 +521,13 @@ function csvRow(csv) {
   return cells.length ? cells : null;
 }
 
-async function prepareWrite(connectorId, input) {
+async function prepareWrite(connectorId, input, cred) {
   const i = input || {};
   const params = i.params || {};
   if (connectorId === 'googleLaneTask') {
     return {
       title: i.title || i.label || params.title || params.what || i.subject || '',
-      taskListId: i.taskListId || params.taskListId || await storedTaskListId(),
+      taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
       notes: i.notes || '',
       dueIso: params.dateIso || i.dueIso || null
     };
@@ -363,7 +547,8 @@ async function prepareWrite(connectorId, input) {
       fileTerm: params.fileTerm || i.fileTerm || '',
       title: params.title || i.title || i.label || '',
       quote: params.quote || i.quote || '',
-      timeZone: zone
+      timeZone: zone,
+      expectAccount: cred && cred.email ? cred.email : ''
     };
   }
   if (connectorId === 'googleDriveSave') return i;
@@ -510,6 +695,54 @@ async function fetchAttachment(msg) {
   }
 }
 
+// Reopening a mail repaints its receipt from storage. Before a checkmark
+// shows, every stored id is read from Google with the connected account's
+// token. present: the API returned it. missing: 404/410, cancelled, deleted
+// or trashed. unknown: no answer or no verified token, which is never a tick.
+function verifyUrlFor(connectorId, ref) {
+  const r = ref || {};
+  const enc = encodeURIComponent;
+  if (connectorId === 'googleHold') {
+    const id = r.eventId || r.externalId;
+    return id ? 'https://www.googleapis.com/calendar/v3/calendars/' + enc(r.calendarId || 'primary') + '/events/' + enc(id) : '';
+  }
+  if (connectorId === 'googleLaneTask') {
+    const id = r.taskId || r.externalId;
+    return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
+  }
+  if (connectorId === 'gmailCompose' || connectorId === 'googleReplyDraft') {
+    const id = r.draftId;
+    return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
+  }
+  const fileId = r.fileId || r.documentId || r.spreadsheetId;
+  if (fileId && /^google(DriveSave|Doc|SheetAppend)$/.test(connectorId)) {
+    return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
+  }
+  return '';
+}
+
+async function verifyStep(step) {
+  const url = verifyUrlFor(step && step.connectorId, step && step.ref);
+  if (!url) return 'unknown';
+  const res = await laneHttp({ method: 'GET', url: url });
+  if (!res) return 'unknown';
+  if (res.status === 404 || res.status === 410) return 'missing';
+  if (!res.ok || !res.json) return 'unknown';
+  const j = res.json;
+  if (j.status === 'cancelled' || j.deleted === true || j.trashed === true) return 'missing';
+  return j.id ? 'present' : 'unknown';
+}
+
+async function verifySteps(steps) {
+  const picked = await laneCredential();
+  if (!picked.ok) return { ok: false, reason: picked.reason === 'no-token' ? 'unverified' : 'unverified', states: [] };
+  const states = [];
+  for (let i = 0; i < (steps || []).length; i++) {
+    try { states.push(await verifyStep(steps[i])); } catch (e) { states.push('unknown'); }
+  }
+  return { ok: true, account: picked.email, states: states };
+}
+
 function onLaneMessage(msg, sender, sendResponse) {
   if (msg && msg.type === 'flow:fetch-attachment') {
     fetchAttachment(msg).then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
@@ -517,24 +750,22 @@ function onLaneMessage(msg, sender, sendResponse) {
   }
   if (!msg || !Lane) return undefined;
   if (msg.type === 'flow:google-write') {
-    Promise.resolve(prepareWrite(msg.connectorId, msg.input))
-      .then((input) => Lane.write(msg.connectorId, input))
+    Promise.resolve(guardedWrite(msg.connectorId, msg.input))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-verify') {
+    Promise.resolve(verifySteps(Array.isArray(msg.steps) ? msg.steps.slice(0, 8) : []))
+      .then(sendResponse, () => sendResponse({ ok: false, reason: 'unverified', states: [] }));
     return true;
   }
   if (msg.type === 'flow:google-undo') {
     const gate = beginUndo();
-    Promise.resolve(prepareUndo(msg.connectorId, msg.ref))
-      .then((ref) => Lane.undo(msg.connectorId, ref))
+    Promise.resolve(guardedUndo(msg.connectorId, msg.ref))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }))
       .finally(() => endUndo(gate));
-    return true;
-  }
-  if (msg.type === 'flow:google-contacts') {
-    Promise.resolve(Lane.lookupContacts(msg.input || msg))
-      .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
     return true;
   }
   if (msg.type === 'flow:gmail-compose') {

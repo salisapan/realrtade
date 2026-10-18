@@ -42,6 +42,29 @@ function accountButton(o, ownEmail, name) {
   return '<a class="gb_d" aria-label="' + esc(label) + '" href="https://accounts.google.com/SignOutOptions"></a>';
 }
 
+// Gmail's own header in a right-to-left account. The collapsed line names the
+// recipients with no label. "Show details" opens a table of label cells
+// (td) and address cells, the labels carry bidi marks and a trailing colon.
+// opts.detailsTable = { to: [], cc: [], expanded: bool, hebrew: bool, bidi: bool }
+function gmailDetailsTable(o, senderEmail, senderName, ownEmail) {
+  const d = o.detailsTable || {};
+  const mark = d.bidi === false ? '' : '\u200f';
+  const label = (he, en) => mark + (d.hebrew === false ? en : he) + ':' + mark;
+  const cell = (a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? (d.hebrew === false ? 'me' : 'אני') : esc(a)) + '</span>';
+  const row = (lab, list) => (list && list.length)
+    ? ('<tr><td class="gG">' + lab + '</td><td>' + list.map(cell).join(', ') + '</td></tr>')
+    : '';
+  const table = '<table class="ajB" role="presentation">' +
+    '<tr><td class="gG">' + label('מאת', 'from') + '</td><td><span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span></td></tr>' +
+    row(label('אל', 'to'), d.to) + row(label('עותק', 'cc'), d.cc) +
+    '</table>';
+  if (d.expanded) return table;
+  const all = (d.to || []).concat(d.cc || []);
+  const names = all.map((a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? 'אליי' : esc(a)) + '</span>').join(', ');
+  return '<div class="hb"><span class="ajy" role="button" aria-label="הצג פרטים" data-table="' + esc(table) + '" ' +
+    'onclick="this.parentNode.insertAdjacentHTML(\'afterend\', this.getAttribute(\'data-table\'));this.parentNode.remove()">' + names + '</span></div>';
+}
+
 function gmailHtml(opts) {
   const o = opts || {};
   if (o.liveSelf) return gmailLiveSelf(o);
@@ -57,6 +80,7 @@ function gmailHtml(opts) {
   const files = Array.isArray(o.attachments) ? o.attachments : [];
   const toLine = toList.length ? ('<div class="to">To: ' + toList.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>') : '';
   const ccLine = ccList.length ? ('<div class="cc">Cc: ' + ccList.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>') : '';
+  const detailsTable = o.detailsTable ? gmailDetailsTable(o, senderEmail, senderName, ownEmail) : '';
   const chips = files.map((f) => {
     const name = (f && (f.name || f.filename)) || 'report.pdf';
     const mime = (f && f.mimeType) || 'application/pdf';
@@ -80,7 +104,7 @@ function gmailHtml(opts) {
   const message = '<div class="' + (o.threadBesideInbox ? 'adn' : '') + '" role="' + (o.threadBesideInbox ? 'article' : 'listitem') + '" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
     '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
     '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
-    toLine + ccLine + chips +
+    (o.detailsTable ? detailsTable : toLine + ccLine) + chips +
     '<div class="a3s">' + esc(body) + '</div>' +
     file +
     '</div>';

@@ -20,7 +20,7 @@ vm.createContext(sandbox);
 const core = [
   'domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'intent.js', 'actions.js',
   'proof-of-close.js', 'draft-reply.js', 'google-config.js', 'google-calendar.js', 'google-tasks.js',
-  'google-drive.js', 'google-docs.js', 'google-sheets.js', 'google-contacts.js', 'google-compose.js',
+  'google-drive.js', 'google-docs.js', 'google-sheets.js', 'google-compose.js',
   'google-proof.js'
 ];
 for (const f of core) {
@@ -35,7 +35,6 @@ const Tasks = vm.runInContext('FlowGoogleTasks', sandbox);
 const Drive = vm.runInContext('FlowGoogleDrive', sandbox);
 const Docs = vm.runInContext('FlowGoogleDocs', sandbox);
 const Sheets = vm.runInContext('FlowGoogleSheets', sandbox);
-const Contacts = vm.runInContext('FlowGoogleContacts', sandbox);
 const Compose = vm.runInContext('FlowGoogleCompose', sandbox);
 const Proof = vm.runInContext('FlowGoogleProof', sandbox);
 const Lane = vm.runInContext('FlowGoogleLane', sandbox);
@@ -85,10 +84,12 @@ console.log('\n--- allowlist, key, the one manifest ---\n');
   const pageSrc = fs.readFileSync(path.join(EXT, 'src', 'google-compose-page.js'), 'utf8');
   check('the compose page never activates a control', pageSrc.indexOf('.click(') < 0 && pageSrc.indexOf('MutationObserver') < 0);
   const gmailScripts = live.content_scripts[0].js;
-  check('the manifest does not load the compose filler',
-    gmailScripts.indexOf('core/google-compose.js') < 0 &&
-    gmailScripts.indexOf('src/google-compose-page.js') < 0 &&
-    gmailScripts.indexOf('core/draft-reply.js') < 0);
+  check('the manifest loads the compose planner and the compose page before the Gmail script, so a card can tell an open reply from none',
+    gmailScripts.indexOf('core/google-compose.js') >= 0 &&
+    gmailScripts.indexOf('src/google-compose-page.js') >= 0 &&
+    gmailScripts.indexOf('core/draft-reply.js') >= 0 &&
+    gmailScripts.indexOf('core/google-compose.js') < gmailScripts.indexOf('src/content-gmail.js') &&
+    gmailScripts.indexOf('src/google-compose-page.js') < gmailScripts.indexOf('src/content-gmail.js'));
   const gmailSrc = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
   const composeSlice = gmailSrc.slice(gmailSrc.indexOf('async function sendGmailCompose'), gmailSrc.indexOf('function sendLaneUndo'));
   check('a filled receipt is the compose DOM, not the in-memory fill',
@@ -98,7 +99,7 @@ console.log('\n--- allowlist, key, the one manifest ---\n');
     receiptSlice.indexOf('composeReadBack') >= 0 && receiptSlice.indexOf('host.replaceChildren') >= 0 &&
     receiptSlice.indexOf('Compose filled') > receiptSlice.indexOf('composeReadBack'));
   const worker = fs.readFileSync(path.join(EXT, 'src', 'background.js'), 'utf8');
-  check('background.js does not gain the lane dispatcher', worker.indexOf('FlowGoogleLane') < 0);
+  check('background.js does not gain the lane dispatcher', !/FlowGoogleLane(?!Account)/.test(worker));
 }
 
 console.log('\n--- calendar hold reads the event back, then undo deletes it ---\n');
@@ -108,9 +109,10 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const body = Cal.eventBody({ dateIso: '2026-10-08', hour: 10, minute: 0, fileName: 'glance-pricing-q4.pdf', fileUrl: FILE_URL, quote: EN });
   check('the event invites nobody', body && Array.isArray(body.attendees) && body.attendees.length === 0 && body.summary === 'glance-pricing-q4.pdf');
   check('attendees are refused', Cal.createRequest(Object.assign({}, body, { attendees: [{ email: 'a@b.c' }] })) === null);
+  const eventBack = { id: 'ev1', status: 'confirmed', summary: body.summary, start: body.start, end: body.end };
   const held = scripted([
     { status: 200, ok: true, json: { id: 'ev1', htmlLink: 'https://calendar.google.com/calendar/event?eid=ev1' } },
-    { status: 200, ok: true, json: { id: 'ev1', status: 'confirmed' } }
+    { status: 200, ok: true, json: eventBack }
   ]);
   const wrote = await Cal.write({
     scopes: Cfg.SCOPES, dateIso: '2026-10-08', hour: 10, minute: 0,
@@ -120,12 +122,12 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('calendar create does not notify guests', held.calls[0].method === 'POST' && held.calls[0].url.indexOf('sendUpdates=none') >= 0);
   check('calendar calls stay off gmail', noGmail(held.calls));
   const undone = scripted([
-    { status: 200, ok: true, json: { id: 'ev1', status: 'confirmed' } },
+    { status: 200, ok: true, json: eventBack },
     { status: 204, ok: true, json: null }
   ]);
   const undo = await Cal.undo(wrote.ref, undone.http);
   check('calendar undo reads the event, then deletes it', undo.ok === true && undone.calls[0].method === 'GET' && undone.calls[1].method === 'DELETE' && undone.calls[1].url.indexOf('ev1') >= 0 && undone.calls[1].url.indexOf('sendUpdates=none') >= 0, undo);
-  const editedCal = scripted([{ status: 200, ok: true, json: { id: 'ev1', summary: 'Changed', status: 'confirmed' } }]);
+  const editedCal = scripted([{ status: 200, ok: true, json: Object.assign({}, eventBack, { summary: 'Changed' }) }]);
   const refusedCal = await Cal.undo(wrote.ref, editedCal.http);
   check('calendar undo refuses a changed event and does not delete it', refusedCal.ok === false && refusedCal.reason === 'user-edited' && editedCal.calls.length === 1 && editedCal.calls[0].method === 'GET', refusedCal);
   const bareCal = scripted([]);
@@ -139,11 +141,12 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
 
   console.log('\n--- a task is read back, then undo deletes it ---\n');
   const tasked = scripted([
+    { status: 200, ok: true, json: { id: 'list1', title: 'Glance' } },
     { status: 200, ok: true, json: { id: 't1', title: 'Send the file' } },
     { status: 200, ok: true, json: { id: 't1', title: 'Send the file' } }
   ]);
   const task = await Tasks.write({ scopes: Cfg.SCOPES, taskListId: 'list1', title: 'Send the file' }, tasked.http, CLOCK);
-  check('task write is proved from the GET', proved(task) && task.proof.system === 'google/tasks' && tasked.calls[0].method === 'POST' && tasked.calls[1].method === 'GET', task);
+  check('task write is proved from the GET', proved(task) && task.proof.system === 'google/tasks' && tasked.calls[0].method === 'GET' && tasked.calls[1].method === 'POST' && tasked.calls[2].method === 'GET', task);
   check('task calls stay off gmail', noGmail(tasked.calls));
   const taskUndo = scripted([
     { status: 200, ok: true, json: { id: 't1', title: 'Send the file' } },
@@ -161,7 +164,7 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('task undo with no snapshot refuses and does not delete', bareTaskUndo.ok === false && bareTaskUndo.reason === 'unconfirmed' && bareTaskUndo.error === "Couldn't confirm it's unchanged. Undo left it alone." && bareTaskHttp.calls.length === 0 && !bareTaskHttp.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'), bareTaskUndo);
 
   console.log('\n--- one Drive file is read back, then undo trashes it ---\n');
-  const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z' };
+  const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z', md5Checksum: 'c'.repeat(32) };
   const saved = scripted([
     { status: 200, ok: true, json: { files: [] } },
     { status: 200, ok: true, json: { id: 'folder1', name: 'Glance' } },
@@ -193,7 +196,7 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     { status: 200, ok: true, json: { id: 'file1', trashed: true } }
   ]);
   const driveUndo = await Drive.undo(drive.ref, trashed.http);
-  check('drive undo reads the file, then trashes it', driveUndo.ok === true && drive.ref.snapshot.headRevisionId === 'rev-1' && trashed.calls[0].method === 'GET' && trashed.calls[1].method === 'PATCH', driveUndo);
+  check('drive undo reads the file, then trashes it', driveUndo.ok === true && drive.ref.snapshot.md5Checksum === SNAP.md5Checksum && trashed.calls[0].method === 'GET' && trashed.calls[1].method === 'PATCH', driveUndo);
   const driveEdited = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', name: 'note-edited.txt', trashed: false }, SNAP, { headRevisionId: 'rev-2', modifiedTime: '2026-10-15T01:00:00.000Z' }) }]);
   const driveRefused = await Drive.undo(drive.ref, driveEdited.http);
   check('drive undo refuses a changed file and does not trash it', driveRefused.ok === false && driveRefused.reason === 'user-edited' && driveRefused.error === 'You edited this. Undo left it alone.' && driveEdited.calls.length === 1 && driveEdited.calls[0].method === 'GET', driveRefused);
@@ -203,16 +206,22 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   let driveThrew = false;
   const driveTimeout = await Drive.undo(drive.ref, async () => { driveThrew = true; throw new Error('timeout'); });
   check('drive undo refuses on a timeout and does not trash', driveTimeout.ok === false && driveTimeout.reason === 'unconfirmed' && driveThrew === true, driveTimeout);
-  const bareDrive = Object.assign({}, drive.ref, { snapshot: null });
+  const bareDrive = Object.assign({}, drive.ref, { snapshot: null, contentHash: '' });
   const driveNoSnap = await Drive.undo(bareDrive, scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP) }]).http);
   check('drive undo without a snapshot does not trash', driveNoSnap.ok === false && driveNoSnap.reason === 'unconfirmed' && driveNoSnap.error === "Couldn't confirm it's unchanged. Undo left it alone.", driveNoSnap);
   const timeOnly = { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime };
   const driveTimeOnly = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, timeOnly) }]);
   const driveTimeRefused = await Drive.undo(Object.assign({}, drive.ref, { snapshot: timeOnly }), driveTimeOnly.http);
   check('drive undo refuses a modifiedTime match when version is missing and does not trash', driveTimeRefused.ok === false && driveTimeRefused.reason === 'unconfirmed' && driveTimeRefused.error === "Couldn't confirm it's unchanged. Undo left it alone." && driveTimeOnly.calls.length === 1, driveTimeRefused);
-  const driveVersion = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP, { version: '2' }) }]);
-  const driveVersionRefused = await Drive.undo(drive.ref, driveVersion.http);
-  check('drive undo refuses a version mismatch and does not trash', driveVersionRefused.ok === false && driveVersionRefused.reason === 'user-edited' && driveVersionRefused.error === 'You edited this. Undo left it alone.' && driveVersion.calls.length === 1, driveVersionRefused);
+  const driveVersion = scripted([
+    { status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP, { version: '2', headRevisionId: 'rev-2' }) },
+    { status: 200, ok: true, json: { id: 'file1', trashed: true } }
+  ]);
+  const driveVersionTrashed = await Drive.undo(drive.ref, driveVersion.http);
+  check('drive undo trashes after a version bump when the md5Checksum is the same', driveVersionTrashed.ok === true && driveVersion.calls.length === 2 && driveVersion.calls[1].method === 'PATCH', driveVersionTrashed);
+  const driveMd5 = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'file1', trashed: false }, SNAP, { md5Checksum: 'd'.repeat(32) }) }]);
+  const driveMd5Refused = await Drive.undo(drive.ref, driveMd5.http);
+  check('drive undo refuses a changed md5Checksum and does not trash', driveMd5Refused.ok === false && driveMd5Refused.reason === 'user-edited' && driveMd5Refused.error === 'You edited this. Undo left it alone.' && driveMd5.calls.length === 1, driveMd5Refused);
   const driveRevOnly = scripted([{ status: 200, ok: true, json: { id: 'file1', trashed: false, version: '1', modifiedTime: SNAP.modifiedTime, headRevisionId: 'rev-live' } }]);
   const driveRevRefused = await Drive.undo(Object.assign({}, drive.ref, { snapshot: { version: '1', modifiedTime: SNAP.modifiedTime } }), driveRevOnly.http);
   check('drive undo refuses when only the live file has a head revision and does not trash', driveRevRefused.ok === false && driveRevRefused.reason === 'unconfirmed' && driveRevOnly.calls.length === 1, driveRevRefused);
@@ -413,21 +422,6 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const clear = await Sheets.undo(pickedRow.ref, cleared.http);
   check('undo of an append reads the row, then clears that range', clear.ok === true && cleared.calls[0].method === 'GET' && cleared.calls[1].method === 'POST' && cleared.calls[1].url.indexOf(':clear') >= 0, clear);
 
-  console.log('\n--- contacts lookup is a GET and nothing else ---\n');
-  const people = scripted([{
-    status: 200, ok: true, json: {
-      results: [{ person: { resourceName: 'people/c1', names: [{ displayName: 'Ada Lovelace' }], emailAddresses: [{ value: 'Ada@Example.com' }] } }]
-    }
-  }]);
-  const found = await Contacts.lookup({ scopes: Cfg.SCOPES, email: 'ada@example.com' }, people.http);
-  check('exact email matches', found.ok === true && found.found === true && found.match.email === 'ada@example.com' && people.calls.length === 1 && people.calls[0].method === 'GET', found);
-  check('contact lookup never writes', noGmail(people.calls) && people.calls[0].url.indexOf('searchContacts') >= 0);
-  const missed = scripted([{ status: 200, ok: true, json: { results: [{ person: { emailAddresses: [{ value: 'other@example.com' }] } }] } }]);
-  const none = await Contacts.lookup({ scopes: Cfg.SCOPES, email: 'ada@example.com' }, missed.http);
-  check('a partial address is not a match', none.ok === true && none.found === false, none);
-  const bad = await Contacts.lookup({ scopes: Cfg.SCOPES, email: 'not-an-email' }, scripted([]).http);
-  check('an invalid email is refused before the call', bad.ok === false && bad.reason === 'unclear');
-
   console.log('\n--- compose is filled, read back, and never sent ---\n');
   const state = { to: '', subject: '', body: '', sendClicks: 0 };
   const filled = Compose.fill({ to: 'ada@example.com', subject: 'Receipt', body: 'Attached.' }, state, CLOCK);
@@ -532,8 +526,9 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('a calendar write without this proof still delegates', Proof.stepCountsAsHandled(oldCalendar) === true);
   check('lane messages are only the lane types', Lane.isLaneMessage({ type: 'flow:google-write' }) === true && Lane.isLaneMessage({ type: 'flow:execute-action' }) === false);
   const via = await Lane.write('googleLaneTask', { scopes: Cfg.SCOPES, taskListId: 'list1', title: 'Call back' }, scripted([
-    { status: 200, ok: true, json: { id: 't2' } },
-    { status: 200, ok: true, json: { id: 't2' } }
+    { status: 200, ok: true, json: { id: 'list1', title: 'Glance' } },
+    { status: 200, ok: true, json: { id: 't2', title: 'Call back' } },
+    { status: 200, ok: true, json: { id: 't2', title: 'Call back' } }
   ]).http, CLOCK);
   check('the dispatcher writes a lane task', proved(via) && via.proof.system === 'google/tasks', via);
 

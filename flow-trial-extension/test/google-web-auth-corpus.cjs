@@ -181,6 +181,7 @@ function load(opts) {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return {
     calls,
     tokens,
@@ -407,7 +408,7 @@ async function run() {
       stored: { googleTasksAuth: { taskListId: 'LIST_A' } },
       routes: [
         [/\/lists\/LIST_A\/tasks$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_ok' }) } }],
-        [/\/lists\/LIST_A\/tasks\/task_ok$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_ok' }) } }]
+        [/\/lists\/LIST_A\/tasks\/task_ok$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_ok', title: 'Send the SOW', status: 'needsAction' }) } }]
       ]
     });
     const out = await attempt(env.fn('googleTasksWrite')({ label: 'Send the SOW', facts: {}, senderName: 'Dana' }));
@@ -422,7 +423,7 @@ async function run() {
     const env = load({
       stored: { googleTasksAuth: { taskListId: 'LIST_A' } },
       routes: [
-        [/\/lists\/LIST_A\/tasks\/task_4$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_4' }) } }],
+        [/\/lists\/LIST_A\/tasks\/task_4$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_4', title: 'Send the SOW', status: 'needsAction' }) } }],
         [/\/lists\/LIST_A\/tasks$/, {
           get reply() {
             n += 1;
@@ -510,7 +511,7 @@ async function run() {
         googleWebAuth: { accessToken: 'ya29.for-tasks', expiresAt: Date.now() + 3600e3 }
       },
       routes: [
-        [/\/lists\/LIST_A\/tasks\/task_web$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_web' }) } }],
+        [/\/lists\/LIST_A\/tasks\/task_web$/, { reply: { ok: true, status: 200, json: async () => ({ id: 'task_web', title: 'Send the SOW', status: 'needsAction' }) } }],
         [/\/lists\/LIST_A\/tasks$/, {
           get reply() {
             posts += 1;

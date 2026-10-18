@@ -27,6 +27,7 @@ const sandbox = {
   setTimeout,
   clearTimeout,
   AbortController,
+  URL,
   fetch: async (url, init) => {
     fetches.push({ url: String(url), init: init || {} });
     const body = JSON.stringify({ id: 'e2e-gtask-1', title: 'Pay the invoice', status: 'needsAction' });
@@ -65,12 +66,24 @@ const sandbox = {
     }
   }
 };
+// The account probe (Gmail profile) is answered here for every fetch the
+// checks below install, so the counted calls are the lane's own.
+{
+  let inner = sandbox.fetch;
+  const profile = /\/gmail\/v1\/users\/me\/profile/;
+  const answer = { ok: true, status: 200, text: async () => '{"emailAddress":"host@example.com"}', json: async () => ({ emailAddress: 'host@example.com' }) };
+  Object.defineProperty(sandbox, 'fetch', {
+    configurable: true,
+    get: () => (url, init) => (profile.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
+    set: (fn) => { inner = fn; }
+  });
+}
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
 const cores = [
-  'google-config.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
-  'google-docs.js', 'google-sheets.js', 'google-contacts.js', 'google-compose.js', 'google-proof.js'
+  'google-config.js', 'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
+  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js'
 ];
 for (const f of cores) {
   vm.runInContext(fs.readFileSync(path.join(EXT, 'core', f), 'utf8'), sandbox, { filename: f });
@@ -92,7 +105,7 @@ check('background.js imports the lane host once', imports.length === 1, imports.
 
 const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
 check('Hold It, Task, Save file, Doc and Sheet send flow:google-write', /type: 'flow:google-write'/.test(gmail) && /googleHold:/.test(gmail) === false && /calendar: 'googleHold'/.test(gmail) && /googleTask: 'googleLaneTask'/.test(gmail) && /driveFile: 'googleDriveSave'/.test(gmail) && /driveDoc: 'googleDoc'/.test(gmail) && /driveSheet: 'googleSheetAppend'/.test(gmail));
-check('Draft reply sends flow:gmail-compose and a contacts lookup', /type: 'flow:gmail-compose'/.test(gmail) && /type: 'flow:google-contacts'/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
+check('Draft reply sends flow:gmail-compose, and with no reply open creates the draft through the drafts API (no contacts lookup, no contacts scope)', /type: 'flow:gmail-compose'/.test(gmail) && !/flow:google-contacts/.test(gmail) && /googleReplyDraft/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
 check('the card Undo sends flow:google-undo', /type: 'flow:google-undo'/.test(gmail));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
@@ -124,7 +137,7 @@ async function main() {
 
   const CONFIRM = "Couldn't confirm it's unchanged. Undo left it alone.";
   const EDITED = 'You edited this. Undo left it alone.';
-  const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z' };
+  const SNAP = { headRevisionId: 'rev-1', version: '1', modifiedTime: '2026-10-15T00:00:00.000Z', md5Checksum: 'a'.repeat(32) };
   const driveRef = {
     fileId: 'file1',
     externalId: 'file1',
@@ -139,7 +152,7 @@ async function main() {
   }
 
   async function flush() {
-    for (let i = 0; i < 24; i++) await Promise.resolve();
+    for (let i = 0; i < 400; i++) await Promise.resolve();
   }
 
   const matchBody = JSON.stringify(Object.assign({ id: 'file1', trashed: false }, SNAP));
@@ -155,11 +168,20 @@ async function main() {
   const versionCalls = [];
   sandbox.fetch = async (url, init) => {
     versionCalls.push((init && init.method) || 'GET');
-    const live = Object.assign({ id: 'file1', trashed: false }, SNAP, { version: '2' });
+    const live = Object.assign({ id: 'file1', trashed: false }, SNAP, { version: '2', headRevisionId: 'rev-2', modifiedTime: '2026-10-15T00:05:00.000Z' });
+    return { ok: true, status: 200, text: async () => JSON.stringify(live) };
+  };
+  const versionBumped = await askUndo('googleDriveSave', driveRef);
+  check('a version bump with the same md5Checksum still trashes the file', versionBumped.ok === true && versionCalls[0] === 'GET' && versionCalls.indexOf('PATCH') >= 0, versionBumped);
+
+  const editCalls = [];
+  sandbox.fetch = async (url, init) => {
+    editCalls.push((init && init.method) || 'GET');
+    const live = Object.assign({ id: 'file1', trashed: false }, SNAP, { md5Checksum: 'b'.repeat(32), version: '2' });
     return { ok: true, status: 200, text: async () => JSON.stringify(live) };
   };
   const versionRefused = await askUndo('googleDriveSave', driveRef);
-  check('a version mismatch says the file was edited and does not trash', versionRefused.ok === false && versionRefused.reason === 'user-edited' && versionRefused.error === EDITED && versionCalls.length === 1 && versionCalls[0] === 'GET', versionRefused);
+  check('a changed md5Checksum says the file was edited and does not trash', versionRefused.ok === false && versionRefused.reason === 'user-edited' && versionRefused.error === EDITED && editCalls.length === 1 && editCalls[0] === 'GET', versionRefused);
 
   const timeCalls = [];
   sandbox.fetch = async (url, init) => {
@@ -347,6 +369,7 @@ async function main() {
         status: 'confirmed',
         summary: 'פגישה',
         start: { dateTime: '2026-10-22T11:00:00Z', timeZone: 'Asia/Jerusalem' },
+        end: { dateTime: '2026-10-22T11:30:00Z', timeZone: 'Asia/Jerusalem' },
         htmlLink: 'https://calendar.google.com/calendar/event?eid=evt-sticky'
       })
     };

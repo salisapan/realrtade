@@ -92,6 +92,7 @@ function attachChrome(w, store, lang, errors) {
         let result = { ok: true };
         if (msg && msg.type === 'flow:connector-status') result = { googleTasks: { connected: true, configured: true } };
         if (msg && msg.type === 'flow:pro-status') result = { ok: true, active: false };
+        if (msg && msg.type === 'flow:google-verify') result = { ok: true, states: (msg.steps || []).map(() => 'present') };
         if (cb) setTimeout(() => cb(result), 0);
         return Promise.resolve(result);
       }

@@ -109,6 +109,7 @@ const cases = [
   ['Send the quarterly report', 'Note to self', 'I promsed Omer to sedn the quarterly report by EOD. Thanks', 'Send the quarterly report by EOD'],
   ['Call about the campaign', 'Re: the campaign', 'gimme a call October 19 at 9am Thank you', 'Call about the campaign'],
   ['Call about the launch checklist', 'Re: Re: Re: the launch checklist', 'Shall we hop on a call October 19 at 3pm', 'Call about the launch checklist'],
+  ['לחדש את הדומיין ofek.dev', 'לעצמי', 'תזכורת לעצמי: לחדש את הדומיין ofek.dev ביום שישי.', 'לחדש את הדומיין ofek.dev'],
   ['שיחה בנושא', 'בהמשך לקליטת העובד החדש', 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', 'שיחה בנושא קליטת העובד החדש']
 ];
 cases.forEach(function (row) {

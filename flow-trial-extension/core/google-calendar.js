@@ -175,6 +175,25 @@ const FlowGoogleCalendar = (() => {
     return hash(summary + '\n' + description + '\n' + start);
   }
 
+  function sameInstant(a, b) {
+    const x = Date.parse(a);
+    const y = Date.parse(b);
+    return Number.isFinite(x) && Number.isFinite(y) && x === y;
+  }
+
+  function sameEvent(sent, back) {
+    if (!sent || !back) return false;
+    if (String(back.summary || '') !== String(sent.summary || '')) return false;
+    if (!back.start || !sameInstant(back.start.dateTime, sent.start.dateTime)) return false;
+    if (!back.end || !sameInstant(back.end.dateTime, sent.end.dateTime)) return false;
+    return true;
+  }
+
+  function accountOf(ev) {
+    const who = (ev && ev.organizer && ev.organizer.email) || (ev && ev.creator && ev.creator.email) || '';
+    return String(who).trim().toLowerCase();
+  }
+
   function namesCalendar(text) {
     return /(?:\b(?:calendar|invite|event|hold)\b|ביומן|ליומן|בזימון)/i.test(String(text || ''));
   }
@@ -258,17 +277,41 @@ const FlowGoogleCalendar = (() => {
       written: 'Calendar · ' + body.summary + (when ? ' · ' + when : ''),
       url: null
     };
-    if (!event.id) return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+    if (!event.id) return Object.assign({ ok: false, reason: pending, ref: null, proof: null, object: 'event', title: body.summary }, base);
     const got = await call(http, { method: 'GET', url: eventUrl(event.id) });
+    const named = { object: 'event', title: body.summary, eventId: event.id };
+    // An event that cannot be confirmed is removed again, so nothing stays in
+    // Google that the card does not own. If the removal also fails the ref is
+    // kept, and the card offers Undo for it.
+    const withdraw = async () => {
+      const gone = await call(http, { method: 'DELETE', url: eventUrl(event.id) });
+      const removed = gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410;
+      return Object.assign({ ok: false, reason: failed, ref: removed ? null : { eventId: event.id, externalId: event.id }, proof: null, removed: removed }, named, base);
+    };
     if (!got.ok || !got.json || got.json.id !== event.id || got.json.status === 'cancelled') {
-      return Object.assign({ ok: false, reason: failed, ref: { eventId: event.id, externalId: event.id }, proof: null }, base);
+      if (got.status === 404 || got.status === 410) return Object.assign({ ok: false, reason: failed, ref: null, proof: null, removed: true }, named, base);
+      return withdraw();
+    }
+    // Handled needs the event the API returns for that id to be the event
+    // that was asked for: the title and both instants, on the account that
+    // is open in the tab.
+    if (!sameEvent(body, got.json)) return withdraw();
+    const expected = String(i.expectAccount || '').trim().toLowerCase();
+    const actual = accountOf(got.json);
+    if (expected && actual && expected !== actual) {
+      await call(http, { method: 'DELETE', url: eventUrl(event.id) });
+      return Object.assign({ ok: false, reason: 'wrong-account', account: actual, expected: expected, ref: null, proof: null }, named, base);
     }
     const link = event.htmlLink && String(event.htmlLink).slice(0, 8) === 'https://' ? event.htmlLink : null;
     if (link) base.url = link;
+    // The receipt row states what Google returned for that id, not the request.
+    const backStart = got.json.start && got.json.start.dateTime ? String(got.json.start.dateTime) : '';
+    const backWhen = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(backStart) ? backStart.slice(0, 10) + ' ' + backStart.slice(11, 16) : when;
+    base.written = 'Calendar · ' + String(got.json.summary || body.summary) + (backWhen ? ' · ' + backWhen : '');
     const proof = C && C.proofOf(SYSTEM, event.id, link, C.clockIso(clock));
     const ref = { eventId: event.id, externalId: event.id, contentHash: contentHash(got.json) };
-    if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
-    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+    if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, named, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof, title: String(got.json.summary || body.summary) }, base);
   }
 
   function unconfirmedUndo() {

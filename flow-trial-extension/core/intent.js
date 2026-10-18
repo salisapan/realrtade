@@ -2331,7 +2331,7 @@ const FlowIntent = (() => {
   }
   const EN_DATE_TAIL = /\s+(?:by|due|until|before|no later than|tomorrow|today|tonight|asap|eod|eow|end of (?:the )?(?:week|day)|for\s+next\b|tomorr\w*|next\s+(?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|on\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|oct(?:ober)?|nov(?:ember)?|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:tember)?|dec(?:ember)?|\d{1,2})|(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|january|february|march|april|may|june|july|august|september|october|november|december)\b[\s\S]*$/i;
   const EN_DATE_LEAD = /^(?:by|on|before|until|due|no later than)\s+(?:eod|eow|asap|tomorrow|today|tonight|end of (?:the )?(?:week|day)|next\s+(?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|oct|nov)(?:\s+\d{1,2})?(?:,\s*(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2})?)\b\s*/i;
-  const HE_DATE_WORD = '(?:עד|מחר|היום|השבוע|ביום|ליום|לפני|סוף|asap|למערכת)';
+  const HE_DATE_WORD = '(?:עד|מחר|היום|השבוע|ביום|ליום|לפני|סוף|asap|למערכת|ב(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת))';
   const HE_DATE_TAIL = new RegExp('\\s+' + HE_DATE_WORD + '(?=\\s|$|[.,!?])[\\s\\S]*$', 'i');
   const HE_DATE_LEAD = new RegExp('^' + HE_DATE_WORD + '(?=\\s|$|[.,!?])[\\s\\S]*$', 'i');
   const AT_CLOCK = /\s+at\s+\d[\s\S]*$/i;
@@ -2344,7 +2344,7 @@ const FlowIntent = (() => {
     s = s.replace(EN_DATE_TAIL, '').replace(AT_CLOCK, '').replace(HE_DATE_TAIL, '').replace(NUM_DATE, '');
     s = s.replace(/\s+(?:and\s+get\s+back|and\s+send|so\s+(?:we|i)\s+can)\b[\s\S]*$/i, '');
     s = s.replace(/\s+as\s+an\s+attachment\b[\s\S]*$/i, '');
-    s = s.split(/(?<!\d)[.!?](?!\d)/)[0];
+    s = s.split(/(?<!\d)[.!?](?![\w\u0590-\u05FF-])/)[0];
     s = s.replace(/\s+to\s+(?:my\s+)?(?:google\s+drive|one\s?drive|the\s+portal|the\s+drive|portal|drive)\b[\s\S]*$/i, '');
     s = s.replace(/\s+from\s+you\b[\s\S]*$/i, '');
     s = s.replace(/^(?:and\s+(?:send|email)\s+)/i, '');
@@ -2789,7 +2789,7 @@ const FlowIntent = (() => {
     if (/^["“”'«„]/.test(t)) return true;
     if (/^(?:תזכורת|בבקשה|אפשר|מחכים ל|מחכה ל|עדיין חסר|יש מצב|אני אגיע|אנחנו בפנים|לזכור |סיכמנו |הבטחתי |רק משהו|מה דעתך|can i get\b)/i.test(t)) return true;
     if (/[?!]/.test(t)) return true;
-    if (/(?<!\d)\.(?!\d)/.test(t) || /\.$/.test(t)) return true;
+    if (/(?<!\d)\.(?![\w\u0590-\u05FF-])/.test(t) || /\.$/.test(t)) return true;
     return false;
   }
   function selfFollowTitle() {
@@ -3134,7 +3134,7 @@ const FlowIntent = (() => {
       .replace(/^הבטחתי\s+ל[\u0590-\u05FF]+\s+/, '');
     if (clause === s) return '';
     clause = clause.replace(/^צרף\s+/, 'לצרף ');
-    clause = clause.replace(HE_DATE_TAIL, '').replace(EN_DATE_TAIL, '').replace(/[.?!].*$/, '').replace(/\s+/g, ' ').trim();
+    clause = clause.replace(HE_DATE_TAIL, '').replace(EN_DATE_TAIL, '').replace(/[.?!](?![\w\u0590-\u05FF-]).*$/, '').replace(/\s+/g, ' ').trim();
     // "בבקשה להוסיף משימה <verb>" is the verb. The wrapper is not the title.
     // Hebrew letters are not \b word chars, so the guard is a space or the end.
     if (/^להוסיף משימה(?:\s|$)/.test(clause)) return '';

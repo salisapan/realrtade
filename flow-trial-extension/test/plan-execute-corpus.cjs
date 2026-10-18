@@ -52,7 +52,7 @@ function shownFamilies(host) {
 function connectorFamily(id) {
   if (id === 'outlookCalendar' || id === 'calendar' || id === 'googleHold') return 'calendar';
   if (id === 'outlookTask' || id === 'googleTask' || id === 'googleTasks' || id === 'microsoftTodo' || id === 'googleLaneTask') return 'task';
-  if (id === 'outlookDraft' || id === 'gmailDraft' || id === 'gmailCompose') return 'draft';
+  if (id === 'outlookDraft' || id === 'gmailDraft' || id === 'gmailCompose' || id === 'googleReplyDraft') return 'draft';
   if (id === 'onedriveFile' || id === 'driveFile' || id === 'attachmentSave' || id === 'googleDriveFile' || id === 'googleDriveSave') return 'file';
   return null;
 }
@@ -195,6 +195,7 @@ function planCtx(kind, surface) {
     app: surface,
     uiLang: 'en',
     messageId: 'PLAN-' + surface + '-' + kind,
+    threadId: 'PLAN-thread-' + kind,
     outlookIncomingId: 'PLAN-' + surface + '-' + kind,
     subject: 'Dana Levi',
     bodyText: 'Please confirm the note from Dana Levi.',

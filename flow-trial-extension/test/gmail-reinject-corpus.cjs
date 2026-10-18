@@ -186,6 +186,7 @@ sandbox.reinjectGmailTabs().then((first) => {
       tag: tag, className: '', textContent: '', children: [], attrs: {}, style: {},
       isConnected: true, parent: null, removed: false,
       setAttribute(k, v) { this.attrs[k] = String(v); },
+      removeAttribute(k) { delete this.attrs[k]; },
       getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
       appendChild(child) { child.parent = this; this.children.push(child); return child; },
       insertBefore(child) { return this.appendChild(child); },
@@ -310,7 +311,8 @@ sandbox.reinjectGmailTabs().then((first) => {
           lastError: null,
           sendMessage(msg, cb) {
             page.sent.push(msg);
-            if (typeof cb === 'function') cb({ ok: true });
+            const verify = msg && msg.type === 'flow:google-verify';
+            if (typeof cb === 'function') cb(verify ? { ok: true, states: (msg.steps || []).map(() => 'present') } : { ok: true });
           },
           onMessage: { addListener() {} }
         },

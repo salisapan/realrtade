@@ -171,8 +171,8 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
 const cores = [
-  'google-config.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
-  'google-docs.js', 'google-sheets.js', 'google-contacts.js', 'google-compose.js', 'google-proof.js'
+  'google-config.js', 'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
+  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js'
 ];
 for (const f of cores) {
   vm.runInContext(fs.readFileSync(path.join(EXT, 'core', f), 'utf8'), sandbox, { filename: f });
@@ -190,10 +190,10 @@ function mutating(list) {
   return list.filter((c) => c.method === 'POST' || c.method === 'PUT' || c.method === 'PATCH' || c.method === 'DELETE');
 }
 
-const hostBodyStart = hostFile.indexOf('function laneToken(');
+const hostBodyStart = hostFile.indexOf('function storedConnectToken(') >= 0 ? hostFile.indexOf('function storedConnectToken(') : hostFile.indexOf('async function storedConnectToken(');
 const hostBodyEnd = hostFile.indexOf('\nfunction ', hostBodyStart + 10);
 const laneTokenSource = hostFile.slice(hostBodyStart, hostBodyEnd);
-check('laneToken names googleWebAuth', laneTokenSource.indexOf('googleWebAuth') >= 0, laneTokenSource.slice(0, 80));
+check('the stored Connect token reader names googleWebAuth', laneTokenSource.indexOf('googleWebAuth') >= 0, laneTokenSource.slice(0, 80));
 check('laneToken does not read __glanceE2e', laneTokenSource.indexOf('__glanceE2e') < 0);
 check('the host does not assign __glanceE2e', !/__glanceE2e\s*=/.test(hostFile));
 check('the sandbox never gained an e2e hook', sandbox.__glanceE2e == null);
@@ -267,7 +267,8 @@ async function main() {
   };
   resetFetches();
   const wrong = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
-  check('a bearer that is not the stored token is a 401 reconnect', wrong && wrong.ok === false && fetches.some((c) => c.auth === 'Bearer ya29.not-the-stored-token') && stored.googleReconnect && stored.googleReconnect.needed === true, { wrong, fetches });
+  const wroteWith = fetches.filter((c) => c.url.indexOf('tasks.googleapis.com') >= 0);
+  check('a Chrome token that is not the stored token is never the bearer of a write', wrong && wroteWith.length > 0 && wroteWith.every((c) => c.auth === 'Bearer ' + STORED), { wrong, fetches });
   delete stored.googleReconnect;
   sandbox.chrome.identity.getAuthToken = signedOut;
 

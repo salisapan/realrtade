@@ -20,14 +20,15 @@ test.beforeEach(async ({ glance }) => {
   await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
 });
 
-async function run(glance, id, download, lang) {
+async function run(glance, id, download, lang, noCompose) {
   // The page itself must never be the one that reads the attachment.
   await glance.context.route('https://mail.google.com/e2e/**', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'page fetch' }));
   await glance.seedGmail(lang === 'he' ? { glanceUiLanguage: 'he' } : {});
   const page = await glance.openGmail({
     messageId: 'm-' + id, threadId: 't-' + id, subject: 'Board pack',
     senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: lang || 'en',
-    body: ASK, downloadUrl: download, composeReply: true, composeTo: 'dana@acme.io', composeSubject: 'Re: Board pack'
+    body: ASK, downloadUrl: download,
+    composeReply: !noCompose, composeTo: 'dana@acme.io', composeSubject: 'Re: Board pack'
   });
   const chip = page.locator('div[role="main"] button.flow-chip');
   await expect(chip).toBeVisible({ timeout: 20000 });
@@ -84,6 +85,41 @@ test('Undo in the Hebrew UI trashes the file the upload response named', async (
   expect(trashes[0].path).toBe('/drive/v3/files/' + id);
   expect(server.file(id).name).toBe('board.pdf');
   await expect(page.locator('div[role="main"]')).not.toContainText('עדיין ב-Drive');
+});
+
+test('with no reply open, the save makes the draft through the Gmail drafts API, in the thread, with the Drive link', async ({ glance }) => {
+  const page = await run(glance, 'ch-nocompose', BOARD, 'en', true);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const fileId = server.last.file;
+  await expect.poll(() => Object.keys(server.drafts).length, { timeout: 15000 }).toBe(1);
+  const draftId = Object.keys(server.drafts)[0];
+  const draft = server.drafts[draftId];
+  expect(draft.message.threadId).toBe('t-ch-nocompose');
+  expect(JSON.stringify(draft)).toContain('https://drive.google.com/file/d/' + fileId + '/view');
+  expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + draftId) >= 0)).toBe(true);
+  expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+  await expect(page.locator('[aria-label="Message Body"]')).toHaveCount(0);
+});
+
+test('Undo after a version bump with the same md5Checksum still trashes the file', async ({ glance }) => {
+  const page = await run(glance, 'ch-bump', BOARD);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = server.last.file;
+  const before = server.file(id).version;
+  server.editFile(id, {});
+  expect(server.file(id).version).not.toBe(before);
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect.poll(() => server.file(id).trashed, { timeout: 15000 }).toBe(true);
+});
+
+test('Undo leaves a file whose md5Checksum changed, and says so', async ({ glance }) => {
+  const page = await run(glance, 'ch-edited', BOARD);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = server.last.file;
+  server.editFile(id, { md5Checksum: '0123456789abcdef0123456789abcdef' });
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect(page.locator('div[role="main"]')).toContainText(/edited|left it alone/i, { timeout: 15000 });
+  expect(server.file(id).trashed).toBeFalsy();
 });
 
 test('every request for a Drive file asks only for fields Drive has', async ({ glance }) => {

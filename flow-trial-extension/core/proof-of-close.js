@@ -136,6 +136,19 @@ const FlowProofOfClose = (() => {
     return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isOnedriveKind(kind) || isComputerKind(kind);
   }
 
+  // A Google lane write (event, task, file, doc, sheet row) is Handled only
+  // when the create answered with an id, a GET by that id came back, and the
+  // proof names that same id. ok alone is a claim, not a close.
+  function laneStepVerified(response) {
+    if (!response || response.ok !== true || response.skipped) return false;
+    if (!isProof(response.proof)) return false;
+    const ref = response.ref;
+    if (!ref || typeof ref !== 'object') return false;
+    const made = clean(ref.externalId || ref.eventId || ref.taskId || ref.fileId || ref.documentId || ref.spreadsheetId);
+    if (!made) return false;
+    return clean(response.proof.externalId) === made;
+  }
+
   // One step of a Do It. A task counts only with a proof. Every other
   // kind keeps the write it already had: this slice does not verify them.
   function stepCountsAsHandled(result) {
@@ -1162,6 +1175,7 @@ const FlowProofOfClose = (() => {
     isComputerSystem: isComputerSystem,
     isProofTaskKind: isProofTaskKind,
     stepCountsAsHandled: stepCountsAsHandled,
+    laneStepVerified: laneStepVerified,
     shouldRecordTrustedClose: shouldRecordTrustedClose,
     activityFields: activityFields,
     canonId: canonId,

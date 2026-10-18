@@ -82,12 +82,14 @@ const FlowGoogleDrive = (() => {
     return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,md5Checksum,headRevisionId,version,modifiedTime');
   }
 
+  // What the person's own edit changes is the content and the name. version,
+  // modifiedTime and headRevisionId move on their own after an upload
+  // (indexing, thumbnails, virus scan), so none of them says "edited".
   function fileSnapshot(json) {
-    const snap = {};
     if (!json || typeof json !== 'object') return null;
-    if (json.headRevisionId) snap.headRevisionId = String(json.headRevisionId);
-    if (json.version != null && String(json.version) !== '') snap.version = String(json.version);
-    if (json.modifiedTime) snap.modifiedTime = String(json.modifiedTime);
+    const snap = {};
+    if (json.md5Checksum) snap.md5Checksum = String(json.md5Checksum);
+    if (json.name) snap.name = String(json.name);
     return Object.keys(snap).length ? snap : null;
   }
 
@@ -95,22 +97,16 @@ const FlowGoogleDrive = (() => {
     return !!(obj && obj[key] != null && String(obj[key]) !== '');
   }
 
-  // match, edited, unconfirmed, or missing. Version and modifiedTime both
-  // have to be present and equal. headRevisionId has to match when either
-  // side has it. A modifiedTime match with no version cannot confirm the file.
-  function unchanged(snapshot, live) {
-    if (!snapshot || typeof snapshot !== 'object') return 'missing';
+  // match, edited, unconfirmed, or missing. The md5Checksum of the read-back
+  // after the upload is compared with the md5Checksum of the read before the
+  // trash. A file with no checksum on either side cannot be confirmed.
+  function unchanged(snapshot, live, savedHash) {
+    const snap = snapshot && typeof snapshot === 'object' ? snapshot : {};
     const got = live && typeof live === 'object' ? live : {};
-    if (!present(snapshot, 'version') || !present(snapshot, 'modifiedTime')) return 'unconfirmed';
-    if (!present(got, 'version') || !present(got, 'modifiedTime')) return 'unconfirmed';
-    if (String(snapshot.version) !== String(got.version)) return 'edited';
-    if (String(snapshot.modifiedTime) !== String(got.modifiedTime)) return 'edited';
-    const snapRev = present(snapshot, 'headRevisionId');
-    const liveRev = present(got, 'headRevisionId');
-    if (snapRev || liveRev) {
-      if (!snapRev || !liveRev) return 'unconfirmed';
-      if (String(snapshot.headRevisionId) !== String(got.headRevisionId)) return 'edited';
-    }
+    const saved = present(snap, 'md5Checksum') ? snap.md5Checksum : (/^[0-9a-f]{32}$/i.test(String(savedHash || '')) ? savedHash : '');
+    if (!saved || !present(got, 'md5Checksum')) return 'unconfirmed';
+    if (String(saved).toLowerCase() !== String(got.md5Checksum).toLowerCase()) return 'edited';
+    if (present(snap, 'name') && present(got, 'name') && String(snap.name) !== String(got.name)) return 'edited';
     return 'match';
   }
 
@@ -211,7 +207,7 @@ const FlowGoogleDrive = (() => {
     if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
     if (got.status === 404) return { ok: true, written: 'Drive file removed.' };
     if (!got.ok || got.status === 0) return unconfirmedResult();
-    const verdict = unchanged(ref.snapshot, got.json);
+    const verdict = unchanged(ref.snapshot, got.json, ref.contentHash);
     if (verdict === 'edited') return editedResult();
     if (verdict !== 'match') return unconfirmedResult();
     const del = await call(http, {

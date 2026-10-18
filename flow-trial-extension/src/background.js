@@ -1698,6 +1698,7 @@ async function upgradeGoogleScopesOnce() {
         // just cleared. A later silent getAuthToken does not see it, and
         // the stored web token was deleted above. Keep this token and
         // clear Reconnect now, before the task-list call.
+        await recordGoogleConsent(token, 'chrome');
         const kept = await rememberUpgradedGoogleToken(token, 'chrome');
         if (!kept) throw new Error('Google sign-in was closed or denied.');
         return { token: token, source: 'chrome' };
@@ -1709,6 +1710,7 @@ async function upgradeGoogleScopesOnce() {
         }
         try {
           const saved = await runGoogleWebAuth(true);
+          await recordGoogleConsent(saved.accessToken, 'web');
           await writeGoogleGrantedScopes('granted', 'web');
           await clearGoogleReconnect();
           return { token: saved.accessToken, source: 'web' };
@@ -1725,6 +1727,23 @@ async function upgradeGoogleScopesOnce() {
   return googleScopeUpgradeFlight;
 }
 
+// The account the person consented to in Glance. A silent Chrome token of a
+// different account is never stored over it and never used for a write.
+async function chromeTokenIsConsented(token) {
+  const lane = globalThis.FlowGoogleLaneAccount;
+  if (!lane || !token) return true;
+  const connected = await lane.read();
+  if (!connected) return true;
+  const email = await lane.accountOf(token);
+  return !email || email === connected;
+}
+
+async function recordGoogleConsent(token, source) {
+  const lane = globalThis.FlowGoogleLaneAccount;
+  if (!lane || !token) return;
+  try { await lane.record(token, source); } catch (e) { /* the first verified write records the account */ }
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
@@ -1733,6 +1752,8 @@ async function getGoogleAccessToken(interactive) {
   }
   try {
     const token = await getGoogleAuthToken(wantUi);
+    if (wantUi) await recordGoogleConsent(token, 'chrome');
+    else if (!(await chromeTokenIsConsented(token))) throw new Error('Chrome is signed in as another Google account.');
     // Chrome's identity cache dies with the service worker. The panel
     // reads googleWebAuth from chrome.storage.local.
     await persistGoogleAccessToken(token, 'chrome');
@@ -1741,7 +1762,9 @@ async function getGoogleAccessToken(interactive) {
     const message = err && err.message;
     if (!shouldFallbackFromGetAuthToken(message, { interactive: wantUi })) throw err;
     try {
-      return await getGoogleWebAccessToken(wantUi);
+      const web = await getGoogleWebAccessToken(wantUi);
+      if (wantUi) await recordGoogleConsent(web.token, 'web');
+      return web;
     } catch (fallbackErr) {
       if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
       throw fallbackErr;
@@ -1799,6 +1822,7 @@ async function disconnectConnector(connectorId) {
       GOOGLE_EVER_CONNECTED_STORAGE_KEY,
       GOOGLE_GRANTED_SCOPES_KEY,
       'googleProfile',
+      'googleConnectedAccount',
       'glanceOwnNames'
     ]));
     googleNamesFilled = false;
@@ -1995,6 +2019,10 @@ async function refreshGoogleSession() {
   let chromeError = '';
   try { chromeToken = await getGoogleAuthToken(false); }
   catch (e) { chromeError = (e && e.message) || String(e); }
+  if (chromeToken && !(await chromeTokenIsConsented(chromeToken))) {
+    chromeToken = '';
+    chromeError = 'Chrome is signed in as another Google account.';
+  }
   await glanceAuthLog(Object.assign({
     call: 'getAuthToken',
     interactive: false,
@@ -2149,7 +2177,13 @@ async function rememberGoogleAuthResult(res) {
   return res;
 }
 
-async function googleAuthedFetch(baseUrl, path, options) {
+// options.soft marks a best-effort read (a thread lookup, a probe). Its 401
+// or 403 is that call's own answer: the token is kept, Reconnect is not
+// flagged, and nothing is refreshed. Only a write path can end the grant.
+async function googleAuthedFetch(baseUrl, path, rawOptions) {
+  const soft = !!(rawOptions && rawOptions.soft === true);
+  const options = rawOptions ? Object.assign({}, rawOptions) : rawOptions;
+  if (options) delete options.soft;
   let cred;
   try {
     cred = await getGoogleAccessToken(false);
@@ -2161,6 +2195,7 @@ async function googleAuthedFetch(baseUrl, path, options) {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
   const res = await doFetch(cred.token);
+  if (soft) return res;
   if (res.status !== 401) return rememberGoogleAuthResult(res);
   // A cached token can go stale (revoked access from the Google Account
   // permissions page, expired) without Chrome knowing yet — evict it and
@@ -2204,23 +2239,15 @@ async function googleConnected() {
   return Boolean(await getGoogleTasksAuth());
 }
 
-// Every write lands in the same list, found by title rather than an id
-// stashed only in local storage — reinstalling the extension (which clears
-// chrome.storage.local) still finds the same "Glance" list next time
-// instead of creating a second one.
-async function findOrCreateGlanceTaskList() {
-  const listRes = await googleTasksAuthedFetch('/users/@me/lists?maxResults=100');
-  if (!listRes.ok) throw new Error('Could not read your Google Task lists (' + listRes.status + ').');
-  const lists = (await listRes.json()).items || [];
-  const existing = lists.find((l) => l.title === GLANCE_TASK_LIST_TITLE);
-  if (existing) return existing.id;
-
-  const createRes = await googleTasksAuthedFetch('/users/@me/lists', {
-    method: 'POST',
-    body: JSON.stringify({ title: GLANCE_TASK_LIST_TITLE })
-  });
-  if (!createRes.ok) throw new Error('Could not create a Glance list in Google Tasks (' + createRes.status + ').');
-  return (await createRes.json()).id;
+// Every write lands in the list titled Glance. It is looked up by title,
+// so a reinstall finds the same list, and made only when the account has
+// none, once. The lane host owns that one lookup-then-create, so there is a
+// single place a task list can be created and its title is a constant.
+async function findGlanceTaskList() {
+  const lane = globalThis.FlowGoogleLaneAccount;
+  const id = lane && typeof lane.ensureGlanceList === 'function' ? await lane.ensureGlanceList() : '';
+  if (!id) throw new Error('Could not find or make the ' + GLANCE_TASK_LIST_TITLE + ' list in Google Tasks.');
+  return id;
 }
 
 async function connectGoogleTasks(interactive) {
@@ -2233,7 +2260,7 @@ async function connectGoogleTasks(interactive) {
   // web-flow consent window. Later API calls stay silent.
   const cred = await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
-  const taskListId = await findOrCreateGlanceTaskList();
+  const taskListId = await findGlanceTaskList();
   await chrome.storage.local.set({
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
@@ -2378,14 +2405,14 @@ async function googleTasksWrite(p) {
   // the remedy. The only way out was Disconnect/Connect in the popup, which
   // nothing told the user to do.
   //
-  // findOrCreateGlanceTaskList already knows how to recover; it was simply
+  // findGlanceTaskList already knows how to recover; it was simply
   // only ever called at connect time. Calling it here on a 404 gives the
   // write path the same "re-resolve once, then fail loudly" shape
   // googleAuthedFetch already uses for a stale token one layer down. The new
   // id is persisted so the next write doesn't pay for the round trip again.
   if (res.status === 404) {
     try {
-      const freshListId = await findOrCreateGlanceTaskList();
+      const freshListId = await findGlanceTaskList();
       if (freshListId && freshListId !== taskListId) {
         taskListId = freshListId;
         await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, auth, { taskListId }) });
@@ -2421,7 +2448,7 @@ async function googleTasksWrite(p) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
   const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
-  const fetched = await googleTasksFetchBack(taskListId, task.id);
+  const fetched = await googleTasksFetchBack(taskListId, task.id, body.title);
   if (!fetched.ok) {
     return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
   }
@@ -2441,7 +2468,7 @@ async function googleTasksWrite(p) {
 // Read the task that was just created. fetchedBack is true only when this
 // GET returns that same id and the task is not deleted. A miss stays
 // verify_failed — the loop is not Handled.
-async function googleTasksFetchBack(taskListId, taskId) {
+async function googleTasksFetchBack(taskListId, taskId, sentTitle) {
   let res;
   try {
     res = await googleTasksAuthedFetch(
@@ -2455,6 +2482,7 @@ async function googleTasksFetchBack(taskListId, taskId) {
   let body = null;
   try { body = await res.json(); } catch (e) { return { ok: false }; }
   if (!body || body.id !== taskId || body.deleted) return { ok: false };
+  if (sentTitle != null && String(body.title || '') !== String(sentTitle)) return { ok: false };
   return { ok: true, task: body };
 }
 
@@ -2501,7 +2529,7 @@ async function followTaskCreate(p) {
   let res = await post(taskListId);
   if (res.status === 404) {
     try {
-      const fresh = await findOrCreateGlanceTaskList();
+      const fresh = await findGlanceTaskList();
       if (fresh && fresh !== taskListId) {
         taskListId = fresh;
         await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, auth, { taskListId }) });
@@ -2598,7 +2626,7 @@ async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
   try {
     const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
-    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q));
+    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
     if (!res.ok) return null;
     const data = await res.json();
     return (data.threads && data.threads[0] && data.threads[0].id) || null;
@@ -3059,7 +3087,7 @@ async function findThreadId(senderEmail, subject) {
   if (!senderEmail) return null;
   try {
     const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
-    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q));
+    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
     if (!res.ok) return null;
     const data = await res.json();
     return (data.threads && data.threads[0] && data.threads[0].id) || null;
