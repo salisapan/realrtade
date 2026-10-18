@@ -4,13 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>תאום פגישה לעובד חדש — סוכנות גבאי</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@500;700&display=swap" rel="stylesheet">
-<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<title>תיאום פגישה לעובד חדש — סוכנות גבאי</title>
+<link rel="stylesheet" href="vendor/fonts.css">
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/babel.min.js"></script>
 <style>
 html,body{margin:0;background:#0c1424;color:#e8eefc}
 #boot-error{display:none;position:fixed;inset:0;z-index:9;background:#0c1424;color:#f0b4b4;font:14px/1.5 Assistant,sans-serif;padding:24px;white-space:pre-wrap;direction:ltr;text-align:left}
@@ -49,7 +47,8 @@ const C = {
   q3: "תומר ביטון",
   q3id: "408221117",
   q3start: "16.11.2026",
-  room: "חדר הישיבות אצל הסוכן",
+  room: "חדר הישיבות, סוכנות גבאי, רחוב הרצל 18, רמת גן",
+  phone: "050-•••-••47",
   slot: "חמישי 12.11.2026, 10:30–11:15",
   remind: "רביעי 11.11.2026, 16:00",
   atid: "AT-2026-18442",
@@ -115,12 +114,12 @@ const TRAIL = [
 
 const CAPS = [
   "",
-  "הודעה מהמעסיק נקלטה בשלוש צורות. Flow מזהה עובד חדש ומציע לפתוח את אורי מלכה. ליה נחום ותומר ביטון נשארים בתור.",
+  "הודעת הנייד של המעסיק היא הערוץ הראשי, ומוצגת ראשונה. Flow מזהה עובד חדש ומציע לפתוח את אורי מלכה. שתי הודעות המייל משניות. ליה נחום ותומר ביטון נשארים בתור.",
   "הכרטיס בעתיד מולא מההודעות. צילום הת״ז ממתין לתיוק. טפסים חתומים מהמעסיק לא הגיעו.",
   "השדר מעביר רק מה שכבר בתיק: לקוח, משפחה וצילום ת״ז. האקסל, הפוליסות וקבצי הטרום ייעוץ עדיין לא קיימים.",
   "שירה מסבירה לאורי מה נדרש לפגישה. הלינק וייפוי הכוח יוצאים מפוליוויז. ההפעלה מתוך עתיד חסומה.",
   "עברו שלושה ימים. אורי פתח את הלינק ולא השלים פרטים. חוזרים לאותו תיק, לא פותחים מסלול חדש.",
-  "חזרו שתי הרשאות חתומות. השלישית, העתקי פוליסות, לא נחתמה. מתיוקים רק את מה שחזר.",
+  "חזרו שתי הרשאות חתומות. השלישית, העתקי פוליסות, לא נחתמה. מתייקים רק את מה שחזר.",
   "בתיק שתי הרשאות. חסרה הרשאה להעתקי פוליסות, והפגישה נשארת סגורה עד שתחזור.",
   "הרשאת העתקי הפוליסות נחתמה. אקסל הר הביטוח חזר, כולל פוליסת כלל שאינה פעילה.",
   "ההעתקים הגיעו כסריקות. שם הקובץ אחרי אישור: חברת הביטוח ומספר הפוליסה.",
@@ -129,8 +128,8 @@ const CAPS = [
   "קובץ המסלקה פתח שתי תוכניות אצל לקוח שכבר קיים. קבצי טרום הייעוץ בתיק. אין כאן שליחה.",
   "אורי ביקש לדחות את שלישי בבוקר. ביומן של יואב פנוי חמישי 12.11 ב־10:30. הזימון עדיין לא נשלח.",
   "הזימון בנוי מיומן הסוכן אל מייל הלקוח. הקבצים מצורפים בשמות שאושרו בסריקה.",
-  "תזכורת ליום שלפני הפגישה, עם המועד, המקום וסוג הפגישה. אחרי האישור זו שליחה בתוך ההדגמה.",
-  "כל שליחה, תיוק, שידור וזימון יצאו רק אחרי אישור של שירה. המערכות במסך לא מחוברות באמת.",
+  "תזכורת ליום שלפני הפגישה: תאריך, שעה, כתובת חדר הישיבות, סוג הפגישה, ומה להביא.",
+  "כל שליחה, תיוק, שידור וזימון יצאו רק אחרי אישור של שירה.",
 ];
 
 const WAITS = [
@@ -153,36 +152,36 @@ const WAITS = [
 ];
 
 const APPENDIX = [
-  ["נוהל, שלב 1", "מייל עם צרופות", "מסך 1", "קובץ הרשימה, וצילום הת״ז מהנייד"],
-  ["נוהל, שלב 1", "מלל בגוף ההודעה", "מסך 1", "מייל 09:22, בלי קובץ"],
-  ["נוהל, שלב 1", "מבוטח אחד", "מסך 1", "הודעת הנייד והמייל שבגוף"],
-  ["נוהל, שלב 1", "רשימת עובדים", "מסך 1", "רשימת-עובדים.xlsx, שלושה שמות"],
+  ["נוהל, שלב 1", "מייל עם צרופות", "מסך 1", "וריאציית מייל משנית. צילום הת״ז בהודעת הנייד"],
+  ["נוהל, שלב 1", "מלל בגוף ההודעה", "מסך 1", "וריאציית מייל משנית, 09:22, בלי קובץ"],
+  ["נוהל, שלב 1", "מבוטח אחד", "מסך 1", "הודעת הנייד היא הערוץ הראשי"],
+  ["נוהל, שלב 1", "רשימת עובדים", "מסך 1", "וריאציית מייל משנית. מצורפת רשימת העובדים (xlsx), שלושה שמות"],
   ["נוהל, שלב 2", "הקמת הלקוח בעתיד", "מסך 2", ""],
-  ["נוהל, שלב 2", "תיוק מסמכים אם התקבלו, כולל ת״ז וטפסים חתומים", "מסך 2", "שונה לפי ההערה.  מתויקת ת״ז בלבד. טפסים חתומים מהמעסיק לא מתקבלים"],
+  ["נוהל, שלב 2", "תיוק מסמכים אם התקבלו, כולל ת״ז וטפסים חתומים", "מסך 2", "שונה לפי ההערה. מתויקת ת״ז בלבד. טפסים חתומים מהמעסיק לא מתקבלים"],
   ["נוהל, שלב 2", "ממשק מעתיד לאלמגור, כולל משפחה וטפסים כגון ת״ז", "מסך 3", ""],
-  ["נוהל, שלב 3", "פנייה להר הביטוח, להעתקי פוליסות ולמסלקה, בהנחה שאין טפסים חתומים", "מסכים 4–12", "שונה לפי ההערה.  תמיד, לא רק כשאין טפסים"],
+  ["נוהל, שלב 3", "פנייה להר הביטוח, להעתקי פוליסות ולמסלקה, בהנחה שאין טפסים חתומים", "מסכים 4–12", "שונה לפי ההערה. תמיד, לא רק כשאין טפסים"],
   ["נוהל, שלב 3", "המתאמת מסבירה לעובד", "מסך 4", "השיחה נשארת אצל שירה"],
-  ["נוהל, שלב 3", "לינק פוליוויז מתוך פוליוויז או מתוך עתיד", "מסך 4", "שונה לפי ההערה.  רק מפוליוויז. ההפעלה מעתיד חסומה"],
+  ["נוהל, שלב 3", "לינק פוליוויז מתוך פוליוויז או מתוך עתיד", "מסך 4", "שונה לפי ההערה. רק מפוליוויז. ההפעלה מעתיד חסומה"],
   ["נוהל, שלב 3", "פוליוויז אוספת הר ביטוח, פוליסות ומסלקה ומפיקה דוח", "מסך 4", ""],
   ["נוהל, שלב 3", "הלקוח מקבל לינק, ממלא וחותם", "מסכים 5–8", "כולל סבב עיכוב וסבב מסמך חסר"],
-  ["נוהל, שלב 3", "תיוק אוטומטי אם הלינק יצא מעתיד, אחרת תיוק ידני", "מסכים 6 ו־8", "שונה לפי ההערה.  הלינק לא יצא מעתיד, אז תיוק אחרי אישור"],
-  ["נוהל, שלב 3", "הזמנת מסלקה מעתיד או מאלמגור, ואחר כך פתיחת תוכניות", "מסכים 11–12", "שונה לפי ההערה.  רק מאלמגור. מעתיד חסום"],
+  ["נוהל, שלב 3", "תיוק אוטומטי אם הלינק יצא מעתיד, אחרת תיוק ידני", "מסכים 6 ו־8", "שונה לפי ההערה. הלינק לא יצא מעתיד, אז תיוק אחרי אישור"],
+  ["נוהל, שלב 3", "הזמנת מסלקה מעתיד או מאלמגור, ואחר כך פתיחת תוכניות", "מסכים 11–12", "שונה לפי ההערה. רק מאלמגור. מעתיד חסום"],
   ["נוהל, שלב 4", "אחרי שכל המסמכים בתיק: פנייה, קביעה מיומן הסוכן, שליחה למייל", "מסכים 13–14", ""],
   ["נוהל, שלב 4", "צירוף דוחות והעתקי פוליסות בשמות שהסוכן מבין", "מסך 14", "השמות: מבטח ומספר פוליסה"],
-  ["נוהל, שלב 5", "וואטסאפ לפני הפגישה או X זמן לפני, עם תאריך, מקום וסוג", "מסך 15", "11.11.2026 16:00"],
+  ["נוהל, שלב 5", "וואטסאפ לפני הפגישה, עם תאריך, מקום וסוג", "מסך 15", "תזכורת נשלחת יום לפני, ב־16:00"],
   ["נוהל, לולאות", "עיכוב במילוי פרטים", "מסך 5", ""],
   ["נוהל, לולאות", "מסמך חתום חסר", "מסך 7", ""],
   ["נוהל, לולאות", "דחיית מועד", "מסך 13", ""],
-  ["הערה 1", "הודעת מעסיק גם מהנייד", "מסך 1", "הודעה 09:14, מלל וקובץ"],
+  ["הערה 1", "כל ההודעות מהנייד", "מסך 1", "הודעת הנייד 09:14 ראשונה, הערוץ הראשי. וריאציות המייל משניות"],
   ["הערה 2", "המעסיק לא שולח טפסים חתומים. המתאמת תמיד חותמת דרך פוליוויז להעתקי פוליסות", "מסכים 1, 2, 4", ""],
   ["הערה 3", "לינק ייפוי כוח רק מפוליוויז. העתקי פוליסות נסרקים לשדר", "מסכים 4 ו־9", ""],
   ["הערה 4", "הזמנת מסלקה רק מאלמגור, לא מעתיד", "מסך 11", ""],
   ["הערה 5", "שם קובץ: חברת הביטוח ומספר הפוליסה", "מסכים 9, 10, 14", ""],
   ["שקופית", "הקמת הלקוח בעתיד", "מסך 2", ""],
-  ["שקופית", "הפעלת פוליוויז ממערכת עתיד", "מסך 4", "שונה לפי ההערה.  חסום"],
-  ["שקופית", "הזמנת מסלקה אוטומטית במערכת עתיד", "מסך 11", "שונה לפי ההערה.  חסום"],
-  ["שקופית", "תיוק אוטומטי במערכת עתיד", "מסכים 2, 6, 8", "שונה לפי ההערה.  תיוק אחרי אישור"],
-  ["שקופית", "הקמת לקוח באלמגור כולל משפחה, ת״ז, אקסל והעתקי פוליסות", "מסכים 3 ו־10", "פיצול מכוון. בפתיחה משפחה ות״ז. אקסל והעתקים רק אחרי שקיימים"],
+  ["שקופית", "הפעלת פוליוויז ממערכת עתיד", "מסך 4", "שונה לפי ההערה. חסום"],
+  ["שקופית", "הזמנת מסלקה אוטומטית במערכת עתיד", "מסך 11", "שונה לפי ההערה. חסום"],
+  ["שקופית", "תיוק אוטומטי במערכת עתיד", "מסכים 2, 6, 8", "שונה לפי ההערה. תיוק אחרי אישור"],
+  ["שקופית", "הקמת לקוח באלמגור כולל משפחה, ת״ז, אקסל והעתקי פוליסות", "מסכים 3 ו־10", "בפתיחה משפחה ות״ז. אקסל והעתקים רק אחרי שקיימים"],
   ["שקופית", "הקמת תוכניות מקבצי מסלקה, ואם הלקוח לא קיים גם הקמתו", "מסך 12", "אורי כבר קיים, אז נפתחו תוכניות. ליה נחום הייתה נפתחת עם הקובץ"],
   ["שקופית", "שלוש הרשאות: מסלקה, הר הביטוח, העתקי פוליסות", "מסכים 4, 6, 7, 8", ""],
   ["שקופית", "תיוק כל הרשאה", "מסכים 6 ו־8", ""],
@@ -191,7 +190,7 @@ const APPENDIX = [
   ["שקופית", "צילום ת״ז ותיוק בעתיד", "מסכים 1 ו־2", "הצילום בהודעת הנייד של המעסיק, לא בהודעה נפרדת מהלקוח"],
   ["שקופית", "שדר: לקוח, משפחה ות״ז", "מסך 3", "אצווה 2026-10-08-014"],
   ["שקופית", "שדר: אקסל הר הביטוח והעתקי פוליסות", "מסך 10", ""],
-  ["שקופית", "קבצי טרום ייעוץ אחרי הזמנת המסלקה", "מסך 12", "הכינוי הישן מהשקופית לא מוצג. במסך הכותרת היא טרום ייעוץ"],
+  ["שקופית", "קבצי טרום ייעוץ אחרי הזמנת המסלקה", "מסך 12", "במסך הכותרת היא טרום ייעוץ"],
 ];
 
 const CSS = `
@@ -221,7 +220,7 @@ button{font-family:inherit}
 .proc h2{font-family:Heebo,Assistant,sans-serif;font-size:16px;margin:14px 0 6px;color:#fff}
 .proc ol{margin:6px 0 0;padding-right:18px}
 .proc li{margin:0 0 6px}
-.start{margin-top:16px;background:#152033;border:1px solid #3d5278;padding:16px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.start{margin-top:16px;background:#152033;border:1px solid #3d5278;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
 .start h2{margin:0 0 4px;font-size:18px;color:#fff}
 .start p{margin:0;color:#c5d4ea;font-size:14px}
 .note{font-size:13px;color:#9fb0cc;line-height:1.6}
@@ -268,30 +267,42 @@ tr.miss td{background:#f8f1f1;color:#6e2424}
 .fine{color:#5c574e;font-size:13px}
 .menu{display:flex;gap:14px;padding:4px 12px;border-bottom:1px solid #e4e0d8;font-size:13px;background:#faf9f6;color:#5c574e;flex-wrap:wrap}
 .msg{border:1px solid #d4d0c8;margin:0 0 10px}
+.msg.main{border:2px solid #1f4e79}
+.msg.main .mh{background:#e7eef8}
+.msg.sec{background:#faf9f6}
+.msg.sec .mh,.msg.sec .mb,.msg.sec .att{color:#5c574e}
+.chan{margin:2px 0 8px;font-size:12.5px;font-weight:700;color:#5c574e}
 .msg .mh{display:flex;justify-content:space-between;gap:8px;background:#f3f1ec;padding:6px 8px;font-size:13px;flex-wrap:wrap}
 .msg .mb{padding:8px 10px;font-size:14.5px}
 .att{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #e4e0d8;padding:6px 8px;font-size:13px;background:#faf9f6;flex-wrap:wrap}
-.wa .bar{font-size:13px;font-weight:700;margin-bottom:8px}
-.bub{background:#d9fdd3;border:1px solid #b7e2b0;padding:8px 10px;max-width:min(460px,100%);margin-inline-start:auto;font-size:14.5px;color:#111}
+.wa{margin:0 -14px -14px;background:#efeae2}
+.wah{display:flex;align-items:center;gap:10px;background:#f0f2f5;color:#111b21;padding:8px 12px;border-bottom:1px solid #e4e0d8}
+.ava{width:36px;height:36px;border-radius:50%;background:#dfe5e7;color:#3b4a54;display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 auto}
+.wmeta{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.wmeta b{font-size:15px}
+.wmeta .num{font-size:12.5px;color:#667781}
+.wdraft{margin-inline-start:auto;font-size:12px;font-weight:700;background:#fff;color:#075e54;border:1px solid #d4d0c8;padding:3px 8px;border-radius:999px}
+.bub{background:#d9fdd3;border:1px solid #b7e2b0;padding:8px 10px;max-width:min(460px,100%);margin:12px 14px 14px;margin-inline-start:auto;font-size:14.5px;color:#111;border-radius:8px 8px 8px 2px}
 .bub time{display:block;text-align:left;color:#3f3a33;font-size:12px;margin-top:4px}
 .cal{display:grid;grid-template-columns:repeat(5,minmax(68px,1fr));gap:6px;min-width:420px}
 .cal div{border:1px solid #e4e0d8;padding:6px;min-height:64px;font-size:13px;background:#fff}
 .cal .h{min-height:0;background:#f3f1ec;font-weight:700;border-color:#d4d0c8}
 .old{color:#6e2424;text-decoration:line-through}
 .neu{color:#1f4e79;font-weight:700}
-.pill2{margin:14px auto 4px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 14px;background:#f4f7fb;border:1px solid #c5d4ea;color:#13315c}
-.pill2 .ptx{flex:1 1 220px;min-width:0}
+.pill2{margin:14px auto 4px;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:12px 14px;background:#f4f7fb;border:1px solid #c5d4ea;color:#13315c}
+.pill2 .ptx{min-width:0}
 .pill2 small{display:block;font-size:12px;font-weight:700;color:#1f4e79;margin-bottom:2px}
 .pill2 b{display:block;font-size:15px;line-height:1.45;font-weight:700}
-.acts{display:flex;gap:8px;align-items:center}
-.doit{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 18px;border:1px solid #1f4e79;background:#1f4e79;color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+.acts{display:flex;gap:8px;align-items:center;justify-content:flex-start}
+.doit{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0;border:0;background:transparent;cursor:pointer;line-height:0}
+.doit img{height:44px;width:auto;display:block}
 .ghost{min-height:44px;padding:8px 12px;border:1px solid #c5d4ea;background:#fff;color:#1c2540;font-weight:700;font-size:14px;cursor:pointer}
 .doit:focus-visible,.ghost:focus-visible,.hd-btn:focus-visible,.cn2:focus-visible{outline:3px solid #7aa2d4;outline-offset:2px}
 @media(max-width:520px){
-  .pill2{position:sticky;bottom:0;z-index:20;flex:0 0 auto;height:auto;flex-direction:column;align-items:stretch;align-self:stretch;gap:8px;padding:10px 12px}
-  .pill2 .ptx{flex:0 0 auto}
+  .pill2{position:sticky;bottom:0;z-index:20;flex:0 0 auto;height:auto;align-self:stretch;padding:10px 12px}
   .acts{width:100%;flex:0 0 auto}
-  .doit,.ghost{flex:1 1 0;height:44px;min-height:44px}
+  .ghost{flex:1 1 auto;height:44px}
+  .doit{flex:0 0 auto}
 }
 .chain2{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;flex-wrap:wrap}
 .cn2{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:999px;background:#152033;color:#8fa3c8;border:1px solid #2a3d66;cursor:pointer}
@@ -318,6 +329,13 @@ tr.miss td{background:#f8f1f1;color:#6e2424}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 `;
 
+function DoIt(props) {
+  return (
+    <button type="button" className="doit" onClick={props.onClick} aria-label="Do It">
+      <img src="do-it-inline.png" alt="" width="95" height="44" />
+    </button>
+  );
+}
 function Field(props) {
   return (
     <div className={props.wide ? "form wide" : "form"}>
@@ -407,22 +425,23 @@ function Appendix() {
 function screenBody(step) {
   if (step === 1) return (
     <Win cls="ol" sys="דואר נכנס" sub={C.coord + " · 08.10.2026"} menu={["נכנס", "עובדים חדשים"]}>
-      <Mast sys="דואר נכנס" what={"שלוש הודעות מ" + C.hr + ", " + C.emp + ". אף אחת לא כוללת טופס חתום. הטיפול המוצע: " + C.who + ". " + C.q2 + " ו" + C.q3 + " נשארים בתור."} wait="אישור שזו הודעת עובד חדש, ושאורי הוא התיק שנפתח עכשיו" />
-      <article className="msg">
-        <div className="mh"><b>נייד · מבוטח אחד · מלל וקובץ</b><span className="num">08.10.2026 09:14</span></div>
+      <Mast sys="דואר נכנס" what={"הערוץ הראשי הוא הודעת הנייד מ" + C.hr + ", " + C.emp + ", על " + C.who + ". שתי הודעות המייל הן וריאציות משניות. אף אחת לא כוללת טופס חתום. " + C.q2 + " ו" + C.q3 + " נשארים בתור."} wait="אישור שזו הודעת עובד חדש, ושאורי הוא התיק שנפתח עכשיו" />
+      <article className="msg main">
+        <div className="mh"><b>נייד · הערוץ הראשי · מבוטח אחד · מלל וקובץ</b><span className="num">08.10.2026 09:14</span></div>
         <div className="mb">
           <div>מאת: {C.hr}, משאבי אנוש, {C.emp}</div>
           <p>היי {C.coord.split(" ")[0]}, עובד חדש להסדר.<br />{C.who}<br />ת״ז <span className="num">{C.id}</span><br />תחילת עבודה {C.start}<br />סוכן: {C.agent}<br />בת זוג: {C.spouse}, ת״ז <span className="num">{C.spouseId}</span><br />ילד: {C.child}, יליד {C.childBorn}<br />מצורף צילום תעודת זהות. אין טפסים חתומים.</p>
         </div>
         <div className="att"><span>מצורף</span><b>{C.who}.jpg · 1.8MB</b></div>
       </article>
-      <article className="msg">
-        <div className="mh"><b>מייל · מבוטח אחד · מלל בגוף, בלי קובץ</b><span className="num">08.10.2026 09:22</span></div>
+      <p className="chan">וריאציות מייל, משניות</p>
+      <article className="msg sec">
+        <div className="mh"><b>מייל · משני · מבוטח אחד · מלל בגוף, בלי קובץ</b><span className="num">08.10.2026 09:22</span></div>
         <div className="mb">נושא: עובד חדש — {C.who}. בגוף ההודעה בלבד: ת״ז <span className="num">{C.id}</span>, תחילה {C.start}, סוכן {C.agent}. אין צרופה.</div>
       </article>
-      <article className="msg">
-        <div className="mh"><b>מייל · רשימה בקובץ</b><span className="num">08.10.2026 09:31</span></div>
-        <div className="mb">נושא: עובדים חדשים לנובמבר. מצורף רשימת-עובדים.xlsx.</div>
+      <article className="msg sec">
+        <div className="mh"><b>מייל · משני · רשימה בקובץ</b><span className="num">08.10.2026 09:31</span></div>
+        <div className="mb">נושא: עובדים חדשים לנובמבר. מצורפת רשימת העובדים (xlsx).</div>
         <div className="tbl"><table>
           <thead><tr><th>שם</th><th>ת״ז</th><th>תחילה</th><th>סוכן</th><th>משפחה בהודעה</th></tr></thead>
           <tbody>
@@ -688,15 +707,27 @@ function screenBody(step) {
 
   if (step === 15) return (
     <Win cls="wa" sys="וואטסאפ" sub={"טיוטה אל " + C.who + " · לא נשלחה"}>
-      <Mast sys="וואטסאפ" what={"התזכורת נקבעה ליום שלפני הפגישה, " + C.remind + ". זו שעת ה־X שסוכמה בתיק. אחרי האישור זו שליחה בתוך ההדגמה, לא חיבור לוואטסאפ."} wait="אישור התזכורת" />
+      <Mast sys="וואטסאפ" what={"תזכורת נשלחת יום לפני, ב־16:00. כאן: " + C.remind + "."} wait="אישור התזכורת" />
       <div className="wa">
-        <div className="bar">{C.who}</div>
+        <div className="wah">
+          <span className="ava" aria-hidden="true">{C.first.slice(0, 1)}</span>
+          <span className="wmeta">
+            <b>{C.who}</b>
+            <span className="num">{C.phone}</span>
+          </span>
+          <span className="wdraft">טיוטה</span>
+        </div>
         <div className="bub">
-          שלום {C.first}, תזכורת: מחר {C.slot}, {C.room}. זו פגישת קליטה להסדר פנסיוני עם {C.agent}. נתראה.
-          <time>{C.remind} · טיוטה</time>
+          שלום {C.first},<br />
+          מחר, {C.slot}.<br />
+          פגישת קליטה להסדר פנסיוני עם {C.agent}.<br />
+          המקום: {C.room}.<br />
+          נא להביא תעודת זהות.<br />
+          נתראה,<br />
+          {C.coord.split(" ")[0]}
+          <time><span className="num">{C.remind}</span></time>
         </div>
       </div>
-      <p className="fine">אין בתיק מספר טלפון. המועד, המקום וסוג הפגישה כתובים בהודעה.</p>
     </Win>
   );
 
@@ -720,7 +751,6 @@ function screenBody(step) {
           <h3>מה נשאר אצל שירה</h3>
           <p>השיחה שמסבירה לאורי מה נדרש לפגישה.</p>
           <p>כל אישור לפני שליחה, תיוק, שידור וזימון. בלי האישור הרשומה נשארת טיוטה.</p>
-          <p>אין במסך חיבור חי למערכות.</p>
         </section>
       </div>
       <Win cls="log" sys="יומן הטיפול" sub={C.who + " · " + C.atid + " · " + C.alg}>
@@ -740,7 +770,6 @@ function screenBody(step) {
             <tr><td>ההפרש לעובד</td><td>כ־38 דק׳</td><td>המחשה. לא נמדד בסוכנות גבאי ולא הבטחה</td></tr>
           </tbody>
         </table></div>
-        <p className="fine">פריסה: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות. אין כאן SSO, אין יומן ביקורת, ואין חיבור אמיתי לעתיד, לאלמגור, לפוליוויז, ליומן או לוואטסאפ.</p>
       </Win>
     </div>
   );
@@ -781,7 +810,7 @@ function App() {
         {step === 0 ? (
           <div className="lc">
             <h1>Flow × {C.agency}</h1>
-            <p className="lead">Flow לומד את נוהל תאום הפגישה לעובד חדש, מכין את הרשומה במערכות הסוכנות, ועוצר לפני כל שליחה, חתימה וזימון. {C.coord} מאשרת בכפתור אישור. בלי האישור הרשומה נשארת טיוטה.</p>
+            <p className="lead">Flow לומד את נוהל תיאום הפגישה לעובד חדש, מכין את הרשומה במערכות הסוכנות, ועוצר לפני כל שליחה, חתימה וזימון. {C.coord} מאשרת ב־Do It. בלי הלחיצה הרשומה נשארת טיוטה.</p>
             <div className="method" aria-label="איך Flow עובד">
               <span className="mstep"><i>1</i>מזהה את הכוונה</span>
               <span className="marr">←</span>
@@ -799,29 +828,29 @@ function App() {
             </div>
             <div className="start">
               <div>
-                <h2>תאום פגישה לעובד חדש</h2>
+                <h2>תיאום פגישה לעובד חדש</h2>
                 <p>{C.coord} · {C.who} · עתיד, אלמגור, פוליוויז, יומן ווואטסאפ</p>
               </div>
-              <button type="button" className="doit" onClick={function () { go(1); }}>אישור</button>
+              <DoIt onClick={function () { go(1); }} />
             </div>
             <div className="proc">
               <h2>נוהל הטיפול</h2>
               <ol>
-                <li>הודעה מהמעסיק: מהנייד או מהמייל, בגוף ההודעה או כקובץ, על אדם אחד או על רשימה.</li>
+                <li>הודעה מהמעסיק: הנייד הוא הערוץ הראשי. וריאציות מייל משניות, בגוף ההודעה או כקובץ, על אדם אחד או על רשימה.</li>
                 <li>פתיחה בעתיד, תיוק צילום ת״ז, ושדר לאלמגור עם המשפחה. אין טפסים חתומים מהמעסיק.</li>
                 <li>שלוש הרשאות נחתמות רק דרך פוליוויז: מסלקה, הר הביטוח, העתקי פוליסות. הלינק לא יוצא מעתיד.</li>
                 <li>העתקי הפוליסות נסרקים לשדר. שם הקובץ: חברת הביטוח ומספר הפוליסה.</li>
                 <li>הזמנת המסלקה מאלמגור בלבד. הקבצים פותחים את התוכניות, ואם הלקוח חסר — גם אותו. נוספים קבצי טרום ייעוץ.</li>
-                <li>כשהתיק מלא: זימון מיומן הסוכן אל מייל הלקוח, עם הקבצים בשמם. תזכורת בוואטסאפ יום לפני, או X זמן לפני.</li>
+                <li>כשהתיק מלא: זימון מיומן הסוכן אל מייל הלקוח, עם הקבצים בשמם. תזכורת בוואטסאפ נשלחת יום לפני, ב־16:00.</li>
               </ol>
             </div>
-            <p className="note">פריסה אפשרית: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות. אין במסך הזה SSO ואין יומן ביקורת. הזמנים ביומן הטיפול הם המחשה, לא מדידה. השמות בדויים, ואין בתיק מספר טלפון.</p>
+            <p className="note">פריסה: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות.</p>
           </div>
         ) : (
           <div className="stage">
             <div className="wf-top">
               <div>
-                <div className="wf-cat">תאום פגישה לעובד חדש · מסך {step} מתוך {LAST}</div>
+                <div className="wf-cat">תיאום פגישה לעובד חדש · מסך {step} מתוך {LAST}</div>
                 <h1>{STEPS[step - 1].t}</h1>
               </div>
               <div className="persona">{C.coord} · מתאמת · {C.who}</div>
@@ -833,7 +862,7 @@ function App() {
                 <div className="ptx"><small>Flow זיהה</small><b>{WAITS[step]}</b></div>
                 <div className="acts">
                   <button type="button" className="ghost" onClick={back}>מסך קודם</button>
-                  <button type="button" className="doit" onClick={next}>אישור</button>
+                  <DoIt onClick={next} />
                 </div>
               </div>
             ) : (
