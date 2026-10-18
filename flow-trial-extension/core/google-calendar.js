@@ -354,14 +354,12 @@ const FlowGoogleCalendar = (() => {
     // An event Google had not shown back yet is deleted by its id, with no
     // content check: Glance made it moments ago and nothing was verified.
     if (ref && typeof ref === 'object' && ref.unverified === true && !ref.contentHash) {
-      const seen = await readBack(http, id);
-      if (seen.status === 401 || seen.status === 403) return { ok: false, reason: 'not-connected' };
-      if (seen.status === 404 || seen.status === 410) return { ok: true, written: 'Calendar event removed.' };
-      if (!seen.ok) return { ok: false, reason: 'http-' + seen.status };
-      const gone = await call(http, req);
+      const gone = await call(http, Object.assign({}, req, { unverifiedUndo: true }));
       if (gone.status === 401 || gone.status === 403) return { ok: false, reason: 'not-connected' };
-      if (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410) return { ok: true, written: 'Calendar event removed.' };
-      return { ok: false, reason: 'http-' + gone.status };
+      if (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410) {
+        return { ok: true, written: 'Calendar event removed.' };
+      }
+      return { ok: false, reason: UNVERIFIED, error: 'Not verified — Google has not returned the event yet. It stays, and Undo removes it.' };
     }
     if (!ref || typeof ref !== 'object' || !ref.contentHash) return unconfirmedUndo();
     const got = await call(http, { method: 'GET', url: eventUrl(id) });

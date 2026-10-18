@@ -169,14 +169,12 @@ const FlowGoogleTasks = (() => {
     const req = undoRequest(listId, taskId);
     if (!req) return { ok: false };
     if (ref && ref.unverified === true && !ref.contentHash) {
-      const seen = await readBack(http, listId, taskId);
-      if (seen.status === 401 || seen.status === 403) return { ok: false, reason: 'not-connected' };
-      if (seen.status === 404 || seen.status === 410) return { ok: true, written: 'Google Task removed.' };
-      if (!seen.ok) return { ok: false, reason: 'http-' + seen.status };
-      const gone = await call(http, req);
+      const gone = await call(http, Object.assign({}, req, { unverifiedUndo: true }));
       if (gone.status === 401 || gone.status === 403) return { ok: false, reason: 'not-connected' };
-      if (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410) return { ok: true, written: 'Google Task removed.' };
-      return { ok: false, reason: 'http-' + gone.status };
+      if (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410) {
+        return { ok: true, written: 'Google Task removed.' };
+      }
+      return { ok: false, reason: 'unverified', error: 'Not verified — Google has not returned the task yet. It stays, and Undo removes it.' };
     }
     if (!ref || !ref.contentHash) return unconfirmedUndo();
     const got = await call(http, { method: 'GET', url: taskUrl(listId, taskId) });

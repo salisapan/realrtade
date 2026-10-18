@@ -2199,10 +2199,30 @@ async function rememberGoogleAuthResult(res) {
 // options.soft marks a best-effort read (a thread lookup, a probe). Its 401
 // or 403 is that call's own answer: the token is kept, Reconnect is not
 // flagged, and nothing is refreshed. Only a write path can end the grant.
+async function googleConsentRevokedBlocksWrite() {
+  try {
+    const bag = await chrome.storage.local.get([
+      GOOGLE_RECONNECT_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY
+    ]);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    if (!flag || !flag.needed || !googleHadAccount(bag)) return false;
+    const r = String(flag.reason || '');
+    return r === 'revoked' || r === '401' || r === 'not signed in' || r === 'missing scope';
+  } catch (e) {
+    return false;
+  }
+}
+
 async function googleAuthedFetch(baseUrl, path, rawOptions) {
   const soft = !!(rawOptions && rawOptions.soft === true);
   const options = rawOptions ? Object.assign({}, rawOptions) : rawOptions;
   if (options) delete options.soft;
+  const method = String((options && options.method) || 'GET').toUpperCase();
+  const isWrite = method !== 'GET' && method !== 'HEAD';
+  if (!soft && isWrite && await googleConsentRevokedBlocksWrite()) return googleAuthUnavailableResponse();
   let cred;
   try {
     cred = await getGoogleAccessToken(false);
@@ -2269,12 +2289,12 @@ async function connectGoogleTasks(interactive, preset) {
   // web-flow consent window. Later API calls stay silent.
   const cred = preset || await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
+  await clearGoogleReconnect();
   const taskListId = await findGlanceTaskList();
   await chrome.storage.local.set({
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
   });
-  await clearGoogleReconnect();
   return true;
 }
 

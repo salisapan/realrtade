@@ -84,6 +84,24 @@ test.describe('1. a single 401 on a write', () => {
     expect(posts).toHaveLength(2);
   });
 
+  test('when consent is dropped, a Chrome token does not write and the flow stops at Reconnect', async ({ glance }) => {
+    await glance.seedGmail({ googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
+    server.registerToken('ya29.chrome', SELF);
+    await glance.evaluateWorker(() => {
+      globalThis.__glanceE2e.identityToken = 'ya29.chrome';
+      globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).';
+    });
+    server.rejectAuth('/calendar/v3/calendars/primary/events');
+    const page = await glance.openGmail(opts('revoked-chrome', 'en'));
+    await click(page);
+    await expect(main(page)).toContainText(/Reconnect|Not closed|not signed/i, { timeout: 25000 });
+    await expect(page.locator('div[role="main"] .flow-chip-done-icon')).toHaveCount(0);
+    expect(eventIds()).toHaveLength(0);
+    expect(taskIds()).toHaveLength(0);
+    const stored = await glance.storage();
+    expect(stored.googleReconnect && stored.googleReconnect.needed).toBe(true);
+  });
+
   test('a refresh that fails with invalid_grant drops the consent', async ({ glance }) => {
     await glance.seedGmail({});
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).'; });
@@ -128,6 +146,22 @@ test.describe('2. a read-back that lags', () => {
     await page.locator('div[role="main"] button.flow-chip-undo').click();
     await expect.poll(() => eventIds().length + taskIds().length, { timeout: 15000 }).toBe(0);
     expect(server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/events/' + id) >= 0)).toBe(true);
+  });
+
+  test('when read-backs stay 404 forever, Undo still DELETEs by id and does not claim removal without DELETE', async ({ glance }) => {
+    await glance.seedGmail({});
+    server.lagGets('/calendar/v3/calendars/primary/events/', 20);
+    const page = await glance.openGmail(opts('lag-forever', 'en'));
+    await click(page);
+    await expect(main(page)).toContainText('Not verified', { timeout: 30000 });
+    const id = eventIds()[0];
+    expect(id).toBeTruthy();
+    const getsBefore = server.calls.filter((c) => c.method === 'GET' && c.path.indexOf('/events/' + id) >= 0).length;
+    await page.locator('div[role="main"] button.flow-chip-undo').click();
+    await expect.poll(() => eventIds().length, { timeout: 15000 }).toBe(0);
+    const deletes = server.calls.filter((c) => c.method === 'DELETE' && c.path.indexOf('/events/' + id) >= 0);
+    expect(deletes.length).toBeGreaterThan(0);
+    expect(getsBefore).toBeGreaterThan(0);
   });
 
   test('the same in the Hebrew UI says לא אומת, and a reopen reads Google again and then verifies', async ({ glance }) => {
@@ -401,6 +435,19 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(chip(page)).toHaveCount(1);
   });
 
+  test('details open with a collapsed To line and Cc only: the labelled table wins and no card is shown', async ({ glance }) => {
+    await glance.seedGmail({});
+    const page = await glance.openGmail(Object.assign(opts('cc-collapsed', 'en', {
+      body: 'Can you send me the report',
+      to: [SELF, 'yossi@acme.io'],
+      cc: undefined
+    }), {
+      detailsTable: { expanded: true, hebrew: false, bidi: false, to: ['yossi@acme.io'], cc: [SELF] }
+    }));
+    await page.waitForTimeout(2500);
+    await expect(chip(page)).toHaveCount(0);
+  });
+
   ASKS.forEach(([body, lang], i) => {
     [['no name', undefined], ['named', 'Sali']].forEach(([label, name]) => {
       test('details open, Cc only, ' + label + ': "' + body + '" gets no chip', async ({ glance }) => {
@@ -411,6 +458,19 @@ test.describe('4. copied only: no card of any kind', () => {
         await expect(main(page).locator('.flow-chip, [class*="flow-card"], [data-flow-card]')).toHaveCount(0);
       });
     });
+  });
+});
+
+test.describe('4b. no tab account and no stored profile', () => {
+  test('shows a Reconnect row instead of waiting for a name, and writes nothing', async ({ glance }) => {
+    await glance.seedGmail({ glanceUiLanguage: 'he' });
+    const page = await glance.openGmail(Object.assign(opts('norec-notab', 'he'), { omitAccount: true, titleEmail: 'Gmail' }));
+    await page.waitForTimeout(3000);
+    await expect(main(page)).toContainText('לא הצלחתי לאמת את החשבון — יש להתחבר מחדש');
+    await expect(main(page)).not.toContainText('ממתין לשם');
+    await expect(page.locator('button.flow-chip-reconnect')).toHaveCount(1);
+    await expect(chip(page)).toHaveCount(0);
+    expect(eventIds()).toHaveLength(0);
   });
 });
 

@@ -259,13 +259,13 @@ test('a supplier address in the subject is not self when only the account button
   await expect(card).toHaveCount(0);
 });
 
-test('no stored address and no account button is names-pending, not self', async ({ glance }) => {
+test('no stored address and no account button shows Reconnect, not self', async ({ glance }) => {
   await glance.seedGmail();
   const page = await glance.openGmail({
     messageId: 'm-supplier-none',
     threadId: 't-supplier-none',
     subject: 'Invoice from ' + SUPPLIER,
-    titleEmail: SUPPLIER,
+    titleEmail: 'Gmail',
     senderEmail: SUPPLIER,
     senderName: 'Billing',
     ownEmail: SELF,
@@ -275,5 +275,6 @@ test('no stored address and no account button is names-pending, not self', async
   });
   const host = page.locator('[data-legacy-message-id="m-supplier-none"]');
   await expect(host.locator('.flow-chip-host')).toHaveCount(0);
-  await expect(host.locator('.flow-why-not')).toHaveText('Waiting for your name');
+  await expect(host.locator('.flow-why-not')).toContainText(/verify the account|לא הצלחתי לאמת/);
+  await expect(host.locator('button.flow-chip-reconnect')).toHaveCount(1);
 });

@@ -807,6 +807,59 @@ function glanceUiCopy(kind) {
     return word === 'cc' || word === 'עותק' ? 'cc' : 'bcc';
   }
 
+  function normalizeAudienceLabel(text) {
+    return String(text || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().toLowerCase().replace(/:+$/, '');
+  }
+
+  // Gmail's details table is the source of truth when it is open: labelled
+  // אל:/עותק:/to:/cc: rows only. The collapsed summary line and the sender
+  // row are not recipients.
+  function audienceFromDetailsTable(messageNode, ownEmail, senderEmail) {
+    const lists = { to: [], cc: [], bcc: [] };
+    let userName = '';
+    if (!messageNode || !messageNode.querySelectorAll) return null;
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    const add = (bucket, email) => {
+      const clean = String(email || '').trim().toLowerCase();
+      if (!clean || clean.indexOf('@') < 0 || !bucket || bucket.indexOf(clean) >= 0) return;
+      if (from && clean === from) return;
+      bucket.push(clean);
+    };
+    const tables = messageNode.querySelectorAll('table.ajB, table[role="presentation"]');
+    let labelled = false;
+    for (let t = 0; t < tables.length; t++) {
+      const rows = tables[t].querySelectorAll('tr');
+      for (let r = 0; r < rows.length; r++) {
+        const cells = rows[r].querySelectorAll('td');
+        if (cells.length < 2) continue;
+        const label = normalizeAudienceLabel(cells[0].textContent);
+        if (!label || label === 'from' || label === 'מאת') continue;
+        let bucket = null;
+        if (label === 'to' || label === 'אל') bucket = lists.to;
+        else if (label === 'cc' || label === 'עותק') bucket = lists.cc;
+        else if (label === 'bcc' || label.indexOf('עותק מוסתר') >= 0) bucket = lists.bcc;
+        else continue;
+        labelled = true;
+        const cell = cells[1];
+        cell.querySelectorAll('[email]').forEach((n) => {
+          const email = addressFrom(n).toLowerCase();
+          const shown = String(n.textContent || '').trim().toLowerCase();
+          if (email && email.indexOf('@') >= 0) add(bucket, email);
+          else if (own && (shown === 'me' || shown === 'אני' || shown === 'אליי')) add(bucket, own);
+        });
+      }
+    }
+    if (!labelled) return null;
+    const mine = messageNode.querySelectorAll('[email]');
+    for (let i = 0; i < mine.length; i++) {
+      if (String(mine[i].textContent || '').trim() !== 'me') continue;
+      const name = String(mine[i].getAttribute('name') || '').trim();
+      if (name && name.toLowerCase() !== 'me') userName = name;
+    }
+    return { to: lists.to, cc: lists.cc, userName: userName, labelled: true };
+  }
+
   function inMessageBody(n) {
     return !!(n.closest && n.closest(BODY_SELECTOR + ', ' + QUOTE_CONTAINER_SELECTOR));
   }
@@ -819,6 +872,8 @@ function glanceUiCopy(kind) {
     const own = String(ownEmail || '').trim().toLowerCase();
     const sender = extractSender(messageNode);
     const senderEmail = String((sender && sender.email) || '').trim().toLowerCase();
+    const tableAud = audienceFromDetailsTable(messageNode, ownEmail, senderEmail);
+    if (tableAud) return tableAud;
     const add = (bucket, email) => {
       const clean = String(email || '').trim().toLowerCase();
       if (!clean || clean.indexOf('@') < 0 || !bucket || bucket.indexOf(clean) >= 0) return;
@@ -830,6 +885,7 @@ function glanceUiCopy(kind) {
       if (inMessageBody(n)) continue;
       const t = String(n.textContent || '').replace(/[\u00a0\u202f\u200e\u200f]+/g, ' ').replace(/\s+/g, ' ').trim();
       if (!t || t.length > 400) continue;
+      if (/^(from|מאת)(?=$|[\s:,;])/i.test(t)) continue;
       const head = t.match(/^(to|cc|bcc|אל|עותק(?: מוסתר)?)(?=$|[\s:,;])/i);
       if (!head) continue;
       let current = lists[audienceBucketFor(head[1].replace(/ מוסתר$/, ''))] || lists.to;
@@ -856,7 +912,7 @@ function glanceUiCopy(kind) {
           const shown = String(node.textContent || '').trim().toLowerCase();
           if (email && email.indexOf('@') >= 0) {
             if (!taken.has(node) && email !== senderEmail) add(current, email);
-            else if (email === senderEmail && own && email === own && (shown === 'me' || shown === 'אני')) add(current, email);
+            else if (email !== senderEmail && own && email === own && (shown === 'me' || shown === 'אני')) add(current, email);
           } else if (own && node.children && node.children.length === 0 && (shown === 'me' || shown === 'אני' || shown === 'אליי')) {
             add(current, own);
           }
@@ -1118,6 +1174,11 @@ function glanceUiCopy(kind) {
     return h ? h.textContent.trim() : '';
   }
 
+  function ownEmailFromTitle() {
+    const m = String(document.title || '').match(/Inbox\s*-\s*([^-\n]+?)\s*-\s*Gmail/i);
+    return m ? emailish(m[1]) : '';
+  }
+
   // Multiple Google accounts can each have Gmail open in their own /mail/u/N/
   // tab — the own-email cache below is kept per account index so switching
   // tabs never reads (or overwrites) another account's cached address.
@@ -1281,7 +1342,6 @@ function glanceUiCopy(kind) {
   const copiedWatchers = new WeakMap();
   function watchCopiedOnly(message, messageId, text, ownEmail, audience) {
     if (!message || typeof MutationObserver === 'undefined' || copiedWatchers.has(message)) return;
-    if (audience && ((audience.to || []).length || (audience.cc || []).length)) return;
     let timer = null;
     const stop = () => {
       const w = copiedWatchers.get(message);
@@ -1292,9 +1352,14 @@ function glanceUiCopy(kind) {
     const check = () => {
       if (!message.isConnected || !message.querySelector('.flow-chip-host')) { stop(); return; }
       const aud = audienceOf(message, ownEmail);
-      if (!(aud.to || []).length && !(aud.cc || []).length) return;
-      stop();
-      if (copiedOnlyNow(message, text, ownEmail)) withdrawOffer(message, messageId);
+      if (!copiedOnlyNow(message, text, ownEmail)) return;
+      // Withdraw only on a labelled details table, or while the header is
+      // still empty and a late paint may arrive. A collapsed To line alone is
+      // not enough to pull back a card that was already offered.
+      if (aud.labelled || (!(aud.to || []).length && !(aud.cc || []).length)) {
+        withdrawOffer(message, messageId);
+        stop();
+      }
     };
     const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(check, 80); });
     observer.observe(message, { childList: true, subtree: true, characterData: true });
@@ -1506,23 +1571,28 @@ function glanceUiCopy(kind) {
     // sender, and the note is the ask (a file on your calendar, a hold).
     // A message you sent to someone else still stays quiet.
     const storedOwn = await readStoredOwnEmail();
+    const cachedOwn = await getCachedOwnEmail();
     if (!chromeLive()) return;
     // The account button is this tab. userinfo is one address for the
     // whole extension, so it is used only when this tab has no button.
     // A stored address is not replaced by the other account.
     const buttonOwn = ownEmailFromThread() || '';
-    let ownEmail = buttonOwn || storedOwn || '';
+    let ownEmail = buttonOwn || storedOwn || cachedOwn || '';
+    if (!ownEmail) {
+      const titleOwn = ownEmailFromTitle();
+      if (titleOwn) ownEmail = titleOwn;
+    }
     if (buttonOwn) lastOwnEmail = buttonOwn;
     if (!storedOwn && ownEmail) rememberOwnEmail(ownEmail);
     if (!chromeLive()) return;
-    // No account button and no stored userinfo or openid email. That is
-    // names-pending. It is not a self task, and the page title is not used.
+    // No account button and no stored userinfo or openid email. Nothing can be
+    // verified or written; offer Reconnect instead of waiting for a name.
     if (!ownEmail) {
       const pending = messages[messages.length - 1];
       if (pending && pending.getAttribute && pending.getAttribute('data-glance-names') === 'pending') return;
       const stablePending = pending ? stableMessageKey(pending) : null;
       if (pending && pending.setAttribute) pending.setAttribute('data-glance-names', 'pending');
-      paintNamesPending(pending, stablePending && stablePending.messageId, currentSubject());
+      paintAccountReconnectRow(pending, stablePending && stablePending.messageId, currentSubject());
       armNamesHold();
       return;
     }
@@ -2660,6 +2730,42 @@ function glanceUiCopy(kind) {
     line.className = 'flow-why-not';
     line.textContent = text;
     line.setAttribute('data-glance-why', reason || 'names-pending');
+  }
+
+  function paintAccountReconnectRow(messageNode, messageId, subject) {
+    if (!messageNode) return;
+    const he = glanceUiHebrew();
+    const line = he ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.";
+    paintGmailWhy(messageNode, 'account-unverified', line);
+    if (messageNode.querySelector('.flow-chip-reconnect')) return;
+    const btn = el('button', 'flow-chip-reconnect', glanceShow(glanceUiCopy('reconnect')));
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      btn.textContent = he ? 'מתחבר…' : 'Connecting…';
+      sendRuntime({ type: 'flow:google-reconnect', account: '' }).then((res) => {
+        if (res && res.ok) {
+          btn.remove();
+          paintGmailWhy(messageNode, 'account-unverified', he ? 'החיבור התחדש. רענן Gmail.' : 'Reconnected. Refresh Gmail.');
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = glanceShow(glanceUiCopy('reconnect'));
+      }).catch(() => {
+        btn.disabled = false;
+        btn.textContent = glanceShow(glanceUiCopy('reconnect'));
+      });
+    });
+    messageNode.appendChild(btn);
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.set({
+      glanceWhyCurrent: {
+        reason: 'account-unverified',
+        subject: subject || '',
+        messageId: messageId || null,
+        at: Date.now()
+      }
+    }).catch(() => {});
   }
 
   function paintNamesPending(messageNode, messageId, subject) {

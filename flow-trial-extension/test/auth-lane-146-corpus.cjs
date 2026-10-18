@@ -321,6 +321,7 @@ async function main() {
   check('a 401 after a successful Connect is Reconnect', again && again.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && againView.needsReconnect === true && againView.label === 'Reconnect Google', { again, againView });
 
   console.log('\n--- Hebrew refusal ---\n');
+  delete stored.googleReconnect;
   stored.googleWebAuth = { accessToken: STORED, expiresAt: Date.now() + 60 * 60 * 1000 };
   sandbox.fetch = async () => jsonResponse(200, { id: 'file-he', modifiedTime: '2026-10-15T00:00:00.000Z' });
   sandbox.chrome.i18n.getUILanguage = () => 'he';

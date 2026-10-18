@@ -124,7 +124,25 @@ async function recordConnectedAccount(token, source) {
   return email;
 }
 
+async function consentRevokedBlocksLane() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return false;
+    const bag = await chrome.storage.local.get([RECONNECT_KEY, EVER_KEY, 'googleTasksAuth', 'googleWebAuth', 'glanceLaneUndo']);
+    const flag = bag && bag[RECONNECT_KEY];
+    if (!flag || !flag.needed || !priorGoogleRecord(bag)) return false;
+    const r = String(flag.reason || '');
+    return r === 'revoked' || r === '401' || r === 'not signed in' || r === 'missing scope';
+  } catch (e) {
+    return false;
+  }
+}
+
 async function laneCredential(tab) {
+  if (await consentRevokedBlocksLane()) {
+    const connected = await readConnectedAccount();
+    const want = Account().norm(tab) || connected;
+    return { ok: false, reason: 'no-token', connected: connected, tab: want, found: [], consentRevoked: true };
+  }
   const A = Account();
   const connected = await readConnectedAccount();
   const stored = await storedConnectToken();
@@ -353,11 +371,12 @@ function laneHttp(req) {
       const token = picked.ok ? picked.token : '';
       const cred = token ? { token: token, source: picked.source } : null;
       if (!token) return noteGoogleAuthFailure('not signed in').then(() => ({ status: 401, ok: false, json: null }));
-      if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate)) {
+      const trashGate = gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate) && !request.unverifiedUndo;
+      if (trashGate) {
         return { status: 0, ok: false, json: null };
       }
       const send = (signal) => {
-        if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate)) {
+        if (gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate) && !request.unverifiedUndo) {
           return Promise.resolve({ status: 0, ok: false, json: null });
         }
         const once = (bearer) => {
@@ -522,6 +541,17 @@ async function guardedWrite(connectorId, input, ctx) {
   const c = ctx || {};
   activeTab = c.tab || '';
   const picked = await laneCredential(c.tab);
+  if (!picked.ok && picked.consentRevoked) {
+    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => ({
+      ok: false,
+      reason: 'not-connected',
+      needsReconnect: true,
+      reconnectLabel: reconnectWords(),
+      error: statusLanguage() === 'he' ? 'חבר מחדש את Google כדי להמשיך.' : 'Reconnect Google to continue.',
+      written: '',
+      proof: null
+    }));
+  }
   if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
   const result = await writeWithListRecovery(connectorId, input, picked.ok ? picked : null);
   if (result && picked.ok && result.ok !== undefined) result.account = picked.email;
@@ -532,6 +562,15 @@ async function guardedUndo(connectorId, ref, ctx) {
   const c = ctx || {};
   activeTab = c.tab || '';
   const picked = await laneCredential(c.tab);
+  if (!picked.ok && picked.consentRevoked) {
+    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => ({
+      ok: false,
+      reason: 'not-connected',
+      needsReconnect: true,
+      reconnectLabel: reconnectWords(),
+      proof: null
+    }));
+  }
   if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
   const prepared = await prepareUndo(connectorId, ref);
   return Lane.undo(connectorId, prepared);
