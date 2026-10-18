@@ -492,25 +492,30 @@
     };
   }
 
+  function firstCloseCopy() {
+    return FlowFirstClose.copy(uiLang());
+  }
+
   function paintFirstCloseReceipt(host, found) {
+    const C = firstCloseCopy();
     host.replaceChildren();
     if (found.undone) {
-      host.appendChild(el('p', 'log-label', 'Undone.'));
-      host.appendChild(el('p', 'hint', 'The task is no longer on your list.'));
+      host.appendChild(el('p', 'log-label', C.undone));
+      host.appendChild(el('p', 'hint', C.undoneLine));
       return;
     }
     const row = found.row;
-    host.appendChild(el('p', 'log-label', 'Handled.'));
-    host.appendChild(el('p', 'hint', row.closedLine || row.writtenLine || 'Logged and tracked.'));
-    const undo = el('button', 'ghost sm', 'Undo');
+    host.appendChild(el('p', 'log-label', C.handled));
+    host.appendChild(el('p', 'hint', uiLang() === 'he' ? C.handledLine : (row.closedLine || row.writtenLine || C.handledLine)));
+    const undo = el('button', 'ghost sm', C.undo);
     undo.type = 'button';
     undo.addEventListener('click', async () => {
       undo.disabled = true;
       const res = await send({ type: 'flow:undo-action', connectorId: row.connectorId || 'googleTask', ref: row.ref });
       if (!res || !res.ok) {
         undo.disabled = false;
-        undo.textContent = 'Undo';
-        host.appendChild(el('p', 'hint', 'Undo did not finish. The task is still there.'));
+        undo.textContent = C.undo;
+        host.appendChild(el('p', 'hint', C.undoFailed));
         return;
       }
       if (typeof FlowStorage.markGoogleTaskUndone === 'function') {
@@ -526,18 +531,19 @@
   }
 
   async function closeFirstSession(entry, step, button) {
+    const C = firstCloseCopy();
     button.disabled = true;
     const label = button.querySelector && button.querySelector('.btn-label');
-    if (label) label.textContent = 'Closing…';
+    if (label) label.textContent = C.closing;
     const result = await send({ type: 'flow:execute-action', payload: taskWritePayload(entry, step) });
     const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
       ? FlowProofOfClose.allowsHandled({ ok: !!(result && result.ok), proof: result && result.proof })
       : false;
     if (!proved) {
       button.disabled = false;
-      if (label) label.textContent = 'Do It';
+      if (label) label.textContent = C.doIt;
       const host = document.getElementById('firstCloseCard');
-      if (host) host.appendChild(el('p', 'hint', 'This stays open. The task was not confirmed.'));
+      if (host) host.appendChild(el('p', 'hint', C.notConfirmed));
       return;
     }
     const fields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.receiptLogFields)
@@ -584,6 +590,9 @@
     const hint = document.getElementById('firstCloseHint');
     const host = document.getElementById('firstCloseCard');
     if (!block || !hint || !host) return;
+    const C = typeof FlowFirstClose !== 'undefined' ? firstCloseCopy() : null;
+    const title = document.getElementById('firstCloseTitle');
+    if (title && C) title.textContent = C.title;
     if (typeof FlowFirstClose === 'undefined' || typeof FlowStorage === 'undefined' || typeof FlowStorage.candidatesFromState !== 'function') {
       block.hidden = true;
       return;
@@ -600,7 +609,7 @@
     const source = googleOn ? 'google' : (outlookOn ? 'outlook' : null);
     if (firstCloseView) {
       block.hidden = false;
-      hint.textContent = firstCloseView.undone ? '' : 'Undo removes the task.';
+      hint.textContent = firstCloseView.undone ? '' : C.handledHint;
       paintFirstCloseReceipt(host, firstCloseView);
       const note = document.getElementById('saved-note');
       if (note) note.hidden = true;
@@ -624,11 +633,11 @@
     });
     if (!chosen) { block.hidden = true; return; }
     block.hidden = false;
-    hint.textContent = 'One click. Read back before it counts. Undo removes it. Nothing is sent.';
+    hint.textContent = C.offerHint;
     host.replaceChildren();
-    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(chosen.entry)) || '';
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(chosen.entry, Date.now(), uiLang())) || '';
     if (why) host.appendChild(el('p', 'log-label', why));
-    const btn = primaryButton('Do It');
+    const btn = primaryButton(C.doIt);
     btn.addEventListener('click', () => { closeFirstSession(chosen.entry, chosen.step, btn); });
     host.appendChild(btn);
     if (chosen.entry.messageId) {

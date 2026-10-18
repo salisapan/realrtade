@@ -66,7 +66,45 @@ const FlowFirstClose = (() => {
     return null;
   }
 
-  return { WINDOW_MS: WINDOW_MS, pick: pick, safeStep: safeStep };
+  // Panel chrome for the one offer. The popup is Hebrew by default, so the
+  // card follows the UI language the host passes in; any other value reads
+  // as English. The mail's own sentence (the why line) is built elsewhere.
+  const COPY = {
+    en: {
+      title: 'One close',
+      offerHint: 'One click. Read back before it counts. Undo removes it. Nothing is sent.',
+      handledHint: 'Undo removes the task.',
+      doIt: 'Do It',
+      closing: 'Closing…',
+      handled: 'Handled.',
+      handledLine: 'Logged and tracked.',
+      undo: 'Undo',
+      undone: 'Undone.',
+      undoneLine: 'The task is no longer on your list.',
+      undoFailed: 'Undo did not finish. The task is still there.',
+      notConfirmed: 'This stays open. The task was not confirmed.'
+    },
+    he: {
+      title: 'סגירה אחת',
+      offerHint: 'לחיצה אחת. נקרא בחזרה לפני שזה נספר. ביטול מסיר. שום דבר לא נשלח.',
+      handledHint: 'ביטול מסיר את המשימה.',
+      doIt: 'בצע',
+      closing: 'סוגר…',
+      handled: 'טופל.',
+      handledLine: 'נרשם ונעקב.',
+      undo: 'בטל',
+      undone: 'בוטל.',
+      undoneLine: 'המשימה כבר לא ברשימה שלך.',
+      undoFailed: 'הביטול לא הושלם. המשימה עדיין שם.',
+      notConfirmed: 'זה נשאר פתוח. המשימה לא אומתה.'
+    }
+  };
+
+  function copy(lang) {
+    return lang === 'he' ? COPY.he : COPY.en;
+  }
+
+  return { WINDOW_MS: WINDOW_MS, pick: pick, safeStep: safeStep, copy: copy };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowFirstClose };

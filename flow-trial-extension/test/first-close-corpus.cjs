@@ -107,6 +107,27 @@ console.log('\n--- first close: silence after the first real close, and the wron
   check('a task that still has to look up a file is 0 offers', offer([file]) === null);
 }
 
+console.log('\n--- first close: the card speaks the UI language ---');
+{
+  const he = FlowFirstClose.copy('he');
+  const en = FlowFirstClose.copy('en');
+  const latin = (t) => (String(t).match(/[A-Za-z][A-Za-z'’]{1,}/g) || []);
+  const hebrew = (t) => /[\u0590-\u05FF]/.test(String(t));
+  const keys = Object.keys(en);
+  check('he and en carry the same keys', JSON.stringify(Object.keys(he)) === JSON.stringify(keys), Object.keys(he));
+  check('every Hebrew line is non-empty and has no Latin word', keys.every((k) => he[k] && latin(he[k]).length === 0), keys.filter((k) => latin(he[k]).length));
+  check('every English line has no Hebrew letter', keys.every((k) => en[k] && !hebrew(en[k])));
+  check('an unknown language reads as English', FlowFirstClose.copy('fr') === en && FlowFirstClose.copy() === en);
+  check('Hebrew keeps the safety words: read back, undo, nothing sent', /נקרא בחזרה/.test(he.offerHint) && /ביטול/.test(he.offerHint) && /לא נשלח/.test(he.offerHint));
+  const FlowStillOpen = vm.runInContext('FlowStillOpen', sandbox);
+  const offered = offer([row(SAFE, 'lang')]);
+  const why = FlowStillOpen.whyLine(offered.entry, NOW, 'he');
+  check('the why line follows the forced UI language', /^התחייבת עד/.test(why) && latin(why).length === 0, why);
+  const cardWords = [he.title, he.offerHint, why, he.doIt].join(' ');
+  console.log('Hebrew card Latin words, before: 22, after: ' + latin(cardWords).length);
+  check('the Hebrew offer card shows 0 Latin words', latin(cardWords).length === 0, latin(cardWords));
+}
+
 console.log('\nBEFORE setup one-click offers: 0');
 console.log('AFTER one safe task: 1 offer, 1 click left, window 60000ms');
 console.log('\nTOTAL FAILURES:', failures);
