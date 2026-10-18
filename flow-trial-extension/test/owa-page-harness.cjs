@@ -3,13 +3,17 @@
 // world, on a Hebrew outlook.live.com reading pane whose ad slot changes every 200 ms, with the Graph mailbox behind the
 // worker faked. It must mount the Glance card in the open message and log each stage in debug mode.
 //
-// Needs jsdom (not a dependency of this repo): `npm i --no-save jsdom` or NODE_PATH pointing at one. Without it, SKIPPED.
+// Needs jsdom, a devDependency of this package. Missing jsdom is a failed run.
 // Run: node test/owa-page-harness.cjs
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 let JSDOM;
-try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('SKIPPED: jsdom not available'); process.exit(0); }
+try { ({ JSDOM } = require('jsdom')); }
+catch (e) {
+  console.error('FAIL: jsdom is not installed. The Outlook page harness cannot run.');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..');
 let failures = 0;
@@ -53,8 +57,9 @@ async function runPage(opts) {
     debug: (...a) => logs.push(a.map(String).join(' ')), warn: (...a) => logs.push(a.map(String).join(' ')), error: (...a) => logs.push('ERROR ' + a.map(String).join(' '))
   });
   const store = Object.assign({
-    outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() }, account: { address: ME, name: 'Glance' }, ownAddresses: [ME] },
-    outlookSync: { stateVersion: 3 }
+    outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() }, account: { address: ME, name: 'Glance' }, ownAddresses: [ME], profile: { displayName: 'Glance', givenName: 'Sali', surname: 'Sapan' } },
+    outlookSync: { stateVersion: 3 },
+    glanceOwnNames: []
   }, o.store || {});
   const sent = [];
   const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
@@ -70,7 +75,16 @@ async function runPage(opts) {
       const immutable = /IdType="ImmutableId"/.test(String(hdrs.Prefer || ''));
       if (o.graphDown) return { ok: false, status: 0, error: 'network' };
       if (o.requireOutlookAuth && !bearer) return { ok: false, status: 401, body: '{"error":{"code":"InvalidAuthenticationToken"}}' };
-      if (/\/me\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ mail: ME, displayName: 'Glance' }) };
+      if (/\/me\?/.test(u)) {
+        const account = store.outlookAuth && store.outlookAuth.account;
+        const profile = store.outlookAuth && store.outlookAuth.profile;
+        return { ok: true, status: 200, body: JSON.stringify({
+          mail: ME,
+          displayName: (account && account.name) || (profile && profile.displayName) || 'Glance',
+          givenName: (profile && profile.givenName) || null,
+          surname: (profile && profile.surname) || null
+        }) };
+      }
       if (/mailFolders\/inbox\/messages/.test(u)) {
         if (o.inboxLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
@@ -365,7 +379,7 @@ async function runPage(opts) {
     const missing = await runPage({ htmlPatch: invoice, emptyInbox: true, urlId: MSG, driveFiles: [], store: { glanceDebug: true }, waitMs: 5000 });
     check('the open invoice ask searches Drive', missing.sent.some((m) => m.type === 'flow:search-drive'), missing.sent.map((m) => m.type));
     check('nothing in Drive or this thread: a holding card', missing.chip && missing.chip.getAttribute('data-glance-chain') === 'needs-you', missing.logs.filter((l) => /^Glance:/.test(l)));
-    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /Draft a holding reply/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
+    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /טיוטת תשובת ביניים/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
     check('the page did not send', !missing.sent.some((m) => /send/i.test(String(m.type)) && m.type !== 'flow:search-drive'));
     const found = await runPage({
       htmlPatch: invoice, emptyInbox: true, urlId: MSG, waitMs: 4000,
@@ -403,7 +417,7 @@ async function runPage(opts) {
     check('one Drive file: Why not shown drops the file stall', !stalled(oneWhy), oneWhy);
 
     const none = await runPage({ htmlPatch: q4html, mailBody: Q4, driveFiles: [], waitMs: 6000 });
-    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /Draft a holding reply/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
+    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /טיוטת תשובת ביניים/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
 
     const failed = await runPage({
       htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
@@ -618,7 +632,9 @@ async function runPage(opts) {
       driveFind: { match: 'one', file: file }
     });
     const blockedWhy = (blocked.store.outlookPageDiag || []).map((d) => d.reason);
-    check('without Calendars.ReadWrite the note stays quiet and names the missing scope', !blocked.chip && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0, blockedWhy);
+    check('without Calendars.ReadWrite a calendar card names the scope and Connect Microsoft',
+      Boolean(blocked.chip) && /Calendars\.ReadWrite/.test(blocked.chip.textContent) && /Connect Microsoft/.test(blocked.chip.textContent) && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0,
+      { text: blocked.chip && blocked.chip.textContent, why: blockedWhy });
     check('that quiet path does not draft a reply', !blocked.sent.some((m) => m.type === 'flow:execute-action'), blocked.sent.map((m) => m.type));
 
     const shown = await runPage({
@@ -901,6 +917,50 @@ async function runPage(opts) {
       { chip: Boolean(shownWhy.chip), left: left.length, pageLeft: pageLeft.map((d) => d.reason) });
     void undone;
     void twice;
+  }
+
+  console.log('\n--- known names, not only the account display name ---\n');
+  {
+    const greet = (text) => (h) => h.replace(/<div>Hi Sali,<\/div>[\s\S]*?<div>Flow team<\/div>/, '<div>' + text + '</div>');
+    const glanceSali = await runPage({ waitMs: 2500 });
+    check('Glance plus Graph givenName Sali mounts Hi Sali', Boolean(glanceSali.chip), glanceSali.chip && glanceSali.chip.textContent);
+    const noNames = await runPage({
+      waitMs: 2500,
+      store: {
+        glanceOwnNames: [],
+        outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() }, account: { address: ME, name: 'Glance' }, ownAddresses: [ME], profile: { displayName: 'Glance' } }
+      }
+    });
+    check('Glance with no given name stays quiet on Hi Sali', !noNames.chip, noNames.chip && noNames.chip.textContent);
+    const hebrew = 'היי סאלי, בבקשה תעדכן אותי עד יום חמישי.';
+    const givenAuth = {
+      token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
+      account: { address: ME, name: 'Glance' },
+      ownAddresses: [ME],
+      profile: { displayName: 'Glance', givenName: 'Sali', surname: 'Sapan' }
+    };
+    const hebrewGiven = await runPage({
+      htmlPatch: greet(hebrew), mailBody: hebrew, waitMs: 2500,
+      store: { outlookAuth: givenAuth, glanceOwnNames: [] }
+    });
+    check('Glance plus givenName Sali mounts היי סאלי', Boolean(hebrewGiven.chip), hebrewGiven.chip && hebrewGiven.chip.textContent);
+    const sapanAuth = {
+      token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
+      account: { address: ME, name: 'Sali Sapan' },
+      ownAddresses: [ME],
+      profile: { displayName: 'Sali Sapan' }
+    };
+    const hebrewSapan = await runPage({
+      htmlPatch: greet(hebrew), mailBody: hebrew, waitMs: 2500,
+      store: { outlookAuth: sapanAuth, glanceOwnNames: [] }
+    });
+    check('account name Sali Sapan alone mounts היי סאלי', Boolean(hebrewSapan.chip), hebrewSapan.chip && hebrewSapan.chip.textContent);
+    const other = await runPage({
+      htmlPatch: greet('Hi Dana, could you review the pilot proposal and confirm by Wednesday?'),
+      mailBody: 'Hi Dana, could you review the pilot proposal and confirm by Wednesday?',
+      waitMs: 2500
+    });
+    check('a greeting to a different name stays quiet', !other.chip, other.chip && other.chip.textContent);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

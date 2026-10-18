@@ -117,6 +117,12 @@ const FlowDraftReply = (() => {
   // follow-up + fill-in placeholder.
   function draftBodyText(p, attachment, attachmentSource, shareUrl) {
     const params = (p && p.params) || {};
+    if (params.inviteFile) {
+      if (params.body) return params.body;
+      const fileOnDraft = params.fileAttached === true || (attachment && (attachmentSource === 'found' || attachmentSource === 'thread'));
+      if (fileOnDraft) return params.lang === 'he' ? 'מצורף.' : 'Attached.';
+      return params.lang === 'he' ? 'אצרף בהקדם.' : "I'll attach it shortly.";
+    }
     const greet = draftGreeting(p && p.senderName, p && p.senderEmail);
     if (params.replyFact && !params.shareLink) {
       const factLine = cleanLine(params.factLine);

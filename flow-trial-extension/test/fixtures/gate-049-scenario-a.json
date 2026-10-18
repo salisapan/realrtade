@@ -11,9 +11,9 @@
    ],
    "sent": "2026-10-08T16:34:00+03:00",
    "subject": "Parking permit - please renew by Sunday",
-   "body": "Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office",
+   "body": "Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office",
    "gate": "quiet:noise",
-   "expected": "request / To Do (renew by Sun Oct 11)",
+   "expected": "request / To Do (renew by the coming Sunday on the run clock)",
    "shots": [
     "16-parking-permit-mail-opened-no-todo-card-after-20s.webp",
     "36-parking-permit-reopened-no-todo-card.webp"

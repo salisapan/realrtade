@@ -147,7 +147,12 @@ function meetCase(name, text) {
   const o = outlook(text);
   check(name + ': calendar hold, not schedule-confirm', intent && intent.type === 'event' && intent.personalClose === 'calendar-hold' && intent.closeFamily === 'D' && process && process.id === 'hold', { type: intent && intent.type, personal: intent && intent.personalClose, family: intent && intent.closeFamily, proc: process && process.id });
   check(name + ': Gmail offers the hold', g.show === true && g.process && g.process.id === 'hold', g.show);
-  check(name + ': Outlook does not invent a reply for a hold', !o.entry && o.why.indexOf('no-draft-close') !== -1, o.why);
+  const steps = (o.entry && o.entry.process && o.entry.process.steps) || [];
+  check(name + ': Outlook offers the hold and does not invent a reply',
+    Boolean(o.entry) && o.entry.process && o.entry.process.id === 'hold' &&
+    steps.length > 0 && steps.every((s) => s.kind === 'calendar') &&
+    !steps.some((s) => /draft|send/i.test(s.kind)),
+    o.entry && o.entry.process);
 }
 meetCase('can we meet tomorrow at 10:00', MEET);
 meetCase('Hebrew נפגש Thursday at 10:00', HE_MEET);
@@ -212,8 +217,8 @@ console.log('\n--- Turn off sits away from Check now ---\n');
   const css = fs.readFileSync(path.join(ROOT, 'popup', 'popup.css'), 'utf8');
   check('Turn off is not appended beside Check now', !/acts\.appendChild\(chk\);\s*acts\.appendChild\(off\)/.test(popup));
   check('Turn off is its own row under Check now', popup.includes("el('div', 'wait-acts wait-off-row')") && /\.wait-off-row\{margin-top:var\(--space-5\)/.test(css));
-  const chkAt = popup.indexOf("st.needsSignIn ? 'Sign in again' : 'Check now'");
-  const offAt = popup.indexOf("const off = el('button', 'ghost sm', 'Turn off')");
+  const chkAt = popup.indexOf("el('button', 'ghost sm', 'בדוק עכשיו')");
+  const offAt = popup.indexOf("el('button', 'ghost sm', 'כבה')");
   const chkBody = chkAt >= 0 && offAt > chkAt ? popup.slice(chkAt, offAt) : '';
   check('Check now does not call Turn off', chkBody.length > 0 && !/disconnect\(/.test(chkBody), chkBody.slice(0, 240));
   check('Microsoft Connect is one screen', popup.includes('data-glance-connect", "microsoft"') || popup.includes("data-glance-connect', 'microsoft'") || popup.includes('data-glance-connect", \'microsoft\''));

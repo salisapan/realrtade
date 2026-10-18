@@ -16,6 +16,7 @@ function check(name, cond, detail) {
 }
 
 const NOW = Date.parse('2026-10-05T09:00:00Z');
+const { connectionProviders, providerIdOf } = require('../core/connectors.js');
 const ROOT = path.join(__dirname, '..');
 
 function ev(over) {
@@ -218,8 +219,9 @@ const scripts = manifest.content_scripts[0].js;
 check('the resolver has no per-object branch', !/===\s*'invoice'|kind === 'invoice'|id === 'invoice'|iCount|Green Invoice/.test(chainSrc));
 check('the Gmail card calls the shared resolver', gmailSrc.indexOf('FlowCloseChains.resolve') >= 0 && gmailSrc.indexOf('injectNeedsYou') >= 0);
 const needsYouSrc = gmailSrc.slice(gmailSrc.indexOf('function injectNeedsYou'), gmailSrc.indexOf('function injectCreateCard'));
-check('the needs-you chip drafts a holding reply and does not say Do It', /Draft a holding reply/.test(needsYouSrc) && /טיוטת תשובת ביניים/.test(needsYouSrc) && !/flow-chip-do-label', 'Do It'/.test(needsYouSrc) && /type: 'flow:follow-draft'/.test(gmailSrc) && /Draft ready\. Not sent\./.test(gmailSrc));
-check('the close chip stays Do It', /function injectChip[\s\S]*flow-chip-do-label', 'Do It'/.test(gmailSrc));
+const displaySrc = fs.readFileSync(path.join(ROOT, 'core/display-copy.js'), 'utf8');
+check('the needs-you chip drafts a holding reply and does not say Do It', /glanceChrome\(\)\.holdingReply/.test(needsYouSrc) && /holdingReply: 'Draft a holding reply'/.test(displaySrc) && /holdingReply: 'טיוטת תשובת ביניים'/.test(displaySrc) && !/flow-chip-do-label', 'Do It'/.test(needsYouSrc) && /type: 'flow:follow-draft'/.test(gmailSrc) && /glanceChrome\(\)\.draftReadyNotSent/.test(gmailSrc) && /draftReadyNotSent: 'Draft ready\. Not sent\.'/.test(displaySrc));
+check('the close chip stays Do It', /function injectChip[\s\S]*flow-chip-do-label', glanceChrome\(\)\.doIt/.test(gmailSrc) && /doIt: 'Do It'/.test(displaySrc));
 check('manifest loads the shared text cut and the close chain', scripts.indexOf('core/source-text.js') > scripts.indexOf('core/judgment.js') && scripts.indexOf('core/close-chains.js') > scripts.indexOf('core/resolution.js'));
 check('popup loads both', popup.indexOf('core/source-text.js') > popup.indexOf('core/judgment.js') && popup.indexOf('core/close-chains.js') > popup.indexOf('core/file-attach.js'));
 
@@ -229,6 +231,25 @@ check('a finished search is not a silence', C.searchSilence({ ok: true, files: [
 check('Google not connected is drive-not-granted', C.searchSilence({ ok: false, reason: 'not-connected' }) === 'drive-not-granted' && C.searchSilence({ ok: false, reason: 'drive-not-granted', status: 403 }) === 'drive-not-granted');
 check('any other search failure is drive-search-failed', C.searchSilence({ ok: false, reason: 'error', status: 500 }) === 'drive-search-failed' && C.searchSilence({ ok: false }) === 'drive-search-failed');
 check('the old file-needs-drive spelling still counts as the chain not having run', C.isFileChainPending('file-needs-drive') && C.isFileChainPending('file-chain-not-run') && !C.isFileChainPending('drive-search-failed'));
+
+console.log('--- a Hebrew UI localizes the not-found card, including an English mail ---');
+const deck = C.resolve({
+  text: 'can you send me the deck by Sunday?',
+  origin: 'gmail',
+  now: NOW,
+  lang: 'he',
+  evidence: C.fileEvidence({ driveOk: true, driveFiles: [], threadFiles: [] })
+});
+check('an English deck ask on a Hebrew UI is the Hebrew not-found card', deck.move === 'needs-you' && deck.card && deck.card.line === 'לא מצאתי את deck.' && deck.card.lead === 'לא מצאתי את ' && deck.card.object === 'deck' && /השרשור הזה/.test(deck.card.searched) && deck.card.skipped.indexOf('לא מחובר, אז לא חיפשתי') === 0 && deck.card.skipped.indexOf('Not connected') < 0, deck.card);
+check('the same ask in English keeps the English card', C.resolve({ text: 'can you send me the deck by Sunday?', origin: 'gmail', now: NOW, lang: 'en', evidence: C.fileEvidence({ driveOk: true, driveFiles: [], threadFiles: [] }) }).card.line === 'I could not find deck.');
+const providers = connectionProviders([
+  { id: 'googleTasks', label: 'Google' },
+  { id: 'googleTask', label: 'Google again' },
+  { id: 'meta' },
+  { id: 'meta' },
+  { id: 'microsoft' }
+]);
+check('each provider id is one row at the source', providers.length === 3 && providerIdOf(providers[0]) === 'google' && providers[1].id === 'meta' && providers[2].id === 'microsoft', providers.map((row) => row.id));
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

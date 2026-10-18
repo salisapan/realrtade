@@ -1,0 +1,6 @@
+{
+  "scriptId": "PASTE_AFTER_CLASP_CREATE",
+  "rootDir": "",
+  "fileExtension": "js",
+  "filePushOrder": ["CoreBundle.js", "Code.js"]
+}

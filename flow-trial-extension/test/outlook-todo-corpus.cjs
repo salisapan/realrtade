@@ -33,15 +33,31 @@ function background(opts) {
     },
     outlookSync: {}
   };
+  if (opts.store) Object.assign(stored, opts.store);
   const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
   const routes = opts.routes || [];
   const sandbox = {
     console, URLSearchParams, URL, TextEncoder, Uint8Array, crypto: webcrypto,
+    btoa: (s) => Buffer.from(String(s), 'binary').toString('base64'),
+    atob: (s) => Buffer.from(String(s), 'base64').toString('binary'),
+    setTimeout: opts.clock || setTimeout,
+    clearTimeout: opts.clearClock || clearTimeout,
+    AbortController: AbortController,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
       try { body = init && init.body ? JSON.parse(init.body) : null; } catch (e) { body = init && init.body; }
-      calls.push({ method, url: String(url), body });
+      calls.push({ method, url: String(url), body, headers: (init && init.headers) || null });
+      if (opts.hangGet && method === 'GET' && /\/me\/events\//.test(String(url))) {
+        return new Promise((resolve, reject) => {
+          const signal = init && init.signal;
+          if (signal) signal.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      }
       for (const route of routes) {
         if (route.method === method && route.test.test(String(url))) return route.reply(body);
       }
@@ -143,7 +159,7 @@ console.log('\n--- judge: task-only is To Do, a draft stays a draft, a calendar 
 (async () => {
 console.log('\n--- write, read back, undo ---\n');
 {
-  const env = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const env = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted', changeKey: 'ck-created', title: 'File the amendment' }) });
   const out = await env.fn('outlookTaskWrite')(PAYLOAD);
   const post = env.calls.find((c) => c.method === 'POST');
   const gets = env.calls.filter((c) => c.method === 'GET' && /\/tasks\//.test(c.url));
@@ -218,9 +234,130 @@ console.log('\n--- write, read back, undo ---\n');
 
   const undo = await env.fn('outlookTaskUndo')(out.ref);
   const del = env.calls.filter((c) => c.method === 'DELETE');
-  check('Undo DELETEs that external id',
-    undo.ok === true && del.length === 1 && /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/.test(del[0].url),
-    del.map((c) => c.url));
+  const afterDelete = env.calls.filter((c) => c.method === 'GET' && /\/tasks\/TASK9$/.test(c.url));
+  check('Undo does not say Undone while GET still returns the task',
+    undo.ok === false && undo.reason === 'still-present' && undo.fetchedBack === true &&
+    del.length === 1 && /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/.test(del[0].url) && afterDelete.length >= 2,
+    { undo, del: del.map((c) => c.url), gets: afterDelete.length });
+}
+
+console.log('\n--- Undo says Undone only after GET confirms the task is gone ---\n');
+{
+  let goneReads = 0;
+  const gone = background({ routes: [
+    { method: 'DELETE', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => {
+      goneReads += 1;
+      if (goneReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', changeKey: 'ck-created', title: 'File the amendment' }), text: async () => '' };
+      return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+    } }
+  ] });
+  const undone = await gone.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
+  const order = gone.calls.map((c) => c.method);
+  check('DELETE then GET 404 is Undone, and the receipt names the To Do page cache',
+    undone.ok === true && undone.fetchedBack === true && undone.deleted === true &&
+    order.indexOf('DELETE') >= 0 && order.indexOf('DELETE') < order.lastIndexOf('GET') &&
+    /two minutes/.test(undone.written || ''),
+    { undone, order });
+  let presentReads = 0;
+  const present = background({ routes: [
+    { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => {
+      presentReads += 1;
+      if (presentReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment' }), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment', status: 'notStarted' }), text: async () => '' };
+    } }
+  ] });
+  const still = await present.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
+  check('a live task after DELETE is not Undone', still.ok === false && still.reason === 'still-present' && still.fetchedBack === true, still);
+  let flaggedReads = 0;
+  const flagged = background({ routes: [
+    { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => {
+      flaggedReads += 1;
+      if (flaggedReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment' }), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'File the amendment', status: 'deleted', isDeleted: true, '@removed': { reason: 'deleted' } }), text: async () => '' };
+    } }
+  ] });
+  const marked = await flagged.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
+  check('a 200 with a deleted flag is not Undone',
+    marked.ok === false && marked.reason === 'still-present' && marked.fetchedBack === true && marked.deleted !== true,
+    marked);
+  const edited = background({ routes: [
+    { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'TASK9', title: 'I changed the title', changeKey: 'ck-user', lastModifiedDateTime: '2026-10-14T12:00:00.000Z' }), text: async () => '' }) }
+  ] });
+  const kept = await edited.fn('outlookTaskUndo')({
+    taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9',
+    created: { changeKey: 'ck-created', title: 'File the amendment', lastModifiedDateTime: '2026-10-14T09:00:00.000Z' }
+  });
+  check('a task the person edited is not deleted',
+    kept.ok === false && kept.reason === 'user-edited' &&
+    kept.written === 'You edited this. Undo left it alone.' &&
+    !edited.calls.some((c) => c.method === 'DELETE' || c.method === 'PATCH'),
+    kept);
+}
+
+console.log('\n--- a read-back that does not answer is not Undone ---\n');
+{
+  let slowWaits = 0;
+  let slowReads = 0;
+  const hung = background({
+    clock: (fn, ms) => {
+      if (ms >= 8000) {
+        slowWaits += 1;
+        if (slowWaits > 1) { fn(); return slowWaits; }
+        return slowWaits;
+      }
+      return setTimeout(fn, ms);
+    },
+    routes: [
+      { method: 'DELETE', test: /\/tasks\/TASK9$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) },
+      { method: 'GET', test: /\/tasks\/TASK9$/, reply: () => {
+        slowReads += 1;
+        if (slowReads === 1) return { ok: true, status: 200, json: async () => ({ id: 'TASK9', changeKey: 'ck-created', title: 'File the amendment' }), text: async () => '' };
+        return new Promise(() => {});
+      } }
+    ]
+  });
+  const slow = await hung.fn('outlookTaskUndo')({ taskListId: 'DEF', taskId: 'TASK9', externalId: 'TASK9', created: { changeKey: 'ck-created', title: 'File the amendment' } });
+  check('an 8s read-back timeout says try again and is not Undone',
+    slow.ok === false && slow.reason === 'verify-timeout' && slow.fetchedBack !== true &&
+    slow.written === "Couldn't verify, try again",
+    slow);
+}
+
+console.log('\n--- To Do Do It rechecks the open mail after the proof read ---\n');
+{
+  const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const fn = page.slice(page.indexOf('async function onOutlookTodoDoIt'), page.indexOf('async function onOnedriveDoIt'));
+  const failFn = page.slice(page.indexOf('function todoWriteFailureLine'), page.indexOf('async function onOutlookTodoDoIt'));
+  const proofAt = fn.indexOf('await livePromiseProof');
+  const recheckAt = fn.indexOf('ignoreStaleClick(host)', proofAt);
+  const writeAt = fn.indexOf("type: 'flow:execute-action'", proofAt);
+  const afterWrite = fn.indexOf('ignoreStaleClick(host)', writeAt);
+  const logAt = fn.indexOf('FlowStorage.appendLog', writeAt);
+  check('the stale check sits after the proof await and before the write',
+    proofAt >= 0 && recheckAt > proofAt && writeAt > recheckAt, { proofAt, recheckAt, writeAt });
+  check('the stale check sits again after the write and before the receipt',
+    afterWrite > writeAt && logAt > afterWrite, { writeAt, afterWrite, logAt });
+  const scopeAt = failFn.indexOf("r.reason === 'tasks-not-granted'");
+  const reconnectAt = failFn.indexOf('Reconnect Outlook');
+  check('a missing To Do scope uses the Setup line, and Reconnect is the expired-token line',
+    fn.indexOf('todoWriteFailureLine') > 0 && scopeAt >= 0 &&
+    failFn.indexOf('Tasks.ReadWrite') > scopeAt &&
+    failFn.indexOf('token-expired') > 0 && reconnectAt > failFn.indexOf('token-expired') &&
+    page.indexOf('Reconnect Outlook to allow To Do') < 0,
+    { scopeAt, reconnectAt });
+  const undoClick = page.slice(page.indexOf('undo.textContent = pageChrome().undoing'), page.indexOf('async function livePromiseProof'));
+  const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
+  check('an undo that does not answer shows try again instead of staying on Undoing',
+    undoClick.indexOf('readBackOrTimeout') > 0 &&
+    undoClick.indexOf("reason === 'verify-timeout'") > 0 &&
+    undoClick.indexOf('pageChrome().couldntVerify') > 0 &&
+    fs.readFileSync(path.join(__dirname, '..', 'core', 'display-copy.js'), 'utf8').indexOf("Couldn't verify, try again") > 0 &&
+    page.indexOf("undoing: 'Undoing…'") > 0 &&
+    popup.indexOf('readBackOrTimeout') > 0 &&
+    popup.indexOf("r.reason === 'verify-timeout'") > 0);
 }
 
 console.log('\n--- a verify miss is not Handled ---\n');
@@ -232,7 +369,20 @@ console.log('\n--- a verify miss is not Handled ---\n');
     out);
   check('the miss does not say Handled and does not delete the task',
     miss.fn('globalThis.FlowProofOfClose.allowsHandled')({ ok: out.ok, proof: out.proof }) === false &&
+    out.written === "Created, couldn't verify" && out.fetchedBack === false &&
     !miss.calls.some((c) => c.method === 'DELETE'));
+  const undone = await miss.fn('outlookTaskUndo')(out.ref);
+  check('Undo with no snapshot says Couldn\'t confirm and does not delete',
+    undone.ok === false && undone.reason === 'unconfirmed' &&
+    undone.written === "Couldn't confirm it's unchanged. Undo left it alone." &&
+    !miss.calls.some((c) => c.method === 'DELETE'), undone);
+  const card = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const missCard = card.slice(card.indexOf('async function onOutlookTodoDoIt'), card.indexOf('async function onOnedriveDoIt'));
+  check('the To Do miss paints a receipt with Undo and is not Handled',
+    missCard.indexOf("Created, couldn't verify") > 0 &&
+    missCard.indexOf("type: 'flow:undo-action'") > missCard.indexOf("Created, couldn't verify") &&
+    missCard.indexOf('pageChrome().handled') > missCard.indexOf("type: 'flow:undo-action'") &&
+    card.indexOf("handled: 'Handled.'") > 0);
   const empty = background({ routes: [
     { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: true, status: 200, json: async () => LISTS, text: async () => '' }) },
     { method: 'POST', test: /\/tasks$/, reply: () => ({ ok: true, status: 201, json: async () => ({}), text: async () => '' }) }
@@ -247,7 +397,123 @@ console.log('\n--- no Tasks.ReadWrite means no write and no Handled ---\n');
   const out = await denied.fn('outlookTaskWrite')(PAYLOAD);
   check('a token without Tasks.ReadWrite does not create a task',
     out.ok === false && out.reason === 'tasks-not-granted' && denied.calls.length === 0, { out, calls: denied.calls });
+  const expired = background({ routes: [
+    { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: false, status: 401, json: async () => ({}), text: async () => '' }) }
+  ] });
+  const expiredOut = await expired.fn('outlookTaskWrite')(PAYLOAD);
+  check('a 401 after the scope is present is an expired token, not a missing scope',
+    expiredOut.ok === false && expiredOut.reason === 'token-expired', expiredOut);
 }
+
+console.log('\n--- a late To Do read-back still counts, and the fields have to match ---\n');
+{
+  let gets = 0;
+  const late = background({ routes: [
+    { method: 'GET', test: /\/me\/todo\/lists$/, reply: () => ({ ok: true, status: 200, json: async () => LISTS, text: async () => '' }) },
+    { method: 'POST', test: /\/me\/todo\/lists\/DEF\/tasks$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'TASK9', title: 'File the amendment', listId: 'DEF' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/todo\/lists\/DEF\/tasks\/TASK9$/, reply: () => {
+      gets += 1;
+      if (gets < 3) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({
+        id: 'TASK9',
+        title: 'File the amendment',
+        dueDateTime: { dateTime: '2026-10-10T00:00:00.0000000', timeZone: 'Etc/UTC' }
+      }), text: async () => '' };
+    } }
+  ] });
+  const out = await late.fn('outlookTaskWrite')(PAYLOAD);
+  const post = late.calls.find((c) => c.method === 'POST');
+  const taskGets = late.calls.filter((c) => c.method === 'GET' && /\/tasks\/TASK9$/.test(c.url));
+  check('a 404 then a matching title and dueDateTime timeZone is verified on the same list',
+    out.ok === true && out.proof && out.proof.fetchedBack === true && out.ref.taskListId === 'DEF' &&
+    taskGets.length >= 3 && taskGets.every((c) => /\/lists\/DEF\/tasks\/TASK9$/.test(c.url)) &&
+    post && post.body.dueDateTime.timeZone === 'UTC',
+    { ok: out.ok, reason: out.reason, gets: taskGets.length });
+  const wrong = background({ routes: happyRoutes(200, {
+    id: 'TASK9', title: 'A different task', status: 'notStarted',
+    dueDateTime: { dateTime: '2026-10-10T00:00:00.0000000', timeZone: 'UTC' }
+  }) });
+  const missed = await wrong.fn('outlookTaskWrite')(PAYLOAD);
+  check('a read-back whose title differs is not verified',
+    missed.ok === false && missed.fetchedBack === false && missed.written === "Created, couldn't verify", missed);
+}
+
+console.log('\n--- a Jerusalem hold is one event at local 14:00 ---\n');
+{
+  const posted = background({
+    scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite', 'offline_access'],
+    store: { glanceTimeZone: 'Asia/Jerusalem' },
+    routes: [
+      { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => Object.assign({ id: 'EVT1', webLink: 'https://outlook.office.com/calendar/item/EVT1' }, body), text: async () => '' }) },
+      { method: 'GET', test: /\/me\/events\/EVT1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+        id: 'EVT1',
+        subject: 'פגישה',
+        body: { contentType: 'Text', content: 'פגישה ביום חמישי 22/10 בשעה 14:00' },
+        start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' },
+        end: { dateTime: '2026-10-22T14:30:00', timeZone: 'Asia/Jerusalem' },
+        attendees: []
+      }), text: async () => '' }) }
+    ]
+  });
+  const wrote = await posted.fn('outlookMeetingWrite')({
+    params: { meeting: true, dateIso: '2026-10-22', hour: 14, minute: 0, title: 'פגישה', quote: 'פגישה ביום חמישי 22/10 בשעה 14:00' }
+  });
+  const post = posted.calls.find((c) => c.method === 'POST');
+  const get = posted.calls.find((c) => c.method === 'GET' && /\/me\/events\/EVT1/.test(c.url));
+  const read = get && { subject: 'פגישה', body: { content: 'פגישה ביום חמישי 22/10 בשעה 14:00' }, start: { dateTime: '2026-10-22T14:00:00', timeZone: 'Asia/Jerusalem' } };
+  check('one POST /me/events at local 14:00 with no Z, Prefer outlook.timezone, no attendees, GET proof and contentHash',
+    wrote && wrote.ok === true && wrote.fetchedBack === true && wrote.ref && wrote.ref.eventId === 'EVT1' && wrote.ref.contentHash &&
+    post && post.body && post.body.start.dateTime === '2026-10-22T14:00:00' && !/Z$/i.test(post.body.start.dateTime) &&
+    post.body.end.dateTime === '2026-10-22T14:30:00' && post.body.start.timeZone === 'Asia/Jerusalem' &&
+    Array.isArray(post.body.attendees) && post.body.attendees.length === 0 && !post.body.isOnlineMeeting &&
+    post.headers && String(post.headers.Prefer).indexOf('Asia/Jerusalem') >= 0 &&
+    posted.calls.filter((c) => c.method === 'POST').length === 1 && get &&
+    String(read.start.dateTime).slice(11, 16) === '14:00',
+    { wrote: wrote && { ok: wrote.ok, reason: wrote.reason, ref: wrote.ref }, start: post && post.body && post.body.start, headers: post && post.headers });
+  const bare = await posted.fn('outlookCalendarUndo')({ eventId: 'EVT1' });
+  check('Undo with no snapshot refuses and does not delete',
+    bare && bare.ok === false && bare.reason === 'unconfirmed' && !posted.calls.some((c) => c.method === 'DELETE'), bare);
+  const edited = background({
+    scopes: ['Mail.ReadWrite', 'Calendars.ReadWrite'],
+    routes: [
+      { method: 'GET', test: /\/me\/events\/EVT1/, reply: () => ({ ok: true, status: 200, json: async () => ({
+        id: 'EVT1', subject: 'Changed', body: { contentType: 'Text', content: 'פגישה' },
+        start: { dateTime: '2026-10-22T11:00:00Z', timeZone: 'Asia/Jerusalem' }
+      }), text: async () => '' }) }
+    ]
+  });
+  const refused = await edited.fn('outlookCalendarUndo')({
+    eventId: 'EVT1',
+    created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T11:00:00' }
+  }, { created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T11:00:00' } });
+  check('Undo after an edit refuses and does not delete',
+    refused && refused.ok === false && refused.reason === 'user-edited' && !edited.calls.some((c) => c.method === 'DELETE'), refused);
+  const hung = background({
+    hangGet: true,
+    scopes: ['Mail.ReadWrite', 'Calendars.ReadWrite'],
+    routes: []
+  });
+  const timed = await hung.fn('outlookCalendarUndo')({
+    eventId: 'EVT1',
+    created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T14:00:00' }
+  }, { created: { subject: 'פגישה', body: { hash: 'abc', prefix: 'פגישה' }, start: '2026-10-22T14:00:00' } });
+  check('a read-back that times out refuses and deletes nothing',
+    timed && timed.ok === false && (timed.reason === 'unconfirmed' || timed.reason === 'verify-timeout') &&
+    !hung.calls.some((c) => c.method === 'DELETE') && hung.calls.filter((c) => c.method === 'DELETE').length === 0,
+    timed);
+}
+
+const { FlowDisplay } = require('../core/display-copy.js');
+check('a To Do plan says Do It in English and בצע in Hebrew',
+  FlowDisplay.actionLabel({ id: 'log-it', steps: [{ kind: 'outlookTask' }] }, 'en') === 'Do It' &&
+  FlowDisplay.actionLabel({ id: 'log-it', steps: [{ kind: 'outlookTask' }] }, 'he') === 'בצע');
+check('a hold plan says Hold It in English and השהה in Hebrew',
+  FlowDisplay.actionLabel({ id: 'hold', steps: [{ kind: 'calendar' }] }, 'en') === 'Hold It' &&
+  FlowDisplay.actionLabel({ id: 'hold', steps: [{ kind: 'calendar' }] }, 'he') === 'השהה');
+const chip = fs.readFileSync(path.join(__dirname, '..', 'src', 'chip-host.js'), 'utf8');
+const stepsView = fs.readFileSync(path.join(__dirname, '..', 'src', 'step-list-view.js'), 'utf8');
+check('a To Do card does not paint the Hold It button',
+  chip.indexOf('noHold: taskOnly') > 0 && stepsView.indexOf('noHold: o.noHold === true') > 0);
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

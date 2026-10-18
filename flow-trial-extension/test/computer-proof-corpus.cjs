@@ -327,13 +327,12 @@ console.log('\n--- wiring stays a scaffold ---\n');
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
   const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
-  check('the extension version is 0.9.55', /"version": "0\.9\.55"/.test(manifest));
+  check('the extension version is 0.9.56', /"version": "0\.9\.56"/.test(manifest));
   const start = gmail.indexOf("copy.connectorId === 'computerClose'");
   const send = gmail.indexOf('chrome.runtime.sendMessage', start);
   const block = start > 0 && send > start ? gmail.slice(start, send) : '';
   check('the thread Undo rewrites the computer Activity row and does not call a writer first',
     block.indexOf('markComputerUndone') > 0 && block.indexOf('Mail.Send') === -1, { start: start, send: send });
-  check('Google Task undo is still the task path', gmail.indexOf('markGoogleTaskUndone') > send);
   check('Activity Undo rewrites a computer row',
     storage.indexOf('markComputerUndone') > 0 && popup.indexOf('markComputerUndone') > 0);
   check('the computer close is not registered as an API writer',
@@ -342,5 +341,174 @@ console.log('\n--- wiring stays a scaffold ---\n');
   check('this path does not ask Sali', core.indexOf('askSali: true') === -1 && core.indexOf('askSali: false') > 0);
 }
 
-console.log('\nTOTAL FAILURES:', failures);
-process.exit(failures ? 1 : 0);
+function bootLaneUndo() {
+  const http = [];
+  const store = {};
+  const page = {
+    console,
+    document: {
+      body: {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      createElement() { return { style: {}, setAttribute() {}, appendChild() {}, insertBefore() {} }; }
+    },
+    MutationObserver: function MutationObserver() {},
+    setTimeout() { return 0; },
+    clearTimeout() {},
+    clearInterval() {},
+    location: { pathname: '/mail/u/0/' },
+    navigator: { language: 'en' },
+    Intl,
+    Date,
+    Promise,
+    FlowStorage: { get() { return Promise.resolve({ onboarded: false, log: [] }); } }
+  };
+  page.MutationObserver.prototype = { observe() {}, disconnect() {}, takeRecords() { return []; } };
+  page.chrome = {
+    runtime: {
+      id: 'ext',
+      lastError: null,
+      sendMessage(msg, cb) {
+        const done = typeof cb === 'function' ? cb : () => {};
+        if (!msg || msg.type !== 'flow:google-undo') { done({ ok: true }); return; }
+        const api = msg.connectorId === 'googleHold' ? page.FlowGoogleCalendar : page.FlowGoogleTasks;
+        Promise.resolve(api.undo(msg.ref, async (req) => {
+          const fail = page.__failDelete && page.__failDelete[msg.connectorId];
+          const status = req.method === 'DELETE' && fail ? fail : (req.method === 'DELETE' ? 204 : 200);
+          http.push({ method: req.method, url: req.url, connectorId: msg.connectorId, status: status });
+          if (req.method === 'DELETE') return { status: status, ok: status >= 200 && status < 300, json: null };
+          if (msg.connectorId === 'googleLaneTask') {
+            return { status: 200, ok: true, json: { id: 'task_1', title: 'Pay the invoice', status: 'needsAction' } };
+          }
+          return { status: 200, ok: true, json: { id: 'evt_1', summary: 'Call', start: { dateTime: '2026-10-22T11:00:00Z' }, description: '' } };
+        })).then(done, (err) => done({ ok: false, error: String(err && err.message || err) }));
+      },
+      onMessage: { addListener() {} }
+    },
+    storage: {
+      local: {
+        get(key) {
+          if (key === 'glanceLaneUndo' || (Array.isArray(key) && key.indexOf('glanceLaneUndo') >= 0)) {
+            return Promise.resolve({ glanceLaneUndo: store.glanceLaneUndo });
+          }
+          return Promise.resolve({});
+        },
+        set(patch) {
+          if (patch && Object.prototype.hasOwnProperty.call(patch, 'glanceLaneUndo')) store.glanceLaneUndo = patch.glanceLaneUndo;
+          return Promise.resolve();
+        },
+        remove() { return Promise.resolve(); }
+      },
+      onChanged: { addListener() {} }
+    },
+    i18n: { getUILanguage: () => page.__lang || 'en' }
+  };
+  page.globalThis = page;
+  vm.createContext(page);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'google-tasks.js'), 'utf8'), page, { filename: 'google-tasks.js' });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'google-calendar.js'), 'utf8'), page, { filename: 'google-calendar.js' });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8'), page, { filename: 'content-gmail.js' });
+  return { page, http, store };
+}
+
+async function checkStoredUndo() {
+  const boot = bootLaneUndo();
+  const task = { title: 'Pay the invoice', status: 'needsAction' };
+  const hash = boot.page.FlowGoogleTasks.contentHash(task);
+  boot.store.glanceLaneUndo = {
+    m1: {
+      expires: Date.now() + 86400000,
+      steps: [{
+        connectorId: 'googleLaneTask',
+        ref: { taskId: 'task_1', externalId: 'task_1', taskListId: 'glance-list', contentHash: hash },
+        line: 'Google Task · Pay the invoice',
+        undoLine: 'Google Task removed.'
+      }]
+    }
+  };
+  const result = await boot.page.glanceUndoStoredLane('m1');
+  const deleted = boot.http.some((call) => call.method === 'DELETE' && call.connectorId === 'googleLaneTask');
+  check('undoStoredLane issues the task DELETE and returns it', deleted && result && result.ok === true && result.written === 'Google Task removed.', { http: boot.http, result });
+
+  boot.page.__lang = 'he';
+  const event = { summary: 'Call', description: '', start: { dateTime: '2026-10-22T11:00:00Z' } };
+  const eventHash = boot.page.FlowGoogleCalendar.contentHash(event);
+  boot.http.length = 0;
+  boot.store.glanceLaneUndo = {
+    m2: {
+      expires: Date.now() + 86400000,
+      steps: [
+        {
+          connectorId: 'googleHold',
+          ref: { eventId: 'evt_1', externalId: 'evt_1', calendarId: 'primary', contentHash: eventHash },
+          line: 'Calendar · Call',
+          undoLine: 'Calendar event removed.'
+        },
+        {
+          connectorId: 'googleLaneTask',
+          ref: { taskId: 'task_1', externalId: 'task_1', taskListId: 'glance-list', contentHash: 'not-the-live-hash' },
+          line: 'Google Task · Pay the invoice',
+          undoLine: 'Google Task removed.'
+        }
+      ]
+    }
+  };
+  const partial = await boot.page.glanceUndoStoredLane('m2');
+  const methods = boot.http.map((call) => call.method + ':' + call.connectorId);
+  const taskDelete = methods.indexOf('DELETE:googleLaneTask');
+  const calendarDelete = methods.indexOf('DELETE:googleHold');
+  check('a refused task still lets the calendar DELETE run, and the Hebrew receipt names both',
+    partial && partial.ok === false && partial.partial === true && taskDelete < 0 && calendarDelete >= 0 &&
+    partial.written.indexOf('שינית את זה') >= 0 && partial.written.indexOf('אירוע היומן הוסר') >= 0,
+    { methods, partial });
+
+  const taskBody = { title: 'Pay the invoice', status: 'needsAction' };
+  const taskHash = boot.page.FlowGoogleTasks.contentHash(taskBody);
+  const calBody = { summary: 'Call', description: '', start: { dateTime: '2026-10-22T11:00:00Z' } };
+  const calHash = boot.page.FlowGoogleCalendar.contentHash(calBody);
+  boot.page.__lang = 'en';
+  boot.page.__failDelete = { googleHold: 500 };
+  boot.http.length = 0;
+  boot.store.glanceLaneUndo = {
+    m3: {
+      expires: Date.now() + 86400000,
+      steps: [
+        {
+          connectorId: 'googleHold',
+          ref: { eventId: 'evt_1', externalId: 'evt_1', calendarId: 'primary', contentHash: calHash },
+          line: 'Calendar · Call',
+          undoLine: 'Calendar event removed.'
+        },
+        {
+          connectorId: 'googleLaneTask',
+          ref: { taskId: 'task_1', externalId: 'task_1', taskListId: 'glance-list', contentHash: taskHash },
+          line: 'Google Task · Pay the invoice',
+          undoLine: 'Google Task removed.'
+        }
+      ]
+    }
+  };
+  const failed = await boot.page.glanceUndoStoredLane('m3');
+  const taskDeletes = () => boot.http.filter((call) => call.method === 'DELETE' && call.connectorId === 'googleLaneTask').length;
+  check('a Calendar 500 names Calendar and still says the Task was removed',
+    failed && failed.ok === false && failed.partial === true &&
+    failed.written.indexOf('Calendar failed') >= 0 && failed.written.indexOf('Google Task removed') >= 0 &&
+    failed.written.indexOf('Google Task was not removed') < 0 && taskDeletes() === 1,
+    { written: failed && failed.written, http: boot.http });
+  boot.page.__failDelete = null;
+  const beforeRetry = taskDeletes();
+  const retried = await boot.page.glanceUndoStoredLane('m3');
+  const calendarDeletes = boot.http.filter((call) => call.method === 'DELETE' && call.connectorId === 'googleHold' && call.status === 204).length;
+  check('a retry deletes the remaining step and does not call the step already removed',
+    retried && retried.ok === true && calendarDeletes === 1 && taskDeletes() === beforeRetry &&
+    retried.written.indexOf('Calendar event removed') >= 0,
+    { retried, http: boot.http, taskDeletes: taskDeletes() });
+}
+
+checkStoredUndo().then(() => {
+  console.log('\nTOTAL FAILURES:', failures);
+  process.exit(failures ? 1 : 0);
+}).catch((err) => {
+  console.log('FAIL: undoStoredLane threw', err);
+  process.exit(1);
+});
