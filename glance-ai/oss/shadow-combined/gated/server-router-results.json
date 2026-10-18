@@ -135,7 +135,9 @@
    "schedule": 3,
    "log-it": 4,
    "reply-track": 2
-  }
+  },
+  "calendarSteps": 3,
+  "calendarClocked": 3
  },
  "server": {
   "codes": {

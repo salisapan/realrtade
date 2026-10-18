@@ -74,6 +74,17 @@ console.log('\n--- from a model answer to a plan, end to end on the device ---\n
   check('validated answer -> one proposal -> Reply & Track due Friday 9 October', p.step === 'draft' && x.plan.processId === 'reply-track' && x.plan.steps[1].params.dateIso === '2026-10-09', x);
 }
 
+{
+  const text = "Hi Sali,\nLet's meet on October 14 at 3pm to go over the budget.\nDavid";
+  const v = U.validate({ intentions: [{ kind: 'meeting', ask_span: "Let's meet on October 14 at 3pm", evidence_span: 'to go over the budget', due_span: 'on October 14 at 3pm', confidence: 0.9 }] }, text, { today });
+  const x = P.plan(ON, U.proposal(v.understanding), { today });
+  check('validated meeting -> a calendar step at 15:00 (the clock travels from the quote to the step)', x.plan && x.plan.steps[0].kind === 'calendar' && x.plan.steps[0].params.hour === 15 && x.plan.steps[0].params.minute === 0, x);
+}
+
+check('a meeting the mail says was cancelled gets no plan: planFor\'s own veto runs on model plans', P.plan(ON, MEET, { today, text: "The meeting on October 14 at 3pm is cancelled." }).plan === null, P.plan(ON, MEET, { today, text: "The meeting on October 14 at 3pm is cancelled." }));
+check('an out-of-office reply that names a meeting gets no plan', P.plan(ON, MEET, { today, text: "I am out of the office until October 20. Our meeting on October 14 at 3pm will move." }).plan === null);
+check('the same meeting with a live ask still plans', P.plan(ON, MEET, { today, text: "Let's meet on October 14 at 3pm to go over the budget." }).plan !== null);
+
 console.log('\n--- portability ---\n');
 const src = fs.readFileSync(path.join(__dirname, '../core/model-plan.js'), 'utf8').replace(/\/\/.*$/gm, '');
 check('no chrome.*, document or window', !/\bchrome\.|\bdocument\.|\bwindow\./.test(src));

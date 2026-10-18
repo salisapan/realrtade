@@ -82,7 +82,7 @@ const FlowModelPlan = (() => {
   }
 
   // plan(flags, proposal, ctx) -> { used:false } | { used:true, plan|null, rows, reason? }
-  // ctx: { today, lang, threadUrl, executionMemory, surface: 'gmail'|'outlook' }
+  // ctx: { text (the mail, for planFor's own vetoes), today, lang, threadUrl, executionMemory, surface: 'gmail'|'outlook' }
   function plan(flags, p, ctx) {
     if (!enabled(flags)) return { used: false };
     ctx = ctx || {};
@@ -91,7 +91,8 @@ const FlowModelPlan = (() => {
     const intent = toIntent(p);
     if (!intent) return { used: true, plan: null, reason: p && p.step === 'file_save' ? 'file-save-is-suggest-save' : 'no-proposal' };
     let process;
-    try { process = A.planFor(intent, { threadUrl: ctx.threadUrl || null, executionMemory: ctx.executionMemory || null }); } catch (e) { return { used: true, plan: null, reason: 'planner-error' }; }
+    // The mail text: planFor's own meeting veto and hedge checks run on model plans too.
+    try { process = A.planFor(intent, { threadUrl: ctx.threadUrl || null, executionMemory: ctx.executionMemory || null, text: typeof ctx.text === 'string' ? ctx.text : '' }); } catch (e) { return { used: true, plan: null, reason: 'planner-error' }; }
     if (!process) return { used: true, plan: null, reason: 'no-process' };
     if (ctx.surface === 'outlook') {
       const OUT = { calendar: 'outlookCalendar', gmailDraft: 'outlookDraft', googleTask: 'outlookTask' };

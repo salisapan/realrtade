@@ -22,9 +22,11 @@ check('it proposes exactly one reply step, as a proposal that needs a click and 
 r = v({ relevant: 'yes', intentions: [{ kind: 'ask_of_me', ask_span: 'תוכל לשלוח לי את החוזה החתום עד יום שלישי?', evidence_span: 'הבנק מחכה', due: '2026-10-13', due_span: 'עד יום שלישי', confidence: 0.85 }] }, HE);
 check('a grounded Hebrew ask is kept and the device reads «עד יום שלישי» itself', r.ok && r.understanding.intentions[0].due === '2026-10-13' && U.proposal(r.understanding).step === 'draft', r);
 r = v({ intentions: [{ kind: 'ask_of_me', ask_span: 'תוכל לשלוח לי את החוזה', evidence_span: 'הבנק מחכה', due: '2026-10-14', due_span: 'עד 14/10', confidence: 0.9 }] }, 'תוכל לשלוח לי את החוזה עד 14/10? הבנק מחכה.');
-check('a numeric date the device cannot settle (14/10: day or month first?) is dropped, not trusted from the model', has(r, 'intentions[0].due', 'span-has-no-date'), r.drops);
+check('«עד 14/10» is read by the device as 14 October (14 can only be a day; extract.js 0.9.56)', r.understanding.intentions[0].due === '2026-10-14' && !has(r, 'intentions[0].due'), r.drops);
+r = v({ intentions: [{ kind: 'ask_of_me', ask_span: 'תוכל לשלוח לי את החוזה', evidence_span: 'הבנק מחכה', due: '2026-03-04', due_span: 'עד 3/4', confidence: 0.9 }] }, 'תוכל לשלוח לי את החוזה עד 3/4? הבנק מחכה.');
+check('a numeric date the device cannot settle («3/4»: day or month first?) is dropped, not trusted from the model', has(r, 'intentions[0].due', 'span-has-no-date'), r.drops);
 r = v({ intentions: [{ kind: 'meeting', ask_span: "Let's meet on October 14 at 3pm", evidence_span: 'to go over the budget', due: '2026-10-14', due_span: 'on October 14 at 3pm', confidence: 0.95 }] }, MEET);
-check('a meeting with a day and a clock in its span proposes a calendar step', U.proposal(r.understanding).step === 'calendar', r);
+check('a meeting with a day and a clock in its span proposes a calendar step, and the proposal carries the clock', U.proposal(r.understanding).step === 'calendar' && U.proposal(r.understanding).due_time && U.proposal(r.understanding).due_time.hour === 15, U.proposal(r.understanding));
 check('spacing, case and invisible marks do not decide grounding', v({ intentions: [ask({ ask_span: 'could  you SEND me‏ the signed lease by october 14?' })] }).understanding.intentions.length === 1);
 check('a JSON string answer is parsed through the strict JSON path', v(JSON.stringify({ intentions: [ask()] })).understanding.intentions.length === 1);
 

@@ -213,7 +213,7 @@ const FlowUnderstanding = (() => {
     const kinds = Array.from(new Set(real.map((s) => s.step)));
     if (kinds.length > 1) return silent('two-intentions');
     const best = real.sort((a, b) => b.it.confidence - a.it.confidence)[0];
-    return { step: best.step, due: best.it.due || null, askSpan: best.it.ask_span, evidence: best.it.evidence_span, confidence: best.it.confidence,
+    return { step: best.step, due: best.it.due || null, due_time: best.it.due_time || null, askSpan: best.it.ask_span, evidence: best.it.evidence_span, confidence: best.it.confidence,
       proposalOnly: true, needsClick: true, closes: false };
   }
 
