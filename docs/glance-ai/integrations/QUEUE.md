@@ -17,7 +17,7 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 | tool | owner | status | branch/PR | claimed_at | notes/blockers (dev app setup = CoS) |
 |---|---|---|---|---|---|
 | Notion | claude | built | `claude/connector-2026-10-14-notion` / #138 (draft) | 2026-10-14 | Foundation (token relay, consent catalogue, learning hook) built with it. Waiting on CoS/owner: Notion public integration registration + env vars, relay deploy, `api.notion.com` manifest host, unverified vendor facts, steps-list destination wiring (open-tasks row 70) |
-| ClickUp | cursor | claimed | `cursor/routine-integration-builder-clickup` / PR # (draft; stacked on #156 -> #138, which carry the token relay, consent catalogue and learning hook) | 2026-10-18 | OAuth2 + secret (relay). CoS: ClickUp OAuth app + client id/secret |
+| ClickUp | cursor | built | `cursor/routine-integration-builder-clickup` / #167 (draft; stacked on #156 -> #138, which carry the token relay, consent catalogue and learning hook) | 2026-10-18 | Built and tested against a mock; not verified live; switches off. Waiting on CoS/owner: ClickUp Workspace owner/admin registers the OAuth app + `CLICKUP_CLIENT_ID`/`CLICKUP_CLIENT_SECRET`, relay deploy, `api.clickup.com` manifest host, unverified vendor facts (`connectors/clickup.md` §10), steps-list destination wiring (open-tasks row 70) |
 | Slack | free | free | - | - | OAuth2 + secret (relay); app review for distribution. CoS: Slack app |
 | Monday | free | free | - | - | OAuth2. CoS: monday app |
 | HubSpot | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
