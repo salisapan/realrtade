@@ -87,6 +87,22 @@ const FlowStepListView = (() => {
     return out;
   }
 
+  // The exact place a file step writes: 'OneDrive > Glance > report.pdf'. Only a file
+  // step has one. The names are the files that are ticked, so a pill toggle changes it.
+  function destinationOf(row, tool, files) {
+    if (!row || (tool.tool !== 'onedrive' && tool.tool !== 'drive')) return '';
+    const Files = (typeof FlowOnedriveFile !== 'undefined') ? FlowOnedriveFile : null;
+    const folder = (Files && Files.FOLDER) || 'Glance';
+    const params = (row.step && row.step.params) || {};
+    let names = (files || []).filter(function (f) { return f.on && !f.skipped && f.name; }).map(function (f) { return f.name; });
+    if (!names.length && !(files || []).length && params.fileName) names = [String(params.fileName)];
+    const where = tool.tool === 'drive' ? 'Drive' : 'OneDrive';
+    if (!names.length) return where + ' > ' + folder;
+    return Files && typeof Files.destination === 'function'
+      ? Files.destination(names.join(', '), where)
+      : where + ' > ' + folder + ' > ' + names.join(', ');
+  }
+
   function fileOnly(rows) {
     const live = (rows || []).filter(function (r) { return r && !r.manual && r.role !== 'close'; });
     return live.length === 1 && live[0].kind === 'attachmentSave' && filesOf(live[0]).length <= 1;
@@ -146,6 +162,8 @@ const FlowStepListView = (() => {
       kind: row.suggested ? 'suggested' : ''
     };
     base.text = stepCopy(row, L);
+    const dest = destinationOf(row, tool, files);
+    if (dest) base.dest = dest;
     base.user = row.added === true;
     if (files.length > 1) {
       base.kind = 'multi';

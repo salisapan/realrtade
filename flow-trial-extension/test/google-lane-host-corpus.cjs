@@ -95,6 +95,13 @@ check('Hold It, Task, Save file, Doc and Sheet send flow:google-write', /type: '
 check('Draft reply sends flow:gmail-compose and a contacts lookup', /type: 'flow:gmail-compose'/.test(gmail) && /type: 'flow:google-contacts'/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
 check('the card Undo sends flow:google-undo', /type: 'flow:google-undo'/.test(gmail));
 
+const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
+const hosts = manifest.host_permissions || [];
+check('the Drive save redirect host is a required host permission, and it is the only googleusercontent one', hosts.indexOf('https://*.googleusercontent.com/*') >= 0 && hosts.filter((h) => /googleusercontent/.test(h)).length === 1, hosts);
+check('the attachment fetch runs in the worker and follows the redirect', /flow:fetch-attachment/.test(fs.readFileSync(path.join(EXT, 'src', 'google-lane-host.js'), 'utf8')) && /redirect: 'follow'/.test(fs.readFileSync(path.join(EXT, 'src', 'google-lane-host.js'), 'utf8')) && /type: 'flow:fetch-attachment'/.test(gmail));
+const store = fs.readFileSync(path.join(EXT, 'docs', 'chrome-web-store-submission.md'), 'utf8');
+check('the store submission explains the googleusercontent host', /host_permissions: https:\/\/\*\.googleusercontent\.com\/\*/.test(store));
+
 const popup = fs.readFileSync(path.join(EXT, 'popup', 'popup.js'), 'utf8');
 check('the panel Undo sends flow:google-undo', /type: 'flow:google-undo'/.test(popup));
 

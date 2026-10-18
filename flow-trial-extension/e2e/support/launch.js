@@ -238,11 +238,13 @@ function installE2EHooks() {
         return Promise.resolve(json(401, { error: { code: 'InvalidAuthenticationToken' } }));
       }
       if (driveContent && method === 'PUT') {
-        const name = driveContent[1];
+        const key = driveContent[1];
         const id = 'e2e-file-' + (e2e.seq++);
-        const item = { id: id, name: name, webUrl: 'https://onedrive.live.com/file/' + id };
+        const item = { id: id, name: decodeURIComponent(key.split('/').pop()), webUrl: 'https://onedrive.live.com/file/' + id, parentReference: { path: '/drive/root:/' + key.split('/').slice(0, -1).join('/') } };
+        item.__key = key;
         e2e.driveItems[id] = item;
-        e2e.driveByName[name] = item;
+        e2e.driveByName[key] = item;
+        e2e.drivePuts = (e2e.drivePuts || []).concat([key]);
         return Promise.resolve(json(201, item));
       }
       const driveRoot = path.match(/\/me\/drive\/root:\/(.+)$/);
@@ -255,7 +257,8 @@ function installE2EHooks() {
         const id = driveItem[1];
         if (method === 'DELETE') {
           const gone = e2e.driveItems[id];
-          if (gone && gone.name) delete e2e.driveByName[gone.name];
+          if (gone && gone.__key) delete e2e.driveByName[gone.__key];
+          e2e.driveDeletes = (e2e.driveDeletes || []).concat([id]);
           delete e2e.driveItems[id];
           return Promise.resolve(empty(204));
         }
