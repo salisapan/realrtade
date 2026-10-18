@@ -36,6 +36,18 @@ const VENDORS = {
     bodyFormat: 'form',
     extraHeaders: {},
     supportsRefresh: true
+  },
+  clickup: {
+    tokenUrl: 'https://api.clickup.com/api/v2/oauth/token',
+    idEnv: 'CLICKUP_CLIENT_ID',
+    secretEnv: 'CLICKUP_CLIENT_SECRET',
+    // ClickUp documents a JSON body of exactly client_id, client_secret and code: no PKCE, no grant_type, no redirect_uri, and
+    // no refresh token today (developer.clickup.com/reference/getaccesstoken). Only the code is forwarded.
+    clientAuth: 'body',
+    bodyFormat: 'json',
+    extraHeaders: {},
+    supportsRefresh: false,
+    codeBodyKeys: ['code']
   }
 };
 
@@ -107,6 +119,7 @@ async function relay(event, deps) {
     if (allowedRedirects(env).indexOf(redirectUri) < 0) return json(400, { error: 'redirect_not_allowed' }, origin);
     form = { grant_type: 'authorization_code', code, redirect_uri: redirectUri };
     if (p.code_verifier) form.code_verifier = String(p.code_verifier);
+    if (Array.isArray(vendor.codeBodyKeys)) form = vendor.codeBodyKeys.reduce((acc, k) => { acc[k] = form[k]; return acc; }, {});
   } else {
     const rt = String(p.refresh_token || '').trim();
     if (!rt) return json(400, { error: 'missing_refresh_token' }, origin);

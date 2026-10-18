@@ -12,4 +12,10 @@
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false };
+//
+// clickupReadBack: the ClickUp write goes through core/clickup-close.js (one task in the chosen List, read back, Undo read back).
+//                  Off = no ClickUp writer exists at all (nothing is registered under the id "clickup").
+// clickupOAuth:    "Sign in with ClickUp" (authorization code, no PKCE: ClickUp does not document it) through the token relay.
+//                  Needs the relay deployed, CLICKUP_CLIENT_ID / CLICKUP_CLIENT_SECRET set in Netlify, and
+//                  OAUTH_PUBLIC.clickupClientId set.
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, clickupReadBack: false, clickupOAuth: false };

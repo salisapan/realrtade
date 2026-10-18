@@ -26,6 +26,12 @@ ok('asana tick = relay sign-in + its one host, nothing else; both connectors tog
   assert.strictEqual(C.stepsFor(['asana', 'notion']).steps.length, 4);
   assert.ok(C.selectAll().indexOf('asana') >= 0);
 });
+ok('clickup tick = relay sign-in + its one API host, nothing else; all three task connectors together give three pairs', () => {
+  const r = C.stepsFor(['clickup']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:clickup', 'host-permission:https://api.clickup.com/*']);
+  assert.strictEqual(C.stepsFor(['clickup', 'asana', 'notion']).steps.length, 6);
+  assert.ok(C.selectAll().indexOf('clickup') >= 0); assert.strictEqual(C.byId('clickup').state, 'experimental');
+});
 ok('microsoft ticks collapse into one sign-in listing only the ticked services', () => {
   const r = C.stepsFor(['ms-todo', 'ms-mail', 'ms-todo']);
   assert.strictEqual(r.steps.length, 1); assert.deepStrictEqual(r.steps[0], { type: 'microsoft-signin', services: ['todo', 'mail'] });
