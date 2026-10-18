@@ -31,6 +31,8 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'oauth-relay', vendor: 'notion' }, { type: 'host-permission', origin: 'https://api.notion.com/*' }] },
     { id: 'asana', label: 'Asana', detail: 'Add one task to the Asana project you pick, then read it back. Undo removes it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'asana' }, { type: 'host-permission', origin: 'https://app.asana.com/*' }] },
+    { id: 'clickup', label: 'ClickUp', detail: 'Add one task to the ClickUp List you pick, then read it back. Undo removes it. Nothing else in your Workspace is read.', group: 'tasks', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'clickup' }, { type: 'host-permission', origin: 'https://api.clickup.com/*' }] },
     // Listed so the screen can show them honestly. Select all never includes these.
     { id: 'jira', label: 'Jira', detail: 'Create one issue and read it back.', group: 'tasks', state: 'coming', steps: [] },
     { id: 'linear', label: 'Linear', detail: 'Create one issue and read it back.', group: 'tasks', state: 'coming', steps: [] },

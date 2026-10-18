@@ -58,6 +58,7 @@ import { LADDER } from '../config/ladder.public.js';
 import { CONNECTORS } from '../config/connectors.public.js';
 import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
 import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
+import '../core/clickup-close.js'; // classic: sets globalThis.FlowClickUpClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -1267,7 +1268,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', clickup: 'clickupAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1284,7 +1285,7 @@ async function disconnectConnector(connectorId) {
     return { ok: true };
   }
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'clickup' ? [key, 'clickupLedger'] : key);
   return { ok: true };
 }
 
@@ -3088,9 +3089,9 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const enabled = connector === 'asana' ? CONNECTORS.asanaReadBack : CONNECTORS.notionReadBack;
+  const enabled = connector === 'clickup' ? CONNECTORS.clickupReadBack : connector === 'asana' ? CONNECTORS.asanaReadBack : CONNECTORS.notionReadBack;
   if (!O || !enabled) return;
-  const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: connector === 'asana' ? 'asana/task' : 'notion/page' }, e, { connector: connector });
+  const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: connector === 'clickup' ? 'clickup/task' : connector === 'asana' ? 'asana/task' : 'notion/page' }, e, { connector: connector });
   const ev = O.buildEvent(input, { enabled: enabled });
   if (!ev) return;
   try {
@@ -3239,6 +3240,88 @@ async function asanaReadBackWrite(p) {
 async function asanaReadBackUndo(ref) {
   const r = await asanaCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'asana' });
+  return r;
+}
+
+/* --------------------------------------------------------- ClickUp, with a proof */
+// docs/glance-ai/connectors/clickup.md. Everything here is behind config/connectors.public.js (clickupReadBack, clickupOAuth), both off.
+
+const CLICKUP_API = 'https://api.clickup.com/api/v2';
+const CLICKUP_AUTH_BASE = 'https://app.clickup.com/api';
+const CLICKUP_LEDGER_KEY = 'clickupLedger';
+
+async function getClickUpAuth() {
+  const { clickupAuth } = await chrome.storage.local.get('clickupAuth');
+  return clickupAuth || null;
+}
+
+// A List link ends in /li/<list> (the vendor's own rule for finding the List id); a bare number also works. Anything else is refused.
+function parseClickUpListId(input) {
+  const t = String(input || '').trim();
+  if (/^\d{4,20}$/.test(t)) return t;
+  const m = t.match(/^https:\/\/app\.clickup\.com\/[^?#]*\/li\/(\d{4,20})(?:[/?#]|$)/);
+  return m ? m[1] : null;
+}
+
+// "Sign in with ClickUp": authorization code through the relay (which adds the secret). ClickUp documents no PKCE; the state is checked
+// before the code leaves. The token (which today does not expire) lives only on this device.
+async function connectClickUpOAuth(listInput) {
+  if (!CONNECTORS.clickupOAuth) throw new Error('Sign in with ClickUp is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.clickupClientId);
+  if (!clientId) throw new Error('ClickUp sign-in isn’t configured on this build yet.');
+  const listId = parseClickUpListId(listInput);
+  if (!listId) throw new Error('That doesn’t look like a ClickUp List link — open the List and copy the URL.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(CLICKUP_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&redirect_uri=' + encodeURIComponent(redirectUri), 'ClickUp');
+  const got = await relayTokenRequest({ vendor: 'clickup', grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('ClickUp connection failed (' + got.error + ').');
+  const res = await fetch(CLICKUP_API + '/list/' + listId, { headers: { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' } });
+  if (res.status === 401 || res.status === 403 || res.status === 404) throw new Error('ClickUp signed you in but cannot open that List — check the link, and that you ticked its Workspace on the ClickUp screen.');
+  if (!res.ok) throw new Error('ClickUp returned ' + res.status + '.');
+  const body = await res.json();
+  const name = (body && typeof body.name === 'string' && body.name) || 'ClickUp List';
+  await chrome.storage.local.set({ clickupAuth: { token: got.data.access_token, refreshToken: null, listId: listId, listName: name, via: 'oauth' } });
+  return { title: name };
+}
+
+function clickupCloseEngine() {
+  return globalThis.FlowClickUpClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getClickUpAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ clickupAuth: a }); },
+    refresh: async () => null,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(CLICKUP_LEDGER_KEY))[CLICKUP_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(CLICKUP_LEDGER_KEY))[CLICKUP_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [CLICKUP_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function clickupReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await clickupCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'clickup:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'clickup', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'clickup', lang: lang });
+    return { ok: true, where: 'ClickUp', target: 'your List', written: 'Added to ClickUp.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'clickup', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'ClickUp' };
+}
+
+async function clickupReadBackUndo(ref) {
+  const r = await clickupCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'clickup' });
   return r;
 }
 
@@ -4354,6 +4437,7 @@ const WRITERS = {
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
+if (CONNECTORS.clickupReadBack) WRITERS.clickup = clickupReadBackWrite;
 const UNDOERS = {
   hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
@@ -4365,6 +4449,7 @@ const UNDOERS = {
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
+if (CONNECTORS.clickupReadBack) UNDOERS.clickup = clickupReadBackUndo;
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
@@ -4373,6 +4458,7 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
+  const cu = await getClickUpAuth();
   return {
     googleTasks: {
       connected: Boolean(gt),
@@ -4397,6 +4483,11 @@ async function connectorStatus() {
       connected: Boolean(md),
       configured: Boolean(MONDAY_CLIENT_ID),
       detail: md ? 'Board ' + md.boardId : null
+    },
+    clickup: {
+      connected: Boolean(cu),
+      configured: CONNECTORS.clickupOAuth === true && Boolean(publicClientId(OAUTH_PUBLIC.clickupClientId)),
+      detail: cu ? cu.listName || null : null
     }
   };
 }
@@ -4429,6 +4520,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'clickup') return reply(sendResponse, connectClickUpOAuth(msg.list).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));

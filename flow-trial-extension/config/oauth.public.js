@@ -16,7 +16,8 @@ export const OAUTH_PUBLIC = {
   slackClientId: 'REPLACE_WITH_SLACK_CLIENT_ID',
   mondayClientId: 'REPLACE_WITH_MONDAY_CLIENT_ID',
   notionClientId: 'REPLACE_WITH_NOTION_CLIENT_ID',
-  asanaClientId: 'REPLACE_WITH_ASANA_CLIENT_ID'
+  asanaClientId: 'REPLACE_WITH_ASANA_CLIENT_ID',
+  clickupClientId: 'REPLACE_WITH_CLICKUP_CLIENT_ID'
 };
 
 // Web application OAuth client for chrome.identity.launchWebAuthFlow.

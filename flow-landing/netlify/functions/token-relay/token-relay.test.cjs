@@ -144,5 +144,29 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f = mock(200, {}); const r = await relay(ev(Object.assign({}, base, { vendor: 'asana' })), { env: ENV, fetch: f, now: () => 1 });
     assert.strictEqual(r.statusCode, 503); assert.strictEqual(f.calls.length, 0);
   });
+  await t('clickup: JSON body is exactly client_id, client_secret, code; verifier and redirect are not forwarded; secret never returned or logged', async () => {
+    const f = mock(200, { access_token: 'pk_tok' }); const logs = [];
+    const env = Object.assign({}, ENV, { CLICKUP_CLIENT_ID: 'ccid', CLICKUP_CLIENT_SECRET: 'CLICKUP-SECRET-1' });
+    const r = await relay(ev({ vendor: 'clickup', grant: 'code', code: 'c1', code_verifier: 'ver-1234567890', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1, log: (...a) => logs.push(a.join(' ')) });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(JSON.parse(r.body).access_token, 'pk_tok');
+    assert.strictEqual(f.calls.length, 1); assert.strictEqual(f.calls[0].url, 'https://api.clickup.com/api/v2/oauth/token');
+    assert.deepStrictEqual(JSON.parse(f.calls[0].init.body), { code: 'c1', client_id: 'ccid', client_secret: 'CLICKUP-SECRET-1' });
+    assert.strictEqual(f.calls[0].init.headers['Content-Type'], 'application/json'); assert.strictEqual(f.calls[0].init.headers.Authorization, undefined);
+    assert.ok(r.body.indexOf('CLICKUP-SECRET-1') < 0); assert.ok(logs.join('|').indexOf('CLICKUP-SECRET-1') < 0 && logs.join('|').indexOf('c1') < 0 && logs.join('|').indexOf('pk_tok') < 0);
+  });
+  await t('clickup: a foreign redirect_uri is still refused; there is no refresh grant; a vendor echo of the secret is withheld; unconfigured -> 503', async () => {
+    const env = Object.assign({}, ENV, { CLICKUP_CLIENT_ID: 'ccid', CLICKUP_CLIENT_SECRET: 'CLICKUP-SECRET-1' });
+    const f = mock(200, { access_token: 'x' });
+    assert.strictEqual((await relay(ev({ vendor: 'clickup', grant: 'code', code: 'c', redirect_uri: 'https://evil.example/cb', install_id: 'install-0001' }), { env, fetch: f, now: () => 1 })).statusCode, 400);
+    assert.strictEqual((await relay(ev({ vendor: 'clickup', grant: 'refresh', refresh_token: 'r', install_id: 'install-0001' }), { env, fetch: f, now: () => 1 })).statusCode, 400);
+    assert.strictEqual(f.calls.length, 0);
+    const f2 = mock(200, { access_token: 'x', echo: 'CLICKUP-SECRET-1' });
+    assert.strictEqual((await relay(ev({ vendor: 'clickup', grant: 'code', code: 'c', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 502);
+    const f3 = mock(200, {}); const r3 = await relay(ev({ vendor: 'clickup', grant: 'code', code: 'c', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env: ENV, fetch: f3, now: () => 1 });
+    assert.strictEqual(r3.statusCode, 503); assert.strictEqual(f3.calls.length, 0);
+    const f4 = mock(401, { err: 'Oauth token not found', ECODE: 'OAUTH_019' });
+    const r4 = await relay(ev({ vendor: 'clickup', grant: 'code', code: 'bad', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f4, now: () => 1 });
+    assert.strictEqual(r4.statusCode, 502); assert.ok(r4.body.indexOf('CLICKUP-SECRET-1') < 0);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

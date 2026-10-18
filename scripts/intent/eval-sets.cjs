@@ -17,7 +17,11 @@ const sets = {
   dev: gold.filter((_, i) => i % 2 === 1),
   blind: fx('intent-blind.json'),
   teacherEval: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval.json')) ? fx('intent-teacher-eval.json') : [],
-  teacherEval2: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval-2.json')) ? fx('intent-teacher-eval-2.json') : []
+  teacherEval2: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval-2.json')) ? fx('intent-teacher-eval-2.json') : [],
+  // Synthetic held-out cases for the ClickUp task loop (docs/glance-ai/connectors/clickup.md §8). Never used to learn weights.
+  clickupHeldOut: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-clickup-heldout.json')) ? fx('intent-clickup-heldout.json') : [],
+  // The 39 synthetic training candidates for the same loop, scored by the CURRENT weights (not yet trained on).
+  clickupSyntheticCandidates: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-clickup-synthetic.json')) ? fx('intent-clickup-synthetic.json') : []
 };
 function prf(set, pred, cls) {
   let tp = 0, fp = 0, fn = 0;

@@ -31,7 +31,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 10 | Stripe (PayPal after it) | the payment arrived | OAuth + secret (relay) | not started |
 | 11 | Trello | a card exists | API key + token flow, not OAuth2 | not started |
 | 12 | Monday | an item exists | OAuth2 | not started |
-| 13 | ClickUp | a task exists | OAuth2 | not started |
+| 13 | ClickUp | a task exists | OAuth2 (no PKCE, no scopes) | **ready, waiting for owner** (2026-10-18): [doc](connectors/clickup.md); built and tested against a mock; DRAFT PR #167 (stacked on #156); switches `clickupReadBack`, `clickupOAuth` off. Waiting: app registration, relay deploy, `api.clickup.com` host |
 | 14 | Box | the file is saved | OAuth2 + secret (relay) | not started |
 | 15 | Calendly | the meeting is booked | OAuth2 | not started |
 | 16 | Adobe Sign | the agreement is signed | OAuth2 + secret (relay) | not started |

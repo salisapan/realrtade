@@ -120,6 +120,17 @@ const FLOW_CONNECTORS = [
       { key: 'project', label: 'Project URL or ID', placeholder: 'https://app.asana.com/0/…', type: 'text' }
     ]
   },
+  {
+    id: 'clickup',
+    label: 'ClickUp',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one task to the ClickUp List you choose and reads it back before it counts as handled. Off in this build; needs a ClickUp app Client ID (docs/glance-ai/connectors/clickup.md).',
+    fields: [
+      { key: 'list', label: 'List URL or ID', placeholder: 'https://app.clickup.com/…/v/li/…', type: 'text' }
+    ]
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 

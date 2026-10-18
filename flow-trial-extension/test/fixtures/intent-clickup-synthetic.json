@@ -1,0 +1,536 @@
+[
+ {
+  "t": "Can you add the onboarding checklist to our ClickUp list before Thursday?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "onboarding checklist"
+  }
+ },
+ {
+  "t": "Please create a ClickUp task for the Q4 pricing review and assign it to Dana.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "Q4 pricing review"
+  }
+ },
+ {
+  "t": "Could you log the vendor contract renewal in ClickUp by end of day?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "vendor contract renewal"
+  }
+ },
+ {
+  "t": "Need you to open a ticket in ClickUp for the broken login page, thanks.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "broken login page"
+  }
+ },
+ {
+  "t": "Please update the status of the Madison launch task in ClickUp by Friday.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "Madison launch"
+  }
+ },
+ {
+  "t": "Can you move the invoice follow-up to the Done column in ClickUp when it's paid?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "invoice follow-up"
+  }
+ },
+ {
+  "t": "Add the website QA items to the ClickUp board today please.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "board",
+   "what": "website QA items"
+  }
+ },
+ {
+  "t": "pls put the demo prep in clickup so the team can see it",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "demo prep"
+  }
+ },
+ {
+  "t": "Could you share the ClickUp doc with Avi so he can comment before Monday?",
+  "act": "ASK",
+  "action": "send",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "doc"
+  }
+ },
+ {
+  "t": "Please review the ClickUp task for the hiring plan and tell me if anything is missing.",
+  "act": "ASK",
+  "action": "review",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "hiring plan"
+  }
+ },
+ {
+  "t": "Can you reply in the ClickUp thread with the final numbers by tomorrow morning?",
+  "act": "ASK",
+  "action": "reply",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "comment",
+   "what": "final numbers"
+  }
+ },
+ {
+  "t": "We need a ClickUp task for the audit documents, due the 30th. Can you set that up?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "audit documents"
+  }
+ },
+ {
+  "t": "I'll add the contract review to ClickUp tonight.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "contract review"
+  }
+ },
+ {
+  "t": "I will create a ClickUp task for the printer replacement and send you the link.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "printer replacement"
+  }
+ },
+ {
+  "t": "Let me log the customer complaint in ClickUp first thing tomorrow.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "customer complaint"
+  }
+ },
+ {
+  "t": "I'll update the ClickUp ticket once the payment clears on Wednesday.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "payment ticket"
+  }
+ },
+ {
+  "t": "I can put the offsite agenda in ClickUp by Friday and tag everyone.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "offsite agenda"
+  }
+ },
+ {
+  "t": "I'll open a ClickUp task for the translation work and assign it to Noa.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "translation work"
+  }
+ },
+ {
+  "t": "Will add the follow-up with Gila to our ClickUp board this afternoon.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "board",
+   "what": "follow-up with Gila"
+  }
+ },
+ {
+  "t": "I'll comment on the ClickUp task with my answer by end of day.",
+  "act": "PROMISE",
+  "action": "reply",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "comment",
+   "what": "my answer"
+  }
+ },
+ {
+  "t": "ClickUp is down again this morning, nothing is loading.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "outage"
+  }
+ },
+ {
+  "t": "I already added the invoice task to ClickUp yesterday.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "invoice"
+  }
+ },
+ {
+  "t": "The ClickUp task for the audit was closed last week.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "audit"
+  }
+ },
+ {
+  "t": "We switched from Trello to ClickUp in March and it has been great.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "product"
+  }
+ },
+ {
+  "t": "ClickUp sent you a notification: Dana commented on Q4 pricing.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "notification"
+  }
+ },
+ {
+  "t": "The ClickUp board looks good to me, no changes needed.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "board"
+  }
+ },
+ {
+  "t": "Thanks, I saw the ClickUp task and it is all clear.",
+  "act": "ACK",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "Got it, the ClickUp link works now.",
+  "act": "ACK",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "link"
+  }
+ },
+ {
+  "t": "Perfect, thanks for adding it to ClickUp.",
+  "act": "ACK",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "אפשר להוסיף את רשימת המשימות של ההדרכה ל-ClickUp עד חמישי?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "רשימת משימות"
+  }
+ },
+ {
+  "t": "תפתחי בבקשה משימה ב-ClickUp לבדיקת התמחור ותשייכי אותה לדנה.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "בדיקת תמחור"
+  }
+ },
+ {
+  "t": "צריך שתעדכן את הסטטוס של המשימה ב-ClickUp עד יום שישי.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "תוסיף בבקשה את חידוש החוזה ל-ClickUp היום.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "חידוש חוזה"
+  }
+ },
+ {
+  "t": "אני אפתח משימה ב-ClickUp להחלפת המדפסת ואשלח לך את הקישור.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "החלפת מדפסת"
+  }
+ },
+ {
+  "t": "אני אוסיף את הפגישה עם גילה ללוח ב-ClickUp עוד הערב.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "board",
+   "what": "פגישה עם גילה"
+  }
+ },
+ {
+  "t": "אעדכן את הכרטיס ב-ClickUp ברגע שהתשלום נכנס.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "כרטיס תשלום"
+  }
+ },
+ {
+  "t": "ClickUp לא עובד אצלי מהבוקר, שום דבר לא נטען.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "outage"
+  }
+ },
+ {
+  "t": "כבר הוספתי את המשימה ל-ClickUp אתמול.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "תודה, ראיתי את המשימה ב-ClickUp והכול ברור.",
+  "act": "ACK",
+  "action": "none",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ }
+]
