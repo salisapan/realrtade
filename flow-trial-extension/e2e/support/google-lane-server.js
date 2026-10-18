@@ -144,7 +144,10 @@ function startGoogleLaneServer() {
     lists: [],
     listCreates: [],
     unauthorized: [],
-    failGets: []
+    failGets: [],
+    rejectOnce: [],
+    driveHits: [],
+    lagGets: []
   };
   seedLists();
 
@@ -171,6 +174,9 @@ function startGoogleLaneServer() {
     state.drafts = {};
     state.unauthorized = [];
     state.failGets = [];
+    state.rejectOnce = [];
+    state.driveHits = [];
+    state.lagGets = [];
     seedLists();
   }
 
@@ -220,6 +226,7 @@ function startGoogleLaneServer() {
         path: path,
         search: url.search,
         at: Date.now(),
+        bearer: (/^Bearer\s+(\S+)/.exec(String(req.headers.authorization || '')) || [])[1] || '',
         body: parsed && Object.keys(parsed).length ? parsed : null
       });
 
@@ -227,6 +234,15 @@ function startGoogleLaneServer() {
       const bearer = /^Bearer\s+\S+/.test(String(req.headers.authorization || ''));
       if (!e2ePath && !bearer) { send(res, 401, GOOGLE_AUTH_401); return; }
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
+
+      if (!e2ePath) {
+        const once = state.rejectOnce.findIndex((part) => path.indexOf(part) >= 0);
+        if (once >= 0) { state.rejectOnce.splice(once, 1); send(res, 401, GOOGLE_AUTH_401); return; }
+      }
+      if (method === 'GET' && !e2ePath) {
+        const lag = state.lagGets.find((l) => path.indexOf(l.part) >= 0 && l.left > 0);
+        if (lag) { lag.left -= 1; send(res, 404, GOOGLE_404('Not Found')); return; }
+      }
 
       if (method === 'GET' && !e2ePath && state.failGets.some((part) => path.indexOf(part) >= 0)) { send(res, 500, { error: { code: 500, message: 'Backend Error', status: 'INTERNAL' } }); return; }
 
@@ -263,7 +279,7 @@ function startGoogleLaneServer() {
           send(res, 200, { files: [{ id: 'pricing-pdf', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] });
           return;
         }
-        send(res, 200, { files: [] });
+        send(res, 200, { files: state.driveHits.slice() });
         return;
       }
 
@@ -558,6 +574,9 @@ function startGoogleLaneServer() {
         get listCreates() { return state.listCreates; },
         get defaultList() { return state.defaultList; },
         rejectAuth: (part) => { state.unauthorized.push(part); },
+        rejectOnce: (part) => { state.rejectOnce.push(part); },
+        driveHits: (files) => { state.driveHits = (files || []).slice(); },
+        lagGets: (part, count) => { state.lagGets.push({ part: part, left: count }); },
         failGet: (part) => { state.failGets.push(part); },
         clearFailGets: () => { state.failGets = []; },
         events: () => state.events,

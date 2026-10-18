@@ -1772,16 +1772,6 @@ async function getGoogleAccessToken(interactive) {
   }
 }
 
-async function invalidateGoogleCredential(cred) {
-  if (!cred) return;
-  if (cred.source === 'web') {
-    const stored = await readGoogleWebAuth();
-    if (stored && stored.accessToken === cred.token) await clearGoogleWebAuth();
-    return;
-  }
-  if (cred.token) await removeCachedGoogleAuthToken(cred.token);
-}
-
 // Evicts Chrome's getAuthToken cache only. Does not open the web flow —
 // Disconnect must not pop a consent window when browser sign-in is off.
 async function clearCachedChromeGoogleTokens() {
@@ -1983,6 +1973,12 @@ async function googleAuthIdentity() {
 }
 
 async function googleLoginHint() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    const wanted = flag && (flag.reason === 'wrong-account' || flag.reason === 'account-unverified') && typeof flag.account === 'string' ? flag.account.trim() : '';
+    if (wanted.indexOf('@') > 0) return wanted;
+  } catch (e) { /* the stored hint below still applies */ }
   const stored = await readGoogleWebAuth();
   const hint = stored && typeof stored.loginHint === 'string' ? stored.loginHint.trim() : '';
   return hint.indexOf('@') > 0 ? hint : '';
@@ -2140,18 +2136,41 @@ async function refreshGoogleSession() {
   return { ok: false, source: null, token: '' };
 }
 
-// One silent refresh after a 401. Web tokens use prompt=none. Chrome tokens
-// use getAuthToken({ interactive: false }). Neither opens a consent window.
+// Google ends a grant with invalid_grant, or says it was revoked. Nothing
+// else a refresh can say (no window, no session, offline) ends it.
+function googleRefreshRevoked(err) {
+  return /invalid_grant|revoked/i.test(String((err && err.message) || err || ''));
+}
+
+// One silent refresh after a 401, then the caller retries once. Web tokens
+// use prompt=none. Chrome tokens use getAuthToken({ interactive: false }).
+// Neither opens a consent window. The stored token is kept when the refresh
+// fails: a 401 can be a single bad answer. Consent is dropped only when the
+// refresh itself says the grant is gone. A null result means: retry once
+// with the token already in hand.
 async function refreshLaneCredential(cred) {
-  await invalidateGoogleCredential(cred);
+  const revoked = async () => {
+    if (cred && cred.source === 'web') await clearGoogleWebAuth();
+    await markGoogleReconnect('revoked');
+    return { revoked: true, token: '', source: cred && cred.source };
+  };
   if (cred && cred.source === 'web') {
     try {
       const saved = await runGoogleWebAuth(false);
       return { token: saved.accessToken, source: 'web' };
-    } catch (e) { /* fall through to the non-interactive Chrome token */ }
+    } catch (e) {
+      if (googleRefreshRevoked(e)) return revoked();
+    }
+  } else if (cred && cred.token) {
+    await removeCachedGoogleAuthToken(cred.token);
   }
-  const token = await getGoogleAuthToken(false);
-  return { token: token, source: 'chrome' };
+  try {
+    const token = await getGoogleAuthToken(false);
+    return { token: token, source: 'chrome' };
+  } catch (e) {
+    if (googleRefreshRevoked(e)) return revoked();
+    return null;
+  }
 }
 
 // The lane host calls these. refreshSilent is getGoogleWebAccessToken(false):
@@ -2197,25 +2216,15 @@ async function googleAuthedFetch(baseUrl, path, rawOptions) {
   const res = await doFetch(cred.token);
   if (soft) return res;
   if (res.status !== 401) return rememberGoogleAuthResult(res);
-  // A cached token can go stale (revoked access from the Google Account
-  // permissions page, expired) without Chrome knowing yet — evict it and
-  // request a fresh one once before surfacing the failure, the same
-  // "refresh once, then fail loudly" shape every OAuth connector above uses.
-  // The refresh stays silent. prompt=none may run for a web token; a
-  // consent window may not.
-  await invalidateGoogleCredential(cred);
-  try {
-    if (cred.source === 'web') {
-      const saved = await runGoogleWebAuth(false);
-      cred = { token: saved.accessToken, source: 'web' };
-    } else {
-      cred = await getGoogleAccessToken(false);
-    }
-  } catch (e) {
-    await markGoogleReconnect('not signed in');
-    return googleAuthUnavailableResponse();
-  }
-  return rememberGoogleAuthResult(await doFetch(cred.token));
+  // A cached token can go stale without Chrome knowing yet. One silent
+  // refresh and one retry, then fail loudly. The refresh stays silent:
+  // prompt=none may run for a web token; a consent window may not. The token
+  // is dropped only when the refresh says the grant was revoked.
+  const next = await refreshLaneCredential(cred);
+  if (next && next.revoked) return rememberGoogleAuthResult(res);
+  let retryToken = cred.token;
+  if (next && next.token && (next.source !== 'chrome' || await chromeTokenIsConsented(next.token))) retryToken = next.token;
+  return rememberGoogleAuthResult(await doFetch(retryToken));
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -2250,7 +2259,7 @@ async function findGlanceTaskList() {
   return id;
 }
 
-async function connectGoogleTasks(interactive) {
+async function connectGoogleTasks(interactive, preset) {
   if (!googleTasksConfigured()) {
     throw new Error('Google isn’t configured on this build yet — manifest.json’s oauth2.client_id still needs a real Google OAuth Client ID (see the README’s “Set up Google” section).');
   }
@@ -2258,7 +2267,7 @@ async function connectGoogleTasks(interactive) {
   // script). The popup Connect click passes true. That is the one moment
   // Chrome may show the account chooser or, if browser sign-in is off, the
   // web-flow consent window. Later API calls stay silent.
-  const cred = await getGoogleAccessToken(interactive !== false);
+  const cred = preset || await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
   const taskListId = await findGlanceTaskList();
   await chrome.storage.local.set({
@@ -2267,6 +2276,31 @@ async function connectGoogleTasks(interactive) {
   });
   await clearGoogleReconnect();
   return true;
+}
+
+// The Reconnect button on a card that refused to write because the account
+// could not be verified. It asks Google for the account of the Gmail tab
+// (login_hint) through the web flow, drops the stored token of the other
+// account first so it cannot be reused, and reports whose sign-in came back.
+async function reconnectGoogleForAccount(account) {
+  const hint = String(account || '').trim();
+  const wanted = hint.indexOf('@') > 0 ? hint : '';
+  if (!wanted) {
+    await connectGoogleTasks(true);
+    return { ok: true, account: await globalThis.FlowGoogleLaneAccount.read() };
+  }
+  await chrome.storage.local.set({ [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: 'account-unverified', account: wanted } });
+  invalidateGoogleWebAuthFlight();
+  await clearGoogleWebAuth();
+  const web = await getGoogleWebAccessToken(true);
+  await recordGoogleConsent(web.token, 'web');
+  const lane = globalThis.FlowGoogleLaneAccount;
+  const got = lane ? await lane.accountOf(web.token) : '';
+  if (!got || got.toLowerCase() !== wanted.toLowerCase()) {
+    return { ok: false, reason: got ? 'wrong-account' : 'account-unverified', account: got || '', wanted: wanted };
+  }
+  await connectGoogleTasks(true, web);
+  return { ok: true, account: got };
 }
 
 function googleTaskTitle(p) {
@@ -5712,6 +5746,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:build-stamp') {
     const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
     return reply(sendResponse, Promise.resolve({ ok: true, build: stamp }));
+  }
+
+  if (msg.type === 'flow:google-reconnect') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
   }
 
   if (msg.type === 'flow:connect') {

@@ -26,42 +26,46 @@ const FlowGoogleAccount = (() => {
 
   // candidates: [{ token, source, email }] in the order they are preferred.
   // email '' means the account could not be read (the profile call failed or
-  // the grant has no Gmail scope). That alone never blocks a write: only an
-  // address that is readable and is not the consented one does, so a token
-  // that cannot be read is used as before and the write says nothing about
-  // the account. connected '' means nothing was recorded yet (an older
-  // install): the first readable candidate becomes the account, and adopt
-  // says to record it.
-  function choose(connected, candidates) {
+  // the grant has no Gmail scope).
+  //
+  // The token is chosen by the account of the Gmail tab, never by which one
+  // answers first. tab is the address the open tab shows; when the tab says
+  // nothing, the account recorded at Connect stands in for it. A write needs
+  // a POSITIVE match: the token's own address, read from the Gmail profile,
+  // is the same address as that account. A readable token of another account
+  // is refused and names both. A token whose address cannot be read, or no
+  // account at all to compare it with, is refused as account-unverified: the
+  // card says so and offers Reconnect. Nothing is ever written on a guess.
+  // With no record and a tab that matches, the match is recorded (adopt).
+  function choose(connected, candidates, tab) {
     const list = (Array.isArray(candidates) ? candidates : []).filter((c) => c && c.token);
     const readable = list.filter((c) => c.email);
-    const want = norm(connected);
-    const unread = () => ({ ok: true, token: list[0].token, source: list[0].source, email: '', adopt: false, unverified: true });
-    if (!want) {
-      const first = readable[0];
-      if (first) return { ok: true, token: first.token, source: first.source, email: first.email, adopt: true };
-      return list.length ? unread() : { ok: false, reason: 'no-token', found: [] };
-    }
+    const recorded = norm(connected);
+    const want = norm(tab) || recorded;
+    if (!list.length) return { ok: false, reason: 'no-token', connected: recorded, tab: want, found: [] };
+    if (!want) return { ok: false, reason: 'account-unverified', why: 'no-account', connected: '', tab: '', found: readable.map((c) => c.email) };
     const hit = readable.find((c) => same(c.email, want));
-    if (hit) return { ok: true, token: hit.token, source: hit.source, email: hit.email, adopt: false };
+    if (hit) return { ok: true, token: hit.token, source: hit.source, email: hit.email, adopt: !recorded };
     if (readable.length) {
-      return { ok: false, reason: 'wrong-account', connected: want, found: readable.map((c) => c.email) };
+      return { ok: false, reason: 'wrong-account', connected: recorded || want, tab: want, found: readable.map((c) => c.email) };
     }
-    return list.length ? unread() : { ok: false, reason: 'no-token', connected: want, found: [] };
+    return { ok: false, reason: 'account-unverified', why: 'profile-unreadable', connected: recorded, tab: want, found: [] };
   }
 
+  // Both addresses are named: the account of the tab and the account of the
+  // sign-in that was found. lang is the language of Glance's own UI.
   function refusalLine(result, lang) {
     const he = String(lang || '').toLowerCase().indexOf('he') === 0;
-    const connected = result && result.connected ? result.connected : '';
+    const tab = result && (result.tab || result.connected) ? (result.tab || result.connected) : '';
     const found = result && Array.isArray(result.found) && result.found.length ? result.found[0] : '';
     if (result && result.reason === 'wrong-account') {
       return he
-        ? 'לא כתבתי: האסימון שנמצא שייך ל-' + found + ', ו-Glance מחובר ל-' + connected + '. חבר מחדש את Google עם החשבון הנכון.'
-        : 'Nothing was written: the Google sign-in found belongs to ' + found + ' and Glance is connected as ' + connected + '. Reconnect Google with the right account.';
+        ? 'לא כתבתי: Gmail פתוח על ' + tab + ', אבל ה-Google שמחובר ל-Glance הוא ' + found + '. חבר מחדש את Google עם ' + tab + '.'
+        : 'Nothing was written: this Gmail tab is ' + tab + ', but the Google sign-in Glance has is ' + found + '. Reconnect Google as ' + tab + '.';
     }
     return he
-      ? 'לא הצלחתי לוודא לאיזה חשבון Google אני כותב, אז לא כתבתי כלום.'
-      : "Couldn't confirm which Google account this would write to, so nothing was written.";
+      ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.'
+      : "Couldn't verify the account — reconnect Google. Nothing was written.";
   }
 
   return {

@@ -24,8 +24,13 @@ const FlowDraftReply = (() => {
     return first;
   }
 
-  function draftGreeting(senderName, senderEmail) {
+  const isHe = (params) => Boolean(params && params.lang === 'he');
+
+  // lang is the language of the mail being answered ('he' or anything else).
+  // The draft is written in it, whatever language Glance's own UI is in.
+  function draftGreeting(senderName, senderEmail, lang) {
     const who = greetingName(senderName, senderEmail);
+    if (lang === 'he') return who ? ('היי ' + who + ',') : 'היי,';
     return who ? ('Hi ' + who + ',') : 'Hi,';
   }
 
@@ -64,7 +69,20 @@ const FlowDraftReply = (() => {
     const sig = askSignals(askText, what);
     if (!sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner && !what) return null;
 
+    const he = isHe(params);
     const lines = [];
+    if (he) {
+      if (sig.wantsReview && sig.wantsConfirm) {
+        lines.push('תודה. אעבור על זה ואחזור עם אישור' + (what ? (': ' + what) : '') + (when ? (' עד ' + when) : '') + '.');
+      } else if (what) {
+        lines.push('תודה. אחזור אליך בנוגע ל: ' + what + (when ? (' (' + when + ')') : '') + '.');
+      } else {
+        lines.push('תודה על ההודעה.');
+      }
+      if (sig.wantsOwner) lines.push('האחראי על ההטמעה אצלנו יהיה [שם].');
+      else if (!sig.wantsReview && !sig.wantsConfirm) lines.push('[כתוב כאן את התשובה]');
+      return lines;
+    }
     if (sig.wantsReview && sig.wantsConfirm) {
       if (sig.hasPilot) {
         let line = "Thanks for sending the pilot proposal. I'll review it and confirm";
@@ -99,7 +117,7 @@ const FlowDraftReply = (() => {
   function attachmentLines(attachment, attachmentSource, params) {
     const lines = [];
     if (attachment && (attachmentSource === 'found' || attachmentSource === 'template')) {
-      lines.push('', 'Attached: ' + attachment.filename);
+      lines.push('', (isHe(params) ? 'מצורף: ' : 'Attached: ') + attachment.filename);
       if (attachmentSource === 'template') {
         const fields = (params && params.fields) || [];
         for (const field of fields) {
@@ -123,14 +141,18 @@ const FlowDraftReply = (() => {
       if (fileOnDraft) return params.lang === 'he' ? 'מצורף.' : 'Attached.';
       return params.lang === 'he' ? 'אצרף בהקדם.' : "I'll attach it shortly.";
     }
-    const greet = draftGreeting(p && p.senderName, p && p.senderEmail);
+    const he = isHe(params);
+    const greet = draftGreeting(p && p.senderName, p && p.senderEmail, he ? 'he' : '');
     if (params.replyFact && !params.shareLink) {
       const factLine = cleanLine(params.factLine);
       return [greet, '', factLine].join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
     }
     const lines = [greet, ''];
     if (shareUrl) {
-      lines.push(params.what || 'The file is ready.');
+      // A line that is not in the mail's language is not used: the planned
+      // sentence for the file step is Glance's own English closing line.
+      const said = params.what && (!he || /[\u0590-\u05FF]/.test(String(params.what))) ? params.what : '';
+      lines.push(said || (he ? 'הקובץ מוכן.' : 'The file is ready.'));
       lines.push(shareUrl);
       return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
     }
@@ -146,12 +168,13 @@ const FlowDraftReply = (() => {
       return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
     }
 
-    if (params.what && params.when) lines.push('Following up on: ' + cleanLine(params.what) + ' (' + cleanLine(params.when) + ')');
-    else if (params.what) lines.push('Following up on: ' + cleanLine(params.what));
-    else lines.push('Following up on your message below.');
+    const follow = he ? 'בהמשך ל: ' : 'Following up on: ';
+    if (params.what && params.when) lines.push(follow + cleanLine(params.what) + ' (' + cleanLine(params.when) + ')');
+    else if (params.what) lines.push(follow + cleanLine(params.what));
+    else lines.push(he ? 'בהמשך להודעה שלך למטה.' : 'Following up on your message below.');
     const att = attachmentLines(attachment, attachmentSource, params);
     for (const line of att) lines.push(line);
-    lines.push('', '[Write your reply here]');
+    lines.push('', he ? '[כתוב כאן את התשובה]' : '[Write your reply here]');
     return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
   }
 

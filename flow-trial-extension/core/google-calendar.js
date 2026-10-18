@@ -255,6 +255,30 @@ const FlowGoogleCalendar = (() => {
     return null;
   }
 
+  // The read of a new event can lag the create. A read that says not found,
+  // or that fails, is repeated with a short backoff, about 3 seconds in all,
+  // before the event is called unverified.
+  const UNVERIFIED = 'unverified';
+  const READ_BACK_DELAYS = [250, 500, 750, 1000, 500];
+
+  function pause(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function notYetReadable(got) {
+    return got.status === 404 || got.status === 410 || got.status === 0 || got.status >= 500;
+  }
+
+  async function readBack(http, id, delays) {
+    const waits = Array.isArray(delays) ? delays : READ_BACK_DELAYS;
+    let got = await call(http, { method: 'GET', url: eventUrl(id) });
+    for (let n = 0; n < waits.length && notYetReadable(got); n++) {
+      await pause(waits[n]);
+      got = await call(http, { method: 'GET', url: eventUrl(id) });
+    }
+    return got;
+  }
+
   async function write(input, http, clock) {
     const C = cfg();
     const i = input || {};
@@ -278,7 +302,7 @@ const FlowGoogleCalendar = (() => {
       url: null
     };
     if (!event.id) return Object.assign({ ok: false, reason: pending, ref: null, proof: null, object: 'event', title: body.summary }, base);
-    const got = await call(http, { method: 'GET', url: eventUrl(event.id) });
+    const got = await readBack(http, event.id, i.readBackDelays);
     const named = { object: 'event', title: body.summary, eventId: event.id };
     // An event that cannot be confirmed is removed again, so nothing stays in
     // Google that the card does not own. If the removal also fails the ref is
@@ -289,7 +313,12 @@ const FlowGoogleCalendar = (() => {
       return Object.assign({ ok: false, reason: failed, ref: removed ? null : { eventId: event.id, externalId: event.id }, proof: null, removed: removed }, named, base);
     };
     if (!got.ok || !got.json || got.json.id !== event.id || got.json.status === 'cancelled') {
-      if (got.status === 404 || got.status === 410) return Object.assign({ ok: false, reason: failed, ref: null, proof: null, removed: true }, named, base);
+      // The event was created and Google has not shown it to a read yet.
+      // It stays, with its id, so Undo can delete it, and the card says it
+      // was not verified. Nothing is claimed and nothing is left unowned.
+      if (got.status === 404 || got.status === 410) {
+        return Object.assign({ ok: false, reason: UNVERIFIED, ref: { eventId: event.id, externalId: event.id, unverified: true }, proof: null, unverified: true }, named, base);
+      }
       return withdraw();
     }
     // Handled needs the event the API returns for that id to be the event
@@ -322,6 +351,18 @@ const FlowGoogleCalendar = (() => {
     const id = ref && typeof ref === 'object' ? (ref.externalId || ref.eventId) : ref;
     const req = undoRequest(id);
     if (!req) return { ok: false };
+    // An event Google had not shown back yet is deleted by its id, with no
+    // content check: Glance made it moments ago and nothing was verified.
+    if (ref && typeof ref === 'object' && ref.unverified === true && !ref.contentHash) {
+      const seen = await readBack(http, id);
+      if (seen.status === 401 || seen.status === 403) return { ok: false, reason: 'not-connected' };
+      if (seen.status === 404 || seen.status === 410) return { ok: true, written: 'Calendar event removed.' };
+      if (!seen.ok) return { ok: false, reason: 'http-' + seen.status };
+      const gone = await call(http, req);
+      if (gone.status === 401 || gone.status === 403) return { ok: false, reason: 'not-connected' };
+      if (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410) return { ok: true, written: 'Calendar event removed.' };
+      return { ok: false, reason: 'http-' + gone.status };
+    }
     if (!ref || typeof ref !== 'object' || !ref.contentHash) return unconfirmedUndo();
     const got = await call(http, { method: 'GET', url: eventUrl(id) });
     if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };

@@ -16,7 +16,7 @@ function check(name, cond, detail) {
 const fetches = [];
 let authCalls = 0;
 const listeners = [];
-const stored = { googleTasksAuth: { taskListId: 'glance-list' } };
+const stored = { googleTasksAuth: { taskListId: 'glance-list' }, googleConnectedAccount: { email: 'host@example.com' } };
 const sandbox = {
   module: undefined,
   console,

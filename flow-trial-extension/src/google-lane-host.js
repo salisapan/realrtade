@@ -124,7 +124,7 @@ async function recordConnectedAccount(token, source) {
   return email;
 }
 
-async function laneCredential() {
+async function laneCredential(tab) {
   const A = Account();
   const connected = await readConnectedAccount();
   const stored = await storedConnectToken();
@@ -133,7 +133,7 @@ async function laneCredential() {
   if (stored) candidates.push({ token: stored, source: 'web' });
   if (chromeToken && chromeToken !== stored) candidates.push({ token: chromeToken, source: 'chrome' });
   for (let i = 0; i < candidates.length; i++) candidates[i].email = await accountOfToken(candidates[i].token);
-  const picked = A.choose(connected, candidates);
+  const picked = A.choose(connected, candidates, tab);
   if (picked.ok && picked.adopt) await recordConnectedAccount(picked.token, picked.source);
   laneSource = picked.ok ? picked.source : 'web';
   return picked;
@@ -200,14 +200,16 @@ function laneGoogleStatus(auth, reconnect, token, ever, extras) {
   };
 }
 
-function noteGoogleAuthFailure(reason) {
+function noteGoogleAuthFailure(reason, account) {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve();
   return Promise.resolve()
     .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth', 'googleWebAuth', 'glanceLaneUndo']))
     .then((bag) => {
       if (!priorGoogleRecord(bag)) return null;
       const ever = bag && everConnectedRecord(bag[EVER_KEY]);
-      const patch = { [RECONNECT_KEY]: { needed: true, reason: String(reason || 'auth') } };
+      const flag = { needed: true, reason: String(reason || 'auth') };
+      if (account) flag.account = String(account);
+      const patch = { [RECONNECT_KEY]: flag };
       if (!ever) patch[EVER_KEY] = { connected: true };
       return chrome.storage.local.set(patch);
     })
@@ -335,13 +337,17 @@ function verifyGet(gate, exec) {
   });
 }
 
+// The Gmail tab of the message being handled: every Google call inside it
+// picks its token by that account, not by the one recorded at Connect.
+let activeTab = '';
+
 function laneHttp(req) {
   const request = req || {};
   const method = request.method || 'GET';
   const url = laneUrl(request.url);
   const gate = undoGate;
   return Promise.resolve()
-    .then(() => laneCredential())
+    .then(() => laneCredential(request.tab || activeTab))
     .then((picked) => {
       if (!picked.ok && picked.reason !== 'no-token') return { status: 0, ok: false, json: null, account: picked };
       const token = picked.ok ? picked.token : '';
@@ -365,9 +371,10 @@ function laneHttp(req) {
         return once(token).then((res) => {
           if (!res || res.status !== 401 || !criticalUrl(request.url)) return settle(res);
           return retryLane(cred).then((next) => {
-            if (!next || !next.token || next.token === token) return settle(res);
+            if (next && next.revoked) return settle(res);
+            if (!next || !next.token || next.token === token) return once(token).then(settle);
             return accountOfToken(next.token).then((email) => {
-              if (!email || !Account().same(email, picked.email)) return settle(res);
+              if (!email || !Account().same(email, picked.email)) return once(token).then(settle);
               return once(next.token).then(settle);
             });
           });
@@ -484,32 +491,48 @@ async function writeWithListRecovery(connectorId, msgInput, cred) {
 }
 
 
-function wrongAccountResult(picked, extra) {
-  const line = Account().refusalLine(picked, uiLanguage());
-  return Object.assign({
+// Both refusals write nothing and keep the Reconnect offer on the card.
+// reconnectAccount is the address the Reconnect button asks Google for: the
+// account of the Gmail tab, or failing that the recorded one.
+function wrongAccountResult(picked, extra, lang) {
+  const line = Account().refusalLine(picked, lang || uiLanguage());
+  const tab = picked.tab || picked.connected || '';
+  const token = picked.found && picked.found[0] ? picked.found[0] : '';
+  const wrong = picked.reason === 'wrong-account';
+  return noteGoogleAuthFailure(wrong ? 'wrong-account' : 'account-unverified', tab).then(() => Object.assign({
     ok: false,
-    reason: picked.reason === 'wrong-account' ? 'wrong-account' : 'account-unverified',
+    reason: wrong ? 'wrong-account' : 'account-unverified',
+    why: picked.why || '',
     error: line,
     written: line,
     connected: picked.connected || '',
-    account: picked.found && picked.found[0] ? picked.found[0] : '',
+    tabAccount: tab,
+    tokenAccount: token,
+    account: token,
+    reconnectAccount: tab,
+    needsReconnect: true,
+    reconnectLabel: reconnectWords(),
     proof: null
-  }, extra || {});
+  }, extra || {}));
 }
 
-// A write goes out only on the verified token of the connected account. The
-// result names that account, so the card can say where it landed.
-async function guardedWrite(connectorId, input) {
-  const picked = await laneCredential();
-  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked);
+// A write goes out only on the verified token of the account the Gmail tab
+// shows. The result names that account, so the card can say where it landed.
+async function guardedWrite(connectorId, input, ctx) {
+  const c = ctx || {};
+  activeTab = c.tab || '';
+  const picked = await laneCredential(c.tab);
+  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
   const result = await writeWithListRecovery(connectorId, input, picked.ok ? picked : null);
   if (result && picked.ok && result.ok !== undefined) result.account = picked.email;
   return result;
 }
 
-async function guardedUndo(connectorId, ref) {
-  const picked = await laneCredential();
-  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked);
+async function guardedUndo(connectorId, ref, ctx) {
+  const c = ctx || {};
+  activeTab = c.tab || '';
+  const picked = await laneCredential(c.tab);
+  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
   const prepared = await prepareUndo(connectorId, ref);
   return Lane.undo(connectorId, prepared);
 }
@@ -733,8 +756,9 @@ async function verifyStep(step) {
   return j.id ? 'present' : 'unknown';
 }
 
-async function verifySteps(steps) {
-  const picked = await laneCredential();
+async function verifySteps(steps, tab) {
+  activeTab = tab || '';
+  const picked = await laneCredential(tab);
   if (!picked.ok) return { ok: false, reason: picked.reason === 'no-token' ? 'unverified' : 'unverified', states: [] };
   const states = [];
   for (let i = 0; i < (steps || []).length; i++) {
@@ -744,25 +768,26 @@ async function verifySteps(steps) {
 }
 
 function onLaneMessage(msg, sender, sendResponse) {
+  activeTab = msg && typeof msg.tabAccount === 'string' ? msg.tabAccount : '';
   if (msg && msg.type === 'flow:fetch-attachment') {
     fetchAttachment(msg).then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
     return true;
   }
   if (!msg || !Lane) return undefined;
   if (msg.type === 'flow:google-write') {
-    Promise.resolve(guardedWrite(msg.connectorId, msg.input))
+    Promise.resolve(guardedWrite(msg.connectorId, msg.input, { tab: msg.tabAccount, lang: msg.lang }))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
     return true;
   }
   if (msg.type === 'flow:google-verify') {
-    Promise.resolve(verifySteps(Array.isArray(msg.steps) ? msg.steps.slice(0, 8) : []))
+    Promise.resolve(verifySteps(Array.isArray(msg.steps) ? msg.steps.slice(0, 8) : [], msg.tabAccount))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unverified', states: [] }));
     return true;
   }
   if (msg.type === 'flow:google-undo') {
     const gate = beginUndo();
-    Promise.resolve(guardedUndo(msg.connectorId, msg.ref))
+    Promise.resolve(guardedUndo(msg.connectorId, msg.ref, { tab: msg.tabAccount, lang: msg.lang }))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }))
       .finally(() => endUndo(gate));

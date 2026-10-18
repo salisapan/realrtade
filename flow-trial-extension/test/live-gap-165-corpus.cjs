@@ -35,13 +35,25 @@ check('a Chrome token of another account alone is refused and names both address
   const r = Account.choose('me@gmail.com', [chrome]);
   return r.ok === false && r.reason === 'wrong-account' && r.connected === 'me@gmail.com' && r.found[0] === 'other@gmail.com' && /other@gmail.com/.test(Account.refusalLine(r, 'en')) && /me@gmail.com/.test(Account.refusalLine(r, 'he'));
 })());
-check('no record yet: the first readable token becomes the account and is adopted', (() => {
-  const r = Account.choose('', [chrome, stored]);
-  return r.ok === true && r.token === 'ya29.chrome' && r.adopt === true;
+check('no record yet but the tab account matches the token: the match is adopted', (() => {
+  const r = Account.choose('', [chrome, stored], 'me@gmail.com');
+  return r.ok === true && r.token === 'ya29.stored' && r.adopt === true;
 })());
-check('an unreadable profile never blocks a write on its own', (() => {
+check('no record and no tab account: nothing to match against, so no write', (() => {
+  const r = Account.choose('', [chrome, stored]);
+  return r.ok === false && r.reason === 'account-unverified' && r.why === 'no-account';
+})());
+check('an unreadable profile is never a match: no write, account-unverified', (() => {
   const r = Account.choose('me@gmail.com', [{ token: 'ya29.x', source: 'web', email: '' }]);
-  return r.ok === true && r.unverified === true && r.email === '' && r.adopt === false;
+  return r.ok === false && r.reason === 'account-unverified' && r.why === 'profile-unreadable' && r.tab === 'me@gmail.com';
+})());
+check('an unreadable token next to a matching one: the matching one is used', (() => {
+  const r = Account.choose('me@gmail.com', [{ token: 'ya29.x', source: 'web', email: '' }, stored]);
+  return r.ok === true && r.token === 'ya29.stored';
+})());
+check('the unverified line is Hebrew in the Hebrew UI and English otherwise', (() => {
+  const r = Account.choose('me@gmail.com', [{ token: 'ya29.x', source: 'web', email: '' }]);
+  return /לא הצלחתי לאמת את החשבון — יש להתחבר מחדש/.test(Account.refusalLine(r, 'he')) && /verify the account/.test(Account.refusalLine(r, 'en'));
 })());
 check('no token at all is no-token', Account.choose('me@gmail.com', []).reason === 'no-token');
 check('bidi marks and case do not make two addresses different', Account.same('\u200eMe@Gmail.com', 'me@gmail.com') === true);

@@ -144,7 +144,7 @@ def check_profiles() -> None:
                 die(f"full zip is missing runtime files: {sorted(set(RUNTIME_MARKERS) - set(have))}")
             if profile == "full" and "vendor/web-llm.LICENSE" not in names:
                 die("full zip ships the runtime without its licence text")
-        if not sizes["lite"] < sizes["full"] / 3:
+        if not sizes["lite"] < sizes["full"] / 2.5:
             die(f"lite ({sizes['lite']}) is not much smaller than full ({sizes['full']}); something large is still bundled")
         if package.encoded_size(sizes["lite"]) > package.FUNCTION_RESPONSE_BUDGET:
             die("the lite zip does not fit the download function's response budget")

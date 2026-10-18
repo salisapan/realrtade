@@ -23,6 +23,7 @@ test.afterAll(async () => {
 
 test.beforeEach(async ({ glance }) => {
   server.reset();
+  server.setAccount('me@x.com');
   await glance.evaluateWorker((origin) => {
     globalThis.__glanceE2e.httpOrigin = origin;
   }, server.origin);

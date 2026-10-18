@@ -15,7 +15,7 @@ function check(name, cond, detail) {
 
 const STORED = 'ya29.stored-connect';
 const LIST = 'glance-list';
-const stored = {};
+const stored = { googleConnectedAccount: { email: 'me@example.com' } };
 const fetches = [];
 let authCalls = 0;
 let lastDetails = null;
@@ -50,6 +50,9 @@ async function laneFetch(url, init) {
   const auth = headers.Authorization || '';
   fetches.push({ url: String(url), method: method, auth: auth });
   const expect = storedBearer();
+  if (/\/gmail\/v1\/users\/me\/profile/.test(String(url))) {
+    return Object.assign(jsonResponse(200, { emailAddress: expect && auth === expect ? 'me@example.com' : 'other@example.com' }), { json: async () => ({ emailAddress: expect && auth === expect ? 'me@example.com' : 'other@example.com' }) });
+  }
   if (!expect || auth !== expect) return jsonResponse(401, { error: { code: 401 } });
   const u = String(url);
   const body = parseInit(init);

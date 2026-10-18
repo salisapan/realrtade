@@ -89,6 +89,27 @@ const FlowGoogleTasks = (() => {
     }
   }
 
+  const UNVERIFIED = 'unverified';
+  const READ_BACK_DELAYS = [250, 500, 750, 1000, 500];
+
+  function pause(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function notYetReadable(got) {
+    return got.status === 404 || got.status === 410 || got.status === 0 || got.status >= 500;
+  }
+
+  async function readBack(http, listId, taskId, delays) {
+    const waits = Array.isArray(delays) ? delays : READ_BACK_DELAYS;
+    let got = await call(http, { method: 'GET', url: taskUrl(listId, taskId) });
+    for (let n = 0; n < waits.length && notYetReadable(got); n++) {
+      await pause(waits[n]);
+      got = await call(http, { method: 'GET', url: taskUrl(listId, taskId) });
+    }
+    return got;
+  }
+
   async function write(input, http, clock) {
     const C = cfg();
     const i = input || {};
@@ -113,11 +134,16 @@ const FlowGoogleTasks = (() => {
     const base = { where: 'Google Tasks', target: listName || 'Google Tasks', written: written, url: null };
     const named = { object: 'task', title: body.title };
     if (!task.id) return Object.assign({ ok: false, reason: 'proof_pending', ref: null, proof: null }, named, base);
-    const got = await call(http, { method: 'GET', url: taskUrl(listId, task.id) });
+    const got = await readBack(http, listId, task.id, i.readBackDelays);
     const backList = listOfTask(got.json);
     const wrongList = listId !== '@default' && backList && backList !== listId;
+    // Created, and Google has not shown it to a read yet: the task stays
+    // with its id, so Undo can delete it, and nothing is claimed.
+    if (got.status === 404 || got.status === 410) {
+      return Object.assign({ ok: false, reason: UNVERIFIED, ref: { taskListId: listId, taskId: task.id, externalId: task.id, unverified: true }, proof: null, unverified: true }, named, base);
+    }
     if (!got.ok || !got.json || got.json.id !== task.id || got.json.deleted || wrongList || !sameTask(body, got.json)) {
-      let removed = got.status === 404;
+      let removed = false;
       if (!removed) {
         const gone = await call(http, { method: 'DELETE', url: taskUrl(listId, task.id) });
         removed = gone.ok || gone.status === 204 || gone.status === 404;
@@ -142,6 +168,16 @@ const FlowGoogleTasks = (() => {
     const listId = ref && (ref.taskListId || ref.listId);
     const req = undoRequest(listId, taskId);
     if (!req) return { ok: false };
+    if (ref && ref.unverified === true && !ref.contentHash) {
+      const seen = await readBack(http, listId, taskId);
+      if (seen.status === 401 || seen.status === 403) return { ok: false, reason: 'not-connected' };
+      if (seen.status === 404 || seen.status === 410) return { ok: true, written: 'Google Task removed.' };
+      if (!seen.ok) return { ok: false, reason: 'http-' + seen.status };
+      const gone = await call(http, req);
+      if (gone.status === 401 || gone.status === 403) return { ok: false, reason: 'not-connected' };
+      if (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410) return { ok: true, written: 'Google Task removed.' };
+      return { ok: false, reason: 'http-' + gone.status };
+    }
     if (!ref || !ref.contentHash) return unconfirmedUndo();
     const got = await call(http, { method: 'GET', url: taskUrl(listId, taskId) });
     if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };

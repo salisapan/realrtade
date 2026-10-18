@@ -45,7 +45,8 @@ function accountButton(o, ownEmail, name) {
 // Gmail's own header in a right-to-left account. The collapsed line names the
 // recipients with no label. "Show details" opens a table of label cells
 // (td) and address cells, the labels carry bidi marks and a trailing colon.
-// opts.detailsTable = { to: [], cc: [], expanded: bool, hebrew: bool, bidi: bool }
+// opts.detailsTable = { to: [], cc: [], expanded: bool, hebrew: bool, bidi: bool, lateMs: number }
+// lateMs: Gmail paints the recipients after the body, so the first scan sees no header.
 function gmailDetailsTable(o, senderEmail, senderName, ownEmail) {
   const d = o.detailsTable || {};
   const mark = d.bidi === false ? '' : '\u200f';
@@ -58,11 +59,23 @@ function gmailDetailsTable(o, senderEmail, senderName, ownEmail) {
     '<tr><td class="gG">' + label('מאת', 'from') + '</td><td><span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span></td></tr>' +
     row(label('אל', 'to'), d.to) + row(label('עותק', 'cc'), d.cc) +
     '</table>';
+  if (d.lateMs) {
+    return '<div class="glance-late-hdr"></div><script>setTimeout(function(){var h=document.querySelector(".glance-late-hdr");if(h)h.innerHTML=' + JSON.stringify(table).replace(/</g, '\\u003c') + ';},' + Number(d.lateMs) + ');</script>';
+  }
   if (d.expanded) return table;
   const all = (d.to || []).concat(d.cc || []);
   const names = all.map((a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? 'אליי' : esc(a)) + '</span>').join(', ');
   return '<div class="hb"><span class="ajy" role="button" aria-label="הצג פרטים" data-table="' + esc(table) + '" ' +
     'onclick="this.parentNode.insertAdjacentHTML(\'afterend\', this.getAttribute(\'data-table\'));this.parentNode.remove()">' + names + '</span></div>';
+}
+
+// opts.threadIdOnHeader: real Gmail puts the thread on h2.hP only, never on the
+// message. opts.noThreadId: no thread id anywhere. opts.threadPermId: only the decimal data-thread-perm-id is there.
+function threadHeaderAttrs(o, threadId) {
+  if (o.noThreadId) return '';
+  if (o.threadPermId) return ' data-thread-perm-id="thread-f:' + esc(o.threadPermId) + '"';
+  if (!o.threadIdOnHeader) return '';
+  return ' data-legacy-thread-id="' + esc(threadId) + '" data-thread-perm-id="thread-f:1"';
 }
 
 function gmailHtml(opts) {
@@ -101,7 +114,7 @@ function gmailHtml(opts) {
       ? ('<form><textarea name="to"></textarea><input name="subjectbox" value="">' +
         '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></form>')
       : '');
-  const message = '<div class="' + (o.threadBesideInbox ? 'adn' : '') + '" role="' + (o.threadBesideInbox ? 'article' : 'listitem') + '" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
+  const message = '<div class="' + (o.threadBesideInbox ? 'adn' : '') + '" role="' + (o.threadBesideInbox ? 'article' : 'listitem') + '"' + ((o.threadIdOnHeader || o.noThreadId) ? '' : ' data-legacy-thread-id="' + esc(threadId) + '"') + ' data-legacy-message-id="' + esc(messageId) + '">' +
     '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
     '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
     (o.detailsTable ? detailsTable : toLine + ccLine) + chips +
@@ -120,7 +133,7 @@ function gmailHtml(opts) {
     account +
     '<div role="main">' +
     inbox +
-    '<h2 class="hP">' + esc(subject) + '</h2>' +
+    '<h2 class="hP"' + threadHeaderAttrs(o, threadId) + '>' + esc(subject) + '</h2>' +
     message + compose + '</div></body></html>';
 }
 

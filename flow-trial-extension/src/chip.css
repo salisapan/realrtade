@@ -505,6 +505,24 @@
   text-underline-offset: 3px;
 }
 .flow-chip-undo:hover { color: #083d26; }
+.flow-chip-reconnect {
+  all: initial;
+  display: inline-block;
+  max-width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0B4F32;
+  cursor: pointer;
+  padding: 6px 0;
+  min-height: 32px;
+  line-height: 1.35;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.flow-chip-reconnect:hover { color: #083d26; }
+.flow-chip-reconnect:disabled { opacity: .65; cursor: default; }
+.flow-chip-reconnect:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
 .flow-chip-undo:disabled { opacity: .65; cursor: default; }
 .flow-chip-undo:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
 
@@ -571,6 +589,7 @@
   .flow-chip-handled,
   .flow-chip-written,
   .flow-chip-undo,
+  .flow-chip-reconnect,
   .flow-chip.flow-chip-done .flow-chip-label { color: #d8f3e4; }
   .flow-chip-undo:hover,
   .flow-chip-link:hover { color: #f3faf6; }

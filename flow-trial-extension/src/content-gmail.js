@@ -64,6 +64,7 @@ function glanceUiCopy(kind) {
   if (kind === 'taskRemoved') return he ? 'משימת Google הוסרה.' : 'Google Task removed.';
   if (kind === 'calendarRemoved') return he ? 'אירוע היומן הוסר.' : 'Calendar event removed.';
   if (kind === 'handled') return he ? 'טופל.' : 'Handled.';
+  if (kind === 'notVerified') return he ? 'לא אומת' : 'Not verified';
   if (kind === 'undo') return he ? 'בטל' : 'Undo';
   if (kind === 'undoAll') return he ? 'בטל הכל' : 'Undo all';
   if (kind === 'undoing') return he ? 'מבטל…' : 'Undoing…';
@@ -1135,8 +1136,29 @@ function glanceUiCopy(kind) {
   // Gmail stamps data-legacy-thread-id on the message or an ancestor. A
   // missing attribute is not guessed at — personal close memory treats a
   // missing thread id as "not clear" unless the subject itself is specific.
+  //
+  // Real Gmail does not stamp the thread on the message at all. The thread
+  // header (h2.hP) carries data-legacy-thread-id, the id the Gmail API takes,
+  // and data-thread-perm-id, the same id written in decimal after
+  // "thread-f:". The decimal is converted to the hex id. The address bar is
+  // read last, and only when it holds a hex id. A thread whose id cannot be
+  // read stays null: nothing is guessed.
+  function threadIdFromHeader() {
+    const header = document.querySelector('div[role="main"] h2.hP, h2.hP');
+    if (header && header.getAttribute) {
+      const legacy = String(header.getAttribute('data-legacy-thread-id') || '').trim();
+      if (/^[0-9a-f]{8,24}$/i.test(legacy)) return legacy.toLowerCase();
+      const perm = /^thread-f:(\d{6,30})$/.exec(String(header.getAttribute('data-thread-perm-id') || '').trim());
+      if (perm && typeof BigInt === 'function') {
+        try { return BigInt(perm[1]).toString(16); } catch (e) { /* not a number */ }
+      }
+    }
+    const hash = String((location && location.hash) || '').split('/').pop().split('?')[0];
+    return /^[0-9a-f]{12,24}$/i.test(hash) ? hash.toLowerCase() : '';
+  }
+
   function threadIdFrom(message) {
-    return gmailAttr(message, 'data-legacy-thread-id') || null;
+    return gmailAttr(message, 'data-legacy-thread-id') || threadIdFromHeader() || null;
   }
 
   // Prefer silence when this open message clearly continues a personal
@@ -1226,6 +1248,57 @@ function glanceUiCopy(kind) {
         });
       });
     });
+  }
+
+  // The one Cc-only rule, asked of the live header. Classification asks it
+  // first. Gmail can paint the recipients after the body, so a card that was
+  // offered before the header was read is asked again once it is there, and
+  // again when Do It is pressed. Copied only, with no greeting of the
+  // account's own name, is no card of any kind.
+  function copiedOnlyNow(message, text, ownEmail) {
+    if (typeof FlowIntent === 'undefined' || typeof FlowIntent.copiedOnly !== 'function') return false;
+    const own = String(ownEmail || '').trim();
+    if (!own || !message || !message.isConnected) return false;
+    const aud = audienceOf(message, own);
+    if (!(aud.to || []).length && !(aud.cc || []).length) return false;
+    try {
+      return FlowIntent.copiedOnly(text, {
+        to: aud.to, cc: aud.cc, ownAddresses: [own],
+        userName: aud.userName || null, ownNames: ownNamesForChip(aud.userName)
+      });
+    } catch (e) { return false; }
+  }
+
+  function withdrawOffer(message, messageId) {
+    if (!message || !message.querySelectorAll) return;
+    message.querySelectorAll('.flow-chip-host').forEach((h) => {
+      if (h.querySelector('.flow-chip-handled, .flow-chip-done-icon') || h.getAttribute('data-glance-chain') === 'task-proof') return;
+      h.remove();
+    });
+    recordSilence(messageId, 'audience');
+  }
+
+  const copiedWatchers = new WeakMap();
+  function watchCopiedOnly(message, messageId, text, ownEmail, audience) {
+    if (!message || typeof MutationObserver === 'undefined' || copiedWatchers.has(message)) return;
+    if (audience && ((audience.to || []).length || (audience.cc || []).length)) return;
+    let timer = null;
+    const stop = () => {
+      const w = copiedWatchers.get(message);
+      if (w) { w.observer.disconnect(); clearTimeout(w.cap); }
+      clearTimeout(timer);
+      copiedWatchers.delete(message);
+    };
+    const check = () => {
+      if (!message.isConnected || !message.querySelector('.flow-chip-host')) { stop(); return; }
+      const aud = audienceOf(message, ownEmail);
+      if (!(aud.to || []).length && !(aud.cc || []).length) return;
+      stop();
+      if (copiedOnlyNow(message, text, ownEmail)) withdrawOffer(message, messageId);
+    };
+    const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(check, 80); });
+    observer.observe(message, { childList: true, subtree: true, characterData: true });
+    copiedWatchers.set(message, { observer: observer, cap: setTimeout(stop, 15000) });
   }
 
   // A Drive / Doc / Sheet close has to know whether exactly one file
@@ -1917,6 +1990,7 @@ function glanceUiCopy(kind) {
             messageId, intent, sender, subject, attachment, attachments,
             threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
           });
+          watchCopiedOnly(message, messageId, text, ownEmail, audience);
           return;
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
@@ -1956,8 +2030,17 @@ function glanceUiCopy(kind) {
       executionMemory: executionMemory,
       attachFile: attachFile
     });
-    const process = planned && planned.process;
+    let process = planned && planned.process;
     if (!process) { void flushSuggest(false); return; }
+    // A reply draft is saved in the thread by its id. With no thread id and
+    // no compose window open, that step cannot be kept, so it is not offered.
+    if (!threadId && !composeBodyOpen()) {
+      const kept = process.steps.filter((step) => !(step && step.kind === 'gmailDraft'));
+      if (kept.length !== process.steps.length) {
+        if (!kept.length) { void flushSuggest(false); recordSilence(messageId, 'thread-id'); return; }
+        process = Object.assign({}, process, { steps: kept });
+      }
+    }
 
     injectChip(message, {
       messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, laneIds: stable.laneIds, intent, process, sender, subject, attachment: chosenAttachment, attachments,
@@ -1971,6 +2054,7 @@ function glanceUiCopy(kind) {
       executionMemory: executionMemory,
       app: 'gmail'
     });
+    watchCopiedOnly(message, messageId, text, ownEmail, audience);
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
     // not a rare edge case — logging 'shown' again every time would fill the
     // 200-entry cap with duplicates for one message and evict real history
@@ -2859,7 +2943,7 @@ function glanceUiCopy(kind) {
     if (response.reason === 'range-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || 'Undo stopped. That text was edited, so nothing was deleted.');
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'wrong-account' && !response.expected && response.error) return response.error;
-    if (response.reason === 'account-unverified') return response.error || (glanceUiHebrew() ? 'לא הצלחתי לוודא לאיזה חשבון Google אני כותב, אז לא כתבתי כלום.' : "Couldn't confirm which Google account this would write to, so nothing was written.");
+    if (response.reason === 'account-unverified') return response.error || (glanceUiHebrew() ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.");
     if (response.reason === 'wrong-account') {
       return glanceUiHebrew()
         ? 'לא נסגר — האירוע נכתב ליומן של ' + (response.account || 'חשבון אחר') + ' ולא של ' + (response.expected || 'החשבון הפתוח') + '. הסרתי אותו.'
@@ -2869,6 +2953,12 @@ function glanceUiCopy(kind) {
       return glanceUiHebrew()
         ? 'לא נסגר — רשימת המשימות ב-Google לא נמצאה. לא נכתבה משימה ולא נוצרה רשימה.'
         : 'Not closed — the Google Tasks list was not found. No task was written and no list was made.';
+    }
+    if (response.reason === 'unverified') {
+      const what = response.object === 'event' ? (glanceUiHebrew() ? 'האירוע' : 'event') : (glanceUiHebrew() ? 'המשימה' : 'task');
+      return glanceUiHebrew()
+        ? 'לא אומת — Google עדיין לא החזיר את ' + what + '. הוא נשאר, ו-Undo מסיר אותו.'
+        : 'Not verified — Google has not returned the ' + what + ' yet. It stays, and Undo removes it.';
     }
     if (response.reason === 'verify_failed') {
       const what = response.object === 'event' ? (glanceUiHebrew() ? 'האירוע' : 'event') : (glanceUiHebrew() ? 'המשימה' : 'task');
@@ -3024,7 +3114,7 @@ function glanceUiCopy(kind) {
       if (cleanParams.shareLink) {
         if (!priorUrl) return null;
         return Object.assign(base, {
-          params: Object.assign({}, cleanParams, { shareUrl: priorUrl, shareLink: true, includeAttachment: false, requestedObjectTerm: null }),
+          params: Object.assign({}, cleanParams, { shareUrl: priorUrl, shareLink: true, includeAttachment: false, requestedObjectTerm: null, lang: cleanParams.lang || mailLanguage(ctx) }),
           senderEmail: ctx.sender.email,
           senderName: ctx.sender.name,
           subject: ctx.subject,
@@ -3032,7 +3122,7 @@ function glanceUiCopy(kind) {
         });
       }
       const payload = Object.assign(base, {
-        params: driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams,
+        params: Object.assign({}, driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams, { lang: cleanParams.lang || mailLanguage(ctx) }),
         senderEmail: ctx.sender.email,
         senderName: ctx.sender.name,
         subject: ctx.subject,
@@ -3234,11 +3324,25 @@ function glanceUiCopy(kind) {
     return raw;
   }
 
+  // The draft answers the mail in the mail's own language. The UI language is
+  // only the fallback for a mail with no letters to read.
+  function mailLanguage(ctx) {
+    const text = String((ctx && ctx.bodyText) || '');
+    const he = (text.match(/[\u0590-\u05FF]/g) || []).length;
+    const latin = (text.match(/[A-Za-z]/g) || []).length;
+    if (he || latin) return he > latin ? 'he' : 'en';
+    return glanceUiHebrew() ? 'he' : 'en';
+  }
+
+  function laneAccountContext() {
+    return { tabAccount: ownEmailFromThread() || lastOwnEmail || '', lang: glanceUiHebrew() ? 'he' : 'en' };
+  }
+
   function sendExecuteAction(payload) {
     const lane = laneConnectorId(payload && payload.connectorId);
     if (!lane) return sendRuntime({ type: 'flow:execute-action', payload: payload });
     if (lane === 'gmailCompose') return sendGmailCompose(payload);
-    return sendRuntime({ type: 'flow:google-write', connectorId: lane, input: payload });
+    return sendRuntime(Object.assign({ type: 'flow:google-write', connectorId: lane, input: payload }, laneAccountContext()));
   }
 
   function composeReadBack(page) {
@@ -3263,11 +3367,11 @@ function glanceUiCopy(kind) {
     if (!planned.ok || !threadId) {
       return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: glanceUiHebrew() ? 'לא הצלחתי להכין טיוטת תשובה בשרשור הזה.' : 'Could not prepare a reply draft in this thread.' };
     }
-    return sendRuntime({
+    return sendRuntime(Object.assign({
       type: 'flow:google-write',
       connectorId: 'googleReplyDraft',
       input: { to: planned.to, subject: planned.subject, body: planned.body, threadId: threadId }
-    });
+    }, laneAccountContext()));
 
   }
 
@@ -3311,7 +3415,7 @@ function glanceUiCopy(kind) {
   // message id, until the expiry. A changed hash refuses. A match deletes.
   const LANE_UNDO_KEY = 'glanceLaneUndo';
   const LANE_UNDO_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-  const LANE_UNDO_FIELDS = ['taskId', 'externalId', 'taskListId', 'listId', 'contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'spreadsheetId', 'snapshot', 'created', 'inserted', 'rangeName', 'draftId', 'threadId', 'to'];
+  const LANE_UNDO_FIELDS = ['taskId', 'externalId', 'taskListId', 'listId', 'contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'spreadsheetId', 'snapshot', 'created', 'inserted', 'rangeName', 'draftId', 'threadId', 'to', 'unverified'];
 
   function laneUndoSnapshot(connectorId, ref) {
     if (!ref || typeof ref !== 'object') return null;
@@ -3594,7 +3698,7 @@ function glanceUiCopy(kind) {
     const lane = laneConnectorId(kind);
     if (!lane) return sendRuntime({ type: 'flow:undo-action', connectorId: kind, ref: ref });
     if (lane === 'gmailCompose' && ref && ref.draftId) {
-      return sendRuntime({ type: 'flow:google-undo', connectorId: 'googleReplyDraft', ref: ref });
+      return sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: 'googleReplyDraft', ref: ref }, laneAccountContext()));
     }
     if (lane === 'gmailCompose') {
       let page = null;
@@ -3605,10 +3709,10 @@ function glanceUiCopy(kind) {
       } else {
         page = { ok: false, reason: 'compose-closed', error: 'Open Reply first. Glance does not press Send.' };
       }
-      void sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
+      void sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: lane, ref: ref }, laneAccountContext()));
       return Promise.resolve(page);
     }
-    return sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
+    return sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: lane, ref: ref }, laneAccountContext()));
   }
 
   // Drive export stays in the service worker. The match stays here, in
@@ -3841,7 +3945,7 @@ function glanceUiCopy(kind) {
     const unknown = steps.map(() => 'unknown');
     let res = null;
     try {
-      res = await sendRuntime({ type: 'flow:google-verify', steps: steps.map((s) => ({ connectorId: s.connectorId, ref: s.ref })) });
+      res = await sendRuntime(Object.assign({ type: 'flow:google-verify', steps: steps.map((s) => ({ connectorId: s.connectorId, ref: s.ref })) }, laneAccountContext()));
     } catch (e) { return unknown; }
     if (!res || res.ok !== true || !Array.isArray(res.states) || res.states.length !== steps.length) return unknown;
     return res.states.map((x) => (x === 'present' || x === 'missing' ? x : 'unknown'));
@@ -4176,9 +4280,123 @@ function glanceUiCopy(kind) {
     placeReceipt(host, chip, done);
   }
 
+  // A write Google accepted and has not shown back yet. It is in Google, so
+  // it has to be undoable. It is never a checkmark and never Handled.
+  function unverifiedOrphan(r) {
+    return !!(r && r.response && r.response.reason === 'unverified' && r.response.ref && r.action && laneConnectorId(r.action.kind));
+  }
+
+  function savedReplyDraft(r) {
+    const res = r && r.response;
+    return !!(res && res.ok === true && res.ref && res.ref.draftId && r.action && laneConnectorId(r.action.kind) === 'gmailCompose');
+  }
+
+  function orphanLine(r) {
+    const line = laneStepLine(laneConnectorId(r.action.kind), r.response);
+    return line + ' — ' + glanceUiCopy('notVerified');
+  }
+
+  // Only orphans on screen: no checkmark, "Not verified", the rows with the
+  // same note, and Undo that deletes each one by its id. The ids are stored,
+  // so the next open reads Google again before it says anything more.
+  function showUnverifiedReceipt(host, chip, ctx, results, orphans) {
+    const msgId = ctx.legacyMessageId || ctx.messageId;
+    rememberLaneUndo(msgId, laneUndoStepsOf(orphans), ctx.laneIds, { total: results.length });
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const status = el('span', 'flow-chip-handled flow-chip-handled-partial', glanceShow(glanceUiCopy('notVerified')));
+    status.setAttribute('data-glance-verified', '0');
+    done.appendChild(status);
+    orphans.forEach((r) => done.appendChild(el('span', 'flow-chip-written', glanceShow(orphanLine(r)))));
+    done.appendChild(el('span', 'flow-chip-label', reasonMessage(orphans[0].response, ctx)));
+    const undo = el('button', 'flow-chip-undo', glanceShow(orphans.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo')));
+    undo.type = 'button';
+    const hint = el('span', 'flow-chip-undo-hint');
+    hint.hidden = true;
+    undo.addEventListener('click', () => {
+      undo.textContent = glanceUiCopy('undoing');
+      undo.disabled = true;
+      rollbackChain(orphans, ctx).then((result) => {
+        if (result.ok) {
+          writeLaneUndoRow(msgId, [], { total: results.length }, ctx.laneIds);
+          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(laneUndoLine(laneConnectorId(orphans[0].action.kind)) || 'Undone.')));
+          return;
+        }
+        undo.textContent = glanceUiCopy('undo');
+        undo.disabled = false;
+        hint.hidden = false;
+        hint.textContent = glanceShow(result.error || laneFailLine(laneConnectorId(orphans[0].action.kind)));
+        hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+      });
+    });
+    const actionsRow = el('span', 'flow-chip-actions');
+    actionsRow.appendChild(undo);
+    done.appendChild(actionsRow);
+    done.appendChild(hint);
+    placeReceipt(host, chip, done);
+    noteLaneOutcome(results);
+  }
+
+  // A refused write: the account could not be verified, or is another one.
+  // Nothing was written. A calendar event that was written and then removed
+  // for the wrong account carries `expected` and is not this.
+  function accountRefusal(r) {
+    const x = r && r.response;
+    return !!(x && !x.ok && !x.expected && x.needsReconnect && (x.reason === 'wrong-account' || x.reason === 'account-unverified'));
+  }
+
+  // The Reconnect button for the account the Gmail tab shows. It sits on the
+  // card, next to the refusal line, and never ticks anything.
+  function offerReconnect(host, chip, response) {
+    if (!host || !response) return;
+    host.querySelectorAll('.flow-chip-reconnect').forEach((n) => n.remove());
+    const he = glanceUiHebrew();
+    const label = glanceShow(glanceUiCopy('reconnect'));
+    const btn = el('button', 'flow-chip-reconnect', label);
+    btn.type = 'button';
+    btn.setAttribute('data-glance-reconnect-account', response.reconnectAccount || '');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = he ? 'מתחבר…' : 'Connecting…';
+      let res = null;
+      try { res = await sendRuntime({ type: 'flow:google-reconnect', account: response.reconnectAccount || '' }); } catch (e) { res = null; }
+      if (res && res.ok) {
+        btn.remove();
+        setChipState(chip, 'flow-chip-error', he ? 'החיבור התחדש. לחץ שוב על Do It.' : 'Reconnected. Press Do It again.');
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = label;
+      const named = res && res.account ? res.account : '';
+      const want = res && res.wanted ? res.wanted : (response.reconnectAccount || '');
+      const line = res && res.reason === 'wrong-account' && named
+        ? (he ? 'התחברת עם ' + named + ', אבל Gmail פתוח על ' + want + '. נסה שוב עם ' + want + '.' : 'You signed in as ' + named + ', but this Gmail tab is ' + want + '. Try again as ' + want + '.')
+        : (he ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.");
+      setChipState(chip, 'flow-chip-error', line);
+    });
+    host.appendChild(btn);
+  }
+
   async function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter(stepHandled);
+    const orphans = results.filter((r) => unverifiedOrphan(r) && succeeded.indexOf(r) < 0);
+    // A reply draft that was saved is prepared, not a close, so it is not a
+    // success. It is still in Gmail, so it is on the receipt and Undo deletes
+    // it by its id.
+    const drafts = results.filter((r) => savedReplyDraft(r) && succeeded.indexOf(r) < 0 && orphans.indexOf(r) < 0);
+    const extra = orphans.concat(drafts);
 
+    if (!succeeded.length && orphans.length) {
+      showUnverifiedReceipt(host, chip, ctx, results, orphans);
+      return;
+    }
+    const refused = results.find(accountRefusal);
+    if (!succeeded.length && refused) {
+      setChipState(chip, 'flow-chip-error', reasonMessage(refused.response, ctx));
+      offerReconnect(host, chip, refused.response);
+      return;
+    }
     if (!succeeded.length) {
       const preview = results.find((r) => r.response && composeReadBack(r.response));
       if (preview) {
@@ -4231,9 +4449,11 @@ function glanceUiCopy(kind) {
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     done.setAttribute('role', 'status');
-    const icon = el('span', 'flow-chip-done-icon', '✓');
-    icon.setAttribute('aria-hidden', 'true');
-    done.appendChild(icon);
+    if (!orphans.length) {
+      const icon = el('span', 'flow-chip-done-icon', '✓');
+      icon.setAttribute('aria-hidden', 'true');
+      done.appendChild(icon);
+    }
 
     const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), glanceShow(copy.status));
     done.appendChild(status);
@@ -4248,6 +4468,8 @@ function glanceUiCopy(kind) {
     for (const line of FlowActions.receiptWrittenLines(succeeded)) {
       done.appendChild(el('span', 'flow-chip-written', line));
     }
+    orphans.forEach((r) => done.appendChild(el('span', 'flow-chip-written', glanceShow(orphanLine(r)))));
+    drafts.forEach((r) => done.appendChild(el('span', 'flow-chip-written', glanceUiHebrew() ? 'טיוטת תשובה נשמרה בשרשור הזה. השליחה בידיים שלך.' : glanceShow(String(r.response.written || '')))));
     const wroteAs = succeeded.map((r) => r.response && r.response.account).find((a) => typeof a === 'string' && a);
     if (wroteAs) {
       const account = el('span', 'flow-chip-account', (glanceUiHebrew() ? 'חשבון: ' : 'Account: ') + wroteAs);
@@ -4260,8 +4482,8 @@ function glanceUiCopy(kind) {
     detail.appendChild(el('span', 'flow-chip-label', glanceShow(closedSummary(succeeded, ctx, results))));
     done.appendChild(detail);
 
-    const sole = succeeded.length === 1 ? succeeded[0].response : null;
-    const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres);
+    const sole = succeeded.length === 1 && !extra.length ? succeeded[0].response : null;
+    const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
     // The sentence is the control. A filled pill would be a second Do It.
     const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
     undo.type = 'button';
@@ -4279,7 +4501,7 @@ function glanceUiCopy(kind) {
     undo.addEventListener('click', () => {
       undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
-      rollbackChain(succeeded, ctx).then((result) => {
+      rollbackChain(succeeded.concat(extra), ctx).then((result) => {
         // Recorded regardless of whether the whole rollback reported ok —
         // any step that genuinely reverted is a genuine "don't propose this
         // again" signal, even if a later step in the chain couldn't. Feeds
@@ -4293,7 +4515,7 @@ function glanceUiCopy(kind) {
           // back leaves it now, so a reopen cannot tick a thing Google no
           // longer holds.
           const gone = new Set(result.undoneIds);
-          const left = succeeded.filter((r) => !gone.has(r.action.id));
+          const left = succeeded.concat(extra).filter((r) => !gone.has(r.action.id));
           writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < results.length, total: results.length }, ctx.laneIds);
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
@@ -4314,7 +4536,7 @@ function glanceUiCopy(kind) {
           }
         }
         if (result.ok) {
-          const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
+          const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
           done.replaceChildren(el('span', 'flow-chip-label', glanceShow(undone)));
           const taskSteps = succeeded.filter(taskKind);
           const markTask = taskSteps.length && typeof FlowStorage.markGoogleTaskUndone === 'function'
@@ -4432,7 +4654,7 @@ function glanceUiCopy(kind) {
     });
     if (meetingNote) bookkeeping.push(meetingNote);
     noteLaneOutcome(results);
-    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded), ctx.laneIds, { total: results.length }));
+    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded.concat(extra)), ctx.laneIds, { total: results.length }));
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
@@ -4497,6 +4719,11 @@ function glanceUiCopy(kind) {
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
     if (host.dataset.collectorOpen === '1') return;
+    const offered = ctx.app === 'gmail' && host.closest ? host.closest('[data-legacy-message-id], [role="listitem"], .adn') : null;
+    if (offered && copiedOnlyNow(offered, ctx.bodyText || '', ownEmailFromThread() || lastOwnEmail || '')) {
+      withdrawOffer(offered, ctx.messageId);
+      return;
+    }
     // Only a template create (a Doc or Sheet) has a body to build. Family B
     // (file-on-hold / file-on-task) has no template. artifactBody reports
     // that as blank, and returning here used to leave the Hold it card

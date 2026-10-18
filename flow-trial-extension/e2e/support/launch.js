@@ -84,7 +84,7 @@ function installE2EHooks() {
         interactive: details ? details.interactive : undefined,
         at: Date.now()
       });
-      return Promise.reject(new Error('e2e-no-window'));
+      return Promise.reject(new Error(e2e.webFlowError || 'e2e-no-window'));
     };
   }
   if (globalThis.__glanceE2e && globalThis.__glanceE2e.installed) {
@@ -639,6 +639,7 @@ async function boot() {
       e.driveByName = {};
       e.seq = 1;
       delete e.httpOrigin;
+      if (globalThis.FlowGoogleLaneAccount && globalThis.FlowGoogleLaneAccount.forget) globalThis.FlowGoogleLaneAccount.forget();
     });
   };
 
