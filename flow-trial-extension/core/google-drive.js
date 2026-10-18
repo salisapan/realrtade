@@ -79,7 +79,7 @@ const FlowGoogleDrive = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,contentHash,headRevisionId,version,modifiedTime');
+    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,md5Checksum,headRevisionId,version,modifiedTime');
   }
 
   function fileSnapshot(json) {
@@ -191,7 +191,7 @@ const FlowGoogleDrive = (() => {
     const link = 'https://drive.google.com/file/d/' + encodeURIComponent(file.id) + '/view';
     base.url = link;
     const proof = C && C.proofOf(SYSTEM, file.id, link, C.clockIso(clock));
-    const remoteHash = got.json && got.json.contentHash ? String(got.json.contentHash) : hashBytes(ready.bytes);
+    const remoteHash = got.json && got.json.md5Checksum ? String(got.json.md5Checksum) : hashBytes(ready.bytes);
     const ref = {
       fileId: file.id,
       externalId: file.id,

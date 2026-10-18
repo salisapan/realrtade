@@ -1884,7 +1884,7 @@ function glanceUiCopy(kind) {
       // DOM references, nothing that depends on the live node), the same
       // snapshot discipline injectChip's own ctx already follows.
       FlowStorage.appendLog({
-        kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
+        kind: 'shown', label: activityLabel({ intent: intent, process: process, bodyText: text }), messageId, score: intent.signals.score, signals: intent.signals,
         process: { id: process.id, name: process.name, steps: process.steps },
         threadUrl: threadUrl(legacyId), threadId: threadId, sender, subject,
         intent: compactIntent(intent),
@@ -2749,7 +2749,7 @@ function glanceUiCopy(kind) {
     if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
     if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
-    if (response.skipped) return 'Skipped — an earlier step in this process didn’t complete.';
+    if (response.skipped) return glanceUiHebrew() ? 'דולג — שלב קודם בתהליך לא הושלם.' : 'Skipped — an earlier step in this process didn’t complete.';
     return response.error || 'Couldn’t complete that action.';
   }
 

@@ -279,9 +279,6 @@ const FlowIntent = (() => {
     'designs?', 'artwork', 'specs?', 'specifications?', 'requirements?',
     // Scheduling
     'availability', 'calendars?', 'time slots?',
-    // Logistics: a supplier asking to confirm a date, an address, or an amount
-    'delivery(?: dates?| times?| address(?:es)?| windows?| details)?', '(?:shipping|ship|due|arrival|pick-?up) dates?',
-    'dates?', 'addresses', 'amounts?', 'totals?', 'deadlines?',
     // HR
     'r[ée]sum[ée]s?', 'CVs?', 'cover letters?', 'references?', 'offer letters?', 'employment contracts?',
     'onboarding paperwork', 'background checks?',
@@ -289,6 +286,43 @@ const FlowIntent = (() => {
     'links?', 'attach(?:ments?|ed)', 'signatures?', 'information', 'details', 'data', 'figures?'
   ];
   const REQUESTED_OBJECT = new RegExp('\\b(' + REQUESTED_OBJECT_GROUPS_EN.join('|') + ')\\b', 'i');
+
+  // Logistics nouns (a date, an address, an amount) are weaker evidence than
+  // a document: they count only as the object of a request addressed to the
+  // reader, never in a sender's own promise and never under a pay or call
+  // verb, where the verb already decides what the sentence is.
+  const REQUESTED_LOGISTICS_EN = new RegExp('\\b(' + [
+    'delivery(?: dates?| times?| address(?:es)?| windows?| details)?', '(?:shipping|ship|due|arrival|pick-?up) dates?',
+    'dates?', 'addresses', 'amounts?', 'totals?', 'deadlines?'
+  ].join('|') + ')\\b', 'i');
+  const REQUESTED_LOGISTICS_HE = /(פרטי(?: ה(?:משלוח|אספקה))?|מועד(?: ה(?:משלוח|אספקה))?|תאריך(?: משלוח| אספקה)?|כתובת|סכום|סכומים|משלוח|אספקה)/;
+  const SENDER_PROMISE = /\b(?:we(?:'|’)ll|we will|i(?:'|’)ll|i will|we(?:'|’)re going to|i(?:'|’)m going to|we can|i can|let me|we(?:'|’)ve|i(?:'|’)ve)\b|(?:^|[^\u0590-\u05FF])(?:נשלח|אשלח|נעביר|אעביר|נחזיר|אחזיר|נמסור|אמסור|נדאג|אדאג|נעדכן|אעדכן)(?![\u0590-\u05FF])/i;
+  const REQUEST_ADDRESSEE = /\b(?:please|kindly|pls|(?:could|can|would|will)\s+you)\b|\?|(?:^|[^\u0590-\u05FF])(?:אנא|נא|תוכל|תוכלי|תוכלו|אפשר|ניתן)(?![\u0590-\u05FF])/i;
+  const SUBJECT_LIKE_START = /^(?:we|i|they|he|she|it|the|our|my|this|that|there|these|those|his|her|their)\b/i;
+  const PAY_OR_CALL_VERB = /\b(?:pay|wire|remit|settle|call|phone|dial|ring)\b|(?:^|[^\u0590-\u05FF])[הוכלמב]?(?:לשלם|שלם|תשלם|שלמו|להתקשר|התקשר|תתקשר|תתקשרי|טלפן)(?![\u0590-\u05FF])/i;
+  function addressedRequest(sentence) {
+    const t = String(sentence || '').trim();
+    if (!t || SENDER_PROMISE.test(t)) return false;
+    if (REQUEST_ADDRESSEE.test(t)) return true;
+    return !SUBJECT_LIKE_START.test(t);
+  }
+  function logisticsCounts(sentence) {
+    const t = String(sentence || '');
+    return addressedRequest(t) && !PAY_OR_CALL_VERB.test(t);
+  }
+  function requestObjectTest(sentence) {
+    if (!sentence) return false;
+    if (REQUESTED_OBJECT.test(sentence) || REQUESTED_OBJECT_HE.test(sentence)) return true;
+    return logisticsCounts(sentence) &&
+      (REQUESTED_LOGISTICS_EN.test(sentence) || REQUESTED_LOGISTICS_HE.test(sentence));
+  }
+  function requestObjectExec(sentence) {
+    if (!sentence) return null;
+    const core = REQUESTED_OBJECT.exec(sentence) || REQUESTED_OBJECT_HE.exec(sentence);
+    if (core) return core;
+    if (!logisticsCounts(sentence)) return null;
+    return REQUESTED_LOGISTICS_EN.exec(sentence) || REQUESTED_LOGISTICS_HE.exec(sentence);
+  }
 
   // Hebrew twin of the same business-object breadth above. Same "no \b" rule
   // every other Hebrew pattern in this file follows — \b is ASCII-only and
@@ -308,7 +342,7 @@ const FlowIntent = (() => {
   // list (e.g. "חשבונית מס" needs no fix because bare "חשבונית" already
   // matches regardless), so only the handful with no such fallback needed
   // this treatment.
-  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|פרטי(?: ה(?:משלוח|אספקה))?|מועד(?: ה(?:משלוח|אספקה))?|תאריך(?: משלוח| אספקה)?|כתובת|סכום|משלוח|אספקה|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
 
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
@@ -977,12 +1011,20 @@ const FlowIntent = (() => {
     // "נא לאשר את ההצעה" is still the reader's yes, and stays silent.
     // "לא נדרשת פעולה" is the FYI, not this exception.
     if (/(?<!לא\s)נדרשת פעולה/.test(raw)) return false;
-    if (/בבקשה\s+תאשר/.test(raw)) return true;
-    if (/(?:^|\s)נא\s+לאשר(?![\u0590-\u05FF])/.test(raw)) return true;
-    if (/תוכל(?:י|ו)?\s+לאשר(?![\u0590-\u05FF])/.test(raw)) return true;
-    if (/אנא\s+(?:לאשר(?![\u0590-\u05FF])|תאשר|אשר(?:י|ו)?(?![\u0590-\u05FF]))/.test(raw)) return true;
+    // "אנא אשר את תאריך האספקה" asks for a fact, not for the reader's yes to
+    // an offer. A confirm form whose object is a date, an amount or an
+    // address is a request; the same form on a proposal stays the reader's own.
+    const sentences = raw.split(/[.!?\n]+/);
+    for (let i = 0; i < sentences.length; i++) {
+      const sent = sentences[i];
+      if (!HE_CONFIRM_ASK.test(sent)) continue;
+      if (REQUESTED_LOGISTICS_HE.test(sent) && !HE_DECISION_OBJECT.test(sent)) continue;
+      return true;
+    }
     return false;
   }
+  const HE_CONFIRM_ASK = /בבקשה\s+תאשר|(?:^|\s)נא\s+לאשר(?![\u0590-\u05FF])|תוכל(?:י|ו)?\s+לאשר(?![\u0590-\u05FF])|אנא\s+(?:לאשר(?![\u0590-\u05FF])|תאשר|אשר(?:י|ו)?(?![\u0590-\u05FF]))/;
+  const HE_DECISION_OBJECT = /הצעה|חוזה|הסכם|תנאי|מחיר|תקציב/;
   // A commitment that is still conditional. "once" and "hoping" are not in
   // judgment.js's HEDGE, so assertedIn still counted them as decided.
   const CONTINGENT = /\b(?:hoping|once)\b|(?:^|\s)(?:מקווה|מקווים)/i;
@@ -1152,8 +1194,7 @@ const FlowIntent = (() => {
     // requestWhat (the actual matched sentence), not the whole message, so
     // an unrelated document mention three paragraphs away from a vague
     // "let me know your thoughts" can't manufacture evidence for it.
-    const hasConcreteRequestObject = Boolean(requestWhat) &&
-      (REQUESTED_OBJECT.test(requestWhat) || REQUESTED_OBJECT_HE.test(requestWhat));
+    const hasConcreteRequestObject = Boolean(requestWhat) && requestObjectTest(requestWhat);
 
     // The actual noun REQUESTED_OBJECT/HE matched on ("invoice", "resume",
     // "NDA"...), not just whether one was present — this is what lets
@@ -1162,8 +1203,7 @@ const FlowIntent = (() => {
     // thread's own existing attachment or a manually-picked file. .exec(),
     // not .test(), specifically to capture group 1 (every alternative in
     // both patterns is wrapped in the same outer capturing group).
-    const requestedObjectMatch = requestWhat &&
-      (REQUESTED_OBJECT.exec(requestWhat) || REQUESTED_OBJECT_HE.exec(requestWhat));
+    const requestedObjectMatch = requestWhat && requestObjectExec(requestWhat);
     const requestedObjectTerm = requestedObjectMatch ? requestedObjectMatch[1] : null;
 
     // Every raw signal, independent of which type ends up winning — the
@@ -1293,16 +1333,17 @@ const FlowIntent = (() => {
           const dateText = iso ? humanDateFallback({ iso: iso }) : '';
           intent.label = FlowJudgment.neutralTitle({ moneyText: facts.moneyText, dateText: dateText || null });
         } else {
-          let titled = selfAskTitle(text, subject, ctx);
-          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+          const decided = selfDecisionTitle(text, facts);
+          let titled = decided || selfAskTitle(text, subject, ctx);
+          if (!decided && !usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
           const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
           if (usableSelfTitle(callTitled)) titled = callTitled;
           // The body sentence is never the title. No verb plus object, no card.
-          if (!usableSelfTitle(titled)) return stayQuiet('hedge', { noRescue: true });
+          if (!decided && !usableSelfTitle(titled)) return stayQuiet('hedge', { noRescue: true });
           intent.label = titled;
         }
         const labelNow = String(intent.label || '').trim();
-        if (!usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
+        if (!/^(?:Decision|החלטה): \S/.test(labelNow) && !usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low') intent.confidence = 'high';
         // "Remind me to renew the domain on Friday" is that task, due Friday.
         // The day is already on facts. The task step reads entities.dateIso.
@@ -1479,11 +1520,12 @@ const FlowIntent = (() => {
       if (selfContentStaysQuiet(blob)) return null;
       if (selfCallCancelled(text) || meetingPlanVeto(text)) return null;
       const subject = ctx && ctx.subject;
-      let titled = selfAskTitle(text, subject, ctx);
-      if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+      const decided = selfDecisionTitle(text, facts);
+      let titled = decided || selfAskTitle(text, subject, ctx);
+      if (!decided && !usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
       const callTitled = haveACallTitle(text, ctx, humanWhen(facts && facts.date, facts && facts.time));
-      if (usableSelfTitle(callTitled)) titled = callTitled;
-      if (!usableSelfTitle(titled)) return null;
+      if (!decided && usableSelfTitle(callTitled)) titled = callTitled;
+      if (!decided && !usableSelfTitle(titled)) return null;
       const made = finish(TYPES.REQUEST, 'high', { what: titled });
       if (!made || !made.type) return null;
       made.label = titled;
@@ -2893,6 +2935,25 @@ const FlowIntent = (() => {
       || /^(?:כבר\s+)?[\u0590-\u05FF]+תי(?![\u0590-\u05FF])/.test(t)
       || /^(?:כבר|בוצע|בוצעה)(?![\u0590-\u05FF])/.test(t)
       || /^(?:already|done)\b/i.test(t);
+  }
+  // A decision note names what was chosen, never the sentence that said so.
+  // "Decision made: Acme is our vendor" is Decision: Acme, and "We're going
+  // with Initech at $4,850" is Decision: Initech, $4,850. Six words at most.
+  const DECISION_NAME = '([A-Z][\\w&.\\-]*(?:\\s+(?!(?:is|are|was|will|as|at|for|to|and|our|the)\\b)[A-Z][\\w&.\\-]*){0,2})';
+  function selfDecisionTitle(raw, facts) {
+    const t = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    const money = facts && facts.moneyText ? ', ' + String(facts.moneyText).trim() : '';
+    let m = t.match(new RegExp('(?:^|[.!\\n]\\s*)(?:[Ff]inal\\s+)?[Dd]ecision(?:\\s+[Mm]ade)?\\s*[:\\-–]\\s*' + DECISION_NAME));
+    if (!m) m = t.match(new RegExp('\\b(?:[Ww]e(?:\'|’)re|[Ww]e are|[Ii](?:\'|’)m|[Ii] am)\\s+going\\s+with\\s+' + DECISION_NAME));
+    if (!m) m = t.match(new RegExp('\\b(?:[Ww]e|[Ii])\\s+(?:decided|chose|picked|selected)\\s+(?:on\\s+|to go with\\s+|to use\\s+)?' + DECISION_NAME));
+    if (m) return clipDecision('Decision: ' + m[1].trim() + money);
+    const he = t.match(/(?:^|[^\u0590-\u05FF])(?:הוחלט|החלטנו|החלטתי)(?:\s+סופית)?\s+(?:על|ש(?:ניקח|נבחר|נעבוד עם))\s*([\u0590-\u05FF][\u0590-\u05FF'"״׳\-]*(?:\s+[\u0590-\u05FF][\u0590-\u05FF'"״׳\-]*)?)/);
+    if (he) return clipDecision('החלטה: ' + he[1].trim() + money);
+    return '';
+  }
+  function clipDecision(title) {
+    return title.split(/\s+/).slice(0, 6).join(' ');
   }
   function usableSelfTitle(label) {
     const t = String(label || '').trim();

@@ -26,6 +26,23 @@ function parseDriveUpload(buf) {
   return { meta: meta, bytes: bytes };
 }
 
+
+// Drive answers only the fields it was asked for, and refuses a name it does
+// not know. The stand-in does the same, so a request for a field that does
+// not exist fails here the way it fails live.
+const DRIVE_FIELDS = ['id', 'name', 'mimeType', 'trashed', 'parents', 'md5Checksum', 'headRevisionId', 'version', 'modifiedTime', 'webViewLink'];
+
+function driveFields(file, param) {
+  if (!param) return { status: 200, body: file };
+  const wanted = String(param).split(',').map((f) => f.trim()).filter(Boolean);
+  const bad = wanted.filter((f) => f !== '*' && DRIVE_FIELDS.indexOf(f) < 0);
+  if (bad.length) return { status: 400, body: { error: { code: 400, message: 'Invalid field selection ' + bad[0] } } };
+  if (wanted.indexOf('*') >= 0) return { status: 200, body: file };
+  const out = {};
+  wanted.forEach((f) => { if (file[f] !== undefined && file[f] !== null) out[f] = file[f]; });
+  return { status: 200, body: out };
+}
+
 function stampFile(file) {
   if (!file) return file;
   if (!file.headRevisionId) file.headRevisionId = 'rev-' + file.id + '-1';
@@ -165,7 +182,9 @@ function startGoogleLaneServer() {
       const oneFile = path.match(/^\/drive\/v3\/files\/([^/]+)$/);
       if (oneFile && method === 'GET') {
         const file = state.files[oneFile[1]];
-        send(res, file ? 200 : 404, file || { error: 'missing' });
+        if (!file) { send(res, 404, { error: 'missing' }); return; }
+        const picked = driveFields(file, url.searchParams.get('fields'));
+        send(res, picked.status, picked.body);
         return;
       }
       if (oneFile && method === 'PATCH') {
@@ -178,7 +197,7 @@ function startGoogleLaneServer() {
       if (path === '/drive/v3/files' && method === 'POST') {
         const meta = readJson(raw);
         const id = 'e2e-file-' + (state.seq++);
-        const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, contentHash: 'created', parents: meta.parents || null });
+        const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, parents: meta.parents || null });
         state.files[id] = file;
         if (meta.mimeType === 'application/vnd.google-apps.document') {
           state.docs[id] = docBody('', '');
@@ -200,12 +219,13 @@ function startGoogleLaneServer() {
           name: packed.meta.name || 'upload.bin',
           mimeType: packed.meta.mimeType || 'application/octet-stream',
           trashed: false,
-          contentHash: hashBytes(packed.bytes),
+          md5Checksum: hashBytes(packed.bytes),
           parents: packed.meta.parents || null
         });
         state.files[id] = file;
         state.last.file = id;
-        send(res, 200, file);
+        const echoed = driveFields(file, url.searchParams.get('fields'));
+        send(res, echoed.status, echoed.body);
         return;
       }
 

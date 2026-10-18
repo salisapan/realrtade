@@ -45,6 +45,10 @@ test('an attachment Gmail will not hand over says so on the File row, in English
 test('an attachment Gmail will not hand over says so on the File row, in Hebrew', async ({ glance }) => {
   const page = await run(glance, 'he', 'dr-he', 'application/pdf:board.pdf:' + URL_, unreadable);
   await expect(page.locator('li[data-step-id="file"]')).toContainText('לא הצלחתי לקרוא את הקובץ המצורף', { timeout: 15000 });
+  const draft = page.locator('li[data-step-id="draft"]');
+  await expect(draft).not.toContainText('Skipped');
+  await expect(draft).not.toContainText('earlier step');
+  await expect(draft).toContainText('דולג');
   expect(uploads()).toHaveLength(0);
 });
 

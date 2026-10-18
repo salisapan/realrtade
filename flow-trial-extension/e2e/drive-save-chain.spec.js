@@ -20,13 +20,13 @@ test.beforeEach(async ({ glance }) => {
   await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
 });
 
-async function run(glance, id, download) {
+async function run(glance, id, download, lang) {
   // The page itself must never be the one that reads the attachment.
   await glance.context.route('https://mail.google.com/e2e/**', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'page fetch' }));
-  await glance.seedGmail({});
+  await glance.seedGmail(lang === 'he' ? { glanceUiLanguage: 'he' } : {});
   const page = await glance.openGmail({
     messageId: 'm-' + id, threadId: 't-' + id, subject: 'Board pack',
-    senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF],
+    senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: lang || 'en',
     body: ASK, downloadUrl: download, composeReply: true, composeTo: 'dana@acme.io', composeSubject: 'Re: Board pack'
   });
   const chip = page.locator('div[role="main"] button.flow-chip');
@@ -71,11 +71,35 @@ test('Undo trashes the saved file and leaves the folder', async ({ glance }) => 
   expect(folder.trashed).toBe(false);
 });
 
+test('Undo in the Hebrew UI trashes the file the upload response named', async ({ glance }) => {
+  const page = await run(glance, 'ch-undo-he', BOARD, 'he');
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const posted = uploads();
+  expect(posted).toHaveLength(1);
+  const id = server.last.file;
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect.poll(() => server.file(id).trashed, { timeout: 15000 }).toBe(true);
+  const trashes = server.calls.filter((c) => c.method === 'PATCH' && c.body && c.body.trashed === true);
+  expect(trashes).toHaveLength(1);
+  expect(trashes[0].path).toBe('/drive/v3/files/' + id);
+  expect(server.file(id).name).toBe('board.pdf');
+  await expect(page.locator('div[role="main"]')).not.toContainText('עדיין ב-Drive');
+});
+
+test('every request for a Drive file asks only for fields Drive has', async ({ glance }) => {
+  const page = await run(glance, 'ch-fields', BOARD);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const asked = server.calls.filter((c) => c.path.indexOf('/drive/v3/files') >= 0 && /fields=/.test(c.search || ''));
+  expect(asked.length).toBeGreaterThan(0);
+  asked.forEach((c) => expect(c.search).not.toMatch(/contentHash/));
+});
+
 test('the Activity row names the save, not a decision', async ({ glance }) => {
   const page = await run(glance, 'ch-act', BOARD);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   const bag = await glance.storage();
-  const rows = (bag.log || []).filter((r) => r && r.kind === 'written' && r.messageId === 'm-ch-act');
+  const rows = (bag.log || []).filter((r) => r && (r.kind === 'written' || r.kind === 'shown') && r.messageId === 'm-ch-act');
+  expect(rows.some((r) => r.kind === 'shown')).toBe(true);
   expect(rows.length).toBeGreaterThan(0);
   rows.forEach((r) => {
     expect(r.label).not.toMatch(/Log this decision/i);
