@@ -144,7 +144,8 @@
         <article class="path-card glance-card" id="glance">
           <span class="who" data-i18n="path.you.who">For you</span>
           <h3>Glance</h3>
-          <p data-i18n="path.you.body">Closes what you asked of others, what you promised, and what others asked of you. Starts in Gmail. Never sends on your behalf.</p>
+          <p class="closer-line" data-i18n="path.you.tag" style="flex:0 0 auto;color:var(--txt-hi)"><b>Not an assistant. A closer.</b></p>
+          <p data-i18n="path.you.body">Closes what you asked of others, what you promised, and what others asked of you. In Gmail and Outlook. Never sends on your behalf.</p>
           <div class="cta-row">
             <span class="magnetic"><a class="doit" href="/trial.html" data-ga="hero_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta2">Get Glance</span></a></span>
           </div>
@@ -180,7 +181,7 @@
           <p data-i18n="how.c.b">On your approval it writes the change. Every write is reversible. Unsure moments stay silent.</p>
         </div>
       </div>
-      <p class="glance-now" data-i18n="hero.glance.p"><b>Now:</b> your personal closing layer, starting in Gmail. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it for real: a calendar event, a task, a drafted reply, or the right Drive file attached — in place, Zero-Prompt, with undo. Personal product. Own revenue. Stays quiet when it is not sure. <b>Next:</b> the same closing loop grows beyond email into the other places your day actually happens — still personal, still Zero-Prompt, still not an org runtime. Same DNA as Flow. Different line: personal closing, not regulated firm infrastructure.</p>
+      <p class="glance-now" data-i18n="hero.glance.p"><b>Now:</b> in Gmail and Outlook, in Hebrew and English. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it where you already work: a calendar event, a task, a drafted reply, or the right file attached. No chat, no setup, no bot to manage. A new task, or a file saved to OneDrive, is read back and linked, so you see it was done. On WhatsApp Web it prepares the reply as a draft, and you send it. Undo on every write. Stays quiet when it is not sure. <b>Next:</b> the same closing loop in more of the places your day happens. Personal closing, not regulated firm infrastructure.</p>
       <p class="quiet-line"><span class="roadmap-badge" data-i18n="trust.b4">Masked secure cloud: roadmap / בפריסה</span><span data-i18n="roadmap.quiet">Running on your own infrastructure is on the roadmap.</span></p>
     </div>
   </section>
@@ -557,14 +558,14 @@ Best,
         </picture>
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">GET STARTED</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
-        <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the Gmail close is the entry wedge, and the same loop grows beyond email.</p>
+        <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the close in Gmail and Outlook is the entry wedge, and the same loop grows beyond email.</p>
         <div class="cta-paths reveal in" data-d="2">
           <div class="cta-path cta-path-form">
             <b data-i18n="wl.path1.t">Deploy Flow in your organization</b>
             <span data-i18n="wl.path1.s">Tell us your work email, role, and company — we'll come back with a real deployment plan, a number, and a call to get it running.</span>
             <div class="wait-wrap" id="waitWrap">
               <form class="wait-form" id="waitForm" novalidate>
-                <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+                <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none;clip-path:inset(50%)">
                 <div class="field">
                   <input type="email" id="waitEmail" inputmode="email" autocomplete="email" data-i18n-ph="wl.ph" placeholder="Enter your work email" aria-label="Work email" required>
                   <span class="field-icon" aria-hidden="true">
@@ -590,7 +591,7 @@ Best,
           </div>
           <a class="cta-path cta-path-link" href="/trial.html" data-ga="close_trial">
             <b data-i18n="wl.path2.t">Get Glance</b>
-            <span data-i18n="wl.path2.s">Own product. Own revenue. Gmail Do It is the entry wedge. The same closing loop grows beyond email, still not an org runtime. No card to start, no sales conversation.</span>
+            <span data-i18n="wl.path2.s">Not an assistant. A closer. One Do It in Gmail and Outlook is the entry point, and the same closing loop grows from there, still not an org runtime. No card to start, no sales conversation.</span>
             <span class="cta-path-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
           </a>
         </div>
@@ -666,7 +667,8 @@ Best,
     'hero.sub':{en:'Glance closes your personal open loops. Flow watches work events in regulated organizations and proposes updates that run when you approve.',he:'Glance סוגר לולאות פתוחות אישיות. Flow עוקב אחרי אירועי עבודה בארגונים מפוקחים ומציע עדכונים שרצים כשאתם מאשרים.'},
     'hero.path':{en:'Choose your path',he:'בחרו מסלול'},
     'path.you.who':{en:'For you',he:'בשבילך'},
-    'path.you.body':{en:'Closes what you asked of others, what you promised, and what others asked of you. Starts in Gmail. Never sends on your behalf.',he:'סוגר את מה שביקשת מאחרים, מה שהבטחת, ומה שאחרים ביקשו ממך. מתחיל ב־Gmail. אף פעם לא שולח בשמך.'},
+    'path.you.tag':{en:'<b>Not an assistant. A closer.</b>',he:'<b>לא עוזר. סוגר.</b>'},
+    'path.you.body':{en:'Closes what you asked of others, what you promised, and what others asked of you. In Gmail and Outlook. Never sends on your behalf.',he:'סוגר את מה שביקשת מאחרים, מה שהבטחת, ומה שאחרים ביקשו ממך. ב־Gmail וב־Outlook. אף פעם לא שולח בשמך.'},
     'path.org.who':{en:'For your organization',he:'לארגון'},
     'path.org.body':{en:'Watches work events across legal, insurance, and security teams. Proposes file and system updates that execute only when you approve.',he:'עוקב אחרי אירועי עבודה בצוותי משפט, ביטוח ואבטחה. מציע עדכוני קבצים ומערכות שרצים רק כשאתם מאשרים.'},
     'path.org.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'},
@@ -688,8 +690,8 @@ Best,
     'hero.cta2':{en:'Get Glance',he:'התקינו Glance'},
     'hero.glance.flow':{en:'Explore Flow for organizations',he:'גלו את Flow לארגונים'},
     'hero.glance.tag':{en:'A separate product, from the same team',he:'מוצר נפרד, מאותו צוות'},
-    'hero.glance.b':{en:'Glance closes the moment in front of you.',he:'Glance סוגר את הרגע שלפניך.'},
-    'hero.glance.p':{en:'<b>Now:</b> your personal closing layer, starting in Gmail. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it for real: a calendar event, a task, a drafted reply, or the right Drive file attached — in place, Zero-Prompt, with undo. Personal product. Own revenue. Stays quiet when it is not sure. <b>Next:</b> the same closing loop grows beyond email into the other places your day actually happens — still personal, still Zero-Prompt, still not an org runtime. Same DNA as Flow. Different line: personal closing, not regulated firm infrastructure.',he:'<b>עכשיו:</b> שכבת הסגירה האישית שלך, שמתחילה ב־Gmail. כשהשרשור הפתוח באמת מחליט משהו, <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> אחד סוגר אותו באמת: אירוע ביומן, משימה, טיוטת תשובה, או קובץ ה־Drive הנכון מצורף — במקום, Zero-Prompt, עם ביטול. מוצר אישי. מסלול הכנסה משלו. נשאר בשקט כשאינו בטוח. <b>הלאה:</b> אותה לולאת סגירה גדלה מעבר למייל אל המקומות האחרים שבהם היום באמת קורה — עדיין אישי, עדיין Zero-Prompt, עדיין לא runtime ארגוני. אותו DNA כמו Flow. קו אחר: סגירה אישית, לא תשתית לפירמה מפוקחת.'},
+    'hero.glance.b':{en:'Not an assistant. A closer.',he:'לא עוזר. סוגר.'},
+    'hero.glance.p':{en:'<b>Now:</b> in Gmail and Outlook, in Hebrew and English. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it where you already work: a calendar event, a task, a drafted reply, or the right file attached. No chat, no setup, no bot to manage. A new task, or a file saved to OneDrive, is read back and linked, so you see it was done. On WhatsApp Web it prepares the reply as a draft, and you send it. Undo on every write. Stays quiet when it is not sure. <b>Next:</b> the same closing loop in more of the places your day happens. Personal closing, not regulated firm infrastructure.',he:'<b>עכשיו:</b> ב־Gmail וב־Outlook, בעברית ובאנגלית. כשהשרשור הפתוח באמת מחליט משהו, <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> אחד סוגר אותו במקום שבו אתה כבר עובד: אירוע ביומן, משימה, טיוטת תשובה, או הקובץ הנכון מצורף. בלי צ׳אט, בלי הגדרות, בלי בוט לנהל. משימה חדשה, או קובץ שנשמר ל־OneDrive, נקראים בחזרה ומקושרים, כך שרואים שזה נעשה. ב־WhatsApp Web הוא מכין את התשובה כטיוטה, ואתה שולח. ביטול לכל כתיבה. נשאר בשקט כשאינו בטוח. <b>הלאה:</b> אותה לולאת סגירה בעוד מקומות שבהם היום שלך קורה. סגירה אישית, לא תשתית לפירמה מפוקחת.'},
     'hero.foot':{en:'Masked cloud, or Flow-Edge designed into the engagement (roadmap / בפריסה).',he:'ענן ממוסך, או Flow-Edge מתוכנן לתוך ההתקשרות (בפריסה).'},
     'challenge.eyebrow':{en:'THE CHALLENGE',he:'THE CHALLENGE'},
     'challenge.title':{en:'Enterprise Workflows Are Broken',he:'תהליכי העבודה בארגון שבורים'},
@@ -759,9 +761,9 @@ Best,
     'wl.path1.t':{en:'Deploy Flow in your organization',he:'פרסו את Flow בארגון שלכם'},
     'wl.path1.s':{en:"Tell us your work email, role, and company — we'll come back with a real deployment plan, a number, and a call to get it running.",he:'השאירו את האימייל, התפקיד והחברה — נחזור עם תוכנית פריסה אמיתית, מספר, ושיחה להתחלת העבודה.'},
     'wl.path2.t':{en:'Get Glance',he:'התקינו Glance'},
-    'wl.path2.s':{en:'Own product. Own revenue. Gmail Do It is the entry wedge. The same closing loop grows beyond email, still not an org runtime. No card to start, no sales conversation.',he:'מוצר עצמאי. מסלול הכנסה משלו. Do It ב-Gmail הוא חץ הכניסה. אותה לולאת סגירה גדלה מעבר למייל, עדיין לא runtime ארגוני. בלי כרטיס כדי להתחיל, בלי שיחת מכירה.'},
+    'wl.path2.s':{en:'Not an assistant. A closer. One Do It in Gmail and Outlook is the entry point, and the same closing loop grows from there, still not an org runtime. No card to start, no sales conversation.',he:'לא עוזר. סוגר. Do It אחד ב־Gmail וב־Outlook הוא חץ הכניסה, ואותה לולאת סגירה גדלה משם, עדיין לא runtime ארגוני. בלי כרטיס כדי להתחיל, בלי שיחת מכירה.'},
     'wl.title':{en:'Ready to Reclaim Your Workflows?',he:'מוכנים להשיב לעצמכם את תהליכי העבודה?'},
-    'wl.lead':{en:'Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the Gmail close is the entry wedge, and the same loop grows beyond email.',he:'שני קווים. ספרו לנו איך הייתם פורסים את Flow ונחזור עם מספר אמיתי. Glance הוא מוצר עצמאי: סגירת ה-Gmail היא חץ הכניסה, ואותה לולאה גדלה מעבר למייל.'},
+    'wl.lead':{en:'Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the close in Gmail and Outlook is the entry wedge, and the same loop grows beyond email.',he:'שני קווים. ספרו לנו איך הייתם פורסים את Flow ונחזור עם מספר אמיתי. Glance הוא מוצר עצמאי: הסגירה ב־Gmail וב־Outlook היא חץ הכניסה, ואותה לולאה גדלה מעבר למייל.'},
     'wl.ph':{en:'Enter your work email',he:'כתובת האימייל הארגוני שלכם'},
     'wl.success':{en:"Check your inbox to confirm your email — we'll follow up with your deployment plan, a call to get started, and the Playbook.",he:'בדקו את תיבת הדואר לאישור הכתובת — נחזור עם תוכנית הפריסה, שיחת התחלה, וה-Playbook.'},
     'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll reach you about your deployment plan.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך ניצור איתכם קשר בנוגע לתוכנית הפריסה.'},
