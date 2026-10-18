@@ -254,7 +254,7 @@
   }
  },
  {
-  "desc": "x07 1KB txt (under 2KB)",
+  "desc": "x07 1KB txt is still the file",
   "input": {
    "surface": "outlook",
    "direction": "inbound",
@@ -292,7 +292,7 @@
    "uploadLimitBytes": null
   },
   "expect": {
-   "reason": "suggest:no-files"
+   "reason": "suggest:show"
   }
  },
  {

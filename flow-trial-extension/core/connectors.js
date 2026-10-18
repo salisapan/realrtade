@@ -123,4 +123,24 @@ const FLOW_CONNECTORS = [
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 
-if (typeof module !== 'undefined') module.exports = { FLOW_CONNECTORS };
+// One card per provider. googleTask and googleTasks are the same Google
+// consent. A second row with that id is the same card, dropped here.
+function providerIdOf(row) {
+  const raw = row && (row.providerId || row.id) || '';
+  if (raw === 'google' || raw === 'googleTask' || raw === 'googleTasks') return 'google';
+  return raw;
+}
+
+function connectionProviders(rows) {
+  const seen = Object.create(null);
+  const out = [];
+  (rows || []).forEach((row) => {
+    const id = providerIdOf(row);
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    out.push(row);
+  });
+  return out;
+}
+
+if (typeof module !== 'undefined') module.exports = { FLOW_CONNECTORS, connectionProviders, providerIdOf };

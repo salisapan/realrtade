@@ -16,18 +16,18 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 
 | tool | owner | status | branch/PR | claimed_at | notes/blockers (dev app setup = CoS) |
 |---|---|---|---|---|---|
-| Notion | claude | built | `claude/connector-2026-10-14-notion` / #138 (draft) | 2026-10-14 | Foundation (token relay, consent catalogue, learning hook) built with it. Waiting on CoS/owner: Notion public integration registration + env vars, relay deploy, `api.notion.com` manifest host, unverified vendor facts, steps-list destination wiring (open-tasks row 70) |
+| Notion | claude | built | `claude/connector-2026-10-14-notion` / #138 (draft) | 2026-10-14 | Foundation (token relay, consent catalogue, learning hook) built with it. Waiting on CoS/owner: Notion public integration registration + env vars, relay deploy, `api.notion.com` manifest host, unverified vendor facts, steps-list destination wiring (open-tasks row 75) |
 | ClickUp | free | free | - | - | OAuth2. CoS: ClickUp OAuth app + client id/secret |
 | Slack | free | free | - | - | OAuth2 + secret (relay); app review for distribution. CoS: Slack app |
 | Monday | free | free | - | - | OAuth2. CoS: monday app |
 | HubSpot | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
 | Pipedrive | free | free | - | - | OAuth2 + secret (relay). CoS: Pipedrive app. Same Glance-vs-Flow question as CRM rows; confirm with owner |
-| Jira | free | free | - | - | OAuth2 3LO + secret (relay). CoS: Atlassian app |
+| Jira | claude | claimed | `claude/connector-2026-10-18-jira` / PR (draft, stacked on #156 Asana, which is on #138 Notion) | 2026-10-18 | OAuth2 3LO + secret (relay). CoS: Atlassian app (developer console) + client id/secret. Shares files with Cursor's ClickUp #167 (same stack base): whichever merges second resolves the registry/switch/catalog conflicts |
 | Zoom | free | free | - | - | OAuth2 + secret (relay); marketplace review. CoS: Zoom app |
 | Salesforce | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
 | WhatsApp | free | free | - | - | Business Cloud API only (no scraping); needs Meta business verification by owner. Never auto-send |
 | Trello | free | free | - | - | API key + token flow, not OAuth2. CoS: Trello Power-Up key |
-| Asana | claude | built | `claude/connector-2026-10-15-asana` / #156 (draft, stacked on #138 until it merges) | 2026-10-15 | Built and tested against a mock; not verified live; switches off. Waiting on CoS/owner: Asana app registration + `ASANA_CLIENT_ID`/`ASANA_CLIENT_SECRET`, relay deploy, `app.asana.com` manifest host, unverified vendor facts (`connectors/asana.md` §9), steps-list destination wiring (open-tasks row 70) |
+| Asana | claude | built | `claude/connector-2026-10-15-asana` / #156 (draft, stacked on #138 until it merges) | 2026-10-15 | Built and tested against a mock; not verified live; switches off. Waiting on CoS/owner: Asana app registration + `ASANA_CLIENT_ID`/`ASANA_CLIENT_SECRET`, relay deploy, `app.asana.com` manifest host, unverified vendor facts (`connectors/asana.md` §9), steps-list destination wiring (open-tasks row 75) |
 | Dropbox | free | free | - | - | OAuth2 PKCE. CoS: Dropbox app |
 
 Rows still only in `connectors-queue.md` (Linear, DocuSign, Teams via Graph, Stripe, Box, Calendly, Adobe Sign, Google Meet link, open banking; Morning on HOLD) are added here as `free` when a routine is about to take one; until then `connectors-queue.md` remains the Claude routine's detailed design reference, and this file is the source of truth for ownership.

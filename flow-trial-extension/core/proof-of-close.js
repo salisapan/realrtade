@@ -193,12 +193,18 @@ const FlowProofOfClose = (() => {
     return clean(ref.externalId) || clean(ref.taskId) || clean(ref.fileId) || clean(ref.itemId);
   }
 
-  // Gmail legacy ids and Outlook ids are the same id in more than one
-  // spelling. A hash of the message text is not stable across a reload.
+  // Graph and OWA ids are case-sensitive. The same id is + and / with
+  // padding on Graph, and - and _ without padding in an OWA address.
+  // A hash of the message text is not stable across a reload.
   function canonId(id) {
     if (typeof id !== 'string' && typeof id !== 'number') return '';
-    const s = String(id).trim().toLowerCase().replace(/\//g, '_');
-    return s;
+    return String(id).trim().replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  // One key after the Graph / OWA spelling is folded. Case stays as it arrived.
+  function idAliases(id) {
+    const c = canonId(id);
+    return c ? [c] : [];
   }
 
   function isGoogleTaskConnector(row) {
@@ -426,9 +432,23 @@ const FlowProofOfClose = (() => {
     if (isComputerSystem(clean(row.system).toLowerCase())) return computerRemountCopy(row, externalId);
     if (isOnedriveRow(row)) return onedriveRemountCopy(row, externalId);
     const ref = { taskId: externalId, externalId: externalId };
-    const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
+    const saved = row.ref && typeof row.ref === 'object' ? row.ref : null;
+    const listId = saved ? clean(saved.taskListId || saved.listId) : '';
     if (listId) ref.taskListId = listId;
+    // The ids alone cannot tell an edit from the original. The snapshot
+    // stored with the write has to ride on the ref Undo sends.
+    const snap = storedSnapshot(row);
+    if (snap) ref.created = snap;
+    if (saved) {
+      ['contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'snapshot'].forEach((key) => {
+        const value = saved[key];
+        if (value != null && value !== '') ref[key] = value;
+      });
+    }
     const microsoft = isMicrosoftTodoRow(row);
+    const deleted = row.glanceDeleted === true || row.deleted === true;
+    const refusedLine = deleted ? '' : clip(row.undoLine, 180);
+    const verifyNote = deleted ? '' : clip(row.verifyNote, 180);
     const connector = microsoft
       ? ((row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo') ? row.connectorId : 'outlookTask')
       : ((row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask');
@@ -438,7 +458,12 @@ const FlowProofOfClose = (() => {
       writtenLine: clip(row.writtenLine, 180) || (microsoft ? 'To Do' : 'Google Task'),
       processName: clip(row.processName, 80),
       closedLine: clip(row.closedLine, 180),
-      undoHint: microsoft ? TODO_UNDO_HINT : UNDO_HINT,
+      undoHint: refusedLine || (microsoft ? TODO_UNDO_HINT : UNDO_HINT),
+      undoLine: refusedLine,
+      undoRefused: refusedLine ? (row.undoRefused || 'user-edited') : null,
+      deleted: deleted,
+      deletedLine: deleted ? (clip(row.deletedLine, 180) || clip(row.receiptStatus, 180)) : '',
+      verifyNote: verifyNote,
       undoneLine: microsoft ? TODO_UNDONE_LINE : UNDONE_LINE,
       undoFailed: microsoft ? TODO_UNDO_FAILED : 'Still there — the Google Task was not removed.',
       url: url.slice(0, 8) === 'https://' ? url : '',
@@ -470,7 +495,295 @@ const FlowProofOfClose = (() => {
     if (display.status === STATUS_HANDLED || display.status === STATUS_HANDLED_HE || display.status === STATUS_PARTIAL) {
       record.receiptStatus = display.status;
     }
+    const snap = contentSnapshot(display.created) || contentSnapshot(display.ref && display.ref.created);
+    if (snap) record.created = snap;
     return record;
+  }
+
+  // Words the person can change. A boolean created flag (a new file versus
+  // a replaced one) is not this snapshot. Server fields are not copied.
+  // An owned key is kept when it is null: an emptied field is still a field.
+  // Keep this list aligned with FlowNativeEdit.CONTENT_KEYS.
+  const SNAP_KEYS = [
+    'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
+    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'
+  ];
+
+  function contentSnapshot(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const snap = {};
+    let any = false;
+    for (let i = 0; i < SNAP_KEYS.length; i++) {
+      const key = SNAP_KEYS[i];
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      const v = value[key];
+      snap[key] = (v == null || v === '') ? null : v;
+      any = true;
+    }
+    return any ? snap : null;
+  }
+
+  function storedSnapshot(row) {
+    if (!row) return null;
+    const onRef = row.ref && typeof row.ref === 'object' ? contentSnapshot(row.ref.created) : null;
+    if (onRef) return onRef;
+    return contentSnapshot(row.created);
+  }
+
+  // One proof record per message. The open mail and Loops both read this
+  // map. A page-only banner is not a second store.
+  function emptyProofStore() {
+    return { records: {}, byId: {} };
+  }
+
+  function sharedProofRow(row) {
+    return isMicrosoftTodoRow(row) || isOnedriveRow(row);
+  }
+
+  function proofIdList(row) {
+    const ids = [];
+    if (!row) return ids;
+    [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId, row.outlookIncomingId, row.graphMessageId, row.legacyMessageId].forEach((id) => {
+      idAliases(id).forEach((c) => { if (c && ids.indexOf(c) < 0) ids.push(c); });
+    });
+    return ids;
+  }
+
+  function objectNameOf(row) {
+    if (!row) return 'To Do';
+    if (row.objectName) return String(row.objectName);
+    if (isOnedriveRow(row)) return 'OneDrive';
+    return 'To Do';
+  }
+
+  function proofExternalId(row) {
+    return externalIdOf(row) || (row && row.ref && typeof row.ref === 'object' ? clean(row.ref.eventId) : '');
+  }
+
+  function proofRecordFromRow(row) {
+    if (!row || !row.messageId || !sharedProofRow(row)) return null;
+    if (row.kind && row.kind !== 'written') return null;
+    if (row.fetchedBack === false || row.undone === true) return null;
+    const externalId = proofExternalId(row);
+    if (!externalId) return null;
+    const ids = proofIdList(row);
+    return {
+      messageId: String(row.messageId),
+      ids: ids,
+      kind: 'written',
+      connectorId: row.connectorId || (isOnedriveRow(row) ? 'onedriveFile' : 'outlookTask'),
+      system: row.system || (isOnedriveRow(row) ? SYSTEM_MICROSOFT_ONEDRIVE : SYSTEM_MICROSOFT_TODO),
+      externalId: externalId,
+      ref: row.ref && typeof row.ref === 'object' ? row.ref : { externalId: externalId, taskId: externalId },
+      created: (row.ref && row.ref.created) || row.created || null,
+      url: row.url || null,
+      fetchedBack: true,
+      writtenLine: row.writtenLine || row.label || '',
+      receiptStatus: row.receiptStatus || STATUS_HANDLED,
+      label: row.label || row.actionTitle || row.writtenLine || '',
+      actionTitle: row.actionTitle || row.label || '',
+      subject: row.subject || '',
+      process: row.process || null,
+      intent: row.intent || null,
+      sender: row.sender || null,
+      text: row.text || row.bodyText || '',
+      threadId: row.threadId || null,
+      outlookConversationId: row.outlookConversationId || null,
+      itemId: row.itemId || null,
+      pathId: row.pathId || null,
+      app: row.app || 'outlook',
+      undoRefused: row.undoRefused || null,
+      undoLine: row.undoLine || null,
+      deleted: row.deleted === true,
+      deletedLine: row.deletedLine || null,
+      verifyNote: row.verifyNote || null,
+      objectName: objectNameOf(row),
+      ts: row.ts || null,
+      where: row.where || null
+    };
+  }
+
+  function rememberProof(store, row) {
+    const base = store && typeof store === 'object' ? store : emptyProofStore();
+    const records = Object.assign({}, base.records || {});
+    const byId = Object.assign({}, base.byId || {});
+    const next = proofRecordFromRow(row);
+    if (!next) return { records: records, byId: byId };
+    const prev = records[next.messageId];
+    if (prev && prev.undone !== true) {
+      if (!next.undoRefused && prev.undoRefused) {
+        next.undoRefused = prev.undoRefused;
+        next.undoLine = prev.undoLine;
+      }
+      if (prev.deleted === true && next.deleted !== true) {
+        next.deleted = true;
+        next.deletedLine = prev.deletedLine;
+      }
+      if (!next.verifyNote && prev.verifyNote) next.verifyNote = prev.verifyNote;
+      (prev.ids || []).forEach((id) => { if (next.ids.indexOf(id) < 0) next.ids.push(id); });
+    }
+    records[next.messageId] = next;
+    next.ids.forEach((id) => { byId[id] = next.messageId; });
+    const primary = canonId(next.messageId);
+    if (primary) byId[primary] = next.messageId;
+    return { records: records, byId: byId };
+  }
+
+  function proofLookupKeys(ids) {
+    const keys = [];
+    function add(id) {
+      idAliases(id).forEach((c) => { if (c && keys.indexOf(c) < 0) keys.push(c); });
+    }
+    if (Array.isArray(ids)) {
+      ids.forEach(add);
+      return keys;
+    }
+    if (ids && (ids.messageIds || ids.threadIds || ids.messageId || ids.threadId)) {
+      const q = queryIds(ids);
+      q.messageIds.forEach(add);
+      q.threadIds.forEach(add);
+      return keys;
+    }
+    add(ids);
+    return keys;
+  }
+
+  function proofForIds(store, ids) {
+    if (!store || !store.records) return null;
+    const keys = proofLookupKeys(ids);
+    const byId = store.byId || {};
+    for (let i = 0; i < keys.length; i++) {
+      const mid = byId[keys[i]];
+      const rec = mid && store.records[mid];
+      if (rec && rec.undone !== true && rec.kind !== 'undone') return rec;
+    }
+    const want = {};
+    keys.forEach((k) => { want[k] = true; });
+    const mids = Object.keys(store.records);
+    for (let i = 0; i < mids.length; i++) {
+      const rec = store.records[mids[i]];
+      if (!rec || rec.undone === true || rec.kind === 'undone') continue;
+      const stored = [].concat(rec.ids || [], [rec.messageId, rec.itemId, rec.pathId, rec.threadId, rec.outlookConversationId]);
+      for (let j = 0; j < stored.length; j++) {
+        const aliases = idAliases(stored[j]);
+        for (let k = 0; k < aliases.length; k++) {
+          if (want[aliases[k]]) return rec;
+        }
+      }
+    }
+    return legacyCaseProof(store, keys);
+  }
+
+  // An old row stored the id in lowercase and never stored a message id.
+  // Case-insensitive match is only that fallback. The receipt can show.
+  // Undo cannot delete it.
+  function legacyCaseProof(store, keys) {
+    if (!store || !store.records || !keys.length) return null;
+    const want = {};
+    keys.forEach((k) => { if (k) want[String(k).toLowerCase()] = true; });
+    const mids = Object.keys(store.records);
+    for (let i = 0; i < mids.length; i++) {
+      const rec = store.records[mids[i]];
+      if (!rec || rec.undone === true || rec.kind === 'undone') continue;
+      if (rec.messageId) continue;
+      const stored = [].concat(rec.ids || [], [rec.itemId, rec.pathId, rec.threadId, rec.outlookConversationId]);
+      for (let j = 0; j < stored.length; j++) {
+        const aliases = idAliases(stored[j]);
+        for (let k = 0; k < aliases.length; k++) {
+          if (want[String(aliases[k]).toLowerCase()]) {
+            return Object.assign({}, rec, { legacyCase: true });
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function dropProof(store, messageId) {
+    const base = store && typeof store === 'object' ? store : emptyProofStore();
+    const records = Object.assign({}, base.records || {});
+    const byId = Object.assign({}, base.byId || {});
+    const key = records[messageId] ? messageId : (byId[canonId(messageId)] || null);
+    const rec = key && records[key];
+    if (!rec) return { records: records, byId: byId };
+    const next = Object.assign({}, rec, { undone: true, kind: 'undone' });
+    records[key] = next;
+    (rec.ids || []).concat([canonId(key)]).forEach((id) => {
+      if (id && byId[id] === key) delete byId[id];
+    });
+    return { records: records, byId: byId };
+  }
+
+  function noteUndoRefused(record, line) {
+    if (!record) return null;
+    return Object.assign({}, record, {
+      undoRefused: 'user-edited',
+      undoLine: line || 'You edited this. Undo left it alone.'
+    });
+  }
+
+  // 404 and 410 mean the item is gone. Any other miss keeps the record.
+  function noteReconcile(record, result) {
+    if (!record) return null;
+    const status = result && Number(result.status);
+    if (status === 404 || status === 410) {
+      const name = record.objectName || 'To Do';
+      return Object.assign({}, record, {
+        deleted: true,
+        deletedLine: 'Deleted in ' + name,
+        verifyNote: null
+      });
+    }
+    if (result && result.ok === true) {
+      return Object.assign({}, record, { verifyNote: null });
+    }
+    return Object.assign({}, record, {
+      verifyNote: "couldn't verify",
+      deleted: record.deleted === true,
+      deletedLine: record.deleted === true ? record.deletedLine : null
+    });
+  }
+
+  function proofAsLogRow(record) {
+    if (!record || record.undone === true || record.kind === 'undone') return null;
+    const deleted = record.deleted === true;
+    const line = deleted ? (record.deletedLine || ('Deleted in ' + (record.objectName || 'To Do'))) : (record.writtenLine || record.label || '');
+    return {
+      kind: 'written',
+      messageId: record.messageId,
+      itemId: record.itemId || null,
+      pathId: record.pathId || null,
+      threadId: record.threadId || null,
+      outlookConversationId: record.outlookConversationId || null,
+      connectorId: record.connectorId,
+      system: record.system,
+      externalId: record.externalId,
+      ref: record.ref,
+      created: record.created || (record.ref && record.ref.created) || null,
+      url: deleted ? null : (record.url || null),
+      where: record.where || null,
+      fetchedBack: true,
+      writtenLine: line,
+      label: deleted ? line : (record.label || line),
+      actionTitle: deleted ? line : (record.actionTitle || record.label || line),
+      receiptStatus: deleted ? line : (record.receiptStatus || STATUS_HANDLED),
+      subject: record.subject || '',
+      process: record.process || null,
+      intent: record.intent || null,
+      sender: record.sender || null,
+      text: record.text || '',
+      app: record.app || 'outlook',
+      ts: record.ts || null,
+      undoRefused: record.undoRefused || null,
+      undoLine: deleted ? null : (record.undoLine || null),
+      deleted: deleted,
+      glanceDeleted: deleted,
+      deletedLine: deleted ? line : null,
+      verifyNote: deleted ? null : (record.verifyNote || null),
+      objectName: record.objectName || 'To Do',
+      legacyCase: record.legacyCase === true,
+      ids: Array.isArray(record.ids) ? record.ids.filter(Boolean).map(String) : []
+    };
   }
 
   // Shape only. The live Google Tasks path is the service worker writer,
@@ -872,7 +1185,14 @@ const FlowProofOfClose = (() => {
     verifyComputerDom: verifyComputerDom,
     computerClose: computerClose,
     localFileCloseShape: localFileCloseShape,
-    applyComputerUndo: applyComputerUndo
+    applyComputerUndo: applyComputerUndo,
+    emptyProofStore: emptyProofStore,
+    rememberProof: rememberProof,
+    proofForIds: proofForIds,
+    dropProof: dropProof,
+    noteUndoRefused: noteUndoRefused,
+    noteReconcile: noteReconcile,
+    proofAsLogRow: proofAsLogRow
   };
 })();
 

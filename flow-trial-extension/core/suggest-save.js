@@ -21,7 +21,8 @@ const FlowSuggestSave = (() => {
 
   const DOC_EXT = { pdf: 1, doc: 1, docx: 1, xls: 1, xlsx: 1, ppt: 1, pptx: 1, csv: 1, txt: 1, rtf: 1, odt: 1, ods: 1, odp: 1, key: 1, pages: 1, numbers: 1 };
   const IMG_EXT = { jpg: 1, jpeg: 1, png: 1, heic: 1 };
-  const DOC_MIN = 2 * 1024;
+  // A real document under 2KB is still the file. An empty file stays small-doc.
+  const DOC_MIN = 1;
   const IMG_MIN = 100 * 1024;
   // Same simple-upload cap as the OneDrive writer. The page adapter applies it.
   // decide() applies a cap only when input.uploadLimitBytes is a number.
@@ -301,6 +302,15 @@ const FlowSuggestSave = (() => {
     let sized = null;
     if (typeof size === 'number') sized = size;
     else if (size != null && size !== '') sized = Number(size);
+    if (sized == null || !isFinite(sized)) {
+      const m = String(a.sizeLabel || a.sizeText || '').match(/(\d+(?:[.,]\d+)?)\s*(B|KB|MB|GB)\b/i);
+      if (m) {
+        const n = Number(String(m[1]).replace(',', '.'));
+        const u = m[2].toUpperCase();
+        const mul = u === 'KB' ? 1024 : u === 'MB' ? 1024 * 1024 : u === 'GB' ? 1024 * 1024 * 1024 : 1;
+        if (isFinite(n) && n >= 0) sized = Math.round(n * mul);
+      }
+    }
     return {
       id: a.id || a.attachmentId || a.url,
       name: a.name || a.filename,

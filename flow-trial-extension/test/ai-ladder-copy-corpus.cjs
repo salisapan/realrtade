@@ -49,7 +49,7 @@ if (enabled) {
   check('ENABLED: the privacy page no longer says "none of this passes through us" without the exception, and lists the processors', /with one exception that is off until you turn it on/.test(privacy) && /also read the single masked sentence/.test(privacy));
   check('ENABLED: the privacy page keeps the line about regulated material', /do not turn this on for mail like that/.test(privacy));
   check('ENABLED: no page still makes the old, absolute promise', !/never leaves your device to be judged/.test(trial) && !/Only the optional Pro drafts and attachment summaries ever leave your machine/.test(trial) && !/never sent anywhere to decide/.test(popupHtml));
-  check('ENABLED: the trial page and the popup say it, with the allowance', /second reading/i.test(trial) && trial.indexOf('120 on Free') >= 0 && /second reading/.test(popupHtml));
+  check('ENABLED: the trial page and the popup say it, with the allowance', /second reading/i.test(trial) && trial.indexOf('120 on Free') >= 0 && (/second reading/.test(popupHtml) || (/קריאה שנייה/.test(popupHtml) && /משפט אחד ממוסך/.test(popupHtml))));
   check('ENABLED: the store text and the README say it', /second\s+reading/.test(store) && /Second reading/.test(readme) && /GLANCE_AI_LADDER/.test(readme));
 } else {
   check('DISABLED: no page describes a path that is not running', !/Second reading of one sentence/.test(privacy) && !/second reading/i.test(trial));

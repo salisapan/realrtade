@@ -33,10 +33,14 @@ test('Outlook silent case renders no card and keeps a Why-not-shown reason', asy
   }).toEqual({ chips: 0, reason: true });
 
   const popup = await glance.openPopup();
-  const why = popup.getByText(/Why not shown/);
-  await expect(why).toBeVisible();
-  await why.click();
-  await expect(popup.getByText(/intent-null|quiet:/)).toBeVisible();
+  const setupWhy = popup.locator('#surface-list [data-glance-why-line]');
+  await expect(setupWhy).toHaveCount(1);
+  await expect(setupWhy).toContainText('לא זוהתה בקשה');
+  await popup.locator('button[data-tab="log"]').click();
+  const activityWhy = popup.locator('#log-list [data-glance-why-line]');
+  await expect(activityWhy).toHaveCount(1);
+  await expect(activityWhy).toBeVisible();
+  await expect(activityWhy).toContainText('לא זוהתה בקשה');
 });
 
 test('Gmail show case renders a card', async ({ glance }) => {

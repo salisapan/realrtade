@@ -71,6 +71,7 @@ function background() {
         const named = body && body.name === 'noid.pdf';
         return json(201, named ? { name: body.name } : { id: 'att-1', name: body && body.name });
       }
+      if (/\/me\/messages\/odraft_1(\?|$)/.test(u) && method === 'GET') return json(200, { id: 'odraft_1', isDraft: true, webLink: 'https://outlook.live.com/mail/drafts/odraft_1' });
       if (/\/me\/messages\/odraft_1$/.test(u) && method === 'DELETE') return { ok: true, status: 204, json: async () => null, text: async () => '' };
       if (/\/drive\/v3\/files\/f1\?fields=/.test(u)) return json(200, { name: 'Invoice 204.pdf', mimeType: 'application/pdf', size: '11' });
       if (/\/drive\/v3\/files\/f1\?alt=media/.test(u)) {
@@ -93,7 +94,7 @@ function background() {
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
-  return { calls, fn: (n) => vm.runInContext(n, sandbox) };
+  return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
 }
 function mimeBody(raw) {
   const mime = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
@@ -115,7 +116,8 @@ function gmailDecide(m) {
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
   // A clear file ask goes to Drive search on Gmail (flow:search-drive) before any chip: outside this pure comparison.
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST) return { show: 'drive', reason: 'drive-search', intent };
-  const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {} });
+  const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {}, text: text });
+  if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
   return { show: true, intent, process };
 }
 // content-gmail.js buildActionPayload for a gmailDraft step with no file.
@@ -207,11 +209,27 @@ const CASES = [
     const gDraft = gShown && g.process.steps.some((s) => s.kind === 'gmailDraft');
     if (g.show === 'drive' || (gShown && !gDraft)) {
       // The planner has no Drive list. Until the mailbox check searches, a file ask is file-chain-not-run.
-      // A calendar close with no reply stays quiet. A task-only close is a To Do task, not a draft.
+      // A calendar hold is the same card, with no reply draft. A task-only close is a To Do task, not a draft.
       const steps = (gShown && g.process && g.process.steps) || [];
       const taskOnly = steps.length > 0 && steps.every((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
       if (taskOnly && oShown) {
         check(m.name + ': Outlook writes a To Do task, not a draft', entry.process.steps.every((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => /draft|send/i.test(s.kind)), entry.process.steps.map((s) => s.kind));
+        continue;
+      }
+      const calendarOnly = steps.length > 0 && steps.every((s) => s.kind === 'calendar');
+      if (calendarOnly && oShown) {
+        const oSteps = (entry.process && entry.process.steps) || [];
+        check(m.name + ': Outlook offers the same calendar hold and does not invent a reply',
+          oSteps.length > 0 && oSteps.every((s) => s.kind === 'calendar') && !oSteps.some((s) => /draft|send/i.test(s.kind)),
+          { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind) });
+        continue;
+      }
+      // planFor is one decision. A schedule (calendar plus a task, no reply) is the same card on both lanes.
+      if (oShown && g.process && entry && entry.process && g.process.id === entry.process.id) {
+        const oSteps = entry.process.steps || [];
+        const norm = (s) => (s.kind === 'outlookTask' || s.kind === 'googleTasks' ? 'googleTask' : s.kind === 'outlookDraft' ? 'gmailDraft' : s.kind);
+        const same = steps.map((s) => norm(s)).join(',') === oSteps.map(norm).join(',') && !oSteps.some((s) => /draft|send/i.test(s.kind));
+        check(m.name + ': both lanes plan the same close and neither invents a reply', same, { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind), id: g.process.id });
         continue;
       }
       const why = (r.diagnostics || []).map((d) => d.reason);
@@ -328,6 +346,131 @@ const CASES = [
     const noIdBg = background();
     const noIdWrite = await noIdBg.fn('outlookDraftWrite')({ connectorId: 'outlookDraft', outlookIncomingId: 'msg1', messageId: 'msg1', attachment: { filename: 'noid.pdf', mimeType: 'application/pdf', base64: Buffer.from('x').toString('base64') }, body: 'No file.' });
     check('no attachment id deletes the draft and does not claim attached', noIdWrite.ok === false && noIdWrite.reason === 'outlook-file-found-no-attach' && !(noIdWrite.written && /attach/i.test(noIdWrite.written)) && noIdBg.calls.some((c) => c.method === 'DELETE' && /\/me\/messages\/odraft_1$/.test(c.url)), noIdWrite);
+  }
+
+  console.log('\n--- one ask, the page and Loops, one draft ---\n');
+  {
+    const gate = background();
+    const op = { connectorId: 'outlookDraft', outlookIncomingId: 'msg-gate', messageId: 'msg-gate', body: 'The certificate is on this draft.' };
+    const first = await gate.fn('outlookDraftWrite')(op);
+    const second = await gate.fn('outlookDraftWrite')(op);
+    const posts = gate.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+    const map = gate.stored.outlookSync && gate.stored.outlookSync.glanceDraftByMessage;
+    check('a second page Do It reuses the draft and does not create another',
+      first.ok && first.ref === 'odraft_1' && second.ok && second.reused === true && second.reason === 'draft-already' && second.ref === 'odraft_1' && posts.length === 1,
+      { first, second, posts: posts.length });
+    check('that draft is the one Loops reads for the same mail',
+      map && map['msg-gate'] === 'odraft_1', map);
+    check('neither write sent the mail', !gate.calls.some((c) => /\/(send|sendMail)(\b|$)/.test(c.url)));
+  }
+
+  console.log('\n--- a mail from the user to the user is incoming ---\n');
+  {
+    const SAVE = 'please save the report to Drive by 20/10';
+    const HE = 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00';
+    const GMAIL = 'ai.local.flow@gmail.com';
+    const ALIAS = 'sali.alias@glance.test';
+    const OTHER_MAIL = 'sali.other@glance.test';
+    const UPN = 'sali.upn@glance.test';
+    const ownGmail = [GMAIL];
+    const ownOutlook = [ME, 'salisapan1@gmail.com'];
+    const ownAlias = [ME, ALIAS, OTHER_MAIL, UPN];
+    const judgeDeps = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    function pair(from, to, text, own, att) {
+      const base = {
+        text: text, subject: 'Note to myself',
+        sender: { name: 'Sali', email: from },
+        now: new Date(NOW),
+        to: [to],
+        ownAddresses: own,
+        inbound: false,
+        attachmentCount: att,
+        hasThreadAttachment: att === 1
+      };
+      return {
+        g: J.judge(Object.assign({ surface: 'gmail' }, base), judgeDeps),
+        o: J.judge(Object.assign({ surface: 'outlook' }, base), judgeDeps)
+      };
+    }
+    function steps(r) {
+      return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
+    }
+    const saveG = pair(GMAIL, GMAIL, SAVE, ownGmail, 1);
+    check('Gmail shape, save the report to Drive by 20/10, self-sent shows a Drive card',
+      saveG.g.show === true && steps(saveG.g).indexOf('driveFile') >= 0 && steps(saveG.g).indexOf('gmailDraft') >= 0 && !steps(saveG.g).some((k) => /send/i.test(k)),
+      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g) });
+    const saveO = pair(ME, ME, SAVE, ownOutlook, 1);
+    check('Outlook shape, save the report to Drive by 20/10, self-sent shows a OneDrive card',
+      saveO.o.show === true && steps(saveO.o).indexOf('onedriveFile') >= 0 && steps(saveO.o).indexOf('outlookDraft') >= 0 && !steps(saveO.o).some((k) => /send/i.test(k)),
+      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o) });
+    const heG = pair(GMAIL, GMAIL, HE, ownGmail, 0);
+    const heO = pair(ME, ME, HE, ownOutlook, 0);
+    check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',
+      heG.g.show === true && steps(heG.g).join(',') === 'googleTask',
+      { show: heG.g.show, reason: heG.g.reason, steps: steps(heG.g) });
+    check('Outlook shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',
+      heO.o.show === true && steps(heO.o).join(',') === 'outlookTask',
+      { show: heO.o.show, reason: heO.o.reason, steps: steps(heO.o) });
+    const alias = pair(ALIAS, OTHER_MAIL, HE, ownAlias, 0);
+    check('an alias writing to another alias of the same user is a task with no draft',
+      alias.o.show === true && steps(alias.o).join(',') === 'outlookTask',
+      { show: alias.o.show, reason: alias.o.reason, steps: steps(alias.o) });
+    const outbound = pair(ME, 'dana@acme.com', HE, ownOutlook, 0);
+    check('a mail from the user to someone else stays quiet',
+      outbound.g.show === false && outbound.o.show === false && outbound.o.reason === 'quiet:hedge',
+      { g: outbound.g.reason, o: outbound.o.reason });
+    const behalf = J.judge({
+      text: HE, subject: 'Note to myself',
+      sender: { name: 'Sali', email: ME },
+      now: new Date(NOW), surface: 'outlook',
+      to: [ME], ownAddresses: ownOutlook, inbound: false,
+      onBehalfOf: 'delegate@acme.com', attachmentCount: 0
+    }, judgeDeps);
+    check('a delegate sending as the user stays quiet', behalf.show === false, { reason: behalf.reason });
+
+    function graphSelf(from, to, text, i, extra) {
+      return Object.assign({
+        id: 'self' + i, conversationId: 'convself' + i, subject: 'Note to myself', isDraft: false,
+        hasAttachments: false,
+        from: { emailAddress: { name: 'Sali', address: from } },
+        toRecipients: [{ emailAddress: { name: 'Sali', address: to } }],
+        receivedDateTime: new Date(NOW - 3600000).toISOString(),
+        body: { contentType: 'text', content: text }
+      }, extra || {});
+    }
+    const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+    function planned(messages, me) {
+      return S.plan({ messages: messages, me: me, watches: [], graph: I.empty(), state: {}, now: NOW, deps: deps });
+    }
+    const report = { hasAttachments: true, attachments: [{ id: 'a1', name: 'report.pdf', isInline: false }] };
+    const saveBox = planned([graphSelf(GMAIL, GMAIL, SAVE, 1, report)], [GMAIL, ME]);
+    check('Outlook mailbox, Gmail address to itself, the save is incoming',
+      saveBox.incoming.length === 1 && !(saveBox.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: saveBox.incoming.length, why: (saveBox.diagnostics || []).map((d) => d.reason) });
+    const saveMe = planned([graphSelf(ME, ME, SAVE, 2, report)], ownOutlook);
+    check('Outlook mailbox, Outlook address to itself, the save is incoming',
+      saveMe.incoming.length === 1 && !(saveMe.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: saveMe.incoming.length, why: (saveMe.diagnostics || []).map((d) => d.reason) });
+    const heBox = planned([graphSelf(GMAIL, GMAIL, HE, 3)], [GMAIL, ME]);
+    const heMe = planned([graphSelf(ME, ME, HE, 4)], ownOutlook);
+    check('Outlook mailbox, Gmail address, the Hebrew meeting is a calendar hold',
+      heBox.incoming.length === 1 && heBox.incoming[0].intent && heBox.incoming[0].intent.personalClose === 'calendar-hold',
+      { incoming: heBox.incoming.length, why: (heBox.diagnostics || []).map((d) => d.reason) });
+    check('Outlook mailbox, Outlook address, the Hebrew meeting is a calendar hold',
+      heMe.incoming.length === 1 && heMe.incoming[0].intent && heMe.incoming[0].intent.personalClose === 'calendar-hold',
+      { incoming: heMe.incoming.length, why: (heMe.diagnostics || []).map((d) => d.reason) });
+    const aliasBox = planned([graphSelf(ALIAS, OTHER_MAIL, HE, 5)], ownAlias);
+    check('Outlook mailbox, proxy address to otherMails, the Hebrew meeting is incoming',
+      aliasBox.incoming.length === 1 && !(aliasBox.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: aliasBox.incoming.length, why: (aliasBox.diagnostics || []).map((d) => d.reason) });
+    const toDana = planned([graphSelf(ME, 'dana@acme.com', HE, 6)], ownOutlook);
+    check('Outlook mailbox, a mail to someone else is not an incoming card',
+      toDana.incoming.length === 0,
+      { incoming: toDana.incoming.length, why: (toDana.diagnostics || []).map((d) => d.reason) });
+    const fwd = planned([graphSelf(ME, ME, HE, 7, { sender: { emailAddress: { name: 'Delegate', address: 'delegate@acme.com' } } })], ownOutlook);
+    check('Outlook mailbox, a delegate on a self-addressed mail stays quiet',
+      fwd.incoming.length === 0 && (fwd.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: fwd.incoming.length, why: (fwd.diagnostics || []).map((d) => d.reason) });
   }
 
   console.log('\nTOTAL FAILURES:', failures);

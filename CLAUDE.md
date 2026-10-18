@@ -6,7 +6,7 @@
 
 **Standing constraints.** Glance is not only a Gmail add-on (Gmail is the entry surface). Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox" (owner, 2026-10-09). Pro is the personal depth
 layer, not team or enterprise (that is Flow). Waiting or tracking alone is not success; true close is. Free must stay genuinely useful, never a dead demo. Zero-Prompt is sacred. Multi-platform means
-execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Do not describe Glance as "a Chrome
+execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Glance never blocks the user: a draft, task, event, or file it created stays editable, and Undo leaves an edited one alone. Do not describe Glance as "a Chrome
 extension for Gmail", "an AI email assistant" or "a smart inbox", and never describe tracking or a prepared draft as completion. Full rules, required framing and before/after examples: `docs/product-identity.md`.
 
 **Every report keeps two parts apart.** *Product definition (vision-locked)*: the block above, unchanged by what the code does today. *Current implementation status (code reality)*: what ships in this
@@ -164,4 +164,23 @@ What Glance calls when it cannot recognise an intent (no external model by defau
 ## Testing and the live Gate
 
 Headless regression for the unpacked extension runs in CI on pull requests into `claude/install-uiux-pro-max-skill-a4agox` (`.github/workflows/glance-e2e.yml`, suite under `flow-trial-extension/e2e/`). It runs before the owner's live browser Gate. The live Gate stays; this suite does not replace it. The command and what "the tests pass" means: `docs/README.md` §4. Status: `docs/open-tasks.md` row 56.
+
+## Product locks — read first
+
+Read these two notes before changing Glance scope, the site, or a bot rule.
+
+- Full dated rules (Product, Flow/Sales, Bot operations): `docs/vault/shared-rules.md`
+- Glance locks, short form: `docs/vault/product-locks.md`
+
+Every new rule or setting saved to the bots' shared memory must be added to `docs/vault/shared-rules.md` via PR by the bot that saved it.
+
+- **On by default, one consent per ecosystem.** Every integrated product is on. There is no off-by-default toggle.
+- **Intent detection on every site.**
+- **Native embeds are part of done.** Every integrated system's own apps, on every device type (iPhone, Android, iPad, Mac, Windows, web). Install once from signup and it appears on all devices.
+- **The Do It card pops up in native apps.** It appears on its own, not only on an icon tap. The Gmail add-on and the Outlook add-in start immediately, in parallel with the urgent ecosystems work. Where a platform forbids an automatic surface, use the closest official route: a prefetched card, push notifications with Do It, and event-based activation.
+- **Every ecosystem.** That auto-pop card and those native embeds apply to every ecosystem, across all apps and devices: Meta (WhatsApp, Messenger, Instagram); Google (Gmail, Calendar, Drive, Docs, Sheets); Microsoft (Outlook, Teams, Word, Excel, OneDrive, To Do).
+- **iPhone:** add-ins first, then Safari.
+- **Signup gate.** It lives only on the Glance page, `flow-landing/trial.html`: email, required Terms and Privacy, a mailing-list opt-in that is not pre-checked, double opt-in, then the store. The main Flow site keeps the top Glance intro and a nav link. The bottom Get Glance card stays off the main site.
+- **Public release.** A polished, complete product, not a friends-only build.
+- **Always ProofOfClose and Undo.** No auto-send. Never clobber a user edit. Undo refuses rather than overwriting one.
 

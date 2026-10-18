@@ -36,6 +36,7 @@ Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail a
 5. Free must stay genuinely useful: Do It without limit, loops that close on the outcome, and, once the server switch is on, the second reading within its allowance. Never a dead demo.
 6. Zero-Prompt is sacred: no chat, no rules screen, no setup questions beyond signing in, one card only when something real is decided; silence when unsure.
 7. Multi-platform means execution and observation across the surfaces where a loop really opens, advances and closes, in service of closure. It does not mean a connector marketplace, inbox-zero, or integrations for their own sake. A new surface is opt-in, read-only, stricter than Gmail, and changes the privacy page and the store text in the same commit (`docs/multi-platform.md`).
+8. Glance never blocks the user. A draft, task, calendar event, or file Glance created stays fully editable in the tool where it lives. Glance does not cover it, disable it, or write it again after the person starts editing. Undo leaves it alone, in one plain line, when a creation snapshot, changeKey, or lastModifiedDateTime shows the person changed it.
 
 ### Before and after
 

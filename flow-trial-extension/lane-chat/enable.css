@@ -1,0 +1,45 @@
+:root {
+  --paper: #07090F;
+  --surface: #11151F;
+  --ink: #E9EDF6;
+  --ink-2: #AEB8CB;
+  --line: #1F2634;
+  --accent: #3B74FF;
+}
+* { box-sizing: border-box; }
+html, body { height: auto; overflow: auto; }
+body {
+  display: block;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Geist", "Segoe UI", sans-serif;
+}
+main {
+  max-width: 38rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 3rem;
+}
+h1 { font-size: 1.6rem; font-weight: 560; margin: 0 0 0.75rem; }
+p { color: var(--ink-2); line-height: 1.5; margin: 0 0 0.9rem; }
+ul { list-style: none; margin: 1.5rem 0 0; padding: 0; }
+li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+}
+button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+#note { min-height: 1.4rem; margin-top: 1rem; }
