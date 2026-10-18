@@ -222,6 +222,14 @@ const FlowStorage = (() => {
     // src/outlook.js: the Microsoft sign-in (kept only on this device), the last check, and what waits for an answer. Never message text beyond the loop's own sentence.
     outlookAuth: null,
     outlookSync: {},
+    // The Hold calendar choice (once / always). Settings reads it through get().
+    // Null is no policy. A missing key would never arrive, so Always could not be revoked.
+    glanceCalendarConsent: null,
+    // The To Do consent choice (once / always). Same shape as the calendar policy.
+    glanceTodoConsent: null,
+    // Tabs whose Outlook script died and could not paint the refresh line.
+    // The popup reads this through get(). A missing key would never arrive.
+    glanceOutlookRefresh: {},
     // A suggested save is recorded here and not drawn. suggestDismissals is
     // the store API for Not now and Undo. No button writes it in 0.9.38.
     suggestLog: [],
@@ -229,6 +237,28 @@ const FlowStorage = (() => {
     // src/content-outlook.js writes this directly. The panel's Why not shown
     // list reads it through get(); a key absent from DEFAULTS never arrives.
     outlookPageDiag: [],
+    glanceWhyCurrent: null,
+    // One why per conversation. A tab writes its own key and never clears
+    // another conversation by storing an empty current why.
+    glanceWhyByConv: {},
+    // UI language for card and panel chrome. Null follows the browser
+    // (chrome.i18n.getUILanguage, then navigator.language). 'he' or 'en' wins.
+    glanceUiLanguage: null,
+    // The Gmail page language. The side panel reads it through get().
+    glanceHostLanguage: null,
+    // Names this person is called, beside the account display name.
+    // Filled from the Google userinfo and Graph profile already granted.
+    // No settings field. Empty until that profile read succeeds.
+    glanceOwnNames: [],
+    // Google userinfo name, given_name, and family_name on the existing
+    // token. Hosts pass this as profile. Null until that read succeeds.
+    googleProfile: null,
+    // Side-panel line. names and source (profile, aria-label, or none).
+    // The aria name is not copied into glanceOwnNames.
+    glanceNamesDiag: null,
+    // Off in production. The Names line is console.info either way.
+    // The popup paints it only when a dev fixture turns this on.
+    glanceDevFixture: false,
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
@@ -267,18 +297,63 @@ const FlowStorage = (() => {
   // touches the keys named in its patch, so concurrent writes to different
   // keys never collide — only same-key, same-function concurrency does.
   //
-  // This only serializes calls made from within one script's own execution
-  // context. It does not protect against two Gmail tabs open at once, each
-  // running an independent copy of this file against the same underlying
-  // storage — that cross-tab race is real but far narrower (it needs
-  // near-simultaneous activity in two tabs) and closing it fully would mean
-  // routing every write through the single background service worker
-  // instead of writing directly from content scripts, a larger change left
-  // for a follow-up.
+  // Two open mails are two copies of this file. Each queue is local to its
+  // page, so Undo on the task mail and Undo on the file mail can both read
+  // the same log and the later set() puts the other row back to Handled.
+  // The service worker grants one glance-log-lock port at a time. Disconnect
+  // (the write finished, or the page closed) lets the next writer through.
+  // A page with no extension id keeps the in-page queue only.
+  function logLockAvailable() {
+    try {
+      return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && typeof chrome.runtime.connect === 'function';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function withLogLock(fn) {
+    if (!logLockAvailable()) return Promise.resolve().then(fn);
+    return new Promise((resolve, reject) => {
+      let port = null;
+      let ran = false;
+      const run = () => {
+        if (ran) return;
+        ran = true;
+        clearTimeout(timer);
+        Promise.resolve().then(fn).then((value) => {
+          try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+          resolve(value);
+        }, (err) => {
+          try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+          reject(err);
+        });
+      };
+      const timer = setTimeout(() => {
+        if (ran) return;
+        try { if (port) port.disconnect(); } catch (e) { /* already closed */ }
+        run();
+      }, 1500);
+      try {
+        port = chrome.runtime.connect({ name: 'glance-log-lock' });
+        port.onDisconnect.addListener(() => {
+          try { if (chrome.runtime) void chrome.runtime.lastError; } catch (e) { /* worker gone */ }
+        });
+        port.onMessage.addListener((msg) => {
+          if (!msg || msg.ok !== true) return;
+          clearTimeout(timer);
+          run();
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        run();
+      }
+    });
+  }
+
   function serialize(fn) {
     let queue = Promise.resolve();
     return (...args) => {
-      const run = queue.then(() => fn(...args));
+      const run = queue.then(() => withLogLock(() => fn(...args)));
       queue = run.catch(() => {}); // one failure must not wedge later calls
       return run;
     };
@@ -350,6 +425,22 @@ const FlowStorage = (() => {
     return head.concat(carried);
   }
 
+  // One Outlook draft can be logged under the scan id and the open id.
+  // The draft id is the decision. A write with no ref stays per message.
+  function writeIdentity(row) {
+    if (!row) return '';
+    const ref = row.ref;
+    let key = '';
+    if (typeof ref === 'string' && ref) key = ref;
+    else if (ref && typeof ref === 'object') {
+      key = ref.draftId || ref.taskId || ref.eventId || ref.externalId || ref.id || '';
+      if (key && typeof key !== 'string') key = String(key);
+    }
+    if (key) return 'ref:' + String(key);
+    if (row.messageId) return 'msg:' + String(row.messageId);
+    return '';
+  }
+
   // The single place the durable derived state above is maintained, so it can
   // never drift from the log it is derived from: one read, one write, inside
   // the same serialized queue that already protects `log`.
@@ -389,10 +480,15 @@ const FlowStorage = (() => {
     if (row.kind === 'written' && row.messageId) {
       const ws = state.writeStats || { total: 0, recent: [] };
       const recent = ws.recent || [];
-      if (!recent.some((w) => w && w.id === row.messageId)) {
+      const ident = writeIdentity(row);
+      const prior = (state.log || []).some((e) => e && e.kind === 'written' && (
+        e.messageId === row.messageId || (ident && writeIdentity(e) === ident)
+      ));
+      const seen = recent.some((w) => w && (w.id === row.messageId || (ident && (w.key === ident || w.id === ident))));
+      if (!seen && !prior) {
         patch.writeStats = {
           total: (ws.total || 0) + 1,
-          recent: [{ id: row.messageId, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
+          recent: [{ id: row.messageId, key: ident, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
         };
       }
     }
@@ -432,6 +528,8 @@ const FlowStorage = (() => {
     }
 
     patch.log = trimLog([row, ...state.log], resolved);
+    const proofs = mergeGlanceProof(state, row);
+    if (proofs) patch.glanceProofs = proofs;
     await set(patch);
     return patch.log;
   });
@@ -750,6 +848,12 @@ const FlowStorage = (() => {
     return FlowStillOpen.select(candidatesFromState(state, now), now || Date.now(), state.log);
   }
 
+  async function getExpiredLoops(now) {
+    if (typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.expiredOf !== 'function') return [];
+    const state = await get();
+    return FlowStillOpen.expiredOf(candidatesFromState(state, now), now || Date.now(), state.log);
+  }
+
   // Weekly summary's "still open" count. Hosts that have not loaded
   // still-open.js keep the older unresolved-shown count so a test sandbox
   // can exercise the trigger without the morning filter. The extension
@@ -809,13 +913,30 @@ const FlowStorage = (() => {
   function writeCountsFrom(state) {
     const ws = (state && state.writeStats) || { total: 0, recent: [] };
     const log = (state && state.log) || [];
-    const legacy = new Set(log.filter((e) => e.kind === 'written' && e.messageId).map((e) => e.messageId));
+    function identOf(e) {
+      return writeIdentity(e) || (e && e.messageId ? 'msg:' + e.messageId : '');
+    }
+    const legacy = new Set();
+    log.forEach((e) => {
+      if (e && e.kind === 'written' && e.messageId) {
+        const id = identOf(e);
+        if (id) legacy.add(id);
+      }
+    });
 
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const week = new Set((ws.recent || []).filter((w) => w && w.ts >= weekAgo).map((w) => w.id));
+    const week = new Set();
+    (ws.recent || []).forEach((w) => {
+      if (!w || w.ts < weekAgo) return;
+      week.add(w.key || (w.id ? 'msg:' + w.id : ''));
+    });
     for (const e of log) {
-      if (e.kind === 'written' && e.messageId && e.ts >= weekAgo) week.add(e.messageId);
+      if (e && e.kind === 'written' && e.messageId && e.ts >= weekAgo) {
+        const id = identOf(e);
+        if (id) week.add(id);
+      }
     }
+    week.delete('');
 
     return { total: Math.max(ws.total || 0, legacy.size), week: week.size };
   }
@@ -1390,6 +1511,18 @@ const FlowStorage = (() => {
   // Outlook Loops receipts: a prepared draft is shown in place until Undo or dismiss.
   // Written rows are terminal for getPending; these helpers surface the active draft
   // receipt and can reopen the ask after a draft-only undo.
+  function proofApi() {
+    return typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+  }
+
+  function mergeGlanceProof(state, row) {
+    const P = proofApi();
+    if (!P || typeof P.rememberProof !== 'function' || !row || !row.messageId) return null;
+    const next = P.rememberProof(state && state.glanceProofs, row);
+    if (!next || !next.records || !next.records[row.messageId]) return null;
+    return next;
+  }
+
   function getActiveOutlookReceiptsFrom(state) {
     const log = (state && state.log) || [];
     // An older undone (e.g. migrated 0.9.3) must not hide a NEWER draft receipt
@@ -1415,6 +1548,30 @@ const FlowStorage = (() => {
       if (seen.has(e.messageId)) continue;
       seen.add(e.messageId);
       out.push(e);
+    }
+    const P = proofApi();
+    const store = state && state.glanceProofs;
+    if (P && typeof P.proofForIds === 'function' && store && store.records) {
+      for (let i = 0; i < out.length; i++) {
+        if (!out[i] || out[i].connectorId === 'outlookDraft') continue;
+        const rec = P.proofForIds(store, [out[i].messageId, out[i].itemId, out[i].pathId, out[i].threadId, out[i].outlookConversationId]);
+        if (!rec) continue;
+        if (rec.undone === true) {
+          out.splice(i, 1);
+          i -= 1;
+          continue;
+        }
+        const view = P.proofAsLogRow(rec);
+        if (view) out[i] = Object.assign({}, out[i], view);
+      }
+      Object.keys(store.records).forEach((mid) => {
+        const rec = store.records[mid];
+        if (!rec || rec.undone === true || seen.has(rec.messageId)) return;
+        const view = P.proofAsLogRow(rec);
+        if (!view || !panelReceipt(view)) return;
+        seen.add(view.messageId);
+        out.push(view);
+      });
     }
     return out;
   }
@@ -1581,8 +1738,8 @@ const FlowStorage = (() => {
       const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
       const taskRow = e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
       if (!taskRow) continue;
-      if (ext && rowExt && rowExt !== ext) continue;
       const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      if (ext && rowExt && rowExt !== ext && !idHit) continue;
       const extHit = ext && rowExt === ext;
       const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
       if (!idHit && !extHit && !threadHit) continue;
@@ -1615,8 +1772,53 @@ const FlowStorage = (() => {
       hit = true;
     }
     const resolved = (state.resolvedMessageIds || []).filter((id) => !messageId || id !== messageId);
-    await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
+    const patch = { log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved };
+    const P = proofApi();
+    if (P && typeof P.dropProof === 'function' && messageId) {
+      patch.glanceProofs = P.dropProof(state.glanceProofs, messageId);
+    }
+    await set(patch);
     return { ok: true, hit: hit };
+  });
+
+  const rememberGlanceProof = serialize(async function rememberGlanceProof(row) {
+    const state = await get();
+    const proofs = mergeGlanceProof(state, row);
+    if (!proofs) return { ok: false };
+    await set({ glanceProofs: proofs });
+    return { ok: true, record: proofs.records[row.messageId] };
+  });
+
+  const patchGlanceProof = serialize(async function patchGlanceProof(messageId, patch) {
+    if (!messageId || !patch || typeof patch !== 'object') return { ok: false };
+    const state = await get();
+    const store = state.glanceProofs || { records: {}, byId: {} };
+    const records = store.records || {};
+    const rec = records[messageId] || (proofApi() && proofApi().proofForIds(store, [messageId]));
+    const key = rec && rec.messageId;
+    if (!key || !records[key]) return { ok: false };
+    const next = Object.assign({}, records[key], patch);
+    const logTouch = {};
+    ['undoRefused', 'undoLine', 'deleted', 'deletedLine', 'verifyNote'].forEach((name) => {
+      if (Object.prototype.hasOwnProperty.call(patch, name)) logTouch[name] = patch[name];
+    });
+    if (patch.deleted === true) logTouch.glanceDeleted = true;
+    let log = state.log;
+    if (Object.keys(logTouch).length) {
+      log = (state.log || []).slice();
+      for (let i = 0; i < log.length; i++) {
+        const e = log[i];
+        if (!e || e.kind !== 'written') continue;
+        const ids = [e.messageId, e.itemId, e.pathId, e.threadId, e.outlookConversationId];
+        if (ids.indexOf(key) < 0 && e.messageId !== next.messageId) continue;
+        log[i] = Object.assign({}, e, logTouch);
+        break;
+      }
+    }
+    const stored = { glanceProofs: { records: Object.assign({}, records, { [key]: next }), byId: store.byId || {} } };
+    if (log !== state.log) stored.log = log;
+    await set(stored);
+    return { ok: true, record: next };
   });
 
   // Same in-place rewrite for the OneDrive file. A second HANDLED row is
@@ -1630,10 +1832,12 @@ const FlowStorage = (() => {
       const e = log[i];
       if (!e || e.kind !== 'written') continue;
       const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.fileId || e.ref.itemId)) || '';
-      const fileRow = e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive';
+      const fileRow = e.connectorId === 'onedriveFile' || e.connectorId === 'attachmentSave' || e.system === 'microsoft/onedrive';
       if (!fileRow) continue;
-      if (ext && rowExt && rowExt !== ext) continue;
       const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      // The chip's undo ref is the save wrapper. Its file id can differ from
+      // the id stored on the written row. The message is still that file.
+      if (ext && rowExt && rowExt !== ext && !idHit) continue;
       const extHit = ext && rowExt === ext;
       const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
       if (!idHit && !extHit && !threadHit) continue;
@@ -1802,7 +2006,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, getExpiredLoops, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, rememberGlanceProof, patchGlanceProof, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

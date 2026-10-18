@@ -82,7 +82,9 @@ test('Scenario A closes the task and the file, and the reply stays a draft', asy
   await expect(loops.locator('#open-list .log-kind').filter({ hasText: 'Draft' })).toHaveCount(1);
 
   await dana.locator('#ReadingPaneContainerId button.flow-chip-undo').click();
+  await expect(dana.locator('#ReadingPaneContainerId .flow-chip-handled')).toHaveCount(0);
   await file.locator('#ReadingPaneContainerId button.flow-chip-undo').click();
+  await expect(file.locator('#ReadingPaneContainerId .flow-chip-handled')).toHaveCount(0);
   await expect.poll(async () => {
     const calls = await glance.apiCalls();
     const task = calls.some((c) => c.method === 'DELETE' && /\/me\/todo\/lists\/[^/]+\/tasks\//.test(c.url));

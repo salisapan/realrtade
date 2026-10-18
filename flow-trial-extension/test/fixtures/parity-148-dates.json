@@ -1,0 +1,84 @@
+{
+  "now": [2026, 9, 15, 12, 0, 0],
+  "conflicts": [
+    {
+      "id": "he-bet",
+      "text": "יום רביעי 22/10 ב-14:00",
+      "labels": ["רביעי 21/10", "חמישי 22/10"]
+    },
+    {
+      "id": "en-at",
+      "text": "Wednesday 22/10 at 14:00",
+      "labels": ["Wednesday 21/10", "Thursday 22/10"]
+    },
+    {
+      "id": "dotted",
+      "text": "פגישה ביום רביעי 22.10 בשעה 14:00",
+      "labels": ["רביעי 21/10", "חמישי 22/10"]
+    },
+    {
+      "id": "sunday",
+      "text": "פגישה ביום ראשון 22/10 בשעה 14:00",
+      "labels": ["ראשון 25/10", "חמישי 22/10"]
+    }
+  ],
+  "team": {
+    "text": "ישיבת צוות ביום חמישי 22/10 בשעה 14:00",
+    "plan": "hold",
+    "iso": "2026-10-22"
+  },
+  "plans": [
+    { "text": "פגישה ביום חמישי 22/10 בשעה 14:00", "id": "hold" },
+    { "text": "פגישה ב-22/10 בשעה 14:00", "id": "hold" },
+    { "text": "פגישה ביום חמישי 22/10", "id": "log-it" }
+  ],
+  "noTimeConflict": {
+    "text": "פגישה ביום רביעי 22/10",
+    "labels": ["רביעי 21/10", "חמישי 22/10"],
+    "forbiddenIso": "2026-10-21"
+  },
+  "deadlines": [
+    "תשלח לי את המצגת עד יום שבת 28/10 בשעה 14:00",
+    "תשלח לי את המצגת עד יום שני 28/10 בשעה 14:00",
+    "תשלח לי את המצגת עד יום שבת 20/10 בשעה 14:00",
+    "תשלח לי את המצגת עד יום שלישי 31/2 בשעה 09:30",
+    "תשלח לי את המצגת עד יום שלישי 31/2 בשעה 14:00",
+    "תשלח לי את המצגת עד יום שבת 31/2 בשעה 14:00"
+  ],
+  "offer14096": {
+    "id": "v2syn-14096",
+    "subject": "Hi",
+    "body": "Reminder: you committed to send the proposal by Oct 20. Thanks, Billing",
+    "date": "2026-10-20"
+  },
+  "quiet": [
+    { "id": "v2syn-26321", "subject": "בוטל", "body": "היי, מבטלת את הcall של ביום רביעי תודה! אבי" },
+    { "id": "v2syn-26338", "subject": "בוטל", "body": "היי לכולם, מבטלת את השיחה של ביום ראשון יום נעים, נועה" },
+    { "id": "v2syn-26354", "subject": "השב: שינוי", "body": "שלום רב, מבטלת את הפגישה של ביום רביעי הבא תודה רבה, דנה" },
+    { "id": "v2syn-4719", "subject": "Hold off", "body": "Following up on our call. Don't schedule the demo on Sunday at 14:30." },
+    { "id": "v2syn-6221", "subject": "Out of office", "body": "Following up on our call. I am out of the office until October 20 with limited access to email." },
+    { "id": "v2syn-6224", "subject": "Fwd: Automatic reply", "body": "Following up on our call. I am out of the office until October 20 with limited access to email." },
+    { "id": "v2syn-6193", "subject": "Automatic reply", "body": "Following up on our call. I am out of the office until October 20 with limited access to email." },
+    { "id": "v2syn-17029", "subject": "Automatic reply", "body": "I am out of the office until next Monday with limited access to email." },
+    { "id": "v2syn-26154", "subject": "RE: סיכום", "body": "השיחת זום הייתה ביום ראשון ב-10:00, תודה שוב" },
+    { "id": "v2syn-26182", "subject": "סיכום", "body": "הראיון הייתה ביום ראשון ב-10:00, תודה שוב" },
+    { "id": "v2syn-5616", "subject": "Thanks", "body": "The demo was on Monday at 2pm, thanks again." },
+    { "id": "v2syn-16630", "subject": "Change of plans", "body": "The check-in Sunday at 11:15 is no loner needed." },
+    { "id": "v2syn-5784", "subject": "Change of plans", "body": "The kickoff tomorrow at 9am is cancelled." },
+    { "id": "v2syn-5749", "subject": "Change of plans", "body": "The review meeting next Monday at 10:00 is cancelled." },
+    { "id": "v2syn-26311", "subject": "הועבר: שינוי", "body": "סאלי שלום, הפגישה ביום חמישי לא תתקיים יום נעים, דנה" },
+    { "id": "v2syn-15670", "subject": "", "body": "You don't ned to save the attachmment to Drive.", "attachmentCount": 1 },
+    { "id": "v2syn-24499", "subject": "", "body": "לא צרךי לשמור את הקובץ המצורף ל-Drive", "attachmentCount": 1 }
+  ],
+  "offer8473": {
+    "id": "v2syn-8473",
+    "subject": "תגובה: תזכורת",
+    "body": "אשלח את גיליון התמחור ב-19 באוקטובר ב-13:00.",
+    "date": "2026-10-19",
+    "plan": "log-it"
+  },
+  "replies": [
+    "בבקשה תשיב לי ביום ראשון 22/10 בשעה 14:00 לגבי ההצעה",
+    "Could you please confirm by Wednesday 22/10 at 14:00 so we can proceed?"
+  ]
+}

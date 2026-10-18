@@ -37,6 +37,7 @@ function background(opts) {
   const routes = opts.routes || [];
   const sandbox = {
     console, URLSearchParams, URL, TextEncoder, Uint8Array, atob, crypto: webcrypto,
+    setTimeout, clearTimeout,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
@@ -246,9 +247,19 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
     outlook(signedNo, 1).show === false && gmail(signedNo, 1).show === false,
     { outlook: outlook(signedNo, 1).reason, gmail: gmail(signedNo, 1).reason });
   const form = 'בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00';
-  check('attaching a form to a demo invite stays quiet',
-    outlook(form, 1).show === false && gmail(form, 1).show === false,
-    { outlook: outlook(form, 1).reason, gmail: gmail(form, 1).reason });
+  const formOutlook = outlook(form, 1);
+  const formGmail = gmail(form, 1);
+  function inviteTrack(row) {
+    const kinds = row.process && row.process.steps && row.process.steps.map((s) => s.kind);
+    const taskAt = kinds ? kinds.findIndex((k) => k === 'googleTask' || k === 'outlookTask') : -1;
+    const draftAt = kinds ? kinds.findIndex((k) => k === 'gmailDraft' || k === 'outlookDraft') : -1;
+    const draft = row.process && row.process.steps && row.process.steps[draftAt] && row.process.steps[draftAt].params && row.process.steps[draftAt].params.body;
+    return row.show === true && row.intent && row.intent.label === 'לצרף טופס 101 לזימון' && draft === 'אצרף בהקדם.' && !/מצורף/.test(String(draft || '')) && taskAt !== -1 && draftAt > taskAt;
+  }
+  check('attaching a form to a demo invite is the file track',
+    inviteTrack(formOutlook) && inviteTrack(formGmail),
+    { outlook: { show: formOutlook.show, reason: formOutlook.reason, label: formOutlook.intent && formOutlook.intent.label },
+      gmail: { show: formGmail.show, reason: formGmail.reason, label: formGmail.intent && formGmail.intent.label } });
 }
 
 (async () => {
@@ -269,6 +280,18 @@ console.log('\n--- create, read back, undo ---\n');
   const del = env.calls.filter((c) => c.method === 'DELETE');
   check('Undo DELETEs a file this write created',
     undo.ok === true && del.length === 1 && /\/me\/drive\/items\/FILE1$/.test(del[0].url), del.map((c) => c.url));
+  const renamed = background({ routes: [
+    { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 200, json: async () => Object.assign({}, FILE, { name: 'renamed.pdf', eTag: 'user' }), text: async () => '' }) }
+  ] });
+  const kept = await renamed.fn('outlookFileUndo')({
+    fileId: 'FILE1', itemId: 'FILE1', externalId: 'FILE1', created: true,
+    editSnap: { name: 'passport.pdf', eTag: 'created' }
+  });
+  check('a file the person edited is not deleted',
+    kept.ok === false && kept.reason === 'user-edited' &&
+    kept.written === 'You edited this. Undo left it alone.' &&
+    !renamed.calls.some((c) => c.method === 'DELETE' || c.method === 'PUT' || c.method === 'PATCH'),
+    kept);
 }
 
 console.log('\n--- a verify miss is not Handled ---\n');

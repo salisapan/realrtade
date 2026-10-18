@@ -237,9 +237,33 @@ const FlowOwaParse = (() => {
     return long.endsWith(short) || long.startsWith(short);
   }
 
+  function labelForms(bytes) {
+    return shownSizeLabels(bytes).map((s) => norm(s).replace(/\s+/g, ''));
+  }
+
+  function labelMatchesSize(label, bytes) {
+    if (!label || bytes == null) return false;
+    return labelForms(bytes).indexOf(label) >= 0;
+  }
+
+  // attachmentsOf stores Math.round(3 * 1024) beside the chip text "3 KB".
+  // Graph's byte count for that same chip is rarely 3072. The label is the
+  // size the person saw. A rounded byte count is not a second measurement.
+  function roundedFromLabel(row) {
+    if (!row || row.size == null || !row.label) return false;
+    const m = String(row.label).match(/^(\d+(?:[.,]\d+)?)(b|kb|mb|gb)$/i);
+    if (!m) return false;
+    const amount = Number(String(m[1]).replace(',', '.'));
+    const unit = m[2].toLowerCase();
+    const mul = unit === 'kb' ? 1024 : unit === 'mb' ? 1024 * 1024 : unit === 'gb' ? 1024 * 1024 * 1024 : 1;
+    return isFinite(amount) && Math.round(amount * mul) === row.size;
+  }
+
   // 'yes' names and sizes agree, including a KB label and a truncated name.
   // 'no' they disagree. 'unknown' the pane did not show a file.
   // A missing size is not a disagreement: the chip could not be read.
+  // A label that displays the Graph size agrees even when the chip also
+  // stored the rounded byte count of that label.
   function fileRelation(paneList, graphList) {
     const pane = fileRows(paneList);
     const graph = fileRows(graphList);
@@ -247,14 +271,15 @@ const FlowOwaParse = (() => {
     if (!graph.length || pane.length !== graph.length) return 'no';
     for (let i = 0; i < pane.length; i++) {
       if (!namesAgree(pane[i].name, graph[i].name)) return 'no';
-      if (pane[i].size != null) {
+      if (pane[i].label && labelMatchesSize(pane[i].label, graph[i].size)) continue;
+      if (pane[i].size != null && !roundedFromLabel(pane[i])) {
         if (pane[i].size !== graph[i].size) return 'no';
         continue;
       }
+      if (pane[i].size != null && pane[i].size === graph[i].size) continue;
+      if (roundedFromLabel(pane[i])) return 'no';
       if (!pane[i].label) continue;
-      if (graph[i].size == null) return 'no';
-      const forms = shownSizeLabels(graph[i].size).map((s) => norm(s).replace(/\s+/g, ''));
-      if (forms.indexOf(pane[i].label) < 0) return 'no';
+      return 'no';
     }
     return 'yes';
   }
@@ -294,12 +319,36 @@ const FlowOwaParse = (() => {
     return Boolean(convOk || netOk);
   }
 
+  // A file links to the open message. A known conversation, message id, or
+  // internet id that differs is another message: a kilobyte label does not
+  // cross it. An id the page has not confirmed stays unresolved. No
+  // conversation on the pane is not a conflict; the filename may still
+  // name the one matching row.
+  function fileMayLink(pane, m) {
+    if (!pane || !m) return false;
+    if (pane.idSource === 'url-unconfirmed' || pane.idSource === 'url-stale') return false;
+    const paneItem = canonId(pane.itemId);
+    const msgId = canonId(m.id);
+    if (paneItem && msgId && paneItem !== msgId) return false;
+    if (paneItem && msgId && paneItem === msgId) return true;
+    const paneNet = canonId(pane.internetMessageId);
+    const msgNet = canonId(m.internetMessageId);
+    if (paneNet && msgNet && paneNet !== msgNet) return false;
+    if (paneNet && msgNet && paneNet === msgNet) return true;
+    const paneConv = canonId(pane.conversationId);
+    const msgConv = canonId(m.conversationId);
+    if (paneConv && msgConv && paneConv !== msgConv) return false;
+    if (paneConv && !msgConv) return false;
+    return true;
+  }
+
   // One subject and sender is not enough. That mail links only when the
-  // query already covered the mailbox and one confirming signal holds: the
-  // open conversation or internet id, or a filename visible on the page that
-  // is on that message. A filename corroborates only when nothing conflicts.
-  // A conversation id, an internet message id, or a parsed clock that does
-  // not match the candidate stays unresolved, even when the filename matches.
+  // query already covered the mailbox and the row is the open message: a
+  // confirmed message id, or the same conversation. A filename and a
+  // kilobyte label corroborate that row. They never select a different
+  // message. An unconfirmed id stays unresolved. A conversation id, an
+  // internet message id, or a parsed clock that does not match the
+  // candidate stays unresolved, even when the filename matches.
   // An empty chip with no id stays unresolved. A failed attachment read is
   // unknown, not an empty list. Several mails are split by the minute and
   // the attachment, after an unmarked 1–12 hour is settled. A file that
@@ -386,6 +435,7 @@ const FlowOwaParse = (() => {
       const conflict = idConflict(pane, one) || clockConflict(pane, one, minute);
       if (conflict) return pack(null, (why || 'subject-unique') + ' conflict-' + conflict);
       if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
+      if (!fileMayLink(pane, one)) return pack(null, (why || 'subject-unique') + ' unconfirmed');
       if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
       return pack(null, (why || 'subject-unique') + ' unconfirmed');
     }
@@ -440,13 +490,37 @@ const FlowOwaParse = (() => {
     }
     pool = agreedId;
     if (fileRows(pane && pane.attachments).length) {
-      const agreed = pool.filter((m) => fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
+      const agreed = pool.filter((m) => fileMayLink(pane, m) && fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
       if (agreed.length === 1) return pack(agreed[0], 'time-file');
       if (!agreed.length) return pack(null, 'file-miss');
       return pack(null, 'file-ambiguous');
     }
     if (pool.length === 1) return pack(pool[0], 'single');
     return pack(null, 'ambiguous');
+  }
+
+  // Subject search is the last resort. A row from another conversation, or
+  // a row whose clock is a different minute, is not the open mail. No clock
+  // on the page means nothing here is confirmed.
+  function subjectFallbackRows(pane, rows) {
+    const list = (rows || []).filter(Boolean);
+    if (!pane) return [];
+    const confirmed = canonId(pane.conversationId);
+    let pool = list;
+    if (confirmed) {
+      pool = list.filter((m) => {
+        const got = canonId(m && m.conversationId);
+        return Boolean(got) && got === confirmed;
+      });
+    }
+    const minute = minuteKey(pane.receivedDateTime || pane.date) || '';
+    const alt = minuteKey(pane.clockAlt) || '';
+    if (!minute && !alt) return [];
+    return pool.filter((m) => {
+      const got = minuteKey(m && m.receivedDateTime);
+      if (!got) return false;
+      return got === minute || (alt && got === alt);
+    });
   }
 
   function matchEntry(pane, entries) {
@@ -564,14 +638,45 @@ const FlowOwaParse = (() => {
     return (d && d.querySelector && d.querySelector('[role="main"]')) || null;
   }
 
+  // The recipient well and a To/Cc line are not the sender. A header that
+  // merely contains those lines is still searched.
+  function recipientLineEl(el) {
+    if (!el || !el.getAttribute) return false;
+    if (String(el.getAttribute('data-testid') || '') === 'RecipientWell') return true;
+    const id = String(el.getAttribute('id') || '');
+    if (/_(?:TO|CC)$/i.test(id)) return true;
+    const aria = plainLine(el.getAttribute('aria-label') || el.getAttribute('title') || '');
+    if (/^(?:to|cc|אל|עותק)\b/i.test(aria)) return true;
+    if (!el.children || el.children.length === 0) {
+      const own = plainLine(textOf(el)).slice(0, 40);
+      if (/^(?:to|cc|אל|עותק)\s*:/i.test(own)) return true;
+    }
+    return false;
+  }
+
+  function inRecipientBlock(n) {
+    if (!n) return false;
+    if (n.closest && n.closest('[data-testid="RecipientWell"]')) return true;
+    let p = n;
+    for (let i = 0; p && i < 10; i++) {
+      if (recipientLineEl(p)) return true;
+      p = p.parentElement;
+    }
+    return false;
+  }
+
   // Sender of the open message: a mailto link, an element whose title/aria-label carries an address, or "Name <address>"
   // text in the message header, above the body, that is not one of the person's own addresses.
+  // Graph `from` is the address when the page only shows a name. This walk
+  // skips the recipient well so a To/Cc address is not stored as the sender.
   function senderOf(container, bodyRoot, own) {
     const mine = new Set((own || []).map((a) => String(a || '').toLowerCase()));
     const ok = (e) => e && !mine.has(e);
-    if (!container || !container.querySelectorAll) return { email: '', name: '' };
+    let ownEmail = '';
+    if (!container || !container.querySelectorAll) return { email: '', name: '', ownEmail: '' };
     const nodes = container.querySelectorAll('a[href^="mailto:"], [title*="@"], [aria-label*="@"], span, button');
     for (const n of nodes) {
+      if (inRecipientBlock(n)) continue;
       if (bodyRoot && (n === bodyRoot || (bodyRoot.contains && bodyRoot.contains(n)) || !before(n, bodyRoot))) continue;
       let email = '';
       let name = '';
@@ -593,9 +698,12 @@ const FlowOwaParse = (() => {
         if (m) { email = m[2]; name = m[1].trim(); }
       }
       email = normEmail(email);
-      if (EMAIL_RE.test(email) && ok(email)) return { email, name: looksLikeDateTime(name) ? '' : name.slice(0, 80) };
+      if (!EMAIL_RE.test(email)) continue;
+      const clean = looksLikeDateTime(name) ? '' : name.slice(0, 80);
+      if (ok(email)) return { email, name: clean, ownEmail: '' };
+      if (!ownEmail) ownEmail = email;
     }
-    return { email: '', name: '' };
+    return { email: '', name: '', ownEmail: ownEmail };
   }
 
   const HEADINGS = '[role="heading"], h1, h2, h3';
@@ -840,6 +948,7 @@ const FlowOwaParse = (() => {
       rawUrlId: ids.raw || null,
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
+      ownSenderEmail: who.ownEmail || '',
       senderName: senderName.slice(0, 80),
       text: stripReadingChrome(body),
       to: whoTo.to,
@@ -1309,12 +1418,16 @@ const FlowOwaParse = (() => {
       const key = norm(name) + '|' + norm(label).replace(/\s+/g, '');
       if (seen[key]) continue;
       seen[key] = 1;
-      out.push({ name: name, sizeLabel: label });
+      const unit = sizeM[2].toUpperCase();
+      const amount = Number(sizeM[1].replace(',', '.'));
+      const mul = unit === 'KB' ? 1024 : unit === 'MB' ? 1024 * 1024 : unit === 'GB' ? 1024 * 1024 * 1024 : 1;
+      const size = isFinite(amount) ? Math.round(amount * mul) : null;
+      out.push(size == null ? { name: name, sizeLabel: label } : { name: name, size: size, sizeLabel: label });
     }
     return out;
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, subjectFallbackRows, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

@@ -50,6 +50,7 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
     mailboxSettings: { timeFormat: 'HH:mm' }
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Northwind agreement - signed PDF',
@@ -78,17 +79,18 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
   }).toBe(true);
 });
 
-test('the header says Outlook connected when Microsoft is on', async ({ glance }) => {
+test('the header says Connected when Microsoft is on', async ({ glance }) => {
   await glance.seedOutlook();
   const popup = await glance.openPopup();
-  await expect(popup.locator('#statusPill')).toHaveText('Outlook connected');
-  await expect(popup.getByText('Connect Google')).toBeVisible();
+  await expect(popup.locator('#statusPill')).toHaveText('מחובר');
+  await expect(popup.getByText('התחבר ל-Google')).toBeVisible();
 });
 
 test('a Hebrew To line in one text node still offers the Q3 draft', async ({ glance }) => {
   test.setTimeout(60000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkGlanceE2EHebrewToInline',
     subject: Q3_SUBJECT,
     senderEmail: S.SENDER,
@@ -123,6 +125,7 @@ test('an older undone promise still matches when OWA adds a translation line', a
     }]
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkPassport34',
     subject: 'Gate 0.9.34 To Do title',
     senderEmail: S.SENDER,
@@ -133,6 +136,7 @@ test('an older undone promise still matches when OWA adds a translation line', a
   await expect(pane.locator('button.flow-chip')).toHaveCount(0);
   await expect(pane.getByText(line)).toHaveCount(0);
   const same = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkPassport35',
     subject: 'Gate 0.9.35 To Do title',
     senderEmail: S.SENDER,
@@ -164,6 +168,7 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
     conversation: []
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Northwind agreement - signed PDF',
@@ -175,7 +180,8 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
   await expect(page.locator('#ReadingPaneContainerId').getByText('Save the file?')).toHaveCount(0);
   await expect.poll(async () => {
     const bag = await glance.storage();
-    return (bag.outlookPageDiag || []).some((d) => d && d.reason === 'suggest:unresolved' && /hour-ambiguous/.test(String(d.detail || '')));
+    const rows = (bag.suggestLog || []).concat(bag.outlookPageDiag || []);
+    return rows.some((d) => d && d.reason === 'suggest:unresolved' && /hour-ambiguous/.test(String(d.detail || '')));
   }).toBe(true);
 });
 
@@ -183,6 +189,7 @@ test('a To label and a name on the next node still offers the Q3 draft', async (
   test.setTimeout(60000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkGlanceE2EToSibling',
     subject: Q3_SUBJECT,
     senderEmail: S.SENDER,
@@ -210,6 +217,7 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
     mailboxSettings: { timeFormat: 'HH:mm' }
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Northwind agreement - signed PDF',

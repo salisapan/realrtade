@@ -10,6 +10,10 @@
 //     it reads like an answer (a delivery, a payment, a "no", a promised day); "ok", "thanks", chat and an out-of-office never ask,
 //     and anything that hands the ball back to you never asks or closes;
 //   - two loops that fit equally: silence. A loop that was asked about recently is not asked about again.
+//   - a "next move" link (opts.moveLink, only with CARRY.nextMove on, core/follow-up.js nextMove): when the person took Glance's
+//     move and asked THIS person in THIS app (or asked one named colleague) in the last 7 days, the first answer from them there
+//     belongs to that loop, as a topical link does. Exactly one loop moved there, or no link. It never widens what counts as an
+//     answer: classifyReply still decides, and "ok", a question back or an out-of-office still close nothing.
 const FlowCrossChannel = (() => {
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
@@ -22,6 +26,7 @@ const FlowCrossChannel = (() => {
 
   const ASK_COOLDOWN_MS = 3 * 24 * 3600 * 1000;
   const MIN_WORDS = 4;
+  const MOVE_LINK_MS = 7 * 24 * 3600 * 1000;
 
   function words(t) { return (String(t || '').match(/\S+/g) || []).length; }
 
@@ -44,7 +49,24 @@ const FlowCrossChannel = (() => {
     return null;
   }
 
-  // sender: a party (core/channel.js). where: { channel, thread }. opts: { now, extract }.
+  // Loops whose most recent "next move" sent the person to ask this sender in this app, and that heard nothing since.
+  // channel move: the sender is the loop's counterpart and `where.channel` is the app of the move.
+  // colleague move: the sender's address is the colleague the person asked (any app the person used to ask them).
+  function moved(watches, graph, sender, where, now) {
+    const app = (where && where.channel) || 'gmail';
+    const from = String((sender && sender.email) || '').toLowerCase();
+    return (Array.isArray(watches) ? watches : []).filter((w) => {
+      if (!w || w.status !== 'waiting' || w.direction === 'mine' || w.direction === 'clock' || !Array.isArray(w.moves)) return false;
+      const done = w.moves.filter((m) => m && !m.dismissed && (m.type === 'channel' || m.type === 'colleague') && typeof m.at === 'number');
+      const m = done[done.length - 1];
+      if (!m || now - m.at > MOVE_LINK_MS || now < m.at) return false;
+      if (w.lastReplyAt && w.lastReplyAt >= m.at) return false;            // they already answered after the move
+      if (m.type === 'channel') return m.app === app && Boolean(w.counterpart) && identity.same(graph, w.counterpart, sender);
+      return Boolean(from) && String(m.to || '').toLowerCase() === from;
+    });
+  }
+
+  // sender: a party (core/channel.js). where: { channel, thread }. opts: { now, extract, moveLink }.
   // Returns null or { watchId, action: 'close' | 'promised' | 'ask', reply, link: 'ref'|'amount'|'person' }.
   function judge(watches, graph, sender, text, where, opts) {
     const o = opts || {};
@@ -52,13 +74,15 @@ const FlowCrossChannel = (() => {
     const ex = o.extract || extractMod;
     const body = String(text || '').trim();
     if (!identity || !story || !followUp || !body) return null;
+    const viaMove = o.moveLink === true ? moved(watches, graph, sender, where, now) : [];
     const cands = candidates(watches, graph, sender, where);
-    if (!cands.length) return null;
+    if (!cands.length && viaMove.length !== 1) return null;
 
     // Which loop is it about? A topical link picks one; otherwise only a person with exactly one loop qualifies.
     const linked = cands.map((w) => ({ w, link: topical(w, body, ex) })).filter((x) => x.link);
     let pick = null;
-    if (linked.length === 1) pick = linked[0];
+    if (viaMove.length === 1 && (!linked.length || (linked.length === 1 && linked[0].w === viaMove[0]))) pick = { w: viaMove[0], link: linked.length ? linked[0].link : 'move' };
+    else if (linked.length === 1) pick = linked[0];
     else if (linked.length > 1) return null;                         // two loops fit: do not guess
     else if (cands.length === 1) pick = { w: cands[0], link: 'person' };
     else return null;
@@ -87,7 +111,7 @@ const FlowCrossChannel = (() => {
     return Object.assign({}, res.patch, { viaChannel: channel || null });
   }
 
-  return { ASK_COOLDOWN_MS, candidates, topical, judge, patchFor };
+  return { ASK_COOLDOWN_MS, MOVE_LINK_MS, candidates, moved, topical, judge, patchFor };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCrossChannel };
