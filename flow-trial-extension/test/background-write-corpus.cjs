@@ -43,6 +43,22 @@ function load(opts) {
   const bodies = [];
   const tokens = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
+  if (!Object.prototype.hasOwnProperty.call(stored, 'googleGrantedScopes')) {
+    stored.googleGrantedScopes = {
+      version: [
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'openid'
+      ].join('\n'),
+      status: 'granted',
+      source: 'chrome',
+      at: 1
+    };
+  }
   let tokenSeq = 0;
 
   const sandbox = {

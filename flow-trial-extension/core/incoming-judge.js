@@ -91,7 +91,7 @@ const FlowIncomingJudge = (() => {
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
     const sender = i.sender || {};
-    const now = i.now instanceof Date ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const now = i.now instanceof Date ? i.now : new Date(typeof i.now === 'number' ? i.now : (i.now && typeof i.now.getTime === 'function' ? i.now.getTime() : Date.now()));
     const intent = intentApi.classify(text, {
       senderEmail: sender.email || null,
       senderName: sender.name || null,
