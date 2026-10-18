@@ -632,7 +632,7 @@ const FlowActions = (() => {
     return false;
   }
 
-  function planFor(intent, ctx) {
+  function planForRaw(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
     if (intent.googleClose && !intent.selfTask) return planGoogle(intent, ctx);
@@ -817,6 +817,86 @@ const FlowActions = (() => {
       dateChoices: needsDateChoice ? choices : null,
       steps: steps
     };
+  }
+
+  // One guard, right before render, for every card type. A title is a short
+  // action, never the sentence the mail said. When the written title equals
+  // a sentence of the body, is nearly all of one, or runs past six words,
+  // the card falls back to a fixed short action title in the mail's language.
+  const TITLE_MAX_WORDS = 6;
+  function titleNorm(value) {
+    return String(value || '')
+      .replace(/[\u00A0\u200B-\u200F\u2060\uFEFF]/g, ' ')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}$₪€%\s]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function titleWords(value) { return String(value || '').trim().split(/\s+/).filter(Boolean); }
+  function bodySentences(text) {
+    const out = [];
+    String(text || '').split(/\r?\n+|(?<=[.!?])\s+/).forEach((part) => {
+      const n = titleNorm(part);
+      if (n) out.push(n);
+    });
+    return out;
+  }
+  const DECISION_NOTE = /הוחלט|החלטנו|החלטתי|החלטה|(?:^|[^\p{L}])סופי(?![\p{L}])|\bdecision\b|\bdecided\b|\bgoing with\b|\bfinal\b/iu;
+  function titleIsBody(title, sentences) {
+    const words = titleWords(title).length;
+    const norm = titleNorm(title);
+    if (!norm) return false;
+    // A decision is Decision: Name. A decision statement longer than that
+    // is the sentence pasted in.
+    if (words > TITLE_MAX_WORDS && DECISION_NOTE.test(title)) return true;
+    if (words < 3) return false;
+    for (let i = 0; i < sentences.length; i++) {
+      const s = sentences[i];
+      if (s === norm) return true;
+      if (words >= 6 && s.indexOf(norm) !== -1 && norm.split(' ').length >= 0.9 * s.split(' ').length) return true;
+    }
+    return false;
+  }
+  const FALLBACK_TITLE = {
+    decision: ['Log decision', 'לתעד החלטה'],
+    commitment: ['Log commitment', 'לתעד התחייבות'],
+    task: ['Handle this note', 'לטפל בהערה'],
+    reply: ['Reply requested', 'נדרשת תשובה'],
+    event: ['Meeting', 'פגישה'],
+    file: ['Save the file', 'לשמור את הקובץ'],
+    followup: ['Follow up', 'מעקב']
+  };
+  function fallbackKind(intent, process, title) {
+    const pid = process && process.id;
+    if (pid === 'file-it' || pid === 'suggest-save') return 'file';
+    if (DECISION_NOTE.test(String(title || '')) || intent.type === 'decision') return 'decision';
+    if (pid === 'reply-track') return 'reply';
+    if (intent.selfTask || pid === 'log-it') return 'task';
+    if (intent.type === 'event') return 'event';
+    if (intent.type === 'commitment') return 'commitment';
+    if (intent.type === 'followup') return 'followup';
+    return intent.type === 'request' ? 'reply' : 'task';
+  }
+  function guardTitles(intent, process, ctx) {
+    if (!intent || !process) return process;
+    const text = String((ctx && ctx.text) || '');
+    if (!text) return process;
+    const hold = intent.personalClose === 'calendar-hold' || process.id === 'hold';
+    const sentences = bodySentences(text);
+    const he = /[\u0590-\u05FF]/.test(text);
+    const shortFor = (title) => FALLBACK_TITLE[fallbackKind(intent, process, title)][he ? 1 : 0];
+    if (!hold && intent.label && titleIsBody(intent.label, sentences)) intent.label = shortFor(intent.label);
+    (process.steps || []).forEach((step) => {
+      if (!step || !step.params || !step.params.title) return;
+      if (step.kind === 'calendar') return;
+      if (titleIsBody(step.params.title, sentences)) step.params.title = shortFor(step.params.title);
+    });
+    return process;
+  }
+
+  function planFor(intent, ctx) {
+    const process = planForRaw(intent, ctx);
+    return guardTitles(intent, process, ctx);
   }
 
   // The receipt lines for writes that actually landed. A failed step can

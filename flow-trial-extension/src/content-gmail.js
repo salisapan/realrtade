@@ -2715,7 +2715,16 @@ function glanceUiCopy(kind) {
     chip.replaceChildren(el('span', 'flow-chip-label', shown));
   }
 
+  function receiptProcessName(name) {
+    if (!glanceUiHebrew() || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.localizeHeading !== 'function') return name;
+    return glanceShow(FlowDisplay.localizeHeading('he', name));
+  }
+
   function reasonMessage(response, ctx) {
+    return glanceShow(reasonMessageRaw(response, ctx));
+  }
+
+  function reasonMessageRaw(response, ctx) {
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return response.needsReconnect ? glanceUiCopy('reconnect') : glanceUiCopy('connect');
@@ -3743,8 +3752,8 @@ function glanceUiCopy(kind) {
     if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
-      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
-      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', receiptProcessName(copy.processName)));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', glanceShow(copy.closedLine)));
       done.appendChild(detail);
     }
 
@@ -3965,8 +3974,8 @@ function glanceUiCopy(kind) {
     }
 
     const detail = el('span', 'flow-chip-detail');
-    detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
-    detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
+    detail.appendChild(el('span', 'flow-chip-process-name', receiptProcessName(ctx.process.name)));
+    detail.appendChild(el('span', 'flow-chip-label', glanceShow(closedSummary(succeeded, ctx))));
     done.appendChild(detail);
 
     const sole = succeeded.length === 1 ? succeeded[0].response : null;
@@ -4068,7 +4077,7 @@ function glanceUiCopy(kind) {
     // one line in a partial receipt.
     if (results.length > succeeded.length) {
       const failed = results.filter((r) => !(r.response && r.response.ok));
-      const detail = failed.map((r) => r.action.label + ': ' + reasonMessage(r.response, ctx)).join(' · ');
+      const detail = failed.map((r) => glanceShow(r.action.label) + ': ' + reasonMessage(r.response, ctx)).join(' · ');
       done.appendChild(el('span', 'flow-chip-partial-note', '(' + detail + ')'));
     }
 
@@ -4214,7 +4223,7 @@ function glanceUiCopy(kind) {
           empty.focus();
           return;
         }
-        setChipState(chip, 'flow-chip-error', 'Nothing was written. A required field is still empty.');
+        setChipState(chip, 'flow-chip-error', glanceChrome().nothingWritten);
         return;
       }
       ctx.slotFills = fills;

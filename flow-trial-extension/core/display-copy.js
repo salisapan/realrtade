@@ -107,7 +107,8 @@ const FlowDisplay = (() => {
     'Attach it': 'לצרף',
     'Reply with it': 'להשיב עם הקובץ',
     'Draft it': 'לנסח טיוטה',
-    'Note it': 'לרשום הערה'
+    'Note it': 'לרשום הערה',
+    'File it': 'לשמור את הקובץ'
   };
 
   function localizeHeading(lang, title, extra) {
@@ -116,6 +117,11 @@ const FlowDisplay = (() => {
     let matched = raw.match(/^Log (.+) agreed$/);
     if (matched) return 'רשום ' + matched[1] + ' שסוכם';
     if (raw === 'Log this decision') return 'רשום את ההחלטה';
+    if (raw === 'Log decision') return 'לתעד החלטה';
+    if (raw === 'Handle this note') return 'לטפל בהערה';
+    if (raw === 'Log commitment') return 'לתעד התחייבות';
+    if (raw === 'Follow up') return 'מעקב';
+    if (raw === 'Save the file') return 'לשמור את הקובץ';
     if (raw === 'Log that this is not going ahead') return 'רשום שזה לא מתקדם';
     if (raw === 'Log agreement executed') return 'רשום שההסכם נחתם';
     if (raw === 'Log discrepancy raised') return 'רשום שהועלתה אי התאמה';
@@ -566,6 +572,33 @@ const FlowDisplay = (() => {
       alreadyClosed: 'Already closed elsewhere — nothing to do.',
       nothingWritten: 'Nothing was written. A required field is still empty.',
       somethingWrong: 'Something went wrong. Try again.',
+      nothingWrittenShort: 'Nothing was written.',
+      stepDraftLink: 'Draft link',
+      stepReplyDraft: 'Reply draft',
+      stepDraftFile: 'Draft reply + file',
+      notConfirmed: 'Not closed — the task was not confirmed.',
+      notReadBack: 'Not closed — Glance could not read that task back.',
+      notWired: 'That action isn’t wired up yet.',
+      couldntComplete: 'Couldn’t complete that action.',
+      composeClosed: 'Open Reply first. Glance does not press Send.',
+      composeEmpty: 'The compose window is still empty.',
+      skippedEarlier: 'Skipped — an earlier step in this process didn’t complete.',
+      todoUiCache: 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
+      notAllGone: 'Not all of it is gone. Undo again to remove what’s left.',
+      lineCalOff: 'Off your calendar.',
+      lineCalMoved: 'Moved on your calendar.',
+      lineSchedDraftTrack: 'Scheduled, drafted, and tracked.',
+      lineSchedReminder: 'Scheduled, with a reminder set.',
+      lineDraftTrack: 'Drafted and tracked.',
+      lineReminderReply: 'Reminder set, reply ready.',
+      lineFactDraft: 'The fact is in a reply draft.',
+      lineLogTrack: 'Logged and tracked.',
+      lineCalFile: 'On your calendar, with the file.',
+      lineTaskFile: 'On the task, with the file.',
+      lineDriveLink: 'Saved to Drive, link drafted.',
+      lineTemplateLink: 'Drafted from the template, link ready.',
+      lineOneDrive: 'Saved on OneDrive.',
+      lineDraftFile: 'Drafted, with the file attached.',
       onCalendar: 'On your calendar.',
       preparingNow: 'Preparing…',
       markKept: 'Mark kept',
@@ -691,6 +724,33 @@ const FlowDisplay = (() => {
       alreadyClosed: 'כבר נסגר במקום אחר — אין מה לעשות.',
       nothingWritten: 'שום דבר לא נכתב. שדה חובה עדיין ריק.',
       somethingWrong: 'משהו השתבש. נסה שוב.',
+      nothingWrittenShort: 'שום דבר לא נכתב.',
+      stepDraftLink: 'קישור בטיוטה',
+      stepReplyDraft: 'טיוטת תשובה',
+      stepDraftFile: 'טיוטת תשובה + קובץ',
+      notConfirmed: 'לא נסגר — המשימה לא אומתה.',
+      notReadBack: 'לא נסגר — Glance לא הצליח לקרוא את המשימה בחזרה.',
+      notWired: 'הפעולה הזו עדיין לא מחוברת.',
+      couldntComplete: 'לא הצלחתי להשלים את הפעולה.',
+      composeClosed: 'פתח קודם תשובה. Glance לא לוחץ על שליחה.',
+      composeEmpty: 'חלון הכתיבה עדיין ריק.',
+      skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',
+      todoUiCache: 'ב-Microsoft To Do המשימה יכולה להישאר על המסך כשתי דקות. אחרי רענון היא נעלמת.',
+      notAllGone: 'לא הכול הוסר. בטל שוב כדי להסיר את מה שנשאר.',
+      lineCalOff: 'הוסר מהיומן שלך.',
+      lineCalMoved: 'הוזז ביומן שלך.',
+      lineSchedDraftTrack: 'נקבע ביומן, נוצרה טיוטה, והמעקב פעיל.',
+      lineSchedReminder: 'נקבע ביומן, עם תזכורת.',
+      lineDraftTrack: 'נוצרה טיוטה, והמעקב פעיל.',
+      lineReminderReply: 'התזכורת נקבעה, התשובה מוכנה.',
+      lineFactDraft: 'הפרט מופיע בטיוטת תשובה.',
+      lineLogTrack: 'נרשם, והמעקב פעיל.',
+      lineCalFile: 'ביומן שלך, עם הקובץ.',
+      lineTaskFile: 'על המשימה, עם הקובץ.',
+      lineDriveLink: 'נשמר ב-Drive, הקישור בטיוטה.',
+      lineTemplateLink: 'נוצרה טיוטה מהתבנית, הקישור מוכן.',
+      lineOneDrive: 'נשמר ב-OneDrive.',
+      lineDraftFile: 'נוצרה טיוטה, עם הקובץ מצורף.',
       onCalendar: 'ביומן שלך.',
       preparingNow: 'מכין…',
       markKept: 'סמן שנשמר',
@@ -848,6 +908,85 @@ const FlowDisplay = (() => {
     }
     const deleted = raw.match(/^Deleted in (.+)$/) || raw.match(/^נמחק ב-(.+)$/);
     if (deleted) return fillChrome(L.deletedIn || 'Deleted in {name}', { name: deleted[1] });
+    if (uiLangFrom({ setting: lang }) === 'he') return showReceiptHe(raw);
+    return raw;
+  }
+
+  const DONE_VERB_HE = {
+    'scheduled': 'נקבעה פגישה',
+    'drafted a reply': 'נוצרה טיוטת תשובה',
+    'set a reminder': 'נקבעה תזכורת',
+    'wrote the doc': 'נכתב המסמך',
+    'wrote the sheet': 'נכתב הגיליון',
+    'saved the file': 'נשמר הקובץ',
+    'completed one step': 'הושלם צעד אחד'
+  };
+
+  const NOUN_HE = {
+    'Google Task': 'המשימה ב-Google',
+    'To Do task': 'המשימה ב-To Do',
+    'Gmail draft': 'הטיוטה ב-Gmail',
+    'Calendar event': 'האירוע ביומן',
+    'Doc': 'המסמך',
+    'Sheet': 'הגיליון',
+    'Drive file': 'הקובץ ב-Drive',
+    'OneDrive file': 'הקובץ ב-OneDrive'
+  };
+
+  function splitEnglishList(text) {
+    return String(text).replace(/, and /g, ', ').split(/, | and /);
+  }
+
+  function joinHebrewList(items) {
+    if (items.length <= 1) return items[0] || '';
+    return items.slice(0, -1).join(', ') + ' ו' + items[items.length - 1];
+  }
+
+  function nounsHe(list, withEt) {
+    const out = [];
+    const parts = splitEnglishList(list);
+    for (let i = 0; i < parts.length; i++) {
+      const noun = NOUN_HE[parts[i].replace(/^the /, '')];
+      if (!noun) return null;
+      out.push(withEt ? 'את ' + noun : noun);
+    }
+    return out;
+  }
+
+  // Receipt sentences that are built from a list of what was written
+  // (receipt-copy.js and the Closed summary in content-gmail.js). A list with
+  // a word this table does not know is left as it came: a half-translated
+  // sentence would name the wrong thing.
+  function showReceiptHe(raw) {
+    let m = raw.match(/^Closed — (.+)\.$/);
+    if (m) {
+      const verbs = splitEnglishList(m[1]).map((v) => DONE_VERB_HE[v]);
+      if (verbs.every(Boolean)) return 'נסגר — ' + joinHebrewList(verbs) + '.';
+      return raw;
+    }
+    m = raw.match(/^Closing — (.+)…$/);
+    if (m) {
+      if (m[1] === 'working') return 'סוגר — עובד…';
+      const verbs = splitEnglishList(m[1]).map((v) => DONE_VERB_HE[v]);
+      return verbs.every(Boolean) ? 'סוגר — ' + joinHebrewList(verbs) + '…' : raw;
+    }
+    m = raw.match(/^No matching contact for (.+)\.$/);
+    if (m) return 'אין איש קשר מתאים עבור ' + m[1] + '.';
+    m = raw.match(/^Undo all removes (.+)\.$/);
+    if (m) {
+      const nouns = nounsHe(m[1], true);
+      return nouns ? 'ביטול הכל מסיר ' + joinHebrewList(nouns) + '.' : raw;
+    }
+    m = raw.match(/^Undone — (.+) (?:was|were) removed\.$/);
+    if (m) {
+      const nouns = nounsHe(m[1], false);
+      return nouns ? 'בוטל — ' + joinHebrewList(nouns) + ' הוסרו.' : raw;
+    }
+    m = raw.match(/^The (.+) is still there\. Undo again to remove it\.$/);
+    if (m) {
+      const nouns = nounsHe(m[1], false);
+      return nouns ? nouns[0] + ' עדיין שם. בטל שוב כדי להסיר.' : raw;
+    }
     return raw;
   }
 

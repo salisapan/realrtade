@@ -1875,7 +1875,7 @@
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
       if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
-      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', pageShow(copy.closedLine)));
       done.appendChild(detail);
     }
     const chromeWords = pageChrome();

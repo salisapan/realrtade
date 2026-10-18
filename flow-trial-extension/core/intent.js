@@ -2939,17 +2939,22 @@ const FlowIntent = (() => {
   // A decision note names what was chosen, never the sentence that said so.
   // "Decision made: Acme is our vendor" is Decision: Acme, and "We're going
   // with Initech at $4,850" is Decision: Initech, $4,850. Six words at most.
-  const DECISION_NAME = '([A-Z][\\w&.\\-]*(?:\\s+(?!(?:is|are|was|will|as|at|for|to|and|our|the)\\b)[A-Z][\\w&.\\-]*){0,2})';
+  const DECISION_NAME = '([A-Z][\\w&.\\-]*(?:[ \\t]+(?!(?:is|are|was|will|as|at|for|to|and|our|the)\\b)[A-Z][\\w&.\\-]*){0,2})';
+  // A greeting or a sign-off ends the sentence. The name never runs into it.
+  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:תודה(?:\s+רבה)?|בתודה|בברכה|ברכה|יום\s+(?:טוב|נעים)|המשך\s+יום|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
   function selfDecisionTitle(raw, facts) {
-    const t = String(raw || '').replace(/\s+/g, ' ').trim();
-    if (!t) return '';
     const money = facts && facts.moneyText ? ', ' + String(facts.moneyText).trim() : '';
-    let m = t.match(new RegExp('(?:^|[.!\\n]\\s*)(?:[Ff]inal\\s+)?[Dd]ecision(?:\\s+[Mm]ade)?\\s*[:\\-–]\\s*' + DECISION_NAME));
-    if (!m) m = t.match(new RegExp('\\b(?:[Ww]e(?:\'|’)re|[Ww]e are|[Ii](?:\'|’)m|[Ii] am)\\s+going\\s+with\\s+' + DECISION_NAME));
-    if (!m) m = t.match(new RegExp('\\b(?:[Ww]e|[Ii])\\s+(?:decided|chose|picked|selected)\\s+(?:on\\s+|to go with\\s+|to use\\s+)?' + DECISION_NAME));
-    if (m) return clipDecision('Decision: ' + m[1].trim() + money);
-    const he = t.match(/(?:^|[^\u0590-\u05FF])(?:הוחלט|החלטנו|החלטתי)(?:\s+סופית)?\s+(?:על|ש(?:ניקח|נבחר|נעבוד עם))\s*([\u0590-\u05FF][\u0590-\u05FF'"״׳\-]*(?:\s+[\u0590-\u05FF][\u0590-\u05FF'"״׳\-]*)?)/);
-    if (he) return clipDecision('החלטה: ' + he[1].trim() + money);
+    const lines = String(raw || '').replace(/\u00A0/g, ' ').split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+      if (!t) continue;
+      let m = t.match(new RegExp('(?:^|[.!]\\s*)(?:[Ff]inal[ \\t]+)?[Dd]ecision(?:[ \\t]+[Mm]ade)?[ \\t]*[:\\-–][ \\t]*' + DECISION_NAME));
+      if (!m) m = t.match(new RegExp('\\b(?:[Ww]e(?:\'|’)re|[Ww]e are|[Ii](?:\'|’)m|[Ii] am)[ \\t]+going[ \\t]+with[ \\t]+' + DECISION_NAME));
+      if (!m) m = t.match(new RegExp('\\b(?:[Ww]e|[Ii])[ \\t]+(?:decided|chose|picked|selected)[ \\t]+(?:on[ \\t]+|to go with[ \\t]+|to use[ \\t]+)?' + DECISION_NAME));
+      if (m) return clipDecision('Decision: ' + m[1].trim() + money);
+      const he = t.match(/(?:^|[^\u0590-\u05FF])(?:הוחלט|החלטנו|החלטתי)(?:[ \t]+סופית)?[ \t]+(?:על|ש(?:ניקח|נבחר|נעבוד עם))[ \t]*([\u0590-\u05FF][\u0590-\u05FF'"״׳\-]*(?:[ \t]+[\u0590-\u05FF][\u0590-\u05FF'"״׳\-]*)?)/);
+      if (he) return clipDecision('החלטה: ' + he[1].trim() + money);
+    }
     return '';
   }
   function clipDecision(title) {
