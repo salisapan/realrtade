@@ -1,0 +1,192 @@
+[
+ {
+  "t": "Would you mind adding the shipping delay to our ClickUp so ops can track it by Monday?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "shipping delay"
+  }
+ },
+ {
+  "t": "Please set up a ClickUp task to renew the domain before the 15th.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "renew the domain"
+  }
+ },
+ {
+  "t": "Could you put the budget questions into ClickUp for tomorrow's meeting?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "budget questions"
+  }
+ },
+ {
+  "t": "Kindly update the ClickUp card for the Haifa client once they confirm.",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "Haifa client"
+  }
+ },
+ {
+  "t": "I'll create the ClickUp task for the brochure edits before lunch.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "brochure edits"
+  }
+ },
+ {
+  "t": "I'll make sure the ClickUp board has the new hires by Thursday.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "board",
+   "what": "new hires"
+  }
+ },
+ {
+  "t": "Let me add that to ClickUp right after the call.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "ClickUp's mobile app crashed on me twice today.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "product"
+  }
+ },
+ {
+  "t": "The ClickUp task was already assigned to Yossi last Tuesday.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "We pay for the ClickUp Business plan, it's in the budget sheet.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "product"
+  }
+ },
+ {
+  "t": "Great, the ClickUp task is exactly what I needed.",
+  "act": "ACK",
+  "action": "none",
+  "lang": "en",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ },
+ {
+  "t": "אפשר בבקשה להכניס את השיחה עם הלקוח ל-ClickUp עד מחר בבוקר?",
+  "act": "ASK",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "שיחה עם לקוח"
+  }
+ },
+ {
+  "t": "אני אכניס את משימת החשבונית ל-ClickUp לפני שאני יוצא היום.",
+  "act": "PROMISE",
+  "action": "complete",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task",
+   "what": "חשבונית"
+  }
+ },
+ {
+  "t": "המשימה ב-ClickUp כבר נסגרה בשבוע שעבר.",
+  "act": "INFORM",
+  "action": "none",
+  "lang": "he",
+  "src": "synthetic-clickup-2026-10-18",
+  "synthetic": true,
+  "ownerVerified": false,
+  "entities": {
+   "tool": "clickup",
+   "object": "task"
+  }
+ }
+]
