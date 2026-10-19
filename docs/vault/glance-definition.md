@@ -15,3 +15,11 @@ Verbatim copy of the block in [[product-identity]]. Do not edit here: change it 
 - Every report keeps two parts apart: **Product definition (vision-locked)** = the block above; **Current implementation status (code reality)** = what ships in this commit.
 - "It is a Chrome extension on Gmail" is a status sentence, never the definition.
 - Flow (enterprise) is a separate product: [[product-architecture]].
+
+## Positioning (Sali, 2026-10-18)
+Summary only; the full wording is in [[product-identity]] "Positioning".
+- Category: **Intent Closer / סוגר כוונות**. Headline: **"לא עוזר. סוגר."**
+- Sentence: For people whose day moves between Gmail, Outlook and WhatsApp, in Hebrew and English, Glance spots anywhere what needs to happen and closes it with one Do It, with proof it was done. No chat, no setup, no bot to manage.
+- Not: an AI assistant, a chat, a bot, an email assistant.
+- First user: Israeli freelancer / small business on Gmail + WhatsApp. Entry story: «אף שקל לא נופל בין הכיסאות».
+- The block above is unchanged: "never sends on your behalf", "Handled." and the distribution channel wait for Sali ([[decisions]], 2026-10-18).
