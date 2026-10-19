@@ -2336,6 +2336,20 @@ const FlowIntent = (() => {
   const HE_DATE_LEAD = new RegExp('^' + HE_DATE_WORD + '(?=\\s|$|[.,!?])[\\s\\S]*$', 'i');
   const AT_CLOCK = /\s+at\s+\d[\s\S]*$/i;
   const NUM_DATE = /\s+(?:עד\s+)?(?:ה-)?\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?[\s\S]*$/;
+  function unwrapGoogleRedirectUrl(s) {
+    let t = String(s || '').trim();
+    const inline = t.match(/google\.com\/url\?(?:[^#\s]*&)?q=([^&#\s]+)/i);
+    if (inline) {
+      try { t = decodeURIComponent(inline[1]); } catch (e) { t = inline[1]; }
+    } else {
+      const m = t.match(/^(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#]*&)?q=([^&#]+)/i);
+      if (m) {
+        try { t = decodeURIComponent(m[1]); } catch (e) { t = m[1]; }
+      }
+    }
+    if (/^(?:https?:\/\/)?(?:www\.)?google\.com\/url\b/i.test(t)) return '';
+    return t;
+  }
   function takeObject(rest, keepThe) {
     let s = String(rest || '').replace(/\s+/g, ' ').trim();
     s = s.replace(EN_DATE_LEAD, '');
@@ -2363,6 +2377,7 @@ const FlowIntent = (() => {
     s = s.replace(/\s+is$/i, '');
     s = s.replace(/\b([A-Za-z]{2,})\s+\1\b/gi, '$1');
     s = s.replace(/[.?!]+$/g, '').replace(/[,\s]+$/g, '').replace(/\s+/g, ' ').trim();
+    s = unwrapGoogleRedirectUrl(s);
     return s;
   }
   // The verb picks the preposition. להתקשר takes ל-. לעדכן takes את or לגבי.
@@ -3095,6 +3110,16 @@ const FlowIntent = (() => {
     const s = String(src || '').replace(/\s+/g, ' ').trim();
     const money = (raw) => String(raw || '').replace(/\s+/g, '');
     let m;
+    // A wrapped Google redirect link is the hostname, not a sentence with a dot.
+    m = s.match(/\bremind me to\s+renew\s+(?:the\s+)?(https?:\/\/\S+)/i);
+    if (m) {
+      let obj = unwrapGoogleRedirectUrl(m[1]);
+      if (!obj || /google\.com\/url\b/i.test(obj)) {
+        const q = s.match(/google\.com\/url\?[^\s#]+/i);
+        if (q) obj = unwrapGoogleRedirectUrl('https://www.' + q[0]);
+      }
+      if (obj) return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    }
     // "Remind me to renew the domain on Friday" is Renew the domain.
     // The day stays on the task. It is not a new verb.
     m = s.match(/\bremind me to\s+renew\s+((?:the|my|our|your)\s+.+?)(?:\s+(?:on|by|before)\b|$)/i);

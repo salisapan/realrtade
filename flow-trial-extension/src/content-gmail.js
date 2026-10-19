@@ -1034,6 +1034,52 @@ function glanceUiCopy(kind) {
     return chipsOnCollapsedLine(messageNode).length > 0;
   }
 
+  function senderIsOwn(senderEmail, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    return Boolean(own && from && from === own);
+  }
+
+  // A self-sent mail with a real PDF (or similar) must keep its card even
+  // when rule (6) would not open details for an inbound ask and even when
+  // classification is still thin. Cc-only stays quiet — this is only when
+  // the collapsed header is clearly a note to self.
+  function selfMailAttachmentKeepCard(messageNode, senderEmail, ownEmail, audience, attachments) {
+    if (!senderIsOwn(senderEmail, ownEmail)) return false;
+    if (!attachments || !attachments.length) return false;
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const aud = noteAddressedToSelf(messageNode, senderEmail, ownEmail, audience);
+    const cc = (aud.cc || []).map((a) => String(a || '').trim().toLowerCase());
+    if (cc.some((a) => a && a !== own)) return false;
+    if (otherSenderOnlyOwnChip(messageNode, senderEmail, ownEmail, audience)) return false;
+    if (!headerToSelf(messageNode, own, senderEmail)) return false;
+    if (typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return false;
+    const mapped = attachments.map((meta) => {
+      const sized = Number(meta.size);
+      return {
+        id: meta.url || meta.filename,
+        name: meta.filename,
+        size: (isFinite(sized) && sized > 0) ? sized : 8192,
+        contentType: meta.mimeType || '',
+        isInline: false
+      };
+    });
+    const decision = FlowSuggestSave.suggestSave({
+      surface: 'gmail',
+      direction: 'inbound',
+      senderIsUser: false,
+      consent: true,
+      attachmentsRead: true,
+      attachments: mapped,
+      text: '',
+      subject: '',
+      messageId: 'self-attach-probe',
+      dismissed: {},
+      log: []
+    });
+    return Boolean(decision && decision.eligible);
+  }
+
   async function expandMessageDetails(messageNode) {
     const toggle = messageNode && messageNode.querySelector
       ? messageNode.querySelector(DETAILS_TOGGLE)
@@ -1867,6 +1913,7 @@ function glanceUiCopy(kind) {
     // below a one-line "Sounds good!" reply count toward "is there enough
     // new content to judge" in the first place.
     let text = ownMessageText(message);
+    const attachmentsEarly = allRealAttachments(message);
     // A note to yourself can be only a subject line. The subject is the note.
     if (text.length < 20 && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.selfSent === 'function') {
       const early = extractSender(message);
@@ -1880,6 +1927,10 @@ function glanceUiCopy(kind) {
         headerToSelf: headerToSelf(message, ownEmail, early.email)
       })) {
         text = FlowIncomingJudge.textForJudge(text, noteSubject, true);
+        // A short subject plus a real attachment is still the note — "חוזה
+        // חתום" is a filename topic, not a completion that silences save.
+        const sub = String(noteSubject || '').replace(/\s+/g, ' ').trim();
+        if (sub && attachmentsEarly.length && text.length < 20) text = sub;
       }
     }
     // A fact ask can be one short Hebrew sentence ("מה הסכום בגיליון?").
@@ -2034,7 +2085,28 @@ function glanceUiCopy(kind) {
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
     const audienceNeedsProbe = audienceUnclear(message, sender.email, ownEmail, audience);
-    if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && inboundAsk)) {
+    const attachKeep = selfMailAttachmentKeepCard(message, sender.email, ownEmail, audience, attachments);
+    if (attachKeep && (!intent || !intent.type) && String(subject || '').trim()) {
+      intent = await classifyForChip(String(subject || '').trim(), {
+        senderEmail: sender.email,
+        senderName: sender.name,
+        subject: subject,
+        calibration: state.calibration,
+        calibrationByType: state.calibrationByType,
+        attachmentCount: attachments.length,
+        messageId: messageId,
+        debug: debug,
+        to: audience.to,
+        cc: audience.cc,
+        ownAddresses: ownEmail ? [ownEmail] : [],
+        userName: audience.userName || null,
+        ownNames: ownNamesForChip(audience.userName),
+        namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
+        namesWaitDone: namesWaitDone === true,
+        inbound: false
+      });
+    }
+    if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && inboundAsk) && !attachKeep) {
       clearGmailWhy(message);
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
@@ -2049,7 +2121,7 @@ function glanceUiCopy(kind) {
     }
     // Collapsed headers hide To vs Cc. Open Gmail's details at most once per
     // message, only after a real chip candidate exists, then close the box.
-    if (audienceNeedsProbe) {
+    if (audienceNeedsProbe && (FlowIntent.shouldShowChip(intent) || inboundAsk || attachKeep)) {
       audience = await audienceAfterDetailsProbe(messageId, message, sender.email, ownEmail, audience);
       if (audienceUnclear(message, sender.email, ownEmail, audience)) {
         recordSilence(messageId, 'audience');
@@ -2078,7 +2150,7 @@ function glanceUiCopy(kind) {
         armNamesHold();
         return;
       }
-      if (!FlowIntent.shouldShowChip(intent)) {
+      if (!FlowIntent.shouldShowChip(intent) && !attachKeep) {
         const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
           || (factOwns && !intent.type ? 'fact' : null);
         recordSilence(messageId, reason || 'audience', {

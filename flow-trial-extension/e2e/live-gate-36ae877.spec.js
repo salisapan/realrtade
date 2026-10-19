@@ -90,6 +90,26 @@ test('L36 self HE אני header + subject renewal gets a task card', async ({ gl
   await expect(hePage.locator('[data-legacy-message-id="m-self-he"] .flow-chip-host')).toHaveCount(1);
 });
 
+test('L36 self renew unwraps google.com/url in the task title', async ({ glance }) => {
+  await glance.seedGmail();
+  const page = await glance.openGmail({
+    liveSelf: true,
+    messageId: 'm-self-url',
+    threadId: 't-self-url',
+    ownEmail: SELF,
+    senderName: 'flow',
+    subject: 'Domain renewal – Ofek',
+    body: 'Remind me to renew the https://www.google.com/url?q=http://ofek.dev',
+    toSelfText: 'me',
+    accountLabel: 'Google Account: flow (' + SELF + ')'
+  });
+  await page.waitForTimeout(3500);
+  const host = page.locator('[data-legacy-message-id="m-self-url"] .flow-chip-host');
+  await expect(host).toHaveCount(1);
+  await expect(host).toContainText('Renew ofek.dev');
+  await expect(host).not.toContainText('google.com/url');
+});
+
 test.describe('self completion vs open work', () => {
   const selfOpen = async (glance, id, subject, body, lang) => {
     const page = await glance.openGmail({

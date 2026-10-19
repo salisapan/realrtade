@@ -56,6 +56,17 @@ function liveGmailPage(opts) {
   if (o.liveMutate === 'quietBody') {
     mutate += `var body=document.querySelector('.a3s');if(body)body.textContent='Thanks, got it.';`;
   }
+  if (o.liveMutate === 'selfPdfAttach') {
+    const pdfName = o.attachName || 'חוזה-ברוש.pdf';
+    const url = 'https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(pdfName);
+    const dl = 'application/pdf:' + pdfName + ':' + url;
+    const span = '<span download_url="' + esc(dl) + '">' + esc(pdfName) + '</span>';
+    if (main.html.indexOf('class="a3s"') >= 0) {
+      main.html = main.html.replace(/(<div class="a3s"[^>]*>)/, '$1' + span);
+    } else {
+      main.html = main.html + span;
+    }
+  }
   const toOnlyMeFix = o.liveMutate === 'toOnlyMe'
     ? `if(window.__glanceLiveMutate==='toOnlyMe'&&block){
         var own='${own}';
