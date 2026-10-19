@@ -38,3 +38,6 @@ flow-trial-extension/core/dense-prior-data.js
 
 # Human-text eval set built from the owner's own sent mail (masked, local only, never committed)
 flow-trial-extension/test/fixtures/private/
+
+# Graphify local AST graph (large HTML/JSON/cache). Community notes for Obsidian live in docs/graphify/.
+graphify-out/

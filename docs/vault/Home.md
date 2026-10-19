@@ -23,6 +23,10 @@ updated: 2026-10-05
 | Living toolbar icon | [[living-icon-handoff]] | [[product-identity]] (Visual identity) | this note |
 | Open work, blockers | [[open-loops-pointer]] | [[open-tasks]] | [[open-tasks]] |
 
+## Code graph (Graphify)
+- [[_GRAPHIFY_INDEX]] — community-level map of the codebase (auto-exported under `docs/graphify/`)
+- [[GRAPH_REPORT]] — architecture highlights from the last scan
+
 ## Process
 - [[when-to-write-to-vault]] — מתי כותבים ל־vault (and what goes to `docs/` in the same commit)
 - New session log: Daily note → `vault/sessions/YYYY-MM-DD.md` (template [[session]])
