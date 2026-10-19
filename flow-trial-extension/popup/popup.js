@@ -21,6 +21,9 @@
   // the log list itself, every time, since nothing after the throwing
   // await in this function ever ran.
   let currentInsight = null;
+  // The receipt for the close just made on this panel. It lives for this
+  // open of the popup; Activity keeps the durable row.
+  let firstCloseView = null;
 
   // Same relocation, same reason, one variable over: STEP_NOUNS is a
   // `const`, but a `const` is exactly as dead-zoned as a `let` until its own
@@ -150,6 +153,13 @@
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local') return;
+      if (!ch.stillOpenScan && !ch.sourceConnectedAt && !ch.log && !ch.onboarded) return;
+      renderFirstClose().catch(() => {});
+    });
+  } catch (e) { /* the panel keeps the last offer */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== 'local' || !ch.glanceNamesDiag) return;
       if (state) state.glanceNamesDiag = ch.glanceNamesDiag.newValue || null;
       paintNamesDiag();
@@ -229,6 +239,7 @@
   paintNamesDiag();
   await renderLog();
   await renderOpen();
+  await renderFirstClose();
   await renderWaiting();
   checkOutsideSignals().catch(() => {});
   syncTaskCompletions().catch(() => {});
@@ -427,6 +438,7 @@
     await renderStatusPill();
     paintNamesDiag();
     renderSetupDone();
+    await renderFirstClose();
   }
 
   // Once a system is connected there is nothing left to save, so the button
@@ -442,6 +454,198 @@
       note.textContent = 'מוכן. פתח מייל — Glance שותק עד שלולאה באמת פתוחה.';
       note.hidden = false;
     }
+  }
+
+  // The one safe task already on this device, offered where Connect just
+  // landed. Handled only after a read-back. A draft, a second step, or a
+  // hedge never reaches this card.
+  function primaryButton(label) {
+    const btn = el('button', 'primary sm');
+    btn.type = 'button';
+    btn.appendChild(el('span', 'shell'));
+    btn.appendChild(el('span', 'ring'));
+    btn.appendChild(el('span', 'shine'));
+    btn.appendChild(el('span', 'btn-label', label));
+    return btn;
+  }
+
+  function taskWritePayload(entry, step) {
+    const params = (step && step.params) || {};
+    const intent = (entry && entry.intent) || {};
+    const entities = intent.entities || {};
+    const what = params.what || entities.what || null;
+    return {
+      connectorId: step.kind,
+      threadUrl: entry.threadUrl || params.threadUrl || null,
+      label: params.title || intent.label || step.label || 'Task',
+      params: {
+        dateIso: params.dateIso || (intent.facts && intent.facts.date && intent.facts.date.iso) || null,
+        amount: params.amount || null,
+        what: what
+      },
+      facts: intent.facts || null,
+      entities: intent.entities || (what ? { what: what } : null),
+      senderName: entry.sender && entry.sender.name,
+      senderEmail: entry.sender && entry.sender.email,
+      subject: entry.subject || '',
+      bodyText: String(entry.text || what || '').slice(0, 20000)
+    };
+  }
+
+  function firstCloseCopy() {
+    return FlowFirstClose.copy(uiLang());
+  }
+
+  function paintFirstCloseReceipt(host, found) {
+    const C = firstCloseCopy();
+    host.replaceChildren();
+    if (found.undone) {
+      host.appendChild(el('p', 'log-label', C.undone));
+      host.appendChild(el('p', 'hint', C.undoneLine));
+      return;
+    }
+    const row = found.row;
+    host.appendChild(el('p', 'log-label', C.handled));
+    host.appendChild(el('p', 'hint', uiLang() === 'he' ? C.handledLine : (row.closedLine || row.writtenLine || C.handledLine)));
+    const undo = el('button', 'ghost sm', C.undo);
+    undo.type = 'button';
+    undo.addEventListener('click', async () => {
+      undo.disabled = true;
+      const res = await send({ type: 'flow:undo-action', connectorId: row.connectorId || 'googleTask', ref: row.ref });
+      if (!res || !res.ok) {
+        undo.disabled = false;
+        undo.textContent = C.undo;
+        host.appendChild(el('p', 'hint', C.undoFailed));
+        return;
+      }
+      if (typeof FlowStorage.markGoogleTaskUndone === 'function') {
+        await FlowStorage.markGoogleTaskUndone(row.messageId, row.ref, row.threadId);
+      }
+      if (row.messageId) {
+        await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: row.messageId });
+      }
+      firstCloseView = { undone: true, row: row };
+      await renderFirstClose();
+    });
+    host.appendChild(undo);
+  }
+
+  async function closeFirstSession(entry, step, button) {
+    const C = firstCloseCopy();
+    button.disabled = true;
+    const label = button.querySelector && button.querySelector('.btn-label');
+    if (label) label.textContent = C.closing;
+    const result = await send({ type: 'flow:execute-action', payload: taskWritePayload(entry, step) });
+    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+      ? FlowProofOfClose.allowsHandled({ ok: !!(result && result.ok), proof: result && result.proof })
+      : false;
+    if (!proved) {
+      button.disabled = false;
+      if (label) label.textContent = C.doIt;
+      const host = document.getElementById('firstCloseCard');
+      if (host) host.appendChild(el('p', 'hint', C.notConfirmed));
+      return;
+    }
+    const fields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.receiptLogFields)
+      ? FlowProofOfClose.receiptLogFields(result.proof, {
+        writtenLine: result.written,
+        processName: entry.process && entry.process.name,
+        closedLine: entry.process && entry.process.closedLine,
+        status: 'Handled.'
+      })
+      : null;
+    const written = Object.assign({
+      kind: 'written',
+      firstClose: true,
+      label: (step.params && step.params.title) || (entry.intent && entry.intent.label) || 'Task',
+      messageId: entry.messageId,
+      threadId: entry.threadId || null,
+      app: entry.app || 'gmail',
+      connectorId: step.kind,
+      ref: result.ref,
+      where: result.where,
+      url: result.url || null,
+      sender: entry.sender || null,
+      subject: entry.subject || null,
+      intent: entry.intent || null,
+      process: entry.process || null,
+      text: entry.text || ''
+    }, fields || { fetchedBack: true });
+    firstCloseView = { undone: false, row: written };
+    await FlowStorage.appendLog(written);
+    if (entry.messageId) {
+      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: entry.messageId });
+      if (typeof FlowStorage.recordCloseQuality === 'function') {
+        await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: entry.messageId });
+      }
+    }
+    if (typeof FlowStorage.forgetStillOpenScan === 'function') {
+      await FlowStorage.forgetStillOpenScan(entry.threadId, entry.messageId);
+    }
+    await renderFirstClose();
+  }
+
+  async function renderFirstClose() {
+    const block = document.getElementById('firstClose');
+    const hint = document.getElementById('firstCloseHint');
+    const host = document.getElementById('firstCloseCard');
+    if (!block || !hint || !host) return;
+    const C = typeof FlowFirstClose !== 'undefined' ? firstCloseCopy() : null;
+    const title = document.getElementById('firstCloseTitle');
+    if (title && C) title.textContent = C.title;
+    if (typeof FlowFirstClose === 'undefined' || typeof FlowStorage === 'undefined' || typeof FlowStorage.candidatesFromState !== 'function') {
+      block.hidden = true;
+      return;
+    }
+    const googleOn = Boolean(status && status.googleTasks && status.googleTasks.connected);
+    let outlookOn = false;
+    if (!googleOn) {
+      try {
+        const o = outlook();
+        const st = o && typeof o.status === 'function' ? await o.status() : null;
+        outlookOn = Boolean(st && st.connected && !st.needsSignIn);
+      } catch (e) { outlookOn = false; }
+    }
+    const source = googleOn ? 'google' : (outlookOn ? 'outlook' : null);
+    if (firstCloseView) {
+      block.hidden = false;
+      hint.textContent = firstCloseView.undone ? '' : C.handledHint;
+      paintFirstCloseReceipt(host, firstCloseView);
+      const note = document.getElementById('saved-note');
+      if (note) note.hidden = true;
+      return;
+    }
+    const bag = await FlowStorage.get();
+    if (!source) { block.hidden = true; return; }
+    const closes = FlowStorage.writeCountsFrom(bag);
+    if (!(bag.sourceConnectedAt > 0) && closes.total === 0) {
+      await FlowStorage.set({ sourceConnectedAt: Date.now() });
+      bag.sourceConnectedAt = Date.now();
+    }
+    const chosen = FlowFirstClose.pick({
+      candidates: FlowStorage.candidatesFromState(bag, Date.now()),
+      now: Date.now(),
+      connectedAt: bag.sourceConnectedAt,
+      sourceConnected: true,
+      source: source,
+      closes: closes,
+      log: bag.log || []
+    });
+    if (!chosen) { block.hidden = true; return; }
+    block.hidden = false;
+    hint.textContent = C.offerHint;
+    host.replaceChildren();
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(chosen.entry, Date.now(), uiLang())) || '';
+    if (why) host.appendChild(el('p', 'log-label', why));
+    const btn = primaryButton(C.doIt);
+    btn.addEventListener('click', () => { closeFirstSession(chosen.entry, chosen.step, btn); });
+    host.appendChild(btn);
+    if (chosen.entry.messageId) {
+      FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: chosen.entry.messageId })
+        .catch(() => {});
+    }
+    const note = document.getElementById('saved-note');
+    if (note) note.hidden = true;
   }
 
   function microsoftFaceLabel(connection) {
@@ -899,7 +1103,10 @@
       if (res && res.ok) {
         // Connecting IS the setup. Making people also press "Save & start"
         // afterwards was a second click that did nothing the first did not.
-        await FlowStorage.set({ connectorId: c.id, onboarded: true });
+        const prior = await FlowStorage.get();
+        const patch = { connectorId: c.id, onboarded: true };
+        if (!(prior && prior.sourceConnectedAt > 0)) patch.sourceConnectedAt = Date.now();
+        await FlowStorage.set(patch);
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {

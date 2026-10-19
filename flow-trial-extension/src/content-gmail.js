@@ -303,6 +303,10 @@ function glanceUiCopy(kind) {
     // just quiet until there's something real to connect for.
     if (!watching) { watching = true; observe(); }
     if (!state.onboarded) return;
+    // Connecting must not wait for the next Gmail mutation, and must not
+    // sit behind the 60s inbox throttle. The rows already on screen are
+    // judged now, so the setup panel can offer one close inside a minute.
+    maybeScanInbox(true).catch((e) => console.error('[Glance] inbox scan failed', e));
     // The sidebar surface (privacy badge, Draft-It, attachment X-ray) is the
     // Glance Pro feature set: it calls the masked-AI backend, which costs
     // money per use and is licence-gated on the server. Free accounts never
@@ -439,7 +443,10 @@ function glanceUiCopy(kind) {
 
       const res = await new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:connect', connectorId: 'googleTasks' }, resolve));
       if (res && res.ok) {
-        await FlowStorage.set({ onboarded: true, connectorId: 'googleTasks' });
+        const prior = await FlowStorage.get();
+        const patch = { onboarded: true, connectorId: 'googleTasks' };
+        if (!(prior && prior.sourceConnectedAt > 0)) patch.sourceConnectedAt = Date.now();
+        await FlowStorage.set(patch);
         state = await FlowStorage.get();
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: 'googleTasks', via: 'auto' } });
         return true;
@@ -675,6 +682,7 @@ function glanceUiCopy(kind) {
       threadUrl: threadLink,
       sender: sender,
       subject: subject,
+      text: text,
       ts: Date.now(),
       app: SOURCE_APP,
       intent: compactIntent(intent),
@@ -683,12 +691,12 @@ function glanceUiCopy(kind) {
     return true;
   }
 
-  async function maybeScanInbox() {
+  async function maybeScanInbox(force) {
     if (!watching || !state || !state.onboarded) return;
     if (typeof FlowIntent === 'undefined' || typeof FlowStillOpen === 'undefined') return;
     const rows = document.querySelectorAll('tr.zA');
     if (!rows.length) return;
-    if (Date.now() - lastInboxScan < 60000) return;
+    if (!force && Date.now() - lastInboxScan < 60000) return;
     lastInboxScan = Date.now();
     const executionMemory = await FlowExecutionMemory.getAll();
     const freshState = await FlowStorage.get();

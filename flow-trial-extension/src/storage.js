@@ -7,6 +7,9 @@ const FlowStorage = (() => {
     onboarded: false,
     domainId: null,
     connectorId: null,
+    // When a source first became connected on this install. The first-session
+    // offer measures itself from this clock. Null until a connect lands.
+    sourceConnectedAt: null,
     // Set once content-gmail.js's automatic Google connect (see
     // ensureGoogleAutoConnect there) has actually shown the interactive
     // account chooser and the account either declined it or it failed for a
