@@ -29,5 +29,6 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 | Trello | free | free | - | - | API key + token flow, not OAuth2. CoS: Trello Power-Up key |
 | Asana | claude | built | `claude/connector-2026-10-15-asana` / #156 (draft, stacked on #138 until it merges) | 2026-10-15 | Built and tested against a mock; not verified live; switches off. Waiting on CoS/owner: Asana app registration + `ASANA_CLIENT_ID`/`ASANA_CLIENT_SECRET`, relay deploy, `app.asana.com` manifest host, unverified vendor facts (`connectors/asana.md` §9), steps-list destination wiring (open-tasks row 75) |
 | Dropbox | free | free | - | - | OAuth2 PKCE. CoS: Dropbox app |
+| Linear | claude | claimed | `claude/connector-2026-10-19-linear` / PR (draft, stacked on #168 Jira, #156 Asana, #138 Notion) | 2026-10-19 | OAuth2 (PKCE per Linear docs: unverified) + secret via the relay. CoS: Linear OAuth app (Settings > API) + client id/secret |
 
 Rows still only in `connectors-queue.md` (Linear, DocuSign, Teams via Graph, Stripe, Box, Calendly, Adobe Sign, Google Meet link, open banking; Morning on HOLD) are added here as `free` when a routine is about to take one; until then `connectors-queue.md` remains the Claude routine's detailed design reference, and this file is the source of truth for ownership.
