@@ -4,8 +4,22 @@ const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
 const GYM = 'please remember to renew your gym membership by Friday 23/10';
-const HOLD_SUBJECT = 'פגישה 18/10 11:00 רוטשילד 12';
 const HOLD_BODY = 'תשמור לי את הזמן';
+const HOLD_OFFSET_DAYS = 7;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function holdOnCalendar(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return {
+    subject: 'פגישה ' + dd + '/' + mm + ' 11:00 רוטשילד 12',
+    title: 'Hold ' + WEEKDAYS[d.getDay()] + ' 11:00',
+    when: MONTHS[d.getMonth()] + ' ' + d.getDate()
+  };
+}
 
 test('a mail-only grant shows To Do consent and does not write', async ({ glance }) => {
   test.setTimeout(60000);
@@ -67,18 +81,19 @@ test('the popup shell has no leftover English status words', async ({ glance }) 
 test('a hold card shows the time in the card text, and a dateless hold is not a card', async ({ glance }) => {
   test.setTimeout(60000);
   await glance.seedOutlook();
+  const hold = holdOnCalendar(HOLD_OFFSET_DAYS);
   const page = await glance.openOutlook({
     id: 'AQMkGlanceHoldWhen',
-    subject: HOLD_SUBJECT,
+    subject: hold.subject,
     senderEmail: S.SENDER,
     senderName: 'flow',
     body: HOLD_BODY
   });
   const title = page.locator('#ReadingPaneContainerId .gs-intent, #ReadingPaneContainerId .flow-chip-process-name').first();
-  await expect(title).toHaveText('Hold Sun 11:00');
+  await expect(title).toHaveText(hold.title);
   const when = page.locator('#ReadingPaneContainerId [data-glance-when]');
   await expect(when).toBeVisible();
-  await expect(when).toContainText('Oct 18');
+  await expect(when).toContainText(hold.when);
   await expect(when).toContainText('11:00');
 
   const quiet = await glance.openOutlook({

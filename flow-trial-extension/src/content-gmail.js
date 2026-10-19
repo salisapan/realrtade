@@ -826,29 +826,35 @@ function glanceUiCopy(kind) {
       if (from && clean === from) return;
       bucket.push(clean);
     };
-    const tables = messageNode.querySelectorAll('table.ajB, table[role="presentation"]');
+    const rows = [];
+    const seen = new Set();
+    const pushRow = (tr) => {
+      if (!tr || seen.has(tr) || inMessageBody(tr)) return;
+      seen.add(tr);
+      rows.push(tr);
+    };
+    messageNode.querySelectorAll('.ajB table tr, table.ajC tr, table.ajB tr').forEach(pushRow);
+    messageNode.querySelectorAll('tr.ajv').forEach(pushRow);
     let labelled = false;
-    for (let t = 0; t < tables.length; t++) {
-      const rows = tables[t].querySelectorAll('tr');
-      for (let r = 0; r < rows.length; r++) {
-        const cells = rows[r].querySelectorAll('td');
-        if (cells.length < 2) continue;
-        const label = normalizeAudienceLabel(cells[0].textContent);
-        if (!label || label === 'from' || label === 'מאת') continue;
-        let bucket = null;
-        if (label === 'to' || label === 'אל') bucket = lists.to;
-        else if (label === 'cc' || label === 'עותק') bucket = lists.cc;
-        else if (label === 'bcc' || label.indexOf('עותק מוסתר') >= 0) bucket = lists.bcc;
-        else continue;
-        labelled = true;
-        const cell = cells[1];
-        cell.querySelectorAll('[email]').forEach((n) => {
-          const email = addressFrom(n).toLowerCase();
-          const shown = String(n.textContent || '').trim().toLowerCase();
-          if (email && email.indexOf('@') >= 0) add(bucket, email);
-          else if (own && (shown === 'me' || shown === 'אני' || shown === 'אליי')) add(bucket, own);
-        });
-      }
+    for (let r = 0; r < rows.length; r++) {
+      const tr = rows[r];
+      const labelCell = tr.querySelector('td.gG') || tr.querySelectorAll('td')[0];
+      const addrCell = tr.querySelector('td.gL') || tr.querySelectorAll('td')[1];
+      if (!labelCell || !addrCell) continue;
+      const label = normalizeAudienceLabel(labelCell.textContent);
+      if (!label || label === 'from' || label === 'מאת') continue;
+      let bucket = null;
+      if (label === 'to' || label === 'אל') bucket = lists.to;
+      else if (label === 'cc' || label === 'עותק') bucket = lists.cc;
+      else if (label === 'bcc' || label.indexOf('עותק מוסתר') >= 0) bucket = lists.bcc;
+      else continue;
+      labelled = true;
+      addrCell.querySelectorAll('[email]').forEach((n) => {
+        const email = addressFrom(n).toLowerCase();
+        const shown = String(n.textContent || '').trim().toLowerCase();
+        if (email && email.indexOf('@') >= 0) add(bucket, email);
+        else if (own && (shown === 'me' || shown === 'אני' || shown === 'אליי')) add(bucket, own);
+      });
     }
     if (!labelled) return null;
     const mine = messageNode.querySelectorAll('[email]');
@@ -1172,11 +1178,6 @@ function glanceUiCopy(kind) {
   function currentSubject() {
     const h = document.querySelector('h2.hP') || document.querySelector('div[role="main"] h2');
     return h ? h.textContent.trim() : '';
-  }
-
-  function ownEmailFromTitle() {
-    const m = String(document.title || '').match(/Inbox\s*-\s*([^-\n]+?)\s*-\s*Gmail/i);
-    return m ? emailish(m[1]) : '';
   }
 
   // Multiple Google accounts can each have Gmail open in their own /mail/u/N/
@@ -1578,10 +1579,6 @@ function glanceUiCopy(kind) {
     // A stored address is not replaced by the other account.
     const buttonOwn = ownEmailFromThread() || '';
     let ownEmail = buttonOwn || storedOwn || cachedOwn || '';
-    if (!ownEmail) {
-      const titleOwn = ownEmailFromTitle();
-      if (titleOwn) ownEmail = titleOwn;
-    }
     if (buttonOwn) lastOwnEmail = buttonOwn;
     if (!storedOwn && ownEmail) rememberOwnEmail(ownEmail);
     if (!chromeLive()) return;

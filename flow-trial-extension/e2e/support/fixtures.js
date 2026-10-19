@@ -53,16 +53,28 @@ function gmailDetailsTable(o, senderEmail, senderName, ownEmail) {
   const label = (he, en) => mark + (d.hebrew === false ? en : he) + ':' + mark;
   const cell = (a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? (d.hebrew === false ? 'me' : 'אני') : esc(a)) + '</span>';
   const row = (lab, list) => (list && list.length)
-    ? ('<tr><td class="gG">' + lab + '</td><td>' + list.map(cell).join(', ') + '</td></tr>')
+    ? ('<tr class="ajv"><td class="gG">' + lab + '</td><td class="gL">' + list.map(cell).join(', ') + '</td></tr>')
     : '';
-  const table = '<table class="ajB" role="presentation">' +
-    '<tr><td class="gG">' + label('מאת', 'from') + '</td><td><span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span></td></tr>' +
+  const innerTable = '<table class="ajC" role="presentation">' +
+    '<tr class="ajv"><td class="gG">' + label('מאת', 'from') + '</td><td class="gL"><span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span></td></tr>' +
     row(label('אל', 'to'), d.to) + row(label('עותק', 'cc'), d.cc) +
     '</table>';
-  if (d.lateMs) {
-    return '<div class="glance-late-hdr"></div><script>setTimeout(function(){var h=document.querySelector(".glance-late-hdr");if(h)h.innerHTML=' + JSON.stringify(table).replace(/</g, '\\u003c') + ';},' + Number(d.lateMs) + ');</script>';
+  const table = '<div class="ajB">' + innerTable + '</div>';
+  const collapsedTo = (d.to || []).map((a) => {
+    const me = String(a).toLowerCase() === String(ownEmail).toLowerCase();
+    return me ? (d.hebrew === false ? 'me' : 'אני') : esc(a);
+  });
+  if ((d.cc || []).some((a) => String(a).toLowerCase() === String(ownEmail).toLowerCase())) {
+    collapsedTo.push(d.hebrew === false ? 'me' : 'אני');
   }
-  if (d.expanded) return table;
+  const collapsedPrefix = d.hebrew === false ? 'to' : 'to';
+  const collapsedLine = collapsedTo.length
+    ? ('<div class="gE iv gt"><span>' + collapsedPrefix + ' ' + collapsedTo.join(', ') + '</span></div>')
+    : '';
+  if (d.lateMs) {
+    return '<div class="glance-late-hdr"></div><script>setTimeout(function(){var h=document.querySelector(".glance-late-hdr");if(h)h.innerHTML=' + JSON.stringify(collapsedLine + table).replace(/</g, '\\u003c') + ';},' + Number(d.lateMs) + ');</script>';
+  }
+  if (d.expanded) return collapsedLine + table;
   const all = (d.to || []).concat(d.cc || []);
   const names = all.map((a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? 'אליי' : esc(a)) + '</span>').join(', ');
   return '<div class="hb"><span class="ajy" role="button" aria-label="הצג פרטים" data-table="' + esc(table) + '" ' +

@@ -275,9 +275,9 @@ console.log('\n--- Handled survives a thread reload ---\n');
   const scan = scanAt >= 0 ? gmail.slice(scanAt, scanAt + 12000) : '';
   const remountAt = scan.indexOf('await remountProvedTaskReceipts');
   const missingAt = scan.indexOf('if (!ownEmail)');
-  const paintAt = scan.indexOf('paintNamesPending', missingAt);
+  const paintAt = scan.indexOf('paintAccountReconnectRow', missingAt);
   const returnAt = paintAt >= 0 ? scan.indexOf('return', paintAt) : -1;
-  check('a missing address remounts a proved task, then waits for a name',
+  check('a missing address remounts a proved task, then shows Reconnect',
     remountAt >= 0 && missingAt > remountAt && paintAt > missingAt && returnAt > paintAt,
     { remountAt: remountAt, missingAt: missingAt, paintAt: paintAt, returnAt: returnAt });
   check('a successful task undo rewrites the HANDLED row instead of leaving it',
