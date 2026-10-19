@@ -1700,10 +1700,16 @@ function glanceUiCopy(kind) {
     dropStaleCards();
     if (!chromeLive()) return;
     const main = document.querySelector('div[role="main"]');
-    if (!main) return;
+    if (!main) {
+      logScanSkip('', 'no-main-pane');
+      return;
+    }
 
     const messages = openMailNodes(main);
-    if (!messages.length) return;
+    if (!messages.length) {
+      logScanSkip('', 'no-open-messages');
+      return;
+    }
 
     try {
       await remountProvedTaskReceipts(messages);
@@ -1736,7 +1742,11 @@ function glanceUiCopy(kind) {
     // verified or written; offer Reconnect instead of waiting for a name.
     if (!ownEmail) {
       const pending = messages[messages.length - 1];
-      if (pending && pending.getAttribute && pending.getAttribute('data-glance-names') === 'pending') return;
+      if (pending && pending.getAttribute && pending.getAttribute('data-glance-names') === 'pending') {
+        const pendingKey = stableMessageKey(pending);
+        logScanSkip(pendingKey && pendingKey.messageId, 'own-email-pending');
+        return;
+      }
       const stablePending = pending ? stableMessageKey(pending) : null;
       if (pending && pending.setAttribute) pending.setAttribute('data-glance-names', 'pending');
       paintAccountReconnectRow(pending, stablePending && stablePending.messageId, currentSubject());

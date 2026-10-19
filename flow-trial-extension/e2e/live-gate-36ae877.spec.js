@@ -5,6 +5,7 @@ const { startGoogleLaneServer } = require('./support/google-lane-server');
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'glance.salisapan@outlook.com';
 const ASK = 'Please save the attached pdf to Drive.';
+const GMAIL_REDIRECT_OFek = 'https://www.google.com/url?q=http://ofek.dev&source=gmail&ust=1792459637319000&usg=AOvVaw1HPvAdPiNszcpLxyGDkTuA&sa=E';
 const chip = (page) => page.locator('div[role="main"] .flow-chip-host');
 const needsYou = (page) => page.locator('div[role="main"] [data-glance-chain="needs-you"]');
 let server;
@@ -82,12 +83,15 @@ test('L36 self HE אני header + subject renewal gets a task card', async ({ gl
     ownEmail: SELF,
     senderName: 'flow',
     subject: 'חידוש דומיין אופק',
-    body: 'חידוש דומיין אופק\nhttp://google.com/url?q=http://ofek.dev',
+    body: 'תזכיר לי לחדש את הדומיין ' + GMAIL_REDIRECT_OFek + ' ביום שישי',
     toSelfText: 'אני',
     accountLabel: 'Google Account: flow (' + SELF + ')'
   });
   await hePage.waitForTimeout(3500);
-  await expect(hePage.locator('[data-legacy-message-id="m-self-he"] .flow-chip-host')).toHaveCount(1);
+  const heHost = hePage.locator('[data-legacy-message-id="m-self-he"] .flow-chip-host');
+  await expect(heHost).toHaveCount(1);
+  await expect(heHost).toContainText('לחדש את הדומיין ofek.dev');
+  await expect(heHost).not.toContainText('&source=gmail');
 });
 
 test('L36 self renew unwraps google.com/url in the task title', async ({ glance }) => {
@@ -99,7 +103,7 @@ test('L36 self renew unwraps google.com/url in the task title', async ({ glance 
     ownEmail: SELF,
     senderName: 'flow',
     subject: 'Domain renewal – Ofek',
-    body: 'Remind me to renew the https://www.google.com/url?q=http://ofek.dev',
+    body: 'Remind me to renew the ' + GMAIL_REDIRECT_OFek,
     toSelfText: 'me',
     accountLabel: 'Google Account: flow (' + SELF + ')'
   });
@@ -108,6 +112,7 @@ test('L36 self renew unwraps google.com/url in the task title', async ({ glance 
   await expect(host).toHaveCount(1);
   await expect(host).toContainText('Renew ofek.dev');
   await expect(host).not.toContainText('google.com/url');
+  await expect(host).not.toContainText('&source=gmail');
 });
 
 test.describe('self completion vs open work', () => {
