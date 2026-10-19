@@ -71,6 +71,7 @@ import { CONNECTORS } from '../config/connectors.public.js';
 import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
 import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
 import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
+import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import './google-lane-host.js';
 import './gmail-reinject.js';
@@ -1781,7 +1782,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1807,7 +1808,7 @@ async function disconnectConnector(connectorId) {
     return { ok: true };
   }
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : key);
   return { ok: true };
 }
 
@@ -3955,8 +3956,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4210,6 +4211,102 @@ async function jiraReadBackWrite(p) {
 async function jiraReadBackUndo(ref) {
   const r = await jiraCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'jira' });
+  return r;
+}
+
+/* ---------------------------------------------------- Linear, with a proof */
+// docs/glance-ai/connectors/linear.md. Everything here is behind config/connectors.public.js (linearReadBack, linearOAuth), both off.
+
+const LINEAR_AUTH_BASE = 'https://linear.app/oauth/authorize';
+const LINEAR_API = 'https://api.linear.app/graphql';
+const LINEAR_SCOPES = 'read,write';
+const LINEAR_LEDGER_KEY = 'linearLedger';
+
+async function getLinearAuth() {
+  const { linearAuth } = await chrome.storage.local.get('linearAuth');
+  return linearAuth || null;
+}
+
+// "ENG", or a Linear link (https://linear.app/<workspace>/team/ENG/...). Returns the team key or null.
+function parseLinearTeamKey(input) {
+  const t = String(input || '').trim();
+  if (/^[A-Z][A-Z0-9]{1,6}$/.test(t)) return t;
+  let u = null;
+  try { u = new URL(t); } catch (e) { return null; }
+  if (u.hostname !== 'linear.app') return null;
+  const m = u.pathname.match(/\/team\/([A-Z][A-Z0-9]{1,6})(?:\/|$)/);
+  return m ? m[1] : null;
+}
+
+// "Sign in with Linear" (OAuth 2.0 authorization code, PKCE S256). The one-time code and the verifier go to the relay, which adds the secret.
+async function connectLinearOAuth(teamInput) {
+  if (!CONNECTORS.linearOAuth) throw new Error('Sign in with Linear is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.linearClientId);
+  if (!clientId) throw new Error('Linear sign-in isn’t configured on this build yet.');
+  const teamKey = parseLinearTeamKey(teamInput);
+  if (!teamKey) throw new Error('Paste the Linear team key (for example ENG) or a link to the team.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(LINEAR_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&scope=' + encodeURIComponent(LINEAR_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Linear');
+  const got = await relayTokenRequest({ vendor: 'linear', grant: 'code', code: code, code_verifier: verifier, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Linear connection failed (' + got.error + ').');
+  const res = await fetch(LINEAR_API, { method: 'POST', headers: { Authorization: 'Bearer ' + got.data.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query { teams(first: 100) { nodes { id key name } } }' }) });
+  if (!res.ok) throw new Error('Linear returned ' + res.status + '.');
+  const body = await res.json();
+  const nodes = (body && body.data && body.data.teams && Array.isArray(body.data.teams.nodes)) ? body.data.teams.nodes : [];
+  const team = nodes.find((n) => n && n.key === teamKey && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(n.id)));
+  if (!team) throw new Error('Linear signed you in but found no team with the key ' + teamKey + ' that you belong to.');
+  await chrome.storage.local.set({ linearAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, teamId: team.id, teamKey: team.key, teamName: team.name || team.key, via: 'oauth' } });
+  return { title: team.name || team.key };
+}
+
+async function linearRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'linear', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function linearCloseEngine() {
+  return globalThis.FlowLinearClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getLinearAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ linearAuth: a }); },
+    refresh: linearRefreshToken,
+    uuid: () => crypto.randomUUID(),
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(LINEAR_LEDGER_KEY))[LINEAR_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(LINEAR_LEDGER_KEY))[LINEAR_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [LINEAR_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function linearReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await linearCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'linear:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'linear', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'linear', lang: lang });
+    return { ok: true, where: 'Linear', target: 'your team', written: 'Added to Linear.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'linear', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Linear' };
+}
+
+async function linearReadBackUndo(ref) {
+  const r = await linearCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'linear' });
   return r;
 }
 
@@ -5874,6 +5971,7 @@ const WRITERS = {
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
 if (CONNECTORS.jiraReadBack) WRITERS.jira = jiraReadBackWrite;
+if (CONNECTORS.linearReadBack) WRITERS.linear = linearReadBackWrite;
 const UNDOERS = {
   hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
@@ -5886,6 +5984,7 @@ const UNDOERS = {
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
 if (CONNECTORS.jiraReadBack) UNDOERS.jira = jiraReadBackUndo;
+if (CONNECTORS.linearReadBack) UNDOERS.linear = linearReadBackUndo;
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
@@ -6015,6 +6114,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));

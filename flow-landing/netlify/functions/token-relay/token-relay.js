@@ -46,6 +46,16 @@ const VENDORS = {
     bodyFormat: 'json',
     extraHeaders: {},
     supportsRefresh: true
+  },
+  linear: {
+    tokenUrl: 'https://api.linear.app/oauth/token',
+    idEnv: 'LINEAR_CLIENT_ID',
+    secretEnv: 'LINEAR_CLIENT_SECRET',
+    // Linear takes a form-encoded body with client_id and client_secret; the PKCE code_verifier is forwarded as sent; refresh tokens exist for apps created after Linear introduced them (verify against the vendor page before go-live).
+    clientAuth: 'body',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
   }
 };
 

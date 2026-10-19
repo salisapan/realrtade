@@ -155,5 +155,16 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const r2 = await relay(ev({ vendor: 'jira', grant: 'refresh', refresh_token: 'old-ref', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 });
     assert.strictEqual(r2.statusCode, 200); assert.deepStrictEqual(JSON.parse(f2.calls[0].init.body), { grant_type: 'refresh_token', refresh_token: 'old-ref', client_id: 'jcid', client_secret: 'JIRA-SECRET-1' });
   });
+  await t('linear: form body with client id and secret goes to the Linear token url only; verifier forwarded; secret never returned or echoed', async () => {
+    const f = mock(200, { access_token: 'l-tok', refresh_token: 'l-ref', expires_in: 86399 });
+    const env = Object.assign({}, ENV, { LINEAR_CLIENT_ID: 'lcid', LINEAR_CLIENT_SECRET: 'LINEAR-SECRET-1' });
+    const r = await relay(ev({ vendor: 'linear', grant: 'code', code: 'c1', code_verifier: 'ver-1234567890', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(f.calls[0].url, 'https://api.linear.app/oauth/token');
+    const sent = new URLSearchParams(f.calls[0].init.body);
+    assert.strictEqual(sent.get('client_id'), 'lcid'); assert.strictEqual(sent.get('client_secret'), 'LINEAR-SECRET-1'); assert.strictEqual(sent.get('code_verifier'), 'ver-1234567890'); assert.strictEqual(sent.get('grant_type'), 'authorization_code');
+    assert.ok(r.body.indexOf('LINEAR-SECRET-1') < 0);
+    const f2 = mock(200, { access_token: 'x', note: 'LINEAR-SECRET-1' });
+    assert.strictEqual((await relay(ev({ vendor: 'linear', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 502);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

@@ -131,6 +131,17 @@ const FLOW_CONNECTORS = [
       { key: 'project', label: 'Project key or link', placeholder: 'OPS or https://….atlassian.net/…', type: 'text' }
     ]
   },
+  {
+    id: 'linear',
+    label: 'Linear',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one issue to the Linear team you choose and reads it back before it counts as handled. Off in this build; needs a Linear OAuth app Client ID (docs/glance-ai/connectors/linear.md).',
+    fields: [
+      { key: 'team', label: 'Team key or link', placeholder: 'ENG or https://linear.app/…/team/ENG', type: 'text' }
+    ]
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 

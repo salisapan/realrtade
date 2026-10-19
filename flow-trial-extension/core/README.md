@@ -93,6 +93,7 @@ it, not touching the module.
 | `json-enforce.js` | Strict JSON for model output, shared by every tier that asks a model for a structured answer (the on-device model, the company server). |
 | `lang-normalize.js` | Language normalisation for local intent recognition — portable, no chrome.*, no DOM, no network, no model. |
 | `learning-ledger.js` | "What Glance learned from you": a short, plain list of every time the engine moved because of something this person did. |
+| `linear-close.js` | One issue in the person's chosen Linear team as the close, read back as the proof: the issue id is chosen on the device and stored before the create, so a retry never makes a second; Handled only when the read-back matches; Undo deletes and requires the issue to be gone or trashed. GraphQL with every value as a variable. The network, token store, ledger and id generator are injected. Portable: no chrome.*, no DOM. |
 | `local-lm-audit.js` | The fixed sentences an on-device language model must pass on THIS device before core/local-lm.js lets it propose anything. |
 | `local-lm-server.js` | A language model the person runs ON THEIR OWN COMPUTER (Ollama, LM Studio, or anything that speaks the same two HTTP dialects), as another source for the session core/local-lm.js already knows how to use. |
 | `local-lm.js` | A language model that runs on THIS device, as the third recognition tier. |

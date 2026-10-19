@@ -32,6 +32,12 @@ ok('jira tick = relay sign-in + its one host (the Atlassian gateway), nothing el
   assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira']).steps.length, 6);
   assert.ok(C.selectAll().indexOf('jira') >= 0);
 });
+ok('linear tick = relay sign-in + its one host, nothing else; all four task connectors together', () => {
+  const r = C.stepsFor(['linear']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:linear', 'host-permission:https://api.linear.app/*']);
+  assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira', 'linear']).steps.length, 8);
+  assert.ok(C.selectAll().indexOf('linear') >= 0);
+});
 ok('microsoft ticks collapse into one sign-in listing only the ticked services', () => {
   const r = C.stepsFor(['ms-todo', 'ms-mail', 'ms-todo']);
   assert.strictEqual(r.steps.length, 1); assert.deepStrictEqual(r.steps[0], { type: 'microsoft-signin', services: ['todo', 'mail'] });
