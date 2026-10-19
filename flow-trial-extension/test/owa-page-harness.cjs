@@ -505,8 +505,14 @@ async function runPage(opts) {
       }
     });
     const aliasWhy = reasonsOf(alias);
-    check('mail from the same account stays silent, schedule card included', !alias.chip && !/Scheduling/.test((alias.doc && alias.doc.body && alias.doc.body.textContent) || ''), alias.chip && alias.chip.textContent);
-    check('the page records own-sender or note-to-self', aliasWhy.page.indexOf('own-sender') >= 0 || aliasWhy.page.indexOf('note-to-self') >= 0 || aliasWhy.plan.indexOf('own-sender') >= 0 || aliasWhy.plan.indexOf('note-to-self') >= 0, aliasWhy);
+    const aliasText = (alias.doc && alias.doc.body && alias.doc.body.textContent) || '';
+    const aliasConsent = /אין הרשאת To Do/.test(aliasText);
+    const aliasTask = Boolean(alias.chip) && !/Scheduling/.test(alias.chip.textContent || '');
+    check('self shows task or consent', (aliasTask || aliasConsent) && !/Scheduling/.test(aliasText), alias.chip && alias.chip.textContent);
+    check('the page records own-sender, note-to-self, or the To Do consent',
+      aliasWhy.page.indexOf('own-sender') >= 0 || aliasWhy.page.indexOf('note-to-self') >= 0 || aliasWhy.page.indexOf('tasks-not-granted') >= 0
+      || aliasWhy.plan.indexOf('own-sender') >= 0 || aliasWhy.plan.indexOf('note-to-self') >= 0,
+      aliasWhy);
 
     // Live 0.9.19: itemId null, conversationId set, Drive fileCount 1, prepare chosen,
     // conversationId $filter returned nothing, showFilePrepare returned false, final outlook:file-found-no-attach.

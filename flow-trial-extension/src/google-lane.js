@@ -7,7 +7,8 @@ const FlowGoogleLane = (() => {
     googleLaneTask: 'FlowGoogleTasks',
     googleDriveSave: 'FlowGoogleDrive',
     googleDoc: 'FlowGoogleDocs',
-    googleSheetAppend: 'FlowGoogleSheets'
+    googleSheetAppend: 'FlowGoogleSheets',
+    googleReplyDraft: 'FlowGoogleDrafts'
   };
 
   let injected = null;
@@ -36,7 +37,7 @@ const FlowGoogleLane = (() => {
 
   function isLaneMessage(msg) {
     const type = msg && msg.type;
-    return type === 'flow:google-write' || type === 'flow:google-undo' || type === 'flow:google-contacts';
+    return type === 'flow:google-write' || type === 'flow:google-undo';
   }
 
   async function write(connectorId, input, http, clock) {
@@ -62,15 +63,8 @@ const FlowGoogleLane = (() => {
     return api.undo(ref, await httpOf(http));
   }
 
-  async function lookupContacts(input, http) {
-    const Contacts = mod('FlowGoogleContacts');
-    if (!Contacts) return { ok: false, reason: 'unavailable' };
-    return Contacts.lookup(input, await httpOf(http));
-  }
-
   async function dispatch(msg, http, clock) {
     if (!isLaneMessage(msg)) return undefined;
-    if (msg.type === 'flow:google-contacts') return lookupContacts(msg, http);
     if (msg.type === 'flow:google-undo') return undo(msg.connectorId, msg.ref, http, msg.state);
     return write(msg.connectorId, msg.input, http, clock);
   }
@@ -91,7 +85,6 @@ const FlowGoogleLane = (() => {
     isLaneMessage: isLaneMessage,
     write: write,
     undo: undo,
-    lookupContacts: lookupContacts,
     dispatch: dispatch,
     install: install
   };

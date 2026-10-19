@@ -44,6 +44,7 @@ function load(opts) {
   const tokens = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
   let tokenSeq = 0;
+  let lastTitle = '';
 
   const sandbox = {
     console,
@@ -62,6 +63,7 @@ function load(opts) {
       } else {
         bodies.push(null);
       }
+      if (method === 'POST' && /\/lists\/[^/]+\/tasks$/.test(String(url)) && bodies[bodies.length - 1] && bodies[bodies.length - 1].title) lastTitle = bodies[bodies.length - 1].title;
       const auth = options && options.headers && options.headers.Authorization;
       if (auth) tokens.push(String(auth).replace('Bearer ', ''));
       for (const [match, answer] of opts.routes || []) {
@@ -72,7 +74,7 @@ function load(opts) {
       // googleTasksWrite reads the created task back. A test that needs the
       // GET to fail registers its own route; anything else confirms the id.
       const taskRead = method === 'GET' && String(url).match(/\/lists\/[^/]+\/tasks\/([^/?]+)(?:\?.*)?$/);
-      if (taskRead) return res(200, { id: decodeURIComponent(taskRead[1]), status: 'needsAction' });
+      if (taskRead) return res(200, { id: decodeURIComponent(taskRead[1]), title: lastTitle, status: 'needsAction' });
       return res(500, { error: { message: 'unrouted: ' + method + ' ' + url } });
     },
     chrome: {
@@ -115,6 +117,7 @@ function load(opts) {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return {
     calls, bodies, tokens, stored,
     fn: (name) => vm.runInContext(name, sandbox)
@@ -422,7 +425,7 @@ async function run() {
       stored: CONNECTED,
       routes: [
         [/\/lists\/LIST_A\/tasks$/, { method: 'POST', reply: res(200, { id: 'task_proved', status: 'needsAction' }) }],
-        [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'GET', reply: res(200, { id: 'task_proved', status: 'needsAction' }) }],
+        [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'GET', reply: res(200, { id: 'task_proved', title: 'Send the signed SOW', status: 'needsAction' }) }],
         [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'DELETE', reply: res(204, {}) }]
       ]
     });

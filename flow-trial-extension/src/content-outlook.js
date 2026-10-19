@@ -179,6 +179,20 @@
     }
   }
 
+  // The card shows the title in the UI language. The To Do and the event
+  // written on Do It carry that same title.
+  function activityLabel(ctx) {
+    const raw = ctx && ctx.intent && ctx.intent.label;
+    const p = ctx && ctx.process;
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save')) return artifactTitleFor(ctx, raw);
+    return raw;
+  }
+
+  function artifactTitleFor(ctx, title) {
+    if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.artifactTitle !== 'function') return title;
+    return FlowDisplay.artifactTitle(pageUiLang(), ctx, title);
+  }
+
   function pageUiLang() {
     let ui = '';
     try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
@@ -661,6 +675,51 @@
     return out;
   }
 
+  // The ask can sit inside a Word or Excel attachment. It is read on this
+  // device (core/docreader.js), with the mail's own Graph sign-in, and only
+  // when the mail text alone gave no card. Two files, 2 MB each, 4000
+  // characters in all. Nothing leaves the device and nothing is stored.
+  const OFFICE_READ_MAX_BYTES = 2 * 1024 * 1024;
+  const OFFICE_READ_MAX_FILES = 2;
+  const OFFICE_READ_MAX_CHARS = 4000;
+
+  function officeKind(file) {
+    const name = String((file && (file.name || file.filename)) || '').toLowerCase();
+    const type = String((file && file.contentType) || '').toLowerCase();
+    if (/\.docx$/.test(name) || /wordprocessingml\.document/.test(type)) return 'docx';
+    if (/\.xlsx$/.test(name) || /spreadsheetml\.sheet/.test(type)) return 'xlsx';
+    return '';
+  }
+
+  function bytesFromBase64(b64) {
+    const bin = atob(String(b64 || '').replace(/\s/g, ''));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 255;
+    return out;
+  }
+
+  async function officeAttachmentText(pane, mailbox) {
+    if (typeof FlowDocReader === 'undefined' || !pane) return '';
+    const seen = (pane.attachments || []).length > 0 || Boolean(mailbox && mailbox.hasAttachments === true);
+    if (!seen) return '';
+    let read = null;
+    try { read = await suggestFiles(await hydratePane(pane)); } catch (e) { return ''; }
+    if (!read || read.unresolved || !Array.isArray(read.files) || !read.messageId) return '';
+    const picks = read.files.filter((f) => f && f.isInline !== true && officeKind(f) && Number(f.size) <= OFFICE_READ_MAX_BYTES && !/itemAttachment/i.test(String(f['@odata.type'] || ''))).slice(0, OFFICE_READ_MAX_FILES);
+    let text = '';
+    for (const file of picks) {
+      try {
+        const item = await graphJson('/me/messages/' + encodeURIComponent(read.messageId) + '/attachments/' + encodeURIComponent(file.id), 'office-read');
+        if (!item || !item.contentBytes) continue;
+        const bytes = bytesFromBase64(item.contentBytes);
+        const got = officeKind(file) === 'docx' ? await FlowDocReader.extractDocxText(bytes) : await FlowDocReader.extractXlsxText(bytes);
+        if (got) text += (text ? '\n' : '') + got;
+      } catch (e) { /* an unreadable file adds nothing */ }
+      if (text.length >= OFFICE_READ_MAX_CHARS) break;
+    }
+    return text.slice(0, OFFICE_READ_MAX_CHARS);
+  }
+
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
   async function decideFromText(pane, ownAddresses, mailbox) {
@@ -703,8 +762,8 @@
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true
     });
-    const r = FlowIncomingJudge.judge({
-      text: own, subject: pane.subject || '',
+    const judgeWith = (text) => FlowIncomingJudge.judge({
+      text: text, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
       now: new Date(), threadUrl: location.href,
       hasThreadAttachment: attachmentCount === 1,
@@ -720,6 +779,14 @@
       forwarded: pane.onBehalf === true,
       inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
     });
+    let r = judgeWith(own);
+    if (!(r && r.show)) {
+      const inside = await officeAttachmentText(pane, mailbox);
+      if (inside) {
+        const withFile = judgeWith((own ? own + '\n' : '') + inside);
+        if (withFile && withFile.show) r = withFile;
+      }
+    }
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
   }
@@ -1808,7 +1875,7 @@
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
       if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
-      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', pageShow(copy.closedLine)));
       done.appendChild(detail);
     }
     const chromeWords = pageChrome();
@@ -2303,7 +2370,7 @@
       payload: {
         connectorId: 'outlookTask',
         params: params,
-        label: (ctx.intent && ctx.intent.label) || params.title || 'Task',
+        label: artifactTitleFor(ctx, (ctx.intent && ctx.intent.label) || params.title || 'Task'),
         senderName: ctx.sender && ctx.sender.name,
         senderEmail: ctx.sender && ctx.sender.email,
         subject: ctx.subject || '',
@@ -3327,7 +3394,7 @@
       dateIso: dateIso,
       hour: hour,
       minute: minute,
-      title: p.title || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Meeting',
+      title: artifactTitleFor(ctx, p.title || (ctx && ctx.intent && ctx.intent.label) || (ctx && ctx.subject) || 'Meeting'),
       quote: p.quote || null,
       threadUrl: p.threadUrl || (ctx && ctx.threadUrl) || null,
       requireTime: p.requireTime === true
@@ -4293,7 +4360,7 @@
 
     await FlowStorage.appendLog({
       kind: 'shown',
-      label: ctx.intent.label,
+      label: activityLabel(ctx),
       messageId: ctx.messageId,
       score: ctx.intent.signals && ctx.intent.signals.score,
       signals: ctx.intent.signals,
@@ -5191,7 +5258,8 @@
       await clearReason(pane);
       return;
     }
-    if (!pageAlreadyDecided(pane)) await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
+    const fileGap = decision.reason === 'suggest:no-consent' && Array.isArray(files) && files.length > 0;
+    if (!pageAlreadyDecided(pane) || (fileGap && genericTextQuiet(pane))) await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
   }
 
   function paintRemove(el) {

@@ -6,7 +6,7 @@
 // lbihckfmoffgjjlnneoeaehbhoonfenh.
 //
 // Allowed scopes, and nothing else: openid, email, profile, drive.file,
-// calendar.events, tasks, contacts.readonly. Docs and Sheets are used only
+// calendar.events, tasks. Docs and Sheets are used only
 // on a file Glance created or the person picked. A gmail.* scope is refused
 // here. Gmail is read and filled on the Gmail page. Glance never presses Send.
 const FlowGoogleConfig = (() => {
@@ -18,15 +18,13 @@ const FlowGoogleConfig = (() => {
   const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
   const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar.events';
   const SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';
-  const SCOPE_CONTACTS = 'https://www.googleapis.com/auth/contacts.readonly';
   const SCOPES = [
     SCOPE_OPENID,
     SCOPE_EMAIL,
     SCOPE_PROFILE,
     SCOPE_DRIVE_FILE,
     SCOPE_CALENDAR,
-    SCOPE_TASKS,
-    SCOPE_CONTACTS
+    SCOPE_TASKS
   ];
 
   function scopeList(scopes) {
@@ -100,6 +98,20 @@ const FlowGoogleConfig = (() => {
     return proof;
   }
 
+  // The APIs whose 401 means the grant itself is gone: the ones a card
+  // writes to. Any other Google URL (a profile read, a stray lookup) can
+  // answer 401 without the token being wrong, and that answer must never
+  // throw the token away or flag Reconnect.
+  function isCriticalUrl(url) {
+    let u;
+    try { u = new URL(String(url || '')); } catch (e) { return false; }
+    const host = u.hostname;
+    const path = u.pathname || '';
+    if (host === 'tasks.googleapis.com' || host === 'docs.googleapis.com' || host === 'sheets.googleapis.com' || host === 'gmail.googleapis.com') return true;
+    if (host === 'www.googleapis.com') return /^\/(calendar|drive|upload\/drive)\//.test(path);
+    return false;
+  }
+
   function clockIso(clock) {
     if (typeof clock === 'function') return clock();
     if (typeof clock === 'string' && !Number.isNaN(Date.parse(clock))) return clock;
@@ -116,7 +128,6 @@ const FlowGoogleConfig = (() => {
     SCOPE_DRIVE_FILE: SCOPE_DRIVE_FILE,
     SCOPE_CALENDAR: SCOPE_CALENDAR,
     SCOPE_TASKS: SCOPE_TASKS,
-    SCOPE_CONTACTS: SCOPE_CONTACTS,
     scopeList: scopeList,
     refusalReason: refusalReason,
     refused: refused,
@@ -124,6 +135,7 @@ const FlowGoogleConfig = (() => {
     hasScope: hasScope,
     gate: gate,
     proofOf: proofOf,
+    isCriticalUrl: isCriticalUrl,
     clockIso: clockIso
   };
 })();

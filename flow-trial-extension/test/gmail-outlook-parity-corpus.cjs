@@ -113,7 +113,7 @@ function gmailDecide(m) {
   if (!intent || !intent.type || !FlowIntent.shouldShowChip(intent)) return { show: false, reason: 'quiet', intent };
   const gate = FlowFileAttach ? FlowFileAttach.gate(text) : { kind: 'ignore' };
   if (gate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) return { show: false, reason: 'file', intent };
-  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
+  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent };
   // A clear file ask goes to Drive search on Gmail (flow:search-drive) before any chip: outside this pure comparison.
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST) return { show: 'drive', reason: 'drive-search', intent };
   const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {}, text: text });
@@ -141,8 +141,9 @@ function graphMessage(m, i) {
   };
 }
 function outlookDecide(m, i, extra) {
-  const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
-  const r = S.plan(Object.assign({ messages: [graphMessage(m, i)], me: [ME, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW, deps }, extra || {}));
+  const over = extra || {};
+  const deps = Object.assign({ extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions }, over.deps || {});
+  const r = S.plan(Object.assign({ messages: [graphMessage(m, i)], me: [ME, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW }, over, { deps }));
   return { r, entry: r.incoming[0] || null };
 }
 
@@ -273,8 +274,10 @@ const CASES = [
     // The sender also has an open loop from Gmail. Before 0.9.14 the cross-channel check turned the new Outlook ask into a
     // "does this settle...?" question and returned before the ask was judged: no card.
     const gmailLoop = { id: 'g:t1', threadId: 'g:t1', channel: 'gmail', messageId: 'gm1', subject: 'Intro', counterpart: { name: 'flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'the intro deck', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW - 3 * 86400000, chaseIso: '2026-10-07', lang: 'en' };
-    const { entry } = outlookDecide(m, 0, { watches: [gmailLoop] });
-    check('an open Gmail loop with the same person does not swallow the Outlook ask (Gmail would still chip it)', Boolean(entry), null);
+    const held = outlookDecide(m, 0);
+    check('with no profile name, Hi Sali is held for the name', !held.entry && (held.r.diagnostics || []).some((d) => d.reason === 'names-pending'), (held.r.diagnostics || []).map((d) => d.reason));
+    const named = outlookDecide(m, 0, { watches: [gmailLoop], deps: { userName: 'Sali Sapan', ownNames: ['Sali', 'Sali Sapan', 'סאלי'] } });
+    check('an open Gmail loop with the same person does not swallow the Outlook ask (Gmail would still chip it)', Boolean(named.entry), (named.r.diagnostics || []).map((d) => d.reason));
   }
   {
     const m = CASES[1];
@@ -298,7 +301,7 @@ const CASES = [
     const gmail = read('src/content-gmail.js');
     check('Gmail classifies with sender, subject, calibration and attachment count', /classifyForChip\(text, \{\s*senderEmail: sender\.email,\s*senderName: sender\.name,\s*subject: subject,\s*calibration: state\.calibration,\s*calibrationByType: state\.calibrationByType,\s*attachmentCount: attachments\.length/.test(gmail));
     check('Gmail\'s draft payload is { params (minus attach-chooser fields), senderEmail, senderName, subject }', /const \{ selectedAttachment, driveFileId, driveFileName, driveMimeType, \.\.\.cleanParams \} = action\.params;/.test(gmail) && /senderEmail: ctx\.sender\.email,\s*senderName: ctx\.sender\.name,\s*subject: ctx\.subject/.test(gmail));
-    check('Gmail gates on shouldShowChip, the file gate and resolution before planFor', /if \(!FlowIntent\.shouldShowChip\(intent\)\)/.test(gmail) && /FlowFileAttach\.gate\(text\)/.test(gmail) && /FlowResolution\.owns\(fileGate\.ask\.id\)/.test(gmail));
+    check('Gmail gates on shouldShowChip, the file gate and the shared receipt judge before planFor', /if \(!FlowIntent\.shouldShowChip\(intent\)\)/.test(gmail) && /FlowFileAttach\.gate\(text\)/.test(gmail) && /FlowIncomingJudge\.silencesReceipt\(text\)/.test(gmail) && !/FlowResolution\.owns\(fileGate\.ask\.id\)/.test(gmail));
     const judge = read('core/incoming-judge.js');
     check('the shared judge classifies with the same context keys', /senderEmail:[^\n]*\n\s*senderName:[^\n]*\n\s*subject:[^\n]*\n\s*calibration:[^\n]*\n\s*calibrationByType:[^\n]*\n\s*attachmentCount:/.test(judge));
     const bgSrc = read('src/background.js');
@@ -396,13 +399,13 @@ const CASES = [
       return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
     }
     const saveG = pair(GMAIL, GMAIL, SAVE, ownGmail, 1);
-    check('Gmail shape, save the report to Drive by 20/10, self-sent shows a Drive card',
-      saveG.g.show === true && steps(saveG.g).indexOf('driveFile') >= 0 && steps(saveG.g).indexOf('gmailDraft') >= 0 && !steps(saveG.g).some((k) => /send/i.test(k)),
-      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g) });
+    check('Gmail shape, save the report to Drive by 20/10, self-sent is a task with no draft',
+      saveG.g.show === true && steps(saveG.g).join(',') === 'googleTask' && saveG.g.intent && saveG.g.intent.label === 'Save the report',
+      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g), label: saveG.g.intent && saveG.g.intent.label });
     const saveO = pair(ME, ME, SAVE, ownOutlook, 1);
-    check('Outlook shape, save the report to Drive by 20/10, self-sent shows a OneDrive card',
-      saveO.o.show === true && steps(saveO.o).indexOf('onedriveFile') >= 0 && steps(saveO.o).indexOf('outlookDraft') >= 0 && !steps(saveO.o).some((k) => /send/i.test(k)),
-      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o) });
+    check('Outlook shape, save the report to Drive by 20/10, self-sent is a task with no draft',
+      saveO.o.show === true && steps(saveO.o).join(',') === 'outlookTask' && saveO.o.intent && saveO.o.intent.label === 'Save the report',
+      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o), label: saveO.o.intent && saveO.o.intent.label });
     const heG = pair(GMAIL, GMAIL, HE, ownGmail, 0);
     const heO = pair(ME, ME, HE, ownOutlook, 0);
     check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',

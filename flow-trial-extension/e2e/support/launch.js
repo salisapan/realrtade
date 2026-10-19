@@ -41,32 +41,6 @@ function copyExtension(opts) {
     'https://www.business.facebook.com/latest/inbox/*'
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
-  // This copy only. The repo manifest does not load the compose filler.
-  // The lane specs fill a Gmail compose window, so this copy inserts the
-  // full-flavor scripts in the same order, ahead of the card.
-  const gmail = (manifest.content_scripts || []).find((s) => (s.matches || []).indexOf('https://mail.google.com/*') >= 0);
-  if (gmail && Array.isArray(gmail.js)) {
-    const filler = [
-      'core/draft-reply.js',
-      'core/google-config.js',
-      'core/google-calendar.js',
-      'core/google-tasks.js',
-      'core/google-drive.js',
-      'core/google-docs.js',
-      'core/google-sheets.js',
-      'core/google-contacts.js',
-      'core/google-compose.js',
-      'core/google-proof.js',
-      'src/google-compose-page.js'
-    ];
-    let at = gmail.js.indexOf('src/content-gmail.js');
-    filler.forEach((file) => {
-      if (gmail.js.indexOf(file) >= 0) return;
-      if (at < 0) { gmail.js.push(file); return; }
-      gmail.js.splice(at, 0, file);
-      at += 1;
-    });
-  }
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
 }
@@ -110,7 +84,7 @@ function installE2EHooks() {
         interactive: details ? details.interactive : undefined,
         at: Date.now()
       });
-      return Promise.reject(new Error('e2e-no-window'));
+      return Promise.reject(new Error(e2e.webFlowError || 'e2e-no-window'));
     };
   }
   if (globalThis.__glanceE2e && globalThis.__glanceE2e.installed) {
@@ -125,6 +99,7 @@ function installE2EHooks() {
   e2e.authFail = false;
   e2e.scenario = e2e.scenario || { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
   e2e.googleTasks = e2e.googleTasks || {};
+  e2e.tokenAccounts = e2e.tokenAccounts || {};
   e2e.todoTasks = e2e.todoTasks || {};
   e2e.drafts = e2e.drafts || {};
   e2e.driveItems = e2e.driveItems || {};
@@ -163,6 +138,12 @@ function installE2EHooks() {
     const scenario = e2e.scenario || {};
 
     if (host === 'login.microsoftonline.com') return Promise.resolve(json(400, { error: 'e2e-no-login' }));
+    if (host === 'gmail.googleapis.com' && /\/users\/me\/profile$/.test(path)) {
+      const auth = String((init && init.headers && (init.headers.Authorization || init.headers.authorization)) || '');
+      const token = auth.replace(/^Bearer\s+/i, '');
+      const email = (e2e.tokenAccounts || {})[token] || 'ai.local.flow@gmail.com';
+      return Promise.resolve(json(200, { emailAddress: email, messagesTotal: 1, threadsTotal: 1, historyId: '1' }));
+    }
     if (host === 'theflow-ai.com' || host === 'gmail.googleapis.com' || host === 'oauth2.googleapis.com') {
       return Promise.resolve(json(200, {}));
     }
@@ -195,10 +176,23 @@ function installE2EHooks() {
         const task = e2e.googleTasks[id];
         return Promise.resolve(task ? json(200, task) : json(404, { error: { message: 'missing' } }));
       }
+      const knownList = (id) => id === 'glance-list' || id === '@default';
+      if (col && !knownList(col[1])) return Promise.resolve(json(404, { error: { code: 404, message: 'Invalid task list ID', status: 'NOT_FOUND' } }));
       if (col && method === 'POST') {
         const id = 'e2e-gtask-' + (e2e.seq++);
-        e2e.googleTasks[id] = { id: id, title: 'e2e', status: 'needsAction' };
-        return Promise.resolve(json(200, e2e.googleTasks[id]));
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        const task = { kind: 'tasks#task', id: id, title: posted.title || '', status: 'needsAction' };
+        if (posted.notes) task.notes = posted.notes;
+        if (posted.due) task.due = String(posted.due).slice(0, 10) + 'T00:00:00.000Z';
+        e2e.googleTasks[id] = task;
+        return Promise.resolve(json(200, task));
+      }
+      const oneList = path.match(/\/users\/@me\/lists\/([^/]+)$/);
+      if (oneList) {
+        return Promise.resolve(knownList(oneList[1])
+          ? json(200, { kind: 'tasks#taskList', id: oneList[1] === '@default' ? 'glance-list' : oneList[1], title: 'Glance' })
+          : json(404, { error: { code: 404, message: 'Invalid task list ID', status: 'NOT_FOUND' } }));
       }
       if (path.indexOf('/users/') >= 0 && path.indexOf('/lists') >= 0) {
         return Promise.resolve(json(200, { items: [{ id: 'glance-list', title: 'Glance' }] }));
@@ -218,7 +212,7 @@ function installE2EHooks() {
           name: row.name || 'file.bin',
           contentType: row.contentType || 'application/octet-stream',
           size: row.size || 3,
-          contentBytes: 'ZTJlLXBkZg=='
+          contentBytes: row.contentBytes || 'ZTJlLXBkZg=='
         }));
       }
       const att = path.match(/\/me\/messages\/([^/]+)\/attachments$/);
@@ -238,11 +232,13 @@ function installE2EHooks() {
         return Promise.resolve(json(401, { error: { code: 'InvalidAuthenticationToken' } }));
       }
       if (driveContent && method === 'PUT') {
-        const name = driveContent[1];
+        const key = driveContent[1];
         const id = 'e2e-file-' + (e2e.seq++);
-        const item = { id: id, name: name, webUrl: 'https://onedrive.live.com/file/' + id };
+        const item = { id: id, name: decodeURIComponent(key.split('/').pop()), webUrl: 'https://onedrive.live.com/file/' + id, parentReference: { path: '/drive/root:/' + key.split('/').slice(0, -1).join('/') } };
+        item.__key = key;
         e2e.driveItems[id] = item;
-        e2e.driveByName[name] = item;
+        e2e.driveByName[key] = item;
+        e2e.drivePuts = (e2e.drivePuts || []).concat([key]);
         return Promise.resolve(json(201, item));
       }
       const driveRoot = path.match(/\/me\/drive\/root:\/(.+)$/);
@@ -255,7 +251,8 @@ function installE2EHooks() {
         const id = driveItem[1];
         if (method === 'DELETE') {
           const gone = e2e.driveItems[id];
-          if (gone && gone.name) delete e2e.driveByName[gone.name];
+          if (gone && gone.__key) delete e2e.driveByName[gone.__key];
+          e2e.driveDeletes = (e2e.driveDeletes || []).concat([id]);
           delete e2e.driveItems[id];
           return Promise.resolve(empty(204));
         }
@@ -412,7 +409,7 @@ function installE2EHooks() {
   e2e.googleAuthToken = function (interactive) {
     e2e.authCalls.push({ interactive: Boolean(interactive), at: Date.now() });
     if (e2e.authFail) return Promise.reject(new Error('The user did not approve access.'));
-    return Promise.resolve('ya29.e2e');
+    return Promise.resolve(e2e.identityToken || 'ya29.e2e');
   };
   bindGlanceE2eWebAuth(e2e);
 
@@ -428,7 +425,7 @@ function installE2EHooks() {
       return;
     }
     try { chrome.runtime.lastError = undefined; } catch (err2) { /* native lastError */ }
-    done('ya29.e2e');
+    done(e2e.identityToken || 'ya29.e2e');
   };
   const flowStub = function (details, cb) {
     e2e.flows.push({
@@ -642,6 +639,7 @@ async function boot() {
       e.driveByName = {};
       e.seq = 1;
       delete e.httpOrigin;
+      if (globalThis.FlowGoogleLaneAccount && globalThis.FlowGoogleLaneAccount.forget) globalThis.FlowGoogleLaneAccount.forget();
     });
   };
 
@@ -694,8 +692,14 @@ async function boot() {
 
   harness.openGmail = async function openGmail(opts) {
     const o = opts || {};
-    const url = gmailUrl(o.messageId);
+    const url = gmailUrl(o.messageId, o.accountIndex);
     return openDocument(url, gmailHtml(o));
+  };
+
+  harness.openGmailHtml = async function openGmailHtml(html, opts) {
+    const o = opts || {};
+    const url = gmailUrl(o.messageId, o.accountIndex);
+    return openDocument(url, html);
   };
 
   harness.seedOutlook = async function seedOutlook(extra, authOpts) {

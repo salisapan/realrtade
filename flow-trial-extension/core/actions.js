@@ -632,10 +632,10 @@ const FlowActions = (() => {
     return false;
   }
 
-  function planFor(intent, ctx) {
+  function planForRaw(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
-    if (intent.googleClose) return planGoogle(intent, ctx);
+    if (intent.googleClose && !intent.selfTask) return planGoogle(intent, ctx);
     // The classifier lives on the intent, and planFor calls it again when
     // the mail text is in hand. Either one vetoes the meeting plan.
     const vetoText = ctx.text;
@@ -724,17 +724,17 @@ const FlowActions = (() => {
     // A note the user sent is a task. An attach on that note keeps its
     // title and drops the draft. It is not the inbound file track.
     // "gimme a call October 19 at 9am" and "Shall we hop on a call
-    // October 19 at 3pm" keep the base plan, calendar included.
+    // October 19 at 3pm" are tasks: Call about / שיחה בנושא.
+    // The calendar-as-base rule for those two is cancelled.
     // A hold stays a hold. The other dated call stays schedule.
     const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
-    if (intent.selfTask && !(callNamesADate && intent.type === 'event')) proc = logIt;
-    else if (intent.selfTask && intent.personalClose !== 'calendar-hold') {
-      proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
-    }
+    // A note the user sent to themself is a task, including a dated call
+    // and a save that would otherwise write Drive plus a draft.
+    if (intent.selfTask) proc = logIt;
     // "I'll call you" is already the task. The untimed block would retitle
     // it Call when the subject says Reminder, and would return null when
     // the day has no clock ("I will call you on Friday.").
-    if (!senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
+    if (!intent.selfTask && !senderCallYou && (untimedCalendar || createTaskAsk || callReminder) && !(intent.inviteFile)) {
       if (ownPromise && !createTaskAsk && !callReminder && !coordinate && !answerAsk && !readerSaid) {
         proc = logIt;
       } else if ((createTaskAsk || callReminder) && !readerSaid) {
@@ -761,7 +761,9 @@ const FlowActions = (() => {
         proc = logIt;
       }
     }
-    if (senderCallYou && !intent.inviteFile) {
+    // A note to self is verb plus object. Log commitment is the promise
+    // sent to someone else.
+    if (senderCallYou && !intent.inviteFile && !intent.selfTask) {
       proc = logIt;
       const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
       intent.label = when ? ('Log commitment for ' + when) : 'Log this decision';
@@ -774,10 +776,10 @@ const FlowActions = (() => {
     // would drop that object. Inbound "add this to my tasks: call …" stays Call.
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
-    } else if (taskPlan && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
+    } else if (taskPlan && !intent.selfTask && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
       // "call October 19" named the month as a person. A dated call with
       // no person keeps the meeting title, and the calendar step stays.
-      if (!callNamesADate) {
+      if (!callNamesADate || intent.selfTask) {
         const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
         const dateText = when || null;
         intent.label = (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.neutralTitle === 'function')
@@ -815,6 +817,86 @@ const FlowActions = (() => {
       dateChoices: needsDateChoice ? choices : null,
       steps: steps
     };
+  }
+
+  // One guard, right before render, for every card type. A title is a short
+  // action, never the sentence the mail said. When the written title equals
+  // a sentence of the body, is nearly all of one, or runs past six words,
+  // the card falls back to a fixed short action title in the mail's language.
+  const TITLE_MAX_WORDS = 6;
+  function titleNorm(value) {
+    return String(value || '')
+      .replace(/[\u00A0\u200B-\u200F\u2060\uFEFF]/g, ' ')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}$₪€%\s]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function titleWords(value) { return String(value || '').trim().split(/\s+/).filter(Boolean); }
+  function bodySentences(text) {
+    const out = [];
+    String(text || '').split(/\r?\n+|(?<=[.!?])\s+/).forEach((part) => {
+      const n = titleNorm(part);
+      if (n) out.push(n);
+    });
+    return out;
+  }
+  const DECISION_NOTE = /הוחלט|החלטנו|החלטתי|החלטה|(?:^|[^\p{L}])סופי(?![\p{L}])|\bdecision\b|\bdecided\b|\bgoing with\b|\bfinal\b/iu;
+  function titleIsBody(title, sentences) {
+    const words = titleWords(title).length;
+    const norm = titleNorm(title);
+    if (!norm) return false;
+    // A decision is Decision: Name. A decision statement longer than that
+    // is the sentence pasted in.
+    if (words > TITLE_MAX_WORDS && DECISION_NOTE.test(title)) return true;
+    if (words < 3) return false;
+    for (let i = 0; i < sentences.length; i++) {
+      const s = sentences[i];
+      if (s === norm) return true;
+      if (words >= 6 && s.indexOf(norm) !== -1 && norm.split(' ').length >= 0.9 * s.split(' ').length) return true;
+    }
+    return false;
+  }
+  const FALLBACK_TITLE = {
+    decision: ['Log decision', 'לתעד החלטה'],
+    commitment: ['Log commitment', 'לתעד התחייבות'],
+    task: ['Handle this note', 'לטפל בהערה'],
+    reply: ['Reply requested', 'נדרשת תשובה'],
+    event: ['Meeting', 'פגישה'],
+    file: ['Save the file', 'לשמור את הקובץ'],
+    followup: ['Follow up', 'מעקב']
+  };
+  function fallbackKind(intent, process, title) {
+    const pid = process && process.id;
+    if (pid === 'file-it' || pid === 'suggest-save') return 'file';
+    if (DECISION_NOTE.test(String(title || '')) || intent.type === 'decision') return 'decision';
+    if (pid === 'reply-track') return 'reply';
+    if (intent.selfTask || pid === 'log-it') return 'task';
+    if (intent.type === 'event') return 'event';
+    if (intent.type === 'commitment') return 'commitment';
+    if (intent.type === 'followup') return 'followup';
+    return intent.type === 'request' ? 'reply' : 'task';
+  }
+  function guardTitles(intent, process, ctx) {
+    if (!intent || !process) return process;
+    const text = String((ctx && ctx.text) || '');
+    if (!text) return process;
+    const hold = intent.personalClose === 'calendar-hold' || process.id === 'hold';
+    const sentences = bodySentences(text);
+    const he = /[\u0590-\u05FF]/.test(text);
+    const shortFor = (title) => FALLBACK_TITLE[fallbackKind(intent, process, title)][he ? 1 : 0];
+    if (!hold && intent.label && titleIsBody(intent.label, sentences)) intent.label = shortFor(intent.label);
+    (process.steps || []).forEach((step) => {
+      if (!step || !step.params || !step.params.title) return;
+      if (step.kind === 'calendar') return;
+      if (titleIsBody(step.params.title, sentences)) step.params.title = shortFor(step.params.title);
+    });
+    return process;
+  }
+
+  function planFor(intent, ctx) {
+    const process = planForRaw(intent, ctx);
+    return guardTitles(intent, process, ctx);
   }
 
   // The receipt lines for writes that actually landed. A failed step can

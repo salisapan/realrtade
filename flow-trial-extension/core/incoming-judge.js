@@ -53,11 +53,29 @@ const FlowIncomingJudge = (() => {
     return (a > 12 && a <= 31 && b >= 1 && b <= 12) || (b > 12 && b <= 31 && a >= 1 && a <= 12);
   }
 
-  function textForJudge(rawText, subject) {
+  // A note to yourself with the sentence in the subject line and little or
+  // nothing in the body. The subject is the note. Someone else's subject is not.
+  function selfSent(input) {
+    const i = input || {};
+    const from = String((i.sender && i.sender.email) || i.senderEmail || '').trim().toLowerCase();
+    const own = (i.ownAddresses || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    if (!from || own.indexOf(from) === -1) return false;
+    const to = (i.to || i.toRecipients || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    const cc = (i.cc || i.ccRecipients || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    const rest = to.concat(cc);
+    if (!rest.length) {
+      if (i.headerToSelf === true) return true;
+      return to.length > 0 && to.every((a) => own.indexOf(a) !== -1);
+    }
+    return rest.every((a) => own.indexOf(a) !== -1);
+  }
+
+  function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
     if (body.length >= MIN_TEXT || !sub) return body;
     if (body.indexOf(sub) !== -1) return body;
+    if (selfNote && sub.length >= MIN_TEXT) return (sub + '\n' + body).trim();
     if (!subjectCarriesSlot(sub)) return body;
     return (sub + '\n' + body).trim();
   }
@@ -86,7 +104,7 @@ const FlowIncomingJudge = (() => {
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
-    const text = textForJudge(i.text, i.subject);
+    const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
@@ -123,6 +141,12 @@ const FlowIncomingJudge = (() => {
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
     }
+    // A self-sent webinar or launch blast stays quiet. The task rule does
+    // not cover marketing.
+    const marketBlob = ((i.subject ? String(i.subject) + '\n' : '') + text);
+    if (intent.selfTask && typeof intentApi.marketingWebinar === 'function' && intentApi.marketingWebinar(marketBlob)) {
+      return { show: false, reason: 'quiet:marketing', intent };
+    }
     if (!intentApi.shouldShowChip(intent)) {
       const named = quiet && typeof quiet.reasonFor === 'function' ? quiet.reasonFor(intent) : null;
       return { show: false, reason: named ? 'quiet:' + named : 'chip-low-confidence', intent };
@@ -153,16 +177,20 @@ const FlowIncomingJudge = (() => {
     const replyInsteadOfFile = isRequest && noParsedClock && intent.personalClose === 'follow-up-ask' && !intent.inviteFile && followUpCall;
     // A self-sent attach is a task. Other file asks stay on the file chain.
     const selfAttachTask = Boolean(intent && intent.selfAttachTask);
-    if (!selfAttachTask && !replyInsteadOfFile && isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
+    const selfSentTask = Boolean(intent && intent.selfTask);
+    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
     // A deadline whose day was dropped (31/2, or a weekday that is not that
     // calendar day) is still the reply. The file chain is not that close.
     const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
-    if (!selfAttachTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
-      if (resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
+    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
+      if (resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
       // (task + short attached draft), on Outlook as well as Gmail.
       if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile)) return { show: false, reason: 'file-chain-not-run', intent };
+      // A contract, a quote, a proposal, or a signed copy is not a reply.
+      // The page still searches Drive. The judge stays quiet until that search runs.
+      if ((i.surface || 'gmail') === 'gmail' && resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
     }
     // Same classifier as planFor. A meeting that was cancelled, postponed,
     // already held, or an out-of-office note does not show. A marketing
@@ -193,7 +221,7 @@ const FlowIncomingJudge = (() => {
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
     const asked = intent.googleClose;
-    if ((i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
+    if (!selfSentTask && (i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
       return { show: false, reason: 'onedrive-target-on-gmail', intent };
     }
     // The judge has already said offer. planFor may change the kind:
@@ -262,7 +290,17 @@ const FlowIncomingJudge = (() => {
     return D.draftBodyText(draftPayload(process, ctx), null, null, null);
   }
 
-  return { MIN_TEXT, prepareForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText };
+  // The Gmail page asks this instead of classifying a receipt on its own.
+  // True only when the ask attests a payment (a receipt or a transfer).
+  function silencesReceipt(text) {
+    const fileAttach = sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
+    const resolution = sibling(typeof FlowResolution !== 'undefined' ? FlowResolution : null, './resolution.js', 'FlowResolution');
+    const gate = fileAttach && typeof fileAttach.gate === 'function' ? fileAttach.gate(prepareForJudge(text)) : { kind: 'ignore' };
+    if (!gate || gate.kind !== 'clear' || !gate.ask || !gate.ask.id) return false;
+    return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
+  }
+
+  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
