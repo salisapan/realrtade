@@ -917,8 +917,8 @@ function glanceUiCopy(kind) {
           const email = addressFrom(node).toLowerCase();
           const shown = String(node.textContent || '').trim().toLowerCase();
           if (email && email.indexOf('@') >= 0) {
-            if (!taken.has(node) && email !== senderEmail) add(current, email);
-            else if (email !== senderEmail && own && email === own && (shown === 'me' || shown === 'אני')) add(current, email);
+            if (own && email === own && (shown === 'me' || shown === 'אני' || shown === 'אליי')) add(current, email);
+            else if (!taken.has(node) && email !== senderEmail) add(current, email);
           } else if (own && node.children && node.children.length === 0 && (shown === 'me' || shown === 'אני' || shown === 'אליי')) {
             add(current, own);
           }
@@ -959,7 +959,7 @@ function glanceUiCopy(kind) {
       const email = String(n.getAttribute('email') || '').trim().toLowerCase();
       if (email && email !== from && !inMessageBody(n)) found.add(email);
     });
-    return found.has(own) && found.size > 1;
+    return found.size > 0 && (!found.has(own) || found.size > 1);
   }
 
   async function expandMessageDetails(messageNode) {
@@ -982,8 +982,7 @@ function glanceUiCopy(kind) {
       if (n.closest && n.closest(BODY_SELECTOR)) continue;
       const t = String(n.textContent || '').replace(/[\u00a0\u202f]+/g, ' ').replace(/\s+/g, ' ').trim();
       if (!t || t.length > 24) continue;
-      if (/^(?:to|אל)\s+me$/i.test(t)) return true;
-      if (t === 'אליי') return true;
+      if (/^(?:to|אל)\s+(?:me|אני|אליי)$/i.test(t)) return true;
     }
     return false;
   }
@@ -1346,7 +1345,7 @@ function glanceUiCopy(kind) {
     let timer = null;
     const stop = () => {
       const w = copiedWatchers.get(message);
-      if (w) { w.observer.disconnect(); clearTimeout(w.cap); }
+      if (w) w.observer.disconnect();
       clearTimeout(timer);
       copiedWatchers.delete(message);
     };
@@ -1354,17 +1353,17 @@ function glanceUiCopy(kind) {
       if (!message.isConnected || !message.querySelector('.flow-chip-host')) { stop(); return; }
       const aud = audienceOf(message, ownEmail);
       if (!copiedOnlyNow(message, text, ownEmail)) return;
-      // Withdraw only on a labelled details table, or while the header is
-      // still empty and a late paint may arrive. A collapsed To line alone is
-      // not enough to pull back a card that was already offered.
+      // Withdraw when the labelled details table is open, or while the header
+      // is still empty and a late paint may arrive. Keep watching after a
+      // late details expand — no time cap.
       if (aud.labelled || (!(aud.to || []).length && !(aud.cc || []).length)) {
         withdrawOffer(message, messageId);
-        stop();
+        if (aud.labelled) stop();
       }
     };
     const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(check, 80); });
     observer.observe(message, { childList: true, subtree: true, characterData: true });
-    copiedWatchers.set(message, { observer: observer, cap: setTimeout(stop, 15000) });
+    copiedWatchers.set(message, { observer: observer });
   }
 
   // A Drive / Doc / Sheet close has to know whether exactly one file
@@ -1788,7 +1787,13 @@ function glanceUiCopy(kind) {
     if (text.length < 20 && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.selfSent === 'function') {
       const early = extractSender(message);
       const noteSubject = currentSubject();
-      if (headerToSelf(message) && FlowIncomingJudge.selfSent({ sender: early, ownAddresses: ownEmail ? [ownEmail] : [], to: [], cc: [] })) {
+      const earlyAud = noteAddressedToSelf(message, early.email, ownEmail, audienceOf(message, ownEmail));
+      if (FlowIncomingJudge.selfSent({
+        sender: early,
+        ownAddresses: ownEmail ? [ownEmail] : [],
+        to: earlyAud.to,
+        cc: earlyAud.cc
+      })) {
         text = FlowIncomingJudge.textForJudge(text, noteSubject, true);
       }
     }
@@ -5317,12 +5322,17 @@ function glanceUiCopy(kind) {
     const text = String(raw || '');
     const first = text.indexOf(':');
     const link = text.search(/:https?:\/\//i);
+    const decodeName = (name) => {
+      const rawName = String(name || '');
+      if (!/%[0-9A-Fa-f]{2}/.test(rawName)) return rawName;
+      try { return decodeURIComponent(rawName.replace(/\+/g, ' ')); } catch (e) { return rawName; }
+    };
     if (first > 0 && link > first) {
-      return { mimeType: text.slice(0, first), filename: text.slice(first + 1, link), url: text.slice(link + 1) };
+      return { mimeType: text.slice(0, first), filename: decodeName(text.slice(first + 1, link)), url: text.slice(link + 1) };
     }
     const parts = text.split(':');
     if (parts.length < 3) return null;
-    return { mimeType: parts[0], filename: parts[1], url: parts.slice(2).join(':') };
+    return { mimeType: parts[0], filename: decodeName(parts[1]), url: parts.slice(2).join(':') };
   }
 
   // Wired once per chip (chip.dataset.flowWired guards re-wiring on every
