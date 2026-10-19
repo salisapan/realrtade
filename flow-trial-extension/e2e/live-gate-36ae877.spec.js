@@ -1,6 +1,40 @@
 // Live Gate on 36ae877 — three engineer-verified fixes (content-gmail.js only).
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+
+const INTENT_ROOT = path.join(__dirname, '..');
+let intentVm;
+function intentEngine() {
+  if (intentVm) return intentVm;
+  const engine = { module: undefined, console };
+  vm.createContext(engine);
+  for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
+    vm.runInContext(fs.readFileSync(path.join(INTENT_ROOT, 'core', f), 'utf8'), engine, { filename: f });
+  }
+  intentVm = engine;
+  return engine;
+}
+function selfRenewLabel(body) {
+  const J = vm.runInContext('FlowIncomingJudge', intentEngine());
+  const out = J.judge({
+    text: body,
+    subject: 'Domain renewal – Ofek',
+    sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+    surface: 'gmail',
+    to: ['ai.local.flow@gmail.com'],
+    cc: [],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'flow',
+    ownNames: ['flow'],
+    direction: 'self',
+    inbound: false,
+    now: new Date('2026-10-16T12:00:00Z')
+  });
+  return String((out && out.intent && out.intent.label) || '');
+}
 
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'glance.salisapan@outlook.com';
@@ -113,6 +147,18 @@ test('L36 self renew unwraps google.com/url in the task title', async ({ glance 
   await expect(host).toContainText('Renew ofek.dev');
   await expect(host).not.toContainText('google.com/url');
   await expect(host).not.toContainText('&source=gmail');
+});
+
+test('unwrapGoogleRedirectUrl finishes quickly on param-heavy links without q=', () => {
+  const poison = 'https://www.google.com/url?' + Array(30).fill('sa=E').join('&');
+  const body = 'Remind me to renew the ' + poison + ' on Friday';
+  const t0 = Date.now();
+  const label = selfRenewLabel(body);
+  const ms = Date.now() - t0;
+  expect(ms).toBeLessThan(500);
+  expect(label).toBe('Remind me to renew the https://www.google.com/url');
+  expect(label).not.toMatch(/ust=/);
+  expect(label).not.toMatch(/sa=E/);
 });
 
 test.describe('self completion vs open work', () => {
