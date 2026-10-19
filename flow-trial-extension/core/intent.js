@@ -2338,17 +2338,13 @@ const FlowIntent = (() => {
   const NUM_DATE = /\s+(?:עד\s+)?(?:ה-)?\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?[\s\S]*$/;
   function unwrapGoogleRedirectUrl(s) {
     let t = String(s || '').trim();
-    const inline = t.match(/google\.com\/url\?(?:[^#\s]*&)?q=([^&#\s]+)/i);
-    if (inline) {
-      try { t = decodeURIComponent(inline[1]); } catch (e) { t = inline[1]; }
-    } else {
-      const m = t.match(/^(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#]*&)?q=([^&#]+)/i);
-      if (m) {
-        try { t = decodeURIComponent(m[1]); } catch (e) { t = m[1]; }
-      }
-    }
-    if (/^(?:https?:\/\/)?(?:www\.)?google\.com\/url\b/i.test(t)) return '';
-    return t;
+    const re = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s]*&)?q=([^&#\s]+)/gi;
+    t = t.replace(re, (_, q) => {
+      try { return decodeURIComponent(q); } catch (e) { return q; }
+    });
+    t = t.replace(/https?:\/\//gi, '');
+    if (/^(?:www\.)?google\.com\/url\b/i.test(t.trim())) return '';
+    return t.replace(/\s+/g, ' ').trim();
   }
   function takeObject(rest, keepThe) {
     let s = String(rest || '').replace(/\s+/g, ' ').trim();

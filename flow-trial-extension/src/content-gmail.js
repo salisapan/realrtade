@@ -1025,13 +1025,24 @@ function glanceUiCopy(kind) {
     if (!own || !from || from === own) return false;
     const chips = chipsOnCollapsedLine(messageNode);
     if (chips.length !== 1) return false;
-    return chipIsOwn(chips[0], own);
+    if (!chipIsOwn(chips[0], own)) return false;
+    // 1:1 mail to the reader shows one "me" chip with a real address — not Cc-only.
+    const email = String(addressFrom(chips[0]) || '').trim().toLowerCase();
+    if (email && email === own) return false;
+    return true;
   }
 
   // Collapsed chip line with no To/Cc label is never a resolved audience.
   function collapsedChipLineUnlabelled(messageNode, audience) {
     if (audience && audience.labelled) return false;
-    return chipsOnCollapsedLine(messageNode).length > 0;
+    const chips = chipsOnCollapsedLine(messageNode);
+    if (!chips.length) return false;
+    // A single addressed chip with an email is the To line, not an unresolved copy.
+    if (chips.length === 1) {
+      const email = String(addressFrom(chips[0]) || '').trim();
+      if (email.indexOf('@') >= 0) return false;
+    }
+    return true;
   }
 
   function senderIsOwn(senderEmail, ownEmail) {
@@ -1064,20 +1075,25 @@ function glanceUiCopy(kind) {
         isInline: false
       };
     });
-    const decision = FlowSuggestSave.suggestSave({
-      surface: 'gmail',
-      direction: 'inbound',
-      senderIsUser: false,
-      consent: true,
-      attachmentsRead: true,
-      attachments: mapped,
-      text: '',
-      subject: '',
-      messageId: 'self-attach-probe',
-      dismissed: {},
-      log: []
-    });
-    return Boolean(decision && decision.eligible);
+    try {
+      const decision = FlowSuggestSave.suggestSave({
+        surface: 'gmail',
+        direction: 'inbound',
+        senderIsUser: false,
+        consent: true,
+        attachmentsRead: true,
+        attachments: mapped,
+        text: '',
+        subject: '',
+        messageId: 'self-attach-probe',
+        dismissed: [],
+        log: []
+      });
+      return Boolean(decision && decision.eligible);
+    } catch (e) {
+      console.error('[Glance] self attachment keep-card probe failed', e);
+      return false;
+    }
   }
 
   async function expandMessageDetails(messageNode) {
@@ -1098,6 +1114,11 @@ function glanceUiCopy(kind) {
     if (!messageNode.querySelector('.ajB table, table.ajC, table.ajB')) return false;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 120));
+    const row = toggle.closest('td') || toggle.parentElement;
+    if (row) {
+      const open = row.querySelector('.ajB');
+      if (open) open.remove();
+    }
     return true;
   }
 
@@ -1759,7 +1780,10 @@ function glanceUiCopy(kind) {
       }
     }
     const message = judgeAt >= 0 ? messages[judgeAt] : null;
-    if (!message) return; // own mail to someone else, or no message we can tell apart from one
+    if (!message) {
+      logScanSkip('', 'no-incoming-message');
+      return; // own mail to someone else, or no message we can tell apart from one
+    }
 
     const stable = stableMessageKey(message);
     const legacyId = stable.legacy || null;
@@ -1812,12 +1836,16 @@ function glanceUiCopy(kind) {
       // The read-back is still open. A later pass offers Do It if it fails.
     } else if (message.querySelector('.flow-chip-host')) {
       void noteSuggestShown(currentContext && currentContext.messageId);
+      logScanSkip(stable.messageId, 'chip-present');
       return;
     }
 
     const messageId = stable.messageId;
     openSuggest = null;
-    if (!messageId) return;
+    if (!messageId) {
+      logScanSkip('', 'no-message-id');
+      return;
+    }
     if (!chromeLive()) return;
 
     // The open mail's own Do It, every step. A task row from another
@@ -1827,6 +1855,7 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     if (laneRecord && laneRecord.steps && laneRecord.steps.length && message.isConnected && !message.querySelector('.flow-chip-host')) {
       mountLaneReceipt(message, laneRecord, messageId);
+      logScanSkip(messageId, 'lane-receipt');
       return;
     }
 
@@ -1875,6 +1904,7 @@ function glanceUiCopy(kind) {
       if (!already && message.isConnected && !message.querySelector('.flow-chip-host')) {
         mountProvedTaskReceipt(message, taskRow);
       }
+      logScanSkip(messageId, 'task-receipt');
       return;
     }
     if (typeof FlowStorage.verifyGateFrom === 'function' && FlowStorage.verifyGateFrom(settled, messageId) === 'verifying') {
@@ -1890,6 +1920,7 @@ function glanceUiCopy(kind) {
         if (message.firstChild) message.insertBefore(host, message.firstChild);
         else message.appendChild(host);
       }
+      logScanSkip(messageId, 'verifying');
       return;
     }
     if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) {
@@ -1899,6 +1930,7 @@ function glanceUiCopy(kind) {
         const late = await readLaneUndo(stable.legacy || messageId, stable.laneIds);
         if (late && late.steps && late.steps.length) mountLaneReceipt(message, late, messageId);
       }
+      logScanSkip(messageId, 'terminal-outcome');
       return;
     }
     const verifyingHost = message.querySelector('.flow-chip-host[data-glance-verifying]');
@@ -1937,7 +1969,10 @@ function glanceUiCopy(kind) {
     // The 20-character floor stays for everything else — this does not
     // lower the scorer, it only lets a fully-formed fact ask through.
     const factProbe = (text.length >= 12 && typeof FlowFactReply !== 'undefined') ? FlowFactReply.detect(text) : null;
-    if (text.length < 20 && !factProbe) return; // still rendering, or genuinely nothing new was written
+    if (text.length < 20 && !factProbe && !attachmentsEarly.length) {
+      logScanSkip(messageId, 'short-text');
+      return; // still rendering, or genuinely nothing new was written
+    }
 
     // Seen-ids stay a "we already looked at this message" mark, including
     // when personal-close memory stays quiet below. The 'shown' row is a
@@ -2057,6 +2092,7 @@ function glanceUiCopy(kind) {
     if (intent && intent.namesPending) {
       paintNamesPending(message, messageId, subject);
       armNamesHold();
+      logScanSkip(messageId, 'names-pending');
       return;
     }
     if (namesWaitDone && message && message.setAttribute) {
@@ -2084,6 +2120,9 @@ function glanceUiCopy(kind) {
     const inboundMail = String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase();
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
+    const inboundHeAsk = inboundMail && text.length >= 12
+      && /(?:תשמור|לשמור|שמור|תעלה|להעלות|בדרייב|ב-?דרייב|drive|save|upload)/i.test(text);
+    const inboundAttachAsk = inboundMail && attachments.length > 0 && inboundHeAsk;
     const audienceNeedsProbe = audienceUnclear(message, sender.email, ownEmail, audience);
     const attachKeep = selfMailAttachmentKeepCard(message, sender.email, ownEmail, audience, attachments);
     if (attachKeep && (!intent || !intent.type) && String(subject || '').trim()) {
@@ -2106,12 +2145,13 @@ function glanceUiCopy(kind) {
         inbound: false
       });
     }
-    if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && inboundAsk) && !attachKeep) {
+    if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && (inboundAsk || inboundAttachAsk)) && !attachKeep) {
       clearGmailWhy(message);
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
       const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
         || (factOwns && !intent.type ? 'fact' : null);
+      logScanSkip(messageId, reason || 'no-chip-candidate');
       recordSilence(messageId, reason, {
         family: intent.closeFamily || intent.quiet,
         clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
@@ -2121,9 +2161,10 @@ function glanceUiCopy(kind) {
     }
     // Collapsed headers hide To vs Cc. Open Gmail's details at most once per
     // message, only after a real chip candidate exists, then close the box.
-    if (audienceNeedsProbe && (FlowIntent.shouldShowChip(intent) || inboundAsk || attachKeep)) {
+    if (audienceNeedsProbe && (FlowIntent.shouldShowChip(intent) || inboundAsk || inboundAttachAsk || attachKeep)) {
       audience = await audienceAfterDetailsProbe(messageId, message, sender.email, ownEmail, audience);
       if (audienceUnclear(message, sender.email, ownEmail, audience)) {
+        logScanSkip(messageId, 'audience');
         recordSilence(messageId, 'audience');
         return;
       }
@@ -2148,11 +2189,13 @@ function glanceUiCopy(kind) {
       if (intent && intent.namesPending) {
         paintNamesPending(message, messageId, subject);
         armNamesHold();
+        logScanSkip(messageId, 'names-pending');
         return;
       }
       if (!FlowIntent.shouldShowChip(intent) && !attachKeep) {
         const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
           || (factOwns && !intent.type ? 'fact' : null);
+        logScanSkip(messageId, reason || 'audience-reclassify');
         recordSilence(messageId, reason || 'audience', {
           family: intent.closeFamily || intent.quiet,
           clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
@@ -2163,6 +2206,7 @@ function glanceUiCopy(kind) {
     }
     // The ask named OneDrive. This surface writes Drive. Stay quiet rather than save it there.
     if (intent.googleClose && intent.googleClose.target === 'onedrive') {
+      logScanSkip(messageId, 'onedrive-target-on-gmail');
       recordSilence(messageId, 'onedrive-target-on-gmail');
       return;
     }
@@ -2180,13 +2224,16 @@ function glanceUiCopy(kind) {
     // The shared judge skips this silence when intent.inviteFile is set.
     const inviteAsked = Boolean(intent && intent.inviteFile);
     if (!inviteAsked && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
-      recordSilence(messageId, fileGate.reason === 'third-party' ? 'third-party' : 'file');
+      const fileReason = fileGate.reason === 'third-party' ? 'third-party' : 'file';
+      logScanSkip(messageId, fileReason);
+      recordSilence(messageId, fileReason);
       return;
     }
     // A request that attests a payment (a receipt) takes more than one step.
     // The shared judge is the only receipt check on this page. A contract,
     // a quote, or a signed copy is a file to send, not that silence.
     if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
+      logScanSkip(messageId, 'file');
       recordSilence(messageId, 'file');
       return;
     }
@@ -2201,6 +2248,7 @@ function glanceUiCopy(kind) {
     // Google connect prompt so a continuation never asks for access, and
     // before 'shown' is logged so it never becomes an open Brief row.
     if (await personalCloseSaysSilence(intent, threadId, subject)) {
+      logScanSkip(messageId, 'memory');
       recordSilence(messageId, 'memory');
       return;
     }
@@ -2212,7 +2260,10 @@ function glanceUiCopy(kind) {
     // (see the comment above this function's earlier connectorId check) —
     // either way, the account isn't actually ready to write to Google, and
     // ensureGoogleAutoConnect() is the one path that can fix that silently.
-    if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
+    if (!usingGoogle && !(await ensureGoogleAutoConnect())) {
+      logScanSkip(messageId, 'google-connect');
+      return;
+    }
 
     let attachFile = null;
     const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
@@ -2257,6 +2308,7 @@ function glanceUiCopy(kind) {
           return;
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
+          logScanSkip(messageId, 'file-chain');
           recordSilence(messageId, 'file');
           return;
         }
@@ -2279,6 +2331,7 @@ function glanceUiCopy(kind) {
         // A create-from-template is not a found file, so it is not offered
         // once the close chain already said the file is missing.
         if (!decision || decision.action === 'silence' || decision.action === 'create') {
+          logScanSkip(messageId, 'file-attach');
           recordSilence(messageId, 'file');
           return;
         }
@@ -2294,13 +2347,22 @@ function glanceUiCopy(kind) {
       attachFile: attachFile
     });
     let process = planned && planned.process;
-    if (!process) { void flushSuggest(false); return; }
+    if (!process) {
+      logScanSkip(messageId, 'no-process');
+      void flushSuggest(false);
+      return;
+    }
     // A reply draft is saved in the thread by its id. With no thread id and
     // no compose window open, that step cannot be kept, so it is not offered.
     if (!threadId && !composeBodyOpen()) {
       const kept = process.steps.filter((step) => !(step && step.kind === 'gmailDraft'));
       if (kept.length !== process.steps.length) {
-        if (!kept.length) { void flushSuggest(false); recordSilence(messageId, 'thread-id'); return; }
+        if (!kept.length) {
+          logScanSkip(messageId, 'thread-id');
+          void flushSuggest(false);
+          recordSilence(messageId, 'thread-id');
+          return;
+        }
         process = Object.assign({}, process, { steps: kept });
       }
     }
@@ -3517,6 +3579,10 @@ function glanceUiCopy(kind) {
       messageId: ctx.messageId, reason: decision.reason, surface: 'gmail',
       fileCount: decision.fileCount, target: decision.target
     });
+  }
+
+  function logScanSkip(messageId, reason) {
+    console.log('[Glance] scan skip:', String(reason || 'unknown'), messageId || '');
   }
 
   function recordSilence(messageId, reason, detail) {
