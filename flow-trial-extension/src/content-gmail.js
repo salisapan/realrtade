@@ -838,8 +838,8 @@ function glanceUiCopy(kind) {
     let labelled = false;
     for (let r = 0; r < rows.length; r++) {
       const tr = rows[r];
-      const labelCell = tr.querySelector('td.gG') || tr.querySelectorAll('td')[0];
-      const addrCell = tr.querySelector('td.gL') || tr.querySelectorAll('td')[1];
+      const labelCell = tr.querySelector('th.gG, td.gG');
+      const addrCell = tr.querySelector('td.gL');
       if (!labelCell || !addrCell) continue;
       const label = normalizeAudienceLabel(labelCell.textContent);
       if (!label || label === 'from' || label === 'מאת') continue;
@@ -942,7 +942,8 @@ function glanceUiCopy(kind) {
     return to.indexOf(own) >= 0 && to.length > 1 && !(audience.cc || []).length;
   }
 
-  const DETAILS_TOGGLE = '[aria-label="Show details"], [data-tooltip="Show details"], [aria-label="הצג פרטים"], [data-tooltip="הצג פרטים"], [aria-label="הצגת פרטים"], span.ajy';
+  const DETAILS_TOGGLE = '[aria-label="Show details"], [data-tooltip="Show details"], [aria-label="הצג פרטים"], [data-tooltip="הצג פרטים"], [aria-label="הצגת פרטים"], [aria-label="הצגת הפרטים"], [data-tooltip="הצגת הפרטים"], .ajy[role="button"], span.ajy';
+  const detailsAudienceRead = new Map();
 
   // A collapsed header names the recipients on one line with no label, so a
   // copy looks the same as a To. The account among others on that line is
@@ -959,7 +960,78 @@ function glanceUiCopy(kind) {
       const email = String(n.getAttribute('email') || '').trim().toLowerCase();
       if (email && email !== from && !inMessageBody(n)) found.add(email);
     });
-    return found.size > 0 && (!found.has(own) || found.size > 1);
+    return found.size > 0 && (from !== own || !found.has(own) || found.size > 1);
+  }
+
+  function audienceUnclear(messageNode, senderEmail, ownEmail, audience) {
+    if (audience && audience.labelled) return false;
+    return audienceAmbiguous(audience, ownEmail)
+      || collapsedRecipientsAmbiguous(messageNode, senderEmail, ownEmail, audience)
+      || otherSenderOnlyOwnChip(messageNode, senderEmail, ownEmail, audience)
+      || (collapsedChipLineUnlabelled(messageNode, audience) && !collapsedSelfHeader(messageNode, senderEmail, ownEmail));
+  }
+
+  async function audienceAfterDetailsProbe(messageId, messageNode, senderEmail, ownEmail, audience) {
+    if (detailsAudienceRead.has(messageId)) return detailsAudienceRead.get(messageId);
+    let bag = audience;
+    if (await expandMessageDetails(messageNode)) {
+      bag = noteAddressedToSelf(messageNode, senderEmail, ownEmail, audienceOf(messageNode, ownEmail));
+      await collapseMessageDetails(messageNode);
+    }
+    detailsAudienceRead.set(messageId, bag);
+    return bag;
+  }
+
+  function collapsedHeaderLine(messageNode) {
+    if (!messageNode || !messageNode.querySelector) return null;
+    const hb = messageNode.querySelector('tr.acZ.xD span.hb, tr.acZ.xD .hb, span.hb');
+    if (!hb || inMessageBody(hb)) return null;
+    return hb;
+  }
+
+  function chipsOnCollapsedLine(messageNode) {
+    const hb = collapsedHeaderLine(messageNode);
+    if (!hb) return [];
+    return Array.from(hb.querySelectorAll('[email], [data-hovercard-id]'));
+  }
+
+  function chipIsOwn(n, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    if (!own || !n) return false;
+    const email = String(addressFrom(n) || '').trim().toLowerCase();
+    const shown = String(n.textContent || '').trim();
+    if (email && email === own) return true;
+    return /^(?:me|אני)$/i.test(shown) && (!email || email === own);
+  }
+
+  // Real Gmail: span.hb lists chips only — no "to/אל". Self only when you sent it and every chip is you.
+  function collapsedSelfHeader(messageNode, senderEmail, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (!own || !from || from !== own) return false;
+    const chips = chipsOnCollapsedLine(messageNode);
+    if (!chips.length) return false;
+    for (let i = 0; i < chips.length; i++) {
+      if (!chipIsOwn(chips[i], own)) return false;
+    }
+    return true;
+  }
+
+  // Someone else sent it but the collapsed line shows only your "me" chip — same look as empty To + Cc you.
+  function otherSenderOnlyOwnChip(messageNode, senderEmail, ownEmail, audience) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (audience && audience.labelled) return false;
+    if (!own || !from || from === own) return false;
+    const chips = chipsOnCollapsedLine(messageNode);
+    if (chips.length !== 1) return false;
+    return chipIsOwn(chips[0], own);
+  }
+
+  // Collapsed chip line with no To/Cc label is never a resolved audience.
+  function collapsedChipLineUnlabelled(messageNode, audience) {
+    if (audience && audience.labelled) return false;
+    return chipsOnCollapsedLine(messageNode).length > 0;
   }
 
   async function expandMessageDetails(messageNode) {
@@ -972,9 +1044,20 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  async function collapseMessageDetails(messageNode) {
+    const toggle = messageNode && messageNode.querySelector
+      ? messageNode.querySelector(DETAILS_TOGGLE)
+      : null;
+    if (!toggle || !messageNode.querySelector) return false;
+    if (!messageNode.querySelector('.ajB table, table.ajC, table.ajB')) return false;
+    try { toggle.click(); } catch (e) { return false; }
+    await new Promise((r) => setTimeout(r, 120));
+    return true;
+  }
+
   // Collapsed Gmail header: "to me", and the me chip has no email attribute.
   // The body is not this header. "Remind me" in the message is not "to me".
-  function headerToSelf(messageNode) {
+  function headerToSelf(messageNode, ownEmail, senderEmail) {
     if (!messageNode || !messageNode.querySelectorAll) return false;
     const nodes = messageNode.querySelectorAll('span, div, p');
     for (let i = 0; i < nodes.length; i++) {
@@ -984,6 +1067,7 @@ function glanceUiCopy(kind) {
       if (!t || t.length > 24) continue;
       if (/^(?:(?:to|אל)\s+(?:me|אני)|אליי)$/i.test(t)) return true;
     }
+    if (collapsedSelfHeader(messageNode, senderEmail, ownEmail)) return true;
     return false;
   }
 
@@ -993,7 +1077,7 @@ function glanceUiCopy(kind) {
     const bag = audience || { to: [], cc: [], userName: '' };
     const own = String(ownEmail || '').trim().toLowerCase();
     const from = String(senderEmail || '').trim().toLowerCase();
-    if (!own || !from || from !== own || !headerToSelf(messageNode)) return bag;
+    if (!own || !from || from !== own || !headerToSelf(messageNode, own, from)) return bag;
     const cc = (bag.cc || []).map((a) => String(a || '').trim().toLowerCase());
     if (cc.some((a) => a && a !== own)) return bag;
     const to = (bag.to || []).map((a) => String(a || '').trim().toLowerCase());
@@ -1793,7 +1877,7 @@ function glanceUiCopy(kind) {
         ownAddresses: ownEmail ? [ownEmail] : [],
         to: earlyAud.to,
         cc: earlyAud.cc,
-        headerToSelf: headerToSelf(message)
+        headerToSelf: headerToSelf(message, ownEmail, early.email)
       })) {
         text = FlowIncomingJudge.textForJudge(text, noteSubject, true);
       }
@@ -1832,18 +1916,6 @@ function glanceUiCopy(kind) {
     const subject = currentSubject();
     const threadId = threadIdFrom(message);
     let audience = noteAddressedToSelf(message, sender.email, ownEmail, audienceOf(message, ownEmail));
-    // The collapsed header lists every recipient on one line, so To and Cc
-    // look the same. With the account among several recipients and no label
-    // to tell the lists apart, Gmail's own details are opened once. If the
-    // audience is still unknown, the card stays quiet.
-    const unclear = (a) => audienceAmbiguous(a, ownEmail) || collapsedRecipientsAmbiguous(message, sender.email, ownEmail, a);
-    if (unclear(audience)) {
-      if (await expandMessageDetails(message)) audience = noteAddressedToSelf(message, sender.email, ownEmail, audienceOf(message, ownEmail));
-      if (unclear(audience)) {
-        recordSilence(messageId, 'audience');
-        return;
-      }
-    }
 
     // Opt-in local trace. chrome.storage.local.glanceDebug === true, unset
     // by default. One read per scan. Never sent off-device. A storage miss
@@ -1958,7 +2030,11 @@ function glanceUiCopy(kind) {
     // for the dedup rule that keeps a re-scanned open message from being
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
-    if (!FlowIntent.shouldShowChip(intent)) {
+    const inboundMail = String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase();
+    const inboundAsk = inboundMail && text.length >= 20
+      && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
+    const audienceNeedsProbe = audienceUnclear(message, sender.email, ownEmail, audience);
+    if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && inboundAsk)) {
       clearGmailWhy(message);
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
@@ -1970,6 +2046,48 @@ function glanceUiCopy(kind) {
         debug: debug
       });
       return;
+    }
+    // Collapsed headers hide To vs Cc. Open Gmail's details at most once per
+    // message, only after a real chip candidate exists, then close the box.
+    if (audienceNeedsProbe) {
+      audience = await audienceAfterDetailsProbe(messageId, message, sender.email, ownEmail, audience);
+      if (audienceUnclear(message, sender.email, ownEmail, audience)) {
+        recordSilence(messageId, 'audience');
+        return;
+      }
+      intent = await classifyForChip(text, {
+        senderEmail: sender.email,
+        senderName: sender.name,
+        subject: subject,
+        calibration: state.calibration,
+        calibrationByType: state.calibrationByType,
+        attachmentCount: attachments.length,
+        messageId: messageId,
+        debug: debug,
+        to: audience.to,
+        cc: audience.cc,
+        ownAddresses: ownEmail ? [ownEmail] : [],
+        userName: audience.userName || null,
+        ownNames: ownNamesForChip(audience.userName),
+        namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
+        namesWaitDone: namesWaitDone === true,
+        inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
+      });
+      if (intent && intent.namesPending) {
+        paintNamesPending(message, messageId, subject);
+        armNamesHold();
+        return;
+      }
+      if (!FlowIntent.shouldShowChip(intent)) {
+        const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
+          || (factOwns && !intent.type ? 'fact' : null);
+        recordSilence(messageId, reason || 'audience', {
+          family: intent.closeFamily || intent.quiet,
+          clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
+          debug: debug
+        });
+        return;
+      }
     }
     // The ask named OneDrive. This surface writes Drive. Stay quiet rather than save it there.
     if (intent.googleClose && intent.googleClose.target === 'onedrive') {

@@ -696,6 +696,12 @@ async function boot() {
     return openDocument(url, gmailHtml(o));
   };
 
+  harness.openGmailHtml = async function openGmailHtml(html, opts) {
+    const o = opts || {};
+    const url = gmailUrl(o.messageId, o.accountIndex);
+    return openDocument(url, html);
+  };
+
   harness.seedOutlook = async function seedOutlook(extra, authOpts) {
     const bag = Object.assign({
       onboarded: true,
