@@ -762,7 +762,8 @@
       if (given || surname || (display && display !== 'glance' && display !== 'me')) return false;
     }
     const shown = String(userName || '').trim().toLowerCase();
-    if (shown && shown !== 'glance' && shown !== 'me') return false;
+    if (shown && shown !== 'me') return false;
+    if (st && st.outlookAuth && (st.outlookAuth.profile || st.outlookAuth.account)) return false;
     return true;
   }
 
