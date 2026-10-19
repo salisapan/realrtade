@@ -60,7 +60,13 @@ const FlowIncomingJudge = (() => {
     const from = String((i.sender && i.sender.email) || i.senderEmail || '').trim().toLowerCase();
     const own = (i.ownAddresses || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
     if (!from || own.indexOf(from) === -1) return false;
-    const rest = [].concat(i.to || [], i.cc || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    const to = (i.to || i.toRecipients || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    const cc = (i.cc || i.ccRecipients || []).map((a) => String(a || '').trim().toLowerCase()).filter(Boolean);
+    const rest = to.concat(cc);
+    if (!rest.length) {
+      if (i.headerToSelf === true) return true;
+      return to.length > 0 && to.every((a) => own.indexOf(a) !== -1);
+    }
     return rest.every((a) => own.indexOf(a) !== -1);
   }
 

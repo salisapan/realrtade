@@ -2924,9 +2924,27 @@ const FlowIntent = (() => {
     '(?:^|[^\\u0590-\\u05FF])(?:תזכיר(?:י|ו)?\\s+לי|תזכור(?:י|ו)?|לא\\s+לשכוח|אל\\s+תשכח(?:י|ו)?|צריך|צריכה|חייב|חייבת|אצטרך|מחר|הערב|בשבוע הבא|בחודש הבא|אחר כך|בהמשך)(?![\\u0590-\\u05FF])',
     '(?:^|[^\\u0590-\\u05FF])(?:אני\\s+)?א(?:שלח|חדש|שלם|תקשר|עשה|בדוק|קבע|עדכן|זכור|סגור|עביר|כין|צור|פתח|חזור|זמין|שמור)(?![\\u0590-\\u05FF])'
   ].join('|'), 'i');
+  function selfKeepsDoneTask(blob) {
+    const s = String(blob || '');
+    if (/\bget it done\b/i.test(s)) return true;
+    if (/\bneeds to be done\b/i.test(s)) return true;
+    if (/\bto be done\b/i.test(s)) return true;
+    if (/\bdone\s+(?:by|before|until|on|in)\b/i.test(s)) return true;
+    if (/צריך\s+לבצע/.test(s)) return true;
+    return false;
+  }
+  function selfCompletionMarked(blob) {
+    const s = String(blob || '');
+    if (SELF_DONE_MARK.test(s)) return true;
+    if (/\b[a-z][a-z-]+\s+done\b(?!\s+(?:by|before|until|on|in)\b)/i.test(s)) return true;
+    if (/\b(?:completed|renewed|paid)\b/i.test(s)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:הושלם|בוצע)(?![\u0590-\u05FF])/.test(s)) return true;
+    return false;
+  }
   function selfPastDone(raw) {
     const blob = String(raw || '');
-    if (!SELF_DONE_MARK.test(blob)) return false;
+    if (selfKeepsDoneTask(blob)) return false;
+    if (!selfCompletionMarked(blob)) return false;
     return !SELF_FUTURE_CUE.test(blob);
   }
   // "I renewed the insurance" is what happened. It is not a task title.

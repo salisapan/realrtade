@@ -56,6 +56,23 @@ test('L36 self EN subject-only Domain renewal gets a task card', async ({ glance
   await expect(page.locator('[data-legacy-message-id="m-self-en"] .flow-chip-host')).toHaveCount(1);
 });
 
+test('L36 self bare אליי header still gets a subject-only task card', async ({ glance }) => {
+  await glance.seedGmail({ glanceUiLanguage: 'he' });
+  const page = await glance.openGmail({
+    liveSelf: true,
+    messageId: 'm-self-alei',
+    threadId: 't-self-alei',
+    ownEmail: SELF,
+    senderName: 'flow',
+    subject: 'Remind me to renew the domain on Friday',
+    body: '',
+    toSelfText: 'אליי',
+    accountLabel: 'Google Account: flow (' + SELF + ')'
+  });
+  await page.waitForTimeout(3500);
+  await expect(page.locator('[data-legacy-message-id="m-self-alei"] .flow-chip-host')).toHaveCount(1);
+});
+
 test('L36 self HE אני header + subject renewal gets a task card', async ({ glance }) => {
   await glance.seedGmail();
   const hePage = await glance.openGmail({
@@ -71,6 +88,56 @@ test('L36 self HE אני header + subject renewal gets a task card', async ({ gl
   });
   await hePage.waitForTimeout(3500);
   await expect(hePage.locator('[data-legacy-message-id="m-self-he"] .flow-chip-host')).toHaveCount(1);
+});
+
+test.describe('self completion vs open work', () => {
+  const selfOpen = async (glance, id, subject, body, lang) => {
+    const page = await glance.openGmail({
+      liveSelf: true,
+      messageId: 'm-' + id,
+      threadId: 't-' + id,
+      ownEmail: SELF,
+      senderName: 'flow',
+      subject: subject,
+      body: body,
+      lang: lang || 'en',
+      toSelfText: lang === 'he' ? 'אני' : 'me',
+      accountLabel: 'Google Account: flow (' + SELF + ')'
+    });
+    await page.waitForTimeout(3500);
+    return page;
+  };
+
+  test('EN: Domain renewal done in the subject stays quiet', async ({ glance }) => {
+    await glance.seedGmail();
+    const page = await selfOpen(glance, 'done-en', 'Domain renewal done – Ofek', '');
+    await expect(page.locator('[data-legacy-message-id="m-done-en"] .flow-chip-host')).toHaveCount(0);
+  });
+
+  test('HE: בוצע in the subject stays quiet', async ({ glance }) => {
+    await glance.seedGmail({ glanceUiLanguage: 'he' });
+    const page = await selfOpen(glance, 'done-he', 'חידוש דומיין בוצע – אופק', '', 'he');
+    await expect(page.locator('[data-legacy-message-id="m-done-he"] .flow-chip-host')).toHaveCount(0);
+  });
+
+  test('EN: get it done / needs to be done / done by Friday still get a card', async ({ glance }) => {
+    await glance.seedGmail();
+    const cases = [
+      ['keep-get', 'note', 'Please get it done before the board meeting'],
+      ['keep-needs', 'note', 'This needs to be done by Friday'],
+      ['keep-by', 'note', 'Send the pack — to be done by Friday']
+    ];
+    for (const [id, sub, body] of cases) {
+      const page = await selfOpen(glance, id, sub, body);
+      await expect(page.locator('[data-legacy-message-id="m-' + id + '"] .flow-chip-host')).toHaveCount(1);
+    }
+  });
+
+  test('HE: צריך לבצע still gets a card', async ({ glance }) => {
+    await glance.seedGmail({ glanceUiLanguage: 'he' });
+    const page = await selfOpen(glance, 'keep-he', 'תשלום', 'צריך לבצע את התשלום עד יום שישי', 'he');
+    await expect(page.locator('[data-legacy-message-id="m-keep-he"] .flow-chip-host')).toHaveCount(1);
+  });
 });
 
 test('L36 Drive save decodes a percent-encoded Hebrew filename in the receipt', async ({ glance }) => {

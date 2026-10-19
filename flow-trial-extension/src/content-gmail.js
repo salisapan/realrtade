@@ -982,7 +982,7 @@ function glanceUiCopy(kind) {
       if (n.closest && n.closest(BODY_SELECTOR)) continue;
       const t = String(n.textContent || '').replace(/[\u00a0\u202f]+/g, ' ').replace(/\s+/g, ' ').trim();
       if (!t || t.length > 24) continue;
-      if (/^(?:to|אל)\s+(?:me|אני|אליי)$/i.test(t)) return true;
+      if (/^(?:(?:to|אל)\s+(?:me|אני)|אליי)$/i.test(t)) return true;
     }
     return false;
   }
@@ -1792,7 +1792,8 @@ function glanceUiCopy(kind) {
         sender: early,
         ownAddresses: ownEmail ? [ownEmail] : [],
         to: earlyAud.to,
-        cc: earlyAud.cc
+        cc: earlyAud.cc,
+        headerToSelf: headerToSelf(message)
       })) {
         text = FlowIncomingJudge.textForJudge(text, noteSubject, true);
       }
