@@ -19,7 +19,12 @@ const FlowUnderstandingRouter = (() => {
   const ER = sibling(typeof FlowExecRouter !== 'undefined' ? FlowExecRouter : null, './exec-router.js', 'FlowExecRouter');
 
   const SWITCH = 'aiPrimary';
-  const DEFAULTS = Object.freeze({ [SWITCH]: false });
+  // M8, per-user relevance (docs/glance-ai/user-context-v0.md): a second switch, also off. With it on, the host's profile scorer
+  // (deps.relevance) may only SILENCE: not_relevant ends the route before any model call; relevant and unknown change nothing. It never
+  // adds a card that today's rules would not show (the owner lock keeps the Cc-only, addressed-to-other and no-To/Cc hedges until a
+  // contrast-pair shadow test).
+  const RELEVANCE_SWITCH = 'aiRelevanceV1';
+  const DEFAULTS = Object.freeze({ [SWITCH]: false, [RELEVANCE_SWITCH]: false });
   const TIMEOUT_MS = 20000;
 
   function enabled(flags) { return !!(flags && flags[SWITCH] === true); }
@@ -72,6 +77,15 @@ const FlowUnderstandingRouter = (() => {
     // Tier 0: the device rules keep the last word on quiets, and the clear half never reaches a model.
     if (input.direction && input.direction !== 'inbound') { trace.push('tier0:not-inbound'); return out(t0.step || 'SILENT', 0, { reason: 'not-inbound' }); }
     if (t0.quiet) { trace.push('tier0:quiet'); return out('SILENT', 0, { reason: 'quiet:' + t0.quiet }); }
+    if (flags[RELEVANCE_SWITCH] === true && typeof deps.relevance === 'function') {
+      let r = null;
+      try { r = deps.relevance(input); } catch (e) { r = null; }
+      if (r && r.relevance === 'not_relevant') {
+        trace.push('tier0:not-relevant');
+        return out('SILENT', 0, { reason: 'profile:' + ((r.reasons && r.reasons.join('+')) || 'not_relevant'), relevance: 'not_relevant' });
+      }
+      trace.push('tier0:relevance-' + ((r && r.relevance) || 'unknown'));
+    }
     if (t0.step && t0.step !== 'SILENT') { trace.push('tier0:engine'); return out(t0.step, 0, { reason: 'engine' }); }
     if (!t0.possible) { trace.push('tier0:nothing'); return out('SILENT', 0, { reason: 'no-possible-intention' }); }
     if (!U) return out('SILENT', 0, { reason: 'no-validator' });
@@ -109,7 +123,7 @@ const FlowUnderstandingRouter = (() => {
     return decide(v, 2);
   }
 
-  return { SWITCH, DEFAULTS, TIMEOUT_MS, enabled, route };
+  return { SWITCH, RELEVANCE_SWITCH, DEFAULTS, TIMEOUT_MS, enabled, route };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowUnderstandingRouter };

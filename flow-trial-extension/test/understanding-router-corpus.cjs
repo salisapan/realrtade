@@ -108,6 +108,28 @@ const deps = (over) => Object.assign({ gate: passGate, veto: noVeto, mask }, ove
     check('the gate may narrow the step (it has the last word)', gs.step === 'task' && gs.proposal.step === 'task');
   }
 
+  console.log('\n--- per-user relevance (M8): it may only silence ---\n');
+  {
+    const REL = { aiPrimary: true, aiRelevanceV1: true };
+    const not = () => ({ relevance: 'not_relevant', reasons: ['does_not_answer_group'] });
+    const t1 = spy(good), t2 = spy(goodMasked);
+    const e = await R.route(input({ tier0: { quiet: null, step: 'draft', possible: true } }), deps({ tier1: t1, tier2: t2, relevance: not }), REL);
+    check('not_relevant silences even a card today\'s engine would show', e.step === 'SILENT' && e.reason === 'profile:does_not_answer_group' && e.relevance === 'not_relevant', e);
+    const m = await R.route(input(), deps({ tier1: t1, tier2: t2, relevance: not }), REL);
+    check('not_relevant ends the route before any model call (no cloud cost)', m.step === 'SILENT' && t1.calls.length === 0 && t2.calls.length === 0);
+    const rel = await R.route(input({ tier0: { quiet: null, step: 'SILENT', possible: false } }), deps({ relevance: () => ({ relevance: 'relevant', reasons: ['user_is_approver_for'] }) }), REL);
+    check('relevant never adds a card the rules would not show', rel.step === 'SILENT' && rel.reason === 'no-possible-intention');
+    const unk = await R.route(input({ tier0: { quiet: null, step: 'draft', possible: true } }), deps({ relevance: () => ({ relevance: 'unknown' }) }), REL);
+    check('unknown keeps today\'s behaviour', unk.step === 'draft' && unk.reason === 'engine');
+    const th = await R.route(input({ tier0: { quiet: null, step: 'draft', possible: true } }), deps({ relevance: () => { throw new Error('x'); } }), REL);
+    check('a scorer that throws counts as unknown', th.step === 'draft');
+    const off = await R.route(input({ tier0: { quiet: null, step: 'draft', possible: true } }), deps({ relevance: not }), ON);
+    check('relevance switch off: the scorer is ignored', off.step === 'draft');
+    const q = await R.route(input({ tier0: { quiet: 'newsletter', step: 'SILENT', possible: true } }), deps({ relevance: () => ({ relevance: 'relevant' }) }), REL);
+    check('a hard quiet still wins over relevant', q.reason === 'quiet:newsletter');
+    check('the relevance switch is named and defaults off', R.RELEVANCE_SWITCH === 'aiRelevanceV1' && R.DEFAULTS.aiRelevanceV1 === false);
+  }
+
   console.log('\n--- portability ---\n');
   const src = require('fs').readFileSync(require('path').join(__dirname, '../core/understanding-router.js'), 'utf8').replace(/\/\/.*$/gm, '');
   check('no chrome.*, document or window', !/\bchrome\.|\bdocument\.|\bwindow\./.test(src));

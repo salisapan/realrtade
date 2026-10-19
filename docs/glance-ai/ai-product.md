@@ -160,6 +160,12 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
   - (2) `model-plan` did not pass the mail text to `planFor`, so its new meeting veto (cancelled, past, out-of-office, webinar) and its hedge check did not run on model plans. They do now, with corpus cases.
   - `extract.js` 0.9.56 now reads «עד 14/10» as 14 October; the corpus follows it, and «3/4» stays unread.
   - Lab after the fixes: 9/9 model proposals planned, 8/8 right dates, 0 send steps, 0/464 wrong Do It, 37/322 missed.
+- 2026-10-19: **M8 built (silence-only)** (same branch, PR #128): `core/understanding-router.js` switch `aiRelevanceV1` (off).
+  - The host's per-user profile scorer is injected as `deps.relevance`. A `not_relevant` mail is silenced right after the hard quiets, before any model call. `relevant` and `unknown` change nothing, so the router never adds a card today's rules would not show; the owner lock keeps the Cc-only, addressed-to-other and no-To/Cc hedges.
+  - Measured through the real router on the frozen contrast-heldout-v0 pairs (`glance-ai/profile/run-router-relevance.cjs`; synthetic, `ownerVerified` 0), with Tier 0 as today's engine and the lab's `featurize` as the scorer: wrong Do It 10/60 → **5/60**, missed close on relevant mail 50/60 → 50/60 (unchanged). 33 of 120 mails end before any model call.
+  - The offer side (the full lab judge) stays a shadow only: it would bring missed closes to 11/60, but wrong Do It stays at 10/60, so it is not built in.
+  - With no profile the scorer says `unknown`, and the 786-case lab numbers do not move.
+- 2026-10-19 review: the 7 corpora from 10-18 are still red at the tip. `realshape-0956` and `regress-144` are red too: their Hebrew hold fixture is pinned to «18/10 11:00», which is now in the past (date-bound, no code commit). `live-gate-0956` failed once and passed three times in a row (flaky).
 - 2026-10-18 review, red on the working-branch tip without this change (with `jsdom` installed): `background-write`, `card-decision`, `gmail-outlook-parity`, `google-closes`, `outlook-runner` and `outlook-sync` break at `3bba620f` (#163, the 0.9.56 bundle). `flip-sample-0956` has been red since `183e1cd5` (#144). Without `jsdom` (a new devDependency) 10 more fail for that reason alone. `outlook-calendar` is green again.
 - 2026-10-12 review, red on the working-branch tip without this change:
   - `outlook-calendar-corpus` is still red (the `instanceof Date` defect, see 10-11).
