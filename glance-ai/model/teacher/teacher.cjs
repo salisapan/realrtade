@@ -11,13 +11,18 @@ const FILES = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'c
   'file-attach.js', 'fact-reply.js', 'quiet-metrics.js', 'resolution.js', 'commitment-title.js', 'graph-mail.js',
   'incoming-judge.js', 'outlook-calendar.js', 'draft-reply.js'];
 const sb = { module: undefined, console: { log() {}, warn() {}, error() {}, info() {}, debug() {} }, exports: {}, TextEncoder, atob, btoa };
-sb.globalThis = sb; vm.createContext(sb);
+sb.globalThis = sb; vm.createContext(sb); freezeClock(sb, vm, new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00'));
 for (const f of FILES) { const p = path.join(ROOT, 'core', f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), sb, { filename: f }); }
 const g = (n) => { try { return vm.runInContext('typeof ' + n + ' !== "undefined" ? ' + n + ' : null', sb); } catch (e) { return null; } };
 const FI = g('FlowIntent'), FA = g('FlowActions'), J = g('FlowIncomingJudge'), G = g('FlowGoogleCloses'), OC = g('FlowOutlookCalendar'), GM = g('FlowGraphMail');
 const DEPS = { intent: FI, actions: FA, factReply: g('FlowFactReply'), fileAttach: g('FlowFileAttach'), resolution: g('FlowResolution'), quietMetrics: g('FlowQuietMetrics') };
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
 const NOW = new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00');
+// The engine reads the clock (new Date(), Date.now()) to decide whether a date in the mail is past. Freeze it to GLANCE_NOW so a
+// dataset built on a later day is the same dataset (found 2026-10-19: "by October 14" turned silent once the real day passed it).
+function freezeClock(sb, vm, now) {
+  vm.runInContext('(function (N) { var D = Date; function F() { var a = Array.prototype.slice.call(arguments); return a.length ? new (Function.prototype.bind.apply(D, [null].concat(a)))() : new D(N); } F.prototype = D.prototype; F.now = function () { return N; }; F.UTC = D.UTC; F.parse = D.parse; globalThis.Date = F; })(' + now.getTime() + ')', sb);
+}
 
 const STEP_NEUTRAL = { gmailDraft: 'draft', outlookDraft: 'draft', googleTask: 'task', googleTasks: 'task', outlookTask: 'task', calendar: 'calendar', outlookCalendar: 'calendar', driveFile: 'file_save', onedriveFile: 'file_save' };
 function neutral(kind) { return STEP_NEUTRAL[kind] || kind; }

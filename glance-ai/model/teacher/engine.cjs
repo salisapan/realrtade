@@ -9,6 +9,11 @@ const FILES = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'c
   'incoming-judge.js', 'outlook-calendar.js', 'draft-reply.js'];
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
 const NOW = new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00');
+// The engine reads the clock (new Date(), Date.now()) to decide whether a date in the mail is past. Freeze it to GLANCE_NOW so a
+// dataset built on a later day is the same dataset (found 2026-10-19: "by October 14" turned silent once the real day passed it).
+function freezeClock(sb, vm, now) {
+  vm.runInContext('(function (N) { var D = Date; function F() { var a = Array.prototype.slice.call(arguments); return a.length ? new (Function.prototype.bind.apply(D, [null].concat(a)))() : new D(N); } F.prototype = D.prototype; F.now = function () { return N; }; F.UTC = D.UTC; F.parse = D.parse; globalThis.Date = F; })(' + now.getTime() + ')', sb);
+}
 const STEP_NEUTRAL = { gmailDraft: 'draft', outlookDraft: 'draft', googleTask: 'task', googleTasks: 'task', outlookTask: 'task', calendar: 'calendar', outlookCalendar: 'calendar', driveFile: 'file_save', onedriveFile: 'file_save' };
 const neutral = (k) => STEP_NEUTRAL[k] || k;
 const cache = {};
@@ -19,7 +24,7 @@ function makeEngine(name) {
   const root = named || (name && name !== 'tip' && fs.existsSync(path.join(String(name), 'core', 'intent.js')) ? String(name) : null);
   if (!root || !fs.existsSync(path.join(root, 'core', 'intent.js'))) return null;
   const sb = { module: undefined, console: { log() {}, warn() {}, error() {}, info() {}, debug() {} }, exports: {}, TextEncoder, atob, btoa };
-  sb.globalThis = sb; vm.createContext(sb);
+  sb.globalThis = sb; vm.createContext(sb); freezeClock(sb, vm, NOW);
   for (const f of FILES) { const p = path.join(root, 'core', f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), sb, { filename: name + '/' + f }); }
   const g = (n) => { try { return vm.runInContext('typeof ' + n + ' !== "undefined" ? ' + n + ' : null', sb); } catch (e) { return null; } };
   const FI = g('FlowIntent'), FA = g('FlowActions'), J = g('FlowIncomingJudge'), G = g('FlowGoogleCloses'), OC = g('FlowOutlookCalendar'), GM = g('FlowGraphMail'), FX = g('FlowExtract'), FJ = g('FlowJudgment');
@@ -31,6 +36,16 @@ function makeEngine(name) {
     const primary = show && st.length ? neutral(st[0]) : null;
     return { show, reason: show ? 'show' : reason, type: intent && intent.type || null, family: fam, steps: st, primaryStep: primary, label: show ? (fam + '|' + primary) : 'SILENT' };
   }
+  // What the browser host passes besides the text (src/content-*.js): the recipients, the mailbox's own address, the person's
+  // names and the direction. Without them the tip engine holds every greeted mail as names-pending and its Cc-only and
+  // addressed-to-other rules never see the recipients (found 2026-10-19). Only GLANCE_HOST_CTX=0 turns it off, so the pinned
+  // 0.9.35 dataset can be checked both ways; 0.9.35 reads none of these fields.
+  function hostCtx(c, own) {
+    if (process.env.GLANCE_HOST_CTX === '0') return {};
+    const names = Array.isArray(c.ownNames) ? c.ownNames : [];
+    return { to: c.to || [], cc: c.cc || [], ownAddresses: [own], ownNames: names, userName: names[0] || null,
+      direction: c.direction || null, inbound: c.direction === 'inbound', namesWaitDone: true };
+  }
   function teach(c) {
     const surface = c.surface === 'outlook' ? 'outlook' : 'gmail';
     const own = OWN[surface];
@@ -41,8 +56,8 @@ function makeEngine(name) {
     try {
       if (surface === 'gmail') {
         if (fromOwn && G.messageToJudge([[own].concat(to)], own) < 0) return out(false, 'own-sender', null);
-        const r = J.judge({ text: body, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
-          threadUrl: 'https://mail.google.com/x', hasThreadAttachment: (c.attachmentCount || 0) >= 1, attachmentCount: c.attachmentCount || 0, surface: 'gmail' }, DEPS);
+        const r = J.judge(Object.assign({ text: body, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
+          threadUrl: 'https://mail.google.com/x', hasThreadAttachment: (c.attachmentCount || 0) >= 1, attachmentCount: c.attachmentCount || 0, surface: 'gmail' }, hostCtx(c, own)), DEPS);
         if (r.show) return out(true, null, r.intent, r.process.steps);
         return out(false, r.intent && r.intent.googleWait ? 'google-wait(drive-lookup)' : r.reason, r.intent);
       }
@@ -55,8 +70,8 @@ function makeEngine(name) {
       }
       if (fromOwn) return out(false, to.length && to.every((t) => t === own) ? 'note-to-self' : 'own-sender', null);
       const n = G.needsOneAttachment(text) ? (c.attachmentCount || 0) : 0;
-      const r = J.judge({ text, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
-        threadUrl: 'https://outlook.live.com/x', hasThreadAttachment: n === 1, attachmentCount: n, surface: 'outlook' }, DEPS);
+      const r = J.judge(Object.assign({ text, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
+        threadUrl: 'https://outlook.live.com/x', hasThreadAttachment: n === 1, attachmentCount: n, surface: 'outlook' }, hostCtx(c, own)), DEPS);
       if (r.show) return out(true, null, r.intent, r.process.steps);
       return out(false, r.reason, r.intent);
     } catch (e) { return out(false, 'engine-error', null); }

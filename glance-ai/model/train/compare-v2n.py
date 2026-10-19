@@ -2,6 +2,9 @@
 # only where the engine is silent). Reference rows and the engine blind-spot rows (gap, train/gap-labels-v23.cjs) are counted apart.
 # usage (from glance-ai/model): .venv/bin/python train/compare-v2n.py name=preds.jsonl [name=preds.jsonl ...]   (labels: features-v23 test, as in V23.md)
 import json,sys
+# Compared at STEP level (task, calendar, draft, file_save), as the product and promote_gate.cjs compare: commitment|task and
+# dated-commitment|task are the same Do It. (compare-v23.py compares the whole family|step label.)
+step=lambda l: l if l=='SILENT' else l.split('|')[-1]
 feat={}
 for l in open('train/features-v23/test.jsonl'):
   r=json.loads(l); feat[r['id']]=r
@@ -15,18 +18,18 @@ def run(preds,name):
       x=preds.get(i)
       if not x: continue
       eng='SILENT' if veto(x) or not x['eng'] else x['eng']
-      pred=x['pred'] if mode=='model' else (eng if eng!='SILENT' else x['pred'])
+      pred=step(x['pred'] if mode=='model' else (eng if eng!='SILENT' else x['pred'])); y=step(f['y'])
       if f.get('gap'):
         m['gap_n']+=1; L=m['gap_he'] if f['lang']=='he' else m['gap_en']; L[1]+=1
         if pred!='SILENT': 
-          if pred==f['y']: m['gap_caught']+=1; L[0]+=1
+          if pred==y: m['gap_caught']+=1; L[0]+=1
           else: m['gap_wrongact']+=1
         continue
       if f.get('unsure'): continue
-      if f['y']=='SILENT':
+      if y=='SILENT':
         m['sure_sil']+=1; m['sure_wdi']+= pred!='SILENT'
       else:
-        m['sure_show']+=1; m['sure_miss']+= pred=='SILENT'; m['wrongAct']+= pred not in ('SILENT',f['y'])
+        m['sure_show']+=1; m['sure_miss']+= pred=='SILENT'; m['wrongAct']+= pred not in ('SILENT',y)
     out[mode]=m
   return out
 for name,p in [(a.split("=")[0],a.split("=")[1]) for a in sys.argv[1:]]:
