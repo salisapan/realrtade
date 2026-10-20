@@ -64,6 +64,7 @@ function glanceUiCopy(kind) {
   if (kind === 'taskRemoved') return he ? 'משימת Google הוסרה.' : 'Google Task removed.';
   if (kind === 'calendarRemoved') return he ? 'אירוע היומן הוסר.' : 'Calendar event removed.';
   if (kind === 'handled') return he ? 'טופל.' : 'Handled.';
+  if (kind === 'notVerified') return he ? 'לא אומת' : 'Not verified';
   if (kind === 'undo') return he ? 'בטל' : 'Undo';
   if (kind === 'undoAll') return he ? 'בטל הכל' : 'Undo all';
   if (kind === 'undoing') return he ? 'מבטל…' : 'Undoing…';
@@ -180,6 +181,7 @@ function glanceUiCopy(kind) {
     }
     clearLaneTimers();
     removeOwnCards();
+    try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.stop(document, window); } catch (e) { /* nothing to stop */ }
   }
 
   // One read of chrome.runtime.id. When the extension context is gone that
@@ -722,17 +724,30 @@ function glanceUiCopy(kind) {
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   }
 
+  // Gmail puts the address on email, or only on data-hovercard-id when the
+  // visible chip is the display name. A name with no @ is not an address.
+  function addressFrom(el) {
+    if (!el || !el.getAttribute) return '';
+    const email = String(el.getAttribute('email') || '').trim();
+    if (email.indexOf('@') >= 0) return email;
+    const hover = String(el.getAttribute('data-hovercard-id') || '').trim();
+    if (hover.indexOf('@') >= 0) return hover;
+    return email;
+  }
+
   function extractSender(messageNode) {
-    const el = messageNode.querySelector('[email]');
+    if (!messageNode || !messageNode.querySelector) return { email: null, name: null };
+    const el = messageNode.querySelector('[email], [data-hovercard-id]');
     if (!el) return { email: null, name: null };
-    return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
+    const email = addressFrom(el);
+    return { email: email || null, name: el.getAttribute('name') || el.textContent.trim() };
   }
 
   // The Gmail account button, for example
   // "Google Account: Sali Sapan (x@y)". The name only. No scope, no token.
   // A label that is not that button is not a name.
   function accountNameFromLabel(label) {
-    const raw = String(label || '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const raw = String(label || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
     const prefixed = raw.match(/^(?:Google Account|חשבון Google)\s*:\s*(.+)$/i);
     if (!prefixed) return '';
     const body = prefixed[1].trim();
@@ -778,27 +793,139 @@ function glanceUiCopy(kind) {
     } catch (e) { /* the panel keeps the last line */ }
   }
 
-  // To and Cc as the open message shows them. A line that starts with To or
-  // Cc (or אל / עותק) is that list. The sender's address is not a recipient.
-  function audienceOf(messageNode) {
-    const to = [];
-    const cc = [];
+  // To and Cc as the open message shows them. The header is read in
+  // document order: a label (to, cc, bcc, אל, עותק) switches the list, a
+  // chip or an address lands in the list that is current, and the "me" chip,
+  // which carries no address, is the account's own. This covers the collapsed
+  // line ("to Dana, cc: me"), the opened details table, and fixtures that
+  // put each list in its own block. The sender's address is not a recipient,
+  // and nothing inside the message body or its quoted history is a header.
+  const AUDIENCE_LABEL = /(^|[\s,;])(to|cc|bcc|אל|עותק(?: מוסתר)?)\s*:|(^|[\s,;])(עותק)(?=\s)/ig;
+
+  function audienceBucketFor(label) {
+    const word = String(label || '').toLowerCase();
+    if (word === 'to' || word === 'אל') return 'to';
+    return word === 'cc' || word === 'עותק' ? 'cc' : 'bcc';
+  }
+
+  function normalizeAudienceLabel(text) {
+    return String(text || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().toLowerCase().replace(/:+$/, '');
+  }
+
+  // Gmail's details table is the source of truth when it is open: labelled
+  // אל:/עותק:/to:/cc: rows only. The collapsed summary line and the sender
+  // row are not recipients.
+  function audienceFromDetailsTable(messageNode, ownEmail, senderEmail) {
+    const lists = { to: [], cc: [], bcc: [] };
     let userName = '';
-    if (!messageNode || !messageNode.querySelectorAll) return { to: to, cc: cc, userName: userName };
-    const blocks = messageNode.querySelectorAll('div, p, li');
-    for (let i = 0; i < blocks.length; i++) {
-      const n = blocks[i];
-      const t = String(n.innerText || '').trim();
+    if (!messageNode || !messageNode.querySelectorAll) return null;
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    const add = (bucket, email) => {
+      const clean = String(email || '').trim().toLowerCase();
+      if (!clean || clean.indexOf('@') < 0 || !bucket || bucket.indexOf(clean) >= 0) return;
+      if (from && clean === from) return;
+      bucket.push(clean);
+    };
+    const rows = [];
+    const seen = new Set();
+    const pushRow = (tr) => {
+      if (!tr || seen.has(tr) || inMessageBody(tr)) return;
+      seen.add(tr);
+      rows.push(tr);
+    };
+    messageNode.querySelectorAll('.ajB table tr, table.ajC tr, table.ajB tr').forEach(pushRow);
+    messageNode.querySelectorAll('tr.ajv').forEach(pushRow);
+    let labelled = false;
+    for (let r = 0; r < rows.length; r++) {
+      const tr = rows[r];
+      const labelCell = tr.querySelector('th.gG, td.gG');
+      const addrCell = tr.querySelector('td.gL');
+      if (!labelCell || !addrCell) continue;
+      const label = normalizeAudienceLabel(labelCell.textContent);
+      if (!label || label === 'from' || label === 'מאת') continue;
+      let bucket = null;
+      if (label === 'to' || label === 'אל') bucket = lists.to;
+      else if (label === 'cc' || label === 'עותק') bucket = lists.cc;
+      else if (label === 'bcc' || label.indexOf('עותק מוסתר') >= 0) bucket = lists.bcc;
+      else continue;
+      labelled = true;
+      addrCell.querySelectorAll('[email]').forEach((n) => {
+        const email = addressFrom(n).toLowerCase();
+        const shown = String(n.textContent || '').trim().toLowerCase();
+        if (email && email.indexOf('@') >= 0) add(bucket, email);
+        else if (own && (shown === 'me' || shown === 'אני' || shown === 'אליי')) add(bucket, own);
+      });
+    }
+    if (!labelled) return null;
+    const mine = messageNode.querySelectorAll('[email]');
+    for (let i = 0; i < mine.length; i++) {
+      if (String(mine[i].textContent || '').trim() !== 'me') continue;
+      const name = String(mine[i].getAttribute('name') || '').trim();
+      if (name && name.toLowerCase() !== 'me') userName = name;
+    }
+    return { to: lists.to, cc: lists.cc, userName: userName, labelled: true };
+  }
+
+  function inMessageBody(n) {
+    return !!(n.closest && n.closest(BODY_SELECTOR + ', ' + QUOTE_CONTAINER_SELECTOR));
+  }
+
+  function audienceOf(messageNode, ownEmail) {
+    const lists = { to: [], cc: [], bcc: [] };
+    let userName = '';
+    let labelled = false;
+    if (!messageNode || !messageNode.querySelectorAll) return { to: lists.to, cc: lists.cc, userName: userName, labelled: false };
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const sender = extractSender(messageNode);
+    const senderEmail = String((sender && sender.email) || '').trim().toLowerCase();
+    const tableAud = audienceFromDetailsTable(messageNode, ownEmail, senderEmail);
+    if (tableAud) return tableAud;
+    const add = (bucket, email) => {
+      const clean = String(email || '').trim().toLowerCase();
+      if (!clean || clean.indexOf('@') < 0 || !bucket || bucket.indexOf(clean) >= 0) return;
+      bucket.push(clean);
+    };
+    const nodes = messageNode.querySelectorAll('div, p, li, span, td, tr');
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (inMessageBody(n)) continue;
+      const t = String(n.textContent || '').replace(/[\u00a0\u202f\u200e\u200f]+/g, ' ').replace(/\s+/g, ' ').trim();
       if (!t || t.length > 400) continue;
-      const bucket = /^(to|אל)\b/i.test(t) ? to : (/^(cc|עותק)\b/i.test(t) ? cc : null);
-      if (!bucket) continue;
-      const marked = n.querySelectorAll('[email]');
-      for (let j = 0; j < marked.length; j++) {
-        const email = String(marked[j].getAttribute('email') || '').trim().toLowerCase();
-        if (email && bucket.indexOf(email) < 0) bucket.push(email);
+      if (/^(from|מאת)(?=$|[\s:,;])/i.test(t)) continue;
+      const head = t.match(/^(to|cc|bcc|אל|עותק(?: מוסתר)?)(?=$|[\s:,;])/i);
+      if (!head) continue;
+      let current = lists[audienceBucketFor(head[1].replace(/ מוסתר$/, ''))] || lists.to;
+      if (/^עותק מוסתר/.test(head[1])) current = lists.bcc;
+      const walker = document.createTreeWalker(n, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+      let node = walker.nextNode();
+      const taken = new Set();
+      while (node) {
+        if (node.nodeType === 3) {
+          const text = String(node.nodeValue || '').replace(/[\u00a0\u202f\u200e\u200f]+/g, ' ');
+          let last = 0;
+          let m;
+          AUDIENCE_LABEL.lastIndex = 0;
+          while ((m = AUDIENCE_LABEL.exec(text))) {
+            const label = m[2] || m[4];
+            labelled = true;
+            (text.slice(last, m.index).toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || []).forEach((e) => add(current, e));
+            current = lists[audienceBucketFor(label)] || current;
+            last = m.index + m[0].length;
+          }
+          (text.slice(last).toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || []).forEach((e) => add(current, e));
+        } else if (node.nodeType === 1 && node.getAttribute) {
+          const email = addressFrom(node).toLowerCase();
+          const shown = String(node.textContent || '').trim().toLowerCase();
+          if (email && email.indexOf('@') >= 0) {
+            if (own && email === own && (shown === 'me' || shown === 'אני' || shown === 'אליי')) add(current, email);
+            else if (!taken.has(node) && email !== senderEmail) add(current, email);
+          } else if (own && node.children && node.children.length === 0 && (shown === 'me' || shown === 'אני' || shown === 'אליי')) {
+            add(current, own);
+          }
+        }
+        node = walker.nextNode();
       }
-      const found = t.toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
-      found.forEach((email) => { if (bucket.indexOf(email) < 0) bucket.push(email); });
     }
     const mine = messageNode.querySelectorAll('[email]');
     for (let i = 0; i < mine.length; i++) {
@@ -806,7 +933,241 @@ function glanceUiCopy(kind) {
       const name = String(mine[i].getAttribute('name') || '').trim();
       if (name && name.toLowerCase() !== 'me') userName = name;
     }
-    return { to: to, cc: cc, userName: userName };
+    return { to: lists.to, cc: lists.cc, userName: userName, labelled: labelled };
+  }
+
+  function audienceAmbiguous(audience, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    if (!own || !audience || audience.labelled) return false;
+    const to = (audience.to || []).map((a) => String(a || '').trim().toLowerCase());
+    return to.indexOf(own) >= 0 && to.length > 1 && !(audience.cc || []).length;
+  }
+
+  const DETAILS_TOGGLE = '[aria-label="Show details"], [data-tooltip="Show details"], [aria-label="הצג פרטים"], [data-tooltip="הצג פרטים"], [aria-label="הצגת פרטים"], [aria-label="הצגת הפרטים"], [data-tooltip="הצגת הפרטים"], .ajy[role="button"], span.ajy';
+  const detailsAudienceRead = new Map();
+
+  // A collapsed header names the recipients on one line with no label, so a
+  // copy looks the same as a To. The account among others on that line is
+  // not enough to know it was addressed to the account.
+  function collapsedRecipientsAmbiguous(messageNode, senderEmail, ownEmail, audience) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    if (!own || !messageNode || !messageNode.querySelector || (audience && audience.labelled)) return false;
+    const toggle = messageNode.querySelector(DETAILS_TOGGLE);
+    if (!toggle) return false;
+    const line = toggle.parentElement || toggle;
+    const from = String(senderEmail || '').trim().toLowerCase();
+    const found = new Set();
+    line.querySelectorAll('[email]').forEach((n) => {
+      const email = String(n.getAttribute('email') || '').trim().toLowerCase();
+      if (email && email !== from && !inMessageBody(n)) found.add(email);
+    });
+    return found.size > 0 && (from !== own || !found.has(own) || found.size > 1);
+  }
+
+  function audienceUnclear(messageNode, senderEmail, ownEmail, audience) {
+    if (audience && audience.labelled) return false;
+    return audienceAmbiguous(audience, ownEmail)
+      || collapsedRecipientsAmbiguous(messageNode, senderEmail, ownEmail, audience)
+      || otherSenderOnlyOwnChip(messageNode, senderEmail, ownEmail, audience)
+      || (collapsedChipLineUnlabelled(messageNode, audience) && !collapsedSelfHeader(messageNode, senderEmail, ownEmail));
+  }
+
+  async function audienceAfterDetailsProbe(messageId, messageNode, senderEmail, ownEmail, audience) {
+    if (detailsAudienceRead.has(messageId)) return detailsAudienceRead.get(messageId);
+    let bag = audience;
+    if (await expandMessageDetails(messageNode)) {
+      bag = noteAddressedToSelf(messageNode, senderEmail, ownEmail, audienceOf(messageNode, ownEmail));
+      await collapseMessageDetails(messageNode);
+    }
+    detailsAudienceRead.set(messageId, bag);
+    return bag;
+  }
+
+  function collapsedHeaderLine(messageNode) {
+    if (!messageNode || !messageNode.querySelector) return null;
+    const hb = messageNode.querySelector('tr.acZ.xD span.hb, tr.acZ.xD .hb, span.hb');
+    if (!hb || inMessageBody(hb)) return null;
+    return hb;
+  }
+
+  function chipsOnCollapsedLine(messageNode) {
+    const hb = collapsedHeaderLine(messageNode);
+    if (!hb) return [];
+    return Array.from(hb.querySelectorAll('[email], [data-hovercard-id]'));
+  }
+
+  function chipIsOwn(n, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    if (!own || !n) return false;
+    const email = String(addressFrom(n) || '').trim().toLowerCase();
+    const shown = String(n.textContent || '').trim();
+    if (email && email === own) return true;
+    return /^(?:me|אני)$/i.test(shown) && (!email || email === own);
+  }
+
+  // Real Gmail: span.hb lists chips only — no "to/אל". Self only when you sent it and every chip is you.
+  function collapsedSelfHeader(messageNode, senderEmail, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (!own || !from || from !== own) return false;
+    const chips = chipsOnCollapsedLine(messageNode);
+    if (!chips.length) return false;
+    for (let i = 0; i < chips.length; i++) {
+      if (!chipIsOwn(chips[i], own)) return false;
+    }
+    return true;
+  }
+
+  // Someone else sent it but the collapsed line shows only your "me" chip — same look as empty To + Cc you.
+  function otherSenderOnlyOwnChip(messageNode, senderEmail, ownEmail, audience) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (audience && audience.labelled) return false;
+    if (!own || !from || from === own) return false;
+    const chips = chipsOnCollapsedLine(messageNode);
+    if (chips.length !== 1) return false;
+    if (!chipIsOwn(chips[0], own)) return false;
+    // 1:1 mail to the reader shows one "me" chip with a real address — not Cc-only.
+    const email = String(addressFrom(chips[0]) || '').trim().toLowerCase();
+    if (email && email === own) return false;
+    return true;
+  }
+
+  // Collapsed chip line with no To/Cc label is never a resolved audience.
+  function collapsedChipLineUnlabelled(messageNode, audience) {
+    if (audience && audience.labelled) return false;
+    const chips = chipsOnCollapsedLine(messageNode);
+    if (!chips.length) return false;
+    // A single addressed chip with an email is the To line, not an unresolved copy.
+    if (chips.length === 1) {
+      const email = String(addressFrom(chips[0]) || '').trim();
+      if (email.indexOf('@') >= 0) return false;
+    }
+    return true;
+  }
+
+  function senderIsOwn(senderEmail, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    return Boolean(own && from && from === own);
+  }
+
+  // A self-sent mail with a real PDF (or similar) must keep its card even
+  // when rule (6) would not open details for an inbound ask and even when
+  // classification is still thin. Cc-only stays quiet — this is only when
+  // the collapsed header is clearly a note to self.
+  function selfMailAttachmentKeepCard(messageNode, senderEmail, ownEmail, audience, attachments) {
+    if (!senderIsOwn(senderEmail, ownEmail)) return false;
+    if (!attachments || !attachments.length) return false;
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const aud = noteAddressedToSelf(messageNode, senderEmail, ownEmail, audience);
+    const cc = (aud.cc || []).map((a) => String(a || '').trim().toLowerCase());
+    if (cc.some((a) => a && a !== own)) return false;
+    if (otherSenderOnlyOwnChip(messageNode, senderEmail, ownEmail, audience)) return false;
+    if (!headerToSelf(messageNode, own, senderEmail)) return false;
+    if (typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return false;
+    const mapped = attachments.map((meta) => {
+      const sized = Number(meta.size);
+      return {
+        id: meta.url || meta.filename,
+        name: meta.filename,
+        size: (isFinite(sized) && sized > 0) ? sized : 8192,
+        contentType: meta.mimeType || '',
+        isInline: false
+      };
+    });
+    try {
+      const decision = FlowSuggestSave.suggestSave({
+        surface: 'gmail',
+        direction: 'inbound',
+        senderIsUser: false,
+        consent: true,
+        attachmentsRead: true,
+        attachments: mapped,
+        text: '',
+        subject: '',
+        messageId: 'self-attach-probe',
+        dismissed: [],
+        log: []
+      });
+      return Boolean(decision && decision.eligible);
+    } catch (e) {
+      console.error('[Glance] self attachment keep-card probe failed', e);
+      return false;
+    }
+  }
+
+  function messageDetailsOpen(messageNode) {
+    return !!(messageNode && messageNode.querySelector
+      && messageNode.querySelector('.ajB table, table.ajC, table.ajB'));
+  }
+
+  function removeMessageDetailsPanels(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return;
+    messageNode.querySelectorAll('.ajA').forEach((n) => n.remove());
+    messageNode.querySelectorAll('.ajB').forEach((n) => {
+      if (n.closest && n.closest('.ajA')) return;
+      n.remove();
+    });
+  }
+
+  async function expandMessageDetails(messageNode) {
+    const toggle = messageNode && messageNode.querySelector
+      ? messageNode.querySelector(DETAILS_TOGGLE)
+      : null;
+    if (!toggle) return false;
+    if (messageDetailsOpen(messageNode)) return true;
+    try { toggle.click(); } catch (e) { return false; }
+    await new Promise((r) => setTimeout(r, 200));
+    return messageDetailsOpen(messageNode);
+  }
+
+  async function collapseMessageDetails(messageNode) {
+    const toggle = messageNode && messageNode.querySelector
+      ? messageNode.querySelector(DETAILS_TOGGLE)
+      : null;
+    if (!toggle || !messageNode.querySelector) return false;
+    if (!messageDetailsOpen(messageNode)) return true;
+    try { toggle.click(); } catch (e) { return false; }
+    await new Promise((r) => setTimeout(r, 120));
+    removeMessageDetailsPanels(messageNode);
+    const row = toggle.closest('td') || toggle.parentElement;
+    if (row) {
+      const open = row.querySelector('.ajB');
+      if (open) open.remove();
+    }
+    return !messageDetailsOpen(messageNode);
+  }
+
+  // Collapsed Gmail header: "to me", and the me chip has no email attribute.
+  // The body is not this header. "Remind me" in the message is not "to me".
+  function headerToSelf(messageNode, ownEmail, senderEmail) {
+    if (!messageNode || !messageNode.querySelectorAll) return false;
+    const nodes = messageNode.querySelectorAll('span, div, p');
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.closest && n.closest(BODY_SELECTOR)) continue;
+      const t = String(n.textContent || '').replace(/[\u00a0\u202f]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 24) continue;
+      if (/^(?:(?:to|אל)\s+(?:me|אני)|אליי)$/i.test(t)) return true;
+    }
+    if (collapsedSelfHeader(messageNode, senderEmail, ownEmail)) return true;
+    return false;
+  }
+
+  // A note from the account to itself. The collapsed header names no
+  // address, and a mail that also names someone else is not this note.
+  function noteAddressedToSelf(messageNode, senderEmail, ownEmail, audience) {
+    const bag = audience || { to: [], cc: [], userName: '' };
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const from = String(senderEmail || '').trim().toLowerCase();
+    if (!own || !from || from !== own || !headerToSelf(messageNode, own, from)) return bag;
+    const cc = (bag.cc || []).map((a) => String(a || '').trim().toLowerCase());
+    if (cc.some((a) => a && a !== own)) return bag;
+    const to = (bag.to || []).map((a) => String(a || '').trim().toLowerCase());
+    if (to.some((a) => a && a !== own && a !== 'me')) return bag;
+    bag.to = [own];
+    return bag;
   }
 
   // Every [email] on the message, sender first. Same order extractSender
@@ -814,10 +1175,9 @@ function glanceUiCopy(kind) {
   function addressesOn(messageNode) {
     if (!messageNode || !messageNode.querySelectorAll) return [];
     const all = [];
-    const els = messageNode.querySelectorAll('[email]');
+    const els = messageNode.querySelectorAll('[email], [data-hovercard-id]');
     for (const el of els) {
-      const email = el.getAttribute('email');
-      if (email) all.push(el);
+      if (addressFrom(el)) all.push(el);
     }
     if (!all.length) return [];
     // messageToJudge treats the first address as the sender. A Hebrew
@@ -829,14 +1189,14 @@ function glanceUiCopy(kind) {
       if (String(el.textContent || '').trim().toLowerCase() === 'me') continue;
       const block = el.closest ? el.closest('div, p, li') : null;
       const head = block ? String(block.innerText || '').trim() : '';
-      if (/^(to|cc|אל|עותק)\b/i.test(head)) continue;
-      sender = el.getAttribute('email') || '';
+      if (/^(to|cc|bcc|אל|עותק)(?=$|[\s:,;])/i.test(head)) continue;
+      sender = addressFrom(el);
       break;
     }
     const out = [];
     if (sender) out.push(sender);
     for (let i = 0; i < all.length; i++) {
-      const email = all[i].getAttribute('email');
+      const email = addressFrom(all[i]);
       if (email && out.indexOf(email) < 0) out.push(email);
     }
     return out;
@@ -931,19 +1291,56 @@ function glanceUiCopy(kind) {
     return plain;
   }
 
-  // Gmail renders any recipient who is the signed-in account as the literal
-  // text "me" rather than their name, on every message that arrived TO them.
-  // That gives a way to read the account's own address without any
-  // account-detection hack: scan the thread for a "me"-labeled [email] node.
-  function ownEmailFromThread(messages) {
-    for (const m of messages) {
-      const els = m.querySelectorAll('[email]');
-      for (const el of els) {
-        if ((el.textContent || '').trim() === 'me') return el.getAttribute('email');
-      }
-    }
-    return null;
+  // Own address is the stored userinfo email, then the openid login hint,
+  // then the Gmail account button. The page title, the subject, and a
+  // "me" chip are not an address. A stored address is never replaced.
+  function accountEmailFromLabel(label) {
+    const raw = String(label || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/[\u00a0\u202f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const prefixed = raw.match(/^(?:Google Account|חשבון Google)\s*:\s*(.+)$/i);
+    if (!prefixed) return '';
+    const email = prefixed[1].match(/\(([^)]*@[^)]+)\)\s*$/);
+    return email ? email[1].trim() : '';
   }
+
+  function ownEmailFromAccount() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) return '';
+    const nodes = document.querySelectorAll('a[aria-label], button[aria-label], [role="button"][aria-label]');
+    for (let i = 0; i < nodes.length; i++) {
+      const email = accountEmailFromLabel(nodes[i].getAttribute('aria-label'));
+      if (email) return email;
+    }
+    return '';
+  }
+
+  function ownEmailFromThread() {
+    return ownEmailFromAccount() || null;
+  }
+
+  function emailish(value) {
+    const raw = String(value || '').trim();
+    return raw.indexOf('@') > 0 ? raw : '';
+  }
+
+  function storedOwnEmailFromBag(bag) {
+    const profile = bag && bag.googleProfile;
+    const fromProfile = emailish(profile && profile.email);
+    if (fromProfile) return fromProfile;
+    const web = bag && bag.googleWebAuth;
+    return emailish(web && web.loginHint);
+  }
+
+  async function readStoredOwnEmail() {
+    if (!chromeLive()) return '';
+    try {
+      const bag = await chrome.storage.local.get(['googleProfile', 'googleWebAuth']);
+      return storedOwnEmailFromBag(bag);
+    } catch (e) {
+      tearDownOrphan();
+      return '';
+    }
+  }
+
+  let lastOwnEmail = '';
 
   function currentSubject() {
     const h = document.querySelector('h2.hP') || document.querySelector('div[role="main"] h2');
@@ -968,8 +1365,29 @@ function glanceUiCopy(kind) {
   // Gmail stamps data-legacy-thread-id on the message or an ancestor. A
   // missing attribute is not guessed at — personal close memory treats a
   // missing thread id as "not clear" unless the subject itself is specific.
+  //
+  // Real Gmail does not stamp the thread on the message at all. The thread
+  // header (h2.hP) carries data-legacy-thread-id, the id the Gmail API takes,
+  // and data-thread-perm-id, the same id written in decimal after
+  // "thread-f:". The decimal is converted to the hex id. The address bar is
+  // read last, and only when it holds a hex id. A thread whose id cannot be
+  // read stays null: nothing is guessed.
+  function threadIdFromHeader() {
+    const header = document.querySelector('div[role="main"] h2.hP, h2.hP');
+    if (header && header.getAttribute) {
+      const legacy = String(header.getAttribute('data-legacy-thread-id') || '').trim();
+      if (/^[0-9a-f]{8,24}$/i.test(legacy)) return legacy.toLowerCase();
+      const perm = /^thread-f:(\d{6,30})$/.exec(String(header.getAttribute('data-thread-perm-id') || '').trim());
+      if (perm && typeof BigInt === 'function') {
+        try { return BigInt(perm[1]).toString(16); } catch (e) { /* not a number */ }
+      }
+    }
+    const hash = String((location && location.hash) || '').split('/').pop().split('?')[0];
+    return /^[0-9a-f]{12,24}$/i.test(hash) ? hash.toLowerCase() : '';
+  }
+
   function threadIdFrom(message) {
-    return gmailAttr(message, 'data-legacy-thread-id') || null;
+    return gmailAttr(message, 'data-legacy-thread-id') || threadIdFromHeader() || null;
   }
 
   // Prefer silence when this open message clearly continues a personal
@@ -1059,6 +1477,61 @@ function glanceUiCopy(kind) {
         });
       });
     });
+  }
+
+  // The one Cc-only rule, asked of the live header. Classification asks it
+  // first. Gmail can paint the recipients after the body, so a card that was
+  // offered before the header was read is asked again once it is there, and
+  // again when Do It is pressed. Copied only, with no greeting of the
+  // account's own name, is no card of any kind.
+  function copiedOnlyNow(message, text, ownEmail) {
+    if (typeof FlowIntent === 'undefined' || typeof FlowIntent.copiedOnly !== 'function') return false;
+    const own = String(ownEmail || '').trim();
+    if (!own || !message || !message.isConnected) return false;
+    const aud = audienceOf(message, own);
+    if (!(aud.to || []).length && !(aud.cc || []).length) return false;
+    try {
+      return FlowIntent.copiedOnly(text, {
+        to: aud.to, cc: aud.cc, ownAddresses: [own],
+        userName: aud.userName || null, ownNames: ownNamesForChip(aud.userName)
+      });
+    } catch (e) { return false; }
+  }
+
+  function withdrawOffer(message, messageId) {
+    if (!message || !message.querySelectorAll) return;
+    message.querySelectorAll('.flow-chip-host').forEach((h) => {
+      if (h.querySelector('.flow-chip-handled, .flow-chip-done-icon') || h.getAttribute('data-glance-chain') === 'task-proof') return;
+      h.remove();
+    });
+    recordSilence(messageId, 'audience');
+  }
+
+  const copiedWatchers = new WeakMap();
+  function watchCopiedOnly(message, messageId, text, ownEmail, audience) {
+    if (!message || typeof MutationObserver === 'undefined' || copiedWatchers.has(message)) return;
+    let timer = null;
+    const stop = () => {
+      const w = copiedWatchers.get(message);
+      if (w) w.observer.disconnect();
+      clearTimeout(timer);
+      copiedWatchers.delete(message);
+    };
+    const check = () => {
+      if (!message.isConnected || !message.querySelector('.flow-chip-host')) { stop(); return; }
+      const aud = audienceOf(message, ownEmail);
+      if (!copiedOnlyNow(message, text, ownEmail)) return;
+      // Withdraw when the labelled details table is open, or while the header
+      // is still empty and a late paint may arrive. Keep watching after a
+      // late details expand — no time cap.
+      if (aud.labelled || (!(aud.to || []).length && !(aud.cc || []).length)) {
+        withdrawOffer(message, messageId);
+        if (aud.labelled) stop();
+      }
+    };
+    const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(check, 80); });
+    observer.observe(message, { childList: true, subtree: true, characterData: true });
+    copiedWatchers.set(message, { observer: observer });
   }
 
   // A Drive / Doc / Sheet close has to know whether exactly one file
@@ -1244,10 +1717,16 @@ function glanceUiCopy(kind) {
     dropStaleCards();
     if (!chromeLive()) return;
     const main = document.querySelector('div[role="main"]');
-    if (!main) return;
+    if (!main) {
+      logScanSkip('', 'no-main-pane');
+      return;
+    }
 
     const messages = openMailNodes(main);
-    if (!messages.length) return;
+    if (!messages.length) {
+      logScanSkip('', 'no-open-messages');
+      return;
+    }
 
     try {
       await remountProvedTaskReceipts(messages);
@@ -1265,22 +1744,32 @@ function glanceUiCopy(kind) {
     // A note addressed only to yourself is the exception: there is no other
     // sender, and the note is the ask (a file on your calendar, a hold).
     // A message you sent to someone else still stays quiet.
-    let ownEmail = ownEmailFromThread(messages);
-    if (ownEmail) {
-      rememberOwnEmail(ownEmail);
-      if (!chromeLive()) return;
-    } else {
-      ownEmail = await getCachedOwnEmail();
-      if (!chromeLive()) return;
+    const storedOwn = await readStoredOwnEmail();
+    const cachedOwn = await getCachedOwnEmail();
+    if (!chromeLive()) return;
+    // The account button is this tab. userinfo is one address for the
+    // whole extension, so it is used only when this tab has no button.
+    // A stored address is not replaced by the other account.
+    const buttonOwn = ownEmailFromThread() || '';
+    let ownEmail = buttonOwn || storedOwn || cachedOwn || '';
+    if (buttonOwn) lastOwnEmail = buttonOwn;
+    if (!storedOwn && ownEmail) rememberOwnEmail(ownEmail);
+    if (!chromeLive()) return;
+    // No account button and no stored userinfo or openid email. Nothing can be
+    // verified or written; offer Reconnect instead of waiting for a name.
+    if (!ownEmail) {
+      const pending = messages[messages.length - 1];
+      if (pending && pending.getAttribute && pending.getAttribute('data-glance-names') === 'pending') {
+        const pendingKey = stableMessageKey(pending);
+        logScanSkip(pendingKey && pendingKey.messageId, 'own-email-pending');
+        return;
+      }
+      const stablePending = pending ? stableMessageKey(pending) : null;
+      if (pending && pending.setAttribute) pending.setAttribute('data-glance-names', 'pending');
+      paintAccountReconnectRow(pending, stablePending && stablePending.messageId, currentSubject());
+      armNamesHold();
+      return;
     }
-    // Without a resolved own-email, "the last visible message" can't be told
-    // apart from "the reader's own outbound message to someone else" — and
-    // misreading something the reader asked of a third party as a request
-    // made OF the reader is a wrong classification, not just a missed one.
-    // Staying silent here is deliberate: the cache above fills in on the
-    // very next ordinary (multi-recipient) thread, so this only ever costs
-    // a missed chip once per account, never a wrong one.
-    if (!ownEmail) return;
 
     // "Waiting on" looks at the thread as a whole — whose message is newest —
     // so it runs before the incoming-mail logic below, which skips the
@@ -1318,7 +1807,10 @@ function glanceUiCopy(kind) {
       }
     }
     const message = judgeAt >= 0 ? messages[judgeAt] : null;
-    if (!message) return; // own mail to someone else, or no message we can tell apart from one
+    if (!message) {
+      logScanSkip('', 'no-incoming-message');
+      return; // own mail to someone else, or no message we can tell apart from one
+    }
 
     const stable = stableMessageKey(message);
     const legacyId = stable.legacy || null;
@@ -1371,12 +1863,16 @@ function glanceUiCopy(kind) {
       // The read-back is still open. A later pass offers Do It if it fails.
     } else if (message.querySelector('.flow-chip-host')) {
       void noteSuggestShown(currentContext && currentContext.messageId);
+      logScanSkip(stable.messageId, 'chip-present');
       return;
     }
 
     const messageId = stable.messageId;
     openSuggest = null;
-    if (!messageId) return;
+    if (!messageId) {
+      logScanSkip('', 'no-message-id');
+      return;
+    }
     if (!chromeLive()) return;
 
     // The open mail's own Do It, every step. A task row from another
@@ -1386,6 +1882,7 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     if (laneRecord && laneRecord.steps && laneRecord.steps.length && message.isConnected && !message.querySelector('.flow-chip-host')) {
       mountLaneReceipt(message, laneRecord, messageId);
+      logScanSkip(messageId, 'lane-receipt');
       return;
     }
 
@@ -1434,6 +1931,7 @@ function glanceUiCopy(kind) {
       if (!already && message.isConnected && !message.querySelector('.flow-chip-host')) {
         mountProvedTaskReceipt(message, taskRow);
       }
+      logScanSkip(messageId, 'task-receipt');
       return;
     }
     if (typeof FlowStorage.verifyGateFrom === 'function' && FlowStorage.verifyGateFrom(settled, messageId) === 'verifying') {
@@ -1449,6 +1947,7 @@ function glanceUiCopy(kind) {
         if (message.firstChild) message.insertBefore(host, message.firstChild);
         else message.appendChild(host);
       }
+      logScanSkip(messageId, 'verifying');
       return;
     }
     if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) {
@@ -1458,6 +1957,7 @@ function glanceUiCopy(kind) {
         const late = await readLaneUndo(stable.legacy || messageId, stable.laneIds);
         if (late && late.steps && late.steps.length) mountLaneReceipt(message, late, messageId);
       }
+      logScanSkip(messageId, 'terminal-outcome');
       return;
     }
     const verifyingHost = message.querySelector('.flow-chip-host[data-glance-verifying]');
@@ -1471,12 +1971,35 @@ function glanceUiCopy(kind) {
     // of the "quoted text" fix — never lets a long quoted contract sitting
     // below a one-line "Sounds good!" reply count toward "is there enough
     // new content to judge" in the first place.
-    const text = ownMessageText(message);
+    let text = ownMessageText(message);
+    const attachmentsEarly = allRealAttachments(message);
+    // A note to yourself can be only a subject line. The subject is the note.
+    if (text.length < 20 && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.selfSent === 'function') {
+      const early = extractSender(message);
+      const noteSubject = currentSubject();
+      const earlyAud = noteAddressedToSelf(message, early.email, ownEmail, audienceOf(message, ownEmail));
+      if (FlowIncomingJudge.selfSent({
+        sender: early,
+        ownAddresses: ownEmail ? [ownEmail] : [],
+        to: earlyAud.to,
+        cc: earlyAud.cc,
+        headerToSelf: headerToSelf(message, ownEmail, early.email)
+      })) {
+        text = FlowIncomingJudge.textForJudge(text, noteSubject, true);
+        // A short subject plus a real attachment is still the note — "חוזה
+        // חתום" is a filename topic, not a completion that silences save.
+        const sub = String(noteSubject || '').replace(/\s+/g, ' ').trim();
+        if (sub && attachmentsEarly.length && text.length < 20) text = sub;
+      }
+    }
     // A fact ask can be one short Hebrew sentence ("מה הסכום בגיליון?").
     // The 20-character floor stays for everything else — this does not
     // lower the scorer, it only lets a fully-formed fact ask through.
     const factProbe = (text.length >= 12 && typeof FlowFactReply !== 'undefined') ? FlowFactReply.detect(text) : null;
-    if (text.length < 20 && !factProbe) return; // still rendering, or genuinely nothing new was written
+    if (text.length < 20 && !factProbe && !attachmentsEarly.length) {
+      logScanSkip(messageId, 'short-text');
+      return; // still rendering, or genuinely nothing new was written
+    }
 
     // Seen-ids stay a "we already looked at this message" mark, including
     // when personal-close memory stays quiet below. The 'shown' row is a
@@ -1505,6 +2028,7 @@ function glanceUiCopy(kind) {
     const sender = extractSender(message);
     const subject = currentSubject();
     const threadId = threadIdFrom(message);
+    let audience = noteAddressedToSelf(message, sender.email, ownEmail, audienceOf(message, ownEmail));
 
     // Opt-in local trace. chrome.storage.local.glanceDebug === true, unset
     // by default. One read per scan. Never sent off-device. A storage miss
@@ -1528,7 +2052,6 @@ function glanceUiCopy(kind) {
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
-    const audience = audienceOf(message);
     openSuggest = {
       messageId: messageId,
       text: text,
@@ -1596,6 +2119,7 @@ function glanceUiCopy(kind) {
     if (intent && intent.namesPending) {
       paintNamesPending(message, messageId, subject);
       armNamesHold();
+      logScanSkip(messageId, 'names-pending');
       return;
     }
     if (namesWaitDone && message && message.setAttribute) {
@@ -1620,12 +2144,41 @@ function glanceUiCopy(kind) {
     // for the dedup rule that keeps a re-scanned open message from being
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
-    if (!FlowIntent.shouldShowChip(intent)) {
+    const inboundMail = String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase();
+    const inboundAsk = inboundMail && text.length >= 20
+      && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
+    const inboundHeAsk = inboundMail && text.length >= 12
+      && /(?:תשמור|לשמור|שמור|תעלה|להעלות|בדרייב|ב-?דרייב|drive|save|upload)/i.test(text);
+    const inboundAttachAsk = inboundMail && attachments.length > 0 && inboundHeAsk;
+    const audienceNeedsProbe = audienceUnclear(message, sender.email, ownEmail, audience);
+    const attachKeep = selfMailAttachmentKeepCard(message, sender.email, ownEmail, audience, attachments);
+    if (attachKeep && (!intent || !intent.type) && String(subject || '').trim()) {
+      intent = await classifyForChip(String(subject || '').trim(), {
+        senderEmail: sender.email,
+        senderName: sender.name,
+        subject: subject,
+        calibration: state.calibration,
+        calibrationByType: state.calibrationByType,
+        attachmentCount: attachments.length,
+        messageId: messageId,
+        debug: debug,
+        to: audience.to,
+        cc: audience.cc,
+        ownAddresses: ownEmail ? [ownEmail] : [],
+        userName: audience.userName || null,
+        ownNames: ownNamesForChip(audience.userName),
+        namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
+        namesWaitDone: namesWaitDone === true,
+        inbound: false
+      });
+    }
+    if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && (inboundAsk || inboundAttachAsk)) && !attachKeep) {
       clearGmailWhy(message);
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
       const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
         || (factOwns && !intent.type ? 'fact' : null);
+      logScanSkip(messageId, reason || 'no-chip-candidate');
       recordSilence(messageId, reason, {
         family: intent.closeFamily || intent.quiet,
         clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
@@ -1633,8 +2186,54 @@ function glanceUiCopy(kind) {
       });
       return;
     }
+    // Collapsed headers hide To vs Cc. Open Gmail's details at most once per
+    // message, only after a real chip candidate exists, then close the box.
+    if (audienceNeedsProbe && (FlowIntent.shouldShowChip(intent) || inboundAsk || inboundAttachAsk || attachKeep)) {
+      audience = await audienceAfterDetailsProbe(messageId, message, sender.email, ownEmail, audience);
+      if (audienceUnclear(message, sender.email, ownEmail, audience)) {
+        logScanSkip(messageId, 'audience');
+        recordSilence(messageId, 'audience');
+        return;
+      }
+      intent = await classifyForChip(text, {
+        senderEmail: sender.email,
+        senderName: sender.name,
+        subject: subject,
+        calibration: state.calibration,
+        calibrationByType: state.calibrationByType,
+        attachmentCount: attachments.length,
+        messageId: messageId,
+        debug: debug,
+        to: audience.to,
+        cc: audience.cc,
+        ownAddresses: ownEmail ? [ownEmail] : [],
+        userName: audience.userName || null,
+        ownNames: ownNamesForChip(audience.userName),
+        namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
+        namesWaitDone: namesWaitDone === true,
+        inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
+      });
+      if (intent && intent.namesPending) {
+        paintNamesPending(message, messageId, subject);
+        armNamesHold();
+        logScanSkip(messageId, 'names-pending');
+        return;
+      }
+      if (!FlowIntent.shouldShowChip(intent) && !attachKeep) {
+        const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
+          || (factOwns && !intent.type ? 'fact' : null);
+        logScanSkip(messageId, reason || 'audience-reclassify');
+        recordSilence(messageId, reason || 'audience', {
+          family: intent.closeFamily || intent.quiet,
+          clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
+          debug: debug
+        });
+        return;
+      }
+    }
     // The ask named OneDrive. This surface writes Drive. Stay quiet rather than save it there.
     if (intent.googleClose && intent.googleClose.target === 'onedrive') {
+      logScanSkip(messageId, 'onedrive-target-on-gmail');
       recordSilence(messageId, 'onedrive-target-on-gmail');
       return;
     }
@@ -1643,19 +2242,25 @@ function glanceUiCopy(kind) {
     // hedge, a "don't send") must not become a Do It. Other closes are
     // left alone — this only stops a REQUEST chip that would otherwise
     // offer to attach or draft around an unclear file.
-    const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
+    // A note the user sent to themself is already a task, with no draft
+    // and no attach-to-invite track. The file chain does not take it.
+    const selfSentTask = Boolean(intent && intent.selfTask);
+    const fileGate = selfSentTask ? { kind: 'ignore' } : (typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' });
     // A file asked onto an invite that already exists is the attach card
     // (task + short draft). The receipt chain does not own that ask.
     // The shared judge skips this silence when intent.inviteFile is set.
     const inviteAsked = Boolean(intent && intent.inviteFile);
     if (!inviteAsked && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
-      recordSilence(messageId, fileGate.reason === 'third-party' ? 'third-party' : 'file');
+      const fileReason = fileGate.reason === 'third-party' ? 'third-party' : 'file';
+      logScanSkip(messageId, fileReason);
+      recordSilence(messageId, fileReason);
       return;
     }
-    // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
-    // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
-    // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
-    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+    // A request that attests a payment (a receipt) takes more than one step.
+    // The shared judge is the only receipt check on this page. A contract,
+    // a quote, or a signed copy is a file to send, not that silence.
+    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
+      logScanSkip(messageId, 'file');
       recordSilence(messageId, 'file');
       return;
     }
@@ -1670,6 +2275,7 @@ function glanceUiCopy(kind) {
     // Google connect prompt so a continuation never asks for access, and
     // before 'shown' is logged so it never becomes an open Brief row.
     if (await personalCloseSaysSilence(intent, threadId, subject)) {
+      logScanSkip(messageId, 'memory');
       recordSilence(messageId, 'memory');
       return;
     }
@@ -1681,7 +2287,10 @@ function glanceUiCopy(kind) {
     // (see the comment above this function's earlier connectorId check) —
     // either way, the account isn't actually ready to write to Google, and
     // ensureGoogleAutoConnect() is the one path that can fix that silently.
-    if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
+    if (!usingGoogle && !(await ensureGoogleAutoConnect())) {
+      logScanSkip(messageId, 'google-connect');
+      return;
+    }
 
     let attachFile = null;
     const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
@@ -1722,9 +2331,11 @@ function glanceUiCopy(kind) {
             messageId, intent, sender, subject, attachment, attachments,
             threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
           });
+          watchCopiedOnly(message, messageId, text, ownEmail, audience);
           return;
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
+          logScanSkip(messageId, 'file-chain');
           recordSilence(messageId, 'file');
           return;
         }
@@ -1747,6 +2358,7 @@ function glanceUiCopy(kind) {
         // A create-from-template is not a found file, so it is not offered
         // once the close chain already said the file is missing.
         if (!decision || decision.action === 'silence' || decision.action === 'create') {
+          logScanSkip(messageId, 'file-attach');
           recordSilence(messageId, 'file');
           return;
         }
@@ -1761,8 +2373,26 @@ function glanceUiCopy(kind) {
       executionMemory: executionMemory,
       attachFile: attachFile
     });
-    const process = planned && planned.process;
-    if (!process) { void flushSuggest(false); return; }
+    let process = planned && planned.process;
+    if (!process) {
+      logScanSkip(messageId, 'no-process');
+      void flushSuggest(false);
+      return;
+    }
+    // A reply draft is saved in the thread by its id. With no thread id and
+    // no compose window open, that step cannot be kept, so it is not offered.
+    if (!threadId && !composeBodyOpen()) {
+      const kept = process.steps.filter((step) => !(step && step.kind === 'gmailDraft'));
+      if (kept.length !== process.steps.length) {
+        if (!kept.length) {
+          logScanSkip(messageId, 'thread-id');
+          void flushSuggest(false);
+          recordSilence(messageId, 'thread-id');
+          return;
+        }
+        process = Object.assign({}, process, { steps: kept });
+      }
+    }
 
     injectChip(message, {
       messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, laneIds: stable.laneIds, intent, process, sender, subject, attachment: chosenAttachment, attachments,
@@ -1776,6 +2406,7 @@ function glanceUiCopy(kind) {
       executionMemory: executionMemory,
       app: 'gmail'
     });
+    watchCopiedOnly(message, messageId, text, ownEmail, audience);
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
     // not a rare edge case — logging 'shown' again every time would fill the
     // 200-entry cap with duplicates for one message and evict real history
@@ -1791,7 +2422,7 @@ function glanceUiCopy(kind) {
       // DOM references, nothing that depends on the live node), the same
       // snapshot discipline injectChip's own ctx already follows.
       FlowStorage.appendLog({
-        kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
+        kind: 'shown', label: activityLabel({ intent: intent, process: process, bodyText: text }), messageId, score: intent.signals.score, signals: intent.signals,
         process: { id: process.id, name: process.name, steps: process.steps },
         threadUrl: threadUrl(legacyId), threadId: threadId, sender, subject,
         intent: compactIntent(intent),
@@ -2383,6 +3014,42 @@ function glanceUiCopy(kind) {
     line.setAttribute('data-glance-why', reason || 'names-pending');
   }
 
+  function paintAccountReconnectRow(messageNode, messageId, subject) {
+    if (!messageNode) return;
+    const he = glanceUiHebrew();
+    const line = he ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.";
+    paintGmailWhy(messageNode, 'account-unverified', line);
+    if (messageNode.querySelector('.flow-chip-reconnect')) return;
+    const btn = el('button', 'flow-chip-reconnect', glanceShow(glanceUiCopy('reconnect')));
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      btn.textContent = he ? 'מתחבר…' : 'Connecting…';
+      sendRuntime({ type: 'flow:google-reconnect', account: '' }).then((res) => {
+        if (res && res.ok) {
+          btn.remove();
+          paintGmailWhy(messageNode, 'account-unverified', he ? 'החיבור התחדש. רענן Gmail.' : 'Reconnected. Refresh Gmail.');
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = glanceShow(glanceUiCopy('reconnect'));
+      }).catch(() => {
+        btn.disabled = false;
+        btn.textContent = glanceShow(glanceUiCopy('reconnect'));
+      });
+    });
+    messageNode.appendChild(btn);
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.set !== 'function') return;
+    FlowStorage.set({
+      glanceWhyCurrent: {
+        reason: 'account-unverified',
+        subject: subject || '',
+        messageId: messageId || null,
+        at: Date.now()
+      }
+    }).catch(() => {});
+  }
+
   function paintNamesPending(messageNode, messageId, subject) {
     const lang = glanceUiLang();
     const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.namesPendingLine === 'function')
@@ -2450,6 +3117,7 @@ function glanceUiCopy(kind) {
       : { title: ctx.process.name, sentence: null, fileCard: false };
     let title = face.title || ctx.process.name;
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.cardTitle === 'function') title = FlowDisplay.cardTitle(lang, ctx, title);
+    ctx.renderedTitle = title;
     host.appendChild(el('span', 'flow-chip-process-name', title));
 
     // loop mark + gradient "Glance" + the rest of the sentence as its own
@@ -2622,10 +3290,39 @@ function glanceUiCopy(kind) {
     chip.replaceChildren(el('span', 'flow-chip-label', shown));
   }
 
+  function receiptProcessName(name) {
+    if (!glanceUiHebrew() || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.localizeHeading !== 'function') return name;
+    return glanceShow(FlowDisplay.localizeHeading('he', name));
+  }
+
   function reasonMessage(response, ctx) {
+    return glanceShow(reasonMessageRaw(response, ctx));
+  }
+
+  function reasonMessageRaw(response, ctx) {
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return response.needsReconnect ? glanceUiCopy('reconnect') : glanceUiCopy('connect');
+    if (response.reason === 'drive-not-granted') {
+      return glanceUiHebrew()
+        ? 'דרייב עדיין לא אושר. חבר מחדש את Google ואשר את Drive.'
+        : 'Drive is not allowed yet. Reconnect Google and allow Drive.';
+    }
+    if (response.reason === 'attachment-unreadable') {
+      return glanceUiHebrew()
+        ? 'לא הצלחתי לקרוא את הקובץ המצורף מג׳ימייל, לכן לא נשמר דבר.'
+        : 'Could not read the attachment from Gmail, so nothing was saved.';
+    }
+    if (response.reason === 'attachment-too-big') {
+      return glanceUiHebrew()
+        ? 'הקובץ גדול מ-4MB ולכן לא נשמר בדרייב.'
+        : 'That file is over 4 MB, so it was not saved to Drive.';
+    }
+    if (response.reason === 'attachment-ambiguous') {
+      return glanceUiHebrew()
+        ? 'יש כמה קבצים מצורפים. פתח אחד ונסה שוב.'
+        : 'More than one file is attached. Open one and try again.';
+    }
     if (response.reason === 'unclear' && /file and time|time for this event/i.test(response.error || '')) return glanceUiCopy('calendar');
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
@@ -2633,10 +3330,38 @@ function glanceUiCopy(kind) {
     if (response.reason === 'unconfirmed') return response.error || response.written || "Couldn't confirm it's unchanged. Undo left it alone.";
     if (response.reason === 'range-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || 'Undo stopped. That text was edited, so nothing was deleted.');
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
-    if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
-    if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
+    if (response.reason === 'wrong-account' && !response.expected && response.error) return response.error;
+    if (response.reason === 'account-unverified') return response.error || (glanceUiHebrew() ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.");
+    if (response.reason === 'wrong-account') {
+      return glanceUiHebrew()
+        ? 'לא נסגר — האירוע נכתב ליומן של ' + (response.account || 'חשבון אחר') + ' ולא של ' + (response.expected || 'החשבון הפתוח') + '. הסרתי אותו.'
+        : 'Not closed — the event went to the calendar of ' + (response.account || 'another account') + ', not ' + (response.expected || 'the open account') + '. Glance removed it.';
+    }
+    if (response.reason === 'list-missing') {
+      return glanceUiHebrew()
+        ? 'לא נסגר — רשימת המשימות ב-Google לא נמצאה. לא נכתבה משימה ולא נוצרה רשימה.'
+        : 'Not closed — the Google Tasks list was not found. No task was written and no list was made.';
+    }
+    if (response.reason === 'unverified') {
+      const what = response.object === 'event' ? (glanceUiHebrew() ? 'האירוע' : 'event') : (glanceUiHebrew() ? 'המשימה' : 'task');
+      return glanceUiHebrew()
+        ? 'לא אומת — Google עדיין לא החזיר את ' + what + '. הוא נשאר, ו-Undo מסיר אותו.'
+        : 'Not verified — Google has not returned the ' + what + ' yet. It stays, and Undo removes it.';
+    }
+    if (response.reason === 'verify_failed') {
+      const what = response.object === 'event' ? (glanceUiHebrew() ? 'האירוע' : 'event') : (glanceUiHebrew() ? 'המשימה' : 'task');
+      const name = response.title ? ' "' + response.title + '"' : '';
+      return glanceUiHebrew()
+        ? 'לא נסגר — לא מצאתי את ' + what + name + ' ב-Google אחרי הכתיבה.'
+        : 'Not closed — Glance could not find the ' + what + name + ' in Google after writing it.';
+    }
+    if (response.reason === 'proof_pending') {
+      const event = response.object === 'event';
+      if (glanceUiHebrew()) return event ? 'לא נסגר — האירוע לא אושר ביומן.' : (response.object === 'draft' ? 'לא נסגר — הטיוטה לא אושרה.' : 'לא נסגר — המשימה לא אושרה.');
+      return event ? 'Not closed — the event was not confirmed.' : (response.object === 'draft' ? 'Not closed — the draft was not confirmed.' : 'Not closed — the task was not confirmed.');
+    }
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
-    if (response.skipped) return 'Skipped — an earlier step in this process didn’t complete.';
+    if (response.skipped) return glanceUiHebrew() ? 'דולג — שלב קודם בתהליך לא הושלם.' : 'Skipped — an earlier step in this process didn’t complete.';
     return response.error || 'Couldn’t complete that action.';
   }
 
@@ -2659,6 +3384,8 @@ function glanceUiCopy(kind) {
   // for however long that download takes, for an attachment that was never
   // going anywhere.
   const ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+  // core/google-drive.js refuses a file above this, so say so before the send.
+  const DRIVE_SAVE_MAX_BYTES = 4 * 1024 * 1024;
 
   // download_url is an attribute Gmail's own rendering sets on a real
   // attachment chip (see findAttachmentChips below) — not something email
@@ -2681,9 +3408,15 @@ function glanceUiCopy(kind) {
   // still created, just without the attachment — never a failed action.
   async function fetchAttachmentBase64(meta) {
     if (!isTrustedAttachmentUrl(meta.url)) return null;
+    const viaWorker = await sendRuntime({ type: 'flow:fetch-attachment', url: meta.url, maxBytes: ATTACHMENT_MAX_BYTES, expectMime: meta.mimeType }).catch(() => null);
+    if (viaWorker && viaWorker.ok === true && viaWorker.base64) {
+      return { filename: meta.filename, mimeType: meta.mimeType || viaWorker.mimeType, base64: viaWorker.base64 };
+    }
     try {
       const res = await fetch(meta.url, { credentials: 'include' });
       if (!res.ok) return null;
+      const gotType = String(res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      if (gotType === 'text/html' && String(meta.mimeType || '').toLowerCase() !== 'text/html') return null;
       const declaredLength = Number(res.headers.get('content-length') || 0);
       if (declaredLength > ATTACHMENT_MAX_BYTES) return null;
       const buf = await res.arrayBuffer();
@@ -2735,10 +3468,12 @@ function glanceUiCopy(kind) {
 
     if (action.kind === 'driveFile') {
       if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
-      const only = ctx.attachments && ctx.attachments.length === 1 ? ctx.attachments[0] : null;
-      if (!only) return null;
+      const listed = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
+      const only = listed.length === 1 ? listed[0] : null;
+      if (!only) return { fail: { reason: listed.length > 1 ? 'attachment-ambiguous' : 'attachment-unreadable' } };
       const fetched = await fetchAttachmentBase64(only);
-      if (!fetched) return null;
+      if (!fetched) return { fail: { reason: 'attachment-unreadable' } };
+      if (Math.floor(String(fetched.base64 || '').length * 3 / 4) > DRIVE_SAVE_MAX_BYTES) return { fail: { reason: 'attachment-too-big' } };
       return Object.assign(base, { attachment: fetched, params: { copyAttachment: true } });
     }
 
@@ -2754,7 +3489,8 @@ function glanceUiCopy(kind) {
         const zone = await glanceUserTimeZone();
         if (zone) params.timeZone = zone;
       }
-      return Object.assign(base, { params: params });
+      params.title = renderedTitleFor(ctx, params.title);
+      return Object.assign(base, { params: params, ownEmail: ownEmailFromThread() || lastOwnEmail || '' });
     }
 
     if (action.kind === 'gmailDraft') {
@@ -2766,17 +3502,19 @@ function glanceUiCopy(kind) {
       if (cleanParams.shareLink) {
         if (!priorUrl) return null;
         return Object.assign(base, {
-          params: Object.assign({}, cleanParams, { shareUrl: priorUrl, shareLink: true, includeAttachment: false, requestedObjectTerm: null }),
+          params: Object.assign({}, cleanParams, { shareUrl: priorUrl, shareLink: true, includeAttachment: false, requestedObjectTerm: null, lang: cleanParams.lang || mailLanguage(ctx) }),
           senderEmail: ctx.sender.email,
           senderName: ctx.sender.name,
-          subject: ctx.subject
+          subject: ctx.subject,
+          threadId: ctx.threadId || ''
         });
       }
       const payload = Object.assign(base, {
-        params: driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams,
+        params: Object.assign({}, driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams, { lang: cleanParams.lang || mailLanguage(ctx) }),
         senderEmail: ctx.sender.email,
         senderName: ctx.sender.name,
-        subject: ctx.subject
+        subject: ctx.subject,
+        threadId: ctx.threadId || ''
       });
       if (driveFileId) {
         // background.js fetches Drive bytes itself — it already holds the
@@ -2798,7 +3536,7 @@ function glanceUiCopy(kind) {
     const taskEntities = (ctx.intent && ctx.intent.entities)
       || (action.params && action.params.what ? { what: action.params.what } : null);
     return Object.assign(base, {
-      label: action.params.title || action.label,
+      label: renderedTitleFor(ctx, action.params.title || action.label),
       params: {
         dateIso: action.params.dateIso || null,
         amount: action.params.amount || null,
@@ -2868,6 +3606,10 @@ function glanceUiCopy(kind) {
       messageId: ctx.messageId, reason: decision.reason, surface: 'gmail',
       fileCount: decision.fileCount, target: decision.target
     });
+  }
+
+  function logScanSkip(messageId, reason) {
+    console.log('[Glance] scan skip:', String(reason || 'unknown'), messageId || '');
   }
 
   function recordSilence(messageId, reason, detail) {
@@ -2947,11 +3689,52 @@ function glanceUiCopy(kind) {
     });
   }
 
+  // The card shows the title in the UI language. The event and the task
+  // written on Do It carry that same title.
+  function artifactTitleFor(ctx, title) {
+    if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.artifactTitle !== 'function') return title;
+    return FlowDisplay.artifactTitle(glanceUiLang(), ctx, title);
+  }
+
+  // One source of truth for what Glance writes. The string the card showed is
+  // the string the event, the task and the Activity row carry. Nothing in the
+  // write path translates or rebuilds it. A card that was never rendered here
+  // (a replay from the Brief) falls back to the same display function.
+  function renderedTitleFor(ctx, fallback) {
+    const shown = ctx && typeof ctx.renderedTitle === 'string' ? ctx.renderedTitle.trim() : '';
+    if (shown) return shown;
+    return artifactTitleFor(ctx, fallback);
+  }
+
+  // The Activity row names what the card said. A Save the file? card is not a decision.
+  function activityLabel(ctx) {
+    const raw = ctx && ctx.intent && ctx.intent.label;
+    const shown = ctx && typeof ctx.renderedTitle === 'string' ? ctx.renderedTitle.trim() : '';
+    if (shown) return shown;
+    const p = ctx && ctx.process;
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save')) return artifactTitleFor(ctx, raw);
+    return raw;
+  }
+
+  // The draft answers the mail in the mail's own language. The UI language is
+  // only the fallback for a mail with no letters to read.
+  function mailLanguage(ctx) {
+    const text = String((ctx && ctx.bodyText) || '');
+    const he = (text.match(/[\u0590-\u05FF]/g) || []).length;
+    const latin = (text.match(/[A-Za-z]/g) || []).length;
+    if (he || latin) return he > latin ? 'he' : 'en';
+    return glanceUiHebrew() ? 'he' : 'en';
+  }
+
+  function laneAccountContext() {
+    return { tabAccount: ownEmailFromThread() || lastOwnEmail || '', lang: glanceUiHebrew() ? 'he' : 'en' };
+  }
+
   function sendExecuteAction(payload) {
     const lane = laneConnectorId(payload && payload.connectorId);
     if (!lane) return sendRuntime({ type: 'flow:execute-action', payload: payload });
     if (lane === 'gmailCompose') return sendGmailCompose(payload);
-    return sendRuntime({ type: 'flow:google-write', connectorId: lane, input: payload });
+    return sendRuntime(Object.assign({ type: 'flow:google-write', connectorId: lane, input: payload }, laneAccountContext()));
   }
 
   function composeReadBack(page) {
@@ -2961,9 +3744,31 @@ function glanceUiCopy(kind) {
     return back;
   }
 
+  function composeBodyOpen() {
+    if (typeof FlowGoogleComposePage === 'undefined' || typeof FlowGoogleComposePage.findBody !== 'function') return false;
+    return !!FlowGoogleComposePage.findBody(document);
+  }
+
+  // No compose window is open. The reply draft is saved in the thread
+  // through the Gmail drafts API and read back by its id. Glance never sends.
+  async function saveReplyDraft(payload, input) {
+    const planned = typeof FlowGoogleCompose !== 'undefined' && typeof FlowGoogleCompose.plan === 'function'
+      ? FlowGoogleCompose.plan(input)
+      : { ok: false };
+    const threadId = (payload && payload.threadId) || '';
+    if (!planned.ok || !threadId) {
+      return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: glanceUiHebrew() ? 'לא הצלחתי להכין טיוטת תשובה בשרשור הזה.' : 'Could not prepare a reply draft in this thread.' };
+    }
+    return sendRuntime(Object.assign({
+      type: 'flow:google-write',
+      connectorId: 'googleReplyDraft',
+      input: { to: planned.to, subject: planned.subject, body: planned.body, threadId: threadId }
+    }, laneAccountContext()));
+
+  }
+
   async function sendGmailCompose(payload) {
     const email = (payload && payload.senderEmail) || '';
-    if (email) await sendRuntime({ type: 'flow:google-contacts', email: email, query: email });
     const input = {
       to: email,
       subject: payload && payload.subject,
@@ -2971,11 +3776,13 @@ function glanceUiCopy(kind) {
       senderEmail: email,
       quote: payload && payload.params && (payload.params.what || payload.params.quote),
       body: payload && payload.params && payload.params.body,
+      shareUrl: payload && payload.params && payload.params.shareUrl,
       useDraft: true,
       draft: payload
     };
     // The service-worker message stays so the lane hears the fill. Its
     // in-memory object is not the compose window and is not the receipt.
+    if (!composeBodyOpen()) return saveReplyDraft(payload, input);
     const swPromise = sendRuntime({ type: 'flow:gmail-compose', connectorId: 'gmailCompose', input: input, payload: input });
     let page = null;
     if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.fill === 'function') {
@@ -3000,7 +3807,7 @@ function glanceUiCopy(kind) {
   // message id, until the expiry. A changed hash refuses. A match deletes.
   const LANE_UNDO_KEY = 'glanceLaneUndo';
   const LANE_UNDO_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-  const LANE_UNDO_FIELDS = ['taskId', 'externalId', 'taskListId', 'listId', 'contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'spreadsheetId', 'snapshot', 'created', 'inserted', 'rangeName'];
+  const LANE_UNDO_FIELDS = ['taskId', 'externalId', 'taskListId', 'listId', 'contentHash', 'eventId', 'calendarId', 'documentId', 'fileId', 'spreadsheetId', 'snapshot', 'created', 'inserted', 'rangeName', 'draftId', 'threadId', 'to', 'unverified'];
 
   function laneUndoSnapshot(connectorId, ref) {
     if (!ref || typeof ref !== 'object') return null;
@@ -3110,7 +3917,7 @@ function glanceUiCopy(kind) {
     return null;
   }
 
-  function rememberLaneUndo(messageId, steps, extraIds) {
+  function rememberLaneUndo(messageId, steps, extraIds, meta) {
     const keys = laneStoreIds(messageId, extraIds);
     if (!keys.length || !steps || !steps.length) return Promise.resolve();
     if (!chromeLive()) return Promise.resolve();
@@ -3125,6 +3932,7 @@ function glanceUiCopy(kind) {
           if (!all[key] || !all[key].expires || all[key].expires < now) delete all[key];
         });
         const row = { expires: now + LANE_UNDO_TTL_MS, steps: steps, ids: keys };
+        if (meta && meta.total > steps.length) { row.partial = true; row.total = meta.total; }
         keys.forEach((id) => { all[id] = row; });
         return store.set({ [LANE_UNDO_KEY]: all });
       })
@@ -3173,7 +3981,7 @@ function glanceUiCopy(kind) {
     return laneFailLine(connectorId);
   }
 
-  function writeLaneUndoRow(messageId, steps) {
+  function writeLaneUndoRow(messageId, steps, meta, extraIds) {
     if (!messageId || !chromeLive()) return Promise.resolve();
     const store = chrome.storage && chrome.storage.local;
     if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
@@ -3182,7 +3990,7 @@ function glanceUiCopy(kind) {
       .then((bag) => {
         const all = bag && bag[LANE_UNDO_KEY] && typeof bag[LANE_UNDO_KEY] === 'object' ? bag[LANE_UNDO_KEY] : {};
         const row = findLaneRow(all, [messageId]);
-        const keys = laneStoreIds(messageId);
+        const keys = laneStoreIds(messageId, extraIds);
         const drop = {};
         keys.forEach((id) => { drop[id] = true; const folded = laneCanon(id); if (folded) drop[folded] = true; });
         Object.keys(all).forEach((key) => {
@@ -3191,6 +3999,8 @@ function glanceUiCopy(kind) {
         Object.keys(drop).forEach((key) => { delete all[key]; });
         if (steps && steps.length && keys.length) {
           all[keys[0]] = { expires: (row && row.expires) || (Date.now() + LANE_UNDO_TTL_MS), steps: steps, ids: keys };
+          const partial = (meta && meta.partial) || (row && row.partial);
+          if (partial) { all[keys[0]].partial = true; all[keys[0]].total = (meta && meta.total) || (row && row.total) || steps.length + 1; }
           keys.forEach((id) => { all[id] = all[keys[0]]; });
         }
         return store.set({ [LANE_UNDO_KEY]: all });
@@ -3255,7 +4065,8 @@ function glanceUiCopy(kind) {
           error: refused.length ? (removed.length ? written : (firstFail && firstFail.error)) : ''
         };
         if (!record || !messageId) return result;
-        return writeLaneUndoRow(messageId, remaining).then(() => result);
+        const total = record.total || record.steps.length;
+        return writeLaneUndoRow(messageId, remaining, { partial: remaining.length < total, total: total }).then(() => result);
       });
     });
   }
@@ -3278,6 +4089,9 @@ function glanceUiCopy(kind) {
   function sendLaneUndo(kind, ref) {
     const lane = laneConnectorId(kind);
     if (!lane) return sendRuntime({ type: 'flow:undo-action', connectorId: kind, ref: ref });
+    if (lane === 'gmailCompose' && ref && ref.draftId) {
+      return sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: 'googleReplyDraft', ref: ref }, laneAccountContext()));
+    }
     if (lane === 'gmailCompose') {
       let page = null;
       if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.undo === 'function') {
@@ -3287,10 +4101,10 @@ function glanceUiCopy(kind) {
       } else {
         page = { ok: false, reason: 'compose-closed', error: 'Open Reply first. Glance does not press Send.' };
       }
-      void sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
+      void sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: lane, ref: ref }, laneAccountContext()));
       return Promise.resolve(page);
     }
-    return sendRuntime({ type: 'flow:google-undo', connectorId: lane, ref: ref });
+    return sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: lane, ref: ref }, laneAccountContext()));
   }
 
   // Drive export stays in the service worker. The match stays here, in
@@ -3336,6 +4150,23 @@ function glanceUiCopy(kind) {
   // (success, failure, or skip) as it resolves — this is what lets the chip
   // narrate progress while Do It is still running, not just before and
   // after (see onDoIt's own use of it).
+  // The title that was sent is the title that landed. A mismatch is logged
+  // and flagged on the response; the write itself is never retried.
+  function assertWrittenTitle(action, payload, response) {
+    if (!response || response.ok !== true || typeof response.title !== 'string') return;
+    let expected = '';
+    if (payload && payload.params && (payload.params.fileName || payload.params.fileTerm) && action.kind === 'calendar') expected = String(payload.params.fileName || payload.params.fileTerm);
+    else if (payload && payload.params && typeof payload.params.title === 'string') expected = payload.params.title;
+    else if (payload && typeof payload.label === 'string') expected = payload.label;
+    expected = expected.replace(/[\r\n]+/g, ' ').trim();
+    if (!expected) return;
+    const limit = action.kind === 'calendar' ? 200 : 1024;
+    if (response.title !== expected.slice(0, limit)) {
+      response.titleMismatch = true;
+      console.error('[Glance] written title differs from the card title', { card: expected, written: response.title });
+    }
+  }
+
   async function runActionsSequentially(actions, ctx, onStepDone) {
     const results = [];
     const okIds = new Set();
@@ -3347,10 +4178,13 @@ function glanceUiCopy(kind) {
       } else {
         const prior = action.dependsOn ? okById.get(action.dependsOn) : null;
         const payload = await buildActionPayload(action, ctx, prior && prior.response);
-        if (!payload) {
+        if (payload && payload.fail) {
+          result = { action, response: Object.assign({ ok: false }, payload.fail) };
+        } else if (!payload) {
           result = { action, response: { ok: false, reason: 'unclear' } };
         } else {
           const response = await sendExecuteAction(payload);
+          assertWrittenTitle(action, payload, response);
           result = { action, response };
           if (response && response.ok) {
             okIds.add(action.id);
@@ -3433,11 +4267,14 @@ function glanceUiCopy(kind) {
   // stays as the honest fallback for a partial success (some steps failed)
   // — closedLine describes the full process and would overclaim if only
   // some of it actually landed.
-  function closedSummary(succeeded, ctx) {
-    const isFullClose = ctx && ctx.process.closedLine && succeeded.length === ctx.process.steps.length;
+  function closedSummary(succeeded, ctx, results) {
+    const failedStep = (results || []).some((r) => !stepHandled(r) && !(r.response && (r.response.ok || r.response.skipped)));
+    const isFullClose = !failedStep && ctx && ctx.process.closedLine && succeeded.length === ctx.process.steps.length;
     if (isFullClose) return ctx.process.closedLine;
     const verbs = succeeded.map((r) => STEP_DONE_VERB[r.action.kind] || 'completed one step');
-    return 'Closed — ' + joinWithAnd(verbs) + '.';
+    // A process with a step that did not finish is not closed.
+    const all = !failedStep && ctx && ctx.process;
+    return (all ? 'Closed — ' : 'Partly done — ') + joinWithAnd(verbs) + '.';
   }
 
   // The chip's receipt for a closed process of 1-5 steps: the status word
@@ -3460,6 +4297,11 @@ function glanceUiCopy(kind) {
   // count as closed.
   function stepHandled(r) {
     if (r && r.response && (r.response.preview === true || r.response.closes === false)) return false;
+    const lane = r && r.action && laneConnectorId(r.action.kind);
+    if (lane && lane !== 'gmailCompose') {
+      if (typeof FlowProofOfClose === 'undefined' || typeof FlowProofOfClose.laneStepVerified !== 'function') return false;
+      if (!FlowProofOfClose.laneStepVerified(r.response)) return false;
+    }
     if (typeof FlowProofOfClose !== 'undefined') return FlowProofOfClose.stepCountsAsHandled(r);
     if (taskKind(r)) return false;
     return !!(r && r.response && r.response.ok && !r.response.skipped);
@@ -3482,10 +4324,57 @@ function glanceUiCopy(kind) {
       .catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
   }
 
+  function laneVerifyCopy(kind) {
+    const he = glanceUiHebrew();
+    if (kind === 'unverified') return he ? 'לא ניתן לאמת' : "Can't verify";
+    if (kind === 'missing') return he ? 'בוטל / נמחק' : 'Removed or deleted';
+    if (kind === 'checking') return he ? 'בודק ב-Google…' : 'Checking Google…';
+    return '';
+  }
+
+  // present | missing | unknown for each stored step, read from Google by id.
+  async function verifyLaneSteps(steps) {
+    const unknown = steps.map(() => 'unknown');
+    let res = null;
+    try {
+      res = await sendRuntime(Object.assign({ type: 'flow:google-verify', steps: steps.map((s) => ({ connectorId: s.connectorId, ref: s.ref })) }, laneAccountContext()));
+    } catch (e) { return unknown; }
+    if (!res || res.ok !== true || !Array.isArray(res.states) || res.states.length !== steps.length) return unknown;
+    return res.states.map((x) => (x === 'present' || x === 'missing' ? x : 'unknown'));
+  }
+
+  // A receipt repainted from storage is a claim about Google. It is a
+  // checkmark only when Google returns every stored id.
   function mountLaneReceipt(messageNode, record, messageId) {
     if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
     const steps = (record && record.steps) || [];
     if (!steps.length) return;
+    if (messageNode.getAttribute && messageNode.getAttribute('data-glance-lane-verifying') === '1') return;
+    messageNode.setAttribute('data-glance-lane-verifying', '1');
+    verifyLaneSteps(steps).then((states) => {
+      messageNode.removeAttribute('data-glance-lane-verifying');
+      if (!messageNode.isConnected || messageNode.querySelector('.flow-chip-host')) return;
+      const present = steps.filter((st, i) => states[i] === 'present');
+      const missing = states.filter((x) => x === 'missing').length;
+      const everyPresent = present.length === steps.length;
+      if (!everyPresent && missing > 0) {
+        const keep = present;
+        writeLaneUndoRow(messageId, keep, { partial: true, total: record.total || steps.length });
+      }
+      paintLaneReceipt(messageNode, record, messageId, states);
+    }).catch(() => { messageNode.removeAttribute('data-glance-lane-verifying'); });
+  }
+
+  function paintLaneReceipt(messageNode, record, messageId, states) {
+    if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
+    const steps = (record && record.steps) || [];
+    if (!steps.length) return;
+    const verdict = states || steps.map(() => 'unknown');
+    const allPresent = verdict.every((x) => x === 'present');
+    const nothingLeft = verdict.every((x) => x === 'missing');
+    const anyUnknown = verdict.some((x) => x === 'unknown');
+    const total = (record && record.total) || steps.length;
+    const partialReceipt = allPresent && total > steps.length && !!(record && record.partial);
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
     host.setAttribute('data-glance-chain', 'lane-proof');
@@ -3493,14 +4382,27 @@ function glanceUiCopy(kind) {
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     done.setAttribute('role', 'status');
-    const icon = el('span', 'flow-chip-done-icon', '✓');
-    icon.setAttribute('aria-hidden', 'true');
-    done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-handled', glanceUiCopy('handled')));
-    steps.forEach((step) => {
+    if (allPresent) {
+      const icon = el('span', 'flow-chip-done-icon', '✓');
+      icon.setAttribute('aria-hidden', 'true');
+      done.appendChild(icon);
+    }
+    const partialCopy = typeof FlowReceipt !== 'undefined' && FlowReceipt.confirmation
+      ? FlowReceipt.confirmation({ succeeded: verdict.filter((x) => x === 'present').length, total: Math.max(total, steps.length), lang: glanceUiLang() }).status
+      : null;
+    let statusText = glanceUiCopy('handled');
+    if (partialReceipt && partialCopy) statusText = glanceShow(partialCopy);
+    else if (nothingLeft) statusText = laneVerifyCopy('missing');
+    else if (!allPresent) statusText = anyUnknown ? laneVerifyCopy('unverified') : (partialCopy ? glanceShow(partialCopy) : laneVerifyCopy('missing'));
+    const keepUndo = !nothingLeft;
+    const statusEl = el('span', 'flow-chip-handled' + (allPresent && !partialReceipt ? '' : ' flow-chip-handled-partial'), statusText);
+    statusEl.setAttribute('data-glance-verified', allPresent ? '1' : '0');
+    done.appendChild(statusEl);
+    steps.forEach((step, i) => {
       const text = step && (step.line || step.undoLine);
       if (!text) return;
-      const span = el('span', 'flow-chip-written', text);
+      const note = verdict[i] === 'missing' ? ' — ' + laneVerifyCopy('missing') : (verdict[i] === 'unknown' ? ' — ' + laneVerifyCopy('unverified') : '');
+      const span = el('span', 'flow-chip-written', text + note);
       if (step.undoLine) span.setAttribute('data-glance-undo-line', step.undoLine);
       done.appendChild(span);
     });
@@ -3569,8 +4471,10 @@ function glanceUiCopy(kind) {
         hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
       }).catch(() => { tearDownOrphan(); });
     });
-    done.appendChild(actionsRow);
-    done.appendChild(hint);
+    if (keepUndo && !(record && record.noUndo)) {
+      done.appendChild(actionsRow);
+      done.appendChild(hint);
+    }
     host.appendChild(done);
     if (messageNode.firstChild) messageNode.insertBefore(host, messageNode.firstChild);
     else messageNode.appendChild(host);
@@ -3579,12 +4483,31 @@ function glanceUiCopy(kind) {
   // The Handled banner after Gmail tears the message node down. Same
   // receipt as the Do It that just landed: status, written line, process
   // name, Undo (deletes the task by externalId), and View.
-  function mountProvedTaskReceipt(messageNode, row) {
+  function mountProvedTaskReceipt(messageNode, row, verified) {
     if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
     const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
       ? FlowProofOfClose.remountCopy(row)
       : null;
     if (!copy) return;
+    const googleTask = copy.connectorId === 'googleTask' || copy.connectorId === 'googleTasks';
+    const taskRef = copy.ref && copy.ref.taskListId && (copy.ref.taskId || copy.ref.externalId) ? copy.ref : null;
+    if (googleTask && !verified) {
+      // The Activity row says a task was written. Google is asked before a tick.
+      if (messageNode.getAttribute('data-glance-lane-verifying') === '1') return;
+      if (!taskRef) {
+        paintLaneReceipt(messageNode, { steps: [{ connectorId: 'googleLaneTask', ref: {}, line: copy.writtenLine || 'Google Task', undoLine: '' }], noUndo: true }, row.messageId || '', ['unknown']);
+        return;
+      }
+      messageNode.setAttribute('data-glance-lane-verifying', '1');
+      const step = { connectorId: 'googleLaneTask', ref: taskRef, line: copy.writtenLine || 'Google Task', undoLine: '' };
+      verifyLaneSteps([step]).then((states) => {
+        messageNode.removeAttribute('data-glance-lane-verifying');
+        if (!messageNode.isConnected || messageNode.querySelector('.flow-chip-host')) return;
+        if (states[0] === 'present') { mountProvedTaskReceipt(messageNode, row, true); return; }
+        paintLaneReceipt(messageNode, { steps: [step], noUndo: true }, row.messageId || '', states);
+      }).catch(() => { messageNode.removeAttribute('data-glance-lane-verifying'); });
+      return;
+    }
 
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
@@ -3601,15 +4524,18 @@ function glanceUiCopy(kind) {
     if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
-      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
-      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', receiptProcessName(copy.processName)));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', glanceShow(copy.closedLine)));
       done.appendChild(detail);
     }
 
-    const undo = el('button', 'flow-chip-undo', glanceShow(copy.undoHint));
+    const undoLabel = glanceUiCopy('undo');
+    const undo = el('button', 'flow-chip-undo', glanceShow(undoLabel));
     undo.type = 'button';
+    undo.setAttribute('aria-label', glanceShow(undoLabel));
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (copy.undoHint && copy.undoHint !== undoLabel) hint.textContent = glanceShow(copy.undoHint);
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
@@ -3749,22 +4675,158 @@ function glanceUiCopy(kind) {
     placeReceipt(host, chip, done);
   }
 
+  // A write Google accepted and has not shown back yet. It is in Google, so
+  // it has to be undoable. It is never a checkmark and never Handled.
+  function unverifiedOrphan(r) {
+    return !!(r && r.response && r.response.reason === 'unverified' && r.response.ref && r.action && laneConnectorId(r.action.kind));
+  }
+
+  function savedReplyDraft(r) {
+    const res = r && r.response;
+    return !!(res && res.ok === true && res.ref && res.ref.draftId && r.action && laneConnectorId(r.action.kind) === 'gmailCompose');
+  }
+
+  function draftReadBackVerified(r) {
+    if (!savedReplyDraft(r)) return false;
+    const gate = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+    const proof = r.response && r.response.proof;
+    if (gate && typeof gate.isProof === 'function' && gate.isProof(proof)) return true;
+    return r.response && r.response.fetchedBack === true;
+  }
+
+  function composeDraftClosed(r) {
+    const res = r && r.response;
+    if (!res || res.ok !== true || res.skipped) return false;
+    if (!r.action || laneConnectorId(r.action.kind) !== 'gmailCompose') return false;
+    if (draftReadBackVerified(r)) return true;
+    return !!composeReadBack(res);
+  }
+
+  function receiptClosedStep(r) {
+    if (stepHandled(r)) return true;
+    return composeDraftClosed(r);
+  }
+
+  function orphanLine(r) {
+    const line = laneStepLine(laneConnectorId(r.action.kind), r.response);
+    return line + ' — ' + glanceUiCopy('notVerified');
+  }
+
+  // Only orphans on screen: no checkmark, "Not verified", the rows with the
+  // same note, and Undo that deletes each one by its id. The ids are stored,
+  // so the next open reads Google again before it says anything more.
+  function showUnverifiedReceipt(host, chip, ctx, results, orphans) {
+    const msgId = ctx.legacyMessageId || ctx.messageId;
+    rememberLaneUndo(msgId, laneUndoStepsOf(orphans), ctx.laneIds, { total: results.length });
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const status = el('span', 'flow-chip-handled flow-chip-handled-partial', glanceShow(glanceUiCopy('notVerified')));
+    status.setAttribute('data-glance-verified', '0');
+    done.appendChild(status);
+    orphans.forEach((r) => done.appendChild(el('span', 'flow-chip-written', glanceShow(orphanLine(r)))));
+    done.appendChild(el('span', 'flow-chip-label', reasonMessage(orphans[0].response, ctx)));
+    const undo = el('button', 'flow-chip-undo', glanceShow(orphans.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo')));
+    undo.type = 'button';
+    const hint = el('span', 'flow-chip-undo-hint');
+    hint.hidden = true;
+    undo.addEventListener('click', () => {
+      undo.textContent = glanceUiCopy('undoing');
+      undo.disabled = true;
+      rollbackChain(orphans, ctx).then((result) => {
+        if (result.ok) {
+          writeLaneUndoRow(msgId, [], { total: results.length }, ctx.laneIds);
+          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(laneUndoLine(laneConnectorId(orphans[0].action.kind)) || 'Undone.')));
+          return;
+        }
+        undo.textContent = glanceUiCopy('undo');
+        undo.disabled = false;
+        hint.hidden = false;
+        hint.textContent = glanceShow(result.error || laneFailLine(laneConnectorId(orphans[0].action.kind)));
+        hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+      });
+    });
+    const actionsRow = el('span', 'flow-chip-actions');
+    actionsRow.appendChild(undo);
+    done.appendChild(actionsRow);
+    done.appendChild(hint);
+    placeReceipt(host, chip, done);
+    noteLaneOutcome(results);
+  }
+
+  // A refused write: the account could not be verified, or is another one.
+  // Nothing was written. A calendar event that was written and then removed
+  // for the wrong account carries `expected` and is not this.
+  function accountRefusal(r) {
+    const x = r && r.response;
+    return !!(x && !x.ok && !x.expected && x.needsReconnect && (x.reason === 'wrong-account' || x.reason === 'account-unverified'));
+  }
+
+  // The Reconnect button for the account the Gmail tab shows. It sits on the
+  // card, next to the refusal line, and never ticks anything.
+  function offerReconnect(host, chip, response) {
+    if (!host || !response) return;
+    host.querySelectorAll('.flow-chip-reconnect').forEach((n) => n.remove());
+    const he = glanceUiHebrew();
+    const label = glanceShow(glanceUiCopy('reconnect'));
+    const btn = el('button', 'flow-chip-reconnect', label);
+    btn.type = 'button';
+    btn.setAttribute('data-glance-reconnect-account', response.reconnectAccount || '');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = he ? 'מתחבר…' : 'Connecting…';
+      let res = null;
+      try { res = await sendRuntime({ type: 'flow:google-reconnect', account: response.reconnectAccount || '' }); } catch (e) { res = null; }
+      if (res && res.ok) {
+        btn.remove();
+        setChipState(chip, 'flow-chip-error', he ? 'החיבור התחדש. לחץ שוב על Do It.' : 'Reconnected. Press Do It again.');
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = label;
+      const named = res && res.account ? res.account : '';
+      const want = res && res.wanted ? res.wanted : (response.reconnectAccount || '');
+      const line = res && res.reason === 'wrong-account' && named
+        ? (he ? 'התחברת עם ' + named + ', אבל Gmail פתוח על ' + want + '. נסה שוב עם ' + want + '.' : 'You signed in as ' + named + ', but this Gmail tab is ' + want + '. Try again as ' + want + '.')
+        : (he ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.");
+      setChipState(chip, 'flow-chip-error', line);
+    });
+    host.appendChild(btn);
+  }
+
   async function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter(stepHandled);
+    const orphans = results.filter((r) => unverifiedOrphan(r) && succeeded.indexOf(r) < 0);
+    // A reply draft that was saved is prepared, not a close, so it is not a
+    // success. It is still in Gmail, so it is on the receipt and Undo deletes
+    // it by its id.
+    const drafts = results.filter((r) => savedReplyDraft(r) && succeeded.indexOf(r) < 0 && orphans.indexOf(r) < 0);
+    const extra = orphans.concat(drafts);
 
+    if (!succeeded.length && orphans.length) {
+      showUnverifiedReceipt(host, chip, ctx, results, orphans);
+      return;
+    }
+    const refused = results.find(accountRefusal);
+    if (!succeeded.length && refused) {
+      setChipState(chip, 'flow-chip-error', reasonMessage(refused.response, ctx));
+      offerReconnect(host, chip, refused.response);
+      return;
+    }
     if (!succeeded.length) {
       const preview = results.find((r) => r.response && composeReadBack(r.response));
       if (preview) {
         showPreviewReceipt(host, chip, preview);
         return;
       }
-      const composeTry = results.find((r) => r.action && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
+      const composeTry = results.find((r) => r.action && !(r.response && r.response.skipped) && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
       if (composeTry) {
         showPreviewReceipt(host, chip, composeTry);
         return;
       }
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
-      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
+      const firstFailed = results.find((r) => r.response && !r.response.skipped);
+      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (firstFailed && firstFailed.response) || (results[0] && results[0].response), ctx));
       return;
     }
 
@@ -3782,14 +4844,16 @@ function glanceUiCopy(kind) {
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
     const taskSteps = results.filter(taskKind);
+    const attempted = results.filter((r) => r && r.action && !(r.response && r.response.skipped));
+    const closedSteps = attempted.filter(receiptClosedStep);
     const copy = FlowReceipt.confirmation({
-      succeeded: succeeded.length,
-      total: results.length,
+      succeeded: closedSteps.length,
+      total: attempted.length,
       priorCloses,
       lang: glanceUiLang(),
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
-        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        ? closedSteps.filter(taskKind).map((r) => r.response && r.response.proof)
         : undefined,
       verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
@@ -3803,9 +4867,11 @@ function glanceUiCopy(kind) {
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     done.setAttribute('role', 'status');
-    const icon = el('span', 'flow-chip-done-icon', '✓');
-    icon.setAttribute('aria-hidden', 'true');
-    done.appendChild(icon);
+    if (!orphans.length) {
+      const icon = el('span', 'flow-chip-done-icon', '✓');
+      icon.setAttribute('aria-hidden', 'true');
+      done.appendChild(icon);
+    }
 
     const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), glanceShow(copy.status));
     done.appendChild(status);
@@ -3820,19 +4886,29 @@ function glanceUiCopy(kind) {
     for (const line of FlowActions.receiptWrittenLines(succeeded)) {
       done.appendChild(el('span', 'flow-chip-written', line));
     }
+    orphans.forEach((r) => done.appendChild(el('span', 'flow-chip-written', glanceShow(orphanLine(r)))));
+    drafts.forEach((r) => done.appendChild(el('span', 'flow-chip-written', glanceUiHebrew() ? 'טיוטת תשובה נשמרה בשרשור הזה. השליחה בידיים שלך.' : glanceShow(String(r.response.written || '')))));
+    const wroteAs = succeeded.map((r) => r.response && r.response.account).find((a) => typeof a === 'string' && a);
+    if (wroteAs) {
+      const account = el('span', 'flow-chip-account', (glanceUiHebrew() ? 'חשבון: ' : 'Account: ') + wroteAs);
+      account.setAttribute('data-glance-account', wroteAs);
+      done.appendChild(account);
+    }
 
     const detail = el('span', 'flow-chip-detail');
-    detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
-    detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
+    detail.appendChild(el('span', 'flow-chip-process-name', receiptProcessName(ctx.process.name)));
+    detail.appendChild(el('span', 'flow-chip-label', glanceShow(closedSummary(succeeded, ctx, results))));
     done.appendChild(detail);
 
-    const sole = succeeded.length === 1 ? succeeded[0].response : null;
-    const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres);
-    // The sentence is the control. A filled pill would be a second Do It.
-    const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
+    const sole = succeeded.length === 1 && !extra.length ? succeeded[0].response : null;
+    const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
+    const undoLabel = glanceShow(copy.undoLabel || (attempted.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo')));
+    const undo = el('button', 'flow-chip-undo', undoLabel);
     undo.type = 'button';
+    undo.setAttribute('aria-label', undoLabel);
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (undoHint) hint.textContent = glanceShow(undoHint);
 
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
@@ -3845,7 +4921,7 @@ function glanceUiCopy(kind) {
     undo.addEventListener('click', () => {
       undo.textContent = glanceChrome().undoing;
       undo.disabled = true;
-      rollbackChain(succeeded, ctx).then((result) => {
+      rollbackChain(succeeded.concat(extra), ctx).then((result) => {
         // Recorded regardless of whether the whole rollback reported ok —
         // any step that genuinely reverted is a genuine "don't propose this
         // again" signal, even if a later step in the chain couldn't. Feeds
@@ -3855,6 +4931,12 @@ function glanceUiCopy(kind) {
         // and the precision/harm audit's whole point was that harm has to
         // reach the confidence bar, not just Execution Memory's step bias.
         if (result.undoneIds.length) {
+          // The stored receipt is the record a reopen repaints. What was taken
+          // back leaves it now, so a reopen cannot tick a thing Google no
+          // longer holds.
+          const gone = new Set(result.undoneIds);
+          const left = succeeded.concat(extra).filter((r) => !gone.has(r.action.id));
+          writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < results.length, total: results.length }, ctx.laneIds);
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
           // The full close is no longer true, so a later message in this
@@ -3874,7 +4956,7 @@ function glanceUiCopy(kind) {
           }
         }
         if (result.ok) {
-          const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
+          const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
           done.replaceChildren(el('span', 'flow-chip-label', glanceShow(undone)));
           const taskSteps = succeeded.filter(taskKind);
           const markTask = taskSteps.length && typeof FlowStorage.markGoogleTaskUndone === 'function'
@@ -3885,7 +4967,7 @@ function glanceUiCopy(kind) {
             if (taskSteps.length === succeeded.length && covered) return null;
             return FlowStorage.appendLog({
               kind: 'undone',
-              label: ctx.intent.label,
+              label: activityLabel(ctx),
               messageId: ctx.messageId,
               threadId: ctx.threadId || null,
               connectorId: taskSteps.length === succeeded.length ? 'googleTask' : undefined,
@@ -3923,9 +5005,10 @@ function glanceUiCopy(kind) {
     // reasonMessage() the fully-failed path (above) already uses, so a
     // failure reads the same whether it's the only thing that happened or
     // one line in a partial receipt.
-    if (results.length > succeeded.length) {
-      const failed = results.filter((r) => !(r.response && r.response.ok));
-      const detail = failed.map((r) => r.action.label + ': ' + reasonMessage(r.response, ctx)).join(' · ');
+    const failedNote = results.filter((r) => !stepHandled(r) && !(r.response && (r.response.ok || r.response.skipped)));
+    if (failedNote.length) {
+      const failed = failedNote;
+      const detail = failed.map((r) => glanceShow(r.action.label) + ': ' + reasonMessage(r.response, ctx)).join(' · ');
       done.appendChild(el('span', 'flow-chip-partial-note', '(' + detail + ')'));
     }
 
@@ -3961,7 +5044,7 @@ function glanceUiCopy(kind) {
       ? FlowStorage.recordMeeting({ id: ctx.messageId, title: ctx.intent.label, dateIso: meetingIso, threadUrl: window.location.href })
           .catch((e) => console.error('[Glance] failed to remember the meeting for its debrief', e))
       : null;
-    const closedLine = closedSummary(succeeded, ctx);
+    const closedLine = closedSummary(succeeded, ctx, results);
     const bookkeeping = succeeded.map((r) => {
       const proof = r.response && r.response.proof;
       let proofFields = null;
@@ -3977,7 +5060,7 @@ function glanceUiCopy(kind) {
       }
       return FlowStorage.appendLog(Object.assign({
         kind: 'written',
-        label: ctx.intent.label,
+        label: activityLabel(ctx),
         messageId: ctx.messageId,
         legacyMessageId: ctx.legacyMessageId || null,
         threadId: ctx.threadId || null,
@@ -3991,7 +5074,7 @@ function glanceUiCopy(kind) {
     });
     if (meetingNote) bookkeeping.push(meetingNote);
     noteLaneOutcome(results);
-    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded), ctx.laneIds));
+    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded.concat(extra)), ctx.laneIds, { total: results.length }));
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
@@ -4056,6 +5139,11 @@ function glanceUiCopy(kind) {
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
     if (host.dataset.collectorOpen === '1') return;
+    const offered = ctx.app === 'gmail' && host.closest ? host.closest('[data-legacy-message-id], [role="listitem"], .adn') : null;
+    if (offered && copiedOnlyNow(offered, ctx.bodyText || '', ownEmailFromThread() || lastOwnEmail || '')) {
+      withdrawOffer(offered, ctx.messageId);
+      return;
+    }
     // Only a template create (a Doc or Sheet) has a body to build. Family B
     // (file-on-hold / file-on-task) has no template. artifactBody reports
     // that as blank, and returning here used to leave the Hold it card
@@ -4071,7 +5159,7 @@ function glanceUiCopy(kind) {
           empty.focus();
           return;
         }
-        setChipState(chip, 'flow-chip-error', 'Nothing was written. A required field is still empty.');
+        setChipState(chip, 'flow-chip-error', glanceChrome().nothingWritten);
         return;
       }
       ctx.slotFills = fills;
@@ -4090,7 +5178,7 @@ function glanceUiCopy(kind) {
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     if (host.__glanceSteps) host.__glanceSteps.setAll('preparing');
-    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
+    FlowStorage.appendLog({ kind: 'clicked', label: activityLabel(ctx), messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
@@ -4116,7 +5204,7 @@ function glanceUiCopy(kind) {
       if (host.__glanceSteps && result && result.action) {
         const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
         const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
-        host.__glanceSteps.setRow(result.action.id, next);
+        host.__glanceSteps.setRow(result.action.id, next, next === 'failed' ? reasonMessage(result.response, ctx) : null);
       }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
@@ -4154,7 +5242,7 @@ function glanceUiCopy(kind) {
     // down with it via a shared Promise.all rejection, nor skip the
     // tracking/checkBrief() below that a real dismiss still deserves.
     await Promise.all([
-      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
+      FlowStorage.appendLog({ kind: 'dismissed', label: activityLabel(ctx), messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
         .catch((e) => console.error('[Glance] failed to record a dismiss in the activity log', e)),
       FlowStorage.calibrate('dismiss', ctx.intent.type)
         .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
@@ -4543,9 +5631,20 @@ function glanceUiCopy(kind) {
   }
 
   function parseDownloadUrl(raw) {
-    const parts = String(raw || '').split(':');
+    const text = String(raw || '');
+    const first = text.indexOf(':');
+    const link = text.search(/:https?:\/\//i);
+    const decodeName = (name) => {
+      const rawName = String(name || '');
+      if (!/%[0-9A-Fa-f]{2}/.test(rawName)) return rawName;
+      try { return decodeURIComponent(rawName.replace(/\+/g, ' ')); } catch (e) { return rawName; }
+    };
+    if (first > 0 && link > first) {
+      return { mimeType: text.slice(0, first), filename: decodeName(text.slice(first + 1, link)), url: text.slice(link + 1) };
+    }
+    const parts = text.split(':');
     if (parts.length < 3) return null;
-    return { mimeType: parts[0], filename: parts[1], url: parts.slice(2).join(':') };
+    return { mimeType: parts[0], filename: decodeName(parts[1]), url: parts.slice(2).join(':') };
   }
 
   // Wired once per chip (chip.dataset.flowWired guards re-wiring on every
@@ -4694,7 +5793,7 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
     else if (changes.proLicense) applyProState();
-    else if (changes.glanceOwnNames || changes.googleProfile) {
+    else if (changes.glanceOwnNames || changes.googleProfile || changes.googleWebAuth) {
       FlowStorage.get().then((next) => {
         state = next || state;
         scanReadingPane();
@@ -4710,6 +5809,9 @@ function glanceUiCopy(kind) {
       return mount.querySelector('.flow-chip-host');
     }
   };
+
+  // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
 
   init();
 })();

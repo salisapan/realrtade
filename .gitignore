@@ -73,3 +73,6 @@ glance-ai/model/suggest-save/out/
 glance-ai/model/strip/out/
 glance-ai/model/shadow-pkg/test/out/
 glance-ai/model/shadow-pkg/bench/out/
+
+# Graphify local AST graph (large HTML/JSON/cache). Rebuilt on demand; not committed.
+graphify-out/

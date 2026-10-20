@@ -96,12 +96,32 @@ const FlowDisplay = (() => {
   }
 
   // One entry, one title. A shared chip label is not this entry's action.
-  function localizeHeading(lang, title) {
+  // A card with no sentence of its own is titled by its process name.
+  const PROCESS_NAME_HE = {
+    'Reply & Track': 'מענה ומעקב',
+    'Schedule It': 'לתזמן',
+    'Schedule & Confirm': 'לתזמן ולאשר',
+    'Follow Through': 'לעקוב עד הסוף',
+    'Move It': 'להזיז',
+    'Clear It': 'לפנות',
+    'Attach it': 'לצרף',
+    'Reply with it': 'להשיב עם הקובץ',
+    'Draft it': 'לנסח טיוטה',
+    'Note it': 'לרשום הערה',
+    'File it': 'לשמור את הקובץ'
+  };
+
+  function localizeHeading(lang, title, extra) {
     const raw = String(title == null ? '' : title);
     if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
     let matched = raw.match(/^Log (.+) agreed$/);
     if (matched) return 'רשום ' + matched[1] + ' שסוכם';
     if (raw === 'Log this decision') return 'רשום את ההחלטה';
+    if (raw === 'Log decision') return 'לתעד החלטה';
+    if (raw === 'Handle this note') return 'לטפל בהערה';
+    if (raw === 'Log commitment') return 'לתעד התחייבות';
+    if (raw === 'Follow up') return 'מעקב';
+    if (raw === 'Save the file') return 'לשמור את הקובץ';
     if (raw === 'Log that this is not going ahead') return 'רשום שזה לא מתקדם';
     if (raw === 'Log agreement executed') return 'רשום שההסכם נחתם';
     if (raw === 'Log discrepancy raised') return 'רשום שהועלתה אי התאמה';
@@ -111,7 +131,218 @@ const FlowDisplay = (() => {
     if (matched) return 'רשום ' + matched[1] + ', ' + matched[2];
     if (/^log it$/i.test(raw)) return 'רשום';
     if (raw === 'Save the file?') return 'לשמור את הקובץ?';
+    if (Object.prototype.hasOwnProperty.call(PROCESS_NAME_HE, raw)) return PROCESS_NAME_HE[raw];
+    matched = raw.match(/^Call about (.+)$/);
+    if (matched) return hebrewCallAbout(matched[1], extra);
+    matched = raw.match(/^Call with (.+)$/);
+    if (matched) {
+      if (ownNote(extra) && isOwnPerson(matched[1], extra)) return hebrewSelfCall(extra);
+      return 'שיחה עם ' + matched[1];
+    }
+    const when = hebrewCallWhen(raw);
+    if (when) return 'שיחה ' + when;
+    if (raw === 'Call') return 'שיחה';
+    matched = raw.match(/^Call (.+)$/);
+    if (matched) {
+      const verb = hebrewCallVerb(matched[1]);
+      return verb || raw;
+    }
     return raw;
+  }
+
+  // A topic is one whole phrase, in Hebrew word order, or it is not
+  // translated. A name or a brand inside that phrase stays as written.
+  // There is no word-by-word pass.
+  const CALL_TOPIC_PHRASE_HE = [
+    ['the new pricing plan', 'תוכנית התמחור החדשה'],
+    ['new pricing plan', 'תוכנית התמחור החדשה'],
+    ['the pricing plan', 'תוכנית התמחור'],
+    ['pricing plan', 'תוכנית התמחור'],
+    ['the q4 budget plan', 'תוכנית תקציב Q4'],
+    ['the q4 budget', 'תקציב Q4'],
+    ['q4 budget', 'תקציב Q4'],
+    ["dana's contract renewal", 'חידוש החוזה של Dana'],
+    ['the globex renewal', 'חידוש Globex'],
+    ['globex renewal', 'חידוש Globex'],
+    ['the contract with initech', 'החוזה עם Initech'],
+    ['the hiring plan for glance', 'תוכנית הגיוס של Glance'],
+    ['initech onboarding', 'קליטת Initech'],
+    ['the new website', 'האתר החדש'],
+    ['new website', 'האתר החדש'],
+    ['the launch checklist', 'רשימת ההשקה'],
+    ['launch checklist', 'רשימת ההשקה'],
+    ['the campaign', 'הקמפיין'],
+    ['the pilot', 'הפיילוט'],
+    ['the contract', 'החוזה'],
+    ['the renewal', 'החידוש'],
+    ['the invoice', 'החשבונית'],
+    ['onboarding', 'קליטה'],
+    ['campaign', 'הקמפיין'],
+    ['pilot', 'הפיילוט'],
+    ['contract', 'החוזה'],
+    ['renewal', 'החידוש'],
+    ['invoice', 'החשבונית']
+  ];
+  const CALL_VERB_HE = {
+    'the bank': 'לבנק',
+    'a bank': 'לבנק',
+    bank: 'לבנק',
+    'the accountant': 'לרואה החשבון',
+    'an accountant': 'לרואה החשבון',
+    accountant: 'לרואה החשבון'
+  };
+  const CALL_DAY_HE = {
+    monday: 'יום שני',
+    tuesday: 'יום שלישי',
+    wednesday: 'יום רביעי',
+    thursday: 'יום חמישי',
+    friday: 'יום שישי',
+    saturday: 'יום שבת',
+    sunday: 'יום ראשון',
+    tomorrow: 'מחר',
+    today: 'היום',
+    tonight: 'הלילה'
+  };
+  const CALL_MONTH_HE = {
+    january: 'בינואר', jan: 'בינו׳',
+    february: 'בפברואר', feb: 'בפבר׳',
+    march: 'במרץ', mar: 'במרץ',
+    april: 'באפריל', apr: 'באפר׳',
+    may: 'במאי',
+    june: 'ביוני', jun: 'ביוני',
+    july: 'ביולי', jul: 'ביולי',
+    august: 'באוגוסט', aug: 'באוג׳',
+    september: 'בספטמבר', sep: 'בספט׳', sept: 'בספט׳',
+    october: 'באוקטובר', oct: 'באוק׳',
+    november: 'בנובמבר', nov: 'בנוב׳',
+    december: 'בדצמבר', dec: 'בדצ׳'
+  };
+
+  function personName(extra) {
+    if (!extra || typeof extra !== 'object') return '';
+    const raw = extra.senderName || (extra.sender && extra.sender.name) || '';
+    const name = String(raw).replace(/\s+/g, ' ').trim();
+    if (!name || name.indexOf('@') >= 0 || /^me$/i.test(name)) return '';
+    return name;
+  }
+
+  // A note the person sent to their own address. The sender is then
+  // themselves, and the Hebrew title does not say שיחה עם that name.
+  function ownNote(extra) {
+    if (!extra || typeof extra !== 'object') return false;
+    if (extra.self === true) return true;
+    if (extra.intent && extra.intent.selfTask) return true;
+    const who = personName(extra).toLowerCase();
+    if (!who) return false;
+    const names = [];
+    if (extra.userName) names.push(String(extra.userName));
+    if (Array.isArray(extra.ownNames)) {
+      for (let i = 0; i < extra.ownNames.length; i++) names.push(String(extra.ownNames[i] || ''));
+    }
+    for (let i = 0; i < names.length; i++) {
+      const n = names[i].replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!n) continue;
+      if (who === n) return true;
+      const first = n.split(' ')[0];
+      if (first.length > 1 && who.split(' ')[0] === first) return true;
+    }
+    return false;
+  }
+
+  function isOwnPerson(name, extra) {
+    const who = String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!who) return false;
+    const sender = personName(extra).toLowerCase();
+    if (ownNote(extra) && sender && (who === sender || sender.indexOf(who) >= 0 || who.indexOf(sender) >= 0)) return true;
+    const names = [];
+    if (extra && extra.userName) names.push(String(extra.userName));
+    if (extra && Array.isArray(extra.ownNames)) {
+      for (let i = 0; i < extra.ownNames.length; i++) names.push(String(extra.ownNames[i] || ''));
+    }
+    for (let i = 0; i < names.length; i++) {
+      const n = String(names[i] || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (n && who === n) return true;
+    }
+    return false;
+  }
+
+  function translateCallTopic(phrase) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').replace(/[’']/g, "'").trim();
+    if (!raw || /[\u0590-\u05FF]/.test(raw)) return '';
+    const lower = raw.toLowerCase();
+    for (let i = 0; i < CALL_TOPIC_PHRASE_HE.length; i++) {
+      if (lower === CALL_TOPIC_PHRASE_HE[i][0]) return CALL_TOPIC_PHRASE_HE[i][1];
+    }
+    return '';
+  }
+
+  function hebrewCallAbout(phrase, extra) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (/[\u0590-\u05FF]/.test(raw)) return 'שיחה בנושא ' + raw;
+    const he = translateCallTopic(raw);
+    if (he) return 'שיחה בנושא ' + he;
+    if (ownNote(extra)) return hebrewSelfCall(extra);
+    const who = personName(extra);
+    if (who) return 'שיחה עם ' + who;
+    return 'Call about ' + raw;
+  }
+
+  function hebrewSelfCall(extra) {
+    const body = extra && (extra.bodyText || extra.text || extra.body || '');
+    const when = hebrewWhenFromText(body);
+    return when ? ('שיחה ' + when) : 'שיחה';
+  }
+
+  function hebrewClockToken(token) {
+    const t = String(token || '').replace(/\s+/g, '').toLowerCase();
+    const am = /am$/.test(t);
+    const pm = /pm$/.test(t);
+    if (!am && !pm) return t;
+    const num = t.replace(/am$|pm$/, '');
+    const bits = num.split(':');
+    let hour = parseInt(bits[0], 10);
+    const minute = bits.length > 1 ? bits[1] : '00';
+    if (!isFinite(hour)) return t;
+    if (pm && hour < 12) hour += 12;
+    if (am && hour === 12) hour = 0;
+    return hour + ':' + (minute.length === 1 ? '0' + minute : minute);
+  }
+
+  function hebrewCallWhen(title) {
+    let m = String(title || '').match(/^Call (monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight)(?: (\d{1,2}(?::\d{2})?(?:am|pm)?))?$/i);
+    if (m) {
+      const day = m[1].toLowerCase();
+      const clock = m[2] ? hebrewClockToken(m[2]) : '';
+      const bare = (day === 'tomorrow' || day === 'today' || day === 'tonight')
+        ? CALL_DAY_HE[day]
+        : ('ב' + CALL_DAY_HE[day]);
+      return clock ? (bare + ' ' + clock) : bare;
+    }
+    m = String(title || '').match(/^Call (january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec) (\d{1,2})(?: (\d{1,2}(?::\d{2})?(?:am|pm)?))?$/i);
+    if (!m) return '';
+    const clock = m[3] ? hebrewClockToken(m[3]) : '';
+    const dated = 'ב-' + m[2] + ' ' + CALL_MONTH_HE[m[1].toLowerCase()];
+    return clock ? (dated + ' ' + clock) : dated;
+  }
+
+  function hebrewWhenFromText(text) {
+    const raw = String(text || '');
+    let m = raw.match(/\b(tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (m) return hebrewCallWhen('Call ' + m[1] + ' ' + m[2].replace(/\s+/g, ''));
+    m = raw.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (!m) return '';
+    return hebrewCallWhen('Call ' + m[1] + ' ' + m[2] + ' ' + m[3].replace(/\s+/g, ''));
+  }
+
+  function hebrewCallVerb(object) {
+    const raw = String(object || '').replace(/\s+/g, ' ').replace(/[.,!?]+$/g, '').trim();
+    if (/^(?:her|him|them|you|me|us|she|he|they)$/i.test(raw)) return '';
+    if (/^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight)$/i.test(raw)) return '';
+    const known = CALL_VERB_HE[raw.toLowerCase()];
+    if (known) return 'להתקשר ' + known;
+    if (/^[\u0590-\u05FF][\u0590-\u05FF'’.-]{1,40}$/.test(raw)) return 'להתקשר ל' + raw;
+    if (/^[A-Z][A-Za-z'’.-]{1,40}(?:\s+[A-Z][A-Za-z'’.-]{1,40})?$/.test(raw)) return 'להתקשר ל-' + raw;
+    return '';
   }
 
   function activityTitle(entry, lang) {
@@ -173,6 +404,14 @@ const FlowDisplay = (() => {
       const blob = String((extra && (extra.bodyText || extra.text)) || '');
       return { title: /[\u0590-\u05FF]/.test(blob) ? 'פגישה' : 'Meeting', sentence: null, fileCard: false, logIt: false };
     }
+    // Schedule It is the process name. A call titled by the engine keeps
+    // that title. Other schedule cards still use the process name.
+    if (id === 'schedule') {
+      const titled = intent && String(intent.label || '').trim();
+      if (/^Call about\b/.test(titled) || /^Call with\b/.test(titled) || /^Call\s+\S/.test(titled) || /^שיחה\b/.test(titled)) {
+        return { title: titled.replace(/[.,\s]+$/g, ''), sentence: null, fileCard: false, logIt: false };
+      }
+    }
     return { title: name, sentence: null, fileCard: false, logIt: false };
   }
 
@@ -211,6 +450,9 @@ const FlowDisplay = (() => {
     'third-party': 'משתמש חיצוני',
     'calendar-write-not-granted': 'צריך הרשאה ליומן',
     'outlook-calendar-write-not-granted': 'צריך הרשאה ליומן',
+    'suggest:no-consent': 'יש קובץ מצורף. צריך הרשאת OneDrive כדי לשמור אותו',
+    'suggest:attachments-unread': 'לא הצלחתי לקרוא את הקבצים המצורפים',
+    'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
     'names-pending': 'ממתין לשם'
   };
@@ -330,6 +572,33 @@ const FlowDisplay = (() => {
       alreadyClosed: 'Already closed elsewhere — nothing to do.',
       nothingWritten: 'Nothing was written. A required field is still empty.',
       somethingWrong: 'Something went wrong. Try again.',
+      nothingWrittenShort: 'Nothing was written.',
+      stepDraftLink: 'Draft link',
+      stepReplyDraft: 'Reply draft',
+      stepDraftFile: 'Draft reply + file',
+      notConfirmed: 'Not closed — the task was not confirmed.',
+      notReadBack: 'Not closed — Glance could not read that task back.',
+      notWired: 'That action isn’t wired up yet.',
+      couldntComplete: 'Couldn’t complete that action.',
+      composeClosed: 'Open Reply first. Glance does not press Send.',
+      composeEmpty: 'The compose window is still empty.',
+      skippedEarlier: 'Skipped — an earlier step in this process didn’t complete.',
+      todoUiCache: 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
+      notAllGone: 'Not all of it is gone. Undo again to remove what’s left.',
+      lineCalOff: 'Off your calendar.',
+      lineCalMoved: 'Moved on your calendar.',
+      lineSchedDraftTrack: 'Scheduled, drafted, and tracked.',
+      lineSchedReminder: 'Scheduled, with a reminder set.',
+      lineDraftTrack: 'Drafted and tracked.',
+      lineReminderReply: 'Reminder set, reply ready.',
+      lineFactDraft: 'The fact is in a reply draft.',
+      lineLogTrack: 'Logged and tracked.',
+      lineCalFile: 'On your calendar, with the file.',
+      lineTaskFile: 'On the task, with the file.',
+      lineDriveLink: 'Saved to Drive, link drafted.',
+      lineTemplateLink: 'Drafted from the template, link ready.',
+      lineOneDrive: 'Saved on OneDrive.',
+      lineDraftFile: 'Drafted, with the file attached.',
       onCalendar: 'On your calendar.',
       preparingNow: 'Preparing…',
       markKept: 'Mark kept',
@@ -455,6 +724,33 @@ const FlowDisplay = (() => {
       alreadyClosed: 'כבר נסגר במקום אחר — אין מה לעשות.',
       nothingWritten: 'שום דבר לא נכתב. שדה חובה עדיין ריק.',
       somethingWrong: 'משהו השתבש. נסה שוב.',
+      nothingWrittenShort: 'שום דבר לא נכתב.',
+      stepDraftLink: 'קישור בטיוטה',
+      stepReplyDraft: 'טיוטת תשובה',
+      stepDraftFile: 'טיוטת תשובה + קובץ',
+      notConfirmed: 'לא נסגר — המשימה לא אומתה.',
+      notReadBack: 'לא נסגר — Glance לא הצליח לקרוא את המשימה בחזרה.',
+      notWired: 'הפעולה הזו עדיין לא מחוברת.',
+      couldntComplete: 'לא הצלחתי להשלים את הפעולה.',
+      composeClosed: 'פתח קודם תשובה. Glance לא לוחץ על שליחה.',
+      composeEmpty: 'חלון הכתיבה עדיין ריק.',
+      skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',
+      todoUiCache: 'ב-Microsoft To Do המשימה יכולה להישאר על המסך כשתי דקות. אחרי רענון היא נעלמת.',
+      notAllGone: 'לא הכול הוסר. בטל שוב כדי להסיר את מה שנשאר.',
+      lineCalOff: 'הוסר מהיומן שלך.',
+      lineCalMoved: 'הוזז ביומן שלך.',
+      lineSchedDraftTrack: 'נקבע ביומן, נוצרה טיוטה, והמעקב פעיל.',
+      lineSchedReminder: 'נקבע ביומן, עם תזכורת.',
+      lineDraftTrack: 'נוצרה טיוטה, והמעקב פעיל.',
+      lineReminderReply: 'התזכורת נקבעה, התשובה מוכנה.',
+      lineFactDraft: 'הפרט מופיע בטיוטת תשובה.',
+      lineLogTrack: 'נרשם, והמעקב פעיל.',
+      lineCalFile: 'ביומן שלך, עם הקובץ.',
+      lineTaskFile: 'על המשימה, עם הקובץ.',
+      lineDriveLink: 'נשמר ב-Drive, הקישור בטיוטה.',
+      lineTemplateLink: 'נוצרה טיוטה מהתבנית, הקישור מוכן.',
+      lineOneDrive: 'נשמר ב-OneDrive.',
+      lineDraftFile: 'נוצרה טיוטה, עם הקובץ מצורף.',
       onCalendar: 'ביומן שלך.',
       preparingNow: 'מכין…',
       markKept: 'סמן שנשמר',
@@ -612,6 +908,91 @@ const FlowDisplay = (() => {
     }
     const deleted = raw.match(/^Deleted in (.+)$/) || raw.match(/^נמחק ב-(.+)$/);
     if (deleted) return fillChrome(L.deletedIn || 'Deleted in {name}', { name: deleted[1] });
+    if (uiLangFrom({ setting: lang }) === 'he') return showReceiptHe(raw);
+    return raw;
+  }
+
+  const DONE_VERB_HE = {
+    'scheduled': 'נקבעה פגישה',
+    'drafted a reply': 'נוצרה טיוטת תשובה',
+    'set a reminder': 'נקבעה תזכורת',
+    'wrote the doc': 'נכתב המסמך',
+    'wrote the sheet': 'נכתב הגיליון',
+    'saved the file': 'נשמר הקובץ',
+    'completed one step': 'הושלם צעד אחד'
+  };
+
+  const NOUN_HE = {
+    'Google Task': 'המשימה ב-Google',
+    'To Do task': 'המשימה ב-To Do',
+    'Gmail draft': 'הטיוטה ב-Gmail',
+    'Calendar event': 'האירוע ביומן',
+    'Doc': 'המסמך',
+    'Sheet': 'הגיליון',
+    'Drive file': 'הקובץ ב-Drive',
+    'OneDrive file': 'הקובץ ב-OneDrive'
+  };
+
+  function splitEnglishList(text) {
+    return String(text).replace(/, and /g, ', ').split(/, | and /);
+  }
+
+  function joinHebrewList(items) {
+    if (items.length <= 1) return items[0] || '';
+    return items.slice(0, -1).join(', ') + ' ו' + items[items.length - 1];
+  }
+
+  function nounsHe(list, withEt) {
+    const out = [];
+    const parts = splitEnglishList(list);
+    for (let i = 0; i < parts.length; i++) {
+      const noun = NOUN_HE[parts[i].replace(/^the /, '')];
+      if (!noun) return null;
+      out.push(withEt ? 'את ' + noun : noun);
+    }
+    return out;
+  }
+
+  // Receipt sentences that are built from a list of what was written
+  // (receipt-copy.js and the Closed summary in content-gmail.js). A list with
+  // a word this table does not know is left as it came: a half-translated
+  // sentence would name the wrong thing.
+  function showReceiptHe(raw) {
+    let m = raw.match(/^Closed — (.+)\.$/);
+    if (m) {
+      const verbs = splitEnglishList(m[1]).map((v) => DONE_VERB_HE[v]);
+      if (verbs.every(Boolean)) return 'נסגר — ' + joinHebrewList(verbs) + '.';
+      return raw;
+    }
+    m = raw.match(/^Partly done — (.+)\.$/);
+    if (m) {
+      const verbs = splitEnglishList(m[1]).map((v) => DONE_VERB_HE[v]);
+      if (verbs.every(Boolean)) return 'בוצע חלקית — ' + joinHebrewList(verbs) + '.';
+      return raw;
+    }
+    m = raw.match(/^Closing — (.+)…$/);
+    if (m) {
+      if (m[1] === 'working') return 'סוגר — עובד…';
+      const verbs = splitEnglishList(m[1]).map((v) => DONE_VERB_HE[v]);
+      return verbs.every(Boolean) ? 'סוגר — ' + joinHebrewList(verbs) + '…' : raw;
+    }
+    m = raw.match(/^No matching contact for (.+)\.$/);
+    if (m) return 'אין איש קשר מתאים עבור ' + m[1] + '.';
+    m = raw.match(/^Undo all removes (.+)\.$/);
+    if (m) {
+      const nouns = nounsHe(m[1], true);
+      return nouns ? 'ביטול הכל מסיר ' + joinHebrewList(nouns) + '.' : raw;
+    }
+    m = raw.match(/^Undone — (.+) (?:was|were) removed\.$/);
+    if (m) {
+      const nouns = nounsHe(m[1], false);
+      return nouns ? 'בוטל — ' + joinHebrewList(nouns) + ' הוסרו.' : raw;
+    }
+    m = raw.match(/^The (.+) is still there\. Undo again to remove it\.$/);
+    if (m) {
+      const nouns = nounsHe(m[1], false);
+      return nouns ? nouns[0] + ' עדיין שם. בטל שוב כדי להסיר.' : raw;
+    }
     return raw;
   }
 
@@ -699,7 +1080,19 @@ const FlowDisplay = (() => {
       const line = clock ? holdCardText(lang, clock.dateIso, clock.hour, clock.minute) : '';
       if (line) return line;
     }
-    return localizeHeading(lang, fallback == null ? '' : String(fallback));
+    return localizeHeading(lang, fallback == null ? '' : String(fallback), ctx);
+  }
+
+  // What Glance writes (a calendar event, a Google Task, a To Do) is titled
+  // exactly as the card shows it. A hold keeps the sentence it closes.
+  function artifactTitle(lang, ctx, title) {
+    const raw = title == null ? '' : String(title);
+    if (!raw) return raw;
+    const hold = ctx && (ctx.glanceChain === 'calendar-hold' || (ctx.process && ctx.process.id === 'hold'));
+    if (hold) return raw;
+    const p = ctx && ctx.process;
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(lang, SAVE_TITLE, ctx);
+    return localizeHeading(lang, raw, ctx);
   }
 
   function activityMetric(lang, text) {
@@ -779,6 +1172,7 @@ const FlowDisplay = (() => {
     holdCardText: holdCardText,
     holdClockFrom: holdClockFrom,
     cardTitle: cardTitle,
+    artifactTitle: artifactTitle,
     localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,

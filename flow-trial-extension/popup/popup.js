@@ -386,6 +386,11 @@
       const r = await send({ type: 'flow:build-stamp' });
       theirs = (r && r.build) || '';
     } catch (e) { theirs = ''; }
+    const text = 'גרסת Glance ' + mine + (theirs && theirs !== mine ? ' (שירות: ' + theirs + ')' : '');
+    ['glanceBuild', 'glanceBuildLog'].forEach((id) => {
+      const n = document.getElementById(id);
+      if (n) { n.textContent = text; n.setAttribute('data-glance-build', mine); }
+    });
     const stale = !theirs || theirs !== mine;
     line.hidden = !stale;
     if (stale) line.textContent = 'רענן את Glance';
@@ -675,6 +680,7 @@
       const has = (svc.scopes || []).every((sc) => granted.indexOf(sc) >= 0);
       if (required) { box.checked = true; box.disabled = true; }
       else if (has && granted.length) box.checked = true;
+      else if (svc.defaultOn === true && !has) box.checked = true;
       boxes[svc.id] = box;
       const copy = el('span', null, serviceLabel(svc));
       if (svc.detail) {
@@ -682,7 +688,7 @@
         small.textContent = svc.detail;
         copy.appendChild(small);
       }
-      if (!required && !box.checked) appendMissingScopeLine(copy, svc);
+      if (!required && !has) appendMissingScopeLine(copy, svc);
       lab.appendChild(box);
       lab.appendChild(copy);
       screen.appendChild(lab);
@@ -1811,13 +1817,14 @@
         box.setAttribute('data-glance-service', svc.id);
         const required = Boolean(svc.required || svc.id === 'mail');
         if (required) { box.checked = true; box.disabled = true; }
+        else if (svc.defaultOn === true) box.checked = true;
         boxes[svc.id] = box;
         const copy = el('span', null, serviceLabel(svc));
         const heDetail = {
           mail: 'קורא דואר וכותב טיוטת תשובה. לא שולח.',
           todo: 'מוסיף משימה אחת. Glance קורא אותה לפני שהיא מטופלת. ביטול מוחק את המשימה.',
           calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
-          onedrive: 'כותב קובץ אחד, קורא אותו, ומבטל את הכתיבה. מייל לא מחפש בקבצים.',
+          onedrive: 'שומר קובץ אחד ב-OneDrive > Glance, קורא אותו, וביטול מוחק אותו. מייל לא מחפש בקבצים.',
           contacts: 'קורא אנשי קשר.',
           teams: 'קורא צ׳אטים שאתה בהם.'
         };
@@ -1827,7 +1834,7 @@
           small.textContent = detail;
           copy.appendChild(small);
         }
-        if (!required && !box.checked) appendMissingScopeLine(copy, svc);
+        if (!required) appendMissingScopeLine(copy, svc);
         lab.appendChild(box);
         lab.appendChild(copy);
         screen.appendChild(lab);
@@ -1895,7 +1902,7 @@
         const required = Boolean(svc.required || svc.id === 'mail');
         const has = (svc.scopes || []).every((sc) => grantedNow.indexOf(sc) >= 0);
         if (required) { box.checked = true; box.disabled = true; }
-        else box.checked = has;
+        else box.checked = has || svc.defaultOn === true;
         scopeBoxes[svc.id] = box;
         lab.appendChild(box);
         lab.appendChild(el('span', null, serviceLabel(svc)));

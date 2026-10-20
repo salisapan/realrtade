@@ -52,7 +52,7 @@ function shownFamilies(host) {
 function connectorFamily(id) {
   if (id === 'outlookCalendar' || id === 'calendar' || id === 'googleHold') return 'calendar';
   if (id === 'outlookTask' || id === 'googleTask' || id === 'googleTasks' || id === 'microsoftTodo' || id === 'googleLaneTask') return 'task';
-  if (id === 'outlookDraft' || id === 'gmailDraft' || id === 'gmailCompose') return 'draft';
+  if (id === 'outlookDraft' || id === 'gmailDraft' || id === 'gmailCompose' || id === 'googleReplyDraft') return 'draft';
   if (id === 'onedriveFile' || id === 'driveFile' || id === 'attachmentSave' || id === 'googleDriveFile' || id === 'googleDriveSave') return 'file';
   return null;
 }
@@ -195,6 +195,7 @@ function planCtx(kind, surface) {
     app: surface,
     uiLang: 'en',
     messageId: 'PLAN-' + surface + '-' + kind,
+    threadId: 'PLAN-thread-' + kind,
     outlookIncomingId: 'PLAN-' + surface + '-' + kind,
     subject: 'Dana Levi',
     bodyText: 'Please confirm the note from Dana Levi.',
@@ -222,7 +223,7 @@ function planCtx(kind, surface) {
 async function bootGmail() {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   const files = manifest.content_scripts[0].js;
-  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body><h2 class="hP">Vendor</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1"><span email="dana@acme.io">Dana Levi</span><div class="a3s">Hello</div></div></div></body></html>';
+  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body><a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a><h2 class="hP">Vendor</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1"><span email="dana@acme.io">Dana Levi</span><div class="a3s">Hello</div></div></div></body></html>';
   const dom = new JSDOM(html, { url: 'https://mail.google.com/mail/u/0/#inbox/t1', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   pinDate(w);

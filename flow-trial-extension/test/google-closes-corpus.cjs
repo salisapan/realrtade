@@ -249,10 +249,12 @@ console.log('\n--- family C: create is the ask ---\n');
   const still = plan('No need to call. Please save the attached file to Drive.', { attachmentCount: 1 });
   check('a different no-need does not hide a real save',
     still.intent && still.intent.personalClose === 'drive-file', still.intent && still.intent.personalClose);
-  const laterIt = plan("Please save the attached contract to Drive. Actually, don't save it, I'll send a new version.", { attachmentCount: 1 });
+  // With no known name the engine holds the mail as names-pending (0.9.56); the refusal is read once a name is known.
+  const laterIt = plan("Please save the attached contract to Drive. Actually, don't save it, I'll send a new version.", { attachmentCount: 1, ownNames: ['Sali'], userName: 'Sali' });
   check("a later don't-save-it refers back and stays quiet",
-    laterIt.intent && !laterIt.intent.type && laterIt.intent.googleSilence === true && laterIt.intent.personalClose !== 'drive-file' && !laterIt.process,
-    laterIt.intent && { type: laterIt.intent.type, personal: laterIt.intent.personalClose, process: laterIt.process && laterIt.process.id });
+    // Quiet either way: since 0.9.56 the hedge and negation gate can answer before the Google silence rule does.
+    laterIt.intent && !laterIt.intent.type && (laterIt.intent.googleSilence === true || Boolean(laterIt.intent.googleWait) || laterIt.intent.quiet === 'hedge') && laterIt.intent.personalClose !== 'drive-file' && !laterIt.process,
+    laterIt.intent && { type: laterIt.intent.type, quiet: laterIt.intent.quiet, reason: laterIt.intent.reason, silence: laterIt.intent.googleSilence, wait: laterIt.intent.googleWait, personal: laterIt.intent.personalClose, process: laterIt.process && laterIt.process.id });
   const readOnly = plan("don't save it yet, just read", { attachmentCount: 1 });
   check("don't save it yet, just read stays quiet",
     readOnly.intent && readOnly.intent.personalClose !== 'drive-file' && !(readOnly.process && readOnly.process.steps && readOnly.process.steps.some((s) => s.kind === 'driveFile' || s.kind === 'onedriveFile')),

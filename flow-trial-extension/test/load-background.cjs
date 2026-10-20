@@ -46,4 +46,18 @@ function backgroundScript() {
     classic.map((c) => '{\n' + c + '\n}').join('\n') + '\n' + bg;
 }
 
-module.exports = { backgroundScript };
+// The lane host (src/google-lane-host.js) owns the one lookup-then-create of
+// the list titled Glance and the account of a token. background.js reaches it
+// through globalThis.FlowGoogleLaneAccount. Corpora that run background.js
+// alone run this stand-in after it: it answers the same bridge from the
+// routes of the check (the account is unknown, so no token is refused).
+const LANE_ACCOUNT_STUB = `globalThis.FlowGoogleLaneAccount = { read: async () => '', accountOf: async () => '', record: async () => '', ensureGlanceList: async () => {
+  const listed = await googleTasksAuthedFetch('/users/@me/lists?maxResults=100');
+  if (!listed.ok) return '';
+  const found = ((await listed.json()).items || []).find((l) => l.title === 'Glance');
+  if (found) return found.id;
+  const made = await googleTasksAuthedFetch('/users/@me/lists', { method: 'POST', body: JSON.stringify({ title: 'Glance' }) });
+  return made.ok ? (await made.json()).id : '';
+} };`;
+
+module.exports = { backgroundScript, LANE_ACCOUNT_STUB };

@@ -87,6 +87,7 @@ function boot(store, lang, messageId) {
         let result = { ok: true };
         if (msg && msg.type === 'flow:connector-status') result = { googleTasks: { connected: true, configured: true } };
         if (msg && msg.type === 'flow:pro-status') result = { ok: true, active: false };
+        if (msg && msg.type === 'flow:google-verify') result = { ok: true, states: (msg.steps || []).map(() => 'present') };
         if (msg && msg.type === 'flow:google-undo') {
           const fail = store._fail && store._fail[msg.connectorId];
           if (fail === 500) result = { ok: false, status: 500 };
