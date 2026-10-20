@@ -4357,6 +4357,12 @@ function outlookLaunchInteractive(url) {
 }
 
 function outlookLaunchSilent(url) {
+  // Headless regression only: the hidden login window cannot load there and
+  // would hold every 401 retry for the full 30s. Production never sets __glanceE2e.
+  const hooked = glanceE2eWebAuthFlow({ url, interactive: false });
+  if (hooked && typeof hooked.then === 'function') {
+    return hooked.then((r) => r || null, (e) => ({ error: String((e && e.message) || 'failed') }));
+  }
   return new Promise((resolve) => {
     try {
       chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 30000 }, (r) => {
