@@ -4,8 +4,13 @@
 const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
+test.afterEach(async ({ glance }) => {
+  await glance.evaluateWorker(() => { globalThis.__glanceE2e.tokenAccounts = {}; });
+});
+
 test('Gmail task card writes through the lane host, reads back, and Undo deletes it', async ({ glance }) => {
   await glance.seedGmail();
+  await glance.evaluateWorker(() => { globalThis.__glanceE2e.tokenAccounts = { 'ya29.e2e': 'me@x.com' }; });
   const page = await glance.openGmail({
     messageId: 'm-lane-1',
     threadId: 't-lane-1',

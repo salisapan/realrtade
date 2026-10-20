@@ -276,7 +276,7 @@ const ROWS = [
   { id: 'narrow-dana-he', expect: QUIET, surface: 'gmail', direction: 'inbound', attachmentCount: 0,
     from: { name: 'דנה לוי', email: 'dana@acme.co.il' }, to: [OWN.gmail], subject: 'דוח',
     body: 'דנה: נא לשלוח את הדוח עד יום חמישי' },
-  { id: 'self-sent-save', expect: 'self-file', surface: 'gmail', direction: 'self', attachmentCount: 1,
+  { id: 'self-sent-save', expect: TASK, date: '2026-10-20', surface: 'gmail', direction: 'self', attachmentCount: 1,
     from: { name: 'Sali', email: OWN.gmail }, to: [OWN.gmail], subject: 'Note to myself',
     body: 'please save the report to Drive by 20/10' },
   { id: 'self-sent-hold', expect: TASK, date: '2026-10-20', hour: 14,

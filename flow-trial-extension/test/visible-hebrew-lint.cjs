@@ -140,5 +140,64 @@ check('the popup shows a deleted To Do in the UI language', popupJs.indexOf('sho
 const host = fs.readFileSync(path.join(ROOT, 'src', 'chip-host.js'), 'utf8');
 check('a receipt status goes through the UI-language table', host.indexOf('FlowDisplay.showChrome') >= 0);
 
+console.log('\n--- receipt and status lines the Hebrew UI shows ---\n');
+const statusLines = [
+  'Nothing was written.',
+  'Not closed — the task was not confirmed.',
+  'Not closed — Glance could not read that task back.',
+  'That action isn’t wired up yet.',
+  'Couldn’t complete that action.',
+  'Open Reply first. Glance does not press Send.',
+  'The compose window is still empty.',
+  'Closed — saved the file.',
+  'Closed — scheduled and set a reminder.',
+  'Closed — scheduled, drafted a reply, and set a reminder.',
+  'Closed — wrote the doc and wrote the sheet.',
+  'Closed — completed one step.',
+  'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
+  'Undo all removes the Gmail draft and the Calendar event.',
+  'Undo all removes the Google Task, the Gmail draft, and the Calendar event.',
+  'Undone — the Gmail draft and the Calendar event were removed.',
+  'Undone — the Google Task, the Gmail draft, and the Calendar event were removed.',
+  'The Gmail draft is still there. Undo again to remove it.',
+  'Not all of it is gone. Undo again to remove what’s left.',
+  'Skipped — an earlier step in this process didn’t complete.'
+];
+const closedLines = [];
+['core/actions.js', 'core/incoming-judge.js', 'src/content-gmail.js'].forEach((file) => {
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const re = /closedLine:\s*'((?:[^'\\]|\\.)*)'/g;
+  let m;
+  while ((m = re.exec(src))) closedLines.push(m[1].replace(/\\'/g, "'"));
+});
+check('the catalog closed lines were found', closedLines.length >= 15, closedLines.length);
+const closedBad = [];
+closedLines.concat(statusLines).forEach((line) => {
+  const he = D.showChrome('he', line);
+  const bad = offenders(he);
+  if (he === line || bad.length) closedBad.push(line + ' => ' + he);
+  const back = D.showChrome('en', he);
+  if (D.showChrome('en', line) !== line) closedBad.push('en changed: ' + line);
+});
+check('every closed line and status line is Hebrew in a Hebrew UI', closedBad.length === 0, closedBad);
+check('Nothing was written. reads שום דבר לא נכתב.', D.showChrome('he', 'Nothing was written.') === 'שום דבר לא נכתב.', D.showChrome('he', 'Nothing was written.'));
+check('Closed — saved the file. keeps the close and names the file', /^נסגר — /.test(D.showChrome('he', 'Closed — saved the file.')) && /הקובץ/.test(D.showChrome('he', 'Closed — saved the file.')), D.showChrome('he', 'Closed — saved the file.'));
+const receiptSb = { console };
+vm.createContext(receiptSb);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'src', 'receipt-copy.js'), 'utf8'), receiptSb, { filename: 'receipt-copy.js' });
+const R = vm.runInContext('FlowReceipt', receiptSb);
+const wheresAll = ['Google Tasks', 'Microsoft To Do', 'Gmail', 'Google Calendar', 'Google Docs', 'Google Sheets', 'Google Drive'];
+const receiptBad = [];
+wheresAll.forEach((a, i) => {
+  const combos = [[a], [a, wheresAll[(i + 1) % wheresAll.length]], [a, wheresAll[(i + 1) % wheresAll.length], wheresAll[(i + 2) % wheresAll.length]]];
+  combos.forEach((w) => {
+    [R.undoHint(w), R.undoneLine(w), R.reverseNote({ reversed: 0, remaining: 1, keptWhere: a }), R.reverseNote({ reversed: 1, remaining: 1, keptWhere: a })].forEach((line) => {
+      const he = D.showChrome('he', line);
+      if (he === line || offenders(he).length) receiptBad.push(line + ' => ' + he);
+    });
+  });
+});
+check('every undo and reverse line built from receipt-copy is Hebrew in a Hebrew UI', receiptBad.length === 0, receiptBad);
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

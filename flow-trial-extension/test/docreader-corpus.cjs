@@ -241,6 +241,27 @@ async function run() {
       text === 'Before\nAfter', text);
   }
 
+  console.log('\n--- docreader.js: an .xlsx is read on-device, shared strings and inline text ---\n');
+  {
+    const sst = '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4">' +
+      '<si><t>Item</t></si><si><t>Amount</t></si><si><r><t>Please confirm </t></r><r><t>the totals by Thursday</t></r></si><si><t>אנא אשר את הסכומים</t></si></sst>';
+    const sheet = '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' +
+      '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>' +
+      '<row r="2"><c r="A2" t="inlineStr"><is><t>Rent</t></is></c><c r="B2"><v>4200</v></c></row>' +
+      '<row r="3"><c r="A3" t="s"><v>2</v></c></row>' +
+      '<row r="4"><c r="A4" t="s"><v>3</v></c></row></sheetData></worksheet>';
+    const bytes = buildZip([
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>'), method: 8 },
+      { name: 'xl/sharedStrings.xml', data: Buffer.from(sst, 'utf8'), method: 8 },
+      { name: 'xl/worksheets/sheet1.xml', data: Buffer.from(sheet, 'utf8'), method: 8 }
+    ]);
+    const text = await FlowDocReader.extractXlsxText(bytes);
+    check('an xlsx gives its cells row by row', text === 'Item\tAmount\nRent\t4200\nPlease confirm the totals by Thursday\nאנא אשר את הסכומים', text);
+    let threw = null;
+    try { await FlowDocReader.extractXlsxText(buildZip([{ name: 'word/document.xml', data: Buffer.from('<w/>'), method: 8 }])); } catch (e) { threw = e.message; }
+    check('a zip that is not an xlsx is reported', threw !== null && /sheet/i.test(threw), threw);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }
