@@ -73,3 +73,4 @@ These lines had no date in the 2026-10-16 export. The standing rule at the top o
 - Deploy to Netlify only when Sali writes the explicit approval «מאשר».
 - **2026-10-20.** Designs belong to the Grok bot. A coding agent does not design cards or wait on a mock: it builds the logic behind an off switch and writes what the card must show (example: `docs/glance-ai/card-requests-2026-10-20.md`), and the Grok bot designs it.
 - **2026-10-20.** All code an agent writes lives on git (pushed branches and PRs into the working branch), so every agent can see it. Nothing stays only in one session.
+- **2026-10-20.** Every agent uses Graphify (`scripts/graphify-setup.sh`, then `graphify query/path/explain` before reading code) to cut token use: `docs/glance-ai/graphify.md`. Whatever a routine builds and verifies lands in git and is part of the working code; a run that pushed nothing is not done, so every agent can see it and stay in sync.
