@@ -870,3 +870,72 @@
   border-radius: 999px;
   padding: 2px 8px;
 }
+
+/* The peek: a small card that pops up in view when Glance has an offer that sits below the fold. It points at the
+   card; it never does the work. Namespaced and isolated like the host so Gmail's cascade cannot reach in. */
+#glance-peek {
+  all: initial;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 10px 10px 10px 14px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #1d1d1f;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(240,244,253,.96));
+  border: 1px solid rgba(40,70,150,.18);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 18px 40px -14px rgba(20,40,100,.45), 0 2px 8px rgba(20,40,100,.12);
+  animation: glance-peek-in 320ms cubic-bezier(.16,1,.3,1);
+}
+#glance-peek .glance-peek-brand {
+  font-weight: 700;
+  letter-spacing: -.01em;
+  background: linear-gradient(92deg, #0a63f6, #5b4cf5 55%, #a23de8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  flex: none;
+}
+#glance-peek .glance-peek-text { flex: 1; min-width: 0; color: #3a3a3f; }
+#glance-peek .glance-peek-show {
+  all: unset;
+  flex: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #fff;
+  background: linear-gradient(180deg, #3b6bf5, #1d3fd0);
+  box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 6px 14px -6px rgba(29,63,208,.6);
+}
+#glance-peek .glance-peek-show:focus-visible { outline: 2px solid #0a63f6; outline-offset: 2px; }
+#glance-peek .glance-peek-x {
+  all: unset;
+  flex: none;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  color: #6e6e73;
+  font-size: 16px;
+}
+#glance-peek .glance-peek-x:hover { background: rgba(0,0,0,.06); }
+.flow-chip-host.glance-peek-flash { box-shadow: 0 0 0 3px rgba(59,107,245,.45), 0 10px 26px -16px rgba(20,40,100,.35); transition: box-shadow 300ms ease; }
+@keyframes glance-peek-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { #glance-peek { animation: none; } }
+@media (prefers-color-scheme: dark) {
+  #glance-peek { color: #f2f2f4; background: linear-gradient(180deg, rgba(38,40,52,.98), rgba(28,30,40,.98)); border-color: rgba(140,160,255,.25); }
+  #glance-peek .glance-peek-text { color: #d6d6dc; }
+  #glance-peek .glance-peek-x { color: #a0a0a8; }
+}

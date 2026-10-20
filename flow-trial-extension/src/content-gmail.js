@@ -181,6 +181,7 @@ function glanceUiCopy(kind) {
     }
     clearLaneTimers();
     removeOwnCards();
+    try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.stop(document, window); } catch (e) { /* nothing to stop */ }
   }
 
   // One read of chrome.runtime.id. When the extension context is gone that
@@ -5808,6 +5809,9 @@ function glanceUiCopy(kind) {
       return mount.querySelector('.flow-chip-host');
     }
   };
+
+  // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
 
   init();
 })();

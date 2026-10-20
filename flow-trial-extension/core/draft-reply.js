@@ -57,7 +57,10 @@ const FlowDraftReply = (() => {
       wantsOwner: /\b(?:onboarding owner|name of the (?:person|owner)|person on your side|who will own)\b/i.test(ask)
         || /\bsend me the name\b/i.test(ask),
       hasPilot: /\bpilot proposal\b/i.test(ask),
-      whetherStart: /\bwhether\b/i.test(ask) && /\bstart\b/i.test(ask)
+      whetherStart: /\bwhether\b/i.test(ask) && /\bstart\b/i.test(ask),
+      // The sender wants a call or meeting and is waiting for a time from the reader.
+      wantsSlot: /(?:אשמח|נשמח)\s+לתאם|מתי\s+(?:נוח|מתאים)\s+(?:לכם|לך|לכן)/.test(ask)
+        || /\bwhen (?:would|does|do) (?:it |that |this |a call |a meeting )?(?:work|suit)\b|\bwhat (?:day|time) works\b|\bwhen are you (?:free|available)\b|\b(?:love|like|happy) to (?:set up|schedule|book|arrange|find a time for)\b/i.test(ask)
     };
   }
 
@@ -67,10 +70,17 @@ const FlowDraftReply = (() => {
     const what = cleanLine(params && params.what);
     const when = cleanLine(params && params.when) || null;
     const sig = askSignals(askText, what);
-    if (!sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner && !what) return null;
+    if (!sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner && !sig.wantsSlot && !what) return null;
 
     const he = isHe(params);
     const lines = [];
+    // A scheduling ask gets a reply that offers times. The person fills the two
+    // slots in; nothing is invented and nothing is sent.
+    if (sig.wantsSlot && !sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner) {
+      if (he) { lines.push('תודה, אשמח לשיחה.', 'נוח לי ב: [מועד 1] או [מועד 2].'); }
+      else { lines.push('Thanks, happy to talk.', 'I can do [time 1] or [time 2].'); }
+      return lines;
+    }
     if (he) {
       if (sig.wantsReview && sig.wantsConfirm) {
         lines.push('תודה. אעבור על זה ואחזור עם אישור' + (what ? (': ' + what) : '') + (when ? (' עד ' + when) : '') + '.');

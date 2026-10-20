@@ -1974,7 +1974,8 @@ const FlowIntent = (() => {
     const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
     const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
     const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
-    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
+    // A slot ask ("when works for you?") names no object and no day on purpose: the time is the reply.
+    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped || s.flags.slotAsk);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     // "any chance" is a hedge for every other sentence. These three
