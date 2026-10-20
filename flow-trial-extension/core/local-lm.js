@@ -36,6 +36,10 @@ const FlowLocalLM = (() => {
   const TEST_MIN_POSITIVES = 12;     // fewer proposed positives than this and the test proves nothing
   const TEST_MIN_RECALL = 0.4;       // below this it would almost never help, so it stays off
   const TEST_MAX_AGE_MS = 30 * 24 * 3600 * 1000;
+  // A proposal already agreed for this sentence, in this page. The first time still asks twice. A repeat does not ask again.
+  // Silence is not remembered: a sentence that produced nothing can be asked again. The self-test calls classify, not this.
+  const PROPOSE_CACHE_MAX = 64;
+  const proposeCache = new Map();
 
   const SCHEMA = {
     type: 'object',
@@ -141,9 +145,15 @@ const FlowLocalLM = (() => {
 
   // Ask the device model about a sentence the other tiers left silent. Returns a proposal in the shape
   // core/follow-up.js builds loops from, or null. deps: { session, pipeline, model, status, extract, now }.
+  function proposeKey(sentence, status) {
+    return String(sentence).trim() + '\n' + (status && typeof status.checkedAt === 'number' ? status.checkedAt : 0);
+  }
+
   async function propose(sentence, deps) {
     const d = deps || {};
     if (!eligible(sentence, d)) return null;
+    const key = d.cache === false ? null : proposeKey(sentence, d.status);
+    if (key && proposeCache.has(key)) return proposeCache.get(key);
     const pipeline = d.pipeline;
     const read = await classify(d.session, sentence);
     if (!read || (read.act !== 'ASK' && read.act !== 'PROMISE')) return null;
@@ -155,12 +165,17 @@ const FlowLocalLM = (() => {
     // Code re-reads the spans the model pointed at; the model never supplies a value, only a place.
     const date = ex && ex.parseDate ? (ex.parseDate(sentence, new Date(now)) || (read.when ? ex.parseDate(read.when, new Date(now)) : null)) : null;
     const money = ex && ex.parseMoney ? (ex.parseMoney(sentence) || (read.amount ? ex.parseMoney(read.amount) : null)) : null;
-    return {
+    const proposal = {
       act: read.act, action: read.action, tier: 'lm',
       deadlineIso: date && date.iso ? date.iso : null,
       amount: money ? { value: money.value, currency: money.currency || null, raw: money.raw } : null,
       sentence: String(sentence).trim()
     };
+    if (key) {
+      proposeCache.set(key, proposal);
+      while (proposeCache.size > PROPOSE_CACHE_MAX) proposeCache.delete(proposeCache.keys().next().value);
+    }
+    return proposal;
   }
 
   // ---- the self-test: no result, or a failed one, means the model never runs on this device -------------

@@ -1,7 +1,7 @@
 // The server side of the deeper read (ladder.js): identity, the three counters, the two tiers, refunds, and what is never returned.
 // No network: a scripted router and an in-memory counter, plus one pass through the real router with a fake provider to look at the wire.
 // Run: node ladder.test.cjs
-const { createLadder, memoryStore, supabaseStore, MAX_SENTENCE_CHARS } = require('./ladder.js');
+const { createLadder, memoryStore, supabaseStore, MAX_SENTENCE_CHARS, resetReadCache } = require('./ladder.js');
 const { FlowAiLadder: L } = require('../../../../flow-trial-extension/core/ai-ladder.js');
 const { FlowLocalLM } = require('../../../../flow-trial-extension/core/local-lm.js');
 const { FlowExecRouter: X } = require('../../../../flow-trial-extension/core/exec-router.js');
@@ -33,6 +33,7 @@ function scripted(script, log) {
   };
 }
 function make(over) {
+  if (!(over && over.keepCache)) resetReadCache();
   const log = [];
   const store = (over && over.store) || memoryStore();
   const ctx = Object.assign({
@@ -159,6 +160,73 @@ const used = (store, prefix) => [...store.rows].filter(([k]) => k.startsWith(pre
   const h4 = await handler(ev({ action: 'execute', maskedPrompt: 'hi there' }));
   check('and the Do It proposal too', h4.statusCode === 503 || h4.statusCode === 402);
   Object.keys(process.env).forEach((k) => { if (!(k in saved)) delete process.env[k]; }); Object.assign(process.env, saved);
+
+  console.log('--- suggestion latency and a shared in-flight read ---');
+  resetReadCache();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const CHARGE_MS = 120;
+  const MODEL_MS = 700;
+  function delayStore(ms) {
+    const base = memoryStore();
+    const starts = [];
+    return {
+      rows: base.rows,
+      starts,
+      async charge(subject, period, units, limit) {
+        starts.push(Date.now());
+        await sleep(ms);
+        return base.charge(subject, period, units, limit);
+      }
+    };
+  }
+  const agreeSend = async () => ({ text: ask('ASK', 'send'), route: { provider: 'fake', model: 'fake', slot: 'A' } });
+  const timed = delayStore(CHARGE_MS);
+  let modelStarts = [];
+  const timedRouted = async () => {
+    modelStarts.push(Date.now());
+    await sleep(MODEL_MS);
+    return agreeSend();
+  };
+  const sequentialMs = await (async () => {
+    const t = Date.now();
+    await sleep(CHARGE_MS); await sleep(CHARGE_MS); await sleep(CHARGE_MS);
+    await Promise.all([sleep(MODEL_MS), sleep(MODEL_MS)]);
+    return Date.now() - t;
+  })();
+  const live = make({ keepCache: true, store: timed, routed: timedRouted });
+  const tLive = Date.now();
+  const liveRead = await live.ladder.read(free());
+  const parallelMs = Date.now() - tLive;
+  const chargeSpread = timed.starts.length >= 3 ? timed.starts[2] - timed.starts[0] : 9999;
+  const modelSpread = modelStarts.length >= 2 ? Math.abs(modelStarts[1] - modelStarts[0]) : 9999;
+  console.log('LADDER_LATENCY sequential_ms=' + sequentialMs + ' parallel_ms=' + parallelMs + ' charge_spread_ms=' + chargeSpread + ' model_spread_ms=' + modelSpread);
+  check('the three counters start together, not one after another', liveRead.status === 200 && liveRead.body.units === 1 && chargeSpread < CHARGE_MS / 2, { chargeSpread, starts: timed.starts });
+  check('the fast pair still runs together', modelSpread < CHARGE_MS / 2, { modelSpread });
+  check('one deeper read is under a second, and faster than three counters in a row', parallelMs < 1000 && parallelMs < sequentialMs && sequentialMs > 1000, { parallelMs, sequentialMs });
+
+  let overlapCalls = 0;
+  const overlapStore = memoryStore();
+  const overlapRouted = async () => { overlapCalls++; await sleep(40); return agreeSend(); };
+  resetReadCache();
+  const left = make({ keepCache: true, store: overlapStore, routed: overlapRouted });
+  const right = make({ keepCache: true, store: overlapStore, routed: overlapRouted });
+  const pair = await Promise.all([left.ladder.read(free()), right.ladder.read(free())]);
+  const overlapUnits = used(overlapStore, 'free:')[0];
+  console.log('LADDER_COST overlap_provider_calls=' + overlapCalls + ' overlap_units=' + overlapUnits + ' (two separate reads would be 4 calls and 2 units)');
+  check('two overlapping reads of one sentence share one pair and one unit', pair[0].status === 200 && pair[1].status === 200 && pair[0].body.reading.act === 'ASK' && pair[1].body.reading.act === 'ASK' && overlapCalls === 2 && overlapUnits === 1, { overlapCalls, overlapUnits });
+
+  const again = make({ store: overlapStore });
+  const second = await again.ladder.read(free());
+  check('a later read of the same sentence is a new read: the server does not keep the answer', second.status === 200 && second.body.units === 1 && used(overlapStore, 'free:')[0] === 2, second.body);
+
+  let splitCalls = 0;
+  const splitStore = memoryStore();
+  const splitRouted = async () => { splitCalls++; return agreeSend(); };
+  resetReadCache();
+  const one = make({ keepCache: true, store: splitStore, routed: splitRouted });
+  const two = make({ keepCache: true, store: splitStore, routed: splitRouted, ip: '203.0.113.10' });
+  await Promise.all([one.ladder.read(free()), two.ladder.read(free({ installId: 'b2c3d4e5-f6a7-4890-8bcd-ef0123456789' }))]);
+  check('two people asking at once are not folded into one read', splitCalls === 4 && used(splitStore, 'free:').length === 2, { splitCalls, units: used(splitStore, 'free:') });
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

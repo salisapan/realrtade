@@ -13,6 +13,8 @@
 // is asked and nothing is charged. A charge is refunded when no provider answered. The prompts are built here from core/local-lm.js; the client supplies the sentence only.
 //
 // What is stored: a hash of the person's id and a number per period. Never a sentence, never an answer.
+// A second ask for the same masked sentence, while the first is still running, waits on that read: one charge, one pair of model calls.
+// The moment the read finishes, that wait is forgotten. Nothing of the sentence or the answer is kept.
 const crypto = require('crypto');
 const { FlowAiLadder } = require('../../../../flow-trial-extension/core/ai-ladder.js');
 const { FlowLocalLM } = require('../../../../flow-trial-extension/core/local-lm.js');
@@ -24,6 +26,9 @@ const DEFAULT_IP_DAILY_UNITS = 300;
 const DEFAULT_GLOBAL_DAILY_UNITS = 3000;
 const ID_RE = /^[A-Za-z0-9_-]{8,80}$/;           // the extension's random install id is 12 hex characters (src/background.js getInstallId)
 const FAST_TOKENS = 120;
+// In-flight reads only. Keyed by a hash of the person and the masked sentence. Cleared when the read settles.
+const inflightReads = new Map();
+function resetReadCache() { inflightReads.clear(); }
 
 function sha(prefix, value) {
   return crypto.createHash('sha256').update(prefix + '|' + value).digest('hex');
@@ -156,6 +161,19 @@ function createLadder(ctx) {
     if (languages().indexOf(/[֐-׿]/.test(sentence) ? 'he' : 'en') < 0) return result(422, { code: 'language_off' });
     const me = await who(payload);
     if (!me) return result(400, { code: 'no_identity' });
+    const key = sha('inflight', me.subject + '|' + sentence);
+    const existing = inflightReads.get(key);
+    if (existing) return existing;
+    let settle;
+    const job = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+    inflightReads.set(key, job);
+    finishRead(sentence, me).then(settle.resolve, settle.reject).finally(() => {
+      if (inflightReads.get(key) === job) inflightReads.delete(key);
+    });
+    return job;
+  }
+
+  async function finishRead(sentence, me) {
     const p = FlowAiLadder.planOf(me.pro);
     const month = FlowAiLadder.periodOf(now);
     const day = dayOf(now);
@@ -164,12 +182,20 @@ function createLadder(ctx) {
     const netCap = envNumber(env, 'GLANCE_AI_IP_DAILY_UNITS', DEFAULT_IP_DAILY_UNITS);
     const taken = [];
     try {
-      const mine = await charge(me.subject, month, FlowAiLadder.COST.fast, p.units, taken);
-      if (!mine.allowed) return result(429, { code: 'quota_used', quota: quotaOf(me.pro, mine.used) });
+      // The person, the network address and the daily cap are independent rows. Waiting for them one after another
+      // put three counter round trips on the suggestion before a model was asked. They run together; a refusal still
+      // gives back anything that was taken, and no model is asked.
+      const [mine, net, all] = await Promise.all([
+        charge(me.subject, month, FlowAiLadder.COST.fast, p.units, taken),
+        charge(netSubject, day, FlowAiLadder.COST.fast, netCap, taken),
+        charge('global', day, FlowAiLadder.COST.fast, globalCap, taken)
+      ]);
+      if (!mine.allowed || !net.allowed || !all.allowed) {
+        await refund(taken);
+        if (!mine.allowed) return result(429, { code: 'quota_used', quota: quotaOf(me.pro, mine.used) });
+        return result(429, { code: net.allowed ? 'capacity' : 'busy' });
+      }
       let used = mine.used;
-      const net = await charge(netSubject, day, FlowAiLadder.COST.fast, netCap, taken);
-      const all = net.allowed ? await charge('global', day, FlowAiLadder.COST.fast, globalCap, taken) : net;
-      if (!net.allowed || !all.allowed) { await refund(taken); return result(429, { code: net.allowed ? 'capacity' : 'busy' }); }
 
       let tier = 'fast';
       let outcome = await askPair(sentence, 'fast');
@@ -201,4 +227,4 @@ function createLadder(ctx) {
   return { ready, status, read };
 }
 
-module.exports = { MAX_SENTENCE_CHARS, DEFAULT_IP_DAILY_UNITS, DEFAULT_GLOBAL_DAILY_UNITS, memoryStore, supabaseStore, createLadder };
+module.exports = { MAX_SENTENCE_CHARS, DEFAULT_IP_DAILY_UNITS, DEFAULT_GLOBAL_DAILY_UNITS, memoryStore, supabaseStore, createLadder, resetReadCache };

@@ -62,12 +62,34 @@ const good = { en: { ok: true }, he: { ok: true }, checkedAt: NOW };
     check('the amount was read by code from the sentence, not supplied by the model', p && p.amount && p.amount.value === 1200, p);
     const lie = await L.propose('Wondering whether the permit came through on your side.', { session: session(() => ({ act: 'ASK', action: 'confirm', who: 'you', when: 'next Tuesday at 9', amount: '$9,999' })), pipeline: P, model: M, status: good, now: NOW });
     check('a date and an amount the model invented never become a deadline or a payment', lie && lie.deadlineIso === null && lie.amount === null, lie);
-    check('action "none" is silence, like the tiers above', (await L.propose(silentSentence, { session: session(() => ({ act: 'ASK', action: 'none', who: 'you', when: null, amount: null })), pipeline: P, model: M, status: good, now: NOW })) === null);
-    check('an INFORM reading is no proposal', (await L.propose(silentSentence, { session: session(() => ({ act: 'INFORM', action: 'none', who: 'none', when: null, amount: null })), pipeline: P, model: M, status: good, now: NOW })) === null);
+    check('action "none" is silence, like the tiers above', (await L.propose(silentSentence, { cache: false, session: session(() => ({ act: 'ASK', action: 'none', who: 'you', when: null, amount: null })), pipeline: P, model: M, status: good, now: NOW })) === null);
+    check('an INFORM reading is no proposal', (await L.propose(silentSentence, { cache: false, session: session(() => ({ act: 'INFORM', action: 'none', who: 'none', when: null, amount: null })), pipeline: P, model: M, status: good, now: NOW })) === null);
     check('without a passed self-test nothing is asked at all', (await L.propose(silentSentence, { session: { prompt: async () => { throw new Error('must not be called'); } }, pipeline: P, model: M, status: null, now: NOW })) === null);
     const promiseSent = 'Not sure if I mentioned it, but the figures will reach your side before the board meeting.';
     const shapedNo = await L.propose('The weather report says that it will rain across the whole region tomorrow.', { session: session(() => ({ act: 'PROMISE', action: 'send', who: 'me', when: null, amount: null })), pipeline: P, model: M, status: good, now: NOW });
     check('the structural shape gate still applies to the model\'s proposals', shapedNo === null, shapedNo);
+  }
+
+  console.log('\n--- a repeat proposal is not asked again ---\n');
+  {
+    const again = 'Wondering whether the permit fee came through on your side this week.';
+    let prompts = 0;
+    const slow = { prompt: async () => { prompts++; await new Promise((r) => setTimeout(r, 80)); return JSON.stringify({ act: 'ASK', action: 'confirm', who: 'you', when: null, amount: null }); } };
+    const deps = { session: slow, pipeline: P, model: M, status: good, now: NOW };
+    const t1 = Date.now();
+    const first = await L.propose(again, deps);
+    const firstMs = Date.now() - t1;
+    const asked = prompts;
+    const t2 = Date.now();
+    const second = await L.propose(again, deps);
+    const secondMs = Date.now() - t2;
+    console.log('LOCAL_PROPOSAL first_ms=' + firstMs + ' repeat_ms=' + secondMs + ' prompts_first=' + asked + ' prompts_repeat=' + (prompts - asked));
+    check('the first suggestion still asks twice and both askings have to agree', first && first.act === 'ASK' && first.action === 'confirm' && asked === 2 && firstMs >= 140, { firstMs, asked });
+    check('the same sentence again is the same proposal, no model call, under a second', second && second.action === 'confirm' && second.sentence === first.sentence && prompts === 2 && secondMs < 30, { secondMs, prompts });
+    let silenceThen = 0;
+    const flip = { prompt: async () => { silenceThen++; return JSON.stringify(silenceThen < 3 ? { act: 'ASK', action: 'none', who: 'you', when: null, amount: null } : { act: 'ASK', action: 'confirm', who: 'you', when: null, amount: null }); } };
+    const quiet = 'Wondering whether the filing receipt came through on your side this week.';
+    check('silence is not remembered: a later agreement can still propose', (await L.propose(quiet, { session: flip, pipeline: P, model: M, status: good, now: NOW })) === null && (await L.propose(quiet, { session: flip, pipeline: P, model: M, status: good, now: NOW }))?.action === 'confirm' && silenceThen === 4, silenceThen);
   }
 
   console.log('\n--- the self-test ---\n');
