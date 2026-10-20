@@ -137,6 +137,12 @@
    "reply-track": 2
   },
   "calendarSteps": 3,
-  "calendarClocked": 3
+  "calendarClocked": 3,
+  "watches": 6,
+  "watchable": 6,
+  "watchDated": 5,
+  "watchOnGold": 5,
+  "watchMine": 2,
+  "watchTheirs": 4
  }
 }

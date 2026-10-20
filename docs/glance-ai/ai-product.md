@@ -165,6 +165,13 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
   - Measured through the real router on the frozen contrast-heldout-v0 pairs (`glance-ai/profile/run-router-relevance.cjs`; synthetic, `ownerVerified` 0), with Tier 0 as today's engine and the lab's `featurize` as the scorer: wrong Do It 10/60 → **5/60**, missed close on relevant mail 50/60 → 50/60 (unchanged). 33 of 120 mails end before any model call.
   - The offer side (the full lab judge) stays a shadow only: it would bring missed closes to 11/60, but wrong Do It stays at 10/60, so it is not built in.
   - With no profile the scorer says `unknown`, and the 786-case lab numbers do not move.
+- 2026-10-20: **carry until closed for model closes** (same branch, PR #128, switch `aiPlanV1` off). `core/model-plan.js` `toWatch()` hands a planned ask or promise to the follow loop (`core/follow-up.js` `buildWatch`), so a close only the model found is carried like every other one.
+  - An ask of you becomes a "mine" loop (`owe:reply`) that closes when your reply goes out.
+  - A promise to you becomes a "theirs" loop, chased by the loop's own `chaseDate` until the item arrives.
+  - A meeting stays on the calendar.
+  - `carry` in the plan now uses the same rules, so the plan and the loop never disagree.
+  - Lab: model asks and promises carried by the follow loop went from 0/6 to **6/6** (mine 2, theirs 4); loop deadline on the gold day 5/5.
+- 2026-10-20 review: `negation-conditional` is red at the tip without this change. It was added in `8e0682f1` (#165), and its first failure is v2syn-1639 pos-meeting-ask, which wanted an offer and got intent-null. `gmail-outlook-parity` is green again. The others are unchanged from 10-19.
 - 2026-10-19 review: the 7 corpora from 10-18 are still red at the tip. `realshape-0956` and `regress-144` are red too: their Hebrew hold fixture is pinned to «18/10 11:00», which is now in the past (date-bound, no code commit). `live-gate-0956` failed once and passed three times in a row (flaky).
 - 2026-10-18 review, red on the working-branch tip without this change (with `jsdom` installed): `background-write`, `card-decision`, `gmail-outlook-parity`, `google-closes`, `outlook-runner` and `outlook-sync` break at `3bba620f` (#163, the 0.9.56 bundle). `flip-sample-0956` has been red since `183e1cd5` (#144). Without `jsdom` (a new devDependency) 10 more fail for that reason alone. `outlook-calendar` is green again.
 - 2026-10-12 review, red on the working-branch tip without this change:

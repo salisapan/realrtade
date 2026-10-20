@@ -120,10 +120,10 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
     const vm = require('vm');
     const sb = { module: undefined, console };
     vm.createContext(sb);
-    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'step-list.js', 'json-enforce.js', 'understanding.js', 'model-plan.js'])
+    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'step-list.js', 'json-enforce.js', 'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js'])
       vm.runInContext(fs.readFileSync(path.join(ROOT, 'flow-trial-extension/core', f), 'utf8'), sb, { filename: f });
     const MP = vm.runInContext('FlowModelPlan', sb);
-    const pm = { shown: 0, planned: 0, fileSave: 0, rejected: {}, anchorRight: 0, dated: 0, dateRight: 0, sendSteps: 0, doneWhen: 0, rows: 0, byProcess: {}, calendarSteps: 0, calendarClocked: 0 };
+    const pm = { shown: 0, planned: 0, fileSave: 0, rejected: {}, anchorRight: 0, dated: 0, dateRight: 0, sendSteps: 0, doneWhen: 0, rows: 0, byProcess: {}, calendarSteps: 0, calendarClocked: 0, watches: 0, watchable: 0, watchDated: 0, watchOnGold: 0, watchMine: 0, watchTheirs: 0 };
     for (const c of cases) {
       const r = res[c.id];
       if (r.tier !== 2 || r.step === 'SILENT') continue;
@@ -132,6 +132,11 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
       const x = MP.plan({ aiPlanV1: true }, r.proposal, { text: c.own, today: c.today, lang: c.lang, surface: c.surface === 'outlook' ? 'outlook' : 'gmail' });
       if (!x.plan) { if (x.reason === 'file-save-is-suggest-save') pm.fileSave++; else pm.rejected[x.reason] = (pm.rejected[x.reason] || 0) + 1; continue; }
       pm.planned++; pm.byProcess[x.plan.processId] = (pm.byProcess[x.plan.processId] || 0) + 1;
+      if (r.proposal.step === 'draft' || r.proposal.step === 'task') {
+        pm.watchable++;
+        const w = MP.toWatch(x.plan, r.proposal, { threadId: 'lab-' + c.id, subject: c.subject, channel: c.surface }, Date.parse(c.today + 'T09:00:00'));
+        if (w) { pm.watches++; if (w.direction === 'mine') pm.watchMine++; else pm.watchTheirs++; if (c.gold.due) { pm.watchDated++; if (w.deadlineIso === c.gold.due) pm.watchOnGold++; } }
+      }
       if (x.rows.length === x.plan.steps.length) pm.rows++;
       if (x.plan.doneWhen && x.plan.doneWhen.kind) pm.doneWhen++;
       pm.sendSteps += x.plan.steps.filter((s) => /send/i.test(s.kind)).length;
@@ -142,7 +147,7 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
       if (c.gold.due && ds.length) { pm.dated++; if (ds.every((d) => d === c.gold.due)) pm.dateRight++; }
     }
     R.plan = pm;
-    md += `\n## Plans (M5)\n\nModel proposals on screen: ${pm.shown}. Planned into the product's own process: ${pm.planned} (${JSON.stringify(pm.byProcess)}); file saves left to suggest-save: ${pm.fileSave}; refused by the plan gate: ${JSON.stringify(pm.rejected)}.\nAnchor step equals the gold step: ${pm.anchorRight}/${pm.planned}. Every dated step on the gold due day: ${pm.dateRight}/${pm.dated}. Send steps: ${pm.sendSteps}. Calendar steps with a clock: ${pm.calendarClocked}/${pm.calendarSteps}. A done-when condition: ${pm.doneWhen}/${pm.planned}. Drawn by the steps list (one row per step): ${pm.rows}/${pm.planned}.\n`;
+    md += `\n## Plans (M5)\n\nModel proposals on screen: ${pm.shown}. Planned into the product's own process: ${pm.planned} (${JSON.stringify(pm.byProcess)}); file saves left to suggest-save: ${pm.fileSave}; refused by the plan gate: ${JSON.stringify(pm.rejected)}.\nAnchor step equals the gold step: ${pm.anchorRight}/${pm.planned}. Every dated step on the gold due day: ${pm.dateRight}/${pm.dated}. Send steps: ${pm.sendSteps}. Calendar steps with a clock: ${pm.calendarClocked}/${pm.calendarSteps}. A done-when condition: ${pm.doneWhen}/${pm.planned}. Drawn by the steps list (one row per step): ${pm.rows}/${pm.planned}.\nCarried by the follow loop (asks and promises): ${pm.watches}/${pm.watchable} (mine ${pm.watchMine}, theirs ${pm.watchTheirs}); loop deadline on the gold day: ${pm.watchOnGold}/${pm.watchDated}.\n`;
   }
   if (VIA_SERVER) {
     const spent = [...serverStore.rows.entries()].filter(([k]) => k.startsWith('u-spend')).reduce((a, [, v]) => a + v, 0);

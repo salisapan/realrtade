@@ -20,6 +20,7 @@ const FlowModelPlan = (() => {
   }
   const actions = () => sibling(typeof FlowActions !== 'undefined' ? FlowActions : null, './actions.js', 'FlowActions');
   const stepList = () => sibling(typeof FlowStepList !== 'undefined' ? FlowStepList : null, './step-list.js', 'FlowStepList');
+  const followUp = () => sibling(typeof FlowFollowUp !== 'undefined' ? FlowFollowUp : null, './follow-up.js', 'FlowFollowUp');
 
   const SWITCH = 'aiPlanV1';
   const DEFAULTS = Object.freeze({ [SWITCH]: false });
@@ -58,12 +59,43 @@ const FlowModelPlan = (() => {
     return { kind: 'task-done', proof: 'fetchedBack from the task system (google/tasks, microsoft/todo)', notCompletion: 'the task being created' };
   }
 
-  // When Glance looks again while it is still open: the due day for an ask or a meeting, the day after it for a promise someone owes.
+  // When Glance looks again while it is still open. The follow loop's own rules (core/follow-up.js), so the plan and the loop agree:
+  // an ask of you is looked at on its due day (else the next business day); a promise to you is chased by chaseDate (the promised day);
+  // a meeting is checked on its day.
   function carryFor(p, todayIso) {
-    if (!p.due) return { checkOn: null, then: 'ask-the-person' };
-    const due = Date.parse(p.due + 'T12:00:00Z');
-    const after = p.step === 'task' ? new Date(due + DAY).toISOString().slice(0, 10) : p.due;
-    return { checkOn: after < (todayIso || '') ? todayIso : after, then: p.step === 'task' ? 'chase' : 'remind' };
+    const FU = followUp();
+    const now = todayIso ? Date.parse(todayIso + 'T12:00:00') : Date.now();
+    const t = todayIso || new Date(now).toISOString().slice(0, 10);
+    if (p.step === 'task') {
+      const on = FU ? FU.chaseDate(FU.KINDS.REPLY, p.due || null, now) : (p.due && p.due >= t ? p.due : t);
+      return { checkOn: on, then: 'chase' };
+    }
+    if (!p.due) return { checkOn: p.step === 'draft' && FU ? FU.yoursDate(now) : null, then: 'ask-the-person' };
+    return { checkOn: p.due < t ? t : p.due, then: 'remind' };
+  }
+
+  // toWatch(plan, proposal, msg, now) -> a follow-loop watch (core/follow-up.js buildWatch) or null.
+  // Carry until closed: a close only the model found is carried by the same loop as every other one.
+  //   ask of you    -> direction 'mine' (you owe the answer, subtype owe:reply); closes when your reply goes out.
+  //   promise to you -> direction 'theirs' (they owe it); chased until the promised thing arrives.
+  //   meeting        -> no watch: it closes on the calendar (doneWhen event-exists).
+  // msg: { threadId, messageId, subject, counterpart:{email,name}, channel }. No thread, no watch.
+  function toWatch(plan, p, msg, now) {
+    const FU = followUp();
+    if (!FU || !plan || !p || !msg || !msg.threadId) return null;
+    if (p.step !== 'draft' && p.step !== 'task') return null;
+    const t = typeof now === 'number' ? now : Date.now();
+    const mine = p.step === 'draft';
+    const what = String(p.askSpan || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (!what) return null;
+    const todayIso = FU.isoDay(new Date(t));
+    const chaseIso = mine ? (p.due && p.due >= todayIso ? p.due : FU.yoursDate(t)) : FU.chaseDate(FU.KINDS.REPLY, p.due || null, t);
+    const w = FU.buildWatch({
+      threadId: msg.threadId, messageId: msg.messageId || null, subject: msg.subject || '', counterpart: msg.counterpart || {}, channel: msg.channel || 'gmail', now: t,
+      ask: { kind: FU.KINDS.REPLY, what, deadlineIso: p.due || null, chaseIso, lang: /[\u0590-\u05FF]/.test(what) ? 'he' : 'en',
+        subtype: mine ? 'owe:reply' : 'promised', tier: 'model', direction: mine ? 'mine' : 'theirs' }
+    });
+    return Object.assign(w, { closeWhen: plan.doneWhen ? plan.doneWhen.kind : null, planProcess: plan.processId });
   }
 
   // gate(process, proposal) -> { pass, reason }
@@ -110,7 +142,7 @@ const FlowModelPlan = (() => {
     return { used: true, plan: out, rows };
   }
 
-  return { SWITCH, DEFAULTS, ALLOWED_KINDS, MAX_STEPS, enabled, toIntent, gate, plan, doneWhen, carryFor, titleFrom };
+  return { SWITCH, DEFAULTS, ALLOWED_KINDS, MAX_STEPS, enabled, toIntent, gate, plan, doneWhen, carryFor, toWatch, titleFrom };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowModelPlan };
