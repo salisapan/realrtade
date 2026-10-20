@@ -35,8 +35,9 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'oauth-relay', vendor: 'jira' }, { type: 'host-permission', origin: 'https://api.atlassian.com/*' }] },
     { id: 'linear', label: 'Linear', detail: 'Add one issue to the Linear team you pick, then read it back. Undo removes it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'linear' }, { type: 'host-permission', origin: 'https://api.linear.app/*' }] },
+    { id: 'docusign', label: 'DocuSign', detail: 'Read the status of one envelope you already sent and count the loop closed when it is completed. Glance never sends or changes an envelope.', group: 'sign', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'docusign' }, { type: 'host-permission', origin: 'https://account.docusign.com/*' }, { type: 'host-permission', origin: 'https://*.docusign.net/*' }] },
     // Listed so the screen can show them honestly. Select all never includes these.
-    { id: 'docusign', label: 'DocuSign', detail: 'Count a request closed when the envelope is signed.', group: 'sign', state: 'coming', steps: [] },
     { id: 'dropbox', label: 'Dropbox', detail: 'Save one file and read it back.', group: 'files', state: 'coming', steps: [] },
     { id: 'zoom', label: 'Zoom', detail: 'Create one meeting link and read it back.', group: 'meetings', state: 'coming', steps: [] },
     { id: 'slack', label: 'Slack', detail: 'Count a request closed when the answer arrives in the DM.', group: 'chat', state: 'coming', steps: [] },

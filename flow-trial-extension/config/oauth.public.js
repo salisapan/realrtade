@@ -18,7 +18,8 @@ export const OAUTH_PUBLIC = {
   notionClientId: 'REPLACE_WITH_NOTION_CLIENT_ID',
   asanaClientId: 'REPLACE_WITH_ASANA_CLIENT_ID',
   jiraClientId: 'REPLACE_WITH_JIRA_CLIENT_ID',
-  linearClientId: 'REPLACE_WITH_LINEAR_CLIENT_ID'
+  linearClientId: 'REPLACE_WITH_LINEAR_CLIENT_ID',
+  docusignClientId: 'REPLACE_WITH_DOCUSIGN_INTEGRATION_KEY'
 };
 
 // Web application OAuth client for chrome.identity.launchWebAuthFlow.

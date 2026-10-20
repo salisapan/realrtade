@@ -8,6 +8,12 @@
 // notionOAuth: "Sign in with Notion" through the token relay (flow-landing/netlify/functions/token-relay). Needs the relay deployed,
 //              NOTION_CLIENT_ID / NOTION_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.notionClientId set. Off = the pasted token only.
 //
+// docusignReadBack: READ-ONLY. The person links one envelope they already sent to one loop; Glance reads its status and counts the loop closed only when the
+//                   envelope is completed (core/docusign-close.js). It never creates, sends or changes an envelope. Off = the message type answers connector-not-live.
+// docusignOAuth:    "Sign in with DocuSign" through the token relay. Needs the relay deployed, DOCUSIGN_CLIENT_ID / DOCUSIGN_CLIENT_SECRET set in Netlify, and
+//                   OAUTH_PUBLIC.docusignClientId set.
+// docusignDemo:     use DocuSign's developer (demo) servers instead of production: for the owner's Gate before the vendor go-live review.
+//
 // linearReadBack: the Linear write goes through core/linear-close.js (one issue in the chosen team, created with a client id, read back, Undo read back).
 //                 Off = no Linear writer exists at all (nothing is registered under the id "linear").
 // linearOAuth:    "Sign in with Linear" (OAuth, PKCE) through the token relay. Needs the relay deployed, LINEAR_CLIENT_ID /
@@ -22,4 +28,4 @@
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false };

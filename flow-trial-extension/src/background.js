@@ -72,6 +72,7 @@ import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
 import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
 import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
+import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import './google-lane-host.js';
 import './gmail-reinject.js';
@@ -1798,7 +1799,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1825,7 +1826,7 @@ async function disconnectConnector(connectorId) {
     return { ok: true };
   }
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : key);
   return { ok: true };
 }
 
@@ -4041,8 +4042,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4392,6 +4393,84 @@ async function linearReadBackWrite(p) {
 async function linearReadBackUndo(ref) {
   const r = await linearCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'linear' });
+  return r;
+}
+
+/* -------------------------------------------------- DocuSign, read-only proof */
+// docs/glance-ai/connectors/docusign.md. READ-ONLY: Glance reads one envelope's status; it never creates, sends or changes an envelope.
+// Everything here is behind config/connectors.public.js (docusignReadBack, docusignOAuth, docusignDemo), all off.
+
+const DOCUSIGN_LEDGER_KEY = 'docusignLedger';
+
+function docusignHosts() {
+  const demo = CONNECTORS.docusignDemo === true;
+  return { vendor: demo ? 'docusign-demo' : 'docusign', auth: demo ? 'https://account-d.docusign.com/oauth/auth' : 'https://account.docusign.com/oauth/auth', userinfo: demo ? 'https://account-d.docusign.com/oauth/userinfo' : 'https://account.docusign.com/oauth/userinfo' };
+}
+
+async function getDocusignAuth() {
+  const { docusignAuth } = await chrome.storage.local.get('docusignAuth');
+  return docusignAuth || null;
+}
+
+// "Sign in with DocuSign" (OAuth 2.0 authorization code). The one-time code goes to the relay, which adds the secret.
+async function connectDocusignOAuth() {
+  if (!CONNECTORS.docusignOAuth) throw new Error('Sign in with DocuSign is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.docusignClientId);
+  if (!clientId) throw new Error('DocuSign sign-in isn’t configured on this build yet.');
+  const h = docusignHosts();
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(h.auth + '?response_type=code&scope=signature&client_id=' + encodeURIComponent(clientId) + '&redirect_uri=' + encodeURIComponent(redirectUri), 'DocuSign');
+  const got = await relayTokenRequest({ vendor: h.vendor, grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('DocuSign connection failed (' + got.error + ').');
+  const info = await fetch(h.userinfo, { headers: { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' } });
+  if (!info.ok) throw new Error('DocuSign returned ' + info.status + ' when reading your account.');
+  const body = await info.json();
+  const accounts = (body && Array.isArray(body.accounts) ? body.accounts : []).filter((a) => a && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(a.account_id)) && /^https:\/\/[a-z0-9-]+\.docusign\.net$/.test(String(a.base_uri || '')));
+  const acct = accounts.find((a) => a.is_default === true) || accounts[0];
+  if (!acct) throw new Error('DocuSign signed you in but found no account Glance can read.');
+  await chrome.storage.local.set({ docusignAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, accountId: acct.account_id, baseUri: acct.base_uri, accountName: String(acct.account_name || '').slice(0, 80), demo: CONNECTORS.docusignDemo === true, via: 'oauth' } });
+  return { title: String(acct.account_name || 'DocuSign').slice(0, 80) };
+}
+
+async function docusignRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: auth.demo ? 'docusign-demo' : 'docusign', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function docusignCloseEngine() {
+  return globalThis.FlowDocusignClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getDocusignAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ docusignAuth: a }); },
+    refresh: docusignRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(DOCUSIGN_LEDGER_KEY))[DOCUSIGN_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(DOCUSIGN_LEDGER_KEY))[DOCUSIGN_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [DOCUSIGN_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, envelope } — the loop's own id and the envelope id or DocuSign link the person linked to it.
+async function docusignCheck(payload) {
+  const started = Date.now();
+  const r = await docusignCloseEngine().check(payload || {});
+  if (r.closed) await noteConnectorOutcome('handled', started, { connector: 'docusign', closeType: 'signature' });
+  else if (r.reason === 'verify_failed') await noteConnectorOutcome('readback_failed', started, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+async function docusignRelease(payload) {
+  const r = await docusignCloseEngine().release((payload || {}).key);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'docusign', closeType: 'signature' });
   return r;
 }
 
@@ -6204,6 +6283,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
@@ -6220,6 +6300,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:fact-sources') {
     return reply(sendResponse, factSources(msg.payload || {}));
+  }
+
+  // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.
+  if (msg.type === 'flow:signature-check' || msg.type === 'flow:signature-release') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.docusignReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:signature-check' ? docusignCheck(msg.payload) : docusignRelease(msg.payload));
   }
 
   if (msg.type === 'flow:execute-action') {

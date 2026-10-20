@@ -56,6 +56,26 @@ const VENDORS = {
     bodyFormat: 'form',
     extraHeaders: {},
     supportsRefresh: true
+  },
+  // DocuSign: HTTP Basic client auth and a form body (verify against the vendor page before go-live). Production and the developer (demo) servers are two vendors:
+  // the integration key is the same, the secret is not.
+  docusign: {
+    tokenUrl: 'https://account.docusign.com/oauth/token',
+    idEnv: 'DOCUSIGN_CLIENT_ID',
+    secretEnv: 'DOCUSIGN_CLIENT_SECRET',
+    clientAuth: 'basic',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
+  },
+  'docusign-demo': {
+    tokenUrl: 'https://account-d.docusign.com/oauth/token',
+    idEnv: 'DOCUSIGN_CLIENT_ID',
+    secretEnv: 'DOCUSIGN_DEMO_CLIENT_SECRET',
+    clientAuth: 'basic',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
   }
 };
 

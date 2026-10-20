@@ -142,6 +142,14 @@ const FLOW_CONNECTORS = [
       { key: 'team', label: 'Team key or link', placeholder: 'ENG or https://linear.app/…/team/ENG', type: 'text' }
     ]
   },
+  {
+    id: 'docusign',
+    label: 'DocuSign',
+    kind: 'E-signature',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Reads the status of one envelope you already sent and counts the loop closed when it is completed. Never sends or changes an envelope. Off in this build; needs a DocuSign integration key (docs/glance-ai/connectors/docusign.md).'
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 

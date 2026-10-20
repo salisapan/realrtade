@@ -38,6 +38,12 @@ ok('linear tick = relay sign-in + its one host, nothing else; all four task conn
   assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira', 'linear']).steps.length, 8);
   assert.ok(C.selectAll().indexOf('linear') >= 0);
 });
+ok('docusign tick = relay sign-in + its two hosts, nothing else; all five connectors together', () => {
+  const r = C.stepsFor(['docusign']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:docusign', 'host-permission:https://account.docusign.com/*', 'host-permission:https://*.docusign.net/*']);
+  assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira', 'linear', 'docusign']).steps.length, 11);
+  assert.ok(C.selectAll().indexOf('docusign') >= 0);
+});
 ok('microsoft ticks collapse into one sign-in listing only the ticked services', () => {
   const r = C.stepsFor(['ms-todo', 'ms-mail', 'ms-todo']);
   assert.strictEqual(r.steps.length, 1); assert.deepStrictEqual(r.steps[0], { type: 'microsoft-signin', services: ['todo', 'mail'] });
