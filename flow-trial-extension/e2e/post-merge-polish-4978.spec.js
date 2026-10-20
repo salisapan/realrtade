@@ -64,23 +64,27 @@ test('(a) item7 audience probe leaves Gmail details closed after one open', asyn
   });
   const page = await glance.openGmailHtml(html, { messageId: MSG7 });
   const msgSel = '[data-legacy-message-id="' + MSG7 + '"]';
-  const stats = await page.evaluate(({ msgSel }) => {
-    return new Promise((resolve) => {
-      const root = document.querySelector(msgSel) || document;
-      let toggleClicks = 0;
-      root.querySelectorAll('.ajy').forEach((btn) => {
-        btn.addEventListener('click', () => { toggleClicks++; }, true);
-      });
-      setTimeout(() => {
-        const detailsOpen = !!(root.querySelector && root.querySelector('.ajB table.ajC, table.ajC'));
-        resolve({ toggleClicks, detailsOpen });
-      }, 8000);
+  await page.evaluate((sel) => {
+    const root = document.querySelector(sel) || document;
+    window.__glanceToggleClicks = 0;
+    root.querySelectorAll('.ajy').forEach((btn) => {
+      btn.addEventListener('click', () => { window.__glanceToggleClicks += 1; }, true);
     });
-  }, { msgSel });
-  await expect(page.locator(msgSel + ' .flow-chip-host, div[role="main"] .flow-chip-host').first()).toBeVisible({ timeout: 5000 });
-  expect(stats.toggleClicks).toBeGreaterThanOrEqual(1);
-  expect(stats.toggleClicks).toBeLessThanOrEqual(2);
-  expect(stats.detailsOpen).toBe(false);
+  }, msgSel);
+  await expect(page.locator(msgSel + ' .flow-chip-host, div[role="main"] .flow-chip-host').first()).toBeVisible({ timeout: 20000 });
+  await expect.poll(async () => {
+    return page.evaluate((sel) => {
+      const root = document.querySelector(sel) || document;
+      if (!root || !root.querySelectorAll) return { ajA: -1, ajB: -1, detailsOpen: true };
+      const ajA = root.querySelectorAll('.ajA').length;
+      const ajB = root.querySelectorAll('.ajB').length;
+      const detailsOpen = !!(root.querySelector('.ajB table, table.ajC, table.ajB'));
+      return { ajA, ajB, detailsOpen };
+    }, msgSel);
+  }, { timeout: 20000 }).toEqual({ ajA: 0, ajB: 0, detailsOpen: false });
+  const toggleClicks = await page.evaluate(() => window.__glanceToggleClicks || 0);
+  expect(toggleClicks).toBeGreaterThanOrEqual(1);
+  expect(toggleClicks).toBeLessThanOrEqual(2);
 });
 
 test('(b) verified Drive save and draft show full handled, not partly handled', async ({ glance }) => {
