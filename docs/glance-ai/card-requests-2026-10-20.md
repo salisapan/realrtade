@@ -74,3 +74,12 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Action: one Do It. The receipt shows the file name and an Open link (`url`).
 - Undo: moves the file to the trash. If the person typed in it, the card says Undo unavailable and the file stays.
 
+## W2 — an empty Word or Excel file made in OneDrive
+
+- Module `flow-trial-extension/core/onedrive-new-file.js`, switch `ONEDRIVE_NEW_FILE`. Ecosystem gap "Word / Excel from a request" (`docs/glance-ai/ecosystem-coverage.md`, row 76 part 8). The Outlook twin of W1; same card shape, same canonical Do It.
+- When the card shows: an Outlook mail explicitly asks for a new doc, tracker or sheet with a name ("Can you create a Word document called Supplier onboarding?"). No name, a request to write the content, an existing file, a hedge, "ask Dana to create it", and another app named (Google, Notion, OneNote) show no card.
+- Line: `ליצור <מסמך Word | חוברת Excel> ריק בשם "<file>" ב-OneDrive?` / `Create an empty <Word document | Excel workbook> called "<file>" in your OneDrive?`
+- Steps: `יצירת הקובץ ב-OneDrive ובדיקה חוזרת` / `Create the file in OneDrive and read it back`, then `שיתוף והוספת תוכן: על פי בחירתך, גלאנס לא כותב ולא משתף` / `Share it and add content: your choice, Glance does not write or share` (the person's own step).
+- Action: one Do It. After the read-back the receipt shows `Word · <file>` or `Excel · <file>` with the OneDrive link. The card asks nothing new: the OneDrive box (`Files.ReadWrite`) is the existing consent; without it the plan reports `files-not-granted`.
+- A name already taken in OneDrive > Glance is refused (`name-taken`), nothing is replaced. The card should say the name is used and leave the choice to the person.
+- Undo: deletes the file. If the person edited it, the card says Undo unavailable and the file stays.
