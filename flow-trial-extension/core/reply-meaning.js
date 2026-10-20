@@ -64,7 +64,8 @@ const FlowReplyMeaning = (() => {
     /לא (?:אוכל|נוכל|אצליח|נצליח|אשלם|נשלם|אחתום|נחתום|אאשר|נאשר|מעוניין|מעוניינת|מעוניינים|רלוונטי|רלוונטית|ממשיכים|נמשיך|מתקדמים|נתקדם|מסכים|מסכימה|מסכימים)/,
     /החלטנו (?:שלא|לא|לוותר|לבטל)|החלטתי (?:שלא|לא|לוותר|לבטל)|נאלצ(?:ים|ת|ה)? (?:לסרב|לוותר|לבטל)|מסרב|מסרבת|מבטל(?:ים|ת)?|ביטלנו|ביטלתי/,
     /לא מתאים (?:לנו|לי)|לא רלוונטי (?:לנו|לי|כרגע)|(?:נלך|נבחר|בחרנו|נעבוד) עם (?:ספק|גורם|חברה) אח(?:ר|רת)/,
-    /^(?:לא תודה|ממש לא|לא)[.!,]?\s*$/
+    /^(?:לא תודה|ממש לא|לא)[.!,]?\s*$/,
+    /אין צורך \(ואי אפשר\) ל|אי אפשר לאשר/
   ];
   // "I can't do Tuesday, how about Wednesday?" is a counter-offer, not a no.
   const COUNTER = /\b(?:how about|what about|instead|rather|alternatively|could we (?:do|try|move)|can we (?:do|try|move)|would \w+ work|another (?:time|day|date)|different (?:time|day|date))\b|(?:מה דעתך|מה דעתכם|אולי ב|במקום|במועד אחר|ביום אחר|אפשר (?:ב|לדחות))/i;
@@ -115,6 +116,17 @@ const FlowReplyMeaning = (() => {
     if (!DELIVERED.test(body) || /before (?:i|we) can|לפני ש/i.test(body)) {
       for (const s of lines) {
         if (NEED_EN.test(s) || MISSING_EN.test(s) || (he && NEED_HE.test(s))) return { meaning: 'question', why: 'needs something from you', line: s };
+      }
+    }
+
+    // the ball is back with you: they hand you a task before they will act ("please attach a photo of the licence",
+    // «נא לצרף», «אנא הגש», «אודה לך אם תעדכן»). Only when nothing was delivered, and only in a short reply.
+    const ASK_BACK_EN = /\b(?:please|kindly) (?:attach|provide|submit|upload|include|complete|fill (?:in|out)|reply with|send (?:us|me) (?:a|an|the|your))\b|\b(?:i|we) (?:kindly )?(?:ask|request) that you\b|\bwould you (?:please )?(?:send|provide|attach)\b/i;
+    const ASK_BACK_HE = /(?<![א-ת])(?:נא|אנא) (?:ל|ה)[א-ת]{2,}|אודה לך אם (?:תוכל |תוכלי )?(?:ת[א-ת]{2,})|(?:תצטרך|תצטרכי|עליך|עליכם) (?:להגיש|לשלוח|לצרף|להמציא)|נבקש (?:ממך )?[^.?!]{0,25}(?:לצרף|לשלוח|להמציא)/;
+    if (words(body) <= 80 && !DELIVERED.test(body)) {
+      for (const s of lines) {
+        if (NOT_DECLINE.test(s)) continue;
+        if (ASK_BACK_EN.test(s) || (he && ASK_BACK_HE.test(s))) return { meaning: 'question', why: 'needs something from you', line: s };
       }
     }
 

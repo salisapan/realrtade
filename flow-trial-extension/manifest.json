@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Glance",
   "short_name": "Glance",
-  "version": "0.9.55",
+  "version": "0.9.56",
   "description": "Glance stays on what you are waiting on until it is closed, and closes what is asked of you in one click. Judgment on your device.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0oW6F6XmCie6fLFo3kGjzO7lmgMxNkc2p3CrezAS4qV8VB39agewLKiV4+uJYmA9PMQ2whv0aUXGRhGIue/lIv9RVAGF4lRtiAgvjTTug/GijDYFP89iacyUEVU18S5JhCZ+CZ8s1v/BdvPv6udW8W9zLXV/M7ch2awGjO3UoyLPkUgTqyAIA71da+wX++5kSK2TThOhF9+EL9C9rDOuZEc4d86PHxYhOHiQU4+vE7CxzJd99CrQ0+REL6d2BjR+TMNECqldQNqeAtmaR+iNFj0OFDV6D4JbPwK8AUCDT2S0risK9CzRCkdiYT+cFh2QfNJrMMIuqcgsJV3fsF/UbQIDAQAB",
   "icons": {
@@ -103,7 +103,13 @@
         "src/step-kit.js",
         "src/step-list-view.js",
         "src/receipt-copy.js",
+        "src/native-edit.js",
         "src/follow.js",
+        "core/draft-reply.js",
+        "core/google-config.js",
+        "core/google-compose.js",
+        "src/google-compose-page.js",
+        "src/chip-peek.js",
         "src/content-gmail.js"
       ],
       "css": [
@@ -113,6 +119,23 @@
         "src/brief.css",
         "src/weekly.css",
         "src/follow.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ],
+      "js": [
+        "core/outlook-contacts.js",
+        "core/outlook-word.js",
+        "core/outlook-excel.js",
+        "core/teams-chat.js",
+        "core/outlook-send.js",
+        "src/lane-ms-page.js",
+        "src/content-outlook-lane-ms.js"
       ],
       "run_at": "document_idle"
     }
@@ -135,6 +158,7 @@
     "https://www.googleapis.com/oauth2/*",
     "https://www.googleapis.com/upload/drive/*",
     "https://gmail.googleapis.com/*",
+    "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*"
   ],
   "oauth2": {
@@ -144,7 +168,9 @@
       "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/gmail.compose",
       "https://www.googleapis.com/auth/drive.readonly",
-      "https://www.googleapis.com/auth/drive.file"
+      "https://www.googleapis.com/auth/drive.file",
+      "openid",
+      "https://www.googleapis.com/auth/userinfo.profile"
     ]
   },
   "web_accessible_resources": [
@@ -168,12 +194,32 @@
   },
   "optional_host_permissions": [
     "https://web.whatsapp.com/*",
+    "https://app.slack.com/*",
+    "https://web.telegram.org/*",
     "https://graph.microsoft.com/*",
     "https://login.microsoftonline.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
-    "https://outlook.office365.com/*"
-  ]
+    "https://outlook.office365.com/*",
+    "https://www.messenger.com/*",
+    "https://messenger.com/*",
+    "https://www.facebook.com/messages",
+    "https://www.facebook.com/messages/*",
+    "https://facebook.com/messages",
+    "https://facebook.com/messages/*",
+    "https://business.facebook.com/latest/inbox",
+    "https://business.facebook.com/latest/inbox/*",
+    "https://www.business.facebook.com/latest/inbox",
+    "https://www.business.facebook.com/latest/inbox/*",
+    "https://www.instagram.com/direct",
+    "https://www.instagram.com/direct/*",
+    "https://instagram.com/direct",
+    "https://instagram.com/direct/*"
+  ],
+  "options_ui": {
+    "page": "lane-chat/enable.html",
+    "open_in_tab": true
+  }
 }

@@ -77,6 +77,34 @@ const FlowGraphMail = (() => {
   // msg: a Graph message resource (may carry _folder from the runner). me: string | Set | array.
   // direction 'out' if the message came from sentitems OR its from-address is in meSet; otherwise 'in'.
   // The full body is the sentence. bodyPreview is only the fallback when that body is empty.
+  function recipientEmails(list) {
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach((r) => {
+      const raw = r && r.emailAddress ? r.emailAddress.address : r;
+      const e = channel.normalizeEmail(raw);
+      if (e) out.push(e);
+    });
+    return out;
+  }
+
+  // from == to == the user, or any alias in the same set. A delegate whose
+  // sender is not the from is a real forward and is not this mail.
+  function addressedToSelf(msg, me) {
+    if (!msg) return false;
+    const meSet = meSetOf(me);
+    if (!meSet || !meSet.size) return false;
+    const from = channel.normalizeEmail(msg.from && msg.from.emailAddress && msg.from.emailAddress.address);
+    if (!from || !isOwn(from, meSet)) return false;
+    const sender = channel.normalizeEmail(msg.sender && msg.sender.emailAddress && msg.sender.emailAddress.address);
+    if (sender && sender !== from) return false;
+    const to = recipientEmails(msg.toRecipients);
+    if (!to.length) return false;
+    const cc = recipientEmails(msg.ccRecipients);
+    for (let i = 0; i < to.length; i++) if (!isOwn(to[i], meSet)) return false;
+    for (let i = 0; i < cc.length; i++) if (!isOwn(cc[i], meSet)) return false;
+    return true;
+  }
+
   function toUtterance(msg, me) {
     if (!msg || msg.isDraft) return null;
     const fa = msg.from && msg.from.emailAddress;
@@ -84,7 +112,8 @@ const FlowGraphMail = (() => {
     if (!from.email) return null;
     const meSet = meSetOf(me);
     const fromSent = msg._folder === 'sentitems';
-    const own = fromSent || isOwn(from.email, meSet);
+    const self = addressedToSelf(msg, meSet);
+    const own = !self && (fromSent || isOwn(from.email, meSet));
     const content = msg.body && msg.body.content != null ? String(msg.body.content) : '';
     const raw = content.trim()
       ? (String(msg.body && msg.body.contentType).toLowerCase() === 'html' ? htmlToText(content) : content)
@@ -205,7 +234,7 @@ const FlowGraphMail = (() => {
     return list[0] || channel.normalizeEmail(p.userPrincipalName) || null;
   }
 
-  return { htmlToText, ownText, toUtterance, truncatedPreviewOnly, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, notOwn, pickPrimary, isOpaqueMailbox, isHumanMailbox };
+  return { htmlToText, ownText, toUtterance, truncatedPreviewOnly, counterpartOf, meSetOf, ownAddressesFrom, isOwn, addressedToSelf, learnOwnFromMessages, notOwn, pickPrimary, isOpaqueMailbox, isHumanMailbox };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };

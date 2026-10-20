@@ -67,6 +67,16 @@ const FlowOutlookAuth = (() => {
 
   // The scopes this sign-in will ask for. A passed list wins (the Connect screen).
   // Otherwise the config default (mail). Mail.Send is dropped if it ever appears.
+  // A real token answer. "unknown", a missing scope, and a stale requested
+  // list are not a grant. The calendar module folds Graph URIs and scp.
+  function grantedFromResponse(resp, previous) {
+    const Cal = typeof FlowOutlookCalendar !== 'undefined' ? FlowOutlookCalendar : null;
+    if (Cal && typeof Cal.grantedScopesFromResponse === 'function') return Cal.grantedScopesFromResponse(resp, previous);
+    const raw = resp && resp.scope != null ? String(resp.scope).trim() : '';
+    if (raw && !/^unknown$/i.test(raw)) return raw.split(/[\s,;]+/).filter(Boolean);
+    return (previous && previous.grantedScopes) || null;
+  }
+
   function scopeList(cfg, scopes) {
     const base = Array.isArray(cfg && cfg.SCOPES) ? cfg.SCOPES : [];
     const raw = Array.isArray(scopes) && scopes.length ? scopes : base;
@@ -91,7 +101,7 @@ const FlowOutlookAuth = (() => {
       refreshToken: resp.refresh_token ? String(resp.refresh_token) : (previous && previous.refreshToken) || null,
       expiresAt: t + Math.max(0, (Number(resp.expires_in) || 3600) - 60) * 1000,
       rtIssuedAt: rtIssuedAt,
-      grantedScopes: resp.scope ? String(resp.scope).split(/\s+/).filter(Boolean) : (previous && previous.grantedScopes) || null
+      grantedScopes: grantedFromResponse(resp, previous)
     };
   }
 
@@ -214,6 +224,82 @@ const FlowOutlookAuth = (() => {
   function refreshTokenAlive(token, now) { return Boolean(token && token.refreshToken) && rtAgeOf(token, now) < RT_LIFETIME_MS - 60 * 1000; }
   function isTransient(error) { return !INTERACTION_ERRORS[error] && error !== 'not-connected' && error !== 'not-configured'; }
 
+  // The access token's scp claim, when this file is loaded without the calendar
+  // module (the panel). A Graph audience counts. Another audience does not.
+  function jwtPayload(accessToken) {
+    const parts = String(accessToken || '').split('.');
+    if (parts.length < 2 || !parts[1]) return null;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const clean = String(parts[1]).replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    if (!clean) return null;
+    let bits = '';
+    for (let i = 0; i < clean.length; i++) {
+      const v = chars.indexOf(clean.charAt(i));
+      if (v < 0) return null;
+      bits += v.toString(2).padStart(6, '0');
+    }
+    let text = '';
+    for (let i = 0; i + 8 <= bits.length; i += 8) text += String.fromCharCode(parseInt(bits.slice(i, i + 8), 2));
+    if (!text || text.charAt(0) !== '{') return null;
+    try { return JSON.parse(text); } catch (e) { return null; }
+  }
+
+  function scopeNames(raw) {
+    if (raw == null) return null;
+    const items = Array.isArray(raw) ? raw : [raw];
+    const out = [];
+    items.forEach((item) => {
+      String(item == null ? '' : item).split(/[\s,;]+/).forEach((part) => {
+        let s = String(part || '').trim();
+        if (!s || /^unknown$/i.test(s)) return;
+        if (/^https:\/\/graph\.microsoft\.com\//i.test(s)) s = s.replace(/^https:\/\/graph\.microsoft\.com\//i, '');
+        else if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return;
+        if (!s || s.indexOf('/') >= 0 || /^unknown$/i.test(s)) return;
+        if (out.indexOf(s) < 0) out.push(s);
+      });
+    });
+    return out.length ? out : null;
+  }
+
+  // What this stored token can do. The calendar module's reading wins when
+  // it is loaded. Otherwise the JWT scp wins over a stale grantedScopes list.
+  function tokenScopeNames(token) {
+    const Cal = typeof FlowOutlookCalendar !== 'undefined' ? FlowOutlookCalendar : null;
+    if (Cal && typeof Cal.scopesFromToken === 'function') return Cal.scopesFromToken(token);
+    if (!token || typeof token !== 'object') return null;
+    const payload = jwtPayload(token.accessToken);
+    if (payload && payload.scp != null) {
+      const scp = scopeNames(payload.scp);
+      if (scp && scp.length) return scp;
+    }
+    const granted = scopeNames(token.grantedScopes);
+    if (granted && granted.length) return granted;
+    return scopeNames(token.scope);
+  }
+
+  function hasMailScope(names) {
+    if (!names || !names.length) return false;
+    return names.some((s) => {
+      const name = String(s || '').toLowerCase();
+      return name === 'mail.read' || name === 'mail.readwrite';
+    });
+  }
+
+  // One reading of a stored Microsoft sign-in. The panel and Setup both use it.
+  // valid is the only state that may say connected. expired and missing-scope
+  // ask for a reconnect. missing has no token.
+  function microsoftConnection(auth, sync, now) {
+    const token = auth && auth.token;
+    if (!token || !token.accessToken) return 'missing';
+    const state = sync || {};
+    if (state.needsSignIn) return 'expired';
+    const exp = Number(token.expiresAt);
+    const clock = Number(now) || 0;
+    if (exp && clock && exp <= clock) return 'expired';
+    if (!hasMailScope(tokenScopeNames(token))) return 'missing-scope';
+    return 'valid';
+  }
+
   // One answer to "give me a usable access token", used by the panel, the Outlook page and the background worker alike.
   // deps: { fetch, now, random, sha256, launchSilent? }. auth: the stored outlookAuth record ({ token, account, ... }).
   // opts: { redirectUri, loginHint, force (the token was refused: refresh even if it looks fresh), lastSilentAt, allowSilent }.
@@ -283,7 +369,8 @@ const FlowOutlookAuth = (() => {
   return {
     b64url, newPkce, authorizeUrl, parseRedirect, codeBody, refreshBody, normalizeToken, scopeList,
     explainError, errorSentence, signIn, ensureFresh, silentReauth,
-    session, rtAgeOf, refreshTokenAlive, RT_LIFETIME_MS, SILENT_AFTER_MS, ACCESS_MARGIN_MS, SILENT_RETRY_MS
+    session, rtAgeOf, refreshTokenAlive, RT_LIFETIME_MS, SILENT_AFTER_MS, ACCESS_MARGIN_MS, SILENT_RETRY_MS,
+    microsoftConnection
   };
 })();
 

@@ -55,7 +55,7 @@ function gmail(text, from) {
   const intent = classify(text, who);
   if (!intent || !intent.type || !FlowIntent.shouldShowChip(intent)) return { show: false, reason: 'quiet', intent };
   const gate = FlowFileAttach.gate(text);
-  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent, gate };
+  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent, gate };
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST) return { show: 'drive', reason: 'drive-search', intent, gate };
   const process = proc(intent);
   return { show: true, intent, process, gate };
@@ -99,22 +99,20 @@ function fileCase(name, text, objectId) {
   const gate = FlowFileAttach.gate(text);
   const g = gmail(text);
   const o = outlook(text);
-  const owned = FlowResolution && FlowResolution.owns(objectId);
+  const payment = FlowResolution && FlowResolution.attestsPayment(objectId);
   check(name + ': not a scheduled event', intent && intent.type === 'request' && (!process || process.id !== 'schedule-confirm'), { type: intent && intent.type, proc: process && process.id, family: intent && intent.closeFamily });
   check(name + ': file gate is ' + objectId, gate.kind === 'clear' && gate.ask && gate.ask.id === objectId, gate);
-  if (owned) {
-    // A contract is already the resolution file path (the loop card), the same
-    // close as "send the contract" with no meeting in it. It must not become
-    // a schedule card, and it must not grow a second Drive chip.
-    check(name + ': both surfaces keep the resolution file path', g.show === false && g.reason === 'file' && !o.entry && o.why.indexOf('file') !== -1, { gmail: g, outlook: o.why });
+  if (payment) {
+    // A receipt attests a payment. The shared judge silences that chip.
+    // A contract is a file to send, not that silence.
+    check(name + ': both surfaces keep the receipt silence', g.show === false && g.reason === 'file' && !o.entry && o.why.indexOf('file') !== -1, { gmail: g, outlook: o.why });
   } else {
     check(name + ': Gmail searches Drive before a chip', g.show === 'drive', g);
     check(name + ': Outlook stays on the file, not a schedule card', !o.entry && o.why.indexOf('file-chain-not-run') !== -1, o.why);
   }
   const jg = judge(text, 'gmail');
   const jo = judge(text, 'outlook');
-  const fileReason = owned ? 'file' : 'file-chain-not-run';
-  check(name + ': both judges refuse schedule-confirm', jg.intent && jg.intent.type !== 'event' && (owned ? (jg.reason === 'file' && jo.reason === 'file') : jo.reason === fileReason), { gmail: jg.reason || (jg.process && jg.process.id), outlook: jo.reason });
+  check(name + ': both judges refuse schedule-confirm', jg.intent && jg.intent.type !== 'event' && (payment ? (jg.reason === 'file' && jo.reason === 'file') : jo.reason === 'file-chain-not-run'), { gmail: jg.reason || (jg.process && jg.process.id), outlook: jo.reason });
 }
 
 console.log('\n--- a meeting used as a deadline is the file, not a schedule ---\n');
@@ -147,7 +145,12 @@ function meetCase(name, text) {
   const o = outlook(text);
   check(name + ': calendar hold, not schedule-confirm', intent && intent.type === 'event' && intent.personalClose === 'calendar-hold' && intent.closeFamily === 'D' && process && process.id === 'hold', { type: intent && intent.type, personal: intent && intent.personalClose, family: intent && intent.closeFamily, proc: process && process.id });
   check(name + ': Gmail offers the hold', g.show === true && g.process && g.process.id === 'hold', g.show);
-  check(name + ': Outlook does not invent a reply for a hold', !o.entry && o.why.indexOf('no-draft-close') !== -1, o.why);
+  const steps = (o.entry && o.entry.process && o.entry.process.steps) || [];
+  check(name + ': Outlook offers the hold and does not invent a reply',
+    Boolean(o.entry) && o.entry.process && o.entry.process.id === 'hold' &&
+    steps.length > 0 && steps.every((s) => s.kind === 'calendar') &&
+    !steps.some((s) => /draft|send/i.test(s.kind)),
+    o.entry && o.entry.process);
 }
 meetCase('can we meet tomorrow at 10:00', MEET);
 meetCase('Hebrew נפגש Thursday at 10:00', HE_MEET);
@@ -196,7 +199,13 @@ console.log('\n--- mail from an alias of the same account stays silent ---\n');
     messages: [graphMessage(Q4, { name: 'Sali', email: ALIAS }, 'alias1')],
     me: [ME, ALIAS], watches: [], graph: I.empty(), state: {}, now: NOW, deps
   });
-  check('Outlook planner: alias sender, no incoming and no offer', r.incoming.length === 0 && r.offers.length === 0, { incoming: r.incoming.length, offers: r.offers.length, diag: r.diagnostics });
+  const inc = r.incoming[0];
+  const kinds = ((inc && inc.process && inc.process.steps) || []).map((s) => s.kind);
+  const wantLabel = 'Send the Q4 pricing sheet (glance-pricing-q4)';
+  const gotLabel = inc && inc.intent && inc.intent.label;
+  check('Outlook planner: alias to the same user is a task with no draft',
+    r.incoming.length === 1 && r.offers.length === 0 && kinds.join(',') === 'outlookTask' && gotLabel === wantLabel,
+    { incoming: r.incoming.length, offers: r.offers.length, kinds: kinds.join(','), same: gotLabel === wantLabel, got: gotLabel, want: wantLabel });
   const gmailSrc = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
   const G = E('FlowGoogleCloses');
   check('Gmail reading pane skips mail the account sent to someone else',
@@ -212,8 +221,8 @@ console.log('\n--- Turn off sits away from Check now ---\n');
   const css = fs.readFileSync(path.join(ROOT, 'popup', 'popup.css'), 'utf8');
   check('Turn off is not appended beside Check now', !/acts\.appendChild\(chk\);\s*acts\.appendChild\(off\)/.test(popup));
   check('Turn off is its own row under Check now', popup.includes("el('div', 'wait-acts wait-off-row')") && /\.wait-off-row\{margin-top:var\(--space-5\)/.test(css));
-  const chkAt = popup.indexOf("st.needsSignIn ? 'Sign in again' : 'Check now'");
-  const offAt = popup.indexOf("const off = el('button', 'ghost sm', 'Turn off')");
+  const chkAt = popup.indexOf("el('button', 'ghost sm', 'בדוק עכשיו')");
+  const offAt = popup.indexOf("el('button', 'ghost sm', 'כבה')");
   const chkBody = chkAt >= 0 && offAt > chkAt ? popup.slice(chkAt, offAt) : '';
   check('Check now does not call Turn off', chkBody.length > 0 && !/disconnect\(/.test(chkBody), chkBody.slice(0, 240));
   check('Microsoft Connect is one screen', popup.includes('data-glance-connect", "microsoft"') || popup.includes("data-glance-connect', 'microsoft'") || popup.includes('data-glance-connect", \'microsoft\''));

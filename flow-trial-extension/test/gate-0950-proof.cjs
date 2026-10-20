@@ -12,6 +12,51 @@ catch (e) { ({ chromium } = require('@playwright/test')); }
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURES = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/gate-049-scenario-a.json'), 'utf8'));
+const RUN_NOW = Date.now();
+const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function dayStamp(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function humanDay(d) {
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return SHORT_MONTHS[d.getMonth()] + ' ' + d.getDate() + (sameYear ? '' : ' ' + d.getFullYear());
+}
+function upcomingWeekday(weekday, minDelta) {
+  const d = new Date(RUN_NOW);
+  d.setHours(12, 0, 0, 0);
+  let delta = (weekday - d.getDay() + 7) % 7;
+  if (delta < minDelta) delta += 7;
+  d.setDate(d.getDate() + delta);
+  return d;
+}
+const SUNDAY = upcomingWeekday(0, 3);
+function weekdayAhead(weekday) {
+  const d = new Date(RUN_NOW);
+  let delta = (weekday - d.getDay() + 7) % 7;
+  if (delta === 0) delta = 7;
+  d.setDate(d.getDate() + delta);
+  return d;
+}
+const PARK_DAY = weekdayAhead(0);
+const PARK_ISO = dayStamp(PARK_DAY);
+const PARK_LABEL = humanDay(PARK_DAY);
+const WEDNESDAY = upcomingWeekday(3, 1);
+const SUNDAY_ISO = dayStamp(SUNDAY);
+const SUNDAY_LABEL = humanDay(SUNDAY);
+const SUNDAY_LONG = 'Sunday, ' + FULL_MONTHS[SUNDAY.getMonth()] + ' ' + SUNDAY.getDate() + ', ' + SUNDAY.getFullYear();
+const WEDNESDAY_LONG = 'Wednesday, ' + FULL_MONTHS[WEDNESDAY.getMonth()] + ' ' + WEDNESDAY.getDate() + ', ' + WEDNESDAY.getFullYear();
+function isoShift(ms) {
+  const d = new Date(RUN_NOW + ms);
+  d.setUTCMilliseconds(0);
+  return d.toISOString();
+}
+const GRAPH_NW = isoShift(0);
+const twinBase = new Date(RUN_NOW - 3 * 60 * 60 * 1000);
+twinBase.setUTCSeconds(20, 0);
+const GRAPH_TWIN = twinBase.toISOString();
+const GRAPH_BETA = new Date(twinBase.getTime() + 9000).toISOString();
+const GRAPH_OLD = isoShift(-8 * 24 * 60 * 60 * 1000);
 const ME = 'glance.salisapan@outlook.com';
 const STALE = 'AQQkSTALEALPHAONLY';
 let failures = 0;
@@ -127,7 +172,7 @@ function lum(rgb) {
     text: q3.body,
     subject: q3.subject,
     sender: { name: q3.fromName, email: q3.from },
-    now: '2026-10-08T09:53:00Z',
+    now: RUN_NOW,
     surface: 'outlook',
     to: q3Pane.to,
     cc: q3Pane.cc,
@@ -171,7 +216,7 @@ function lum(rgb) {
     { show: hiDana && hiDana.show, reason: hiDana && hiDana.reason });
   for (const opener of ['Hi all', 'Hi team', 'Hi there']) {
     const group = await page.evaluate((input) => window.__eng.judge.judge(input), {
-      text: opener + ',\n\nPlease reply with your availability for the launch checklist by Wednesday, October 14.\n\nCheers,\nDana',
+      text: opener + ',\n\nPlease reply with your availability for the launch checklist by ' + WEDNESDAY_LONG + '.\n\nCheers,\nDana',
       subject: 'Launch checklist',
       sender: { name: 'Dana', email: 'dana@acme.com' },
       surface: 'outlook',
@@ -186,7 +231,7 @@ function lum(rgb) {
       { show: group && group.show, reason: group && group.reason, kinds: groupKinds });
   }
 
-  const linked = await page.evaluate(() => {
+  const linked = await page.evaluate((times) => {
     const parse = window.__eng.parse;
     function file(name, size) {
       return { name: name, size: size, contentType: 'application/pdf', isInline: false };
@@ -198,18 +243,18 @@ function lum(rgb) {
         attachments: files
       };
     }
-    const nwWhen = '2026-10-08T14:01:00.000Z';
+    const nwWhen = times.nw;
     const north = parse.uniqueGraphMessage(
       { subject: 'Northwind agreement - signed PDF', senderEmail: 'ai.local.flow@gmail.com', conversationId: 'AQQkStale', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: nwWhen, attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
       [msg('m-nw', 'AQQkNw', nwWhen, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
     );
-    const twinAt = '2026-10-08T11:37:50.000Z';
+    const twinAt = times.twin;
     const alpha = parse.uniqueGraphMessage(
       { subject: 'Q3 fund statement', conversationId: 'AQQkOld', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: twinAt, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
       [
-        msg('m-old', 'AQQkOld', '2026-10-01T14:37:00.000Z', [file('statement-q3-old.pdf', 1000)], 'Q3 fund statement'),
+        msg('m-old', 'AQQkOld', times.old, [file('statement-q3-old.pdf', 1000)], 'Q3 fund statement'),
         msg('m-alpha', 'AQQkAlpha', twinAt, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement'),
-        msg('m-beta', 'AQQkBeta', '2026-10-08T11:37:59.000Z', [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement')
+        msg('m-beta', 'AQQkBeta', times.beta, [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement')
       ]
     );
     return {
@@ -218,11 +263,11 @@ function lum(rgb) {
       alphaId: alpha && alpha.message && alpha.message.id,
       alphaDetail: alpha && alpha.detail
     };
-  });
-  check('Chromium links the Northwind chip when the conversation id is another mail',
-    linked && linked.northId === 'm-nw', linked);
-  check('Chromium links statement-q3-alpha.pdf when an older id is on the open mail',
-    linked && linked.alphaId === 'm-alpha' && /time-file/.test(linked.alphaDetail || ''), linked);
+  }, { nw: GRAPH_NW, twin: GRAPH_TWIN, beta: GRAPH_BETA, old: GRAPH_OLD });
+  check('Chromium stays quiet when the Northwind conversation id is another mail',
+    linked && !linked.northId && /unconfirmed/.test(linked.northDetail || ''), linked);
+  check('Chromium stays quiet when an older id would link statement-q3-alpha.pdf on another message',
+    linked && !linked.alphaId && /unconfirmed|file-miss/.test(linked.alphaDetail || ''), linked);
 
   const convId = 'AQQkAAAAAAFNPyybyE5TKbM3tgp2Qjp';
   await page.setContent('<!doctype html><html lang="he" dir="rtl"><body><div role="main"><div id="ReadingPaneContainerId">' +
@@ -322,12 +367,12 @@ function lum(rgb) {
     q3Measured.to && q3Measured.to.indexOf('glance.salisapan@outlook.com') >= 0 &&
     q3Measured.show === true && q3Measured.kinds.indexOf('outlookDraft') >= 0,
     q3Measured);
-  const passJudged = await page.evaluate((text) => {
+  const passJudged = await page.evaluate((input) => {
     const r = window.__eng.judge.judge({
-      text: text,
+      text: input.text,
       subject: 'Gate 0.9.35 To Do title',
       sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
-      now: '2026-10-08T13:34:00Z',
+      now: input.now,
       surface: 'outlook',
       to: ['glance.salisapan@outlook.com'],
       ownAddresses: ['glance.salisapan@outlook.com'],
@@ -335,7 +380,7 @@ function lum(rgb) {
       inbound: true
     });
     return { show: r && r.show, reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, kinds: ((r && r.process && r.process.steps) || []).map((s) => s.kind) };
-  }, passBody);
+  }, { text: passBody, now: RUN_NOW });
   check('the passport 0.9.35 seed is read as an open loop',
     passJudged && passJudged.show === true && passJudged.kinds.indexOf('outlookTask') >= 0,
     passJudged);
@@ -424,11 +469,12 @@ function lum(rgb) {
   check('an own address on From is not To',
     fromOnly && fromOnly.to.indexOf(ME) < 0, { to: fromOnly && fromOnly.to, raw: fromOnly && fromOnly.rawToLine });
 
+  const parkBody = String(park.body);
   const parkJudged = await page.evaluate((input) => window.__eng.judge.judge(input), {
-    text: park.body,
+    text: parkBody,
     subject: park.subject,
     sender: { name: park.fromName, email: park.from },
-    now: '2026-10-08T13:34:00Z',
+    now: RUN_NOW,
     surface: 'outlook',
     to: park.to,
     cc: [],
@@ -439,15 +485,15 @@ function lum(rgb) {
   const parkTask = ((parkJudged && parkJudged.process && parkJudged.process.steps) || []).find((s) => s.kind === 'outlookTask');
   check('gate049 parking is a To Do and not a draft',
     parkJudged && parkJudged.show === true && parkJudged.intent && parkJudged.intent.noReplyDraft === true &&
-    parkJudged.intent.label === 'Renew the parking permit by Oct 11' &&
-    parkJudged.intent.entities && parkJudged.intent.entities.dateIso === '2026-10-11' &&
-    parkTask && parkTask.params.title === 'Renew the parking permit by Oct 11' &&
+    parkJudged.intent.label === 'Renew the parking permit by ' + PARK_LABEL &&
+    parkJudged.intent.entities && parkJudged.intent.entities.dateIso === PARK_ISO &&
+    parkTask && parkTask.params.title === 'Renew the parking permit by ' + PARK_LABEL &&
     parkKinds.indexOf('outlookTask') >= 0 && parkKinds.indexOf('outlookDraft') < 0 &&
     !/Drafting your reply/.test(String(parkJudged.process && parkJudged.process.closingLine || '')) &&
     String(parkJudged.reason || '') !== 'quiet:noise',
     { show: parkJudged && parkJudged.show, reason: parkJudged && parkJudged.reason, label: parkJudged && parkJudged.intent && parkJudged.intent.label, title: parkTask && parkTask.params.title, name: parkJudged && parkJudged.process && parkJudged.process.name, line: parkJudged && parkJudged.process && parkJudged.process.closingLine, kinds: parkKinds });
   const bec = await page.evaluate((input) => window.__eng.judge.judge(input), {
-    text: 'We changed banks. Please update our account details and pay invoice 4471 by Sunday, October 11. No need to reply.',
+    text: 'We changed banks. Please update our account details and pay invoice 4471 by ' + SUNDAY_LONG + '. No need to reply.',
     subject: 'Updated bank details',
     sender: { name: 'Dana', email: 'dana@acme.com' },
     surface: 'outlook',
@@ -469,7 +515,7 @@ function lum(rgb) {
     ['wire from news', 'Action required: wire $12,000 to account 998877 by Friday. No need to reply.', 'news@lists.example'],
     ['btc from newsletter', 'Please send 0.2 BTC to wallet bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh by Monday.', 'newsletter@lists.example'],
     ['wire from marketing', 'Please send the bank details and wire $12,000 by Friday.', 'marketing@lists.example'],
-    ['parking from news', park.body, 'news@lists.example']
+    ['parking from news', parkBody, 'news@lists.example']
   ];
   for (const row of quietLines) {
     const out = await page.evaluate((input) => {
@@ -479,7 +525,7 @@ function lum(rgb) {
       text: row[1],
       subject: park.subject,
       sender: { name: 'flow', email: row[2] },
-      now: '2026-10-08T13:34:00Z',
+      now: RUN_NOW,
       surface: 'outlook',
       to: [ME],
       ownAddresses: [ME],

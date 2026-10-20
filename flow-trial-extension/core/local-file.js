@@ -199,7 +199,7 @@ const FlowLocalFile = (() => {
     if (!put.ok) return miss('upload-failed');
     const id = put.json && typeof put.json.id === 'string' ? put.json.id : '';
     if (!id) return miss(proofs ? proofs.REASON_PENDING : 'proof_pending');
-    const ref = { itemId: id, createdByGlance: true, sha256: sha256, localPath: file.path, name: (put.json && put.json.name) || name };
+    const ref = { itemId: id, createdByGlance: true, sha256: sha256, size: bytes.length, localPath: file.path, name: (put.json && put.json.name) || name };
 
     const got = await io.graph('GET', itemPath(id));
     const failed = proofs ? proofs.REASON_FAILED : 'verify_failed';
@@ -225,10 +225,20 @@ const FlowLocalFile = (() => {
   }
 
   // Undo deletes the item this write created, then reads it back as gone.
+  // A copy the person changed since (another size or hash) is theirs now:
+  // Undo refuses and leaves it (owner lock: never clobber a user edit).
   async function undo(ref, io) {
     io = io || {};
     if (!ref || !ref.itemId || ref.createdByGlance !== true) return { ok: false, reason: 'not-ours' };
     if (typeof io.graph !== 'function') return { ok: false, reason: 'no-host' };
+    const now = await io.graph('GET', itemPath(ref.itemId));
+    if (now.status === 401 || now.status === 403) return { ok: false, reason: 'not-connected' };
+    if (now.status === 404) return { ok: true, undone: true, alreadyGone: true, externalId: ref.itemId };
+    if (!now.ok || !now.json) return { ok: false, reason: 'undo-failed' };
+    const hashes = (now.json.file && now.json.file.hashes) || {};
+    const changedSize = ref.size != null && Number(now.json.size) !== Number(ref.size);
+    const changedHash = Boolean(hashes.sha256Hash && ref.sha256 && upper(hashes.sha256Hash) !== upper(ref.sha256));
+    if (changedSize || changedHash) return { ok: false, reason: 'file-changed', undoUnavailable: true };
     const del = await io.graph('DELETE', itemPath(ref.itemId));
     if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
     if (!del.ok && del.status !== 404) return { ok: false, reason: 'undo-failed' };
