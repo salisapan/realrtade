@@ -104,6 +104,7 @@ function load(opts) {
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
 }
 const ok = (data) => ({ ok: true, status: 200, json: async () => data });

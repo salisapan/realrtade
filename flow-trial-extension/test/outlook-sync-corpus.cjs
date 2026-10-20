@@ -137,7 +137,7 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
       body: { contentType: 'text', content: "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" } }],
     me: [OUT, GMAIL_ME], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
   });
-  check('mail from an alias of the same account stays silent', aliasOnly.incoming.length === 0 && aliasOnly.offers.length === 0, { incoming: aliasOnly.incoming, offers: aliasOnly.offers, diag: aliasOnly.diagnostics });
+  check('mail from an alias of the same account is a task, not an offer', aliasOnly.offers.length === 0 && aliasOnly.incoming.length === 1 && aliasOnly.incoming[0].intent && aliasOnly.incoming[0].intent.selfTask === true && aliasOnly.incoming[0].process && aliasOnly.incoming[0].process.id === 'log-it', { incoming: aliasOnly.incoming, offers: aliasOnly.offers, diag: aliasOnly.diagnostics });
 
   const oldMe = planLive(GMAIL_ME);
   check('old behaviour input (me = gmail only): incoming ask still yields one incoming item', oldMe.incoming.length === 1, oldMe.incoming);

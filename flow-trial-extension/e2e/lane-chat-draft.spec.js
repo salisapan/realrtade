@@ -1,6 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('./support/harness');
+const { freezeDate } = require('./support/frozen-date');
+
+// The dev fixture's place event is Thu Oct 8 2026, 10:00 +03:00, and the sentence asks about last week.
+// "Last week" is Sun Oct 4 to Sat Oct 10 only while the page's clock is in Oct 11-17, so the clock is fixed
+// on Mon Oct 12, and the spec gives the same answer on any run date.
+const FIXTURE_NOW = '2026-10-12T11:00:00+03:00';
+
+async function openFixturePage(glance, search) {
+  const page = await glance.context.newPage();
+  await freezeDate(page, FIXTURE_NOW);
+  await page.goto('chrome-extension://' + glance.extensionId + '/dev/messenger-fixture.html' + (search || ''), { waitUntil: 'domcontentloaded', timeout: 30000 });
+  return page;
+}
 
 const PLACE = 'Taizu, 23 Montefiore, Tel Aviv';
 const OTHER = 'North Abraxas, 40 Lilienblum, Tel Aviv';
@@ -169,7 +182,7 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
 
 test('the dev fixture drafts one address and stays quiet for two', async ({ glance }) => {
   await glance.seed({ glanceDevFixture: true });
-  const page = await glance.openFixture('');
+  const page = await openFixturePage(glance, '');
   const box = page.locator('[data-glance-composer="1"]');
   await expect(box).toContainText('דיזנגוף', { timeout: 15000 });
   const text = await box.innerText();
@@ -182,6 +195,7 @@ test('the dev fixture drafts one address and stays quiet for two', async ({ glan
   const quietLogs = [];
   const quiet = await glance.context.newPage();
   quiet.on('console', (msg) => quietLogs.push(msg.text()));
+  await freezeDate(quiet, FIXTURE_NOW);
   await quiet.goto('chrome-extension://' + glance.extensionId + '/dev/messenger-fixture.html?case=two', { waitUntil: 'domcontentloaded', timeout: 30000 });
   await expect(quiet.locator('[data-glance-quiet]')).toHaveText('[Glance] whyNotShown: conflict', { timeout: 15000 });
   expect((await quiet.locator('[data-glance-composer="1"]').innerText()).trim()).toBe('');

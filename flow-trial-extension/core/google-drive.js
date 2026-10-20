@@ -7,6 +7,9 @@ const FlowGoogleDrive = (() => {
   const MAX_BYTES = 4 * 1024 * 1024;
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=' + encodeURIComponent('id,name,mimeType,trashed');
   const FILES = 'https://www.googleapis.com/drive/v3/files/';
+  const FILES_ROOT = 'https://www.googleapis.com/drive/v3/files';
+  const FOLDER_NAME = 'Glance';
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
   function cfg() {
     return typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
@@ -76,15 +79,17 @@ const FlowGoogleDrive = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,contentHash,headRevisionId,version,modifiedTime');
+    return FILES + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,md5Checksum,headRevisionId,version,modifiedTime');
   }
 
+  // What the person's own edit changes is the content and the name. version,
+  // modifiedTime and headRevisionId move on their own after an upload
+  // (indexing, thumbnails, virus scan), so none of them says "edited".
   function fileSnapshot(json) {
-    const snap = {};
     if (!json || typeof json !== 'object') return null;
-    if (json.headRevisionId) snap.headRevisionId = String(json.headRevisionId);
-    if (json.version != null && String(json.version) !== '') snap.version = String(json.version);
-    if (json.modifiedTime) snap.modifiedTime = String(json.modifiedTime);
+    const snap = {};
+    if (json.md5Checksum) snap.md5Checksum = String(json.md5Checksum);
+    if (json.name) snap.name = String(json.name);
     return Object.keys(snap).length ? snap : null;
   }
 
@@ -92,22 +97,16 @@ const FlowGoogleDrive = (() => {
     return !!(obj && obj[key] != null && String(obj[key]) !== '');
   }
 
-  // match, edited, unconfirmed, or missing. Version and modifiedTime both
-  // have to be present and equal. headRevisionId has to match when either
-  // side has it. A modifiedTime match with no version cannot confirm the file.
-  function unchanged(snapshot, live) {
-    if (!snapshot || typeof snapshot !== 'object') return 'missing';
+  // match, edited, unconfirmed, or missing. The md5Checksum of the read-back
+  // after the upload is compared with the md5Checksum of the read before the
+  // trash. A file with no checksum on either side cannot be confirmed.
+  function unchanged(snapshot, live, savedHash) {
+    const snap = snapshot && typeof snapshot === 'object' ? snapshot : {};
     const got = live && typeof live === 'object' ? live : {};
-    if (!present(snapshot, 'version') || !present(snapshot, 'modifiedTime')) return 'unconfirmed';
-    if (!present(got, 'version') || !present(got, 'modifiedTime')) return 'unconfirmed';
-    if (String(snapshot.version) !== String(got.version)) return 'edited';
-    if (String(snapshot.modifiedTime) !== String(got.modifiedTime)) return 'edited';
-    const snapRev = present(snapshot, 'headRevisionId');
-    const liveRev = present(got, 'headRevisionId');
-    if (snapRev || liveRev) {
-      if (!snapRev || !liveRev) return 'unconfirmed';
-      if (String(snapshot.headRevisionId) !== String(got.headRevisionId)) return 'edited';
-    }
+    const saved = present(snap, 'md5Checksum') ? snap.md5Checksum : (/^[0-9a-f]{32}$/i.test(String(savedHash || '')) ? savedHash : '');
+    if (!saved || !present(got, 'md5Checksum')) return 'unconfirmed';
+    if (String(saved).toLowerCase() !== String(got.md5Checksum).toLowerCase()) return 'edited';
+    if (present(snap, 'name') && present(got, 'name') && String(snap.name) !== String(got.name)) return 'edited';
     return 'match';
   }
 
@@ -136,6 +135,29 @@ const FlowGoogleDrive = (() => {
     }
   }
 
+  // The saved file lives in one folder named Glance, made on the first save.
+  // drive.file sees only what Glance made, so the list finds Glance's own
+  // folder and never a folder the person made with the same name. When the
+  // folder cannot be found or made the file goes to My Drive. Undo trashes
+  // the file only, never the folder.
+  async function glanceFolderId(http) {
+    const q = "mimeType='" + FOLDER_MIME + "' and name='" + FOLDER_NAME + "' and trashed=false";
+    const listed = await call(http, {
+      method: 'GET',
+      url: FILES_ROOT + '?q=' + encodeURIComponent(q) + '&pageSize=1&fields=' + encodeURIComponent('files(id,name)')
+    });
+    const hit = listed.ok && listed.json && Array.isArray(listed.json.files) ? listed.json.files[0] : null;
+    if (hit && hit.id) return String(hit.id);
+    if (listed.status === 401 || listed.status === 403) return '';
+    const made = await call(http, {
+      method: 'POST',
+      url: FILES_ROOT + '?fields=' + encodeURIComponent('id,name'),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME })
+    });
+    return made.ok && made.json && made.json.id ? String(made.json.id) : '';
+  }
+
   async function write(input, http, clock) {
     const C = cfg();
     const i = input || {};
@@ -143,7 +165,10 @@ const FlowGoogleDrive = (() => {
     if (blocked) return blocked;
     const ready = prepare(i);
     if (!ready.ok) return { ok: false, reason: ready.reason || 'unclear' };
-    const packed = multipart({ name: ready.name, mimeType: ready.mimeType }, ready.mimeType, ready.bytes);
+    const folder = i.folder === false ? '' : await glanceFolderId(http);
+    const meta = { name: ready.name, mimeType: ready.mimeType };
+    if (folder) meta.parents = [folder];
+    const packed = multipart(meta, ready.mimeType, ready.bytes);
     const posted = await call(http, {
       method: 'POST',
       url: UPLOAD,
@@ -162,7 +187,7 @@ const FlowGoogleDrive = (() => {
     const link = 'https://drive.google.com/file/d/' + encodeURIComponent(file.id) + '/view';
     base.url = link;
     const proof = C && C.proofOf(SYSTEM, file.id, link, C.clockIso(clock));
-    const remoteHash = got.json && got.json.contentHash ? String(got.json.contentHash) : hashBytes(ready.bytes);
+    const remoteHash = got.json && got.json.md5Checksum ? String(got.json.md5Checksum) : hashBytes(ready.bytes);
     const ref = {
       fileId: file.id,
       externalId: file.id,
@@ -182,7 +207,7 @@ const FlowGoogleDrive = (() => {
     if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
     if (got.status === 404) return { ok: true, written: 'Drive file removed.' };
     if (!got.ok || got.status === 0) return unconfirmedResult();
-    const verdict = unchanged(ref.snapshot, got.json);
+    const verdict = unchanged(ref.snapshot, got.json, ref.contentHash);
     if (verdict === 'edited') return editedResult();
     if (verdict !== 'match') return unconfirmedResult();
     const del = await call(http, {
@@ -200,6 +225,7 @@ const FlowGoogleDrive = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     MAX_BYTES: MAX_BYTES,
+    FOLDER_NAME: FOLDER_NAME,
     hasWriteScope: hasWriteScope,
     safeName: safeName,
     prepare: prepare,

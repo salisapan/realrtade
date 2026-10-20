@@ -8,7 +8,7 @@ import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
-import '../core/google-contacts.js';
 import '../core/google-compose.js';
+import '../core/google-drafts.js';
 import '../core/google-proof.js';
 import './google-lane.js';

@@ -18,6 +18,9 @@ import sys
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from stamp_build import git_sha7, stamped_bytes  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXTENSION_ROOT = REPO_ROOT / "flow-trial-extension"
 ZIP_PATH = (
@@ -304,6 +307,7 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
     for rel in files:
         if rel.startswith("flow-trial-extension/") or rel.startswith("/") or ".." in Path(rel).parts:
             die(f"install zip entry would not sit at the extension root: {rel}")
+    sha = os.environ.get("GLANCE_BUILD_STAMP") or git_sha7()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
@@ -315,7 +319,7 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, files[rel].read_bytes())
+            archive.writestr(info, stamped_bytes(rel, files[rel].read_bytes(), sha))
     os.replace(tmp, out)
     return out.stat().st_size
 

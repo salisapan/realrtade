@@ -65,6 +65,10 @@ const FlowResolution = (() => {
   // The artifacts the host surfaces WIRE to this path first: the ones that attest a payment, where one action is most often wrong.
   // Documents the person sends (a contract, a quote) are wired too: a draft with the file is not a delivery, and a chip that says "Handled." over it was a false close.
   function owns(objectId) { return handles(objectId) && (CLASSES[objectId].attests === 'payment' || CLASSES[objectId].deliverable === true); }
+  // A receipt or a transfer attests a payment. A contract, a quote, a
+  // proposal, and a signed copy are files to send. The receipt silence
+  // is only the payment attestation.
+  function attestsPayment(objectId) { return handles(objectId) && CLASSES[objectId].attests === 'payment'; }
   function norm(v) { return String(v || '').toLowerCase().replace(/\.[a-z0-9]{1,8}$/i, '').replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim(); }
   function he(need) { return Boolean(need && need.lang === 'he'); }
   const sameAmount = (a, b) => Math.abs(a - b) <= Math.max(0.5, a * 0.005);
@@ -458,7 +462,7 @@ const FlowResolution = (() => {
     return (name ? 'Hi ' + name + ',' : 'Hi,') + '\n\nCould you issue a ' + need.label + (payer ? ' for ' + payer : '') + (amt ? ' for ' + amt : '') + (o.dateText ? ' (payment received ' + o.dateText + ')' : '') + ' and send it to me as a file?\n\nThanks,';
   }
 
-  return { CLASSES, handles, owns, doneDefinition, paymentStatus, findExisting, matchIssuerReply, nameAmounts, plan, open, markPaid, markNotPaid, recordRequest, recordOwnerIssuing, recordPrepared, recordChase, readIssuerAnswer, matchIssuerMessage, judgeDelivery, closePatch, replyDraft, issuerRequestDraft, issuerChaseDraft };
+  return { CLASSES, handles, owns, attestsPayment, doneDefinition, paymentStatus, findExisting, matchIssuerReply, nameAmounts, plan, open, markPaid, markNotPaid, recordRequest, recordOwnerIssuing, recordPrepared, recordChase, readIssuerAnswer, matchIssuerMessage, judgeDelivery, closePatch, replyDraft, issuerRequestDraft, issuerChaseDraft };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowResolution };

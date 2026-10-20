@@ -167,7 +167,13 @@ sandbox.reinjectGmailTabs().then((first) => {
   process.on('unhandledRejection', onRejection);
   function matchSel(node, sel) {
     if (!node || !sel) return false;
-    if (sel === '.flow-chip-host, .flow-chip') return matchSel(node, '.flow-chip-host') || matchSel(node, '.flow-chip');
+    if (sel.indexOf(',') >= 0) {
+      const parts = sel.split(',');
+      for (let i = 0; i < parts.length; i++) {
+        if (matchSel(node, parts[i].trim())) return true;
+      }
+      return false;
+    }
     if (sel.charAt(0) === '.') return (' ' + (node.className || '') + ' ').indexOf(' ' + sel.slice(1) + ' ') >= 0;
     const attr = /^([a-z0-9]+)?\[([a-z0-9-]+)(?:="([^"]*)")?\]$/i.exec(sel);
     if (!attr) return false;
@@ -180,6 +186,7 @@ sandbox.reinjectGmailTabs().then((first) => {
       tag: tag, className: '', textContent: '', children: [], attrs: {}, style: {},
       isConnected: true, parent: null, removed: false,
       setAttribute(k, v) { this.attrs[k] = String(v); },
+      removeAttribute(k) { delete this.attrs[k]; },
       getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
       appendChild(child) { child.parent = this; this.children.push(child); return child; },
       insertBefore(child) { return this.appendChild(child); },
@@ -223,6 +230,9 @@ sandbox.reinjectGmailTabs().then((first) => {
     let timerSeq = 1;
     let now = 0;
     const body = makeNode('body');
+    const account = makeNode('a');
+    account.setAttribute('aria-label', 'Google Account: Glance (me@example.com)');
+    body.appendChild(account);
     const main = makeNode('div');
     main.setAttribute('role', 'main');
     body.appendChild(main);
@@ -301,7 +311,8 @@ sandbox.reinjectGmailTabs().then((first) => {
           lastError: null,
           sendMessage(msg, cb) {
             page.sent.push(msg);
-            if (typeof cb === 'function') cb({ ok: true });
+            const verify = msg && msg.type === 'flow:google-verify';
+            if (typeof cb === 'function') cb(verify ? { ok: true, states: (msg.steps || []).map(() => 'present') } : { ok: true });
           },
           onMessage: { addListener() {} }
         },

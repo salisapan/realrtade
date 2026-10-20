@@ -23,6 +23,12 @@ const FlowStepListView = (() => {
     return { tool: 'you', app: 'You' };
   }
 
+  function plainText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   function skippedLine(file) {
     if (typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.skippedLabel === 'function') {
       return FlowSuggestSave.skippedLabel(file);
@@ -79,6 +85,22 @@ const FlowStepListView = (() => {
       out.push(oneFile(f, true));
     });
     return out;
+  }
+
+  // The exact place a file step writes: 'OneDrive > Glance > report.pdf'. Only a file
+  // step has one. The names are the files that are ticked, so a pill toggle changes it.
+  function destinationOf(row, tool, files) {
+    if (!row || (tool.tool !== 'onedrive' && tool.tool !== 'drive')) return '';
+    const Files = (typeof FlowOnedriveFile !== 'undefined') ? FlowOnedriveFile : null;
+    const folder = (Files && Files.FOLDER) || 'Glance';
+    const params = (row.step && row.step.params) || {};
+    let names = (files || []).filter(function (f) { return f.on && !f.skipped && f.name; }).map(function (f) { return f.name; });
+    if (!names.length && !(files || []).length && params.fileName) names = [String(params.fileName)];
+    const where = tool.tool === 'drive' ? 'Drive' : 'OneDrive';
+    if (!names.length) return where + ' > ' + folder;
+    return Files && typeof Files.destination === 'function'
+      ? Files.destination(names.join(', '), where)
+      : where + ' > ' + folder + ' > ' + names.join(', ');
   }
 
   function fileOnly(rows) {
@@ -140,6 +162,8 @@ const FlowStepListView = (() => {
       kind: row.suggested ? 'suggested' : ''
     };
     base.text = stepCopy(row, L);
+    const dest = destinationOf(row, tool, files);
+    if (dest) base.dest = dest;
     base.user = row.added === true;
     if (files.length > 1) {
       base.kind = 'multi';
@@ -152,7 +176,7 @@ const FlowStepListView = (() => {
       return base;
     }
     if (failed) {
-      base.out = (L.couldnt || 'Couldn’t confirm') + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
+      base.out = (row.why ? plainText(row.why) : (L.couldnt || 'Couldn’t confirm')) + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
       return base;
     }
     function statusWord(name) {
@@ -422,8 +446,8 @@ const FlowStepListView = (() => {
         pushState(state);
         draw();
       },
-      setRow: function (id, state) {
-        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state }) : row; });
+      setRow: function (id, state, why) {
+        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null }) : row; });
         pushState(state);
         draw();
       }

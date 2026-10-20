@@ -94,8 +94,8 @@ const PAYLOAD = { params: { content: 'signed', fileName: 'passport.pdf' }, label
 
 function createRoutes(getStatus, getBody) {
   return [
-    { method: 'GET', test: /\/me\/drive\/root:\/passport\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
-    { method: 'PUT', test: /\/me\/drive\/root:\/passport\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => FILE, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/passport\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
+    { method: 'PUT', test: /\/me\/drive\/root:\/Glance\/passport\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: getStatus >= 200 && getStatus < 300, status: getStatus, json: async () => getBody, text: async () => '' }) }
   ];
 }
@@ -107,6 +107,11 @@ console.log('\n--- names, scope, one attachment ---\n');
     F.hasWriteScope(['https://graph.microsoft.com/Files.ReadWrite']) === true &&
     F.hasWriteScope(['Files.ReadWrite.All']) === false);
   check('an unknown scope list is not a refusal', F.hasWriteScope(null) === null);
+  check('the file goes into the Glance folder, and the card can say exactly where',
+    F.FOLDER === 'Glance' && F.rootItemPath('passport.pdf') === '/me/drive/root:/Glance/passport.pdf' &&
+    F.createContentPath('a b.pdf') === '/me/drive/root:/Glance/a%20b.pdf:/content' &&
+    F.destination('passport.pdf') === 'OneDrive > Glance > passport.pdf' &&
+    F.destination('passport.pdf', 'Drive') === 'Drive > Glance > passport.pdf' && F.destination('') === '');
   check('a name cannot climb out of the folder', F.safeName('../secret.txt') === '' && F.safeName('passport.pdf') === 'passport.pdf');
   check('inline text is one upload under the simple cap',
     F.prepare(PAYLOAD).ok === true && F.prepare(PAYLOAD).fetchOne === false && F.prepare(PAYLOAD).name === 'passport.pdf');
@@ -307,7 +312,7 @@ console.log('\n--- a verify miss is not Handled ---\n');
 console.log('\n--- update restores a version, and a file with no version is left alone ---\n');
 {
   const routes = [
-    { method: 'GET', test: /\/me\/drive\/root:\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/versions\?\$top=1$/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [{ id: 'VER1' }] }), text: async () => '' }) },
     { method: 'PUT', test: /\/me\/drive\/items\/FILE1\/content$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
@@ -330,13 +335,32 @@ console.log('\n--- update restores a version, and a file with no version is left
     copy.undoHint === 'Undo restores the previous OneDrive file.', copy);
 
   const bare = [
-    { method: 'GET', test: /\/me\/drive\/root:\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/versions\?\$top=1$/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [] }), text: async () => '' }) }
   ];
   const left = background({ routes: bare });
   const skipped = await left.fn('outlookFileWrite')(PAYLOAD);
   check('no previous version means the file is not overwritten',
     skipped.ok === false && skipped.reason === 'unclear' && !left.calls.some((c) => c.method === 'PUT'), skipped);
+}
+
+console.log('\n--- Undo deletes a file Glance created ---\n');
+{
+  const env = background({ routes: createRoutes(200, FILE).concat([
+    { method: 'DELETE', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ]) });
+  const out = await env.fn('outlookFileWrite')(PAYLOAD);
+  const put = env.calls.find((c) => c.method === 'PUT');
+  check('a new file is put in the Glance folder', out.ok === true && out.ref.created === true && put && /\/me\/drive\/root:\/Glance\/passport\.pdf:\/content$/.test(put.url), put);
+  const undo = await env.fn('outlookFileUndo')(out.ref);
+  const del = env.calls.filter((c) => c.method === 'DELETE');
+  check('Undo deletes that file and says so', undo.ok === true && del.length === 1 && /\/items\/FILE1$/.test(del[0].url) && undo.written === 'OneDrive file removed.', undo);
+  const failing = background({ routes: createRoutes(200, FILE).concat([
+    { method: 'DELETE', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: false, status: 500, json: async () => ({}), text: async () => '' }) }
+  ]) });
+  const w = await failing.fn('outlookFileWrite')(PAYLOAD);
+  const u = await failing.fn('outlookFileUndo')(w.ref);
+  check('a failed delete is an honest error, not a removed file', u.ok === false && u.reason === 'http-500', u);
 }
 
 console.log('\n--- the write scope is the checkbox ---\n');
