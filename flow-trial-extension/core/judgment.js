@@ -163,9 +163,9 @@ const FlowJudgment = (() => {
     /\bany (?:chance|way|possibility)\b[^.?!\n]{0,30}\b(?:connect|chat|talk|meet|call|speak|catch up|sync|hop)\b/i,
     /\bwould it be possible\b[^.?!\n]{0,25}\b(?:meet|talk|chat|call|connect|speak|catch up|get together)\b/i,
     // would Thursday work, how about tomorrow, what about a call
-    /\bwould\s+(?:\w+day|tomorrow|today|next week|this week|the (?:morning|afternoon|evening)|then|that|\d{1,2}(?::\d\d)?\s?(?:am|pm)?)\b[^.?!\n]{0,25}\b(?:work|suit|be good|be fine|be ok|be okay|be better)\b/i,
+    /\bwould\s+(?:\w+day|tomorrow|today|next week|this week|the (?:morning|afternoon|evening)|\d{1,2}(?::\d\d)?\s?(?:am|pm)?)\b[^.?!\n]{0,25}\b(?:work|suit|be good|be fine|be ok|be okay|be better)\b/i,
     /\b(?:how|what) about\b[^.?!\n]{0,40}\b(?:call|chat|meet|talk|tomorrow|today|\w+day|next week|this week|coffee|lunch|sync|morning|afternoon|evening)\b/i,
-    /\b(?:does|do|is)\s+(?:\w+day|tomorrow|today|next week|this week|that|then)\b[^.?!\n]{0,20}\b(?:work|suit)s?\b/i,
+    /\b(?:does|do|is)\s+(?:\w+day|tomorrow|today|next week|this week)\b[^.?!\n]{0,20}\b(?:work|suit)s?\b/i,
     // let's, I'd love to, looking forward to, happy to
     /\blet(?:'|’)?s\s+(?:find|set up|schedule|book|arrange|catch up|sync(?: up)?|talk|connect|touch base|hop on|jump on|get together|meet|speak|chat|grab|pick)\b/i,
     /\b(?:i|we)(?:'d| would|'d really| really would| really)?\s+(?:love|like|appreciate|be happy|be glad|welcome|prefer|want|hope|wish|need)\s+(?:to\s+)?(?:set up|schedule|book|arrange|find a time|catch up|connect|chat|talk|meet|speak|get together|hop on|jump on|discuss|sync|touch base|hear|a few minutes|some of your time|a moment|\d+ minutes)\b/i,
