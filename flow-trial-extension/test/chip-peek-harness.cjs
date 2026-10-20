@@ -26,11 +26,17 @@ const exe = process.env.CHROME_BIN || ['/opt/pw-browsers/chromium-1194/chrome-li
     document.querySelectorAll('.flow-chip-host').forEach((n) => n.remove());
     const h = document.createElement('div');
     h.className = 'flow-chip-host';
+    const n = document.createElement('span'); n.className = 'flow-chip-process-name'; n.textContent = 'Reply & Track'; h.appendChild(n);
     const t = document.createElement('p'); t.className = 'flow-chip-text';
     const b = document.createElement('span'); b.className = 'flow-chip-brand'; b.textContent = 'Glance';
-    t.appendChild(b); t.appendChild(document.createTextNode(' Reply to Dana with two times to talk'));
+    t.appendChild(b); t.appendChild(document.createTextNode(' is drafting a reply to the request and opening a follow-up task.'));
     h.appendChild(t);
-    const c = document.createElement('button'); c.className = 'flow-chip ' + st; h.appendChild(c);
+    const row = document.createElement('div'); row.className = 'flow-chip-main-row';
+    const c = document.createElement('button'); c.className = 'flow-chip ' + st;
+    ['shell', 'ring', 'shine'].forEach((k) => { const s = document.createElement('span'); s.className = k; c.appendChild(s); });
+    const l = document.createElement('span'); l.className = 'flow-chip-do-label'; l.textContent = 'Do It'; c.appendChild(l);
+    c.addEventListener('click', () => { window.__realClicks = (window.__realClicks || 0) + 1; });
+    row.appendChild(c); h.appendChild(row);
     document.getElementById('mail').appendChild(h);
     window.scrollTo(0, 0);
   }, state || '');
@@ -40,16 +46,30 @@ const exe = process.env.CHROME_BIN || ['/opt/pw-browsers/chromium-1194/chrome-li
   check('an offer below the fold pops up', await tick() === true);
   const box = await page.evaluate(() => { const r = document.getElementById('glance-peek').getBoundingClientRect(); return { b: r.bottom, r: r.right, vh: innerHeight, vw: innerWidth }; });
   check('the peek is inside the viewport', box.b <= box.vh && box.r <= box.vw, box);
-  check('the peek says what Glance found, without the brand twice', await page.evaluate(() => document.querySelector('#glance-peek .glance-peek-text').textContent) === 'Reply to Dana with two times to talk');
+  check('the peek is the same card: same sentence, brand and process name', await page.evaluate(() => {
+    const p = document.getElementById('glance-peek'), h = document.querySelector('.flow-chip-host');
+    return p.querySelector('.flow-chip-text').textContent === h.querySelector('.flow-chip-text').textContent
+      && p.querySelector('.flow-chip-process-name').textContent === 'Reply & Track' && !!p.querySelector('.flow-chip-brand');
+  }));
+  check('the peek button is the canonical Do It (shell, ring, shine, label)', await page.evaluate(() => {
+    const c = document.querySelector('#glance-peek .flow-chip');
+    return !!c && !!c.querySelector('.shell') && !!c.querySelector('.ring') && !!c.querySelector('.shine') && c.querySelector('.flow-chip-do-label').textContent === 'Do It';
+  }));
+  check('the peek adds no look of its own: same card background, border and radius as the real card', await page.evaluate(() => {
+    const keys = ['backgroundImage', 'borderTopColor', 'borderRadius', 'boxShadow', 'fontFamily'];
+    const a = getComputedStyle(document.getElementById('glance-peek')), b = getComputedStyle(document.querySelector('.flow-chip-host'));
+    return keys.every((k) => a[k] === b[k]);
+  }));
 
-  await page.click('#glance-peek .glance-peek-show');
+  await page.click('#glance-peek .flow-chip');
   await page.waitForTimeout(900);
-  check('Show scrolls the card into view', await page.evaluate(() => { const r = document.querySelector('.flow-chip-host').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }));
+  check('Do It on the peek runs the real card Do It once', await page.evaluate(() => window.__realClicks) === 1);
+  check('and brings the real card into view for the receipt', await page.evaluate(() => { const r = document.querySelector('.flow-chip-host').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }));
   check('the peek leaves once the card is on screen', await tick() === false);
 
   await addHost('');
   await tick();
-  await page.click('#glance-peek .glance-peek-x');
+  await page.click('#glance-peek .flow-chip-dismiss');
   check('dismiss hides the peek for that card', await tick() === false);
 
   await addHost('flow-chip-pending');
