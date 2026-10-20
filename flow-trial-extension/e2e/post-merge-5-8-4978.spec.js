@@ -4,6 +4,7 @@ const path = require('path');
 const vm = require('vm');
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { liveGmailPage } = require('./support/live-gate-livedom');
 
 const INTENT_ROOT = path.join(__dirname, '..');
 const SELF = 'ai.local.flow@gmail.com';
@@ -72,13 +73,80 @@ test.beforeEach(async ({ glance }) => {
   await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
 });
 
-test('(5) self card title is verb plus object, not לטפל בהערה', () => {
+function inboundJudge(body, subject) {
+  const J = vm.runInContext('FlowIncomingJudge', intentEngine());
+  return J.judge({
+    text: body,
+    subject,
+    sender: { name: 'Sali Sapan', email: 'salisapan1@gmail.com' },
+    surface: 'gmail',
+    to: [SELF],
+    cc: [],
+    ownAddresses: [SELF],
+    userName: 'Sali',
+    ownNames: ['Sali', 'Sali Sapan'],
+    direction: 'inbound',
+    inbound: true,
+    attachmentCount: 1,
+    now: new Date('2026-10-20T12:20:00Z')
+  });
+}
+
+test('(5) inbound gate titles — פעולה נדרשת and OneDrive save', () => {
+  const b5a = 'היי סלי,\nמצורף ה-deck המעודכן לסבב A.\nפעולה נדרשת מצד: חתימה על ה-deck\nתודה, דנה';
+  const b5b = 'היי, תשמרי את המצורף בוואן דרייב בבקשה. תודה!';
+  const j5a = inboundJudge(b5a, 'Deck סבב A (179)');
+  const j5b = inboundJudge(b5b, 'מסמכי ספק (179)');
+  expect(j5a.show).toBe(true);
+  expect(j5b.show).toBe(true);
+  expect(j5a.intent && j5a.intent.label).toBe('לחתום על ה-deck');
+  expect(j5b.intent && j5b.intent.label).toBe('לשמור את המצורף בוואן דרייב');
   const sign = selfTitle('פעולה נדרשת מצד: חתימה על ה-deck\nבתודה', 'הקבלה');
-  const save = selfTitle('תשמרי את המצורף בוואן דרייב', 'דוח ההוצאות מצורף');
   expect(sign).toBe('לחתום על ה-deck');
-  expect(save).toBe('לשמור את המצורף בוואן דרייב');
   expect(sign).not.toBe('לטפל בהערה');
-  expect(save).not.toBe('לטפל בהערה');
+});
+
+test('(5) live-shaped Gmail DOM — PDF chip, Hebrew subject, inbound card titles', async ({ glance }) => {
+  const cases = [
+    {
+      messageId: '1a15941d8c653905',
+      subject: 'Deck סבב A (179)',
+      body: 'היי סלי,\nמצורף ה-deck המעודכן לסבב A. המשקיעים מחכים לגרסה החתומה עד סוף השבוע.\nפעולה נדרשת מצד: חתימה על ה-deck\nתודה, דנה',
+      attachName: 'Deck-סבב-A.pdf',
+      title: 'לחתום על ה-deck'
+    },
+    {
+      messageId: '1a15941e778affc5',
+      subject: 'מסמכי ספק (179)',
+      body: 'היי, תשמרי את המצורף בוואן דרייב בבקשה. תודה!',
+      attachName: 'מסמכי-ספק.pdf',
+      title: 'לשמור את המצורף בוואן דרייב'
+    }
+  ];
+  await glance.seedGmail({
+    onboarded: true,
+    connectorId: 'googleTasks',
+    glanceUiLanguage: 'he',
+    googleProfile: { displayName: 'Sali', givenName: 'Sali' }
+  });
+  for (const row of cases) {
+    const html = liveGmailPage({
+      liveDom: 'item7-collapsed',
+      detailsFrom: 'item7-details',
+      liveMutate: 'selfPdfAttach',
+      messageId: row.messageId,
+      attachName: row.attachName,
+      bodyText: row.body,
+      subjectText: row.subject,
+      title: row.subject + ' - ai.local.flow@gmail.com - Gmail'
+    });
+    const page = await glance.openGmailHtml(html, { messageId: row.messageId });
+    const msgSel = '[data-legacy-message-id="' + row.messageId + '"]';
+    const host = page.locator(msgSel + ' .flow-chip-host, div[role="main"] .flow-chip-host').first();
+    await expect(host).toBeVisible({ timeout: 25000 });
+    await expect(host.locator('.flow-chip-process-name')).toHaveText(row.title, { timeout: 5000 });
+    await page.close();
+  }
 });
 
 test('(6) Hebrew verify-and-update inbound ask gets a card', () => {

@@ -1513,6 +1513,21 @@ const FlowIntent = (() => {
       if (/\b(?:postpon(?:e|ed|ing)|cancel(?:led|ed|ing)?|called off|won'?t happen|will not happen|isn'?t happening)\b/i.test(blob)) return 'negative';
       return '';
     }
+    function rescueInboundActionRequired() {
+      if (addressedToSelf(ctx)) return null;
+      if (!/פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) return null;
+      const subject = ctx && ctx.subject;
+      const decided = selfDecisionTitle(text, facts);
+      let titled = decided || selfAskTitle(text, subject, ctx);
+      if (!decided && !usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+      if (!decided && !usableSelfTitle(titled)) return null;
+      const made = finish(TYPES.REQUEST, 'high', { what: titled });
+      if (!made || !made.type) return null;
+      made.label = titled;
+      made.selfTask = true;
+      made.noReplyDraft = true;
+      return made;
+    }
     function rescueSelfSent(code) {
       if (code === 'calibrated') return null;
       if (!addressedToSelf(ctx)) return null;
@@ -1539,6 +1554,8 @@ const FlowIntent = (() => {
       // a past recap, a negation, a conditional). Any other self-sent
       // note is still the task, including one this path had filed as quiet.
       if (!(extra && extra.noRescue)) {
+        const inboundAction = rescueInboundActionRequired();
+        if (inboundAction) return inboundAction;
         const rescued = rescueSelfSent(code);
         if (rescued) return rescued;
       }
@@ -1781,6 +1798,23 @@ const FlowIntent = (() => {
       }
       if (google && google.close) {
         const g = google.close;
+        // Gmail cannot write OneDrive. An inbound save-to-OneDrive ask is
+        // still a task with a verb-plus-object title, not silence.
+        if (g.copyAttachment && g.target === 'onedrive' && !addressedToSelf(ctx)) {
+          const subject = ctx && ctx.subject;
+          let titled = selfAskTitle(text, subject, ctx);
+          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+          if (usableSelfTitle(titled)) {
+            const label = String(titled).replace(/\s+בבקשה[.!]?\s*$/i, '').trim();
+            const tracked = finish(TYPES.REQUEST, 'high', { what: label });
+            if (tracked && tracked.type) {
+              tracked.label = label;
+              tracked.selfTask = true;
+              tracked.noReplyDraft = true;
+              return tracked;
+            }
+          }
+        }
         const hold = g.personalClose === 'file-on-hold';
         if (hold && suppressed(TYPES.SCHEDULED_EVENT)) {
           return stayQuiet('calibrated', { googleSilence: true });
@@ -2117,6 +2151,8 @@ const FlowIntent = (() => {
         if (via) return via;
       }
       if (quietHint) return stayQuiet(quietHint);
+      const inboundAction = rescueInboundActionRequired();
+      if (inboundAction) return inboundAction;
       const rescued = rescueSelfSent('intent-null');
       if (rescued) return rescued;
       return { type: null, signals, facts };

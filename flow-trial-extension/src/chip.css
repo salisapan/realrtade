@@ -596,6 +596,7 @@
   }
   .flow-chip-handled,
   .flow-chip-written,
+  .flow-chip-account,
   .flow-chip-reconnect,
   .flow-chip.flow-chip-done .flow-chip-label { color: #d8f3e4; }
   .flow-chip-host button.flow-chip-undo {
