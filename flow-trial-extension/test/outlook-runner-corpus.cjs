@@ -419,7 +419,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
       token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW },
       account: { address: GMAIL_ME, userPrincipalName: GMAIL_ME },
       ownAddresses: [GMAIL_ME],
-      // connect() stores displayName; without a reader name "Hi Sali" is held for the name (gmail-outlook-parity).
+      // The stored profile carries the display name; without it the greeting Hi Sali is held as names-pending (0.9.56).
       profile: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [], proxyAddresses: [] }
     };
     w2.store.outlookPending = {
@@ -435,7 +435,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const pend2 = w2.store.outlookPending || {};
     check('upgrade wipe: stale self-offer gone after stateVersion bump', !(pend2.offers || []).some((x) => x.key === 'stale' || (x.base && x.base.counterpart && x.base.counterpart.email === OUT)), pend2);
     check('upgrade wipe: stateVersion written to the current version', w2.store.outlookSync && w2.store.outlookSync.stateVersion === O.create(w2.deps()).STATE_VERSION, w2.store.outlookSync);
-    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), pend2);
+    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), { ids: (pend2.incoming || []).map((x) => x.messageId), diag: s2 && s2.diagnostics });
     check('upgrade sync ok', s2.ok, s2);
   }
 

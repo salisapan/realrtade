@@ -26,7 +26,8 @@ function check(name, cond, detail) {
 const DAY = 24 * 3600 * 1000;
 const NOW = new Date(2026, 9, 3, 12).getTime();
 const ME = 'me@contoso.com';
-const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+// ownNames: with no known name the engine holds a greeted mail as names-pending (0.9.56), so the fixtures say who the reader is.
+const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions, ownNames: ['Me', 'Sali', 'Sali Sapan'] };
 let n = 0;
 const iso = (d) => new Date(NOW - d * DAY).toISOString();
 const mine = (conv, text, ago, subject) => ({ id: 'm' + (++n), conversationId: conv, subject: subject || 'Lease', isDraft: false, from: { emailAddress: { name: 'Me', address: ME } }, toRecipients: [{ emailAddress: { name: 'Dana Cole', address: 'dana@acme.com' } }], sentDateTime: iso(ago), webLink: 'https://outlook.office.com/mail/id/' + n, body: { contentType: 'text', content: text } });
@@ -121,15 +122,17 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
     toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
     receivedDateTime: '2026-10-05T08:00:00Z',
     body: { contentType: 'text', content: 'Can you send me the signed contract by Thursday?' } };
-  // The reader's names, as the runner passes them from the profile. With no names, "Hi Sali" is held for the name (gmail-outlook-parity).
-  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions, userName: 'Sali Sapan', ownNames: ['Sali', 'Sali Sapan'] };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions, ownNames: ['Sali'] };
   const planLive = (me) => S.plan({ messages: [ask, prev], me, watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
 
   const both = planLive([OUT, GMAIL_ME]);
-  // The self-sent "Signed contract" mail is a self task since #165, not an ask from someone else.
+  // One incoming ask is the Flow team's. The message from the person's own second address is a note to self: since 0.9.56
+  // that is a task with no reply draft, so it may appear, but never as a draft to an own address.
   const fromFlow = both.incoming.filter((x) => x.base.counterpart.email === 'ai.local.flow@gmail.com');
-  check('live messages with both own addresses: one incoming from ai.local.flow', fromFlow.length === 1 && both.incoming.every((x) => x.base.counterpart.email === 'ai.local.flow@gmail.com' || (x.intent && x.intent.selfTask === true)), both.incoming);
-  check('incoming label mentions the request and Wed Oct 7', fromFlow[0] && /Reply requested/i.test(fromFlow[0].intent.label) && /Oct 7/.test(fromFlow[0].intent.label), fromFlow[0] && fromFlow[0].intent.label);
+  const fromOwn = both.incoming.filter((x) => x.base.counterpart.email === GMAIL_ME);
+  check('live messages with both own addresses: one incoming from ai.local.flow', fromFlow.length === 1 && both.incoming.length === fromFlow.length + fromOwn.length, both.incoming.map((x) => ({ k: x.key, cp: x.base && x.base.counterpart && x.base.counterpart.email })));
+  check('live messages with both own addresses: a note from the own alias drafts no reply', fromOwn.every((x) => !((x.process && x.process.steps) || []).some((st) => st.kind === 'outlookDraft')), fromOwn.map((x) => x.process && (x.process.steps || []).map((st) => st.kind)));
+  check('incoming label mentions the request and Wed Oct 7', /Reply requested/i.test(both.incoming[0].intent.label) && /Oct 7/.test(both.incoming[0].intent.label), both.incoming[0].intent.label);
   check('self mail produces no offer whose counterpart is an own address', !both.offers.some((o) => o.base.counterpart.email === OUT || o.base.counterpart.email === GMAIL_ME), both.offers);
 
   const aliasOnly = S.plan({
@@ -210,13 +213,12 @@ console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
     toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
     receivedDateTime: '2026-10-05T10:21:00Z', webLink: 'https://outlook.office.com/mail/id/a1',
     body: { contentType: 'text', content: LIVE_BODY } };
-  // The reader's names, as the runner passes them from the profile. With no names, "Hi Sali" is held for the name (gmail-outlook-parity).
-  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions, userName: 'Sali Sapan', ownNames: ['Sali', 'Sali Sapan'] };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions, ownNames: ['Sali'] };
   const r = S.plan({ messages: [ask], me: [OUT, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
   check('live Flow-team body: one incoming (not quiet:hedge)', r.incoming.length === 1 && r.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', { incoming: r.incoming, diagnostics: r.diagnostics });
   check('live Flow-team body: process has outlookDraft', r.incoming[0] && r.incoming[0].process && (r.incoming[0].process.steps || []).some((s) => s.kind === 'outlookDraft'), r.incoming[0] && r.incoming[0].process);
   check('live Flow-team body: Why not shown omits shown-incoming', !(r.diagnostics || []).some((d) => String(d.reason || '').indexOf('shown-') === 0), r.diagnostics);
-  const bare = FlowIntent.classify(LIVE_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2), userName: 'Sali Sapan', ownNames: ['Sali', 'Sali Sapan'] });
+  const bare = FlowIntent.classify(LIVE_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2), ownNames: ['Sali'] });
   check('classify alone: request chip for confirm-by-Wednesday-whether', bare.type === 'request' && FlowIntent.shouldShowChip(bare), { type: bare.type, quiet: bare.quiet, label: bare.label });
   const hedgeStill = FlowIntent.classify('Can you confirm whether the proposal at $3,900 still works?', { senderEmail: 'x@y.com', senderName: 'X', now: new Date(NOW2) });
   check('bare confirm-whether (no "confirm by") still quiet hedge', !hedgeStill.type && hedgeStill.quiet === 'hedge', hedgeStill);

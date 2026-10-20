@@ -1975,7 +1975,8 @@ const FlowIntent = (() => {
     const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
     const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
     const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
-    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
+    // A slot ask ("when works for you?") names no object and no day on purpose: the time is the reply.
+    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped || s.flags.slotAsk);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     // "any chance" is a hedge for every other sentence. These three
@@ -2343,8 +2344,15 @@ const FlowIntent = (() => {
     t = t.replace(re, (_, q) => {
       try { return decodeURIComponent(q); } catch (e) { return q; }
     });
+    const urlParam = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s&]*&)*url=([^&#\s]+)(?:&[^#\s&]*)*/gi;
+    t = t.replace(urlParam, (_, u) => {
+      try { return decodeURIComponent(u); } catch (e) { return u; }
+    });
+    const strip = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s&]*(?:&[^#\s&]+)*)/gi;
+    t = t.replace(strip, '');
     t = t.replace(/https?:\/\//gi, '');
     if (/^(?:www\.)?google\.com\/url\b/i.test(t.trim())) return '';
+    t = t.replace(/\s+(?:the|on)\s*$/i, '').replace(/\s{2,}/g, ' ').trim();
     return t.replace(/\s+/g, ' ').trim();
   }
   function takeObject(rest, keepThe) {
@@ -3073,6 +3081,9 @@ const FlowIntent = (() => {
       if (next === clause) break;
       clause = next;
     }
+    clause = unwrapGoogleRedirectUrl(clause);
+    clause = clause.replace(/(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^\s]+\s*)*/gi, ' ');
+    clause = clause.replace(/\bthe\s+on\b/i, 'on');
     clause = clause.replace(/[?].*$/, ' ').replace(/[.!]+$/g, '').replace(/\s+/g, ' ').trim();
     clause = clause.replace(/^מקווה[\s\S]*?[.]\s*/, '').trim();
     if (/\b(?:swing|stop|come|drop|pass)\s+by\b/i.test(clause)) {
@@ -3115,7 +3126,11 @@ const FlowIntent = (() => {
         const q = s.match(/google\.com\/url\?[^\s#]+/i);
         if (q) obj = unwrapGoogleRedirectUrl('https://www.' + q[0]);
       }
-      if (obj) return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      if (obj && !/google\.com\/url\b/i.test(obj)) {
+        return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      }
+      const renewWhen = s.match(/\bremind me to\s+renew(?:\s+the\s+https?:\/\/\S+)?\s+on\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i);
+      if (renewWhen) return 'Remind me to renew on ' + renewWhen[1].trim();
     }
     // "Remind me to renew the domain on Friday" is Renew the domain.
     // The day stays on the task. It is not a new verb.

@@ -181,6 +181,7 @@ function glanceUiCopy(kind) {
     }
     clearLaneTimers();
     removeOwnCards();
+    try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.stop(document, window); } catch (e) { /* nothing to stop */ }
   }
 
   // One read of chrome.runtime.id. When the extension context is gone that
@@ -1096,14 +1097,29 @@ function glanceUiCopy(kind) {
     }
   }
 
+  function messageDetailsOpen(messageNode) {
+    return !!(messageNode && messageNode.querySelector
+      && messageNode.querySelector('.ajB table, table.ajC, table.ajB'));
+  }
+
+  function removeMessageDetailsPanels(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return;
+    messageNode.querySelectorAll('.ajA').forEach((n) => n.remove());
+    messageNode.querySelectorAll('.ajB').forEach((n) => {
+      if (n.closest && n.closest('.ajA')) return;
+      n.remove();
+    });
+  }
+
   async function expandMessageDetails(messageNode) {
     const toggle = messageNode && messageNode.querySelector
       ? messageNode.querySelector(DETAILS_TOGGLE)
       : null;
     if (!toggle) return false;
+    if (messageDetailsOpen(messageNode)) return true;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 200));
-    return true;
+    return messageDetailsOpen(messageNode);
   }
 
   async function collapseMessageDetails(messageNode) {
@@ -1111,15 +1127,16 @@ function glanceUiCopy(kind) {
       ? messageNode.querySelector(DETAILS_TOGGLE)
       : null;
     if (!toggle || !messageNode.querySelector) return false;
-    if (!messageNode.querySelector('.ajB table, table.ajC, table.ajB')) return false;
+    if (!messageDetailsOpen(messageNode)) return true;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 120));
+    removeMessageDetailsPanels(messageNode);
     const row = toggle.closest('td') || toggle.parentElement;
     if (row) {
       const open = row.querySelector('.ajB');
       if (open) open.remove();
     }
-    return true;
+    return !messageDetailsOpen(messageNode);
   }
 
   // Collapsed Gmail header: "to me", and the me chip has no email attribute.
@@ -4357,7 +4374,7 @@ function glanceUiCopy(kind) {
     const nothingLeft = verdict.every((x) => x === 'missing');
     const anyUnknown = verdict.some((x) => x === 'unknown');
     const total = (record && record.total) || steps.length;
-    const partialReceipt = allPresent && total > steps.length;
+    const partialReceipt = allPresent && total > steps.length && !!(record && record.partial);
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
     host.setAttribute('data-glance-chain', 'lane-proof');
@@ -4512,10 +4529,13 @@ function glanceUiCopy(kind) {
       done.appendChild(detail);
     }
 
-    const undo = el('button', 'flow-chip-undo', glanceShow(copy.undoHint));
+    const undoLabel = glanceUiCopy('undo');
+    const undo = el('button', 'flow-chip-undo', glanceShow(undoLabel));
     undo.type = 'button';
+    undo.setAttribute('aria-label', glanceShow(undoLabel));
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (copy.undoHint && copy.undoHint !== undoLabel) hint.textContent = glanceShow(copy.undoHint);
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
@@ -4666,6 +4686,27 @@ function glanceUiCopy(kind) {
     return !!(res && res.ok === true && res.ref && res.ref.draftId && r.action && laneConnectorId(r.action.kind) === 'gmailCompose');
   }
 
+  function draftReadBackVerified(r) {
+    if (!savedReplyDraft(r)) return false;
+    const gate = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+    const proof = r.response && r.response.proof;
+    if (gate && typeof gate.isProof === 'function' && gate.isProof(proof)) return true;
+    return r.response && r.response.fetchedBack === true;
+  }
+
+  function composeDraftClosed(r) {
+    const res = r && r.response;
+    if (!res || res.ok !== true || res.skipped) return false;
+    if (!r.action || laneConnectorId(r.action.kind) !== 'gmailCompose') return false;
+    if (draftReadBackVerified(r)) return true;
+    return !!composeReadBack(res);
+  }
+
+  function receiptClosedStep(r) {
+    if (stepHandled(r)) return true;
+    return composeDraftClosed(r);
+  }
+
   function orphanLine(r) {
     const line = laneStepLine(laneConnectorId(r.action.kind), r.response);
     return line + ' — ' + glanceUiCopy('notVerified');
@@ -4803,14 +4844,16 @@ function glanceUiCopy(kind) {
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
     const taskSteps = results.filter(taskKind);
+    const attempted = results.filter((r) => r && r.action && !(r.response && r.response.skipped));
+    const closedSteps = attempted.filter(receiptClosedStep);
     const copy = FlowReceipt.confirmation({
-      succeeded: succeeded.length,
-      total: results.length,
+      succeeded: closedSteps.length,
+      total: attempted.length,
       priorCloses,
       lang: glanceUiLang(),
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
-        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        ? closedSteps.filter(taskKind).map((r) => r.response && r.response.proof)
         : undefined,
       verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
@@ -4859,11 +4902,13 @@ function glanceUiCopy(kind) {
 
     const sole = succeeded.length === 1 && !extra.length ? succeeded[0].response : null;
     const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
-    // The sentence is the control. A filled pill would be a second Do It.
-    const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
+    const undoLabel = glanceShow(copy.undoLabel || (attempted.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo')));
+    const undo = el('button', 'flow-chip-undo', undoLabel);
     undo.type = 'button';
+    undo.setAttribute('aria-label', undoLabel);
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (undoHint) hint.textContent = glanceShow(undoHint);
 
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
@@ -5764,6 +5809,9 @@ function glanceUiCopy(kind) {
       return mount.querySelector('.flow-chip-host');
     }
   };
+
+  // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
 
   init();
 })();
