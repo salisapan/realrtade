@@ -1,0 +1,10 @@
+--- a/flow-trial-extension/src/content-outlook.js
++++ b/flow-trial-extension/src/content-outlook.js
+@@ -207,6 +207,7 @@
+     };
+     if (record.extra) Object.assign(stored, record.extra);
+     rememberDecision(stored);
++    try { document.dispatchEvent(new CustomEvent('glance:outlook-card', { bubbles: true })); } catch (e) { /* lane listens */ }
+     try {
+       const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
+       if (stored.epoch !== mailEpoch) return;

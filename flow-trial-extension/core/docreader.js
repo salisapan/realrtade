@@ -150,7 +150,77 @@ const FlowDocReader = (() => {
     return documentXmlToText(xml);
   }
 
-  return { extractDocxText };
+  function unxml(text) {
+    return String(text || '')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  }
+
+  // Every <t> inside one <si> or <is> is one string, in order.
+  function runsText(xml) {
+    let out = '';
+    const re = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g;
+    let m;
+    while ((m = re.exec(xml)) !== null) out += m[1];
+    return unxml(out);
+  }
+
+  const XLSX_MAX_ROWS = 400;
+  const XLSX_MAX_SHEETS = 4;
+
+  // The words and numbers a reader would see, one row per line, cells joined
+  // by a tab. A formula shows the value the file last stored. Not a
+  // spreadsheet engine: no styles, no dates as dates, no charts.
+  async function extractXlsxText(input) {
+    let bytes;
+    if (typeof Blob !== 'undefined' && input instanceof Blob) bytes = new Uint8Array(await input.arrayBuffer());
+    else if (input instanceof ArrayBuffer) bytes = new Uint8Array(input);
+    else bytes = input;
+
+    const entries = parseCentralDirectory(bytes);
+    const sheets = entries
+      .filter((e) => /^xl\/worksheets\/sheet\d+\.xml$/.test(e.name))
+      .sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }))
+      .slice(0, XLSX_MAX_SHEETS);
+    if (!sheets.length) throw new Error('This .xlsx has no worksheet — not a standard Excel workbook.');
+    const sstEntry = entries.find((e) => e.name === 'xl/sharedStrings.xml');
+    const shared = [];
+    if (sstEntry) {
+      const sstXml = new TextDecoder('utf-8').decode(await readEntryData(bytes, sstEntry));
+      const siRe = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+      let si;
+      while ((si = siRe.exec(sstXml)) !== null) shared.push(runsText(si[1]));
+    }
+    const lines = [];
+    for (const sheet of sheets) {
+      const xml = new TextDecoder('utf-8').decode(await readEntryData(bytes, sheet));
+      const rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/g;
+      let row;
+      while ((row = rowRe.exec(xml)) !== null && lines.length < XLSX_MAX_ROWS) {
+        const cells = [];
+        const cellRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+        let c;
+        while ((c = cellRe.exec(row[1])) !== null) {
+          const attrs = c[1] || '';
+          const inner = c[2] || '';
+          const type = (/\bt="([^"]*)"/.exec(attrs) || [])[1] || '';
+          let value = '';
+          if (type === 's') {
+            const idx = (/<v>([\s\S]*?)<\/v>/.exec(inner) || [])[1];
+            value = idx != null && shared[Number(idx)] != null ? shared[Number(idx)] : '';
+          } else if (type === 'inlineStr') {
+            value = runsText(inner);
+          } else {
+            value = unxml((/<v>([\s\S]*?)<\/v>/.exec(inner) || [])[1] || '');
+          }
+          if (value !== '') cells.push(value);
+        }
+        if (cells.length) lines.push(cells.join('\t'));
+      }
+    }
+    return lines.join('\n').trim();
+  }
+
+  return { extractDocxText, extractXlsxText };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowDocReader };

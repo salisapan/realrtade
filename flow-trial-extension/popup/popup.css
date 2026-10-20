@@ -79,6 +79,7 @@ body{
   border:1px solid var(--line);
 }
 .ver.on{color:var(--ok); background:var(--ok-wash); border-color:color-mix(in srgb, var(--ok) 35%, transparent); box-shadow:0 0 10px color-mix(in srgb, var(--ok) 25%, transparent)}
+.ver[dir="auto"]{text-transform:none; letter-spacing:0}
 
 .tabs{display:flex; gap:var(--space-1); padding:0 var(--space-5); border-bottom:1px solid var(--line)}
 .tab{
@@ -120,6 +121,7 @@ main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anc
   text-transform:uppercase; color:var(--ink-3); background:var(--surface-2);
   border-radius:5px; padding:4px 8px; flex:none;
 }
+.badge[dir="auto"]{text-transform:none; letter-spacing:0}
 .badge.on{background:var(--ok-wash); color:var(--ok)}
 .badge.live{background:var(--accent-wash); color:var(--accent)}
 .conn-note{font-size:.75rem; color:var(--ink-3); line-height:1.55; margin:var(--space-3) 0 0}
@@ -292,7 +294,10 @@ main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anc
 #open-list.log-list, #log-list.log-list{max-height:none; overflow:visible}
 /* Section headings are near-black in the light step card. This panel is always dark. */
 #open-list .loops-section{display:block; margin:10px 0 6px}
+.loops-expired{display:block; margin:10px 0 6px}
+.loops-expired > summary{cursor:pointer}
 #open-list .loops-section .acts-label,
+.loops-expired > summary,
 #open-list .flow-step-card .act-section .acts-label{color:var(--ink); display:block; font-size:11px; font-weight:650; letter-spacing:.14em; text-transform:uppercase}
 .log-item{
   background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--surface);

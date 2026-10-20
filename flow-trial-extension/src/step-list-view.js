@@ -23,6 +23,12 @@ const FlowStepListView = (() => {
     return { tool: 'you', app: 'You' };
   }
 
+  function plainText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   function skippedLine(file) {
     if (typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.skippedLabel === 'function') {
       return FlowSuggestSave.skippedLabel(file);
@@ -81,18 +87,65 @@ const FlowStepListView = (() => {
     return out;
   }
 
+  // The exact place a file step writes: 'OneDrive > Glance > report.pdf'. Only a file
+  // step has one. The names are the files that are ticked, so a pill toggle changes it.
+  function destinationOf(row, tool, files) {
+    if (!row || (tool.tool !== 'onedrive' && tool.tool !== 'drive')) return '';
+    const Files = (typeof FlowOnedriveFile !== 'undefined') ? FlowOnedriveFile : null;
+    const folder = (Files && Files.FOLDER) || 'Glance';
+    const params = (row.step && row.step.params) || {};
+    let names = (files || []).filter(function (f) { return f.on && !f.skipped && f.name; }).map(function (f) { return f.name; });
+    if (!names.length && !(files || []).length && params.fileName) names = [String(params.fileName)];
+    const where = tool.tool === 'drive' ? 'Drive' : 'OneDrive';
+    if (!names.length) return where + ' > ' + folder;
+    return Files && typeof Files.destination === 'function'
+      ? Files.destination(names.join(', '), where)
+      : where + ' > ' + folder + ' > ' + names.join(', ');
+  }
+
   function fileOnly(rows) {
     const live = (rows || []).filter(function (r) { return r && !r.manual && r.role !== 'close'; });
     return live.length === 1 && live[0].kind === 'attachmentSave' && filesOf(live[0]).length <= 1;
   }
 
-  function paintModel(row, surface) {
+  function displayTag(tag, L) {
+    if (tag === 'Suggested') return (L && L.suggested) || tag;
+    if (tag === 'Added') return (L && L.added) || tag;
+    if (tag === 'Manual' || tag === 'Manual · for you') return (L && L.manual) || tag;
+    if (tag === 'after Approve') return (L && L.afterApprove) || tag;
+    return tag || '';
+  }
+
+  function stepCopy(row, L) {
+    const copy = String((row && row.copy) || '');
+    const kind = String((row && row.kind) || '');
+    const words = L || {};
+    if (row && row.added) return copy;
+    if (/calendar/i.test(kind) && /^(Calendar|Hold the time)$/.test(copy)) return words.stepCalendar || words.calendarApp || copy;
+    if (/task|todo/i.test(kind) && /^(Task|To Do)$/.test(copy)) return words.stepTask || copy;
+    if (/draft/i.test(kind) && /^(Draft reply|Reply draft|Draft reply \+ file|Draft link|Draft)$/.test(copy)) return words.stepDraft || copy;
+    if (/file|drive|onedrive|attachment/i.test(kind) && /^(OneDrive|Drive|File|Save)$/.test(copy)) return words.stepFile || copy;
+    return copy;
+  }
+
+  function paintModel(row, surface, labels) {
+    const L = labels || { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };
     const tool = toolOf(row, surface);
+    const appNames = {
+      Calendar: L.calendarApp,
+      'To Do': L.todoApp,
+      Outlook: L.outlookApp,
+      Gmail: L.gmailApp,
+      OneDrive: L.onedriveApp,
+      Drive: L.driveApp,
+      You: L.youApp
+    };
+    const app = appNames[tool.app] || tool.app;
     if (row.manual || row.role === 'manual') {
-      return { kind: 'manual', id: row.id, text: row.copy, tag: 'Manual · for you' };
+      return { kind: 'manual', id: row.id, text: row.copy, tag: L.manual || 'Manual · for you' };
     }
     if (row.role === 'close') {
-      return { kind: 'close', id: row.id, text: row.copy, tag: row.tag || 'after Approve', st: row.state ? stateClass(row.state) : '' };
+      return { kind: 'close', id: row.id, text: row.copy, tag: row.tag || L.afterApprove || 'after Approve', st: row.state ? stateClass(row.state) : '' };
     }
     const files = filesOf(row);
     const failed = row.state === 'failed';
@@ -100,15 +153,18 @@ const FlowStepListView = (() => {
     const base = {
       id: row.id,
       tool: tool.tool,
-      app: tool.app,
+      app: app,
       suggested: row.suggested === true,
       added: row.added === true,
       checked: row.checked !== false,
-      tag: row.suggested ? 'Suggested' : (row.added ? 'Added' : (row.tag || '')),
+      tag: row.suggested ? (L.suggested || 'Suggested') : (row.added ? (L.added || 'Added') : displayTag(row.tag, L)),
       st: stateClass(row.state),
       kind: row.suggested ? 'suggested' : ''
     };
-    base.text = row.copy || '';
+    base.text = stepCopy(row, L);
+    const dest = destinationOf(row, tool, files);
+    if (dest) base.dest = dest;
+    base.user = row.added === true;
     if (files.length > 1) {
       base.kind = 'multi';
       base.files = files;
@@ -116,18 +172,23 @@ const FlowStepListView = (() => {
       return base;
     }
     if (row.state === 'offline') {
-      base.out = row.offlineLine || 'Outlook is not connected';
+      base.out = row.offlineLine || L.outlookOff || 'Outlook is not connected';
       return base;
     }
     if (failed) {
-      base.out = 'Couldn’t confirm · <em class="ss-retry">Retry</em>';
+      base.out = (row.why ? plainText(row.why) : (L.couldnt || 'Couldn’t confirm')) + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
       return base;
+    }
+    function statusWord(name) {
+      const key = name || 'queued';
+      if (L[key]) return L[key];
+      return stateLabel(key);
     }
     if (verified) {
-      base.res = stateLabel('verified') + ' <i class="ss-ok" aria-label="verified">✓</i>';
+      base.res = statusWord('verified') + ' <i class="ss-ok" aria-label="' + statusWord('verified') + '">✓</i>';
       return base;
     }
-    base.out = stateLabel(row.state || 'queued');
+    base.out = statusWord(row.state || 'queued');
     return base;
   }
 
@@ -169,6 +230,7 @@ const FlowStepListView = (() => {
         return (r && r.suggested) ? Object.assign({}, r, { checked: false }) : r;
       });
     }
+    let pickedIso = null;
     const root = document.createElement('div');
     root.className = 'flow-step-card flow-step-list';
     if (o.theme === 'dark' || themeDark()) root.setAttribute('data-theme', 'dark');
@@ -182,8 +244,14 @@ const FlowStepListView = (() => {
 
     function cfg() {
       const surface = o.surface || 'outlook';
-      const he = o.lang === 'he';
-      const painted = list.map(function (r) { return paintModel(r, surface); });
+      const ui = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+        ? FlowDisplay.uiLangFrom({ setting: o.uiLang })
+        : (o.uiLang === 'he' ? 'he' : 'en');
+      const labels = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function')
+        ? FlowDisplay.chrome(ui)
+        : { suggested: 'Suggested', added: 'Added', manual: 'Manual · for you' };
+      const he = ui === 'he';
+      const painted = list.map(function (r) { return paintModel(r, surface, labels); });
       const multi = painted.some(function (r) { return r.kind === 'multi'; });
       let chip;
       if (only) {
@@ -192,10 +260,16 @@ const FlowStepListView = (() => {
         const target = surface === 'gmail' ? 'Drive' : 'OneDrive';
         chip = { mode: 'files', noHold: true, target: target };
       } else {
-        chip = { mode: 'count' };
+        chip = { mode: 'count', noHold: o.noHold === true };
+      }
+      if (o.dateChoices && o.dateChoices.length >= 2) {
+        chip.dateChoices = o.dateChoices;
+        chip.selectedIso = pickedIso;
+        chip.needsDateChoice = !pickedIso;
       }
       return {
         he: he,
+        uiLang: ui,
         intent: o.intent || '',
         rows: painted,
         chip: chip,
@@ -291,13 +365,26 @@ const FlowStepListView = (() => {
       if (hold) {
         hold.addEventListener('click', function (e) {
           e.preventDefault();
+          if (o.onHold && o.onHold() === false) return;
           root.setAttribute('data-glance-held', '1');
         });
       }
+      stage.querySelectorAll('.chip-date').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const iso = btn.getAttribute('data-date-iso');
+          if (!iso) return;
+          pickedIso = iso;
+          if (o.onDateChoice) o.onDateChoice(iso);
+          draw();
+        });
+      });
       const go = stage.querySelector('.do-halo');
       if (go) {
         go.addEventListener('click', function (e) {
           e.preventDefault();
+          if (go.disabled) return;
           if (o.onDoIt) o.onDoIt(go);
         });
       }
@@ -359,8 +446,8 @@ const FlowStepListView = (() => {
         pushState(state);
         draw();
       },
-      setRow: function (id, state) {
-        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state }) : row; });
+      setRow: function (id, state, why) {
+        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null }) : row; });
         pushState(state);
         draw();
       }

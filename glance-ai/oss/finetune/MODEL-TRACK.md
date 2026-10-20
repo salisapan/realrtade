@@ -4,6 +4,15 @@ Glance closes open loops. Gmail is where it starts today.
 
 This page is the lab side of Glance's own model (`docs/glance-ai/ai-product.md`). Glance's model is an open model (Qwen3.5-4B, chosen in `../REPORT.md`) fine-tuned on Glance's own data, run on Glance cloud on masked text, behind the device's validator and gate. A model's answer is a proposal; it never closes, writes or sends.
 
+## OWNER DECISION 2026-10-13 (read before every run of the model trainer): learning from use
+
+The owner approved four learning paths («מאשר את כולם»). The full plan is `docs/glance-ai/learning-from-use.md`. What it changes for the lab:
+
+- **Path A, own-use labels.** Decisions the owner makes on his own accounts (approve, edit, undo, with the connector's read-back proof) become labels with `labeledBy: "sali:action"`, `source: "own-use"`. The owner explicitly authorised that these count toward the 200 `ownerVerified` rows. The change to `promote_gate.cjs` and `labeling/lib.cjs` is made in its own reviewed PR with tests (a Claude or agreement label can never carry `sali:action`; a row without proof does not qualify). The trainer routine does NOT change the gate rules itself. Until that PR is merged the gate is unchanged. Ingest the owner's local file only when he hands it over; never overwrite a hand label; keep the text in `flow-trial-extension/test/fixtures/private/` (gitignored) and report aggregates only.
+- **Path B, closing-plan training.** Add real, finished plans (what was proposed, what the person kept, changed or removed, whether the close was proven) to the SFT data as a new target in the Understanding format. A removed step is a negative, an edit is the target. Hold-out: the newest decisions are never used for training in the run that labels them.
+- **Reporting.** Numbers are reported by label source (own-use, two-pass agreement, spec) with n, Hebrew and English apart, as before.
+- **Paths C and D** (per-user calibration on the device; opt-in federated contribution, dormant) belong to the connector builder routine, not to the trainer.
+
 ## The track
 
 | step | tool | state |
@@ -42,14 +51,14 @@ The train split (`data/v2/sft_train.jsonl`, about 11k rows, gitignored) comes fr
 
 `node promote_gate.cjs --base <pred.jsonl> --cand <pred.jsonl> [--cases f] [--labels f] [--understanding f] [--strict]`
 
-A new model replaces the current one only when, on the same cases: no more wrong Do Its (total, Hebrew, English), no more wrong actions, no more missed closes in either language and fewer in total, and a label basis that does not come from the system under test. Two bases count (owner's decision, 2026-10-11, he does not label by hand):
-- **owner-verified**: 200 rows with `ownerVerified: true` (only `labeledBy: sali` can produce them);
+A new model replaces the current one only when, on the same cases: no more wrong Do Its (total, Hebrew, English), no more wrong actions, no more missed closes in either language and fewer in total, and a label basis that does not come from the system under test. Two bases count today (owner's decision, 2026-10-11, he does not label by hand), and a third is approved and waits for its reviewed PR (2026-10-13, path A):
+- **owner-verified**: 200 rows with `ownerVerified: true` (only `labeledBy: sali` can produce them; after the path A PR, also `sali:action` rows from his own use with proof);
 - **two-pass-agreement**: 200 rows with `agreed: true` and `passes >= 2`, made by `labeling/merge-passes.cjs` from two independent blind passes by separate sessions that agree. They are never owner-verified, the verdict says "NOT owner-verified", and they only move a model into the lab's "best so far": wiring a model into the extension or replacing the default still needs the owner's «מאשר». Both passes come from the same model family, so a shared blind spot passes unseen; that is the price of not labelling by hand.
 
 Until one basis reaches 200, the best verdict is "better on spec labels" and `promote` is false. `--labels` takes several comma-separated files (a later file wins for the same id), for example `agreement-gold.jsonl,owner-gold.jsonl`. Predictions may be in the judge format or the Understanding format; an Understanding goes through the validator and `proposal()`, so the score is what the person would see.
 
 ## What waits on the owner
 
-- 200 owner-verified labels (`glance-ai/labeling/`): today 0. This is what makes step 4 able to promote.
+- 200 owner-verified labels (`glance-ai/labeling/`): today 0. This is what makes step 4 able to promote. Path A (his own use) is the way to get them without hand labelling.
 - The spend approval for one GPU run (cap $30, `gpu-estimate.md`).
 - A decision on undated reply asks ("send the deck asap"): act (today's labels) or silence (today's device). The 61 rows wait on it.

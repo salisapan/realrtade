@@ -47,6 +47,10 @@ const TYPES = {
 };
 // How often the person says yes to a proposed move (ASSUMPTION; --accept 1 is the worst case for an early release).
 const ACCEPT_ARG = argOf('--accept');
+// Share of answers that arrive through a move (in the other app, or from the colleague) that Glance links to the loop and
+// closes (core/cross-channel.js with the move link). 1 = every one; the measured share on carry-move-answer-corpus is 5/9.
+// An answer Glance does not recognise leaves the loop open, and the chase goes on.
+const MOVE_RECOGNISED = argOf('--move-recognised') ? +argOf('--move-recognised') : 1;
 const ACCEPT = ACCEPT_ARG ? { channel: +ACCEPT_ARG, colleague: +ACCEPT_ARG, releaseDead: +ACCEPT_ARG, releaseAlive: +ACCEPT_ARG } : { channel: 0.8, colleague: 0.6, releaseDead: 0.85, releaseAlive: 0.35 };
 
 function population() {
@@ -86,7 +90,13 @@ function runLoop(spec, person, world, policy) {
   };
   if (!person.linked && channel === 'whatsapp') w.personKey = 'phone:9725' + person.i;
   const kOf = {}; let answerAt = Infinity; let answeredBy = null;
-  const send = (via, at) => { const k = kOf[via] = (kOf[via] || 0) + 1; const a = answerTo(id, person, via, k, at); if (a && a < answerAt) { answerAt = a; answeredBy = via; } };
+  const send = (via, at) => {
+    const k = kOf[via] = (kOf[via] || 0) + 1;
+    const a = answerTo(id, person, via, k, at);
+    if (!a || a >= answerAt) return;
+    if (via !== channel && rng(id + '|recognised|' + via + '|' + k)() >= MOVE_RECOGNISED) return;   // answered there, not linked
+    answerAt = a; answeredBy = via;
+  };
   send(channel, created);
   const out = { id, lang: person.lang, type: person.type, kind, nudges: 0, moves: [], closedAt: null, releasedAt: null, answeredBy: null };
   const end = created + HORIZON * DAY;
@@ -212,7 +222,7 @@ function main() {
   const identical = JSON.stringify(A) === JSON.stringify(Boff);
   const split = (rows, f) => score(rows.filter(f), specById);
   const report = {
-    seed: SEED, accept: ACCEPT, people: people.length, loops: specs.length, historyLoops: world.all.length, horizonDays: HORIZON,
+    seed: SEED, accept: ACCEPT, moveRecognised: MOVE_RECOGNISED, people: people.length, loops: specs.length, historyLoops: world.all.length, horizonDays: HORIZON,
     switchOffIdenticalToA: identical,
     A: score(A, specById), B: score(B, specById),
     he: { A: split(A, (x) => x.lang === 'he'), B: split(B, (x) => x.lang === 'he') },

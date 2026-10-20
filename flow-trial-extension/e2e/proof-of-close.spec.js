@@ -1,6 +1,10 @@
 const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
+test.afterEach(async ({ glance }) => {
+  await glance.evaluateWorker(() => { globalThis.__glanceE2e.tokenAccounts = {}; });
+});
+
 async function activityUndone(glance) {
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="log"]').click();
@@ -37,6 +41,7 @@ test('Microsoft To Do Do It reads the task back, remounts, and Undo deletes it',
 
 test('Google Tasks Do It reads the task back, remounts, and Undo deletes it', async ({ glance }) => {
   await glance.seedGmail();
+  await glance.evaluateWorker(() => { globalThis.__glanceE2e.tokenAccounts = { 'ya29.e2e': 'me@x.com' }; });
   const page = await glance.openGmail({
     messageId: 'm-todo-1',
     threadId: 't-todo-1',
