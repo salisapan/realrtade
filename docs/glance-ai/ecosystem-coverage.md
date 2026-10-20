@@ -14,7 +14,7 @@ Scopes today (`manifest.json`, `docs/google-lane.md`): `openid`, `email`, `profi
 
 | Tool | Built | Proof | Live Gate | Gap |
 |---|---|---|---|---|
-| Gmail | Reads the open mail, offers one card, reply draft (compose fill or drafts API), no send. `src/content-gmail.js`, `core/incoming-judge.js` | Draft read back by id, Undo deletes it | Many live rounds on #165 and #163, fixes recorded; no recorded PASS on 0.9.56 | The card sits at the end of the mail: a peek card now pins it into view (Gmail only). Reply drafts carry no In-Reply-To (needs a scope). Intent misses are found on real mail (lead asking for a time: fixed 2026-10-20) |
+| Gmail | Reads the open mail, offers one card, reply draft (compose fill or drafts API), no send. `src/content-gmail.js`, `core/incoming-judge.js` | Draft read back by id, Undo deletes it | Many live rounds on #165 and #163, fixes recorded; no recorded PASS on 0.9.56 | The card sits at the end of the mail: a peek card now pins it into view. Reply drafts carry no In-Reply-To (needs a scope). Intent misses are found on real mail (lead asking for a time: fixed 2026-10-20) |
 | Gmail add-on (Workspace card) | Task, calendar hold, schedule; Hebrew and English. `glance-gmail-addon/` | Read back, Undo only if unchanged | Test deployment only (up to 100 test users); not seen on iOS or Android | Cannot open itself on its own; uses a prefetch card. Quiet cases show "Nothing to close" until its bundled engine is rebuilt from `core/` |
 | Google Calendar | Hold and event; one named clock held with a read-back (PR #152, open) | Event read back, Undo checks the content hash | #165 live rounds | Responding to an invite ("please confirm you'll attend") is PR #174 (draft). No Meet link on a hold |
 | Google Tasks | Task with a due date, one list titled Glance | Read back, Undo only if title, due and etag are unchanged | Gate PASS 0.9.30 | Recurring reminders and watchers are queued, not built |
@@ -30,7 +30,7 @@ Entra app `22682454-808b-41e5-80fe-6abadc1d5595`. Scopes in code (`core/outlook-
 
 | Tool | Built | Proof | Live Gate | Gap |
 |---|---|---|---|---|
-| Outlook mail (web) | Same judge as Gmail, reply draft through Graph, never send. `src/content-outlook.js` | Draft read back, Undo deletes it | PASS through 0.9.39 (rows 47, 49, 50) | The peek card is Gmail only. 0.9.56 changes not re-run live |
+| Outlook mail (web) | Same judge as Gmail, reply draft through Graph, never send. `src/content-outlook.js` | Draft read back, Undo deletes it | PASS through 0.9.39 (rows 47, 49, 50) | The below-the-fold peek card runs here too (same module as Gmail). 0.9.56 changes not re-run live |
 | Outlook Calendar | Hold with `POST /me/events` | Read back, Undo deletes | Not run on 0.9.56 | Entra scope confirmation (row 45) |
 | Microsoft To Do | Task on the default list | Read back, Undo deletes | PASS 0.9.31 | none known |
 | OneDrive | Save an attachment to `OneDrive > Glance > file` | Read back, Undo deletes or restores | PASS 0.9.37 | Accounts that connected before the box was ticked have no `Files.ReadWrite` and the Save card stays quiet until ticked once (row 75) |
