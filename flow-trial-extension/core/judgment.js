@@ -142,6 +142,11 @@ const FlowJudgment = (() => {
   // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
   const SLOT_ASK = /\b(?:(?:I|we)(?:'d| would) (?:love|like|be happy|be glad) to (?:set up|schedule|book|arrange|find a time for) (?:a|an|the) (?:\w+ ){0,2}(?:call|meeting|chat|demo|conversation|session)|when (?:would|does|do) (?:it |that |this |a call |a meeting )?(?:work|suit) (?:for )?(?:you|your team)|what (?:day|time) works (?:for )?(?:you|your team)|when are you (?:free|available)|let me know (?:a time|what time|when you(?:'|’)re free))\b/i;
   const SLOT_ASK_HE = /(?:^|\s)(?:אשמח|נשמח)\s+לתאם\s+(?:שיחה|פגישה|הדגמה|דמו)|(?:^|\s)מתי\s+(?:נוח|מתאים)\s+(?:לכם|לך|לכן)|(?:^|\s)מתי\s+(?:תוכלו?|תוכלי)\s+(?:לדבר|להיפגש|לקיים)/;
+  // A request to make a work product: a spreadsheet, a table, a report, a summary, a deck. The product has to be named, so
+  // "please create an account" and "write back when you can" stay quiet, and a bare "document" stays quiet on purpose
+  // (the create-when-missing family decides that). Kept out of HANDOFF so the sentence Glance quotes does not change.
+  const WORK_ASK = /\bplease (?:can you |could you )?(?:draft|write up|write|create|compile|put|enter|fill (?:in|out)|summari[sz]e|make|build) (?:\S+ ){0,5}?(?:spreadsheet|sheet|table|report|summary|figures|numbers|data|deck|presentation|proposal|memo)/i;
+  const WORK_ASK_HE = /(?:^|\s)(?:תכין|תכיני|תכינו|תכתוב|תכתבי|תכתבו|תיצור|תיצרי|תיצרו|תכניס|תכניסי|תכניסו|תסכם|תסכמי|תסכמו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?(?:את\s+)?(?:ה)?(?:מסמך\s+(?:סיכום|סטטוס|תקציב|הצעה|דוח)|טבלה|דוח|דו"ח|סיכום|נתונים|מספרים|גיליון|הצעה|מצגת)/;
   // A first-person delivery promise. Not a COMMIT word ("agreed",
   // "approved") and not a reader reminder ("you agreed to") — "I will send
   // the contract by Friday" is the sender closing a dated obligation on
@@ -513,7 +518,8 @@ const FlowJudgment = (() => {
     const obligation = anyOf(text, OBLIG_PATS, assertedIn);
     const followUpAsk = anyOf(text, [FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE], directedAsk);
     const slotAsk = anyOf(text, [SLOT_ASK, SLOT_ASK_HE], directedAsk);
-    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk || slotAsk;
+    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE], directedAsk);
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk || slotAsk || workAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
@@ -564,7 +570,7 @@ const FlowJudgment = (() => {
     } else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
-    return { total, signals, flags: { commit, lost, executed, obligation, handoff, slotAsk, dispute, onDomain, senderPromise, noise } };
+    return { total, signals, flags: { commit, lost, executed, obligation, handoff, slotAsk, workAsk, dispute, onDomain, senderPromise, noise } };
   }
 
   // The threshold is the only thing that learns. Clicking says "more like that",

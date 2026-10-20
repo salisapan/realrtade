@@ -5554,6 +5554,8 @@
     }
   } catch (e) { /* storage events unavailable */ }
   // Keep the Microsoft session alive while Outlook is open, and judge the inbox once on arrival.
+  // An offer below the fold pops up in view on its own (src/chip-peek.js): same card, same Do It, no design of its own.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
   send({ type: 'flow:outlook-keepalive' }).catch(() => {});
   FlowStorage.get().then((st) => {
     if (st && st.outlookAuth && st.outlookAuth.token) pageSync('load').then(schedule).catch(() => {});
