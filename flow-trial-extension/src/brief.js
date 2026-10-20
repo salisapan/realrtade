@@ -13,6 +13,19 @@
 // because Zero-Prompt means nothing pending is silence, not an empty widget.
 
 const FlowBrief = (() => {
+  let uiOverride = null;
+  function setUiLang(lang) { uiOverride = lang; }
+  function words() {
+    let ui = '';
+    try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+      ? FlowDisplay.uiLangFrom({ setting: uiOverride, uiLanguage: ui, navigatorLanguage: nav })
+      : 'en';
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(lang);
+    return { doIt: 'Do It', dismiss: 'Dismiss' };
+  }
   const INDICATOR_ID = 'flow-brief-indicator-host';
   const PANEL_ID = 'flow-brief-panel-host';
   const RESURFACE_ID = 'flow-resurface-host';
@@ -30,12 +43,26 @@ const FlowBrief = (() => {
   // Closing-frame, matching the rest of the product's copy ("Closed —
   // scheduled and tracked.") — this is what's LEFT to close, phrased the
   // same way, never "notifications" or "reminders."
-  function indicatorLabel(count) {
-    return count === 1 ? '1 thing still open' : count + ' things still open';
+  function fillN(template, n) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.fillChrome === 'function') {
+      return FlowDisplay.fillChrome(template, { n: n });
+    }
+    return String(template || '').split('{n}').join(String(n));
   }
 
+  function indicatorLabel(count) {
+    const L = words();
+    if (count === 1) return L.stillOpenOne || '1 thing still open';
+    if (L.stillOpenMany) return fillN(L.stillOpenMany, count);
+    return count + ' things still open';
+  }
+
+  // The same helper as the card (glanceUiCopy). English Gmail reads
+  // "Still open". Hebrew Gmail reads the Hebrew line. Never both.
   function panelHeadLabel() {
-    return 'מה עדיין פתוח · Still open';
+    if (typeof glanceUiCopy === 'function') return glanceUiCopy('panelHead');
+    const code = (typeof navigator !== 'undefined' && navigator.language) || '';
+    return /^he(-|$)/i.test(String(code)) ? 'מה עדיין פתוח' : 'Still open';
   }
 
   // Ensures the indicator exists and reflects `count`, wiring onToggle to
@@ -69,7 +96,11 @@ const FlowBrief = (() => {
 
     const body = el('div', 'flow-brief-row-body');
     body.appendChild(el('span', 'flow-chip-process-name', row.title));
-    if (row.subtitle) body.appendChild(el('span', 'flow-brief-row-subtitle', row.subtitle));
+    if (row.subtitle) {
+      const sub = el('span', 'flow-brief-row-subtitle', row.subtitle);
+      sub.setAttribute('data-glance-user', 'subtitle');
+      body.appendChild(sub);
+    }
     wrap.appendChild(body);
 
     const actions = el('div', 'flow-brief-row-actions');
@@ -86,13 +117,13 @@ const FlowBrief = (() => {
     doIt.appendChild(el('span', 'shell'));
     doIt.appendChild(el('span', 'ring'));
     doIt.appendChild(el('span', 'shine'));
-    doIt.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    doIt.appendChild(el('span', 'flow-chip-do-label', words().doIt));
     doIt.addEventListener('click', () => row.onDoIt(wrap, doIt));
     actions.appendChild(doIt);
 
     const dismiss = el('button', 'flow-brief-row-x', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', words().dismiss);
     dismiss.addEventListener('click', () => row.onDismiss(wrap));
     actions.appendChild(dismiss);
 
@@ -112,7 +143,8 @@ const FlowBrief = (() => {
     resurfaceHost = el('div', 'flow-resurface');
     resurfaceHost.id = RESURFACE_ID;
     resurfaceHost.setAttribute('dir', 'ltr');
-    resurfaceHost.appendChild(el('span', 'flow-resurface-label', 'Still open from this thread'));
+    const resurfaceWords = words();
+    resurfaceHost.appendChild(el('span', 'flow-resurface-label', resurfaceWords.resurface || 'Still open from this thread'));
     resurfaceHost.appendChild(buildRow(row));
     document.body.appendChild(resurfaceHost);
   }
@@ -134,9 +166,10 @@ const FlowBrief = (() => {
   const PANEL_MAX_ROWS = 12;
 
   function overflowLabel(hidden) {
-    return hidden === 1
-      ? '1 more still open — close these first and it moves up'
-      : hidden + ' more still open — close these first and they move up';
+    const L = words();
+    if (hidden === 1) return L.moreOpenOne || '1 more still open — close these first and it moves up';
+    if (L.moreOpenMany) return fillN(L.moreOpenMany, hidden);
+    return hidden + ' more still open — close these first and they move up';
   }
 
   // rows: [{ id, title, subtitle, onDoIt(rowHost, doItBtn), onDismiss(rowHost) }]
@@ -153,7 +186,7 @@ const FlowBrief = (() => {
     head.appendChild(el('span', 'flow-brief-panel-head-label', panelHeadLabel()));
     const close = el('button', 'flow-brief-panel-close', '×');
     close.type = 'button';
-    close.setAttribute('aria-label', 'Close');
+    close.setAttribute('aria-label', words().close || 'Close');
     close.addEventListener('click', () => { closePanel(); if (opts.onClose) opts.onClose(); });
     head.appendChild(close);
     panelHost.appendChild(head);
@@ -179,5 +212,5 @@ const FlowBrief = (() => {
     return Boolean(panelHost);
   }
 
-  return { show, hide, openPanel, closePanel, isPanelOpen, showResurface, hideResurface };
+  return { show, hide, openPanel, closePanel, isPanelOpen, showResurface, hideResurface, setUiLang };
 })();

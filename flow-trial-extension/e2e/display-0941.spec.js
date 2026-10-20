@@ -50,6 +50,14 @@ test('a panel proof replaces the floating Do It card in place', async ({ glance 
     body: DANA
   });
   await expect(page.locator('#ReadingPaneContainerId button.flow-chip')).toBeVisible();
+  // The page appends its own "shown" row after the card paints. Seeding the
+  // proof before that write lands lets the late shown row replace the proof,
+  // and the card stays on Do It. Wait until that row is stored.
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const log = (bag && bag.log) || [];
+    return log.some((row) => row && row.kind === 'shown' && row.messageId === S.MSG_A);
+  }).toBe(true);
   await glance.seed({ log: [writtenRow(S.MSG_A)] });
   const hosts = page.locator('#ReadingPaneContainerId .flow-chip-host');
   await expect(hosts).toHaveCount(1);

@@ -2,14 +2,17 @@
 // Harvesting that parent put the Cc address in pane.to, so the draft card
 // offered while Graph recipients (Why not shown) stayed quiet:hedge.
 // Run: node test/cc-only-recipients-corpus.cjs
-// Needs jsdom (not a dependency of this repo): npm i --no-save jsdom
+// Needs jsdom, a devDependency of this package. Missing jsdom is a failed run.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }
-catch (e) { console.log('SKIPPED: jsdom not available'); process.exit(0); }
+catch (e) {
+  console.error('FAIL: jsdom is not installed. The Cc-only regression cannot run.');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..');
 const { FlowOwaParse } = require(path.join(ROOT, 'core', 'owa-parse.js'));
@@ -44,9 +47,9 @@ function paneHtml(subject, header, body) {
     '</div></div></div></body></html>';
 }
 
-function readPane(subject, header, body) {
+function readPane(subject, header, body, userName) {
   const dom = new JSDOM(paneHtml(subject, header, body), { url: 'https://outlook.live.com/mail/0/inbox/' });
-  return FlowOwaParse.readPane(dom.window.document, 'https://outlook.live.com/mail/0/inbox/', { own: [ME], userName: 'Sali' });
+  return FlowOwaParse.readPane(dom.window.document, 'https://outlook.live.com/mail/0/inbox/', { own: [ME], userName: userName || 'Sali' });
 }
 
 function judge(text, subject, to, cc) {
@@ -141,6 +144,36 @@ check('a Cc line nested under the reader\'s To line still drafts',
   nestedUser && nestedUser.to.indexOf(ME) >= 0 && nestedUser.to.indexOf('dana@acme.com') < 0 &&
   nestedUser.cc.indexOf('dana@acme.com') >= 0 && draftOffered(nestedRow),
   { to: nestedUser && nestedUser.to, cc: nestedUser && nestedUser.cc, row: nestedRow });
+
+const well = '<div data-testid="RecipientWell"><div>' +
+  '<div id="MSG_k_TO" role="heading"><div class="EditorClass" aria-label="אל: ' + FLOW + '"><span><label>אל:</label></span>' +
+  '<span class="_EType_RECIPIENT_ENTITY"><span class="lpcWrapper" aria-label="' + FLOW + '">' + FLOW + '</span></span></div></div>' +
+  '<div id="MSG_k_CC" role="heading"><div class="EditorClass" aria-label="עותק: ' + ME + '"><span><label>עותק:</label></span>' +
+  '<span class="_EType_RECIPIENT_ENTITY"><span class="lpcWrapper" aria-label="' + ME + '">' + ME + '</span></span></div></div></div></div>';
+const live = readPane(OFFICE_SUBJECT, well, OFFICE_BODY.replace(/\n/g, '<br>'));
+const liveRow = judge(OFFICE_BODY, OFFICE_SUBJECT, live.to, live.cc);
+check('live RecipientWell: To is flow, Cc is me, quiet:hedge',
+  live && live.to.length === 1 && live.to[0] === FLOW && live.cc.length === 1 && live.cc[0] === ME &&
+  liveRow.show !== true && liveRow.reason === 'quiet:hedge' && liveRow.kinds.indexOf('outlookDraft') < 0,
+  { to: live && live.to, cc: live && live.cc, row: liveRow });
+
+const nameOnly = '<div data-testid="RecipientWell"><div>' +
+  '<div id="MSG_k_TO" role="heading"><div class="EditorClass" aria-label="אל: Sali Sapan"><span><label>אל:</label></span>' +
+  '<span class="_EType_RECIPIENT_ENTITY"><span class="lpcWrapper">Sali Sapan</span></span></div></div>' +
+  '<div id="MSG_k_CC" role="heading"><div class="EditorClass" aria-label="עותק: dana@acme.com"><span><label>עותק:</label></span>' +
+  '<span class="_EType_RECIPIENT_ENTITY"><span class="lpcWrapper" aria-label="dana@acme.com">dana@acme.com</span></span></div></div></div></div>';
+const named = readPane(Q3_SUBJECT, nameOnly, Q3_BODY.replace(/\n/g, '<br>'), 'sali sapan');
+const namedRow = judge(Q3_BODY, Q3_SUBJECT, named.to, named.cc);
+check('name-only To for sali sapan with someone else on Cc still drafts',
+  named && named.to.indexOf(ME) >= 0 && named.to.indexOf('dana@acme.com') < 0 &&
+  named.cc.indexOf('dana@acme.com') >= 0 && draftOffered(namedRow),
+  { to: named && named.to, cc: named && named.cc, row: namedRow });
+
+const danaOnly = '<div id="MSG_k_TO" role="heading"><div class="EditorClass" aria-label="אל: Dana Levi"><span>Dana Levi</span></div></div>';
+const dana = readPane(OFFICE_SUBJECT, danaOnly, OFFICE_BODY.replace(/\n/g, '<br>'), 'sali sapan');
+check('a display-name To that is not the reader does not put the reader in To',
+  dana && dana.to.indexOf(ME) < 0,
+  { to: dana && dana.to, cc: dana && dana.cc });
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

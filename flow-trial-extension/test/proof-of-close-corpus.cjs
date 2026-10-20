@@ -207,7 +207,7 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a proved write stores the banner lines on the Activity row',
     gmail.indexOf('FlowProofOfClose.receiptLogFields') > 0);
   const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  check('the extension version is 0.9.55', /"version": "0\.9\.55"/.test(manifest));
+  check('the extension version is 0.9.56', /"version": "0\.9\.56"/.test(manifest));
 
   // Live 0.9.29: Do It stored a hash of the message text. After reload that
   // hash changed (the clock line in the row changed) and the scan treated
@@ -228,7 +228,8 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a changed text-hash still finds the receipt by legacy id and thread id',
     FlowProofOfClose.taskReceiptFromLog([stored], reloadQuery) === stored);
   check('slash and underscore are the same message id',
-    FlowProofOfClose.canonId('18f3/ABC') === FlowProofOfClose.canonId('18f3_abc'));
+    FlowProofOfClose.canonId('18f3/ABC') === FlowProofOfClose.canonId('18f3_ABC') &&
+    FlowProofOfClose.canonId('18f3/ABC') !== FlowProofOfClose.canonId('18f3_abc'));
   const terminalNoHost = FlowProofOfClose.scanReceiptDecision({
     log: [stored],
     messageIds: [newHash, legacy],
@@ -270,10 +271,15 @@ console.log('\n--- Handled survives a thread reload ---\n');
       log: [stored], messageIds: [newHash], threadIds: [threadId], hasHost: true, terminal: true
     }) === 'keep');
 
-  const ownAt = gmail.indexOf('if (!ownEmail) return');
-  const earlyAt = gmail.indexOf('remountProvedTaskReceipts');
-  check('remount runs before the scan can return for a missing own-email or a quiet classification',
-    earlyAt > 0 && ownAt > earlyAt, { earlyAt: earlyAt, ownAt: ownAt });
+  const scanAt = gmail.indexOf('async function scanReadingPane');
+  const scan = scanAt >= 0 ? gmail.slice(scanAt, scanAt + 12000) : '';
+  const remountAt = scan.indexOf('await remountProvedTaskReceipts');
+  const missingAt = scan.indexOf('if (!ownEmail)');
+  const paintAt = scan.indexOf('paintAccountReconnectRow', missingAt);
+  const returnAt = paintAt >= 0 ? scan.indexOf('return', paintAt) : -1;
+  check('a missing address remounts a proved task, then shows Reconnect',
+    remountAt >= 0 && missingAt > remountAt && paintAt > missingAt && returnAt > paintAt,
+    { remountAt: remountAt, missingAt: missingAt, paintAt: paintAt, returnAt: returnAt });
   check('a successful task undo rewrites the HANDLED row instead of leaving it',
     gmail.indexOf('markGoogleTaskUndone') > 0 &&
     fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8').indexOf('markGoogleTaskUndone') > 0);
@@ -385,6 +391,43 @@ console.log('\n--- Microsoft To Do ---\n');
     copy.undoHint === 'Undo removes the To Do task.' && copy.undoneLine === 'Undone — the To Do task was removed.' &&
     copy.externalId === 'todo_1' && copy.ref.taskListId === 'LIST_T',
     copy);
+  const snapRow = Object.assign({}, storedTodo, {
+    ref: {
+      taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1',
+      created: { title: 'Renew the permit', body: 'What: Renew the permit', dueDateTime: '2026-10-20T00:00:00', status: 'notStarted', lastModifiedDateTime: '2026-10-15T01:00:00.000Z', '@odata.etag': 'W/"x"' }
+    }
+  });
+  const snapCopy = FlowProofOfClose.remountCopy(snapRow);
+  check('remount keeps the content snapshot and drops server fields',
+    snapCopy && snapCopy.ref && snapCopy.ref.created &&
+    snapCopy.ref.created.title === 'Renew the permit' &&
+    snapCopy.ref.created.body === 'What: Renew the permit' &&
+    snapCopy.ref.created.dueDateTime === '2026-10-20T00:00:00' &&
+    snapCopy.ref.created.status === 'notStarted' &&
+    snapCopy.ref.created.lastModifiedDateTime == null &&
+    snapCopy.ref.taskId === 'todo_1' && snapCopy.ref.taskListId === 'LIST_T',
+    snapCopy && snapCopy.ref);
+  const emptySnap = FlowProofOfClose.remountCopy(Object.assign({}, snapRow, {
+    ref: {
+      taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1',
+      created: { title: 'Renew the permit', body: null, dueDateTime: null, status: 'notStarted', importance: 'normal', isReminderOn: false }
+    }
+  }));
+  check('remount keeps an emptied body and a removed due date',
+    emptySnap && emptySnap.ref && emptySnap.ref.created &&
+    emptySnap.ref.created.body === null && emptySnap.ref.created.dueDateTime === null &&
+    emptySnap.ref.created.importance === 'normal' &&
+    !Object.prototype.hasOwnProperty.call(emptySnap.ref.created, 'isReminderOn'),
+    emptySnap && emptySnap.ref);
+  const loggedSnap = FlowProofOfClose.receiptLogFields(todo, {
+    writtenLine: 'To Do', status: 'Handled.', created: snapRow.ref.created
+  });
+  const fromLogOnly = FlowProofOfClose.remountCopy(Object.assign({}, storedTodo, loggedSnap, { ref: { taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1' } }));
+  check('the stored receipt fields keep the snapshot for a later remount',
+    loggedSnap && loggedSnap.created && loggedSnap.created.title === 'Renew the permit' &&
+    loggedSnap.created.lastModifiedDateTime == null &&
+    fromLogOnly && fromLogOnly.ref.created && fromLogOnly.ref.created.title === 'Renew the permit',
+    { loggedSnap, fromLogOnly });
   check('a newer To Do undo does not remount',
     FlowProofOfClose.taskReceiptFromLog([
       { kind: 'undone', messageId: oldItem, threadId: conv, connectorId: 'outlookTask', system: 'microsoft/todo', undone: true },
@@ -417,6 +460,83 @@ console.log('\n--- Microsoft To Do ---\n');
   const followEnd = bg.indexOf('async function followTaskComplete');
   check('the waiting-on chase does not write Microsoft To Do',
     follow > 0 && followEnd > follow && bg.slice(follow, followEnd).indexOf('/me/todo/') === -1);
+
+  console.log('\n--- one proof record for the card and for Loops ---\n');
+  const proved = {
+    kind: 'written', messageId: 'graph-1', itemId: 'owa-1', pathId: 'path-1', threadId: 'conv-1',
+    outlookConversationId: 'conv-1', connectorId: 'outlookTask', system: 'microsoft/todo',
+    externalId: 'task-1', fetchedBack: true, writtenLine: 'To Do · Renew the parking permit',
+    receiptStatus: 'Handled.', label: 'Renew the parking permit',
+    ref: { taskId: 'task-1', taskListId: 'list-1', externalId: 'task-1', created: { title: 'Renew the parking permit', importance: 'normal' } },
+    url: 'https://to-do.office.com/tasks/task-1'
+  };
+  let proofs = FlowProofOfClose.rememberProof(null, proved);
+  const byItem = FlowProofOfClose.proofForIds(proofs, ['owa-1']);
+  const byConv = FlowProofOfClose.proofForIds(proofs, ['conv-1']);
+  check('the same proof record is found by the item id and by the conversation id',
+    byItem && byConv && byItem === byConv && byItem.messageId === 'graph-1', byItem && byItem.messageId);
+  const refused = FlowProofOfClose.noteUndoRefused(byItem, 'You edited this. Undo left it alone.');
+  check('a refused Undo stays on the record',
+    refused.undoRefused === 'user-edited' && refused.undoLine === 'You edited this. Undo left it alone.');
+  const refusedCopy = FlowProofOfClose.remountCopy(FlowProofOfClose.proofAsLogRow(refused));
+  check('remountCopy renders the refused Undo, not the default To Do hint',
+    refusedCopy && refusedCopy.undoLine === 'You edited this. Undo left it alone.' &&
+    refusedCopy.undoHint === 'You edited this. Undo left it alone.' &&
+    refusedCopy.undoRefused === 'user-edited' &&
+    refusedCopy.undoHint !== 'Undo removes the To Do task.', refusedCopy);
+  const graphId = 'AQMkAG+ab/cd=';
+  const urlId = 'AQMkAG-ab_cd';
+  const exchanged = FlowProofOfClose.rememberProof(null, Object.assign({}, proved, {
+    messageId: graphId, itemId: graphId, pathId: graphId
+  }));
+  check('a Graph id and an OWA address id are the same proof',
+    FlowProofOfClose.proofForIds(exchanged, [urlId]) &&
+    FlowProofOfClose.proofForIds(exchanged, [urlId]).messageId === graphId);
+  const otherCase = 'aqmkag-ab_cd';
+  check('a Graph id does not match a different case',
+    FlowProofOfClose.canonId(graphId) === FlowProofOfClose.canonId(urlId) &&
+    FlowProofOfClose.canonId(graphId) !== FlowProofOfClose.canonId(otherCase) &&
+    !FlowProofOfClose.proofForIds(exchanged, [otherCase]));
+  const legacyStore = {
+    records: {
+      'legacy-row': {
+        ids: ['aqmkag-ab_cd'], itemId: 'aqmkag-ab_cd', messageId: '',
+        kind: 'written', connectorId: 'outlookTask', system: 'microsoft/todo',
+        externalId: 'task-legacy', fetchedBack: true, writtenLine: 'LEGACY-LINE',
+        receiptStatus: 'Handled.', label: 'LEGACY-LINE', objectName: 'To Do',
+        ref: { taskId: 'task-legacy', externalId: 'task-legacy', created: { title: 'Legacy', importance: 'normal' } }
+      }
+    },
+    byId: {}
+  };
+  const legacyHit = FlowProofOfClose.proofForIds(legacyStore, ['AQMkAG-ab_cd']);
+  const legacyRow = FlowProofOfClose.proofAsLogRow(legacyHit);
+  check('a lowercase id with no message id matches only as a legacy fallback',
+    legacyHit && legacyHit.legacyCase === true && legacyHit.writtenLine === 'LEGACY-LINE' &&
+    legacyRow && legacyRow.legacyCase === true && legacyRow.ids && legacyRow.ids[0] === 'aqmkag-ab_cd' &&
+    !FlowProofOfClose.proofForIds(exchanged, [otherCase]),
+    legacyHit);
+  const gone = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 404 });
+  check('a 404 marks the record deleted in To Do',
+    gone.deleted === true && gone.deletedLine === 'Deleted in To Do' && gone.verifyNote == null, gone);
+  const goneFile = FlowProofOfClose.noteReconcile(Object.assign({}, byItem, { objectName: 'OneDrive' }), { ok: false, status: 410 });
+  check('a 410 uses the object name', goneFile.deletedLine === 'Deleted in OneDrive');
+  const missed = FlowProofOfClose.noteReconcile(byItem, { ok: false, status: 500 });
+  check('a Graph error keeps the record and says couldn\'t verify',
+    missed.deleted !== true && missed.verifyNote === "couldn't verify" && missed.externalId === 'task-1', missed);
+  const dropped = FlowProofOfClose.dropProof(proofs, 'graph-1');
+  check('Undo drops the proof so the card does not return to Handled',
+    FlowProofOfClose.proofForIds(dropped, ['owa-1']) == null);
+  check('the page reconciles from that record and persists a refused Undo',
+    outlook.indexOf("type: 'flow:reconcile-proof'") > 0 && outlook.indexOf('patchGlanceProof') > 0 &&
+    outlook.indexOf('proofForIds') > 0 && outlook.indexOf('function noteReadingPaneOpen') > 0 &&
+    outlook.indexOf('function armReadingPaneWatch') > 0 && outlook.indexOf('function glancePaneNode') > 0 &&
+    outlook.indexOf('function reconcileMountedRow') > 0 &&
+    outlook.indexOf('function mailStill') > 0 &&
+    outlook.indexOf('function paintIfCurrent') > 0 &&
+    outlook.indexOf('function calendarReasonLine') > 0 &&
+    outlook.indexOf("'לא הצלחתי לסיים, נסה שוב'") > 0 &&
+    outlook.indexOf('צריך הרשאה ליומן') > 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -1,4 +1,4 @@
-// WhatsApp Web, read-only, one-to-one chats only, off until the person turns it on (popup: "Where Glance watches").
+// WhatsApp Web, read-only, one-to-one chats only. It ships with the Meta chat lane and runs after the one Meta consent. There is no separate popup row.
 //
 // What it does: when the newest message in the open chat is yours and asks for something, the same small card as in Gmail offers to
 // stay on it; when the other person answers, the same rules close it (or not). An answer here can also settle a loop you opened by
