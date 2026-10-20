@@ -42,12 +42,12 @@ OAuth 2.0 authorization code with **PKCE (S256)** (Linear documents PKCE: unveri
 ## 5. Recognition and the plan
 
 - **No new recognition.** Linear is a **destination** for a close that is already recognised (a task-only Do It). The Hebrew/English recognition, the precision gates and the hard quiets are untouched. No new loop type, so no new intent examples (quality bar §7: **not applicable**; no weights or gates changed).
-- **Appears in the steps list / Loops: NOT YET** (same gap as the other connectors, `open-tasks.md` row 75).
+- **Appears in the steps list / Loops: NOT YET** (same gap as the other connectors, `open-tasks.md` row 77).
 - **Silent when:** not connected, switch off, no team, no title.
 
 ## 6. Learning hook
 
-`core/connector-outcome.js` events with `connector:"linear"`, `destinationSystem:"linear/issue"`: `approved`, `handled`, `readback_failed`, `undone`. `offered`, `edited`, `ignored` have no emitter yet. No title, address, issue identifier or text (asserted). Off with the switch. Conclusions exist and are tested but no card reads them yet (row 75).
+`core/connector-outcome.js` events with `connector:"linear"`, `destinationSystem:"linear/issue"`: `approved`, `handled`, `readback_failed`, `undone`. `offered`, `edited`, `ignored` have no emitter yet. No title, address, issue identifier or text (asserted). Off with the switch. Conclusions exist and are tested but no card reads them yet (row 77).
 
 ## 7. Tests (against a mock; no real account, key or mail)
 
@@ -92,4 +92,4 @@ The authorize/token URLs and form body; PKCE support; scope names and the comma 
 
 ## 12. Blockers to going live
 
-(a) owner registers the Linear OAuth app and sets the env vars; (b) owner «מאשר» to deploy the relay; (c) `api.linear.app` host + store re-review; (d) privacy/store drafts applied; (e) the unverified vendor facts in §9, above all the client-supplied issue id; (f) steps-list destination wiring (row 75).
+(a) owner registers the Linear OAuth app and sets the env vars; (b) owner «מאשר» to deploy the relay; (c) `api.linear.app` host + store re-review; (d) privacy/store drafts applied; (e) the unverified vendor facts in §9, above all the client-supplied issue id; (f) steps-list destination wiring (row 77).

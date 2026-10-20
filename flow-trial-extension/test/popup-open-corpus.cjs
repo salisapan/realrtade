@@ -1142,6 +1142,11 @@ async function run() {
       if (n && n.getAttribute && n.getAttribute('data-glance-service')) services.push(n.getAttribute('data-glance-service'));
       (n.children || []).forEach(walk);
     })(list);
+    const ticked = {};
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-service')) ticked[n.getAttribute('data-glance-service')] = n.checked === true;
+      (n.children || []).forEach(walk);
+    })(list);
     const scopeLines = [];
     (function walk(n) {
       if (n && n.getAttribute && n.getAttribute('data-glance-scope-line')) scopeLines.push(n.textContent);
@@ -1150,6 +1155,8 @@ async function run() {
     check('Outlook Setup says התחבר ל-Microsoft and offers שמירת זמן ביומן',
       words.indexOf('התחבר ל-Microsoft') >= 0 && services.indexOf('calendar') >= 0 && words.indexOf('Connect Google') < 0 && words.indexOf('שמירת זמן ביומן') >= 0,
       { words, services });
+    check('on a new connection the OneDrive box is ticked by default and To Do and Calendar are not',
+      ticked.onedrive === true && ticked.todo === false && ticked.calendar === false && ticked.mail === true, ticked);
     check('each unchecked service names its scope and how to connect',
       scopeLines.some((t) => t.indexOf('Tasks.ReadWrite') >= 0 && t.indexOf('To Do') >= 0) &&
       scopeLines.some((t) => t.indexOf('Calendars.ReadWrite') >= 0 && t.indexOf('שמירת זמן ביומן') >= 0) &&

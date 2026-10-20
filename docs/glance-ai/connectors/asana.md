@@ -42,12 +42,12 @@ OAuth 2.0 **with PKCE (S256)**. Authorize URL `https://app.asana.com/-/oauth_aut
 ## 5. Recognition and the plan
 
 - **No new recognition.** Asana is a **destination** for a close that is already recognised (a task-only Do It). The Hebrew/English recognition, the precision gates and the hard quiets are untouched. No new loop type, so no new intent examples (quality bar §7: **not applicable**; no weights, no gate changed).
-- **Appears in the steps list / Loops: NOT YET** (same gap as Notion, `open-tasks.md` row 75): the steps list builds only `googleTask` / `outlookTask`; letting it choose Asana, via `FlowConnectorOutcome.destinationOrder` over the connected destinations, needs an owner decision on the default when two task systems are connected.
+- **Appears in the steps list / Loops: NOT YET** (same gap as Notion, `open-tasks.md` row 77): the steps list builds only `googleTask` / `outlookTask`; letting it choose Asana, via `FlowConnectorOutcome.destinationOrder` over the connected destinations, needs an owner decision on the default when two task systems are connected.
 - **Silent when:** not connected, switch off, no project, no title.
 
 ## 6. Learning hook
 
-`core/connector-outcome.js` events with `connector:"asana"` from the writer: `approved`, `handled`, `readback_failed`, `undone`. `offered`, `edited`, `ignored` have no emitter yet (they belong to the steps-list card). No title, address or text (asserted). Off with the switch. Conclusions exist and are tested but are not read by any card yet (row 75).
+`core/connector-outcome.js` events with `connector:"asana"` from the writer: `approved`, `handled`, `readback_failed`, `undone`. `offered`, `edited`, `ignored` have no emitter yet (they belong to the steps-list card). No title, address or text (asserted). Off with the switch. Conclusions exist and are tested but are not read by any card yet (row 77).
 
 ## 7. Tests (against a mock; no real account, key or mail)
 
@@ -91,4 +91,4 @@ Endpoint paths and bodies (`/tasks`, `{data:{…}}`, `projects`, `due_on`, `perm
 
 ## 12. Blockers to going live
 
-(a) owner registers the Asana app and sets the env vars; (b) owner «מאשר» to deploy the relay; (c) `app.asana.com` host + store re-review; (d) privacy/store drafts applied; (e) the unverified vendor facts in §9; (f) steps-list destination wiring (row 75).
+(a) owner registers the Asana app and sets the env vars; (b) owner «מאשר» to deploy the relay; (c) `app.asana.com` host + store re-review; (d) privacy/store drafts applied; (e) the unverified vendor facts in §9; (f) steps-list destination wiring (row 77).

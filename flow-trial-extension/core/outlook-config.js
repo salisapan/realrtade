@@ -28,8 +28,8 @@ const FlowOutlookConfig = {
   // To Do asks Tasks.ReadWrite only when that box is checked. Calendar asks
   // Calendars.ReadWrite only when that box is checked. The Entra app must list
   // that delegated permission or consent for the box fails.
-  // OneDrive asks Files.ReadWrite only when that box is checked. One file
-  // write, then a read-back. A mail does not search OneDrive. Files.Read
+  // OneDrive asks Files.ReadWrite only when that box is checked (it starts
+  // ticked). One file write into the Glance folder, then a read-back. A mail does not search OneDrive. Files.Read
   // cannot write. Files.ReadWrite.All is not this scope.
   CONNECT_SERVICES: [
     { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
@@ -37,7 +37,10 @@ const FlowOutlookConfig = {
     // Write one event for a named file at a clock. Not added to the default
     // mail sign-in. Never Mail.Send, never Calendars.ReadWrite.Shared.
     { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite'], required: false },
-    { id: 'onedrive', label: 'OneDrive', detail: 'Write one file, read it back, and undo that write. A mail does not search OneDrive.', scopes: ['Files.ReadWrite'], required: false },
+    // defaultOn pre-ticks the box on a new connection. It does not change
+    // defaultConnectIds() or the scopes of an existing sign-in: the person can
+    // untick it, and an account that never ticked it is asked only when they do.
+    { id: 'onedrive', label: 'OneDrive', detail: 'Save one file into OneDrive > Glance, read it back, and Undo deletes it. A mail does not search OneDrive.', scopes: ['Files.ReadWrite'], required: false, defaultOn: true },
     { id: 'contacts', label: 'Contacts', detail: 'Read contacts.', scopes: ['Contacts.Read'], required: false },
     { id: 'teams', label: 'Teams', detail: 'Read chats you are in.', scopes: ['Chat.Read'], required: false }
   ],

@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'd5826b21492059918243e833c6b4d7ce3bf1e4f04dd75b4d7c415d24e8863547';
+const FIXTURE_SHA = 'd7741c38660db54001b0fb9db90af65912fb7c69d317bd681923f85c5bae6642';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -157,6 +157,85 @@ function describe(out) {
   return 'quiet:' + ((out && out.reason) || 'none');
 }
 
+const HE_BRANDS = {
+  Globex: 1, Initech: 1, Glance: 1, Northwind: 1, Q4: 1, OneDrive: 1,
+  Google: 1, Microsoft: 1, Outlook: 1, Gmail: 1, WhatsApp: 1, Acme: 1,
+  Umbrella: 1, Meta: 1, Slack: 1, Zoom: 1, Dana: 1
+};
+const HE_LOCK = {
+  'v2syn-1115': 'להתקשר לרואה החשבון',
+  'v2syn-1216': 'להתקשר לבנק',
+  'v2syn-1330': 'להתקשר ל-Yossi',
+  'v2syn-14500': 'שיחה ביום חמישי 14:30',
+  'v2syn-14508': 'שיחה ביום חמישי 9:00',
+  'v2syn-14652': 'שיחה מחר 10:00',
+  'v2syn-1824': 'שיחה ביום שני 15:00',
+  'v2syn-1988': 'שיחה ביום חמישי 16:00',
+  'v2syn-1990': 'שיחה ביום שני 14:30',
+  'v2syn-14749': 'שיחה ב-12 באוק׳ 16:00',
+  'v2syn-14781': 'שיחה ב-19 באוק׳ 14:00'
+};
+const HE_BAD = ['החדש תמחור', 'Globex חידוש', 'הפילוט', 'חוזה חידוש', 'שיחה the ', 'שיחה Yossi', 'שיחה you'];
+function callVerbEnglish(label) {
+  if (!/^Call\s+\S/.test(label)) return false;
+  if (/^Call about\b/.test(label) || /^Call with\b/.test(label)) return false;
+  if (/^Call (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|tomorrow|today|tonight)\b/.test(label)) return false;
+  if (/^Call (?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b/.test(label)) return false;
+  return true;
+}
+function rowIsSelf(row) {
+  const email = parseFrom(row && row.from).email.toLowerCase();
+  return email === OWN_GMAIL || email === OWN_OUTLOOK;
+}
+function heExtra(row) {
+  const from = parseFrom(row && row.from);
+  return {
+    senderName: from.name,
+    bodyText: row && row.body,
+    ownNames: NAMES,
+    userName: (row && row.userName) || 'Sali',
+    self: rowIsSelf(row)
+  };
+}
+function verbBand(id) {
+  const n = parseInt((String(id).match(/(\d+)$/) || [])[1], 10);
+  return (n >= 1115 && n <= 1283) || (n >= 1330 && n <= 1370) || n === 1988;
+}
+function hebrewUiFault(he, en, row) {
+  const title = String(he || '');
+  const label = String(en || '');
+  if (HE_LOCK[row.id] && title !== HE_LOCK[row.id]) return 'locked ' + JSON.stringify(title);
+  if (!/^Call\b/.test(label)) return '';
+  const topic = label.match(/^Call about (.+)$/);
+  if (topic) {
+    const phrase = topic[1];
+    if (/^(?:it|this|that|these|those|them|זה|זאת|זו|אותו|אותה)$/i.test(phrase)) return 'pronoun';
+    if (/[,.!?;]/.test(phrase)) return 'punct';
+  }
+  if (callVerbEnglish(label) && /^שיחה/.test(title)) return 'verb-as-sicha';
+  for (let i = 0; i < HE_BAD.length; i++) {
+    if (title.indexOf(HE_BAD[i]) >= 0) return 'word-by-word';
+  }
+  if (!/[\u0590-\u05FF]/.test(title)) return '';
+  const kept = {};
+  const runs = title.match(/(?:ל-|עם |של )([A-Z][A-Za-z0-9'’.-]*(?:\s+[A-Z][A-Za-z0-9'’.-]*)*)/g) || [];
+  runs.forEach(function (run) {
+    run.replace(/^(?:ל-|עם |של )/, '').split(/\s+/).forEach(function (word) { if (word) kept[word] = 1; });
+  });
+  parseFrom(row.from).name.split(/\s+/).forEach(function (word) { if (word) kept[word] = 1; });
+  if (rowIsSelf(row) && /^שיחה עם\b/.test(title)) {
+    const who = title.replace(/^שיחה עם\s+/, '').trim();
+    if (/^(?:Sali(?:\s+Sapan)?|Sapan|סאלי)$/i.test(who)) return 'own-name';
+  }
+  const latin = title.match(/[A-Za-z][A-Za-z0-9'’.-]*/g) || [];
+  for (let i = 0; i < latin.length; i++) {
+    const word = latin[i];
+    if (HE_BRANDS[word] || kept[word] || /^Q\d+$/.test(word)) continue;
+    return 'latin ' + word;
+  }
+  return '';
+}
+
 const bytes = fs.readFileSync(FIXTURE);
 const sha = crypto.createHash('sha256').update(bytes).digest('hex');
 if (sha !== FIXTURE_SHA) {
@@ -164,7 +243,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 659) {
+if (rows.length !== 1983) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -321,6 +400,7 @@ if (extraKnown.length) {
 }
 
 const counts = { offerPass: 0, offerFail: 0, quietPass: 0, quietFail: 0, either: 0, allowed: 0 };
+const heStats = { shown: 0, clean: 0, hebrew: 0, englishLeft: 0, verb: 0, verbBand: 0, faults: 0 };
 const fails = [];
 for (const row of rows) {
   if (row.expected === 'either') { counts.either++; continue; }
@@ -344,7 +424,20 @@ for (const row of rows) {
     const label = !row.expectLabel || ((!shown(g) || (g.intent && g.intent.label === row.expectLabel)) && (!shown(o) || (o.intent && o.intent.label === row.expectLabel)));
     const track = row.expectTrack !== 'file' || (fileTrack(g) && fileTrack(o));
     const draftClaim = row.expectTrack === 'file' ? (draftClaimsAttached(g) || draftClaimsAttached(o)) : '';
-    ok = gOk && oOk && oneShows && kind && !labelWhy && label && track && !draftClaim;
+    const shownLabel = (shown(g) && g.intent && g.intent.label) || (shown(o) && o.intent && o.intent.label) || '';
+    let heWhy = '';
+    if (shownLabel) {
+      heStats.shown++;
+      if (callVerbEnglish(shownLabel)) heStats.verb++;
+      if (verbBand(row.id) && /^Call\b/.test(shownLabel)) heStats.verbBand++;
+      const heTitle = Display.localizeHeading('he', shownLabel, heExtra(row));
+      heWhy = hebrewUiFault(heTitle, shownLabel, row);
+      if (heWhy) heStats.faults++;
+      else heStats.clean++;
+      if (/[\u0590-\u05FF]/.test(heTitle)) heStats.hebrew++;
+      else heStats.englishLeft++;
+    }
+    ok = gOk && oOk && oneShows && kind && !labelWhy && label && track && !draftClaim && !heWhy;
     if (!ok) {
       why = 'gmail ' + describe(g) + ' outlook ' + describe(o);
       if (row.expectKind && !kind) why += ' expectKind ' + row.expectKind + (row.expectDate ? ' ' + row.expectDate : '');
@@ -352,6 +445,7 @@ for (const row of rows) {
       if (row.expectLabel && !label) why += ' label gmail ' + ((g.intent && g.intent.label) || '') + ' outlook ' + ((o.intent && o.intent.label) || '');
       if (row.expectTrack === 'file' && !track) why += ' track';
       if (draftClaim) why += ' draft ' + draftClaim;
+      if (heWhy) why += ' he-ui ' + heWhy + ' ' + JSON.stringify(Display.localizeHeading('he', shownLabel, heExtra(row)));
     }
   } else {
     ok = !shown(g) && !shown(o);
@@ -538,7 +632,7 @@ const SELF_TITLE = [
   { subject: 'Fwd: pricing sheet', body: 'Action needed from you: approve onboarding before Sunday. Best regards', label: 'Approve onboarding' },
   { subject: 'Note to self', body: 'Call Yossi tomorrow at 10:00.', label: 'Call Yossi' },
   { subject: 'Reminder', body: 'Need to call the bank tomorrow.', label: 'Call the bank' },
-  { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Log commitment' },
+  { subject: 'todo', body: 'We agreed to send the signed lease back by EOD.', label: 'Send the signed lease back' },
   { subject: 'בהמשך להקמפיין', body: 'בבקשה תחזור אליי עד מחר בבוקר', label: 'לחזור בנושא הקמפיין' },
   { subject: 'בהמשך להתקציב', body: 'בבקשה תחזרי אליי עד יום ראשון', label: 'לחזור בנושא התקציב' },
   { subject: 'בהמשך לקליטת העובד החדש', body: 'אשמח אם תוכלי להחזיר לי טלפון ביום רביעי הבא?', label: 'שיחה בנושא קליטת העובד החדש' },
@@ -546,7 +640,7 @@ const SELF_TITLE = [
   { subject: 'תזכורת תשלום', body: 'תוכל להעביר את התשלום של ₪89.90 עד סוף היום?', label: 'לשלם ₪89.90' },
   { subject: 'תזכורת תשלום', body: 'תוכל להעביר את התשלום של ₪89.90 עד סוף הום?', label: 'לשלם ₪89.90' },
   { subject: 'תזכורת תשלום', body: 'שבוע טוב! נשמח אם תוכלו להעביר את התשלום של ₪1,200 עד יום חמישי?', label: 'לשלם ₪1,200' },
-  { subject: 'Need the signed contract', body: 'Please reply with the tax form attached by Friday.', label: 'Reply about tax form' },
+  { subject: 'Need the signed contract', body: 'Please reply with the tax form attached by Friday.', label: 'Send the tax form' },
   { subject: 'בהמשך לה-onboarding', body: 'צריך sign-off שלך על ה-PO עד 20/10', label: 'Sign off on PO' },
   { subject: 'RE: W-9 form', body: "I'd appreciate it if you could fill out the lease tomorrow?", label: 'Fill out the lease' },
   { subject: 'Re: Re: Following up', body: 'Could you fill out the deck by end of week?', label: 'Fill out the deck' },
@@ -557,13 +651,8 @@ const SELF_TITLE = [
   { subject: 'RE: Re: the budget', body: 'Confirming €750 for the the Q4 plan work.', label: 'Log €750 agreed' },
   { subject: 'FW: Payment reminder', body: 'Could you process the ₪1,200 payment next Tuesday?', label: 'Pay ₪1,200' },
   { subject: 'Payment reminder', body: 'Please process the $4,850 payment for the pilot tomorrow.', label: 'Pay $4,850 for the pilot' },
-  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Meeting Oct 19 09:00', face: 'Schedule It', proc: 'schedule', steps: [
-    { kind: 'calendar', hour: 9, minute: 0, dateIso: '2026-10-19', title: 'Meeting Oct 19 09:00' },
-    { kind: 'googleTask', dateIso: '2026-10-19', title: 'Meeting Oct 19 09:00' }
-  ] },
-  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Meeting Oct 19 15:00', face: 'Meeting', proc: 'hold', steps: [
-    { kind: 'calendar', hour: 15, minute: 0, dateIso: '2026-10-19', title: 'Shall we hop on a call October 19 at 3pm' }
-  ] }
+  { subject: 'Re: the campaign', body: 'gimme a call October 19 at 9am Thank you', label: 'Call about the campaign' },
+  { subject: 'Re: Re: Re: the launch checklist', body: 'Shall we hop on a call October 19 at 3pm', label: 'Call about the launch checklist' }
 ];
 for (const sample of SELF_TITLE) {
   const out = J.judge({
@@ -779,5 +868,78 @@ console.log('offer pass ' + counts.offerPass + ' fail ' + counts.offerFail);
 console.log('quiet pass ' + counts.quietPass + ' fail ' + counts.quietFail);
 console.log('either ' + counts.either + ' allowed ' + counts.allowed);
 fails.forEach((line) => console.log('FAIL:', line));
+{
+  function selfNote(body, subject) {
+    return judge({
+      from: 'Sali Sapan <' + OWN_GMAIL + '>',
+      to: [OWN_GMAIL],
+      cc: [],
+      subject: subject || 'note',
+      body: body
+    }, 'gmail', { own: [OWN_GMAIL, OWN_OUTLOOK], attachmentCount: 0 });
+  }
+  const ifOnly = selfNote('אם לא תהיה תשובה עד מחר, להתקשר לדנה');
+  const ifEn = selfNote("If we won't hear back by tomorrow, call Dana");
+  const ifDont = selfNote("If they don't reply by Friday, call Dana");
+  const ifSend = selfNote("If we don't have a call Tuesday, send the deck to Ori", 'Call');
+  const mainHe = selfNote('לא תהיה שיחה ביום שלישי, אם דנה תאשר');
+  const mainEn = selfNote("We won't have a call Tuesday, if Dana confirms");
+  const ifLabel = String((ifOnly.intent && ifOnly.intent.label) || '');
+  const enLabel = String((ifEn.intent && ifEn.intent.label) || '');
+  if (!shown(ifOnly) || ifLabel.indexOf('דנה') < 0) {
+    console.log('FAIL: if-clause Hebrew stays a task ' + describe(ifOnly) + ' ' + ifLabel);
+    fails.push('if-clause-he');
+  }
+  if (!shown(ifEn) || !/^Call Dana$/.test(enLabel)) {
+    console.log('FAIL: if-clause English stays Call Dana ' + describe(ifEn) + ' ' + enLabel);
+    fails.push('if-clause-en');
+  }
+  const dontLabel = String((ifDont.intent && ifDont.intent.label) || '');
+  if (!shown(ifDont) || dontLabel !== 'Call Dana') {
+    console.log("FAIL: If they don't reply stays Call Dana " + describe(ifDont) + ' ' + dontLabel);
+    fails.push('if-clause-dont');
+  }
+  const sendLabel = String((ifSend.intent && ifSend.intent.label) || '');
+  if (!shown(ifSend) || sendLabel !== 'Send the deck to Ori' || sendLabel === 'Call about Call') {
+    console.log('FAIL: call inside the if stays Send the deck to Ori ' + describe(ifSend) + ' ' + sendLabel);
+    fails.push('if-clause-send');
+  }
+  if (shown(mainHe) || shown(mainEn)) {
+    console.log('FAIL: negated main clause stays quiet ' + describe(mainHe) + ' ' + describe(mainEn));
+    fails.push('if-clause-main');
+  }
+  const modal = selfNote('אם נאשר את ה-₪18,500, נוכל לחתום ביום שני, אבל עוד לא הוחלט כלום');
+  const modal89 = selfNote('אם נאשר את ה-₪89, נוכל לחתום ביום שני, אבל עוד לא הוחלט כלום');
+  if (shown(modal) || shown(modal89)) {
+    console.log('FAIL: a modal undecided conditional stays quiet ' + describe(modal) + ' ' + describe(modal89));
+    fails.push('if-clause-modal');
+  }
+  const two = selfNote("If Dana doesn't answer Ori, call her Monday at 14:30");
+  const twoLabel = String((two.intent && two.intent.label) || '');
+  if (!shown(two) || twoLabel !== 'Call Monday 14:30') {
+    console.log('FAIL: two names stay Call plus the time ' + describe(two) + ' ' + twoLabel);
+    fails.push('pronoun-two');
+  }
+  const them = selfNote("If Dana and Ori don't answer, call them Monday");
+  const themLabel = String((them.intent && them.intent.label) || '');
+  if (!shown(them) || themLabel !== 'Call Monday') {
+    console.log('FAIL: them stays Call plus the time ' + describe(them) + ' ' + themLabel);
+    fails.push('pronoun-them');
+  }
+  const ringDate = selfNote("I'll ring you October 12 at 16:00.");
+  const ringLabel = String((ringDate.intent && ringDate.intent.label) || '');
+  if (!shown(ringDate) || ringLabel !== 'Call Oct 12 16:00') {
+    console.log('FAIL: ring you on a date ' + describe(ringDate) + ' ' + ringLabel);
+    fails.push('ring-date');
+  }
+}
+const mixed = hebrewUiFault('שיחה בנושא security audit', 'Call about security audit', { id: 'latin-probe', from: 'Dana <dana@acme.io>' });
+const verbProbe = hebrewUiFault('שיחה the bank', 'Call the bank', { id: 'verb-probe', from: 'Sali Sapan <' + OWN_GMAIL + '>' });
+const nameProbe = hebrewUiFault('להתקשר ל-Yossi', 'Call Yossi', { id: 'name-probe', from: 'Sali Sapan <' + OWN_GMAIL + '>' });
+if (mixed.indexOf('latin') !== 0 || verbProbe !== 'verb-as-sicha' || nameProbe) {
+  console.log('FAIL: Hebrew UI rule probe ' + JSON.stringify([mixed, verbProbe, nameProbe]));
+  fails.push('he-ui-probe');
+}
+console.log('HE-UI scan: fixtureRows=1983 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
 console.log('FAILURES: ' + fails.length);
 process.exit(fails.length ? 1 : 0);

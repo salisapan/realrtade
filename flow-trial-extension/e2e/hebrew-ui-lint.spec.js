@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('./support/harness');
+const { sameDayIso } = require('./support/frozen-date');
 
 const SHOTS = '/opt/cursor/artifacts/screenshots';
 
@@ -78,7 +79,7 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
         label: 'Send the contract',
         confidence: 'high',
         personalClose: 'dated-commitment',
-        facts: { date: { iso: '2026-10-17' } },
+        facts: { date: { iso: sameDayIso(0) } },
         entities: { what: 'the signed contract' }
       },
       process: { id: 'log-it', name: 'Send the contract', steps: [{ id: 'task', kind: 'task' }] }
