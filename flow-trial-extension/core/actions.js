@@ -884,7 +884,20 @@ const FlowActions = (() => {
     const hold = intent.personalClose === 'calendar-hold' || process.id === 'hold';
     const sentences = bodySentences(text);
     const he = /[\u0590-\u05FF]/.test(text);
-    const shortFor = (title) => FALLBACK_TITLE[fallbackKind(intent, process, title)][he ? 1 : 0];
+    const subject = String((ctx && ctx.subject) || '');
+    const shortFor = (title) => {
+      const kind = fallbackKind(intent, process, title);
+      if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.selfAskTitle === 'function') {
+        const built = FlowIntent.selfAskTitle(text, subject, ctx);
+        if (built && !titleIsBody(built, sentences)) return built;
+      }
+      const CT = typeof FlowCommitmentTitle !== 'undefined' ? FlowCommitmentTitle : null;
+      if (CT && typeof CT.titleFromBody === 'function') {
+        const fromBody = CT.titleFromBody(text);
+        if (fromBody && !titleIsBody(fromBody, sentences)) return fromBody;
+      }
+      return FALLBACK_TITLE[kind][he ? 1 : 0];
+    };
     if (!hold && intent.label && titleIsBody(intent.label, sentences)) intent.label = shortFor(intent.label);
     (process.steps || []).forEach((step) => {
       if (!step || !step.params || !step.params.title) return;

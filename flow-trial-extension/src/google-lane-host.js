@@ -677,7 +677,7 @@ function calendarRefusal(lang) {
 
 function editedRefusal(lang) {
   const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
-  if (code === 'he' || code.indexOf('he-') === 0) return 'שינית את זה. Undo השאיר אותו כמו שהוא.';
+  if (code === 'he' || code.indexOf('he-') === 0) return 'שינית את זה. הביטול השאיר אותו כמו שהוא.';
   return '';
 }
 
