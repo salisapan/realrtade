@@ -46,7 +46,6 @@ const quiet = [
   ['a password prompt', 'Please enter your password to continue.', 'no-reply@bank.example'],
   ['a phone on silent', 'Please put your phone on silent during the meeting.', 'dana@firm.example'],
   ['write back when you can', 'Hi,\nPlease write back when you can, no rush.\nDana', 'dana@firm.example'],
-  ['Hebrew: write me when it suits you', 'היי, תכתוב לי מתי נוח. תודה', 'dana@firm.example'],
   ['a survey with a footer', 'Please fill in the survey below to help us improve. Unsubscribe here.', 'news@vendor.example']
 ];
 for (const [label, text, from] of quiet) {

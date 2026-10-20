@@ -1214,6 +1214,7 @@ const FlowIntent = (() => {
     const signals = {
       hasMeetingNoun, hasConcreteAnchor, hasConcreteRequestObject, hasConcreteCommitmentObject, isReaderCommit,
       handoff: s.flags.handoff,
+      slotAsk: Boolean(s.flags.slotAsk),
       hasDate: Boolean(facts.date && facts.date.iso),
       hasTime: Boolean(facts.time),
       hasMoney: Boolean(facts.money),
@@ -1652,7 +1653,10 @@ const FlowIntent = (() => {
         dateIso: null
       });
     }
-    if (familyBox.hit && familyBox.hit.suppress) {
+    // "Find a time" names no slot, so family D keeps it off the calendar, and family H reads "perhaps we could" as a hedge. Asking the reader for a time is still a
+    // request: the card is a reply that offers times, not a hold.
+    const slotOnly = Boolean(familyBox.hit && (familyBox.hit.family === 'D' || familyBox.hit.family === 'H') && s.flags && s.flags.slotAsk);
+    if (familyBox.hit && familyBox.hit.suppress && !slotOnly) {
       if (ctx.debug) {
         let matched = familyBox.hit.matched || null;
         if (Array.isArray(matched)) matched = matched.join(', ').slice(0, 80);

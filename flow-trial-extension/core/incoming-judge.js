@@ -111,7 +111,7 @@ const FlowIncomingJudge = (() => {
     const sender = i.sender || {};
     // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.
     const now = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
-    const intent = intentApi.classify(text, {
+    let intent = intentApi.classify(text, {
       senderEmail: sender.email || null,
       senderName: sender.name || null,
       subject: i.subject || '',
@@ -198,6 +198,11 @@ const FlowIncomingJudge = (() => {
     // webinar with no personal ask does not show. A second event that is
     // still on, together with an ask, does show. These gates run before
     // any plan, so a plan cannot create an offer they withhold.
+    // Asking the reader for a time ("are you available for a call Tuesday afternoon?") names a day and no clock. The meeting
+    // gate would veto it as an event with nothing to hold; it is a request, and the card is a reply that offers times.
+    if (intent.type === 'event' && intent.signals && intent.signals.slotAsk && !(intent.facts && intent.facts.time)) {
+      intent = Object.assign({}, intent, { type: 'request', label: 'Reply requested', entities: Object.assign({}, intent.entities || {}, { requestWhat: null, what: null }) });
+    }
     if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
       return { show: false, reason: 'meeting-veto', intent };
     }

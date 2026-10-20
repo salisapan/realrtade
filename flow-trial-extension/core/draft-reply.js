@@ -48,6 +48,16 @@ const FlowDraftReply = (() => {
   }
 
   // Signals taken only from the ask text / planned `what` — never invented.
+  // The sender asks the reader for a time. One detector for the card and the draft (core/judgment.js).
+  function slotAsked(ask) {
+    let J = typeof FlowJudgment !== 'undefined' ? FlowJudgment : null;
+    if (!J && typeof require !== 'undefined') { try { J = require('./judgment.js').FlowJudgment; } catch (e) { J = null; } }
+    if (!J) return false;
+    if (typeof J.slotAskText === 'function' && J.slotAskText(ask)) return true;
+    const all = (J.SLOT_ASKS || []).concat(J.SLOT_ASKS_HE || []);
+    return all.some((re) => re.test(ask));
+  }
+
   function askSignals(askText, what) {
     const ask = (ownAskText(askText) + '\n' + String(what || '')).trim();
     return {
@@ -59,8 +69,7 @@ const FlowDraftReply = (() => {
       hasPilot: /\bpilot proposal\b/i.test(ask),
       whetherStart: /\bwhether\b/i.test(ask) && /\bstart\b/i.test(ask),
       // The sender wants a call or meeting and is waiting for a time from the reader.
-      wantsSlot: /(?:אשמח|נשמח)\s+לתאם|מתי\s+(?:נוח|מתאים)\s+(?:לכם|לך|לכן)/.test(ask)
-        || /\bwhen (?:would|does|do) (?:it |that |this |a call |a meeting )?(?:work|suit)\b|\bwhat (?:day|time) works\b|\bwhen are you (?:free|available)\b|\b(?:love|like|happy) to (?:set up|schedule|book|arrange|find a time for)\b/i.test(ask)
+      wantsSlot: slotAsked(ask)
     };
   }
 
