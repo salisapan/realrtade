@@ -194,7 +194,7 @@ const FlowJudgment = (() => {
     /(?:^|[\s,.;:!?"(])מה\s+(?:אצלך|אצלכם|אצלכן|עם)\s+(?:\S+\s+){0,2}?(?:ביום|בשבוע|מחר|היום|השבוע|בבוקר|בצהריים|בערב|ראשון|שני|שלישי|רביעי|חמישי|שישי)/,
     /(?:^|[\s,.;:!?"(])מה\s+(?:ה)?(?:זמינות|יומן|לוח\s+הזמנים)\s+(?:שלך|שלכם)/,
     /(?:^|[\s,.;:!?"(])מי\s+(?:מכם|מכן|מהצוות)\s+(?:פנוי|פנויה|יכול|יכולה)/,
-    /(?:^|[\s,.;:!?"(])(?:פנוי|פנויה|פנויים|פנויות)\s+(?:ל|ב|השבוע|מחר|היום|בשבוע|ביום)/,
+    /(?:^|[\s,.;:!?"(])(?:פנוי|פנויה|פנויים|פנויות)\s+(?:ל[א-ת]|ב(?!בקשה)[א-ת]|השבוע|מחר|היום)/,
     /(?:^|[\s,.;:!?"(])(?:נשמח|אשמח)\s+(?:למצוא|לסגור|להציע)\s+(?:\S+\s+){0,2}?(?:זמן|מועד|שיחה|פגישה)/,
     /(?:^|[\s,.;:!?"(])בא\s+(?:לך|לכם|לכן)\s+(?:ל|ש)(?:קבוע|דבר|היפגש|תאם|שוחח|התקשר)/
   ];
@@ -204,11 +204,11 @@ const FlowJudgment = (() => {
   const SLOT_COMM_EN = /\b(?:calls?|chat|talk|speak|spoke|meet|meeting|meetings|sync|catch[- ]?up|coffee|lunch|breakfast|drinks|dinner|demo|conversation|discuss|discussion|connect|touch base|walk you through|go (?:through|over)|video call|zoom|teams|hangout|visit|appointment|session|brainstorm|speak with|get together|meet up|hop on|jump on|walkthrough|briefing|kickoff|kick-off)\b/i;
   const SLOT_TIME_EN = /\b(?:time|times|timing|slot|slots|availability|available|calendar|diary|schedule|minutes?|half an hour|an hour|spare|moment|gap|window|(?:mon|tues|wednes|thurs|fri|satur|sun)day|tomorrow|tonight|today|this week|next week|this afternoon|this morning|later|soon|sometime|end of the week|mornings?|afternoons?|evenings?)\b|\bfree(?! of charge| shipping| trial| to| for free)\b|\baround\b|\bfixed\b|\bconvenien(?:t|ce)\b|\bcouple of weeks\b|\bsometime\b|\bearliest\b/i;
   const SLOT_TURN_EN = /\?|\b(?:could|can|would|might|will|shall|may|do|does|are|is|were)\s+(?:you|we|i|it|there|that|this|your)\b|\b(?:let me know|let us know|do let me|please|kindly|whenever|when ready|when you(?:'re| are)|if you(?:'re| are)? (?:free|available|around|able|open|keen|interested|up for)|i(?:'d| would) (?:really )?(?:love|like|welcome|appreciate|be grateful|be keen|be glad|be happy|be delighted|be pleased|prefer)|would (?:really )?(?:love|like|appreciate)|would be (?:great|nice|good|lovely|helpful|useful)|hoping (?:we|that|to)|i hope we|let us|how about|what about|any |care to|want to|up for|interested in|keen to|wondering|checking if|looking to|hoping to|just checking|perhaps|maybe|let(?:'|’)?s|wondered)\b/i;
-  const SLOT_FACT_EN = /\b(?:thanks for|thank you for|it was (?:great|good|nice) to|enjoyed|was scheduled|is scheduled|has been (?:scheduled|moved|cancelled|canceled|confirmed)|is confirmed|was cancelled|is cancelled|attached|recording|office hours|time zone|starts in|we (?:had|spoke|met|discussed)|i (?:had|spoke|met|called)|went well|free shipping|free trial|feel free|for free|no need|not needed|unsubscribe)\b/i;
+  const SLOT_FACT_EN = /\b(?:thanks for|thank you for|it was (?:great|good|nice) to|enjoyed|was scheduled|is scheduled|has been (?:scheduled|moved|cancelled|canceled|confirmed)|is confirmed|was cancelled|is cancelled|attached|recording|office hours|time zone|starts in|\bby (?:\w+day|tomorrow|tonight|eod|cob|end of (?:the )?(?:day|week))\b|\bwho (?:will|is|are|'s)\b|we (?:had|spoke|met|discussed)|i (?:had|spoke|met|called)|went well|free shipping|free trial|feel free|for free|no need|not needed|unsubscribe)\b/i;
   const SLOT_COMM_HE = /(?:שיחה|שיחת|פגישה|פגישת|להיפגש|ניפגש|לדבר|נדבר|לשוחח|נשוחח|להתקשר|אתקשר|נתקשר|זום|טלפון|קפה|ארוחת|ארוחה|דמו|הדגמה|הכרות|סנכרון|נסנכרן|להתחבר|נתחבר|לקפוץ|וידאו|מפגש|לעבור על|נעבור על|לפגוש|נפגש|סשן|לדון|נדון|דיון|לארגן|ארגון|תדריך|סקירה|התנעה)/;
   const SLOT_TIME_HE = /(?:זמן|זמנים|מועד|שעה|שעות|דקה|דקות|חצי שעה|פנוי|פנויה|פנויים|פנויות|זמין|זמינה|זמינים|זמינות|יומן|ביומן|חלון|רגע|פנאי|ימים|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|מחר|היום|השבוע|שבוע הבא|בקרוב|בהמשך|בבוקר|בצהריים|אחר הצהריים|בערב|לפני סוף|בארבע|בחמש|בשלוש|בעשר|שבועיים|בחודש|הקרובים|הקרוב|תאריך|תאריכים|נוח|מתאים|עובדים|טובים)/;
   const SLOT_TURN_HE = /\?|(?:^|[\s,.;:!"(])(?:אפשר|נוכל|תוכל|תוכלו|תוכלי|אוכל|ניתן|יש\s+(?:לך|לכם)|יהיה\s+(?:לך|לכם)|בא\s+(?:לך|לכם)|מתאים|נוח|אשמח|נשמח|הייתי\s+(?:רוצה|שמח|שמחה)|אודה|רציתי|רצינו|מעוניין|מעוניינת|תגיד|תגידי|תגידו|תעדכן|תעדכני|תעדכנו|תשלח|תשלחי|תשלחו|תציע|תציעי|תציעו|בוא|בואו|בואי|נקבע|נתאם|אולי|האם|מה\s+עדיף|מה\s+דעתך|איך\s+נראה|מה\s+נראה|אכפת|מתי|איזה|איזו|אם\s+(?:אתה|את|אתם|אתן)|כש(?:יהיה|נוח|תוכל|תהיה)|רק\s+בודק|רק\s+בודקת|נגיד|נאמר|מעוניינים|בודק\s+אם|מקווה|מקווים|נסדר|נארגן|נציע|תהיה|תהיו|תהיי|זמין|זמינה|זמינים)/;
-  const SLOT_FACT_HE = /(?:תודה\s+על|נעים\s+להכיר|היה\s+(?:נעים|מצוין|כיף)|נקבע(?:ה)?\s+ל|בוטל|בוטלה|מצורפ|הקלטת|שעות\s+הפעילות|תזכורת:|בעוד\s+\S+\s+דקות|דיברנו|נפגשנו|דיברתי|משלוח\s+חינם|הסרה|אין\s+צורך|לא\s+צריך|הוא\s+אמר|היא\s+אמרה|אמר\s+ש|אמרה\s+ש)/;
+  const SLOT_FACT_HE = /(?:תודה\s+על|נעים\s+להכיר|היה\s+(?:נעים|מצוין|כיף)|נקבע(?:ה)?\s+ל|בוטל|בוטלה|מצורפ|הקלטת|שעות\s+הפעילות|תזכורת:|בעוד\s+\S+\s+דקות|דיברנו|נפגשנו|דיברתי|משלוח\s+חינם|הסרה|אין\s+צורך|לא\s+צריך|הוא\s+אמר|היא\s+אמרה|אמר\s+ש|אמרה\s+ש|מי\s+(?:מכם\s+|מכן\s+)?(?:יגיע|תגיע|ישתתף|יצטרף|מגיע))/;
   function slotAskSentence(sentence) {
     const t = String(sentence || '');
     if (t.length < 6 || t.length > 400) return false;
@@ -218,8 +218,23 @@ const FlowJudgment = (() => {
     const turn = he ? SLOT_TURN_HE : SLOT_TURN_EN;
     const fact = he ? SLOT_FACT_HE : SLOT_FACT_EN;
     if (fact.test(t)) return false;
-    const mComm = t.match(comm);
+    // "Could you call me later?" asks the reader to do something; it does not ask when. A marker of availability or a time
+    // in the same sentence makes it an arrangement again.
+    if (!he && /\b(?:call|ring|phone)(?:ing)?\s+(?!me\b|us\b|back\b|in\b|with\b|about\b|this\b|it\b|today\b|tomorrow\b|later\b)(?:the |a |our |your |my )?(?:[A-Z][a-z]+|bank|office|supplier|vendor|client|customer|doctor|landlord)/.test(t) && !/\b(?:when|free|available|convenient|suits?|works?|availability)\b/i.test(t)) return false;
+    if (he && /(?:להתקשר|תתקשר|תתקשרי|תצלצל|תצלצלי)\s+ל(?!אחר)[א-ת]/.test(t) && !/(?:מתי|פנוי|זמין|נוח|מתאים|זמינות)/.test(t)) return false;
+    if (!he && /\b(?:call|ring|phone|text|ping|email|e-mail) me\b/i.test(t) && !/\b(?:when|whenever|free|available|convenient|suits?|works?|time|slot|slots|availability)\b/i.test(t)) return false;
+    if (he && /(?:להתקשר|תתקשר|תתקשרי|תצלצל|תצלצלי|לצלצל|תכתוב|תכתבי|לכתוב)\s+(?:אליי|אלי|לי)/.test(t) && !/(?:מתי|פנוי|זמין|נוח|מתאים|זמן|מועד|חלון|זמינות)/.test(t)) return false;
     const question = /\?/.test(t);
+    // A statement that names a concrete day ("let's meet tomorrow", "we'll talk on Tuesday") proposes a meeting; the event and
+    // Schedule meeting gates already decide it. Only a question about a day asks the reader for a time.
+    const findsATime = /\b(?:find|pick|set|choose|fix|arrange)\s+(?:a|some|the)\s+(?:\w+\s+)?(?:time|day|slot)\b|(?:נמצא|נקבע|נבחר|נסדר|נתאם)\s+(?:לנו\s+)?(?:זמן|מועד|יום)/i.test(t);
+    if (!question && !findsATime && /\b(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|tomorrow|tonight|today)\b|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|(?:^|\s)(?:מחר|היום|הערב)(?:\s|$|[.,])/i.test(t)) return false;
+    // Listed constructs: each already names both the ask and the thing asked about.
+    for (const re of SLOT_ASKS.concat(SLOT_ASKS_HE)) {
+      const m = t.match(re);
+      if (m && !isNegatedBefore(t.slice(0, m.index))) return true;
+    }
+    const mComm = t.match(comm);
     if (!turn.test(t)) return false;
     // Negation in front of the topic withdraws it ("no need for a call", "I can't meet").
     if (mComm && isNegatedBefore(t.slice(0, mComm.index))) return false;
@@ -625,9 +640,9 @@ const FlowJudgment = (() => {
     const followUpAsk = anyOf(text, [FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE], directedAsk);
     // A clock in the text ("Tuesday at 3", "בשעה 16:00") belongs to the event and hold gates, which already decide it.
     const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
-    const slotAsk = !clockNamed && (anyOf(text, SLOT_ASKS.concat(SLOT_ASKS_HE), directedAsk) || slotAskText(text));
+    const slotAsk = !clockNamed && slotAskText(text);
     const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE], directedAsk);
-    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk || slotAsk || workAsk;
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 

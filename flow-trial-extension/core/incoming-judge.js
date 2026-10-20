@@ -198,13 +198,15 @@ const FlowIncomingJudge = (() => {
     // webinar with no personal ask does not show. A second event that is
     // still on, together with an ask, does show. These gates run before
     // any plan, so a plan cannot create an offer they withhold.
-    // Asking the reader for a time ("are you available for a call Tuesday afternoon?") names a day and no clock. The meeting
-    // gate would veto it as an event with nothing to hold; it is a request, and the card is a reply that offers times.
-    if (intent.type === 'event' && intent.signals && intent.signals.slotAsk && !(intent.facts && intent.facts.time)) {
-      intent = Object.assign({}, intent, { type: 'request', label: 'Reply requested', entities: Object.assign({}, intent.entities || {}, { requestWhat: null, what: null }) });
-    }
+    // An event with a day and no clock that the meeting gate would veto. When the sender is asking the reader for a time
+    // ("are you available for a call Tuesday afternoon?") it is a request, and the card is a reply that offers times.
+    // Every other event keeps the path it had (a named hold, or the Schedule meeting task).
     if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
-      return { show: false, reason: 'meeting-veto', intent };
+      if (intent.signals && intent.signals.slotAsk && !(intent.facts && intent.facts.time)) {
+        intent = Object.assign({}, intent, { type: 'request', label: 'Reply requested', entities: Object.assign({}, intent.entities || {}, { requestWhat: null, what: null }) });
+      } else {
+        return { show: false, reason: 'meeting-veto', intent };
+      }
     }
     const planCtx = {
       threadUrl: i.threadUrl || null,
