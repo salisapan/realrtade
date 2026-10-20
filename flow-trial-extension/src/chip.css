@@ -481,30 +481,38 @@
 .flow-chip-link:hover { color: #083d26; }
 .flow-chip-link:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
 
-/* Undo is not a second Do It. Do It keeps shell/ring/shine. This is the
-   sentence that names the record, as a text control, so the receipt has
-   one hierarchy: Handled, what landed, how to take it back. */
-.flow-chip-undo {
-  all: initial;
+/* Undo is not a second Do It. Same secondary control as consent on the card. */
+.flow-chip-host button.flow-chip-undo {
+  all: unset;
+  box-sizing: border-box;
   display: inline-block;
   max-width: 100%;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  font-family: 'Heebo', 'Inter', system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
   color: #0B4F32;
+  background: rgba(11, 79, 50, 0.06);
+  border: 1px solid rgba(11, 79, 50, 0.22);
+  border-radius: 8px;
+  box-shadow: none;
   cursor: pointer;
-  padding: 6px 0;
+  padding: 6px 12px;
   min-height: 32px;
-  border: none;
-  background: none;
-  border-radius: 0;
   line-height: 1.35;
   text-align: start;
   white-space: normal;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
 }
-.flow-chip-undo:hover { color: #083d26; }
+.flow-chip-host button.flow-chip-undo:hover {
+  color: #083d26;
+  background: rgba(11, 79, 50, 0.1);
+  border-color: rgba(11, 79, 50, 0.32);
+}
+.flow-chip-host button.flow-chip-undo:focus-visible {
+  outline: 2px solid #0F6640;
+  outline-offset: 2px;
+}
 .flow-chip-reconnect {
   all: initial;
   display: inline-block;
@@ -588,10 +596,18 @@
   }
   .flow-chip-handled,
   .flow-chip-written,
-  .flow-chip-undo,
   .flow-chip-reconnect,
   .flow-chip.flow-chip-done .flow-chip-label { color: #d8f3e4; }
-  .flow-chip-undo:hover,
+  .flow-chip-host button.flow-chip-undo {
+    color: #d8f3e4;
+    background: rgba(155, 231, 196, 0.1);
+    border-color: rgba(155, 231, 196, 0.28);
+  }
+  .flow-chip-host button.flow-chip-undo:hover {
+    color: #f3faf6;
+    background: rgba(155, 231, 196, 0.16);
+    border-color: rgba(155, 231, 196, 0.38);
+  }
   .flow-chip-link:hover { color: #f3faf6; }
   .flow-chip-link,
   .flow-chip-first-close { color: #9be7c4; }
@@ -605,7 +621,7 @@
   .flow-chip-undo-hint,
   .flow-chip-undo-failed,
   .flow-chip-partial-note { color: #f0c36a; }
-  .flow-chip-undo:focus-visible,
+  .flow-chip-host button.flow-chip-undo:focus-visible,
   .flow-chip-link:focus-visible { outline-color: #9be7c4; }
 }
 

@@ -56,7 +56,7 @@ function glanceUiCopy(kind) {
   const he = glanceUiHebrew();
   if (kind === 'reconnect') return he ? 'חבר מחדש את Google' : 'Reconnect Google';
   if (kind === 'connect') return he ? 'התחבר ל-Google בחלון Glance קודם.' : 'Connect Google in the Glance popup first.';
-  if (kind === 'edited') return he ? 'שינית את זה. Undo השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
+  if (kind === 'edited') return he ? 'שינית את זה. הביטול השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
   if (kind === 'still') return he ? 'עדיין שם — משימת Google לא הוסרה.' : 'Still there — the Google Task was not removed.';
   if (kind === 'calendar') return he ? 'אין מועד אחד לאירוע הזה.' : 'No single time for this event.';
   if (kind === 'calendarFailed') return he ? 'היומן נכשל.' : 'Calendar failed.';
@@ -3326,8 +3326,8 @@ function glanceUiCopy(kind) {
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
     if (response.reason === 'user-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || glanceUiCopy('edited'));
-    if (response.reason === 'unconfirmed') return response.error || response.written || "Couldn't confirm it's unchanged. Undo left it alone.";
-    if (response.reason === 'range-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || 'Undo stopped. That text was edited, so nothing was deleted.');
+    if (response.reason === 'unconfirmed') return response.error || response.written || glanceShow(glanceChrome().couldntUnchanged);
+    if (response.reason === 'range-edited') return glanceUiCopy('edited');
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'wrong-account' && !response.expected && response.error) return response.error;
     if (response.reason === 'account-unverified') return response.error || (glanceUiHebrew() ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.");
@@ -3344,7 +3344,7 @@ function glanceUiCopy(kind) {
     if (response.reason === 'unverified') {
       const what = response.object === 'event' ? (glanceUiHebrew() ? 'האירוע' : 'event') : (glanceUiHebrew() ? 'המשימה' : 'task');
       return glanceUiHebrew()
-        ? 'לא אומת — Google עדיין לא החזיר את ' + what + '. הוא נשאר, ו-Undo מסיר אותו.'
+        ? 'לא אומת — Google עדיין לא החזיר את ' + what + '. הוא נשאר, ו' + glanceChrome().undo + ' מסיר אותו.'
         : 'Not verified — Google has not returned the ' + what + ' yet. It stays, and Undo removes it.';
     }
     if (response.reason === 'verify_failed') {
@@ -4095,7 +4095,7 @@ function glanceUiCopy(kind) {
       let page = null;
       if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.undo === 'function') {
         try { page = FlowGoogleComposePage.undo(ref); } catch (e) {
-          page = { ok: false, reason: 'unavailable', error: 'Undo stopped. The compose was not cleared.' };
+          page = { ok: false, reason: 'unavailable', error: glanceChrome().undoComposeStopped };
         }
       } else {
         page = { ok: false, reason: 'compose-closed', error: 'Open Reply first. Glance does not press Send.' };
@@ -4557,7 +4557,7 @@ function glanceUiCopy(kind) {
             undo.textContent = copy.undoHint;
             undo.disabled = false;
             hint.hidden = false;
-            hint.textContent = 'Undo unavailable.';
+            hint.textContent = glanceShow(glanceChrome().undoUnavailable);
             hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
             return;
           }
@@ -4655,19 +4655,20 @@ function glanceUiCopy(kind) {
       placeReceipt(host, chip, done);
       return;
     }
-    done.appendChild(el('span', 'flow-chip-written', response.written || 'Compose filled. You send it.'));
-    const undo = el('button', 'flow-chip-undo', 'Undo');
+    const chrome = glanceChrome();
+    done.appendChild(el('span', 'flow-chip-written', glanceShow(response.written || chrome.composeFilled)));
+    const undo = el('button', 'flow-chip-undo', chrome.undo);
     undo.type = 'button';
     undo.addEventListener('click', () => {
       undo.disabled = true;
-      undo.textContent = 'Undoing…';
+      undo.textContent = chrome.undoing;
       sendLaneUndo('gmailCompose', response.ref).then((undone) => {
         if (undone && undone.ok) {
-          done.replaceChildren(el('span', 'flow-chip-label', undone.written || 'Undone. Nothing was sent.'));
+          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(undone.written || chrome.undoneNothingSent)));
           return;
         }
-        const line = (undone && (undone.error || undone.written)) || 'Undo stopped. The compose was not cleared.';
-        done.replaceChildren(el('span', 'flow-chip-label', line));
+        const line = (undone && (undone.error || undone.written)) || chrome.undoComposeStopped;
+        done.replaceChildren(el('span', 'flow-chip-label', glanceShow(line)));
       });
     });
     done.appendChild(undo);
@@ -4735,7 +4736,7 @@ function glanceUiCopy(kind) {
       rollbackChain(orphans, ctx).then((result) => {
         if (result.ok) {
           writeLaneUndoRow(msgId, [], { total: results.length }, ctx.laneIds);
-          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(laneUndoLine(laneConnectorId(orphans[0].action.kind)) || 'Undone.')));
+          done.replaceChildren(el('span', 'flow-chip-label', glanceShow(laneUndoLine(laneConnectorId(orphans[0].action.kind)) || glanceChrome().undoneNothingSent)));
           return;
         }
         undo.textContent = glanceUiCopy('undo');
@@ -4986,7 +4987,7 @@ function glanceUiCopy(kind) {
             keptWhere: result.keptWhere
           });
           const refused = result.reason === 'user-edited' || result.reason === 'range-edited' || result.reason === 'range-missing' || result.reason === 'unconfirmed';
-          undo.textContent = glanceShow(refused ? 'Undo' : copy.undoLabel);
+          undo.textContent = glanceShow(refused ? glanceChrome().undo : copy.undoLabel);
           undo.disabled = refused;
           hint.hidden = false;
           hint.textContent = glanceShow((refused && result.error) ? result.error : note);

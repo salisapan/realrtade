@@ -1971,10 +1971,20 @@ const FlowIntent = (() => {
     // "Any chance you could", "please email me", and "please loop in"
     // are the reply on the rows that use those words. A note the user
     // sent to themself is still that task (v2syn-13337).
-    const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
-    const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
+    function heInboundVerifyUpdate(src) {
+      const raw = String(src || '');
+      if (/(?:תוודא(?:י|ו)?|תבדוק(?:י|ו)?)[\s\S]{0,160}?(?:ו)?(?:תעדכן|תעדכני|ותעדכן|ותעדכני|תודיע|ותודיע)\s+(?:לי|אותי)/.test(raw)) return true;
+      if (/(?:^|[\s,.!?\u0590-\u05FF])(?:ו)?(?:תעדכן|תעדכני|ותעדכן|ותעדכני)\s+אותי/.test(raw)) return true;
+      return false;
+    }
+    const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text)
+      || heInboundVerifyUpdate(text);
+    const heVerifyInbound = heInboundVerifyUpdate(text) && !addressedToSelf(ctx);
+    const selfPhrase = addressedToSelf(ctx) && (/\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text)
+      || heInboundVerifyUpdate(text));
     const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
-    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
+    const requestEvidence = (s.flags.handoff || datedAsk || heVerifyInbound)
+      && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped || heVerifyInbound);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     // "any chance" is a hedge for every other sentence. These three
@@ -2783,7 +2793,8 @@ const FlowIntent = (() => {
     [/לעדכן|תעדכ(?:ן|נ(?:י|ו)?)(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להשלים|יש להשלים/, 'להשלים'],
     [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק'],
-    [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
+    [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|תשמר(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
+    [/לחתום|תחתום(?:י|ו)?(?![\u0590-\u05FF])|חתימה\s+על/, 'לחתום'],
     [/(?<=^|[^\u0590-\u05FF])שלח(?:י|ו)?(?![\u0590-\u05FF])/, 'לשלוח'],
     [/(?<=^|[^\u0590-\u05FF])לקבל(?![\u0590-\u05FF])/, 'לקבל'],
     [/(?<=^|[^\u0590-\u05FF])לצרף(?![\u0590-\u05FF])/, 'לצרף'],
@@ -2896,6 +2907,11 @@ const FlowIntent = (() => {
     if (approve) {
       const obj = approve[1].replace(/\s+עד(?:\s|$).*$/, '').trim();
       if (obj) return 'לאשר את ' + obj;
+    }
+    const signOn = t.match(/חתימה\s+על\s+(.+?)(?:\s*$|[.!?\n])/);
+    if (signOn) {
+      const obj = signOn[1].replace(/\s+/g, ' ').trim();
+      if (obj) return 'לחתום על ' + obj;
     }
     return '';
   }
@@ -3070,7 +3086,8 @@ const FlowIntent = (() => {
       /^נקבע\s+/,
       /^קבעתי לנו\s+/,
       /^בהמשך לשיחתנו,?\s*/,
-      /^פעולה נדרשת מצדך:\s*/
+      /^פעולה נדרשת מצדך:\s*/,
+      /^פעולה נדרשת מצד:\s*/
     ];
     for (let guard = 0; guard < 6; guard++) {
       let next = clause;
@@ -3237,7 +3254,7 @@ const FlowIntent = (() => {
     return titleAfter(hit.verb, hit.match, src, subject, {});
   }
 
-  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
+  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar, selfAskTitle };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };
