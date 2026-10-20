@@ -22,7 +22,8 @@ Scopes today (`manifest.json`, `docs/google-lane.md`): `openid`, `email`, `profi
 | Google Docs | Create or append on a file Glance made (`core/google-docs.js`) | Read back | Not run | A request with no attachment ("write a one-page summary") is PR row 76 (8a/8b), not built |
 | Google Sheets | One row on a Glance-made sheet (`core/google-sheets.js`) | Read back | Not run | Same as Docs: create-from-request not built |
 | Google Contacts | Name lookup written, no scope granted | n/a | Not run | Needs the `contacts` scope and its OAuth review |
-| Google Meet, Slides, Forms, Keep | Not built | n/a | n/a | Not started. Meet link on a hold is the first one worth doing |
+| Google Meet | A video-call proposal with one day and one clock becomes a calendar event with a Meet link Google created; the read-back checks title, instants and the `meet.google.com` link (`core/meet-link.js`, switch `MEET_LINK` off, not wired to a card). 2026-10-20 | Read back by id; Undo deletes it and refuses after an edit | Not run | Card is in `card-requests-2026-10-20.md` (M1); wiring into the Gmail card and a live Gate. Adding a link to an existing event is not built |
+| Google Slides, Forms, Keep | Not built | n/a | n/a | Not started |
 
 ## Microsoft
 
@@ -56,6 +57,6 @@ One consent turns on Messenger, Facebook messages, Business Suite, Instagram and
 
 - **Closest to done:** Outlook mail, To Do and OneDrive (live Gates passed on earlier packages), then Gmail with Tasks, Calendar and Drive (built and heavily tested, no recorded PASS on 0.9.56).
 - **Built but never seen live:** Docs, Sheets, Word, Excel, Teams drafts, Contacts, and every Meta surface.
-- **Not started:** Meet, Slides, Forms, Keep, SharePoint, OneNote, Planner, PowerPoint, Facebook Pages, Threads, WhatsApp Business.
+- **Not started:** Slides, Forms, Keep, SharePoint, OneNote, Planner, PowerPoint, Facebook Pages, Threads, WhatsApp Business.
 - **The learning loop:** the on-device threshold and Execution Memory learn from each person's clicks. The export of own-use decisions for training the model (`docs/glance-ai/learning-from-use.md`, paths A to D) is not built in the extension, so "the system learns from everyone's use" is true per person and not yet across people.
 - **The release gate:** a package must pass the regression corpora first. On 2026-10-20 five corpora are red on the working branch tip: `card-decision` (Outlook Why-not-shown reason, PR #143), `flip-sample-0956`, and three that pass only with the clock set back to 2026-10-16 (`realshape-0956`, `negation-conditional`, `regress-144`), so they are date-bound fixtures. Four more were stale fixtures and are fixed. A fresh environment also needs `npm i` in `flow-trial-extension/` for jsdom.

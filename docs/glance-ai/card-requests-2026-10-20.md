@@ -44,3 +44,14 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Step: `התשובה נרשמת ביומן ונבדקת` / `Record the answer on the event and read it back`.
 - Glance sends no email. The organizer sees the answer on the event, the same as with the invite's own buttons.
 - Undo: puts the previous answer back. If the person changed the answer themselves, the card says Undo unavailable.
+
+## M1 — a call held on the calendar with a Meet link
+
+- Module `flow-trial-extension/core/meet-link.js`, switch `MEET_LINK`. Ecosystem gap "Meet link on a hold" (`docs/glance-ai/ecosystem-coverage.md`).
+- When the card shows: someone proposed a video call with one day and one clock ("Can we do a video call tomorrow at 15:00?"). Two clocks, an alternative, a hedge, Zoom or Teams named, and "ask Dana to set it up" show no card.
+- Line: `לקבוע ביומן שיחת וידאו ב-<date> <HH:mm> עם קישור Meet?` / `Hold <date> <HH:mm> on your calendar with a Meet link?`
+- Steps: `יצירת האירוע עם קישור Meet ובדיקה חוזרת` / `Create the event with a Meet link and read it back`, then `שליחת הקישור: על פי בחירתך, גלאנס לא שולח` / `Share the link: your choice, Glance does not send` (shown as the person's own step).
+- Action: one Do It. After the read-back the receipt shows the link (`meetUrl`) with a Copy control, and the calendar link.
+- No guest is added, so no invitation goes out from Glance. The ask is not marked closed by the hold alone: `loopClosed` is false, and "Handled" for the call itself waits for the other person's answer.
+- Undo: deletes the event. If the person edited it (agenda, guest, title, time), the card says Undo unavailable and the event stays.
+
