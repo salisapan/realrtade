@@ -74,7 +74,6 @@ function contextOf(row) {
   return { own, onBehalf, inSent, forwarded, attachmentCount, outbound };
 }
 
-const FIXED_NOW = '2026-10-16T12:00:00';
 function judge(row, surface, ctx) {
   const from = parseFrom(row.from);
   const sender = from.email ? from : { name: from.name || 'Dana Levi', email: 'dana@acme.io' };
@@ -95,8 +94,7 @@ function judge(row, surface, ctx) {
     forwarded: ctx.forwarded,
     onBehalfOf: ctx.onBehalf,
     threadUrl: 'https://example.invalid/t',
-    // The fixtures are written for 2026-10-16. A real clock turns "October 19" into a past day.
-    now: new Date(FIXED_NOW)
+    now: ctx.now || new Date('2026-10-16T12:00:00')
   });
 }
 
@@ -266,7 +264,7 @@ for (const row of rows) {
 {
   const row = byId['v2syn-2019'];
   if (row) {
-    const d = new Date(FIXED_NOW);
+    const d = new Date('2026-10-16T12:00:00'); // the pinned clock the judge helper passes
     d.setDate(d.getDate() + 1);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     row.expectLabel = 'Log commitment for ' + months[d.getMonth()] + ' ' + d.getDate() + ' 10:00';
@@ -743,7 +741,8 @@ for (const id of ['v2syn-3398', 'v2syn-3411', 'v2syn-3415', 'v2syn-3434']) {
 const CALL_YOU = ['v2syn-1969', 'v2syn-1972', 'v2syn-1975', 'v2syn-1977', 'v2syn-1980', 'v2syn-1981', 'v2syn-1982', 'v2syn-1985', 'v2syn-1991', 'v2syn-1994', 'v2syn-2000', 'v2syn-2003', 'v2syn-2005', 'v2syn-2006', 'v2syn-2008', 'v2rtest-file-path-corpus-604'];
 for (const id of CALL_YOU) {
   const row = byId[id];
-  const ctx = contextOf(row);
+  // "October 19" is a future day only on the clock these rows were written on.
+  const ctx = Object.assign({}, contextOf(row), { now: new Date('2026-10-16T12:00:00') });
   for (const surface of ['gmail', 'outlook']) {
     const out = judge(row, surface, ctx);
     const label = String((out.intent && out.intent.label) || '');

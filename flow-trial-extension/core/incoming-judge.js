@@ -109,7 +109,8 @@ const FlowIncomingJudge = (() => {
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
     const sender = i.sender || {};
-    const now = i.now instanceof Date ? i.now : new Date(typeof i.now === 'number' ? i.now : (i.now && typeof i.now.getTime === 'function' ? i.now.getTime() : Date.now()));
+    // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.
+    const now = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const intent = intentApi.classify(text, {
       senderEmail: sender.email || null,
       senderName: sender.name || null,
