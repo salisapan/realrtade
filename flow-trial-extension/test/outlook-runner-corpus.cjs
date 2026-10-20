@@ -419,7 +419,8 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
       token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW },
       account: { address: GMAIL_ME, userPrincipalName: GMAIL_ME },
       ownAddresses: [GMAIL_ME],
-      profile: { mail: '', userPrincipalName: GMAIL_ME, otherMails: [], proxyAddresses: [] }
+      // connect() stores displayName; without a reader name "Hi Sali" is held for the name (gmail-outlook-parity).
+      profile: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [], proxyAddresses: [] }
     };
     w2.store.outlookPending = {
       offers: [{ key: 'stale', base: { counterpart: { email: OUT }, threadId: 'ol:convB' }, ask: { what: 'signed vendor contract', direction: 'theirs' } }],

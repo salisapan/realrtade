@@ -856,7 +856,9 @@ const FlowIntent = (() => {
   // An empty list is then a judgment: the greeting is not this person.
   function greetingAwaitingNames(text, ctx) {
     const c = ctx || {};
-    if (c.namesWaitDone === true || c.namesPending !== true) return false;
+    if (c.namesWaitDone === true) return false;
+    const unresolved = c.namesPending === true || !readerNameList(c).length;
+    if (!unresolved) return false;
     return greetedPerson(text);
   }
   function greetingUnconfirmed(text, ctx) {

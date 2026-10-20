@@ -74,6 +74,7 @@ function contextOf(row) {
   return { own, onBehalf, inSent, forwarded, attachmentCount, outbound };
 }
 
+const FIXED_NOW = '2026-10-16T12:00:00';
 function judge(row, surface, ctx) {
   const from = parseFrom(row.from);
   const sender = from.email ? from : { name: from.name || 'Dana Levi', email: 'dana@acme.io' };
@@ -93,7 +94,9 @@ function judge(row, surface, ctx) {
     inSent: ctx.inSent,
     forwarded: ctx.forwarded,
     onBehalfOf: ctx.onBehalf,
-    threadUrl: 'https://example.invalid/t'
+    threadUrl: 'https://example.invalid/t',
+    // The fixtures are written for 2026-10-16. A real clock turns "October 19" into a past day.
+    now: new Date(FIXED_NOW)
   });
 }
 
@@ -263,7 +266,7 @@ for (const row of rows) {
 {
   const row = byId['v2syn-2019'];
   if (row) {
-    const d = new Date();
+    const d = new Date(FIXED_NOW);
     d.setDate(d.getDate() + 1);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     row.expectLabel = 'Log commitment for ' + months[d.getMonth()] + ' ' + d.getDate() + ' 10:00';
