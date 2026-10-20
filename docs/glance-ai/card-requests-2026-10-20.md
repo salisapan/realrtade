@@ -55,3 +55,12 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - No guest is added, so no invitation goes out from Glance. The ask is not marked closed by the hold alone: `loopClosed` is false, and "Handled" for the call itself waits for the other person's answer.
 - Undo: deletes the event. If the person edited it (agenda, guest, title, time), the card says Undo unavailable and the event stays.
 
+## T1 — a call held on the Outlook calendar with a Teams link
+
+- Module `flow-trial-extension/core/teams-meeting.js`, switch `TEAMS_MEETING`. Ecosystem gap "Teams meeting link" (`docs/glance-ai/ecosystem-coverage.md`). The Outlook twin of M1; same card shape, same canonical Do It.
+- When the card shows: an Outlook mail proposes a call (a generic video call or a Teams call) with one day and one clock. Two clocks, an alternative, a hedge, Zoom or Google Meet named, and "ask Dana to set it up" show no card.
+- Line: `לקבוע ביומן שיחה ב-<date> <HH:mm> עם קישור Teams?` / `Hold <date> <HH:mm> on your calendar with a Teams link?`
+- Steps: `יצירת האירוע עם קישור Teams ובדיקה חוזרת` / `Create the event with a Teams link and read it back`, then `שליחת הקישור: על פי בחירתך, גלאנס לא שולח` / `Share the link: your choice, Glance does not send` (the person's own step).
+- Action: one Do It. After the read-back the receipt shows the join link (`joinUrl`) with a Copy control, and the calendar link. The card asks nothing new: the Calendar box (`Calendars.ReadWrite`) is the existing consent, and the plan reports `no-calendar-scope` if it is not ticked.
+- No guest is added, so no invitation goes out from Glance. `loopClosed` is false: Handled for the call itself waits for the other person's answer.
+- Undo: deletes the event. If the person edited it (agenda, guest, subject, time), the card says Undo unavailable and the event stays.
