@@ -186,10 +186,10 @@ const FlowOutsideSignals = (() => {
   // The loop closes only as any payment loop does: their reply that it was paid, a bank or processor email for that
   // amount (matchPayment above), or the same in another app (core/cross-channel.js, by amount). Nothing here closes.
   const INVOICE_NOUN = /\b(?:invoice|inv[-#]?\s?\d{2,})\b|(?:חשבונית|חשבון עסקה|דרישת תשלום)/i;
-  const ON_THIS_MESSAGE = /\b(?:attached|attaching|enclosed|please find|here(?:'s| is)(?: the| my| our)? invoice|sending (?:you )?(?:the|my|our) invoice)\b|(?:מצורפ|מצ["״]ב|מצרפ|שולח(?:ת)? (?:לך |לכם )?(?:את )?ה?(?:חשבונית|חשבון|דרישת)|הנה ה(?:חשבונית|חשבון))/i;
+  const ON_THIS_MESSAGE = /\b(?:attached|attaching|enclosed|please find|here(?:'s| is)(?: the| my| our)? invoice|sending (?:you )?(?:over )?(?:the|my|our) invoice)\b|(?:מצורפ|מצ["״]ב|רצ["״]ב|מצרפ|צירפתי|שולח(?:ת)? (?:לך |לכם )?(?:את )?ה?(?:חשבונית|חשבון|דרישת)|הנה ה(?:חשבונית|חשבון))/i;
   const ALREADY_PAID = /(?<!\b(?:upon|on) )\breceipt\b|\b(?:paid in full|has been paid|thank you for (?:your )?payment|payment (?:was )?received)\b|(?:^|[\s,.(:"'])קבלה(?=$|[\s,.)!?:"'])|חשבונית מס\s*[/\\-]?\s*קבלה|(?:^|\s)שולמה?(?=$|[\s,.!?])|התשלום התקבל|תודה על התשלום/i;
   const NOT_OWED = /\b(?:quote|quotation|estimate|proposal|credit note|refund|draft invoice|pro[- ]?forma draft)\b|(?:הצעת מחיר|(?:^|\s)הצעה(?=$|[\s,.])|זיכוי|החזר כספי|טיוטת חשבונית)/i;
-  const NOT_YET = /\b(?:will send|i(?:'ll| will) (?:send|issue)|(?:invoice|it) will follow|to follow)\b|(?:אשלח|אוציא|אנפיק|אעביר לך) (?:את )?ה?(?:חשבונית|חשבון)|(?:החשבונית|החשבון) (?:תישלח|יישלח|יצא)/i;
+  const NOT_YET = /\b(?:will send|i(?:'ll| will) (?:send|issue|invoice|bill)|(?:invoice|it) will follow|to follow)\b|(?:אשלח|אוציא|אנפיק|אעביר)(?: לך| לכם)? (?:את )?ה?(?:חשבונית|חשבון)|(?:החשבונית|החשבון) (?:תישלח|יישלח|יצא)/i;
   const BOOKKEEPING = /\b(?:accountant|bookkeep\w*|for your records|vat (?:report|return)|tax return)\b|(?:רו["״]ח|רואה החשבון|רואת החשבון|הנהלת חשבונות|הנה["״]ח|לדיווח|דיווח מע["״]מ|לתיעוד|החשבוניות של החודש)/i;
   const FORWARDED = /(?:^|\n)\s*(?:-{3,}\s*(?:forwarded message|הודעה שהועברה)|(?:fwd?|fw|הועבר)\s*:)/i;
   const PLUS_VAT = /\+\s*מע["״]מ|לפני מע["״]מ|לא כולל מע["״]מ|\bplus vat\b|\b\+\s*vat\b|\bexcl(?:\.|uding)? vat\b/i;

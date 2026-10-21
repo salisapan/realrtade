@@ -619,7 +619,8 @@ const FlowFollow = (() => {
       if (!list.some((w) => FlowFollowUp.isActive(w) && !FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w))) return false;
       const graph = await FlowStorage.getIdentityGraph();
       const party = partyOfNode(ctx, last);
-      const d = FlowCrossChannel.judge(list, graph, party, ctx.messageText(last), { channel, thread: threadId }, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+      const sw = await carrySwitches();
+      const d = FlowCrossChannel.judge(list, graph, party, ctx.messageText(last), { channel, thread: threadId }, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, moveLink: sw.nextMove === true });
       if (!d) return false;
       const watch = list.find((w) => w.id === d.watchId);
       if (!watch || (watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) || settling.has(watch.id)) return false;
@@ -795,6 +796,8 @@ const FlowFollow = (() => {
   async function track1(ask, base) {
     ladderOutcome(ask, true);
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
+    // An invoice loop keeps its number, and the net figure when it was sent "+ מע\"מ" (core/outside-signals.js matchPayment).
+    if (ask.basis === 'invoice') { watch.invoiceNo = ask.invoiceNo || null; watch.amountNet = ask.amountNet || null; }
     watch.threadUrl = base.threadUrl || null;
     const res = await send({ type: 'flow:follow-task', payload: taskPayload(watch) });
     if (!res || !res.ok) {
@@ -841,6 +844,19 @@ const FlowFollow = (() => {
     watch.resolvedBy = 'declined';
     await FlowStorage.upsertWatch(watch);
     dismiss();
+  }
+
+  // ---- carry until closed (config/carry.public.js, read through the service worker; all off in this build) ----
+  let carryP = null;
+  function carrySwitches() {
+    if (!carryP) carryP = send({ type: 'flow:carry' }).then((r) => (r && r.ok ? r : {})).catch(() => ({}));
+    return carryP;
+  }
+  async function invoiceAsk(ctx, last, text) {
+    const sw = await carrySwitches();
+    if (sw.invoices !== true || typeof FlowOutsideSignals === 'undefined' || !FlowOutsideSignals.invoiceLoop) return null;
+    const atts = ctx.attachmentsOf ? (ctx.attachmentsOf(last) || []) : [];
+    return FlowOutsideSignals.invoiceLoop(text, { enabled: true, now: Date.now(), subject: ctx.subject, attachmentNames: atts.map((a) => a && a.name).filter(Boolean) });
   }
 
   function offerCard(ask, base) {
@@ -1322,6 +1338,8 @@ const FlowFollow = (() => {
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
+    // The invoice you sent is the open loop (CARRY.invoices, off): only when nothing above opened one.
+    if (!ask && !watch) ask = await invoiceAsk(ctx, last, mineText);
     // A new surface (a chat) is stricter than Gmail until it has been measured: word-list asks only, no model tiers, no question.
     if (!ask && !watch && !ctx.strict) ask = await lmAsk(mineText);
     recordDecision(mineText, Boolean(ask), key);

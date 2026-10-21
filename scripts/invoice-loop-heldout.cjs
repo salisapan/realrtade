@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Held-out score for core/outside-signals.js invoiceLoop (switch CARRY.invoices, off), on glance-ai/eval-data/invoice-loop-heldout-v0.jsonl.
-// The file was written and frozen before this scorer first ran; the code was not tuned to it. A = today's follow loop
-// (core/follow-up.js classifyOutgoing), B = A, then invoiceLoop when A opens nothing. Run: node scripts/invoice-loop-heldout.cjs
+// Each file was written and frozen before the code it scores was changed; the code is never tuned to a set after it is scored. A = today's follow loop
+// (core/follow-up.js classifyOutgoing), B = A, then invoiceLoop when A opens nothing. Run: node scripts/invoice-loop-heldout.cjs [v0|v1]
 const fs = require('fs');
 const path = require('path');
 const EXT = path.join(__dirname, '..', 'flow-trial-extension', 'core');
@@ -12,7 +12,8 @@ const { FlowFollowUp: F } = require(path.join(EXT, 'follow-up.js'));
 const { FlowOutsideSignals: S } = require(path.join(EXT, 'outside-signals.js'));
 const NOW = new Date('2026-10-18T10:00:00').getTime();
 const ctx = { now: NOW, extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline };
-const rows = fs.readFileSync(path.join(__dirname, '..', 'glance-ai', 'eval-data', 'invoice-loop-heldout-v0.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+const SET = process.argv[2] || 'v0';   // v0: frozen 2026-10-18 before the first scorer run; v1: frozen 2026-10-20 before the v0-error fixes
+const rows = fs.readFileSync(path.join(__dirname, '..', 'glance-ai', 'eval-data', 'invoice-loop-heldout-' + SET + '.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const t = {};
 const add = (arm, lang, k) => { const key = arm + '|' + lang; t[key] = t[key] || { owed: 0, notOwed: 0, opened: 0, missed: 0, wrongLoop: 0, wrongAmount: 0 }; t[key][k]++; };
 const misses = [], wrong = [];
