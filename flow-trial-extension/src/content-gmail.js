@@ -2148,6 +2148,7 @@ function glanceUiCopy(kind) {
     // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
+    if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
@@ -3103,6 +3104,48 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  // A Meet link added to an event the person already organizes ("Can you add a Meet link to the Thursday sync?").
+  // The worker decides (flow:google-event-link-plan, only with the switch EVENT_CALL_LINK on) and reads the
+  // calendar; the page shows the canonical Do It card with a one-step list, or nothing.
+  async function showEventLinkChip(message, c) {
+    let plan = null;
+    try {
+      // The body only: a subject like "Sync notes" must not steer which event is picked.
+      plan = await sendRuntime(Object.assign({ type: 'flow:google-event-link-plan', text: c.text }, laneAccountContext()));
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.event || !plan.event.id) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'event-call-link',
+      name: plan.event.summary || 'Meet link',
+      closingLine: plan.line,
+      closedLine: he ? 'נוסף קישור Meet לאירוע.' : 'Meet link added to the event.',
+      steps: [{
+        id: 'link',
+        kind: 'calendarCallLink',
+        label: 'Calendar',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create a Meet link on the event and read it back',
+        dependsOn: null,
+        params: { event: plan.event }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.line, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   async function showNewFileChip(message, c) {
     let plan = null;
     try {
@@ -3508,6 +3551,13 @@ function glanceUiCopy(kind) {
       });
     }
 
+    // A Meet link on an event already on the calendar (switch EVENT_CALL_LINK, off): only the event's id and title travel.
+    if (action.kind === 'calendarCallLink') {
+      const ev = action.params && action.params.event;
+      if (!ev || !ev.id) return null;
+      return Object.assign(base, { params: { event: { id: ev.id, summary: ev.summary || '', day: ev.day || '' } } });
+    }
+
     // An empty Doc, Sheet or Slides deck asked for by name (switch WORKSPACE_FILE, off). Nothing is written into it.
     if (action.kind === 'driveNewFile') {
       const nf = action.params || {};
@@ -3692,6 +3742,7 @@ function glanceUiCopy(kind) {
     driveDoc: 'googleDoc',
     driveSheet: 'googleSheetAppend',
     driveNewFile: 'googleNewFile',
+    calendarCallLink: 'googleEventCallLink',
     gmailDraft: 'gmailCompose'
   };
 
@@ -4297,6 +4348,7 @@ function glanceUiCopy(kind) {
     gmailDraft: 'drafted a reply',
     googleTask: 'set a reminder',
     driveNewFile: 'created the file',
+    calendarCallLink: 'added a call link',
     driveDoc: 'wrote the doc',
     driveSheet: 'wrote the sheet',
     driveFile: 'saved the file'

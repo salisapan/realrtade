@@ -192,10 +192,30 @@ const FlowEventCallLink = (() => {
     return !!meetUrlOf(ev);
   }
 
+  // The Google lane hands its writers an http function (req -> { status, ok, json }); the module
+  // itself speaks calendar(method, path, body). Either is accepted.
+  const CAL_API = 'https://www.googleapis.com/calendar/v3';
+  function ioOf(arg) {
+    if (typeof arg !== 'function') return arg || {};
+    return {
+      calendar: (method, path, body) => arg({
+        method: method,
+        url: CAL_API + path,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' }
+      })
+    };
+  }
+
+  // The lane's writer signature: (input, http, clock).
+  function write(input, http) {
+    return addLink(input, http);
+  }
+
   // Do It. The host passes the plan's event as the person saw it.
   async function addLink(input, io) {
     input = input || {};
-    io = io || {};
+    io = ioOf(io);
     if (!enabled(input.flags)) return miss('switch-off');
     const id = input.event && input.event.id;
     if (!id) return miss('invalid');
@@ -257,7 +277,7 @@ const FlowEventCallLink = (() => {
 
   // Undo: take the conference off again, only while the event is still as Glance left it.
   async function undo(ref, io) {
-    io = io || {};
+    io = ioOf(io);
     if (!ref || !ref.eventId || ref.createdByGlance !== true) return { ok: false, reason: 'not-ours' };
     if (typeof io.calendar !== 'function') return { ok: false, reason: 'no-host' };
     const got = await io.calendar('GET', eventPath(ref.eventId) + '?conferenceDataVersion=1');
@@ -276,7 +296,7 @@ const FlowEventCallLink = (() => {
     return { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, dayOf, words, pickEvent, plan, addLink, undo, contentHash, meetUrlOf };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, dayOf, words, pickEvent, plan, addLink, write, undo, contentHash, meetUrlOf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowEventCallLink };

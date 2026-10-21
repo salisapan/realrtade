@@ -441,6 +441,35 @@ function startGoogleLaneServer() {
         send(res, 200, event);
         return;
       }
+      if (calCol && method === 'GET') {
+        // The coming events of this account, as Calendar lists them (expanded, by start).
+        const items = Object.values(state.events).filter((e) => !e.__account || e.__account === who);
+        send(res, 200, { kind: 'calendar#events', items: JSON.parse(JSON.stringify(items)) });
+        return;
+      }
+      if (calOne && method === 'PATCH') {
+        const event = state.events[calOne[2]];
+        if (!event || (event.__account && event.__account !== who)) { send(res, 404, GOOGLE_404('Not Found')); return; }
+        const body = readJson(raw);
+        const bad = unknownField(body, EVENT_FIELDS);
+        if (bad) { send(res, 400, GOOGLE_400('Invalid JSON payload received. Unknown name "' + bad + '": Cannot find field.')); return; }
+        const withConf = url.searchParams.get('conferenceDataVersion') === '1';
+        if ('conferenceData' in body) {
+          if (body.conferenceData === null) {
+            delete event.conferenceData;
+            delete event.hangoutLink;
+          } else if (withConf && body.conferenceData.createRequest && !state.noMeetLink) {
+            const link = 'https://meet.google.com/abc-defg-hij';
+            event.hangoutLink = link;
+            event.conferenceData = { createRequest: { requestId: body.conferenceData.createRequest.requestId, status: { statusCode: 'success' } }, entryPoints: [{ entryPointType: 'video', uri: link }], conferenceId: 'abc-defg-hij' };
+          }
+          delete body.conferenceData;
+        }
+        Object.assign(event, body);
+        state.last.patched = calOne[2];
+        send(res, 200, event);
+        return;
+      }
       if (calOne && method === 'GET') {
         const event = state.events[calOne[2]];
         const mine = event && (!event.__account || event.__account === who);
@@ -596,6 +625,14 @@ function startGoogleLaneServer() {
         tasks: () => state.tasks,
         deleteEvent: (id) => { delete state.events[id]; },
         setNoMeetLink: (on) => { state.noMeetLink = on === true; },
+        seedEvent: (ev) => {
+          const id = opaqueId('event', state.seq++);
+          const who = state.account;
+          const event = Object.assign({ kind: 'calendar#event', id: id, status: 'confirmed', htmlLink: 'https://www.google.com/calendar/event?eid=' + id, creator: { email: who, self: true }, organizer: { email: who, self: true } }, ev);
+          Object.defineProperty(event, '__account', { value: who, enumerable: false });
+          state.events[id] = event;
+          return id;
+        },
         deleteTask: (id) => { delete state.tasks[id]; },
         task: (id) => state.tasks[id],
         event: (id) => state.events[id],

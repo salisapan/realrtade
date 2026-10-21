@@ -10,6 +10,8 @@ import '../core/meet-link.js';
 import '../core/recurring-reminder.js';
 // FlowWorkspaceFile: an empty Doc, Sheet or Slides deck from a request, switch WORKSPACE_FILE, off.
 import '../core/workspace-file.js';
+// FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
+import '../core/event-call-link.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
@@ -659,6 +661,14 @@ async function prepareWrite(connectorId, input, cred) {
       expectAccount: cred && cred.email ? cred.email : ''
     };
   }
+  if (connectorId === 'googleEventCallLink') {
+    const E = globalThis.FlowEventCallLink;
+    return {
+      flags: E ? { [E.SWITCH]: await laneSwitchOn(E.SWITCH) } : {},
+      event: params.event || i.event || null,
+      now: new Date().toISOString()
+    };
+  }
   if (connectorId === 'googleNewFile') {
     const W = globalThis.FlowWorkspaceFile;
     return {
@@ -819,7 +829,7 @@ async function fetchAttachment(msg) {
 function verifyUrlFor(connectorId, ref) {
   const r = ref || {};
   const enc = encodeURIComponent;
-  if (connectorId === 'googleHold') {
+  if (connectorId === 'googleHold' || connectorId === 'googleEventCallLink') {
     const id = r.eventId || r.externalId;
     return id ? 'https://www.googleapis.com/calendar/v3/calendars/' + enc(r.calendarId || 'primary') + '/events/' + enc(id) : '';
   }
@@ -872,6 +882,25 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve(guardedWrite(msg.connectorId, msg.input, { tab: msg.tabAccount, lang: msg.lang }))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-event-link-plan') {
+    // The page asks; the worker owns the switch and reads the calendar (the lane's own account check
+    // applies). Off, unreadable or no single event that fits: the page shows nothing.
+    const E = globalThis.FlowEventCallLink;
+    Promise.resolve((async () => {
+      if (!E || typeof E.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(E.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      const text = String(msg.text || '').slice(0, 4000);
+      // Nothing is read from the calendar unless the mail asks for a call link at all.
+      if (E.recognize(text, Date.now()).kind !== 'clear') return { action: 'silence', reason: 'no-ask' };
+      const from = new Date();
+      const to = new Date(from.getTime() + 60 * 24 * 3600 * 1000);
+      const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=100&timeMin=' + encodeURIComponent(from.toISOString()) + '&timeMax=' + encodeURIComponent(to.toISOString());
+      const listed = await laneHttp({ method: 'GET', url: url });
+      if (!listed || !listed.ok || !listed.json || !Array.isArray(listed.json.items)) return { action: 'silence', reason: 'not-searched' };
+      return E.plan({ flags: { [E.SWITCH]: true }, text: text, events: listed.json.items, now: from });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
   if (msg.type === 'flow:google-new-file-plan') {
