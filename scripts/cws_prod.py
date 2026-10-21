@@ -747,16 +747,14 @@ def strip_outlook_dead_connectors(raw: str) -> str:
 def transform_google_lane_host(raw: str) -> str:
     return replace_once(
         raw,
-        """function laneUrl(url) {
+        """// Headless lane tests rewrite Google API hosts to a local stand-in when
+// __glanceE2e.httpOrigin is set (including OpenID userinfo for account probes).
+function laneUrl(url) {
   const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
   const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
   if (!origin || !url) return url;
   try {
     const u = new URL(url);
-    // OpenID userinfo is an account probe, not a lane write host. Headless
-    // lane tests keep it on the worker fetch shim (tokenAccounts), not the
-    // local Tasks/Calendar/Drive stand-in.
-    if (/^\\/oauth2\\/v[0-9]+\\/userinfo/.test(u.pathname || '')) return url;
     const base = new URL(origin);
     return base.origin + u.pathname + u.search;
   } catch (e) {

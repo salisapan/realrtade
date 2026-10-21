@@ -275,6 +275,8 @@ function settleAuth(res, url, opts) {
   return Promise.resolve(res);
 }
 
+// Headless lane tests rewrite Google API hosts to a local stand-in when
+// __glanceE2e.httpOrigin is set (including OpenID userinfo for account probes).
 function laneUrl(url) {
   const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
   const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
