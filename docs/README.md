@@ -44,6 +44,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Which personal loops Glance can close, what this tip covers, and the slices after the steps list. Flow is not this map | `docs/glance-ai/holistic-close-map.md` | `core/proof-of-close.js`, `core/close-chains.js`, `core/request-types.js`, `src/background.js` | - |
 | Which tools in Google, Microsoft and Meta Glance can use today, what is proved, what ran live, and what is missing for the early-adopter release. Status only; the locks are in `docs/vault/product-locks.md` | `docs/glance-ai/ecosystem-coverage.md` | `core/google-*.js`, `core/outlook-*.js`, `core/teams-chat.js`, `lane-chat/`, `src/chat-lane.js`, `docs/open-tasks.md` | - |
 | How every agent saves tokens with Graphify and what counts as shared work | `docs/glance-ai/graphify.md` | `scripts/graphify-setup.sh`, `.cursor/rules/graphify.mdc` | - |
+| Value test on the test mailbox: which ask kinds Glance misses, for the ecosystems routines | `docs/glance-ai/real-mail-misses-2026-10-21.md` | `flow-trial-extension/core/judgment.js`, `flow-trial-extension/test/status-intro-ask-corpus.cjs` | - |
 | When Glance is worth paying for. The chief of staff reads the yaml. Flow is not this bar | `docs/glance-ai/paid-readiness-bar.md` | `core/pmf-metrics.js`, `core/close-quality-metrics.js`, `docs/human-eval.md`, `docs/real-mail-eval/2026-10-08.md` | - |
 
 ## 2. When X changes, update these in the SAME commit
