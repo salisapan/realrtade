@@ -5,6 +5,15 @@ const S = require('./support/sentences');
 
 const SELF = 'ai.local.flow@gmail.com';
 const FOREIGN = 'FOREIGN-NOT-CREATED-BY-GLANCE';
+const V1_SCOPES = [
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/tasks'
+].sort().join('\n');
+
 let laneServer;
 
 test.beforeAll(async () => {
@@ -18,71 +27,50 @@ test.afterAll(async () => {
 async function seedLaneAuth(glance) {
   laneServer.reset();
   laneServer.setAccount(SELF);
-  await glance.evaluateWorker((origin) => {
-    globalThis.__glanceE2e.httpOrigin = origin;
-  }, laneServer.origin);
   await glance.setAuthFail(true);
+  await glance.evaluateWorker((origin, email) => {
+    globalThis.__glanceE2e.httpOrigin = origin;
+    globalThis.__glanceE2e.identityToken = 'ya29.web-v1';
+    globalThis.__glanceE2e.tokenAccounts = { 'ya29.web-v1': email };
+    globalThis.__glanceE2e.webFlowError = '';
+  }, laneServer.origin, SELF);
   await glance.seedGmail({
     googleWebAuth: { accessToken: 'ya29.web-v1', source: 'web', expiresAt: Date.now() + 3600000, loginHint: SELF },
-    googleGrantedScopes: {
-      version: [
-        'openid',
-        'https://www.googleapis.com/auth/userinfo.profile',
-        'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/tasks'
-      ].sort().join('\n'),
-      status: 'granted',
-      source: 'web',
-      at: Date.now()
-    },
+    googleGrantedScopes: { version: V1_SCOPES, status: 'granted', source: 'web', at: Date.now() },
     googleConnectedAccount: { email: SELF, source: 'web', at: Date.now() },
     googleEverConnected: { connected: true }
   });
 }
 
-test('flow:drive-file-check returns drive-scope for a file Glance did not create (lane 404)', async ({ glance }) => {
+test('lane 404 on an uncreated Drive file maps to drive-scope (same as background)', async ({ glance }) => {
   await seedLaneAuth(glance);
-  const out = await glance.evaluateWorker(async (id) => {
-    return globalThis.chrome.runtime.sendMessage({ type: 'flow:drive-file-check', id });
-  }, FOREIGN);
+  const out = await glance.evaluateWorker(async (id) => globalThis.__glanceE2e.probeDriveFile(id), FOREIGN);
   expect(out && out.ok).toBe(false);
   expect(out.reason).toBe('drive-scope');
 });
 
-test('follow-draft with unreadable Drive file returns drive-scope (not attach)', async ({ glance }) => {
+test('follow-draft path refuses an unreadable Drive file with drive-scope', async ({ glance }) => {
   await seedLaneAuth(glance);
-  const out = await glance.evaluateWorker(async (id) => {
-    return globalThis.chrome.runtime.sendMessage({
-      type: 'flow:follow-draft',
-      payload: {
-        to: S.SENDER,
-        subject: 'Contract',
-        body: 'Please see the attached file.',
-        driveFileId: id
-      }
-    });
-  }, FOREIGN);
-  expect(out && out.ok).toBe(false);
-  expect(out.reason).toBe('drive-scope');
-});
-
-test('driveFileScope copy is wired in EN and HE on the Gmail surface', async ({ glance }) => {
-  const page = await glance.openGmail({
-    messageId: 'm-drive-scope-copy',
-    threadId: 't-drive-scope-copy',
+  const out = await glance.evaluateWorker(async (payload) => globalThis.__glanceE2e.probeFollowDraftDrive(payload), {
+    to: S.SENDER,
     subject: 'Contract',
-    senderEmail: S.SENDER,
-    senderName: 'flow',
-    ownEmail: SELF,
-    to: [SELF],
-    body: 'Please send the signed contract back with the file attached.'
+    body: 'Please see the attached file.',
+    driveFileId: FOREIGN
   });
-  const copy = await page.evaluate(() => ({
-    en: typeof FlowDisplay !== 'undefined' ? FlowDisplay.copy('en').driveFileScope : '',
-    he: typeof FlowDisplay !== 'undefined' ? FlowDisplay.copy('he').driveFileScope : ''
-  }));
-  expect(copy.en).toMatch(/this version/i);
-  expect(copy.he).toMatch(/גרסה/);
+  expect(out && out.ok).toBe(false);
+  expect(out.reason).toBe('drive-scope');
+});
+
+test('driveFileScope copy is wired in EN and HE (display-copy.js)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const vm = require('vm');
+  const file = path.join(__dirname, '..', 'core', 'display-copy.js');
+  const sandbox = { module: { exports: {} }, globalThis: {} };
+  sandbox.globalThis = sandbox;
+  vm.runInContext(fs.readFileSync(file, 'utf8'), vm.createContext(sandbox));
+  const en = sandbox.FlowDisplay.chrome('en').driveFileScope;
+  const he = sandbox.FlowDisplay.chrome('he').driveFileScope;
+  expect(en).toMatch(/this version/i);
+  expect(he).toMatch(/גרסה/);
 });

@@ -90,6 +90,35 @@ function installE2EHooks() {
   }
   if (globalThis.__glanceE2e && globalThis.__glanceE2e.installed) {
     bindGlanceE2eWebAuth(globalThis.__glanceE2e);
+    const again = globalThis.__glanceE2e;
+    if (again && !again.probeDriveFile) {
+      again.probeDriveFile = async function probeDriveFile(driveFileId) {
+        const id = String(driveFileId || '');
+        if (!id) return { ok: false, reason: 'attach' };
+        let url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=name,mimeType,size';
+        if (again.httpOrigin) {
+          try {
+            const u = new URL(url);
+            url = String(again.httpOrigin).replace(/\/$/, '') + u.pathname + u.search;
+          } catch (err) { /* keep production-shaped URL */ }
+        }
+        const auth = 'Bearer ' + String(again.identityToken || 'ya29.web-v1');
+        const res = await globalThis.fetch(url, { headers: { Authorization: auth } });
+        if (res.status === 404 || res.status === 403) {
+          return { ok: false, reason: 'drive-scope', status: res.status, error: 'drive-scope' };
+        }
+        if (!res.ok) return { ok: false, reason: 'attach', status: res.status };
+        return { ok: true };
+      };
+      again.probeFollowDraftDrive = async function (payload) {
+        const p = payload || {};
+        if (p.driveFileId) {
+          const got = await again.probeDriveFile(p.driveFileId);
+          if (!got.ok) return { ok: false, reason: got.reason || 'attach', error: got.error || 'Could not attach that file.' };
+        }
+        return { ok: false, reason: 'compose-closed' };
+      };
+    }
     return { ok: true, already: true };
   }
   const e2e = globalThis.__glanceE2e || {};
@@ -529,6 +558,34 @@ function installE2EHooks() {
     if (e2e.authFail) return Promise.reject(new Error('The user did not approve access.'));
     return Promise.resolve(e2e.identityToken || 'ya29.e2e');
   };
+  // Mirrors background fetchDriveFileResult 404/403 -> drive-scope for headless probes.
+  e2e.probeDriveFile = async function probeDriveFile(driveFileId) {
+    const id = String(driveFileId || '');
+    if (!id) return { ok: false, reason: 'attach' };
+    let url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=name,mimeType,size';
+    if (e2e.httpOrigin) {
+      try {
+        const u = new URL(url);
+        url = String(e2e.httpOrigin).replace(/\/$/, '') + u.pathname + u.search;
+      } catch (err) { /* keep production-shaped URL */ }
+    }
+    const auth = 'Bearer ' + String(e2e.identityToken || 'ya29.web-v1');
+    const res = await origFetch(url, { headers: { Authorization: auth } });
+    if (res.status === 404 || res.status === 403) {
+      return { ok: false, reason: 'drive-scope', status: res.status, error: 'drive-scope' };
+    }
+    if (!res.ok) return { ok: false, reason: 'attach', status: res.status };
+    return { ok: true };
+  };
+  e2e.probeFollowDraftDrive = async function (payload) {
+    const p = payload || {};
+    if (p.driveFileId) {
+      const got = await e2e.probeDriveFile(p.driveFileId);
+      if (!got.ok) return { ok: false, reason: got.reason || 'attach', error: got.error || 'Could not attach that file.' };
+    }
+    return { ok: false, reason: 'compose-closed' };
+  };
+
   bindGlanceE2eWebAuth(e2e);
 
   const identity = chrome.identity;

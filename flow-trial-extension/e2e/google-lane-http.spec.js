@@ -319,7 +319,7 @@ test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the bo
   });
   await uncheck(page, 'task');
   await clickDoIt(page);
-  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText('Compose filled');
+  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText(/Draft opened in compose|Compose filled/);
   await expect(page.locator('textarea[name="to"]')).toHaveValue(S.SENDER);
   await expect(page.locator('input[name="subjectbox"]')).toHaveValue('Re: Transfer');
   const body = page.locator('[aria-label="Message Body"]');
@@ -356,7 +356,7 @@ test('Compose fill writes the Gmail window, reads it back, and Undo clears it', 
   });
   await uncheck(page, 'task');
   await clickDoIt(page);
-  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText('Compose filled');
+  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText(/Draft opened in compose|Compose filled/);
   await expect(page.locator('textarea[name="to"]')).toHaveValue(S.SENDER);
   await expect(page.locator('input[name="subjectbox"]')).not.toHaveValue('');
   const body = page.locator('[aria-label="Message Body"]');
@@ -380,7 +380,7 @@ test('Compose Undo refuses after the person types and leaves their text', async 
   });
   await uncheck(page, 'task');
   await clickDoIt(page);
-  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText('Compose filled');
+  await expect(page.locator('div[role="main"] .flow-chip-written')).toContainText(/Draft opened in compose|Compose filled/);
   const body = page.locator('[aria-label="Message Body"]');
   await body.evaluate((el) => { el.textContent = 'Edited by the person'; });
   const before = server.calls.length;

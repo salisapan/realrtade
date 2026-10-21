@@ -97,8 +97,9 @@ test('(c) store zip passes check-prod: stamp matches HEAD, no remote loader host
     env: process.env
   });
   expect(build.status).toBe(0);
-  const zipPath = path.join(EXT, 'dist', `glance-${sha}-full-prod.zip`);
-  const check = spawnSync('python3', [path.join(REPO, 'scripts', 'cws_prod.py'), '--check-prod', zipPath], {
+  const version = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8')).version;
+  const zipPath = path.join(REPO, 'dist', `glance-${version}-${sha}-prod.zip`);
+  const check = spawnSync('python3', [path.join(REPO, 'scripts', 'check-prod.py'), zipPath], {
     cwd: REPO,
     encoding: 'utf8'
   });
