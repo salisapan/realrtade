@@ -232,3 +232,5 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - No Microsoft or Meta gap is unblocked (SharePoint scope, Meta verification, live Gates and Grok cards are the owner's). Builder A shipped system notices; chat does not carry that switch and a service notice in a chat is not a real situation. Nothing touched.
 
 ## 2026-10-21 Ecosystems run A (17th): idle. Every owner priority is built; the Google rows left are Forms (owner scope) and Keep (no API); nothing unblocked. No code touched.
+
+## 2026-10-21 Ecosystems builder B (seventeenth run): idle by the run-discipline rule (nothing unblocked, nothing touched)
