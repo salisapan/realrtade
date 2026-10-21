@@ -8240,8 +8240,21 @@ const FlowActions = (() => {
     if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.soloPhoneTask === 'function') return FlowIntent.soloPhoneTask(text);
     return false;
   }
+  // Inbound meeting statements ("פגישה ביום חמישי 22/10", "the review meeting is on Thursday")
+  // are schedule plans, not timed holds. Coordinating asks stay holds.
+  function inboundMeetingAnnouncement(text) {
+    const src = String(text || '').trim();
+    if (!src || /\?/.test(src)) return false;
+    if (/\b(?:could|can|would|shall)\s+(?:we|you)\s+(?:meet|schedule|book)\b/i.test(src)) return false;
+    if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
+    if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
+    if (/^פגישה\b/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) return true;
+    return false;
+  }
   function meetingNarrow(intent, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    if (inboundMeetingAnnouncement(text)) return false;
     if (soloPhoneTask(text)) return false;
     const close = intent.personalClose;
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
@@ -8251,7 +8264,7 @@ const FlowActions = (() => {
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return false;
     return Boolean(sig.hasMeetingNoun || close === 'calendar-hold');
   }
-  function meetingPlan(intent, proc) {
+  function meetingPlan(intent, proc, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
     const close = intent.personalClose;
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return proc;
@@ -8266,6 +8279,7 @@ const FlowActions = (() => {
     if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
     if (!timed) return proc;
+    if (inboundMeetingAnnouncement(text)) return proc;
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
     return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
@@ -8319,7 +8333,7 @@ const FlowActions = (() => {
     const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent, vetoText);
     const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
     let proc = useMeeting
-      ? meetingPlan(intent, processFor(intent))
+      ? meetingPlan(intent, processFor(intent), vetoText)
       : taskInstead
         ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
         : processFor(intent);
@@ -8397,7 +8411,13 @@ const FlowActions = (() => {
     const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
     // A note the user sent to themself is a task, including a dated call
     // and a save that would otherwise write Drive plus a draft.
-    if (intent.selfTask) proc = logIt;
+    if (intent.selfTask) {
+      if ((intent.type === 'event' || (intent.signals && intent.signals.hasMeetingNoun)) && e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
+        proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+      } else if (proc.id !== 'schedule') {
+        proc = logIt;
+      }
+    }
     // "I'll call you" is already the task. The untimed block would retitle
     // it Call when the subject says Reminder, and would return null when
     // the day has no clock ("I will call you on Friday.").
@@ -8423,7 +8443,11 @@ const FlowActions = (() => {
         const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
         intent.label = 'Reply requested' + (when ? ' by ' + when : '');
       } else if (untimedCalendar && !intent.selfTask) {
-        return null;
+        if (e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
+          proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+        } else {
+          return null;
+        }
       } else if (untimedCalendar) {
         proc = logIt;
       }
@@ -8441,6 +8465,7 @@ const FlowActions = (() => {
     // copied off the event classifier after the calendar step was dropped.
     // A self-sent phone task already named the person. Putting Call back
     // would drop that object. Inbound "add this to my tasks: call …" stays Call.
+    if (proc.id !== 'schedule') {
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && !intent.selfTask && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
@@ -8453,6 +8478,7 @@ const FlowActions = (() => {
           ? FlowJudgment.neutralTitle({ dateText: dateText })
           : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
       }
+    }
     }
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
@@ -9401,6 +9427,10 @@ const FlowIncomingJudge = (() => {
       const named = quiet && typeof quiet.reasonFor === 'function' ? quiet.reasonFor(intent) : null;
       return { show: false, reason: named ? 'quiet:' + named : 'chip-low-confidence', intent };
     }
+    // "Thanks for the update. Please remember to …" is not an opening remember-to ask.
+    if (/\bplease remember to\b/i.test(text) && !/^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(text.trim())) {
+      return { show: false, reason: 'quiet:buried-remember', intent };
+    }
     // Gmail answers a fact ask from one Sheet cell in the open thread (FlowFactReply.apply); a surface without that lookup
     // stays quiet instead of offering a generic reply in its place.
     if ((i.surface || 'gmail') !== 'gmail' && factReply && typeof factReply.blocksInbox === 'function' && factReply.blocksInbox(intent, text)) {
@@ -9599,6 +9629,10 @@ var GlanceI18n = (function () {
       diag: 'diag',
       edited: "The task was edited, so I won't undo it",
       quiet: 'Nothing to close.',
+      quietEmpty: 'Nothing to close in this email.',
+      spottedPrefix: 'Spotted, not supported yet: ',
+      remindMe: 'Remind me',
+      build: 'Build',
       openMessage: 'Open a message.',
       next: 'Next',
       due: 'Due',
@@ -9620,6 +9654,10 @@ var GlanceI18n = (function () {
       diag: 'diag',
       edited: 'המשימה נערכה, אז לא אבטל אותה',
       quiet: 'אין מה לסגור.',
+      quietEmpty: 'אין מה לסגור בהודעה הזו.',
+      spottedPrefix: 'זוהה, עדיין לא נתמך: ',
+      remindMe: 'תזכירו לי',
+      build: 'בנייה',
       openMessage: 'פתחו הודעה.',
       next: 'הפעולה הבאה',
       due: 'יעד',
@@ -10061,7 +10099,8 @@ var GlanceIntent = (function () {
     return decision;
   }
 
-  function silence(reason, planId) {
+  function silence(reason, planId, extra) {
+    extra = extra || {};
     return {
       speak: false,
       source: null,
@@ -10070,7 +10109,9 @@ var GlanceIntent = (function () {
       due: null,
       lang: null,
       reason: reason || 'quiet',
-      planId: planId || null
+      planId: planId || null,
+      droppedPlanId: extra.droppedPlanId || planId || null,
+      intentType: extra.intentType || null
     };
   }
 
@@ -10091,7 +10132,12 @@ var GlanceIntent = (function () {
       }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
       if (mapped) return contentTitle(prepared, mapped);
-      if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
+      if (hit && hit.plan && hit.plan.id) {
+        return silence('dropped', hit.plan.id, {
+          droppedPlanId: hit.plan.id,
+          intentType: hit.intent && hit.intent.type ? hit.intent.type : null
+        });
+      }
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
     }
@@ -10708,16 +10754,69 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function quiet(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
+  function planTypeLabel(lang, planId) {
+    var id = String(planId || '').toLowerCase();
+    var en = {
+      'reply-track': 'reply & track',
+      'reply-fact': 'fact reply',
+      'log-it': 'log it',
+      'follow-through': 'follow-through',
+      'hold': 'calendar hold',
+      'schedule': 'schedule meeting',
+      'schedule-confirm': 'schedule meeting',
+      'file-it': 'save to Drive',
+      'attach-invite': 'attach to invite',
+      'clear-it': 'clear calendar',
+      'move-it': 'move calendar',
+      'create-missing': 'draft from template',
+      'file-on-hold': 'file on calendar',
+      'file-on-task': 'file on task'
+    };
+    var he = {
+      'reply-track': 'מעקב תשובה',
+      'reply-fact': 'תשובה על עובדה',
+      'log-it': 'תיעוד',
+      'follow-through': 'מעקב',
+      'hold': 'החזקה ביומן',
+      'schedule': 'תיאום פגישה',
+      'schedule-confirm': 'תיאום פגישה',
+      'file-it': 'שמירה ב-Drive',
+      'attach-invite': 'צירוף לזימון',
+      'clear-it': 'ביטול ביומן',
+      'move-it': 'הזזה ביומן',
+      'create-missing': 'טיוטה מתבנית',
+      'file-on-hold': 'קובץ ביומן',
+      'file-on-task': 'קובץ במשימה'
+    };
+    var pack = lang === 'he' ? he : en;
+    return pack[id] || en[id] || id || 'close';
   }
 
-  function homepage(next, lang) {
+  function quiet(lang, reason) {
+    var key = (!reason || reason === 'no-plan' || reason === 'intent-null' || reason === 'quiet') ? 'quietEmpty' : 'quiet';
+    return card(lang, [text(lang, i18n().t(lang, key))]);
+  }
+
+  function spottedUnsupported(decision, messageId, lang) {
     var L = i18n();
-    if (!next || !next.title) return card(lang, [text(lang, L.t(lang, 'openMessage'))]);
+    var label = planTypeLabel(lang, decision.droppedPlanId || decision.planId);
+    return card(lang, [
+      text(lang, L.t(lang, 'spottedPrefix') + label),
+      button(lang, 'remindMe', 'onRemindMe', { messageId: String(messageId || ''), source: 'message' })
+    ]);
+  }
+
+  function homepage(next, lang, buildSha) {
+    var L = i18n();
+    if (!next || !next.title) {
+      var widgets = [text(lang, L.t(lang, 'openMessage'))];
+      if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
+      return card(lang, widgets);
+    }
     var widgets = [text(lang, L.t(lang, 'next')), text(lang, next.title)];
     if (next.due) widgets.push(dueLine(lang, next.due));
     widgets.push(button(lang, 'doIt', 'onDoIt', { messageId: 'prefetch', source: 'prefetch' }));
+    if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
     return card(lang, widgets);
   }
 
@@ -10737,6 +10836,8 @@ var GlanceCards = (function () {
     undone: undone,
     grant: grant,
     quiet: quiet,
+    spottedUnsupported: spottedUnsupported,
+    planTypeLabel: planTypeLabel,
     homepage: homepage,
     buttons: buttons
   };
