@@ -367,7 +367,8 @@ var GlanceIntent = (function () {
     return decision;
   }
 
-  function silence(reason, planId) {
+  function silence(reason, planId, extra) {
+    extra = extra || {};
     return {
       speak: false,
       source: null,
@@ -376,7 +377,9 @@ var GlanceIntent = (function () {
       due: null,
       lang: null,
       reason: reason || 'quiet',
-      planId: planId || null
+      planId: planId || null,
+      droppedPlanId: extra.droppedPlanId || planId || null,
+      intentType: extra.intentType || null
     };
   }
 
@@ -397,7 +400,12 @@ var GlanceIntent = (function () {
       }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
       if (mapped) return contentTitle(prepared, mapped);
-      if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
+      if (hit && hit.plan && hit.plan.id) {
+        return silence('dropped', hit.plan.id, {
+          droppedPlanId: hit.plan.id,
+          intentType: hit.intent && hit.intent.type ? hit.intent.type : null
+        });
+      }
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
     }

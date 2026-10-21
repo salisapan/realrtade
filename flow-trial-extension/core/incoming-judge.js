@@ -188,6 +188,10 @@ const FlowIncomingJudge = (() => {
       const named = quiet && typeof quiet.reasonFor === 'function' ? quiet.reasonFor(intent) : null;
       return { show: false, reason: named ? 'quiet:' + named : 'chip-low-confidence', intent };
     }
+    // "Thanks for the update. Please remember to …" is not an opening remember-to ask.
+    if (/\bplease remember to\b/i.test(text) && !/^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(text.trim())) {
+      return { show: false, reason: 'quiet:buried-remember', intent };
+    }
     // Gmail answers a fact ask from one Sheet cell in the open thread (FlowFactReply.apply); a surface without that lookup
     // stays quiet instead of offering a generic reply in its place.
     if ((i.surface || 'gmail') !== 'gmail' && factReply && typeof factReply.blocksInbox === 'function' && factReply.blocksInbox(intent, text)) {

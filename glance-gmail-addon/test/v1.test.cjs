@@ -50,7 +50,7 @@ function loadEngine() {
   // The same call Code.js engineHit_ makes: the one decision every Glance surface shares.
   return function engine(text) {
     const judged = judgeShared({
-      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [], ownAddresses: [], now: NOW, surface: 'gmail', attachmentCount: 0
+      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: ['owner@ai.local.flow@gmail.com'], ownAddresses: ['owner@ai.local.flow@gmail.com'], userName: 'Owner', ownNames: ['Owner', 'Sali', 'Sali Sapan'], now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
     }, {});
     if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
     return { intent: judged.intent, plan: judged.process };
@@ -167,7 +167,7 @@ check('locale he and iw are hebrew', i18n.locale('he-IL') === 'he' && i18n.local
 check('other locales stay english', i18n.locale('en-US') === 'en' && i18n.locale('fr') === 'en' && i18n.locale('') === 'en');
 {
   const quiet = cards.quiet('en');
-  check('silence has no button', cards.buttons(quiet).length === 0 && plain(quiet.widgets[0].text) === 'Nothing to close.');
+  check('silence has no button', cards.buttons(quiet).length === 0 && plain(quiet.widgets[0].text) === 'Nothing to close in this email.');
   const miss = cards.unconfirmed('en');
   check("mismatch card is Couldn't confirm", cards.buttons(miss).length === 0 && plain(miss.widgets[0].text) === "Couldn't confirm");
   check('mismatch card does not claim the task', JSON.stringify(miss).indexOf('In Google Tasks') === -1 && JSON.stringify(miss).indexOf('Undone') === -1);
@@ -701,7 +701,27 @@ console.log('\n--- message path parity ---');
       }
     }
   };
+  sandbox.Session = {
+    getActiveUser: function () {
+      return { getEmail: function () { return 'owner@ai.local.flow@gmail.com'; } };
+    },
+    getScriptTimeZone: function () { return 'Etc/UTC'; }
+  };
+  sandbox.GLANCE_BUILD_SHA = 'testsha';
+  const RealDate = Date;
+  function MockDate() {
+    const args = Array.prototype.slice.call(arguments);
+    if (!args.length) return new RealDate(NOW.getTime());
+    if (args.length === 1) return new RealDate(args[0]);
+    return new (RealDate.bind.apply(RealDate, [null].concat(args)));
+  }
+  MockDate.now = function () { return NOW.getTime(); };
+  MockDate.parse = RealDate.parse;
+  MockDate.UTC = RealDate.UTC;
+  MockDate.prototype = RealDate.prototype;
   vm.createContext(sandbox);
+  sandbox.Date = MockDate;
+  vm.runInContext(fs.readFileSync(path.join(addon, 'BuildSha.js'), 'utf8'), sandbox, { filename: 'BuildSha.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
   const openMessage = vm.runInContext('onGmailMessageOpen', sandbox);
@@ -712,6 +732,8 @@ console.log('\n--- message path parity ---');
   const classify = vm.runInContext('FlowIntent.classify', sandbox);
   const planFor = vm.runInContext('FlowActions.planFor', sandbox);
   const shouldShow = vm.runInContext('FlowIntent.shouldShowChip', sandbox);
+  const judgeShared = vm.runInContext('FlowIncomingJudge.judge', sandbox);
+  const resolveTaskMod = vm.runInContext('Glance.intent.resolveTask', sandbox);
 
   function linesOf(card) {
     return card.sections[0].widgets.filter((item) => item.type === 'text').map((item) => plain(item.text));
@@ -766,10 +788,40 @@ console.log('\n--- message path parity ---');
     const from = parsedFrom(fields.from);
     const fromEmail = from.email || null;
     const fromName = from.name || null;
-    const threadUrl = 'https://mail.google.com/mail/u/0/#all/' + encodeURIComponent(fields.threadId);
-    const bodyPlan = extensionOffer(String(fields.plain || ''), fromEmail, fromName, threadUrl);
-    if (bodyPlan) return bodyPlan;
-    return extensionOffer(String(fields.subject || ''), fromEmail, fromName, threadUrl);
+    const reader = {
+      to: ['owner@ai.local.flow@gmail.com'],
+      ownAddresses: ['owner@ai.local.flow@gmail.com'],
+      userName: 'Owner',
+      ownNames: ['Owner', 'Sali', 'Sali Sapan']
+    };
+    const toList = String(fields.to || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    const ownAddresses = reader.ownAddresses.slice();
+    toList.forEach(function (addr) {
+      const lower = String(addr).toLowerCase();
+      if (ownAddresses.indexOf(lower) < 0) ownAddresses.push(lower);
+    });
+    if (fromEmail && toList.length && toList.every(function (addr) { return String(addr).toLowerCase() === fromEmail.toLowerCase(); })) {
+      if (ownAddresses.indexOf(fromEmail.toLowerCase()) < 0) ownAddresses.push(fromEmail.toLowerCase());
+    }
+    function planForText(text, subject) {
+      if (!text) return null;
+      const judged = judgeShared({
+        text: text,
+        subject: subject || '',
+        sender: { email: fromEmail, name: fromName },
+        to: toList.map(function (a) { return a.toLowerCase(); }),
+        ownAddresses: ownAddresses,
+        userName: reader.userName,
+        ownNames: reader.ownNames,
+        now: NOW,
+        surface: 'gmail',
+        attachmentCount: 0,
+        inbound: true
+      }, {});
+      if (!judged || !judged.show || !judged.process) return null;
+      return judged.process;
+    }
+    return planForText(String(fields.plain || ''), fields.subject || '') || planForText(String(fields.subject || ''), fields.subject || '');
   }
   function shownTitle(sourceText, plan) {
     if (!plan) return '';
@@ -790,7 +842,7 @@ console.log('\n--- message path parity ---');
     const buttons = buttonsOf(card);
     const joined = lines.join('\n');
     if (!plan) {
-      const quiet = lang === 'he' ? 'אין מה לסגור.' : 'Nothing to close.';
+      const quiet = lang === 'he' ? 'אין מה לסגור בהודעה הזו.' : 'Nothing to close in this email.';
       check(name + ' stays quiet', joined.indexOf(quiet) !== -1 && buttons.length === 0, lines);
       return;
     }

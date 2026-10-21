@@ -17,10 +17,10 @@ function onHomepage(e) {
     var next = loadPrefetch_();
     if (next) savePrefetch_(next);
     else clearPrefetch_();
-    return [render_(Glance.cards.homepage(next, lang))];
+    return [render_(Glance.cards.homepage(next, lang, buildSha_()))];
   } catch (err) {
     console.error(err && err.message ? err.message : err);
-    return [render_(Glance.cards.homepage(null, lang))];
+    return [render_(Glance.cards.homepage(null, lang, buildSha_()))];
   }
 }
 
@@ -43,13 +43,30 @@ function onGmailMessageOpen(e) {
       planId: decision.planId,
       calendarService: calendarService
     });
-    if (!decision.speak) return [render_(Glance.cards.quiet(lang))];
+    if (!decision.speak) return [render_(silenceCard_(decision, opened.messageId, lang))];
     return [render_(Glance.cards.proposal(decision, opened.messageId, lang))];
   } catch (err) {
     errorLog_(err);
     var snap = err && err.read ? err.read : read;
     logOpen_(snap, { speak: false, reason: 'error', planId: null, calendarService: calendarReady_() });
     return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'open'))];
+  }
+}
+
+function onRemindMe(e) {
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var job;
+  try {
+    job = stageRemindMe_(e, lang);
+  } catch (err) {
+    return finishDoError_(err, lang);
+  }
+  if (job.card) return job.card;
+  requireScopesNow_(job.scopes);
+  try {
+    return job.write();
+  } catch (err) {
+    return finishDoError_(err, lang);
   }
 }
 
@@ -111,12 +128,96 @@ function stageDoIt_(e, lang) {
   }
   var decision = judgeOpen_(opened, e);
   planLog_(decision, opened.messageId);
-  if (!decision.speak) return { card: update_(render_(Glance.cards.quiet(lang))) };
+  if (!decision.speak) return { card: update_(render_(silenceCard_(decision, opened.messageId, lang))) };
   return {
     scopes: scopesForKind_(decision.kind),
     write: function () {
       return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
     }
+  };
+}
+
+function stageRemindMe_(e, lang) {
+  var openedRead = emptyRead_(e);
+  var opened = readOpen_(e, openedRead);
+  if (!opened) throw readFail_('open', openedRead);
+  var existing = readUndo_(opened.messageId);
+  if (existing && existing.view) {
+    return { card: update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true }))) };
+  }
+  var title = remindTitle_(opened, lang);
+  return {
+    scopes: scopesForKind_('task'),
+    write: function () {
+      return finishCreate_({
+        title: title,
+        due: null,
+        notes: notesFor_(opened),
+        listId: glanceTaskList_(),
+        timeZone: timeZoneOf_(e)
+      }, opened.messageId, lang);
+    }
+  };
+}
+
+function silenceCard_(decision, messageId, lang) {
+  if (decision && decision.reason === 'dropped' && (decision.droppedPlanId || decision.planId)) {
+    return Glance.cards.spottedUnsupported(decision, messageId, lang);
+  }
+  return Glance.cards.quiet(lang, decision && decision.reason);
+}
+
+function remindTitle_(opened, lang) {
+  var subject = Glance.intent.sanitizeTitle(opened && opened.subject);
+  var body = Glance.intent.sanitizeTitle(opened && opened.body);
+  var he = lang === 'he' || /[\u0590-\u05FF]/.test((subject || '') + (body || ''));
+  if (subject) return subject;
+  if (body) {
+    var line = String(body).split('\n').map(function (row) { return row.trim(); }).filter(Boolean)[0] || '';
+    if (line) return Glance.intent.sanitizeTitle(line);
+  }
+  return he ? 'לחזור להודעה' : 'Follow up on this email';
+}
+
+function buildSha_() {
+  try {
+    if (typeof GLANCE_BUILD_SHA !== 'undefined' && GLANCE_BUILD_SHA) return String(GLANCE_BUILD_SHA);
+  } catch (err) { /* optional */ }
+  return '';
+}
+
+function activeUserEmail_() {
+  try {
+    if (typeof Session !== 'undefined' && Session.getActiveUser) {
+      return String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+    }
+  } catch (err) { /* add-on sandbox */ }
+  return '';
+}
+
+function readerContext_() {
+  var email = activeUserEmail_();
+  var display = '';
+  if (email) {
+    var local = email.split('@')[0] || '';
+    if (local) {
+      display = local.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+    }
+  }
+  var ownAddresses = email ? [email] : [];
+  var ownNames = [];
+  if (typeof FlowIntent !== 'undefined' && FlowIntent.readerNamesFrom) {
+    ownNames = FlowIntent.readerNamesFrom({
+      displayName: display,
+      userName: display,
+      profile: null,
+      knownNames: ownAddresses
+    });
+  }
+  return {
+    userName: display || null,
+    ownNames: ownNames,
+    ownAddresses: ownAddresses
   };
 }
 
@@ -205,7 +306,11 @@ function judgeOpen_(opened, e) {
   var now = new Date();
   var timeZone = timeZoneOf_(e);
   var engine = function (raw) { return engineHit_(raw, opened, now); };
-  var decision = Glance.intent.resolveTask(opened.body, { now: now, timeZone: timeZone, engine: engine });
+  var decision = Glance.intent.silence('no-plan', null);
+  var body = String(opened.body || '').trim();
+  if (body) {
+    decision = Glance.intent.resolveTask(opened.body, { now: now, timeZone: timeZone, engine: engine });
+  }
   if (!decision.speak && opened.subject) {
     decision = Glance.intent.resolveTask(opened.subject, { now: now, timeZone: timeZone, engine: engine });
   }
@@ -222,9 +327,12 @@ function engineHit_(text, opened, now) {
       sender: { email: opened.fromEmail || null, name: opened.fromName || null },
       to: opened.toList || [],
       ownAddresses: opened.ownAddresses || [],
+      userName: opened.userName || null,
+      ownNames: opened.ownNames || [],
       now: now,
       surface: 'gmail',
-      attachmentCount: 0
+      attachmentCount: 0,
+      inbound: true
     });
     if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
     return { intent: judged.intent, plan: judged.process };
@@ -414,6 +522,24 @@ function readOpen_(e, read) {
   }
   var from = parseFrom_(fromRaw);
   var threadId = e.gmail.threadId ? String(e.gmail.threadId) : '';
+  var toList = emailsIn_(toRaw);
+  var reader = readerContext_();
+  var ownAddresses = reader.ownAddresses.slice();
+  for (var ti = 0; ti < toList.length; ti++) {
+    if (ownAddresses.indexOf(toList[ti]) < 0) ownAddresses.push(toList[ti]);
+  }
+  if (read.isSelf && from.email) {
+    var fromLower = String(from.email).trim().toLowerCase();
+    if (fromLower && ownAddresses.indexOf(fromLower) < 0) ownAddresses.push(fromLower);
+  }
+  if (typeof FlowIntent !== 'undefined' && FlowIntent.readerNamesFrom) {
+    reader.ownNames = FlowIntent.readerNamesFrom({
+      displayName: reader.userName,
+      userName: reader.userName,
+      profile: null,
+      knownNames: ownAddresses
+    });
+  }
   return {
     messageId: read.messageId,
     threadId: threadId,
@@ -423,7 +549,11 @@ function readOpen_(e, read) {
     subject: read.subject,
     fromName: from.name,
     fromEmail: from.email,
-    isSelf: read.isSelf
+    isSelf: read.isSelf,
+    toList: toList,
+    ownAddresses: ownAddresses,
+    userName: reader.userName,
+    ownNames: reader.ownNames
   };
 }
 
