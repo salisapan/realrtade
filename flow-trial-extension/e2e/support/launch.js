@@ -50,6 +50,7 @@ function outlookAuth(opts) {
   const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'];
   if (o.tasks !== false) scopes.push('Tasks.ReadWrite');
   if (o.files !== false) scopes.push('Files.ReadWrite');
+  if (o.calendar === true) scopes.push('Calendars.ReadWrite');
   const now = Date.now();
   return {
     token: {
@@ -101,6 +102,7 @@ function installE2EHooks() {
   e2e.googleTasks = e2e.googleTasks || {};
   e2e.tokenAccounts = e2e.tokenAccounts || {};
   e2e.todoTasks = e2e.todoTasks || {};
+  e2e.outlookEvents = e2e.outlookEvents || {};
   e2e.drafts = e2e.drafts || {};
   e2e.driveItems = e2e.driveItems || {};
   e2e.driveByName = e2e.driveByName || {};
@@ -273,6 +275,51 @@ function installE2EHooks() {
         };
         return Promise.resolve(json(201, e2e.drafts[id]));
       }
+      // Outlook calendar events. An online meeting gets a Teams join link and, on read, Microsoft's
+      // own join block appended to the body, as Graph does. scenario.eventNoTeams leaves the link out;
+      // scenario.eventDropsRule stores the event without its repeat rule.
+      const eventOne = path.match(/\/me\/events\/([^/?]+)$/);
+      const eventCol = path.match(/\/me\/events$/);
+      if (eventCol && method === 'POST') {
+        const id = 'e2e-event-' + (e2e.seq++);
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        const stored = Object.assign({}, posted, { id: id, isCancelled: false, webLink: 'https://outlook.office.com/calendar/item/' + id, organizer: { emailAddress: { address: 'glance.salisapan@outlook.com' } } });
+        ['start', 'end'].forEach((k) => {
+          if (stored[k] && stored[k].dateTime && !/\./.test(stored[k].dateTime)) stored[k] = { dateTime: stored[k].dateTime + '.0000000', timeZone: stored[k].timeZone };
+        });
+        if (posted.isOnlineMeeting === true && !scenario.eventNoTeams) {
+          stored.onlineMeeting = { joinUrl: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_e2e%40thread.v2/0?context=%7b%7d' };
+        } else {
+          stored.isOnlineMeeting = false;
+          stored.onlineMeeting = null;
+        }
+        if (scenario.eventDropsRule) stored.recurrence = null;
+        else if (stored.recurrence == null) stored.recurrence = null;
+        e2e.outlookEvents[id] = stored;
+        e2e.lastEvent = id;
+        return Promise.resolve(json(201, { id: id, webLink: stored.webLink }));
+      }
+      if (eventOne) {
+        const id = eventOne[1];
+        if (method === 'DELETE') {
+          delete e2e.outlookEvents[id];
+          return Promise.resolve(empty(204));
+        }
+        const event = e2e.outlookEvents[id];
+        if (!event) return Promise.resolve(json(404, { error: { message: 'missing' } }));
+        if (method === 'PATCH') {
+          let patch = {};
+          try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
+          Object.assign(event, patch);
+          return Promise.resolve(json(200, event));
+        }
+        const shown = JSON.parse(JSON.stringify(event));
+        if (shown.isOnlineMeeting === true && shown.body && !/Microsoft Teams/.test(String(shown.body.content || ''))) {
+          shown.body = { contentType: 'html', content: '<div>' + String((shown.body && shown.body.content) || '') + '</div><div>________________________________________________________________________________</div><div>Microsoft Teams meeting</div><div><a href="' + shown.onlineMeeting.joinUrl + '">Join the meeting now</a></div>' };
+        }
+        return Promise.resolve(json(200, shown));
+      }
       const todoOne = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks\/([^/]+)$/);
       const todoCol = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks$/);
       if (todoOne) {
@@ -293,7 +340,7 @@ function installE2EHooks() {
         try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
         // Read-back compares this body with the POST. A stand-in title is a mismatch.
         const stored = { id: id };
-        ['title', 'body', 'dueDateTime', 'status', 'importance'].forEach((key) => {
+        ['title', 'body', 'dueDateTime', 'status', 'importance', 'recurrence', 'isReminderOn', 'reminderDateTime'].forEach((key) => {
           if (posted[key] != null) stored[key] = posted[key];
         });
         e2e.todoTasks[id] = stored;
@@ -634,6 +681,7 @@ async function boot() {
       e.scenario = { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
       e.googleTasks = {};
       e.todoTasks = {};
+      e.outlookEvents = {};
       e.drafts = {};
       e.driveItems = {};
       e.driveByName = {};

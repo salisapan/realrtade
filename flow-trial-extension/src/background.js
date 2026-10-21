@@ -53,6 +53,7 @@ import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConf
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
+import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
 import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
 import '../core/todo-recurrence.js'; // classic: sets globalThis.FlowTodoRecurrence (switch RECURRING_TODO, off)
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose

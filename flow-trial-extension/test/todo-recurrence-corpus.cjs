@@ -116,6 +116,11 @@ function sandbox(switches) {
   check('nothing is sent and no new scope: the To Do list URL only', !/sendMail|Mail\.Send/.test(w) && /\/me\/todo\/lists\//.test(w));
   check('switch default off, stored with the other switches', R.SWITCH === 'RECURRING_TODO' && /glanceSwitches/.test(bg));
 
+  // Node loads a recognizer's helpers by require; the service worker only has what background.js imports.
+  // The clock of a repeat is read with FlowExtract, so it must be imported first and set on globalThis.
+  const iExtract = bg.indexOf("import '../core/extract.js'");
+  check('the worker imports extract.js before the repeat recognizer, and extract.js sets globalThis', iExtract > 0 && iExtract < bg.indexOf("import '../core/recurring-reminder.js'") && /globalThis\.FlowExtract = FlowExtract/.test(fs.readFileSync(path.join(__dirname, '..', 'core', 'extract.js'), 'utf8')));
+
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
   process.exit(failures ? 1 : 0);
 })();
