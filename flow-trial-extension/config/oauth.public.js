@@ -19,7 +19,8 @@ export const OAUTH_PUBLIC = {
   asanaClientId: 'REPLACE_WITH_ASANA_CLIENT_ID',
   jiraClientId: 'REPLACE_WITH_JIRA_CLIENT_ID',
   linearClientId: 'REPLACE_WITH_LINEAR_CLIENT_ID',
-  docusignClientId: 'REPLACE_WITH_DOCUSIGN_INTEGRATION_KEY'
+  docusignClientId: 'REPLACE_WITH_DOCUSIGN_INTEGRATION_KEY',
+  dropboxAppKey: 'REPLACE_WITH_DROPBOX_APP_KEY'
 };
 
 // Web application OAuth client for chrome.identity.launchWebAuthFlow.

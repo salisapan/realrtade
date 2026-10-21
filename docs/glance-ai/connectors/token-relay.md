@@ -15,3 +15,5 @@ Status: **built and tested against a mock vendor. Not deployed.** Deploying is t
 **Existing exchange functions** (`hubspot-`, `salesforce-`, `slack-`, `monday-oauth-exchange`) are untouched. They can move onto the relay one connector at a time; not done in this run.
 
 **Known limits.** In-memory rate limiting resets on a cold start. No per-vendor token revoke yet. A browserless caller with no Origin header can still reach it, but it can only exchange codes that the owner's registered app issued for the extension's redirect URI.
+
+**Not through the relay:** Dropbox (public client with PKCE, no secret) and Google/Microsoft exchange the code directly; see their connector docs.

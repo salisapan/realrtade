@@ -76,6 +76,7 @@ import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
 import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
+import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import './google-lane-host.js';
 import './gmail-reinject.js';
@@ -1802,7 +1803,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1828,8 +1829,9 @@ async function disconnectConnector(connectorId) {
     googleNamesFilled = false;
     return { ok: true };
   }
+  if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
   return { ok: true };
 }
 
@@ -4045,8 +4047,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4474,6 +4476,105 @@ async function docusignCheck(payload) {
 async function docusignRelease(payload) {
   const r = await docusignCloseEngine().release((payload || {}).key);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+/* ------------------------------------------------------- Dropbox, with a proof */
+// docs/glance-ai/connectors/dropbox.md. One file saved into the person's Dropbox app folder, read back by id, size and content hash.
+// Everything here is behind config/connectors.public.js (dropboxReadBack, dropboxOAuth), both off.
+
+const DROPBOX_AUTH_BASE = 'https://www.dropbox.com/oauth2/authorize';
+const DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token';
+const DROPBOX_REVOKE_URL = 'https://api.dropboxapi.com/2/auth/token/revoke';
+const DROPBOX_SCOPES = 'files.content.write files.metadata.read';
+const DROPBOX_LEDGER_KEY = 'dropboxLedger';
+
+async function getDropboxAuth() {
+  const { dropboxAuth } = await chrome.storage.local.get('dropboxAuth');
+  return dropboxAuth || null;
+}
+
+// A public client with PKCE: no secret exists, so the token request goes straight to Dropbox (no relay).
+async function dropboxTokenRequest(form) {
+  const res = await fetch(DROPBOX_TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form).toString() });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok || !data || typeof data.access_token !== 'string') return { ok: false, error: (data && typeof data.error === 'string' && data.error.slice(0, 40)) || ('http-' + res.status) };
+  return { ok: true, data: data };
+}
+
+async function connectDropboxOAuth() {
+  if (!CONNECTORS.dropboxOAuth) throw new Error('Sign in with Dropbox is not switched on in this build.');
+  const appKey = publicClientId(OAUTH_PUBLIC.dropboxAppKey);
+  if (!appKey) throw new Error('Dropbox sign-in isn’t configured on this build yet.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(DROPBOX_AUTH_BASE + '?client_id=' + encodeURIComponent(appKey) + '&response_type=code&token_access_type=offline&scope=' + encodeURIComponent(DROPBOX_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Dropbox');
+  const got = await dropboxTokenRequest({ grant_type: 'authorization_code', code: code, client_id: appKey, redirect_uri: redirectUri, code_verifier: verifier });
+  if (!got.ok) throw new Error('Dropbox connection failed (' + got.error + ').');
+  await chrome.storage.local.set({ dropboxAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, via: 'oauth' } });
+  return { title: 'Dropbox' };
+}
+
+async function dropboxRefreshToken(auth) {
+  const appKey = publicClientId(OAUTH_PUBLIC.dropboxAppKey);
+  if (!auth || !auth.refreshToken || !appKey) return null;
+  const got = await dropboxTokenRequest({ grant_type: 'refresh_token', refresh_token: auth.refreshToken, client_id: appKey });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: auth.refreshToken };
+}
+
+// Best effort on Disconnect: ask Dropbox to end the token. The local token is removed either way.
+async function dropboxRevokeBestEffort() {
+  try {
+    const a = await getDropboxAuth();
+    if (a && a.token) await fetch(DROPBOX_REVOKE_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + a.token } });
+  } catch (e) { /* the token is removed locally regardless */ }
+}
+
+function dropboxCloseEngine() {
+  return globalThis.FlowDropboxClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getDropboxAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ dropboxAuth: a }); },
+    refresh: dropboxRefreshToken,
+    sha256: async (u8) => new Uint8Array(await crypto.subtle.digest('SHA-256', u8)),
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(DROPBOX_LEDGER_KEY))[DROPBOX_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(DROPBOX_LEDGER_KEY))[DROPBOX_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [DROPBOX_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, name, base64 } — the loop's own id, the file name and the file's bytes (base64), all from the person's own Do It.
+async function dropboxSave(payload) {
+  const started = Date.now();
+  const p = payload || {};
+  const b64 = typeof p.base64 === 'string' ? p.base64 : '';
+  if (!b64 || b64.length > Math.ceil(globalThis.FlowDropboxClose.MAX_BYTES * 4 / 3) + 8) return { ok: false, reason: b64 ? 'too-large' : 'bad-params' };
+  if (b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return { ok: false, reason: 'bad-params' };
+  let bytes;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); } catch (e) { return { ok: false, reason: 'bad-params' }; }
+  const lang = /[֐-׿]/.test(String(p.name || '')) ? 'he' : 'en';
+  const r = await dropboxCloseEngine().save({ key: String(p.key || ''), name: p.name, bytes: bytes });
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'dropbox', closeType: 'file', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'dropbox', closeType: 'file', lang: lang });
+  } else if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'dropbox', closeType: 'file', lang: lang });
+  return r;
+}
+
+async function dropboxUndo(payload) {
+  const r = await dropboxCloseEngine().undo((payload || {}).ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'dropbox', closeType: 'file' });
   return r;
 }
 
@@ -6379,6 +6480,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
@@ -6396,6 +6498,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:fact-sources') {
     return reply(sendResponse, factSources(msg.payload || {}));
+  }
+
+  // Dropbox: save one file the person approved into their Dropbox app folder, read it back; undo removes it unless the person edited it. Off = not live.
+  if (msg.type === 'flow:dropbox-save' || msg.type === 'flow:dropbox-undo') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:dropbox-save' ? dropboxSave(msg.payload) : dropboxUndo(msg.payload));
   }
 
   // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.
