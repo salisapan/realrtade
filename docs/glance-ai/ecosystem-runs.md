@@ -191,3 +191,7 @@ One short report per run of the ecosystems builder. Newest last. Status only; a 
 ## 2026-10-21 (Ecosystems builder B, thirteenth run) — idle, by the run-discipline rule
 
 - Nothing unblocked and valuable on the Microsoft and Meta side. Microsoft is wired end to end behind switches (Teams link on a hold and on an existing event, repeat on a hold and on To Do, Word or Excel from a request, Planner); what is left is SharePoint (needs the new scope `Sites.ReadWrite.All` or `Sites.Selected`, owner row 79), and OneNote and PowerPoint, where a PowerPoint deck needs a hand-built `.pptx` that I cannot open in Office here to check it is valid, so I did not ship an empty-file builder I cannot verify. Meta needs the owner's Meta setup (Pages, Business API) or is identity work already pinned in row 71. Nothing touched. The live Gates for the switches are the owner's.
+
+## 2026-10-21 (Ecosystems builder A, fifteenth run) — idle by the run-discipline rule
+
+No Google gap is both unblocked and of user value: every built Google module is wired on its card behind its switch; Forms needs the `forms.body` scope and Keep has no public API (open-tasks row 79). Nothing touched.
