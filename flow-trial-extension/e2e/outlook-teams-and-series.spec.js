@@ -119,3 +119,76 @@ test('RECURRING_TODO on: the To Do task repeats, is read back with its rule, and
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await tasks(glance)).length).toBe(0);
 });
+
+// ---- An empty Word or Excel file from a request (switch ONEDRIVE_NEW_FILE) ---------------------------------
+async function newFileMail(glance, switches, body, id) {
+  await glance.seedOutlook(switches ? { glanceSwitches: switches } : {});
+  return glance.openOutlook({ id: id, subject: 'Supplier', senderEmail: S.SENDER, senderName: 'flow', body: body });
+}
+const drive = (glance) => glance.evaluateWorker(() => ({ items: Object.values(globalThis.__glanceE2e.driveItems), puts: globalThis.__glanceE2e.drivePuts || [] }));
+const ASK_DOC = 'Could you create a Word document called Supplier onboarding?';
+
+test('ONEDRIVE_NEW_FILE off: the ask gets no card and nothing is made', async ({ glance }) => {
+  const page = await newFileMail(glance, null, ASK_DOC, 'AQMk-nf-off');
+  await page.waitForTimeout(3000);
+  // The ordinary card for the ask may show; the new-file card must not.
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="new-file"]')).toHaveCount(0);
+  await expect(page.locator(PANE)).not.toContainText('Create the file in OneDrive');
+  expect((await drive(glance)).items).toHaveLength(0);
+});
+
+test('ONEDRIVE_NEW_FILE on: Do It makes an empty .docx in OneDrive > Glance, read back, Undo deletes it', async ({ glance }) => {
+  const page = await newFileMail(glance, { ONEDRIVE_NEW_FILE: true }, ASK_DOC, 'AQMk-nf-on');
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(PANE)).toContainText('Supplier onboarding.docx');
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const made = await drive(glance);
+  expect(made.items).toHaveLength(1);
+  expect(made.items[0].name).toBe('Supplier onboarding.docx');
+  // drivePuts accumulates across specs in one run; this mail's file is the one named here, once.
+  expect(made.puts.filter((k) => /Supplier onboarding/.test(k))).toEqual(['Glance/Supplier onboarding.docx']);
+  const calls = await glance.apiCalls();
+  expect(calls.some((c) => c.method === 'GET' && /\/me\/drive\/items\/e2e-file-/.test(c.url))).toBe(true);
+  expect(calls.some((c) => /sendMail|\/send\b/.test(c.url))).toBe(false);
+  // the receipt survives a reload
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toHaveCount(1);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await drive(glance)).items.length).toBe(0);
+});
+
+test('ONEDRIVE_NEW_FILE on: Undo leaves a file the person edited', async ({ glance }) => {
+  const page = await newFileMail(glance, { ONEDRIVE_NEW_FILE: true }, ASK_DOC, 'AQMk-nf-edit');
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await glance.evaluateWorker(() => { Object.values(globalThis.__glanceE2e.driveItems).forEach((i) => { i.eTag = '"edited,2"'; i.lastModifiedDateTime = '2026-10-21T09:30:00Z'; }); });
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await page.waitForTimeout(2500);
+  expect((await drive(glance)).items).toHaveLength(1);
+});
+
+test('ONEDRIVE_NEW_FILE on: a name that is already taken is refused and nothing is replaced', async ({ glance }) => {
+  const page = await newFileMail(glance, { ONEDRIVE_NEW_FILE: true }, ASK_DOC, 'AQMk-nf-taken');
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await glance.evaluateWorker(() => {
+    const e = globalThis.__glanceE2e;
+    const item = { id: 'e2e-file-existing', name: 'Supplier onboarding.docx', file: {}, size: 10, eTag: '"x"', lastModifiedDateTime: '2026-10-01T00:00:00Z', __key: 'Glance/Supplier onboarding.docx' };
+    e.driveItems['e2e-file-existing'] = item;
+    e.driveByName['Glance/Supplier onboarding.docx'] = item;
+  });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="new-file"] .flow-chip-handled')).toHaveCount(0);
+  const made = await drive(glance);
+  expect(made.items).toHaveLength(1);
+  expect(made.items[0].id).toBe('e2e-file-existing');
+});
+
+test('ONEDRIVE_NEW_FILE on: a mail that asks for the content to be written gets no card', async ({ glance }) => {
+  const page = await newFileMail(glance, { ONEDRIVE_NEW_FILE: true }, 'Please create a Word document called Offer and write a one-page summary of the call.', 'AQMk-nf-content');
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' button.flow-chip')).toHaveCount(0);
+  expect((await drive(glance)).items).toHaveLength(0);
+});

@@ -74,7 +74,7 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Action: one Do It. The receipt shows the file name and an Open link (`url`).
 - Undo: moves the file to the trash. If the person typed in it, the card says Undo unavailable and the file stays.
 
-## W2 — an empty Word or Excel file made in OneDrive
+## W2 — an empty Word or Excel file made in OneDrive (WIRED 2026-10-21 into the existing card, no new design needed)
 
 - Module `flow-trial-extension/core/onedrive-new-file.js`, switch `ONEDRIVE_NEW_FILE`. Ecosystem gap "Word / Excel from a request" (`docs/glance-ai/ecosystem-coverage.md`, row 76 part 8). The Outlook twin of W1; same card shape, same canonical Do It.
 - When the card shows: an Outlook mail explicitly asks for a new doc, tracker or sheet with a name ("Can you create a Word document called Supplier onboarding?"). No name, a request to write the content, an existing file, a hedge, "ask Dana to create it", and another app named (Google, Notion, OneNote) show no card.

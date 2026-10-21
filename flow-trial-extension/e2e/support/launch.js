@@ -235,8 +235,13 @@ function installE2EHooks() {
       }
       if (driveContent && method === 'PUT') {
         const key = driveContent[1];
+        // conflictBehavior=fail on a name that is taken is a 409, as Graph answers; nothing is replaced.
+        if (/conflictBehavior=fail/.test(parsed.search || '') && e2e.driveByName[key]) {
+          return Promise.resolve(json(409, { error: { code: 'nameAlreadyExists' } }));
+        }
         const id = 'e2e-file-' + (e2e.seq++);
-        const item = { id: id, name: decodeURIComponent(key.split('/').pop()), webUrl: 'https://onedrive.live.com/file/' + id, parentReference: { path: '/drive/root:/' + key.split('/').slice(0, -1).join('/') } };
+        const bodyLen = init && init.body && (init.body.byteLength != null ? init.body.byteLength : init.body.length);
+        const item = { id: id, name: decodeURIComponent(key.split('/').pop()), webUrl: 'https://onedrive.live.com/file/' + id, parentReference: { path: '/drive/root:/' + key.split('/').slice(0, -1).join('/') }, file: { mimeType: (init && init.headers && init.headers['Content-Type']) || 'application/octet-stream' }, size: bodyLen || 1, eTag: '"{e2e-' + id + '},1"', lastModifiedDateTime: '2026-10-21T09:00:00Z' };
         item.__key = key;
         e2e.driveItems[id] = item;
         e2e.driveByName[key] = item;

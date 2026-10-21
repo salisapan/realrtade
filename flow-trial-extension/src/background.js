@@ -62,6 +62,9 @@ import '../core/planner-task.js'; // classic: sets globalThis.FlowPlannerTask (s
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
+import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
+import '../core/outlook-excel.js'; // classic: sets globalThis.FlowOutlookExcel (an empty .xlsx for a new file)
+import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
@@ -5565,6 +5568,59 @@ async function outlookTeamsWanted(callText) {
   return T.callAsked(callText);
 }
 
+// An empty Word document or Excel workbook in OneDrive > Glance for a mail that explicitly asks for one
+// with a name (core/onedrive-new-file.js). Off unless the owner's switch ONEDRIVE_NEW_FILE is true. The
+// plan is asked for by the page; the write reads the file back by id; Undo deletes it only while the
+// file is still the one Glance made. Nothing is shared, written into, or sent.
+async function newFilePlan(msg) {
+  const N = globalThis.FlowOnedriveNewFile;
+  if (!N || typeof N.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  const on = await glanceSwitchOn(N.SWITCH);
+  if (!on) return { action: 'off', reason: 'switch-off' };
+  return N.plan({ flags: { [N.SWITCH]: true }, text: String((msg && msg.text) || '').slice(0, 4000), now: new Date() });
+}
+
+async function onedriveNewFileCall(req) {
+  const r = req || {};
+  const url = OUTLOOK_GRAPH + String(r.path || '');
+  outlookAssertNotSend(url);
+  const init = { method: String(r.method || 'GET').toUpperCase() };
+  if (r.raw != null) {
+    init.body = r.raw;
+    init.headers = { 'Content-Type': r.contentType || 'application/octet-stream' };
+  }
+  let res = null;
+  try { res = await outlookFetch(url, init); } catch (e) { return { ok: false, status: 0, body: null }; }
+  if (!res || res.notConnected) return { ok: false, status: 401, body: null };
+  const status = res.status || 0;
+  let body = null;
+  if (status !== 204 && typeof res.json === 'function') { try { body = await res.json(); } catch (e) { body = null; } }
+  return { ok: !!res.ok, status: status, body: body };
+}
+
+async function onedriveNewFileWrite(p) {
+  const N = globalThis.FlowOnedriveNewFile;
+  if (!N) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(N.SWITCH);
+  const r = await N.create({ flags: { [N.SWITCH]: on }, fileKind: params.fileKind, fileName: params.fileName, grantedScopes: scopes }, { call: onedriveNewFileCall });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
+async function onedriveNewFileUndo(ref) {
+  const N = globalThis.FlowOnedriveNewFile;
+  if (!N) return { ok: false };
+  const u = await N.undo(ref, { call: onedriveNewFileCall });
+  if (u && u.ok) return { ok: true, written: 'File removed from OneDrive.' };
+  if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.error || '' };
+  return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+}
+
 // A Hold It for "weekly sync every Tuesday at 10:00" is one meeting that repeats. With the
 // owner's switch RECURRING_HOLD on (default off, the same switch as the Gmail Hold It) and one
 // stated rule the hold's own date fits, the event becomes the series. Still no attendee.
@@ -6465,7 +6521,7 @@ const WRITERS = {
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
   outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
-  onedriveFile: outlookFileWrite,
+  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite,
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
@@ -6478,7 +6534,7 @@ const UNDOERS = {
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
   outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
-  onedriveFile: outlookFileUndo,
+  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo,
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
@@ -6650,6 +6706,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.docusignReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:signature-check' ? docusignCheck(msg.payload) : docusignRelease(msg.payload));
+  }
+
+  if (msg.type === 'flow:new-file-plan') {
+    return reply(sendResponse, newFilePlan(msg));
   }
 
   if (msg.type === 'flow:execute-action') {
