@@ -95,3 +95,12 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Needed outside the card: the host reads the person's plans (`GET /me/planner/plans`, `Tasks.ReadWrite`, already requested when the To Do box is ticked; the Entra app must list it, open-tasks row 44).
 - Update 2026-10-21: the Meet link now rides on the existing Gmail Hold It when `glanceSwitches.MEET_LINK` is on. The worker result carries `meetUrl` (also `joinUrl`) and the receipt row ends with `· Meet`. The card should show the link with a Copy control, as for Teams. Without the switch nothing changes.
 
+## T1 — a repeating reminder on the calendar
+
+- Module `flow-trial-extension/core/recurring-reminder.js`, switch `RECURRING_REMINDER`. Map row T1.
+- When the card shows: a mail asks the person (or the person commits) to do something on a stated repeat, with a clock: "Please send me the weekly sales report every Monday at 9:00", "Send the VAT summary on the 15th of each month at 10:00". No clock, two repeat rules, "every other", quarterly, or a past habit shows no card.
+- Line: `ליצור ביומן תזכורת חוזרת (<כל יום ראשון 09:00>): <commitment>?` / `Add a repeating reminder to your calendar (<every Monday 09:00>): <commitment>?`
+- Step: `יצירת האירוע החוזר ובדיקה חוזרת (בלי מוזמנים)` / `Create the repeating event and read it back (no guests)`.
+- Action: one Do It. The receipt names the rule (for example `FREQ=WEEKLY;BYDAY=MO`) and the first date, with the calendar link. It does not say the ask is closed: each occurrence is still the person's to do.
+- Undo: deletes the whole series. If the person edited it (note, day, time, guests), the card says Undo unavailable and the series stays.
+

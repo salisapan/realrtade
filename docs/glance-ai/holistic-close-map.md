@@ -144,7 +144,7 @@ C6 scores high because silence is already correct. It is not a slice.
 
 | ID | Loop | Example | Now | Closing action | Path | ProofOfClose | Undo | Risk | Approval | V | Fq | Fe | R | S |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| T1 | A repeating commitment | "Send the VAT summary on the 15th each month." | partial | One recurring task, or the next occurrence | `core/recurrence.js` exists. It is not a live Gate | GET the task, including the recurrence | Delete that series | 1 | Do It | 3 | 3 | 2 | 1 | 90 |
+| T1 | A repeating commitment | "Send the VAT summary on the 15th each month." | partial | One recurring task, or the next occurrence | `core/recurrence.js` exists (learned rhythm, not a live Gate). `core/recurring-reminder.js` (2026-10-21, switch `RECURRING_REMINDER` off, not wired): one explicit request with one repeat rule and one clock becomes one recurring Google Calendar event, no guest, read back by id for title, start and rule; `test/recurring-reminder-corpus.cjs` | GET the task, including the recurrence | Delete that series | 1 | Do It | 3 | 3 | 2 | 1 | 90 |
 | T2 | A board item (Monday.com) | "Add this to the board." | none | Create one item | `mondayWrite` is in `src/background.js`. The host permission was removed. Not on the Connect screen | GET the item | Delete the item | 2 | Do It | 2 | 1 | 1 | 2 | 8 |
 
 E1 and E2 are the task closes that are live. T2 is a poor personal fit. It stays off the roadmap.
