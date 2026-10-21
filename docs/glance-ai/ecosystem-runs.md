@@ -66,3 +66,9 @@ One short report per run of the ecosystems builder. Newest last. Status only; a 
 - **User-visible when:** the owner turns the switch on. The result carries `meetUrl`/`joinUrl` and the receipt ends `· Meet`; showing the link in the card is the Grok bot's job (card ask M1 updated). Live Gate: not run; owner procedure is in the `open-tasks.md` header line.
 - **Tests:** `test/meet-wiring-corpus.cjs` (call check, conference request with no guest, pending then ready, no link and delete, delete fails, foreign host link, impossible date, Undo unedited and edited, worker wiring checks, manifest unchanged). Whole regression of every `test/*corpus.cjs`: green.
 - **Open:** live Gate; showing the link on the card; adding a Meet link to an existing event; the Outlook side already has Teams.
+
+## 2026-10-21 (Ecosystems builder B, fifth run) — no user-facing capability
+
+- **Failed run against the user-facing bar, said plainly.** I looked for a Meta gap I could close without a new card and picked the Messenger and Instagram identity miss in `open-tasks.md` row 71 (a one-to-one chat whose Block control has the same words in its label and text staying quiet). Measured on jsdom fixtures, it does not reproduce: the chat already drafts, old code and a candidate fix behave the same. I reverted the candidate change rather than ship a no-op.
+- **Done:** `test/chat-person-control-corpus.cjs` pins the real behavior (same words twice drafts in English and Hebrew; another person's control, a bare Mute, a two-name title, a group word and a members list stay quiet). Row 71 now says so. Whole regression: see commit.
+- **Still the real blocker:** every remaining buildable module (Planner, Word/Excel from a request, Docs/Sheets/Slides from a request) needs a card the Grok bot has not delivered; the two paths that could piggyback on an existing card (Teams and Meet links on Hold It) are wired and waiting for a live Gate. Graphify not run.
