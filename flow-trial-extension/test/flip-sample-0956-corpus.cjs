@@ -22,7 +22,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail).slice(0, 400) : ''); }
 }
 
-const NOW = new Date('2026-10-05T09:00:00Z');
+const NOW = new Date('2026-10-16T09:00:00Z'); // the clock the labeled rows were written on; incoming-judge now honours a Date from this realm
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
 const NAMES = ['Sali', 'Sali Sapan', 'סאלי'];
 

@@ -25,6 +25,12 @@ const FlowProofOfClose = (() => {
   const SYSTEM_GOOGLE_TASKS = 'google/tasks';
   const SYSTEM_MICROSOFT_TODO = 'microsoft/todo';
   const SYSTEM_MICROSOFT_ONEDRIVE = 'microsoft/onedrive';
+  const SYSTEM_NOTION = 'notion/page';
+  const SYSTEM_ASANA = 'asana/task';
+  const SYSTEM_JIRA = 'jira/issue';
+  const SYSTEM_LINEAR = 'linear/issue';
+  const SYSTEM_DOCUSIGN = 'docusign/envelope';
+  const SYSTEM_DROPBOX = 'dropbox/file';
   const SYSTEM_COMPUTER_PREFIX = 'computer/';
   const LOCAL_FILE_PREFIX = 'computer/local/';
   const REASON_PENDING = 'proof_pending';
@@ -261,6 +267,8 @@ const FlowProofOfClose = (() => {
       return computerHostAllowlisted(computerSystemName.slice(SYSTEM_COMPUTER_PREFIX.length));
     }
     if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
+    // Notion counts only with the read-back proof itself (the earlier token write kept none).
+    if (clean(row.system) === SYSTEM_NOTION || clean(row.system) === SYSTEM_ASANA || clean(row.system) === SYSTEM_JIRA || clean(row.system) === SYSTEM_LINEAR || clean(row.system) === SYSTEM_DOCUSIGN || clean(row.system) === SYSTEM_DROPBOX) return row.fetchedBack === true && !!clean(row.verifiedAt);
     return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row) || isOnedriveConnector(row);
   }
 
@@ -1157,6 +1165,12 @@ const FlowProofOfClose = (() => {
     SYSTEM_GOOGLE_TASKS: SYSTEM_GOOGLE_TASKS,
     SYSTEM_MICROSOFT_TODO: SYSTEM_MICROSOFT_TODO,
     SYSTEM_MICROSOFT_ONEDRIVE: SYSTEM_MICROSOFT_ONEDRIVE,
+    SYSTEM_NOTION: SYSTEM_NOTION,
+    SYSTEM_ASANA: SYSTEM_ASANA,
+    SYSTEM_JIRA: SYSTEM_JIRA,
+    SYSTEM_LINEAR: SYSTEM_LINEAR,
+    SYSTEM_DOCUSIGN: SYSTEM_DOCUSIGN,
+    SYSTEM_DROPBOX: SYSTEM_DROPBOX,
     SYSTEM_COMPUTER_PREFIX: SYSTEM_COMPUTER_PREFIX,
     LOCAL_FILE_PREFIX: LOCAL_FILE_PREFIX,
     REASON_PENDING: REASON_PENDING,

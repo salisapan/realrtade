@@ -829,7 +829,8 @@
       if (given || surname || (display && display !== 'glance' && display !== 'me')) return false;
     }
     const shown = String(userName || '').trim().toLowerCase();
-    if (shown && shown !== 'glance' && shown !== 'me') return false;
+    if (shown && shown !== 'me') return false;
+    if (st && st.outlookAuth && (st.outlookAuth.profile || st.outlookAuth.account)) return false;
     return true;
   }
 
@@ -3429,6 +3430,9 @@
       await holdAsTodo(host, ctx);
       return;
     }
+    // The service worker adds a Teams link only when this text asks for a call
+    // and the TEAMS_MEETING switch is on (off by default). Text stays local.
+    if (params.meeting === true && ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
     const r = await send({
       type: 'flow:execute-action',
       payload: {
@@ -5553,6 +5557,8 @@
     }
   } catch (e) { /* storage events unavailable */ }
   // Keep the Microsoft session alive while Outlook is open, and judge the inbox once on arrival.
+  // An offer below the fold pops up in view on its own (src/chip-peek.js): same card, same Do It, no design of its own.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
   send({ type: 'flow:outlook-keepalive' }).catch(() => {});
   FlowStorage.get().then((st) => {
     if (st && st.outlookAuth && st.outlookAuth.token) pageSync('load').then(schedule).catch(() => {});

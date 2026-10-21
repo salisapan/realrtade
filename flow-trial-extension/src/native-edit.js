@@ -20,9 +20,15 @@ const FlowNativeEdit = (() => {
 
   // Graph stores the same sentence as text or as HTML. Tags, CRLF, and
   // extra whitespace are not an edit. The words are.
+  // Microsoft appends a join block to an online meeting's body, sometimes
+  // after the first read. It is not the person's text: from its underscore
+  // rule to the end is left out, so it can never read as an edit.
+  const TEAMS_JOIN_BLOCK = /_{8,}\s*(?:Microsoft Teams|Join (?:the meeting|on your computer|with a video)|Meeting ID|הצטרפות|הצטרף)[\s\S]*$/i;
+
   function normText(value) {
     return textOf(value)
       .replace(/<[^>]+>/g, ' ')
+      .replace(TEAMS_JOIN_BLOCK, ' ')
       .replace(/&nbsp;/gi, ' ')
       .replace(/&amp;/gi, '&')
       .replace(/&lt;/gi, '<')
@@ -138,7 +144,7 @@ const FlowNativeEdit = (() => {
   // Server fields (lastModifiedDateTime, @odata.etag, changeKey) are not here.
   const CONTENT_KEYS = [
     'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
-    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'
+    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance', 'recurrence'
   ];
 
   function rawFor(key, o) {
@@ -160,10 +166,23 @@ const FlowNativeEdit = (() => {
     if (key === 'to' || key === 'cc' || key === 'attendees') return emptyToNull(addressesOf(raw));
     if (key === 'location') return emptyToNull(locationOf(raw));
     if (key === 'categories') return emptyToNull(categoriesOf(raw));
+    if (key === 'recurrence') return emptyToNull(recurrenceOf(raw));
     if (key === 'isAllDay') return boolOf(raw);
     if (key === 'importance') return importanceOf(raw);
     if (key === 'status') return emptyToNull(plain(raw));
     return emptyToNull(plain(raw));
+  }
+
+  // A repeat rule as one string: type, interval, days, day of month, range kind
+  // and start. Another spelling of the same rule is not an edit; another rule is.
+  function recurrenceOf(raw) {
+    if (typeof raw === 'string') return raw.trim() || null; // an already-stored snapshot value
+    if (!raw || typeof raw !== 'object' || !raw.pattern || typeof raw.pattern !== 'object') return null;
+    const p = raw.pattern;
+    const days = Array.isArray(p.daysOfWeek) ? p.daysOfWeek.map((d) => String(d).toLowerCase()).sort().join(',') : '';
+    const r = raw.range && typeof raw.range === 'object' ? raw.range : {};
+    return [String(p.type || '').toLowerCase(), String(p.interval == null ? 1 : p.interval), days, Number(p.dayOfMonth) > 0 ? String(p.dayOfMonth) : '',
+      String(r.type || '').toLowerCase(), String(r.startDate || '').slice(0, 10)].join('|');
   }
 
   // Graph's own default is normal. low and high are a star the person set.

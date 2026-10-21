@@ -5,9 +5,15 @@ const { startGoogleLaneServer } = require('./support/google-lane-server');
 const S = require('./support/sentences');
 
 const QUOTE = 'Please prepare a quote for Dana Cole at $3,900, titled "14th floor".';
-const SHEET = 'Please log $4,200 confirmed on September 21 in a new spreadsheet.';
+// Dates follow the real clock so the spec does not go stale: a payment a few days
+// back, a file on the calendar a week ahead, a Hebrew weekday date about ten days out.
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAYS_AHEAD = (n) => new Date(Date.now() + n * 24 * 3600 * 1000);
+const BACK = DAYS_AHEAD(-3);
+const SHEET = 'Please log $4,200 confirmed on ' + MONTHS[BACK.getMonth()] + ' ' + BACK.getDate() + ' in a new spreadsheet.';
 const SAVE = 'Please save the attached pdf to Drive.';
-const HOLD = 'Put the glance-pricing-q4.pdf file on my calendar on October 20, 2026 at 10:00.';
+const WEEK = DAYS_AHEAD(7);
+const HOLD = 'Put the glance-pricing-q4.pdf file on my calendar on ' + MONTHS[WEEK.getMonth()] + ' ' + WEEK.getDate() + ', ' + WEEK.getFullYear() + ' at 10:00.';
 const DRAFT = 'Could you confirm the transfer by Friday?';
 const PDF = 'application/pdf:board.pdf:https://mail.googleusercontent.com/e2e/board.pdf';
 
@@ -434,9 +440,29 @@ test('Task Undo refuses after the title is edited and leaves it', async ({ glanc
   expect(server.task(id).title).toBe('Changed by the person');
 });
 
-const HEBREW_HOLD = 'פגישה ביום חמישי 22/10 בשעה 14:00';
+// The next Thursday at least four days out, 14:00 in Jerusalem, and the UTC instant that is.
+const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const THURSDAY = (() => {
+  const d = DAYS_AHEAD(4);
+  while (d.getDay() !== 4) d.setDate(d.getDate() + 1);
+  return d;
+})();
+function jerusalemToUtcIso(y, m, d, hour) {
+  const wall = Date.UTC(y, m - 1, d, hour, 0, 0);
+  const fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const wallOf = (ms) => {
+    const bag = {};
+    fmt.formatToParts(new Date(ms)).forEach((p) => { if (p.type !== 'literal') bag[p.type] = p.value; });
+    return Date.UTC(Number(bag.year), Number(bag.month) - 1, Number(bag.day), Number(bag.hour) % 24, Number(bag.minute), Number(bag.second));
+  };
+  let utc = wall - (wallOf(wall) - wall);
+  utc = wall - (wallOf(utc) - utc);
+  return new Date(utc).toISOString().replace(/\.000Z$/, 'Z');
+}
+const HEBREW_HOLD = 'פגישה ביום ' + HE_DAYS[THURSDAY.getDay()] + ' ' + THURSDAY.getDate() + '/' + (THURSDAY.getMonth() + 1) + ' בשעה 14:00';
+const HEBREW_HOLD_UTC = jerusalemToUtcIso(THURSDAY.getFullYear(), THURSDAY.getMonth() + 1, THURSDAY.getDate(), 14);
 
-test('Hebrew weekday date and hour posts one Jerusalem hold at 11:00Z', async ({ glance }) => {
+test('Hebrew weekday date and hour posts one Jerusalem hold at 14:00 Jerusalem time', async ({ glance }) => {
   const page = await open(glance, {
     seed: { glanceTimeZone: 'Asia/Jerusalem' },
     mail: {
@@ -456,8 +482,8 @@ test('Hebrew weekday date and hour posts one Jerusalem hold at 11:00Z', async ({
   expect(post.search || '').toContain('sendUpdates=none');
   expect(post.body.attendees || []).toEqual([]);
   expect(post.body.start.timeZone).toBe('Asia/Jerusalem');
-  expect(post.body.start.dateTime).toBe('2026-10-22T11:00:00Z');
-  expect(new Date(post.body.start.dateTime).toISOString()).toBe('2026-10-22T11:00:00.000Z');
+  expect(post.body.start.dateTime).toBe(HEBREW_HOLD_UTC);
+  expect(new Date(post.body.start.dateTime).toISOString()).toBe(HEBREW_HOLD_UTC.replace(/Z$/, '.000Z'));
   expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/events/' + server.last.event) >= 0)).toBe(true);
 });
 

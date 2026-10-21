@@ -259,8 +259,11 @@ test('a truncated bodyPreview is outlook:body-preview-only and not a card', asyn
   expect(onPage.shortPreview).toBe(true);
 });
 
-const SELF_SAVE = 'please save the report to Drive by 20/10';
-const SELF_HOLD = 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00';
+// Dates are a week ahead of the real clock, so the spec does not go stale.
+const AHEAD = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+const AHEAD_DMY = AHEAD.getDate() + '/' + (AHEAD.getMonth() + 1);
+const SELF_SAVE = 'please save the report to Drive by ' + AHEAD_DMY;
+const SELF_HOLD = 'תשמור לי את הזמן לפגישה ב-' + AHEAD_DMY + ' ב-14:00';
 
 function reportFile() {
   return [{ id: 'att-report', name: 'report.pdf', contentType: 'application/pdf', size: 4096, isInline: false }];

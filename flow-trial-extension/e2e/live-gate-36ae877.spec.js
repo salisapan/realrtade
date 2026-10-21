@@ -156,7 +156,8 @@ test('unwrapGoogleRedirectUrl finishes quickly on param-heavy links without q=',
   const label = selfRenewLabel(body);
   const ms = Date.now() - t0;
   expect(ms).toBeLessThan(500);
-  expect(label).toBe('Remind me to renew the https://www.google.com/url');
+  expect(label).toBe('Remind me to renew on Friday');
+  expect(label).not.toContain('google.com/url');
   expect(label).not.toMatch(/ust=/);
   expect(label).not.toMatch(/sa=E/);
 });

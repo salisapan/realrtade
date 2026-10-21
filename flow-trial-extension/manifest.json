@@ -109,6 +109,7 @@
         "core/google-config.js",
         "core/google-compose.js",
         "src/google-compose-page.js",
+        "src/chip-peek.js",
         "src/content-gmail.js"
       ],
       "css": [
