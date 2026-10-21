@@ -226,3 +226,7 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Code:** `core/system-notice.js`, `core/incoming-judge.js`, `src/content-gmail.js` (`classifyForChip`, `planOpenMail`), `src/content-outlook.js`, `manifest.json` (one core file added to the content-script list, no permission change), add-on bundle rebuilt.
 - **Tests:** `test/system-notice-corpus.cjs` (all pass); surface-parity, gmail-outlook-parity, identity-copy, chat-task-card, cc-only, deadline-meeting, intent-model green. Not mine and already red before: `gate-0950-proof` (1) and the add-on `v1.test.cjs` (5). docs-consistency red only until this commit's README row. No e2e in a real browser for this card yet.
 - **Open:** live Gate (owner); the phone card and chat do not pass the switch; a sender list from the person's own correspondents; Gmail page path covered by wiring checks only.
+
+## 2026-10-21 Ecosystems builder B (sixteenth run): idle by the run-discipline rule
+
+- No Microsoft or Meta gap is unblocked (SharePoint scope, Meta verification, live Gates and Grok cards are the owner's). Builder A shipped system notices; chat does not carry that switch and a service notice in a chat is not a real situation. Nothing touched.
