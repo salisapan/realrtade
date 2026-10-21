@@ -305,6 +305,10 @@ function installE2EHooks() {
         e2e.lastEvent = id;
         return Promise.resolve(json(201, { id: id, webLink: stored.webLink }));
       }
+      // Only when a spec seeded Outlook events; otherwise the scenario's place events (below) answer.
+      if (/\/me\/calendarView$/.test(path) && method === 'GET' && Object.keys(e2e.outlookEvents || {}).length) {
+        return Promise.resolve(json(200, { value: Object.values(e2e.outlookEvents).map((ev) => JSON.parse(JSON.stringify(ev))) }));
+      }
       if (eventOne) {
         const id = eventOne[1];
         if (method === 'DELETE') {
@@ -317,6 +321,11 @@ function installE2EHooks() {
           let patch = {};
           try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
           Object.assign(event, patch);
+          if (patch.isOnlineMeeting === true && !scenario.eventNoTeams) {
+            event.onlineMeeting = { joinUrl: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_e2e_patch%40thread.v2/0?context=%7b%7d' };
+          } else if (patch.isOnlineMeeting === false) {
+            event.onlineMeeting = null;
+          }
           return Promise.resolve(json(200, event));
         }
         const shown = JSON.parse(JSON.stringify(event));

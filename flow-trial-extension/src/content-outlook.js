@@ -3821,261 +3821,313 @@
     }
   }
 
-  // ---- An empty Word document or Excel workbook from a request ------------------------------------------
-  // "Can you create a Word document called Supplier onboarding?" becomes one Do It that puts an empty
-  // .docx or .xlsx in OneDrive > Glance, read back by id, with Undo that leaves an edited file alone. The
-  // worker decides (flow:new-file-plan) and only when the owner's switch ONEDRIVE_NEW_FILE is on (off by
-  // default); otherwise nothing here changes. It uses the canonical Do It card and the existing step list.
-  const NEW_FILE_CHAIN = 'new-file';
+  // ---- Closes the worker offers on a mail, behind their own off switches ---------------------------------
+  // Each one is the same shape on the canonical Do It card and its step list: the page asks the worker for a
+  // plan (the worker owns the switch and the logic), shows the card on an offer, Do It writes through the
+  // worker with a read-back by id, the receipt survives a reload, Undo leaves anything the person edited.
+  //   - new-file:   an empty Word or Excel file from a request (ONEDRIVE_NEW_FILE)
+  //   - event-link: a Teams link on an event already on the calendar (OUTLOOK_EVENT_CALL_LINK)
+  // Both are quiet unless their switch is on and the scope they use is granted.
 
-  function hasFilesWrite(st) {
+  function scopeOf(st, name) {
     const list = (typeof FlowOutlookCalendar !== 'undefined' && typeof FlowOutlookCalendar.normalizeDelegatedScopes === 'function')
       ? FlowOutlookCalendar.normalizeDelegatedScopes(calendarScopes(st))
       : null;
-    return !!list && list.some((x) => String(x).toLowerCase() === 'files.readwrite');
+    return !!list && list.some((x) => String(x).toLowerCase() === name);
   }
 
   function openFileLabel() {
     return pageUiLang() === 'he' ? 'פתיחת הקובץ' : 'Open file';
   }
 
-  function newFileReasonLine(result) {
+  function closeReasonLine(map, result) {
     const code = String((result && (result.reason || result.error)) || '');
     const he = pageUiLang() === 'he';
-    const lines = {
-      'name-taken': he ? 'כבר יש קובץ בשם הזה ב-OneDrive' : 'A file with that name is already in OneDrive > Glance',
-      'files-not-granted': he ? 'צריך הרשאה ל-OneDrive' : 'OneDrive needs to be allowed first',
-      'not-connected': he ? 'צריך להתחבר מחדש' : 'Reconnect Outlook',
-      'switch-off': he ? 'לא הצלחתי לסיים, נסה שוב' : "Couldn't finish, try again"
-    };
-    return lines[code] || (he ? 'לא הצלחתי לסיים, נסה שוב' : "Couldn't finish, try again");
+    return map[code] || (he ? 'לא הצלחתי לסיים, נסה שוב' : "Couldn't finish, try again");
   }
 
-  // Newest row for this mail. A later Undo (outlookReopen) reopens it.
-  async function findWrittenNewFile(pane) {
-    const bag = await FlowStorage.get();
-    const log = (bag && bag.log) || [];
-    const want = new Set([pane && pane.itemId, pane && pane.conversationId, pane && pane.pathId].map(canonKey).filter(Boolean));
-    for (const e of log) {
-      if (!e || e.connectorId !== 'onedriveNewFile') continue;
-      const ids = [e.messageId, e.outlookConversationId, e.pathId, e.itemId].map(canonKey).filter(Boolean);
-      if (!ids.some((id) => want.has(id))) continue;
-      if (e.kind === 'undone' && e.outlookReopen) return null;
-      if (e.kind === 'written' && e.ref && e.ref.itemId) return e;
-    }
-    return null;
-  }
+  function makeCloseChain(cfg) {
+    const CHAIN = cfg.chain;
 
-  function newFileUndoHandler(host, messageId, ref) {
-    return guardedUndo(host, async () => {
-      const undoToken = captureMailToken();
-      const u = await send({ type: 'flow:undo-action', connectorId: 'onedriveNewFile', ref: ref });
-      if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'verify-timeout')) {
-        return { ok: false, reason: u.reason, written: u.written };
+    // Newest row for this mail. A later Undo (outlookReopen) reopens it.
+    async function findWritten(pane) {
+      const bag = await FlowStorage.get();
+      const log = (bag && bag.log) || [];
+      const want = new Set([pane && pane.itemId, pane && pane.conversationId, pane && pane.pathId].map(canonKey).filter(Boolean));
+      for (const e of log) {
+        if (!e || e.connectorId !== cfg.connectorId) continue;
+        const ids = [e.messageId, e.outlookConversationId, e.pathId, e.itemId].map(canonKey).filter(Boolean);
+        if (!ids.some((id) => want.has(id))) continue;
+        if (e.kind === 'undone' && e.outlookReopen) return null;
+        if (e.kind === 'written' && e.ref && e.ref[cfg.refKey]) return e;
       }
-      if (!(u && u.ok)) return { ok: false, written: (u && u.written) || 'Could not remove the file.' };
-      await FlowStorage.appendLog({
-        kind: 'undone',
-        label: (u && u.written) || 'File removed from OneDrive.',
-        messageId: messageId,
-        app: 'outlook',
-        connectorId: 'onedriveNewFile',
-        outlookReopen: true
-      });
-      if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
-      lastKey = '';
-      lastSig = '';
-      paintIfCurrent(undoToken, function () { paintRemove(host); });
-      schedule();
-      return { ok: true, written: (u && u.written) || 'File removed from OneDrive.', reopen: true };
-    });
-  }
-
-  async function mountNewFileReceipt(pane, row, messageId) {
-    const mount = mountPoint();
-    if (!mount) return false;
-    const token = pane && pane.__mailToken;
-    const old = mount.querySelector('.flow-chip-host');
-    if (old && old.classList.contains('flow-chip-settled') && old.getAttribute('data-glance-chain') === NEW_FILE_CHAIN) {
-      lastOutcome = 'card';
-      lastKey = (messageId || 'open') + '|' + NEW_FILE_CHAIN;
-      return true;
+      return null;
     }
-    if (old) paintIfCurrent(token, function () { paintRemove(old); });
-    const host = paintIfCurrent(token, function () { return injectCard(mount, {
-      app: 'outlook',
-      doLabel: 'Do It',
-      messageId: messageId,
-      itemId: pane && pane.itemId,
-      conversationId: pane && pane.conversationId,
-      hydrateHow: pane && pane.hydrateHow,
-      priorConversationId: pane && pane.priorConversationId,
-      process: { id: 'new-file', name: 'New file', steps: [{ kind: 'drive', id: 'create' }] },
-      intent: { label: row.label || 'New file' },
-      glanceChain: NEW_FILE_CHAIN,
-      decisionReason: NEW_FILE_CHAIN
-    }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; const clickToken = captureMailToken(); paintIfCurrent(clickToken, function () { paintRemove(h); }); } }); });
-    if (!host) return false;
-    host.setAttribute('data-glance-chain', NEW_FILE_CHAIN);
-    host.setAttribute('data-glance-message', messageId || '');
-    lastOutcome = 'card';
-    lastKey = (messageId || 'open') + '|' + NEW_FILE_CHAIN;
-    const status = (row && row.receiptStatus) || pageChrome().handled;
-    paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
-      status: status,
-      written: row.label || status,
-      url: row.url || null,
-      linkLabel: openFileLabel(),
-      onUndo: newFileUndoHandler(host, messageId, row.ref)
-    }); });
-    await clearReason(pane, NEW_FILE_CHAIN);
-    return true;
-  }
 
-  async function showNewFileCard(pane, plan, messageId) {
-    if (doItInFlight) return false;
-    const mount = mountPoint();
-    if (!mount) { await pageReason('page:no-mount', pane); return false; }
-    const token = pane && pane.__mailToken;
-    const old = mount.querySelector('.flow-chip-host');
-    if (old && old.getAttribute('data-glance-chain') === NEW_FILE_CHAIN) { lastOutcome = 'card'; return true; }
-    const process = {
-      id: 'new-file',
-      name: plan.fileName,
-      steps: (plan.steps || []).map((st) => ({ kind: st.kind, id: st.id, label: st.label, proof: st.proof })),
-      closingLine: plan.line
-    };
-    const ctx = {
-      app: 'outlook',
-      doLabel: 'Do It',
-      messageId: messageId,
-      outlookIncomingId: messageId,
-      outlookConversationId: (pane && pane.conversationId) || null,
-      pathId: (pane && pane.pathId) || null,
-      itemId: (pane && pane.itemId) || null,
-      threadId: (pane && (pane.conversationId || pane.itemId)) || messageId,
-      subject: (pane && pane.subject) || '',
-      bodyText: holdTextOf(pane),
-      sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
-      intent: { label: plan.fileName, kind: 'new-file', lang: plan.lang },
-      process: process,
-      newFile: { params: { fileKind: plan.fileKind, fileName: plan.fileName, name: plan.name } },
-      glanceChain: NEW_FILE_CHAIN,
-      decisionReason: NEW_FILE_CHAIN,
-      hydrateHow: pane && pane.hydrateHow,
-      priorConversationId: pane && pane.priorConversationId
-    };
-    if (old) paintIfCurrent(token, function () { paintRemove(old); });
-    const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
-      onDoIt: (h, chip, c) => { onNewFileDoIt(h, chip, c); },
-      onDismiss: (h, c) => { onDismiss(h, c); }
-    }); });
-    if (!host) { await pageReason('page:inject-failed', pane); return false; }
-    host.setAttribute('data-glance-chain', NEW_FILE_CHAIN);
-    host.setAttribute('data-glance-message', messageId || '');
-    lastOutcome = 'card';
-    lastKey = (messageId || 'open') + '|' + NEW_FILE_CHAIN;
-    dbg('decision', { shown: true, chain: NEW_FILE_CHAIN, file: plan.fileName });
-    dbg('rendered', { messageId: messageId || null, chain: NEW_FILE_CHAIN });
-    await clearReason(pane, NEW_FILE_CHAIN);
-    await FlowStorage.appendLog({
-      kind: 'shown',
-      label: plan.fileName,
-      messageId: messageId,
-      process: { id: process.id, name: process.name, steps: process.steps },
-      intent: ctx.intent,
-      app: 'outlook',
-      sender: ctx.sender,
-      subject: ctx.subject,
-      text: ctx.bodyText
-    }).catch(() => {});
-    return true;
-  }
-
-  async function onNewFileDoIt(host, chip, ctx) {
-    const token = captureMailToken();
-    if (ignoreStaleClick(host)) return;
-    doItInFlight = true;
-    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', pageChrome().closing); });
-    let wrote = null;
-    try {
-      const nf = (ctx && ctx.newFile) || {};
-      if (ignoreStaleClick(host)) return;
-      const r = await send({
-        type: 'flow:execute-action',
-        payload: { connectorId: 'onedriveNewFile', params: nf.params || {}, messageId: ctx.messageId }
-      });
-      if (!r || !r.ok || !r.ref || !r.ref.itemId || r.fetchedBack !== true) {
-        paintIfCurrent(token, function () {
-          if (chip) FlowChipHost.setChipState(chip, 'flow-chip-error', newFileReasonLine(r));
+    function undoHandler(host, messageId, ref) {
+      return guardedUndo(host, async () => {
+        const undoToken = captureMailToken();
+        const u = await send({ type: 'flow:undo-action', connectorId: cfg.connectorId, ref: ref });
+        if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'verify-timeout' || u.reason === 'link-changed')) {
+          return { ok: false, reason: u.reason, written: u.written };
+        }
+        if (!(u && u.ok)) return { ok: false, written: (u && u.written) || cfg.undoFailed };
+        await FlowStorage.appendLog({
+          kind: 'undone',
+          label: (u && u.written) || cfg.undone,
+          messageId: messageId,
+          app: 'outlook',
+          connectorId: cfg.connectorId,
+          outlookReopen: true
         });
-        return;
-      }
-      const status = pageChrome().handled;
-      const written = r.written || 'New file in OneDrive.';
-      wrote = { ref: r.ref, written: written, url: r.url || null, status: status };
-      await FlowStorage.appendLog({
-        kind: 'written',
-        label: written,
-        messageId: ctx.messageId,
-        app: 'outlook',
-        connectorId: 'onedriveNewFile',
-        ref: r.ref,
-        where: r.where,
-        url: r.url || null,
-        proof: r.proof || null,
-        fetchedBack: true,
-        receiptStatus: status,
-        intent: ctx.intent,
-        process: ctx.process,
-        sender: ctx.sender,
-        subject: ctx.subject,
-        text: ctx.bodyText,
-        outlookConversationId: ctx.outlookConversationId || null,
-        pathId: ctx.pathId || null,
-        itemId: ctx.itemId || null
+        if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
+        lastKey = '';
+        lastSig = '';
+        paintIfCurrent(undoToken, function () { paintRemove(host); });
+        schedule();
+        return { ok: true, written: (u && u.written) || cfg.undone, reopen: true };
       });
-      if (ctx.messageId) {
-        await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
-        await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
+    }
+
+    async function mountReceipt(pane, row, messageId) {
+      const mount = mountPoint();
+      if (!mount) return false;
+      const token = pane && pane.__mailToken;
+      const old = mount.querySelector('.flow-chip-host');
+      if (old && old.classList.contains('flow-chip-settled') && old.getAttribute('data-glance-chain') === CHAIN) {
+        lastOutcome = 'card';
+        lastKey = (messageId || 'open') + '|' + CHAIN;
+        return true;
       }
+      if (old) paintIfCurrent(token, function () { paintRemove(old); });
+      const host = paintIfCurrent(token, function () { return injectCard(mount, {
+        app: 'outlook',
+        doLabel: 'Do It',
+        messageId: messageId,
+        itemId: pane && pane.itemId,
+        conversationId: pane && pane.conversationId,
+        hydrateHow: pane && pane.hydrateHow,
+        priorConversationId: pane && pane.priorConversationId,
+        process: { id: CHAIN, name: cfg.name, steps: [{ kind: cfg.stepKind, id: 'close' }] },
+        intent: { label: row.label || cfg.name },
+        glanceChain: CHAIN,
+        decisionReason: CHAIN
+      }, { onDoIt: () => {}, onDismiss: (h) => { if (ignoreStaleClick(h)) return; const clickToken = captureMailToken(); paintIfCurrent(clickToken, function () { paintRemove(h); }); } }); });
+      if (!host) return false;
+      host.setAttribute('data-glance-chain', CHAIN);
+      host.setAttribute('data-glance-message', messageId || '');
+      lastOutcome = 'card';
+      lastKey = (messageId || 'open') + '|' + CHAIN;
+      const status = (row && row.receiptStatus) || pageChrome().handled;
       paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
         status: status,
-        written: written,
-        url: r.url || null,
-        linkLabel: openFileLabel(),
-        onUndo: newFileUndoHandler(host, ctx.messageId, r.ref)
+        written: row.label || status,
+        url: row.url || null,
+        linkLabel: cfg.linkLabel(),
+        onUndo: undoHandler(host, messageId, row.ref)
       }); });
-    } catch (e) {
-      glanceError('new file receipt', e);
-      if (wrote && host && host.isConnected) {
-        try {
-          paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
-            status: wrote.status,
-            written: wrote.written,
-            url: wrote.url,
-            linkLabel: openFileLabel(),
-            onUndo: newFileUndoHandler(host, ctx.messageId, wrote.ref)
-          }); });
-        } catch (e2) { glanceError('new file receipt', e2); }
-      }
-    } finally {
-      doItInFlight = false;
+      await clearReason(pane, CHAIN);
+      return true;
     }
+
+    async function showCard(pane, plan, messageId) {
+      if (doItInFlight) return false;
+      const mount = mountPoint();
+      if (!mount) { await pageReason('page:no-mount', pane); return false; }
+      const token = pane && pane.__mailToken;
+      const old = mount.querySelector('.flow-chip-host');
+      if (old && old.getAttribute('data-glance-chain') === CHAIN) { lastOutcome = 'card'; return true; }
+      const label = cfg.cardLabel(plan);
+      const process = {
+        id: CHAIN,
+        name: label,
+        steps: (plan.steps || []).map((st) => ({ kind: st.kind, id: st.id, label: st.label, proof: st.proof })),
+        closingLine: plan.line
+      };
+      const ctx = {
+        app: 'outlook',
+        doLabel: 'Do It',
+        messageId: messageId,
+        outlookIncomingId: messageId,
+        outlookConversationId: (pane && pane.conversationId) || null,
+        pathId: (pane && pane.pathId) || null,
+        itemId: (pane && pane.itemId) || null,
+        threadId: (pane && (pane.conversationId || pane.itemId)) || messageId,
+        subject: (pane && pane.subject) || '',
+        bodyText: holdTextOf(pane),
+        sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
+        intent: { label: label, kind: CHAIN, lang: plan.lang },
+        process: process,
+        closeChain: { params: cfg.paramsOf(plan) },
+        glanceChain: CHAIN,
+        decisionReason: CHAIN,
+        hydrateHow: pane && pane.hydrateHow,
+        priorConversationId: pane && pane.priorConversationId
+      };
+      if (old) paintIfCurrent(token, function () { paintRemove(old); });
+      const host = paintIfCurrent(token, function () { return injectCard(mount, ctx, {
+        onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+        onDismiss: (h, c) => { onDismiss(h, c); }
+      }); });
+      if (!host) { await pageReason('page:inject-failed', pane); return false; }
+      host.setAttribute('data-glance-chain', CHAIN);
+      host.setAttribute('data-glance-message', messageId || '');
+      lastOutcome = 'card';
+      lastKey = (messageId || 'open') + '|' + CHAIN;
+      dbg('decision', { shown: true, chain: CHAIN, what: label });
+      dbg('rendered', { messageId: messageId || null, chain: CHAIN });
+      await clearReason(pane, CHAIN);
+      await FlowStorage.appendLog({
+        kind: 'shown',
+        label: label,
+        messageId: messageId,
+        process: { id: process.id, name: process.name, steps: process.steps },
+        intent: ctx.intent,
+        app: 'outlook',
+        sender: ctx.sender,
+        subject: ctx.subject,
+        text: ctx.bodyText
+      }).catch(() => {});
+      return true;
+    }
+
+    async function onDoIt(host, chip, ctx) {
+      const token = captureMailToken();
+      if (ignoreStaleClick(host)) return;
+      doItInFlight = true;
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', pageChrome().closing); });
+      let wrote = null;
+      try {
+        const cc = (ctx && ctx.closeChain) || {};
+        if (ignoreStaleClick(host)) return;
+        const r = await send({
+          type: 'flow:execute-action',
+          payload: { connectorId: cfg.connectorId, params: cc.params || {}, messageId: ctx.messageId }
+        });
+        if (!r || !r.ok || !r.ref || !r.ref[cfg.refKey] || r.fetchedBack !== true) {
+          paintIfCurrent(token, function () {
+            if (chip) FlowChipHost.setChipState(chip, 'flow-chip-error', closeReasonLine(cfg.reasons(), r));
+          });
+          return;
+        }
+        const status = pageChrome().handled;
+        const written = r.written || cfg.writtenDefault;
+        wrote = { ref: r.ref, written: written, url: r.url || null, status: status };
+        await FlowStorage.appendLog({
+          kind: 'written',
+          label: written,
+          messageId: ctx.messageId,
+          app: 'outlook',
+          connectorId: cfg.connectorId,
+          ref: r.ref,
+          where: r.where,
+          url: r.url || null,
+          proof: r.proof || null,
+          fetchedBack: true,
+          receiptStatus: status,
+          intent: ctx.intent,
+          process: ctx.process,
+          sender: ctx.sender,
+          subject: ctx.subject,
+          text: ctx.bodyText,
+          outlookConversationId: ctx.outlookConversationId || null,
+          pathId: ctx.pathId || null,
+          itemId: ctx.itemId || null
+        });
+        if (ctx.messageId) {
+          await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
+          await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
+        }
+        paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
+          status: status,
+          written: written,
+          url: r.url || null,
+          linkLabel: cfg.linkLabel(),
+          onUndo: undoHandler(host, ctx.messageId, r.ref)
+        }); });
+      } catch (e) {
+        glanceError(CHAIN + ' receipt', e);
+        if (wrote && host && host.isConnected) {
+          try {
+            paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
+              status: wrote.status,
+              written: wrote.written,
+              url: wrote.url,
+              linkLabel: cfg.linkLabel(),
+              onUndo: undoHandler(host, ctx.messageId, wrote.ref)
+            }); });
+          } catch (e2) { glanceError(CHAIN + ' receipt', e2); }
+        }
+      } finally {
+        doItInFlight = false;
+      }
+    }
+
+    // Quiet unless the scope is granted and the worker's plan says offer. A receipt already written stays the card.
+    async function settle(pane, st) {
+      const messageId = (pane && (pane.itemId || pane.conversationId || pane.pathId)) || '';
+      const row = await findWritten(pane);
+      if (row) return mountReceipt(pane, row, row.messageId || messageId);
+      if (!cfg.scopeOk(st)) return false;
+      const text = ((pane && pane.subject) ? pane.subject + '. ' : '') + holdTextOf(pane);
+      if (!String(text).trim()) return false;
+      const plan = await send({ type: cfg.planMessage, text: text });
+      if (!plan || plan.action !== 'offer' || !cfg.planOk(plan)) return false;
+      return showCard(pane, plan, messageId);
+    }
+
+    return { settle: settle, chain: CHAIN };
   }
 
-  // One explicit ask for a new, named, empty file. Quiet unless the worker's switch is on, OneDrive is
-  // allowed (Files.ReadWrite) and the worker's plan says offer. A receipt already written stays the card.
-  async function settleNewFile(pane, st) {
-    const messageId = (pane && (pane.itemId || pane.conversationId || pane.pathId)) || '';
-    const row = await findWrittenNewFile(pane);
-    if (row) return mountNewFileReceipt(pane, row, row.messageId || messageId);
-    if (!hasFilesWrite(st)) return false;
-    const text = ((pane && pane.subject) ? pane.subject + '. ' : '') + holdTextOf(pane);
-    if (!String(text).trim()) return false;
-    const plan = await send({ type: 'flow:new-file-plan', text: text });
-    if (!plan || plan.action !== 'offer' || !plan.fileName) return false;
-    return showNewFileCard(pane, plan, messageId);
+  const newFileChain = makeCloseChain({
+    chain: 'new-file',
+    connectorId: 'onedriveNewFile',
+    planMessage: 'flow:new-file-plan',
+    refKey: 'itemId',
+    stepKind: 'drive',
+    name: 'New file',
+    undone: 'File removed from OneDrive.',
+    undoFailed: 'Could not remove the file.',
+    writtenDefault: 'New file in OneDrive.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'files.readwrite'),
+    planOk: (plan) => Boolean(plan.fileName),
+    cardLabel: (plan) => plan.fileName,
+    paramsOf: (plan) => ({ fileKind: plan.fileKind, fileName: plan.fileName, name: plan.name }),
+    reasons: () => ({
+      'name-taken': pageUiLang() === 'he' ? 'כבר יש קובץ בשם הזה ב-OneDrive' : 'A file with that name is already in OneDrive > Glance',
+      'files-not-granted': pageUiLang() === 'he' ? 'צריך הרשאה ל-OneDrive' : 'OneDrive needs to be allowed first',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook'
+    })
+  });
+
+  const eventLinkChain = makeCloseChain({
+    chain: 'event-link',
+    connectorId: 'outlookEventCallLink',
+    planMessage: 'flow:event-link-plan',
+    refKey: 'eventId',
+    stepKind: 'calendar',
+    name: 'Teams link',
+    undone: 'Teams link removed from the event.',
+    undoFailed: 'Could not remove the Teams link.',
+    writtenDefault: 'Teams link on your event.',
+    linkLabel: () => pageChrome().openEvent,
+    scopeOk: (st) => (typeof FlowOutlookCalendar !== 'undefined' && FlowOutlookCalendar.hasWriteScope) ? FlowOutlookCalendar.hasWriteScope(calendarScopes(st)) : false,
+    planOk: (plan) => Boolean(plan.event && plan.event.id),
+    cardLabel: (plan) => (plan.event && plan.event.summary) || 'Teams link',
+    paramsOf: (plan) => ({ event: plan.event }),
+    reasons: () => ({
+      'not-yours': pageUiLang() === 'he' ? 'האירוע לא שלך' : "That event isn't yours",
+      'already-has-link': pageUiLang() === 'he' ? 'כבר יש קישור לאירוע' : 'The event already has a link',
+      'event-gone': pageUiLang() === 'he' ? 'האירוע לא נמצא' : 'The event is gone',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook'
+    })
+  });
+
+  async function settleCloseChains(pane, st) {
+    if (await newFileChain.settle(pane, st)) return newFileChain.chain;
+    if (await eventLinkChain.settle(pane, st)) return eventLinkChain.chain;
+    return '';
   }
 
   async function scan() {
@@ -4234,8 +4286,9 @@
 
     // A new empty Word or Excel file asked for by name (switch ONEDRIVE_NEW_FILE, off): the worker decides.
     try {
-      if (await settleNewFile(pane, st)) {
-        dbg('decision', { shown: true, reason: NEW_FILE_CHAIN, subject: pane.subject });
+      const closed = await settleCloseChains(pane, st);
+      if (closed) {
+        dbg('decision', { shown: true, reason: closed, subject: pane.subject });
         return;
       }
     } catch (e) {

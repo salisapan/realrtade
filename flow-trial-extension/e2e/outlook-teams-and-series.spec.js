@@ -192,3 +192,81 @@ test('ONEDRIVE_NEW_FILE on: a mail that asks for the content to be written gets 
   await expect(page.locator(PANE + ' button.flow-chip')).toHaveCount(0);
   expect((await drive(glance)).items).toHaveLength(0);
 });
+
+// ---- A Teams link on an event already on the calendar (switch OUTLOOK_EVENT_CALL_LINK) ---------------------
+// "Thursday" in the mail means the nearest coming Thursday, so the event is on that one.
+const NEXT_THURSDAY = (() => {
+  const d = new Date(Date.now() + 1 * 24 * 3600 * 1000);
+  while (d.getDay() !== 4) d.setDate(d.getDate() + 1);
+  return d;
+})();
+const THURSDAY_ISO = NEXT_THURSDAY.getFullYear() + '-' + String(NEXT_THURSDAY.getMonth() + 1).padStart(2, '0') + '-' + String(NEXT_THURSDAY.getDate()).padStart(2, '0');
+const ASK_LINK = 'Can you add a Teams link to the Thursday sync?';
+
+async function eventLinkMail(glance, switches, body, id, seed) {
+  await glance.seedOutlook(switches ? { glanceSwitches: switches } : {}, { calendar: true });
+  await glance.evaluateWorker((day) => {
+    globalThis.__glanceE2e.outlookEvents['e2e-existing-sync'] = {
+      id: 'e2e-existing-sync', subject: 'Thursday sync', isOrganizer: true, isOnlineMeeting: false, onlineMeeting: null, isCancelled: false,
+      start: { dateTime: day + 'T10:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: day + 'T10:30:00.0000000', timeZone: 'UTC' },
+      attendees: [], body: { contentType: 'text', content: 'Weekly sync' }, location: { displayName: '' }, webLink: 'https://outlook.office.com/calendar/item/e2e-existing-sync', recurrence: null
+    };
+  }, THURSDAY_ISO);
+  if (seed) await glance.evaluateWorker(seed);
+  return glance.openOutlook({ id: id, subject: 'Sync', senderEmail: S.SENDER, senderName: 'flow', body: body });
+}
+const syncEvent = (glance) => glance.evaluateWorker(() => globalThis.__glanceE2e.outlookEvents['e2e-existing-sync'] || null);
+
+test('OUTLOOK_EVENT_CALL_LINK off: the ask gets no event-link card and the event is untouched', async ({ glance }) => {
+  const page = await eventLinkMail(glance, null, ASK_LINK, 'AQMk-el-off');
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="event-link"]')).toHaveCount(0);
+  expect((await syncEvent(glance)).isOnlineMeeting).toBe(false);
+});
+
+test('OUTLOOK_EVENT_CALL_LINK on: Do It turns on only the Teams meeting of that event, read back; Undo turns it off', async ({ glance }) => {
+  const page = await eventLinkMail(glance, { OUTLOOK_EVENT_CALL_LINK: true }, ASK_LINK, 'AQMk-el-on');
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="event-link"] button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(PANE)).toContainText('Thursday sync');
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const ev = await syncEvent(glance);
+  expect(ev.isOnlineMeeting).toBe(true);
+  expect(ev.onlineMeeting.joinUrl).toMatch(/teams\.microsoft\.com\/l\/meetup-join/);
+  expect(ev.subject).toBe('Thursday sync');
+  expect(ev.attendees).toEqual([]);
+  const patches = (await glance.apiCalls()).filter((c) => c.method === 'PATCH');
+  expect(patches.length).toBeGreaterThan(0);
+  expect((await glance.apiCalls()).some((c) => /sendMail|\/send\b/.test(c.url))).toBe(false);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toHaveCount(1);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await syncEvent(glance)).isOnlineMeeting).toBe(false);
+});
+
+test('OUTLOOK_EVENT_CALL_LINK on: Undo leaves an event the person edited', async ({ glance }) => {
+  const page = await eventLinkMail(glance, { OUTLOOK_EVENT_CALL_LINK: true }, ASK_LINK, 'AQMk-el-edit');
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="event-link"] button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await glance.evaluateWorker(() => { globalThis.__glanceE2e.outlookEvents['e2e-existing-sync'].subject = 'Thursday sync (moved)'; });
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await page.waitForTimeout(2500);
+  expect((await syncEvent(glance)).isOnlineMeeting).toBe(true);
+});
+
+test('OUTLOOK_EVENT_CALL_LINK on: an event that already has a call is never touched', async ({ glance }) => {
+  const page = await eventLinkMail(glance, { OUTLOOK_EVENT_CALL_LINK: true }, ASK_LINK, 'AQMk-el-has', () => {
+    const ev = globalThis.__glanceE2e.outlookEvents['e2e-existing-sync'];
+    ev.isOnlineMeeting = true; ev.onlineMeeting = { joinUrl: 'https://teams.microsoft.com/l/meetup-join/already' };
+  });
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="event-link"]')).toHaveCount(0);
+  expect((await glance.apiCalls()).filter((c) => c.method === 'PATCH')).toHaveLength(0);
+});
+
+test('OUTLOOK_EVENT_CALL_LINK on: Zoom named is the other side\'s choice and gets no card', async ({ glance }) => {
+  const page = await eventLinkMail(glance, { OUTLOOK_EVENT_CALL_LINK: true }, 'Can you add a Zoom link to the Thursday sync?', 'AQMk-el-zoom');
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="event-link"]')).toHaveCount(0);
+});

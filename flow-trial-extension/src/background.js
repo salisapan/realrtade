@@ -65,6 +65,8 @@ import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
 import '../core/outlook-excel.js'; // classic: sets globalThis.FlowOutlookExcel (an empty .xlsx for a new file)
 import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)
+import '../core/event-call-link.js'; // classic: sets globalThis.FlowEventCallLink (the event picker the Outlook twin uses)
+import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOutlookEventCallLink (switch OUTLOOK_EVENT_CALL_LINK, off)
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
@@ -5621,6 +5623,67 @@ async function onedriveNewFileUndo(ref) {
   return { ok: false, reason: (u && u.reason) || 'undo-failed' };
 }
 
+// A Teams link on an event that is already on the calendar ("add a Teams link to the Thursday sync"),
+// core/outlook-event-call-link.js. Off unless the owner's switch OUTLOOK_EVENT_CALL_LINK is true. The
+// worker lists the next fortnight of the person's events (read only), the module picks the one event
+// that fits or stays silent; Do It turns on the Teams meeting of that one event only, reads it back by
+// id, and Undo turns it off again only while the event is as Glance left it. No guest, nothing sent.
+async function graphJson(method, path, body, headers) {
+  const url = OUTLOOK_GRAPH + String(path || '');
+  outlookAssertNotSend(url);
+  const init = { method: String(method || 'GET').toUpperCase() };
+  if (headers) init.headers = Object.assign({}, headers);
+  if (body != null) { init.body = JSON.stringify(body); init.headers = Object.assign({}, init.headers || {}, { 'Content-Type': 'application/json' }); }
+  let res = null;
+  try { res = await outlookFetch(url, init); } catch (e) { return { ok: false, status: 0, json: null }; }
+  if (!res || res.notConnected) return { ok: false, status: 401, json: null };
+  let json = null;
+  if (res.status !== 204 && typeof res.json === 'function') { try { json = await res.json(); } catch (e) { json = null; } }
+  return { ok: !!res.ok, status: res.status || 0, json: json };
+}
+
+async function eventLinkPlan(msg) {
+  const M = globalThis.FlowOutlookEventCallLink;
+  if (!M || typeof M.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  if (!(await glanceSwitchOn(M.SWITCH))) return { action: 'off', reason: 'switch-off' };
+  const text = String((msg && msg.text) || '').slice(0, 4000);
+  const now = new Date();
+  // Cheap first: no events are listed unless the mail asks for a link at all.
+  const asked = M.recognize(text, now);
+  if (!asked || asked.kind !== 'clear') return { action: 'silence', reason: (asked && asked.reason) || 'no-ask' };
+  const from = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+  const to = new Date(now.getTime() + 14 * 24 * 3600 * 1000).toISOString();
+  const listed = await graphJson('GET', '/me/calendarView?startDateTime=' + encodeURIComponent(from) + '&endDateTime=' + encodeURIComponent(to) +
+    '&$top=50&$select=id,subject,start,isOnlineMeeting,isOrganizer,isCancelled', null, { Prefer: 'outlook.timezone="' + localTimeZone() + '"' });
+  if (!listed.ok || !listed.json || !Array.isArray(listed.json.value)) return { action: 'silence', reason: 'not-searched' };
+  const plan = M.plan({ flags: { [M.SWITCH]: true }, text: text, now: now, events: listed.json.value });
+  return plan;
+}
+
+async function eventLinkWrite(p) {
+  const M = globalThis.FlowOutlookEventCallLink;
+  if (!M) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  if (!Cal || !Cal.hasWriteScope(scopes)) return { ok: false, reason: 'calendar-write-not-granted' };
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(M.SWITCH);
+  const r = await M.addLink({ flags: { [M.SWITCH]: on }, event: params.event }, { graph: graphJson });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
+async function eventLinkUndo(ref) {
+  const M = globalThis.FlowOutlookEventCallLink;
+  if (!M) return { ok: false };
+  const u = await M.undo(ref, { graph: graphJson });
+  if (u && u.ok) return { ok: true, written: 'Teams link removed from the event.' };
+  if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'link-changed')) return { ok: false, reason: u.reason, written: u.error || '' };
+  return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+}
+
 // A Hold It for "weekly sync every Tuesday at 10:00" is one meeting that repeats. With the
 // owner's switch RECURRING_HOLD on (default off, the same switch as the Gmail Hold It) and one
 // stated rule the hold's own date fits, the event becomes the series. Still no attendee.
@@ -6521,7 +6584,7 @@ const WRITERS = {
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
   outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
-  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite,
+  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, outlookEventCallLink: eventLinkWrite,
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
@@ -6534,7 +6597,7 @@ const UNDOERS = {
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
   outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
-  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo,
+  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, outlookEventCallLink: eventLinkUndo,
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
@@ -6706,6 +6769,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.docusignReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:signature-check' ? docusignCheck(msg.payload) : docusignRelease(msg.payload));
+  }
+
+  if (msg.type === 'flow:event-link-plan') {
+    return reply(sendResponse, eventLinkPlan(msg));
   }
 
   if (msg.type === 'flow:new-file-plan') {
