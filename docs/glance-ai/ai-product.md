@@ -88,9 +88,9 @@ Today the site promises judgment on the device, with one masked sentence for the
 | # | Decision | Why it blocks |
 |---|---|---|
 | 1 | ~~Approve this spec, and the identity wording in §8~~ **done 2026-10-09** | - |
-| 2 | Where Glance cloud model is served, and the monthly spend cap | Tier 2 cannot go live without a host |
-| 3 | 200 owner-verified labels (`glance-ai/labeling/`, row 60) | Promotion of any model and any fine-tune needs them |
-| 4 | The new privacy and consent copy (§6) | Nothing leaves the device under the new rule before it |
+| 2 | ~~Where Glance cloud model is served~~ **approved 2026-10-14**: a pay-per-use GPU host running our own copy of the model; the cap amount (below $50) still to be set; not rented yet | Tier 2 cannot go live without a host |
+| 3 | 200 owner-verified labels (`glance-ai/labeling/`, row 60): now from the owner's own use, path A of `learning-from-use.md` (2026-10-13) | Promotion of any model and any fine-tune needs them |
+| 4 | ~~The new privacy and consent copy (§6)~~ **approved 2026-10-14** (`docs/glance-ai/proposals/2026-10-12-owner-decisions.md` §2); it ships in the commit that wires the switch, off, and goes live only with a Netlify «מאשר» | Nothing leaves the device under the new rule before it |
 | 5 | Free/Pro allowance for model-first reading, after M6 numbers | Cost per user |
 
 ## 8. Identity change (approved and applied 2026-10-09)
@@ -122,3 +122,65 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
 - 2026-10-09: spec written; direction decided by the owner; daily routine set (Sun–Thu, 10:52 Israel).
 - 2026-10-09: the owner approved the spec and the identity wording; applied in the identity files. The old 07:47 open-tasks routine was switched off at the owner's request.
 - 2026-10-10: M8 (per-user context) added at the owner's request. Three more routines set: breadth builder (open-tasks row 65), scenario rehearsal (66), red team (67).
+- 2026-10-11: **M1 built** (branch `claude/ai-engine-2026-10-11`, switch `aiUnderstandingV1`, default off). `core/understanding.js` validates a model's Understanding against the masked text. Every claim must quote real words; the device reads the due date from the quoted words itself; `proposal()` gives at most one step. Corpus `test/understanding-corpus.cjs`. Measured offline on the 786 cached Qwen3.5-4B shadow cases (`glance-ai/oss/shadow-combined/gated/score-understanding.cjs`, no model run, spec labels):
+
+  | system | wrong Do It | missed (HE / EN) | model card with a wrong date |
+  |---|---|---|---|
+  | model, no gate | 8/464 | 23/322 (11/153, 12/169) | 8/8 |
+  | model + validator (no gate) | **3/464** | 26/322 (14/153, 12/169) | **0/5** |
+  | model + strict gate (today's lab best) | 0/464 | 37/322 (21/153, 16/169) | 8/8 |
+  | model + validator + strict gate | 0/464 | 40/322 (24/153, 16/169) | **0/5** |
+
+  Finding: every Hebrew weekday date the model put on a card was wrong (8/8; for example «ביום רביעי» said on a Wednesday read as tomorrow). The strict gate let all 8 through, and the validator corrects or stops all of them. Cost: 3 Hebrew promise cards (they already carried a wrong date) go silent, because `core/extract.js` does not read «עד רביעי» or «עד שלישי» without «יום». That parser fix is the next step; it waits because `extract.js` is in an open PR. The cached answers carry no spans or confidence, so the scorer gives each claim the span the text offers and every act a confidence of 0.9. The confidence floor is not measured here.
+- 2026-10-12: **M1 finished, M2 built** (same branch; switches `aiUnderstandingV1` and `aiPrimary`, both default off).
+  - The validator now also reads a bare weekday that `core/extract.js` leaves unread («עד שלישי», «ביום ה׳», "by Thursday"). It reads exactly one named day, the next one. A Hebrew weekday needs its prefix (bare «שני» is "two"), and two weekdays mean two alternatives, so no day.
+  - The 3 Hebrew cards M1 lost come back with the right date. On the 786 cached cases, validator + strict gate: 0/464 wrong Do It, 37/322 missed (21/153 HE, 16/169 EN), the same as the strict gate alone. Model cards with a wrong date: **0/8** (the gate alone: 8/8).
+  - `core/understanding-router.js`: Tier 0 rules, then the device model, then Glance cloud with consent and only masked text; the strict gate and veto sit on every model answer.
+  - End to end with the device's real mask in front of Tier 2 (`glance-ai/oss/shadow-combined/gated/score-router.cjs`, cached answers as Tier 2): 0 wrong Do It on every set, 37/322 missed, 0/8 wrong dates. The mask stopped none of the lab texts.
+  - Cost input for M6 and owner decisions 2 and 5: **150 of 796 mails (19%) reach Tier 2**. The rest are settled on the device with no model call.
+  - Corpora: `test/understanding-corpus.cjs` and `test/understanding-router-corpus.cjs`.
+- 2026-10-12 (after the owner's «תעשה הכל»): **M6 cost model** (`glance-ai/oss/cost/cost-model.cjs`, tables in `cost-tables.md`). It uses the measured 19% Tier 2 share and assumes a 1,500-character mail. At 100 mails a day, Glance cloud costs about $0.05–0.20 per person per month on pay-per-use hosts; an always-on L4 is about $281 a month fixed. Prices come from a web search and are not verified on the providers' pages. The three owner decisions (host and cap, privacy and consent copy, batch-001 labels) are prepared as one-word approvals in `docs/glance-ai/proposals/2026-10-12-owner-decisions.md`.
+- 2026-10-13: **M3 built** (same branch, PR #128). `flow-landing/netlify/functions/glance-assist/understand.js` adds the actions `understand-read` and `understand-status`.
+  - Off until all three are set: `GLANCE_AI_PRIMARY` (languages), `GLANCE_AI_SPEND_CAP_USD` (the owner's monthly cap for everyone together, counted per read at `GLANCE_AI_CALL_MICROUSD`, default $0.0004) and the model endpoint (`GLANCE_MODEL_URL` + `GLANCE_MODEL_KEY`, any OpenAI-compatible server; the host is still the owner's §7 row 2).
+  - Each person also has a monthly allowance (`GLANCE_AI_PRIMARY_FREE`/`_PRO`, placeholders 300/3,000 until §7 row 5).
+  - The server refuses text that still holds a contact detail, an amount or a date, with no call and no charge. It grounds every quote with `validate(..., { placesOnly: true })` and returns no model text.
+  - A model that never answered is refunded; an answered read is charged.
+  - The one shared prompt is `core/understanding.js` `instructions()`.
+  - Bug found and fixed while building: the server read values it cannot read (the placeholders) and lowercased the quotes, so a date never reached the device. Now the server keeps the quote as written and the device reads it.
+  - Tests: `glance-assist/understand.test.cjs` (switch, cap, masking, allowance, refunds, wire format, and one pass device mask → server → device router).
+  - Lab: `score-router.cjs --via-server`: 0/464 wrong Do It, 37/322 missed, 0/8 wrong dates, the same as in-process. 150/150 cloud reads answered; $0.06 counted against the cap.
+- 2026-10-14: **M5 built** (same branch, PR #128): `core/model-plan.js`, switch `aiPlanV1` off.
+  - A grounded model proposal becomes the product's own process (`actions.js` `planFor`), drawn by the steps list (`step-list.js` `rowsFor`).
+  - The plan gate allows only calendar, draft and task writes (never a send or a page action), requires an anchor that matches the proposal, and accepts only dates the device read.
+  - Each plan carries `doneWhen` (a sent reply, an event read back, the promised item arriving; never the draft or the task itself) and `carry` (when Glance looks again).
+  - Lab (`score-router.cjs`, Plans section): the 9 closes only the model found reach the screen. Before, 0/9 had a plan the steps list could draw. Now 9/9 are planned (Schedule It 3, Log It 4, Reply & Track 2), with 0 plan-gate refusals, 8/8 dated steps on the gold day, 0 send steps and 9/9 with a done-when. Anchor equals the gold step on 8/9 (the one miss is the existing wrong-action case).
+  - The owner decision on labels (§7 row 3) is now met by path A of `docs/glance-ai/learning-from-use.md`. The batch-001 ask is withdrawn: the owner does not label by hand.
+- 2026-10-18: after merging the working branch (0.9.56, #163/#144), two hand-off defects in M1/M5 came to light and are fixed.
+  - (1) `proposal()` dropped the meeting's clock (`due_time`), so a model meeting would have become a calendar event with no hour. The new `planFor` correctly refuses a calendar step without a clock, so the 3 lab meeting plans became `no-process`. The clock now travels from the quote to the step: calendar steps with a clock went from 0/3 to 3/3.
+  - (2) `model-plan` did not pass the mail text to `planFor`, so its new meeting veto (cancelled, past, out-of-office, webinar) and its hedge check did not run on model plans. They do now, with corpus cases.
+  - `extract.js` 0.9.56 now reads «עד 14/10» as 14 October; the corpus follows it, and «3/4» stays unread.
+  - Lab after the fixes: 9/9 model proposals planned, 8/8 right dates, 0 send steps, 0/464 wrong Do It, 37/322 missed.
+- 2026-10-19: **M8 built (silence-only)** (same branch, PR #128): `core/understanding-router.js` switch `aiRelevanceV1` (off).
+  - The host's per-user profile scorer is injected as `deps.relevance`. A `not_relevant` mail is silenced right after the hard quiets, before any model call. `relevant` and `unknown` change nothing, so the router never adds a card today's rules would not show; the owner lock keeps the Cc-only, addressed-to-other and no-To/Cc hedges.
+  - Measured through the real router on the frozen contrast-heldout-v0 pairs (`glance-ai/profile/run-router-relevance.cjs`; synthetic, `ownerVerified` 0), with Tier 0 as today's engine and the lab's `featurize` as the scorer: wrong Do It 10/60 → **5/60**, missed close on relevant mail 50/60 → 50/60 (unchanged). 33 of 120 mails end before any model call.
+  - The offer side (the full lab judge) stays a shadow only: it would bring missed closes to 11/60, but wrong Do It stays at 10/60, so it is not built in.
+  - With no profile the scorer says `unknown`, and the 786-case lab numbers do not move.
+- 2026-10-20: **carry until closed for model closes** (same branch, PR #128, switch `aiPlanV1` off). `core/model-plan.js` `toWatch()` hands a planned ask or promise to the follow loop (`core/follow-up.js` `buildWatch`), so a close only the model found is carried like every other one.
+  - An ask of you becomes a "mine" loop (`owe:reply`) that closes when your reply goes out.
+  - A promise to you becomes a "theirs" loop, chased by the loop's own `chaseDate` until the item arrives.
+  - A meeting stays on the calendar.
+  - `carry` in the plan now uses the same rules, so the plan and the loop never disagree.
+  - Lab: model asks and promises carried by the follow loop went from 0/6 to **6/6** (mine 2, theirs 4); loop deadline on the gold day 5/5.
+- 2026-10-21: **M4 built** (same branch, PR #128): `core/understanding-device.js`, switch `aiDeviceTier1` off.
+  - The device model reads a mail twice and counts an answer only when both readings agree. A per-language self-test (the `local-lm.js` bars) decides whether it may run at all; otherwise Router v2 sends the mail to Glance cloud, masked.
+  - Lab simulation (`score-router.cjs --device`): the cached Qwen3.5-4B answers play the device model. Its self-test on these cases fails, with precision EN 0.57 and HE 0.56 before the gate, against a 0.97 bar. So Tier 1 stays off, all 150 mails go to the cloud, and the numbers do not move. The gate keeps a weak device model out.
+  - What-if with the test forced to pass (`--device --device-pass`): the device answers 33 mails itself and cloud calls drop from 150 to 117. Quality is unchanged (0/464 wrong Do It, 37/322 missed, 0/8 wrong dates, 9/9 planned, 6/6 carried), because the strict gate and veto sit on Tier 1 too.
+  - Not a measurement of any real browser model.
+- 2026-10-21: the AI-engine numbers (M1–M8) live in this §10 only. `docs/glance-ai/STATE.md` and `glance-ai/run-cpu-checks.sh` are left as on the working branch, because open PR #150 also changes both files and the auto-merge lock forbids a shared file. The lab scorers run on their own: `node glance-ai/oss/shadow-combined/gated/score-understanding.cjs`, `score-router.cjs`, `score-router.cjs --via-server`, `node glance-ai/profile/run-router-relevance.cjs`, `node glance-ai/oss/cost/cost-model.cjs`. They go back into `run-cpu-checks.sh` once #150 is closed.
+- 2026-10-20 review: `negation-conditional` is red at the tip without this change. It was added in `8e0682f1` (#165), and its first failure is v2syn-1639 pos-meeting-ask, which wanted an offer and got intent-null. `gmail-outlook-parity` is green again. The others are unchanged from 10-19.
+- 2026-10-19 review: the 7 corpora from 10-18 are still red at the tip. `realshape-0956` and `regress-144` are red too: their Hebrew hold fixture is pinned to «18/10 11:00», which is now in the past (date-bound, no code commit). `live-gate-0956` failed once and passed three times in a row (flaky).
+- 2026-10-18 review, red on the working-branch tip without this change (with `jsdom` installed): `background-write`, `card-decision`, `gmail-outlook-parity`, `google-closes`, `outlook-runner` and `outlook-sync` break at `3bba620f` (#163, the 0.9.56 bundle). `flip-sample-0956` has been red since `183e1cd5` (#144). Without `jsdom` (a new devDependency) 10 more fail for that reason alone. `outlook-calendar` is green again.
+- 2026-10-12 review, red on the working-branch tip without this change:
+  - `outlook-calendar-corpus` is still red (the `instanceof Date` defect, see 10-11).
+  - `glance-ai/profile/test-heldout.cjs:36` expects the learned profile scorer at 58.3% (35/60) and gets 60.0% (36/60). It is green on the first parent of `f8f57a6` and red from the #118 merge, so the 0.9.41–0.9.55 engine moved one pair. The number needs re-pinning by the lab owner. It also stops `run-cpu-checks.sh` before its later steps; both M1/M2 scorers were run directly and pass.
+- 2026-10-11 review: `test/outlook-calendar-corpus.cjs` has been red on the working branch since 2026-10-08, with or without this change. Cause: `core/outlook-calendar.js:119` checks `i.now instanceof Date`, which is false for a Date from another realm (the test's vm sandbox), so the code falls back to the real clock, and the fixture's 2026-10-08 is now in the past. Clock-dependent, not a code commit (bisect lands on the docs-only #105). Fix: read `now` through `getTime()`. Also red on the base without this change: `glance-ai/run-cpu-checks.sh` step 4 (regenerated `all.jsonl` sha256 `d7961f08…` against the pinned `d4aab097…`), so steps 5–7 did not run. The gated score and the new Understanding score were run directly and pass.

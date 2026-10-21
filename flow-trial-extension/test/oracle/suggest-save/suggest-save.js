@@ -35,7 +35,8 @@
 
   var DOC_EXT = { pdf: 1, doc: 1, docx: 1, xls: 1, xlsx: 1, ppt: 1, pptx: 1, csv: 1, txt: 1, rtf: 1, odt: 1, ods: 1, odp: 1, key: 1, pages: 1, numbers: 1 };
   var IMG_EXT = { jpg: 1, jpeg: 1, png: 1, heic: 1 };
-  var DOC_MIN = 2 * 1024, IMG_MIN = 100 * 1024;
+  // A real document under 2KB is still the file. An empty file stays small-doc.
+  var DOC_MIN = 1, IMG_MIN = 100 * 1024;
 
   function extOf(name) { var m = /\.([A-Za-z0-9]{1,8})$/.exec(String(name || '')); return m ? m[1].toLowerCase() : ''; }
   function cidSet(list) { var s = {}; (list || []).forEach(function (c) { s[String(c).replace(/^<|>$/g, '').toLowerCase()] = 1; }); return s; }

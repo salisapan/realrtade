@@ -20,6 +20,9 @@
 //   That consent window opens only after an explicit Connect click. Do It,
 //   a 401 retry, and Gmail auto-connect stay silent and, if they cannot
 //   mint a token, report not-connected instead of popping a window.
+//   A change in the required scopes is the one exception: the cached token
+//   still carries the old grant, so Glance drops it and asks once, including
+//   the web-auth fallback. A later silent call does not ask again.
 //   No server-side exchange and no Client Secret either way.
 //
 //   Notion authenticates with an internal integration token the user creates
@@ -42,19 +45,49 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
+import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
+import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
+import '../core/todo-recurrence.js'; // classic: sets globalThis.FlowTodoRecurrence (switch RECURRING_TODO, off)
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
+// Loaded after proof-of-close.js on purpose: the module reads FlowProofOfClose when it loads.
+import '../core/planner-task.js'; // classic: sets globalThis.FlowPlannerTask (switch PLANNER_TASK, off)
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
+import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
+import '../core/outlook-excel.js'; // classic: sets globalThis.FlowOutlookExcel (an empty .xlsx for a new file)
+import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)
+import '../core/event-call-link.js'; // classic: sets globalThis.FlowEventCallLink (the event picker the Outlook twin uses)
+import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOutlookEventCallLink (switch OUTLOOK_EVENT_CALL_LINK, off)
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
+import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
+import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+// The worker cannot call import(). These are the helpers imported at the top of this file.
+globalThis.__glanceGoogleAuth = {
+  GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
+  webTokenUsable: webTokenUsable
+};
+import '../core/lane-ms-host.js'; // lane-ms: one hook, loads the Microsoft Graph lane
 import { LADDER } from '../config/ladder.public.js';
+import { CONNECTORS } from '../config/connectors.public.js';
+import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
+import '../core/asana-close.js'; // classic: sets globalThis.FlowAsanaClose
+import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
+import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
+import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
+import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
+import './google-lane-host.js';
+import './gmail-reinject.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -190,13 +223,52 @@ try {
   });
 } catch (e) { console.error('[Glance] right-click menu unavailable', e); }
 chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
+async function migrateGoogleEverConnected() {
+  try {
+    const bag = await chrome.storage.local.get([
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      'glanceLaneUndo'
+    ]);
+    const patch = googleEverConnectedPatch(bag);
+    if (patch) await chrome.storage.local.set(patch);
+  } catch (e) { /* storage can close during a restart */ }
+}
+function refreshStoredGoogleNames() {
+  refreshGoogleSession().then((session) => {
+    if (session && session.token) return rememberGoogleProfile(session.token);
+  }).catch(() => {});
+}
+// One silent pass per service-worker start. onInstalled (unpacked reload is
+// reason "update"), onStartup, and a timer all call this. The first one
+// runs. A new worker starts the flag over.
+let googleAuthBooted = false;
+function bootGoogleAuth() {
+  if (googleAuthBooted) return;
+  googleAuthBooted = true;
+  refreshStoredGoogleNames();
+}
+chrome.runtime.onInstalled.addListener((details) => {
+  const reason = details && details.reason;
+  if (reason !== 'install' && reason !== 'update') return;
+  migrateGoogleEverConnected();
+  injectOpenGmailTabs();
+  bootGoogleAuth();
+});
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => {
+  migrateGoogleEverConnected();
+  injectOpenGmailTabs();
+  bootGoogleAuth();
+});
+if (typeof setTimeout === 'function') setTimeout(bootGoogleAuth, 0);
 
 /* ---------------------------------------------------- other apps (opt-in) */
 // Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
 // site's permission (an OPTIONAL host permission: the install itself asks for nothing new) and then registers the content scripts for
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
+// WhatsApp Web is not its own row. It turns on with the one Meta consent.
 const SURFACES = {
-  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
   slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
   telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
@@ -209,7 +281,7 @@ const SURFACES = {
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
-const GMAIL_ONLY_SCRIPTS = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
+const GMAIL_ONLY_SCRIPTS = ['core/draft-reply.js', 'core/google-config.js', 'core/google-compose.js', 'src/google-compose-page.js', 'src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
 
 function surfaceScripts(id) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
@@ -254,8 +326,81 @@ async function registerSurfaceNow(id) {
   return { ok: true, registered: !same, injected };
 }
 
+// What to do with an Outlook tab after the service worker returns.
+// A live script is asked to look again. An empty page is injected.
+// A dead script is left in place: reloading the tab would wipe a message
+// the person is still writing. The page paints the refresh line itself.
+// If that line is missing, the icon badge is the fallback. A window that
+// is not a normal browser window is left alone.
+function recoverOutlookTab(probe) {
+  const windowType = probe && probe.windowType;
+  // "missing" is a failed window lookup, not a popup. Only a known
+  // non-browser window is left alone.
+  if (windowType && windowType !== 'normal' && windowType !== 'missing') return 'skip';
+  // A fresh injection has its own chrome.runtime.id. That is not the page
+  // script. Only a ping the existing script answers means it is still live.
+  if (probe && probe.pingOk) return 'rescan';
+  if (probe && probe.hasPage && probe.refreshShown) return 'leave';
+  if (probe && probe.hasPage) return 'ask';
+  return 'inject';
+}
+
+async function noteOutlookNeedsRefresh(tabId) {
+  try {
+    const cur = await chrome.storage.local.get({ glanceOutlookRefresh: {} });
+    const map = Object.assign({}, (cur && cur.glanceOutlookRefresh) || {});
+    map[String(tabId)] = true;
+    await chrome.storage.local.set({ glanceOutlookRefresh: map });
+  } catch (e) { /* the icon badge still marks the tab */ }
+  try {
+    if (chrome.action && typeof chrome.action.setBadgeText === 'function') {
+      chrome.action.setBadgeText({ text: '!', tabId: tabId });
+      if (typeof chrome.action.setBadgeBackgroundColor === 'function') {
+        chrome.action.setBadgeBackgroundColor({ color: '#123ccb', tabId: tabId });
+      }
+    }
+  } catch (e) { /* the popup still reads the stored flag */ }
+  console.warn('Glance: outlook tab ' + tabId + ' needs a manual refresh');
+}
+
+async function clearOutlookNeedsRefresh(tabId) {
+  try {
+    const cur = await chrome.storage.local.get({ glanceOutlookRefresh: {} });
+    const map = Object.assign({}, (cur && cur.glanceOutlookRefresh) || {});
+    delete map[String(tabId)];
+    await chrome.storage.local.set({ glanceOutlookRefresh: map });
+  } catch (e) { /* the flag expires when the page is fresh */ }
+  try {
+    if (chrome.action && typeof chrome.action.setBadgeText === 'function') {
+      chrome.action.setBadgeText({ text: '', tabId: tabId });
+    }
+  } catch (e) { /* the number badge can return */ }
+}
+
+function gmailSurfaceScript() {
+  let blocks = [];
+  try { blocks = chrome.runtime.getManifest().content_scripts || []; } catch (e) { blocks = []; }
+  const block = blocks.find((s) => (s.matches || []).some((m) => String(m).indexOf('mail.google.com') >= 0));
+  if (!block || !block.js || !block.js.length) return null;
+  return { matches: block.matches, js: block.js, css: block.css || [] };
+}
+
+// Already-open Gmail tabs on install, update, and browser start. No reload.
+async function injectOpenGmailTabs() {
+  const script = gmailSurfaceScript();
+  if (!script) return 0;
+  const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+  return injectSurfaceIntoOpenTabs('gmail', script, stamp, { reload: false });
+}
+
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
-async function injectSurfaceIntoOpenTabs(id, script, stamp) {
+async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
+  const gmail = id === 'gmail' || (script && Array.isArray(script.matches) && script.matches.some((m) => String(m).indexOf('mail.google.com') >= 0));
+  if (gmail) {
+    const fn = globalThis.reinjectGmailTabs;
+    if (typeof fn === 'function') return fn();
+    return 0;
+  }
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
   const want = stamp || ((typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '');
   let tabs = [];
@@ -263,6 +408,79 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp) {
   let n = 0;
   for (const tab of tabs || []) {
     if (!tab || typeof tab.id !== 'number') continue;
+    if (id === 'outlook') {
+      let windowType = 'normal';
+      try {
+        if (chrome.windows && chrome.windows.get && tab.windowId != null) {
+          const win = await chrome.windows.get(tab.windowId);
+          windowType = (win && win.type) || 'normal';
+        }
+      } catch (e) { windowType = 'missing'; }
+      let pingOk = false;
+      try {
+        const pong = await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-ping' });
+        pingOk = Boolean(pong && pong.ok);
+      } catch (e) { pingOk = false; }
+      if (windowType && windowType !== 'normal' && windowType !== 'missing') continue;
+      if (pingOk) {
+        try { await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }); } catch (e) { /* the ping just answered */ }
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      let seen = { globals: false, refreshShown: false };
+      try {
+        const probe = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            // DOM only. This function runs in a new isolated world, so
+            // chrome.runtime.id here is the new extension, not the page script.
+            let line = null;
+            let marked = false;
+            try {
+              line = document.querySelector('[data-glance-refresh]');
+              const root = document.documentElement;
+              marked = Boolean(root && root.getAttribute('data-glance-outlook')) ||
+                Boolean(document.querySelector('.flow-chip-host, .flow-why-not'));
+            } catch (e) { line = null; marked = false; }
+            return { globals: marked || Boolean(line), refreshShown: Boolean(line) };
+          }
+        });
+        seen = (probe && probe[0] && probe[0].result) || seen;
+      } catch (e) { seen = { globals: false, refreshShown: false }; }
+      const action = recoverOutlookTab({
+        windowType: windowType,
+        pingOk: false,
+        hasPage: Boolean(seen.globals),
+        refreshShown: Boolean(seen.refreshShown)
+      });
+      if (action === 'rescan') {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } }
+          });
+        } catch (e) { /* the next open looks again */ }
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      if (action === 'leave') {
+        await clearOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      if (action === 'ask') {
+        await noteOutlookNeedsRefresh(tab.id);
+        continue;
+      }
+      try {
+        if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+        n++;
+      } catch (e) {
+        // A second inject cannot redeclare the dead script. Leave the tab.
+        await noteOutlookNeedsRefresh(tab.id);
+      }
+      continue;
+    }
     try {
       const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
         let alive = false;
@@ -292,7 +510,9 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp) {
       if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
       n++;
-    } catch (e) { console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e); }
+    } catch (e) {
+      console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e);
+    }
   }
   if (n) console.info('Glance: ' + id + ' injected into ' + n + ' open tab(s)');
   return n;
@@ -337,8 +557,146 @@ async function restoreSurfaces() {
     }
   } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
 }
+// Builds from before the one Meta consent registered WhatsApp Web as
+// flow-whatsapp when that row was on. That registration can still be in
+// the browser after an update, and it would run beside glance-lane-whatsapp.
+// One wake-up removes it, only for a profile whose old WhatsApp row was on.
+// A missing id is the usual case and is remembered so later wakes do not
+// ask again. A profile that never turned that row on is left alone.
+const LEGACY_WHATSAPP_SCRIPT = 'flow-whatsapp';
+const LEGACY_WHATSAPP_FLAG = 'glanceLegacyWhatsAppCleared';
+
+function legacyWhatsAppAlreadyGone(err) {
+  const msg = String((err && err.message) || err || '').toLowerCase();
+  return msg.indexOf('not found') >= 0 || msg.indexOf('does not exist') >= 0 || msg.indexOf('nonexistent') >= 0;
+}
+
+async function dropLegacyWhatsApp() {
+  if (!chrome.scripting || !chrome.scripting.unregisterContentScripts || !chrome.storage || !chrome.storage.local) return;
+  let bag = {};
+  try { bag = await chrome.storage.local.get({ [LEGACY_WHATSAPP_FLAG]: false, surfaces: {} }); } catch (e) { return; }
+  if (bag[LEGACY_WHATSAPP_FLAG]) return;
+  const surfaces = bag.surfaces || {};
+  if (!surfaces.whatsapp || !surfaces.whatsapp.enabled) return;
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [LEGACY_WHATSAPP_SCRIPT] });
+  } catch (e) {
+    if (!legacyWhatsAppAlreadyGone(e)) return;
+  }
+  try { await chrome.storage.local.set({ [LEGACY_WHATSAPP_FLAG]: true }); } catch (e) { /* the next wake tries again */ }
+}
+
+// Chat drafts are registered from the options page. An update keeps the old
+// list, and Chrome does not inject into a tab that is already open. When the
+// person already allowed the host, register again and inject into that tab.
+const LANE_CHAT = [
+  {
+    id: 'glance-lane-whatsapp',
+    origins: ['https://web.whatsapp.com/*'],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
+  },
+  {
+    id: 'glance-lane-messenger',
+    origins: [
+      'https://www.messenger.com/*',
+      'https://messenger.com/*',
+      'https://www.facebook.com/messages',
+      'https://www.facebook.com/messages/*',
+      'https://facebook.com/messages',
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*'
+    ],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
+  },
+  {
+    id: 'glance-lane-instagram',
+    origins: [
+      'https://www.instagram.com/direct',
+      'https://www.instagram.com/direct/*',
+      'https://instagram.com/direct',
+      'https://instagram.com/direct/*'
+    ],
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
+  }
+];
+
+async function clearLaneChats() {
+  if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
+  for (const lane of LANE_CHAT) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered */ }
+  }
+}
+
+async function restoreLaneChats() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  const metaOrigins = (typeof FlowMetaConsent !== 'undefined' && Array.isArray(FlowMetaConsent.ORIGINS)) ? FlowMetaConsent.ORIGINS.slice() : [];
+  let on = false;
+  let known = false;
+  try {
+    on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    known = true;
+  } catch (e) { on = false; known = false; }
+  if (!on) {
+    if (known) await clearLaneChats();
+    if (chrome.tabs && chrome.tabs.query) {
+      const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
+      const urls = messenger ? messenger.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) : [];
+      let open = [];
+      try { open = urls.length ? await chrome.tabs.query({ url: urls }) : []; } catch (e) { open = []; }
+      if (open.length) console.info('[Glance] whyNotShown: messenger-not-granted');
+    }
+    return;
+  }
+  for (const lane of LANE_CHAT) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
+    try {
+      await chrome.scripting.registerContentScripts([{
+        id: lane.id,
+        matches: lane.origins,
+        js: lane.js,
+        runAt: 'document_idle',
+        persistAcrossSessions: true
+      }]);
+    } catch (e) {
+      console.info('[Glance] whyNotShown: lane-not-registered');
+      continue;
+    }
+    if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) continue;
+    let tabs = [];
+    try { tabs = await chrome.tabs.query({ url: lane.origins }); } catch (e) { tabs = []; }
+    for (const tab of tabs || []) {
+      if (!tab || typeof tab.id !== 'number') continue;
+      let alive = false;
+      try {
+        const reply = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => Boolean(window.__glanceLaneChat)
+        });
+        alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
+      } catch (e) { alive = false; }
+      if (alive) continue;
+      try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: lane.js }); }
+      catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
+    }
+  }
+}
+
+dropLegacyWhatsApp();
 restoreSurfaces();
-chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); });
+restoreLaneChats();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+try {
+  if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
+    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+  }
+  if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
+    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+  }
+} catch (e) { /* the next wake reads the grant again */ }
 
 async function surfaceStatus() {
   const surfaces = await readSurfaces();
@@ -1059,10 +1417,16 @@ function invalidateGoogleWebAuthFlight() {
   googleWebAuthInteractiveFlight = null;
 }
 
-// A Gmail content-script flow:connect is ensureGoogleAutoConnect. The
-// popup Connect button has no tab. Only the latter may open a window.
+// A Gmail content-script flow:connect is ensureGoogleAutoConnect and must
+// not open a window. The side panel and the popup have no tab. The popup
+// opened as a normal tab does have one, and it is still our page, so Connect
+// may open a window. A web page, or a sender from another extension, may not.
 function googleConnectWantsInteractive(sender) {
-  return !(sender && sender.tab);
+  if (!sender || !sender.tab) return true;
+  const runtimeId = chrome.runtime && chrome.runtime.id;
+  const url = typeof sender.url === 'string' ? sender.url : '';
+  if (!runtimeId || sender.id !== runtimeId) return false;
+  return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
 }
 
 function googleTasksConfigured() {
@@ -1080,6 +1444,21 @@ function glanceE2eGoogleAuth(interactive) {
   const e2e = globalThis.__glanceE2e;
   if (!e2e || typeof e2e.googleAuthToken !== 'function') return null;
   return e2e.googleAuthToken(Boolean(interactive));
+}
+
+// Headless regression only. A local mock server sets httpOrigin. Production
+// never sets __glanceE2e, so the URL below is unchanged.
+function glanceE2eRewrite(url) {
+  const e2e = globalThis.__glanceE2e;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
 }
 
 function getGoogleAuthToken(interactive) {
@@ -1106,7 +1485,18 @@ function removeCachedGoogleAuthToken(token) {
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
+// Headless regression only. chrome.identity.launchWebAuthFlow cannot be
+// replaced inside the service worker, the same reason getAuthToken goes
+// through glanceE2eGoogleAuth. Production never sets __glanceE2e.
+function glanceE2eWebAuthFlow(details) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || typeof e2e.launchWebAuthFlow !== 'function') return null;
+  return e2e.launchWebAuthFlow(details);
+}
+
 function launchGoogleWebAuthFlow(details) {
+  const hooked = glanceE2eWebAuthFlow(details);
+  if (hooked && typeof hooked.then === 'function') return hooked;
   return new Promise((resolve, reject) => {
     try {
       chrome.identity.launchWebAuthFlow(details, (responseUrl) => {
@@ -1169,18 +1559,22 @@ async function runGoogleWebAuth(interactive) {
   const redirectUri = googleWebRedirectUri();
   if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
   const state = randomOAuthState();
+  const hint = await googleLoginHint();
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
     scopes: googleManifestScopes(),
     state,
-    prompt: interactive ? 'select_account' : 'none'
+    prompt: interactive ? 'select_account' : 'none',
+    loginHint: hint
   });
   const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
   if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
   const parsed = parseGoogleImplicitRedirect(resultUrl, state);
-  const record = { accessToken: parsed.accessToken };
+  const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
   if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
+  const keptHint = parsed.email || hint;
+  if (keptHint) record.loginHint = keptHint;
   const committed = await commitGoogleWebAuth(record, epoch);
   if (!committed) throw new Error('Google sign-in was closed or denied.');
   return record;
@@ -1216,31 +1610,185 @@ async function getGoogleWebAccessToken(interactive) {
 }
 
 // getAuthToken first. The web flow runs only after a non-cancel failure.
+// openid and userinfo.profile sit on that same consent (Instinct R1). There
+// is no second prompt. given_name, family_name, and name from userinfo are
+// written onto glanceOwnNames. A refusal leaves the name list as it is.
+let googleNamesFilled = false;
+let googleProfileFlight = null;
+let googleScopeUpgradeFlight = null;
+function namesFromGoogleUserinfo(info) {
+  const out = [];
+  function add(raw) {
+    const name = String(raw || '').trim();
+    if (!name || name.toLowerCase() === 'me') return;
+    if (out.some((n) => n.toLowerCase() === name.toLowerCase())) return;
+    out.push(name);
+  }
+  const src = info || {};
+  const given = String(src.given_name || src.givenName || '').trim();
+  const family = String(src.family_name || src.familyName || src.surname || '').trim();
+  add(src.name || src.displayName);
+  add(given);
+  add(family);
+  if (given && family) add(given + ' ' + family);
+  return out;
+}
+function sameTextList(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (String(a[i]) !== String(b[i])) return false;
+  }
+  return true;
+}
+function sameGoogleProfile(a, b) {
+  const left = a || {};
+  const right = b || {};
+  return (left.displayName || null) === (right.displayName || null)
+    && (left.givenName || null) === (right.givenName || null)
+    && (left.surname || null) === (right.surname || null)
+    && (left.email || null) === (right.email || null);
+}
+function rememberGoogleProfile(token) {
+  if (!token || googleNamesFilled) return Promise.resolve();
+  if (googleProfileFlight) return googleProfileFlight;
+  googleProfileFlight = (async () => {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (!res.ok) return;
+      const info = await res.json();
+      const names = namesFromGoogleUserinfo(info);
+      if (!names.length) return;
+      const profile = {
+        displayName: info.name || null,
+        givenName: info.given_name || null,
+        surname: info.family_name || null
+      };
+      const userEmail = String((info && info.email) || '').trim();
+      if (userEmail.indexOf('@') > 0) profile.email = userEmail;
+      const bag = await chrome.storage.local.get({ glanceOwnNames: [], googleProfile: null });
+      const prev = Array.isArray(bag.glanceOwnNames) ? bag.glanceOwnNames : [];
+      const merged = prev.slice();
+      names.forEach((name) => {
+        if (!merged.some((n) => String(n).toLowerCase() === name.toLowerCase())) merged.push(name);
+      });
+      const patch = {};
+      if (!sameTextList(prev, merged)) patch.glanceOwnNames = merged;
+      if (!sameGoogleProfile(bag.googleProfile, profile)) patch.googleProfile = profile;
+      if (Object.keys(patch).length) await chrome.storage.local.set(patch);
+      googleNamesFilled = true;
+    } catch (e) { /* userinfo refused; the greeting stays on the names already stored */ }
+    finally { googleProfileFlight = null; }
+  })();
+  return googleProfileFlight;
+}
+
+async function readGoogleGrantedScopes() {
+  const bag = await chrome.storage.local.get(GOOGLE_GRANTED_SCOPES_KEY);
+  return bag[GOOGLE_GRANTED_SCOPES_KEY] || null;
+}
+
+async function writeGoogleGrantedScopes(status, source) {
+  await chrome.storage.local.set({
+    [GOOGLE_GRANTED_SCOPES_KEY]: {
+      version: scopeVersion(googleManifestScopes()),
+      status: status,
+      source: source || null,
+      at: Date.now()
+    }
+  });
+}
+
+// One shared ask. Drops the cached Chrome token and the stored web token,
+// then getAuthToken({ interactive: true }) once. A non-cancel failure uses
+// the web-auth window once. A cancel is remembered so a silent caller does
+// not ask again.
+async function upgradeGoogleScopesOnce() {
+  if (!googleScopeUpgradeFlight) {
+    let flight;
+    flight = (async () => {
+      await clearCachedChromeGoogleTokens();
+      await clearGoogleWebAuth();
+      try {
+        const token = await getGoogleAuthToken(true);
+        await writeGoogleGrantedScopes('granted', 'chrome');
+        // The chooser token lives in Chrome's cache, which this function
+        // just cleared. A later silent getAuthToken does not see it, and
+        // the stored web token was deleted above. Keep this token and
+        // clear Reconnect now, before the task-list call.
+        await recordGoogleConsent(token, 'chrome');
+        const kept = await rememberUpgradedGoogleToken(token, 'chrome');
+        if (!kept) throw new Error('Google sign-in was closed or denied.');
+        return { token: token, source: 'chrome' };
+      } catch (err) {
+        const message = err && err.message;
+        if (!shouldFallbackFromGetAuthToken(message, { interactive: true })) {
+          await writeGoogleGrantedScopes('asked', 'chrome');
+          throw err;
+        }
+        try {
+          const saved = await runGoogleWebAuth(true);
+          await recordGoogleConsent(saved.accessToken, 'web');
+          await writeGoogleGrantedScopes('granted', 'web');
+          await clearGoogleReconnect();
+          return { token: saved.accessToken, source: 'web' };
+        } catch (webErr) {
+          await writeGoogleGrantedScopes('asked', 'web');
+          throw webErr;
+        }
+      }
+    })().finally(() => {
+      if (googleScopeUpgradeFlight === flight) googleScopeUpgradeFlight = null;
+    });
+    googleScopeUpgradeFlight = flight;
+  }
+  return googleScopeUpgradeFlight;
+}
+
+// The account the person consented to in Glance. A silent Chrome token of a
+// different account is never stored over it and never used for a write.
+async function chromeTokenIsConsented(token) {
+  const lane = globalThis.FlowGoogleLaneAccount;
+  if (!lane || !token) return true;
+  const connected = await lane.read();
+  if (!connected) return true;
+  const email = await lane.accountOf(token);
+  return !email || email === connected;
+}
+
+async function recordGoogleConsent(token, source) {
+  const lane = globalThis.FlowGoogleLaneAccount;
+  if (!lane || !token) return;
+  try { await lane.record(token, source); } catch (e) { /* the first verified write records the account */ }
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
+  const granted = await readGoogleGrantedScopes();
+  if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
+    return upgradeGoogleScopesOnce();
+  }
   try {
     const token = await getGoogleAuthToken(wantUi);
+    if (wantUi) await recordGoogleConsent(token, 'chrome');
+    else if (!(await chromeTokenIsConsented(token))) throw new Error('Chrome is signed in as another Google account.');
+    // Chrome's identity cache dies with the service worker. The panel
+    // reads googleWebAuth from chrome.storage.local.
+    await persistGoogleAccessToken(token, 'chrome');
     return { token, source: 'chrome' };
   } catch (err) {
     const message = err && err.message;
     if (!shouldFallbackFromGetAuthToken(message, { interactive: wantUi })) throw err;
     try {
-      return await getGoogleWebAccessToken(wantUi);
+      const web = await getGoogleWebAccessToken(wantUi);
+      if (wantUi) await recordGoogleConsent(web.token, 'web');
+      return web;
     } catch (fallbackErr) {
       if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
       throw fallbackErr;
     }
   }
-}
-
-async function invalidateGoogleCredential(cred) {
-  if (!cred) return;
-  if (cred.source === 'web') {
-    const stored = await readGoogleWebAuth();
-    if (stored && stored.accessToken === cred.token) await clearGoogleWebAuth();
-    return;
-  }
-  if (cred.token) await removeCachedGoogleAuthToken(cred.token);
 }
 
 // Evicts Chrome's getAuthToken cache only. Does not open the web flow —
@@ -1263,7 +1811,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1276,10 +1824,22 @@ async function disconnectConnector(connectorId) {
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY]));
+    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
+      key,
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      GOOGLE_RECONNECT_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      GOOGLE_GRANTED_SCOPES_KEY,
+      'googleProfile',
+      'googleConnectedAccount',
+      'glanceOwnNames'
+    ]));
+    googleNamesFilled = false;
     return { ok: true };
   }
-  await chrome.storage.local.remove(key);
+  if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
+  // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
   return { ok: true };
 }
 
@@ -1301,36 +1861,411 @@ function googleAuthUnavailableResponse() {
 // Chrome can mint one, and the stored web-flow token otherwise. Both the
 // first fetch and the 401 retry are silent — interactive:true is reserved
 // for an explicit Connect click.
-async function googleAuthedFetch(baseUrl, path, options) {
+async function markGoogleReconnect(reason) {
+  await chrome.storage.local.set({
+    [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: String(reason || 'auth') }
+  });
+}
+
+async function clearGoogleReconnect() {
+  await chrome.storage.local.remove(GOOGLE_RECONNECT_STORAGE_KEY);
+}
+
+// chrome.storage.local, never session storage and never a module variable.
+// A new service worker still sees this record. A Chrome getAuthToken
+// callback has no expires_in. The access token is the same one-hour
+// implicit window, so the next start can tell age from expiry.
+const CHROME_TOKEN_MS = 60 * 60 * 1000;
+async function persistGoogleAccessToken(token, source, extra) {
+  const accessToken = String(token || '').trim();
+  if (!accessToken) return false;
+  const more = extra || {};
+  const record = {
+    accessToken: accessToken,
+    source: source || null,
+    obtainedAt: Date.now()
+  };
+  if (more.expiresAt) record.expiresAt = more.expiresAt;
+  else if ((source || '') === 'chrome') record.expiresAt = Date.now() + CHROME_TOKEN_MS;
+  const existing = await readGoogleWebAuth();
+  const hint = more.loginHint || (existing && existing.loginHint) || '';
+  if (hint) record.loginHint = hint;
+  return commitGoogleWebAuth(record, googleWebAuthEpoch);
+}
+
+// The account chooser returns a token and does not write googleWebAuth.
+// Persist it on the same key the silent path already reads, and drop the
+// Reconnect flag in that same step. The panel reads this record.
+async function rememberUpgradedGoogleToken(token, source) {
+  const committed = await persistGoogleAccessToken(token, source);
+  if (!committed) return false;
+  await clearGoogleReconnect();
+  return true;
+}
+
+function googleHadAccount(bag) {
+  const b = bag || {};
+  const ever = b[GOOGLE_EVER_CONNECTED_STORAGE_KEY];
+  if (ever === true || (ever && ever.connected)) return true;
+  if (b.googleTasksAuth) return true;
+  const web = b[GOOGLE_WEB_AUTH_STORAGE_KEY];
+  return Boolean(web && (web.accessToken || web.refreshToken));
+}
+
+// A stored implicit token with no expiresAt is not a session. Reading it
+// is not a refresh. prompt=none has to run.
+function storedImplicitNeedsRefresh(record, now) {
+  if (!record || typeof record.accessToken !== 'string' || !record.accessToken) return true;
+  if (record.expiresAt == null || record.expiresAt === '') return true;
+  return !webTokenUsable(record, now);
+}
+
+function tokenAgeMs(record, now) {
+  if (!record) return null;
+  if (typeof record.obtainedAt === 'number' && Number.isFinite(record.obtainedAt)) return now - record.obtainedAt;
+  if (typeof record.expiresAt === 'number' && Number.isFinite(Number(record.expiresAt))) {
+    return now - (Number(record.expiresAt) - CHROME_TOKEN_MS);
+  }
+  return null;
+}
+
+function glanceAuthSafe(message) {
+  return String(message || '').replace(/ya29\.[A-Za-z0-9._\-]+/g, '[token]').slice(0, 300);
+}
+
+const glanceAuthLines = [];
+async function glanceAuthLog(fields) {
+  const row = fields || {};
+  const out = {
+    call: row.call || '',
+    result: row.result || '',
+    message: glanceAuthSafe(row.message),
+    expiresAt: row.expiresAt == null ? null : row.expiresAt,
+    ageMs: row.ageMs == null ? null : row.ageMs,
+    state: row.state || '',
+    source: row.source || '',
+    interactive: row.interactive === undefined ? null : Boolean(row.interactive),
+    prompt: row.prompt || '',
+    extensionId: row.extensionId || '',
+    idFromKey: row.idFromKey || '',
+    keyPinned: row.keyPinned === undefined ? null : Boolean(row.keyPinned),
+    clientId: row.clientId || '',
+    extensionIdMatchesKey: row.extensionIdMatchesKey === undefined ? null : Boolean(row.extensionIdMatchesKey)
+  };
+  const line = '[glance-auth] ' + JSON.stringify(out);
+  console.info(line);
+  glanceAuthLines.push(line);
+  if (glanceAuthLines.length > 12) glanceAuthLines.shift();
+  try { await chrome.storage.local.set({ glanceAuthLog: glanceAuthLines.slice() }); }
+  catch (e) { /* the console line is the log */ }
+}
+
+async function extensionIdFromManifestKey() {
+  let key = '';
+  try { key = String((chrome.runtime.getManifest() || {}).key || ''); } catch (e) { key = ''; }
+  if (!key || !crypto || !crypto.subtle || typeof atob !== 'function') return '';
+  try {
+    const bin = atob(key);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    let hex = '';
+    for (let i = 0; i < digest.length; i++) hex += digest[i].toString(16).padStart(2, '0');
+    let id = '';
+    for (let i = 0; i < 32; i++) id += String.fromCharCode('a'.charCodeAt(0) + parseInt(hex[i], 16));
+    return id;
+  } catch (e) {
+    return '';
+  }
+}
+
+async function googleAuthIdentity() {
+  const manifest = chrome.runtime.getManifest() || {};
+  const oauth2 = manifest.oauth2 || {};
+  const extensionId = chrome.runtime && chrome.runtime.id || '';
+  const idFromKey = await extensionIdFromManifestKey();
+  return {
+    extensionId: extensionId,
+    idFromKey: idFromKey,
+    keyPinned: Boolean(manifest.key),
+    clientId: oauth2.client_id || '',
+    extensionIdMatchesKey: Boolean(idFromKey) && idFromKey === extensionId
+  };
+}
+
+async function googleLoginHint() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    const wanted = flag && (flag.reason === 'wrong-account' || flag.reason === 'account-unverified') && typeof flag.account === 'string' ? flag.account.trim() : '';
+    if (wanted.indexOf('@') > 0) return wanted;
+  } catch (e) { /* the stored hint below still applies */ }
+  const stored = await readGoogleWebAuth();
+  const hint = stored && typeof stored.loginHint === 'string' ? stored.loginHint.trim() : '';
+  return hint.indexOf('@') > 0 ? hint : '';
+}
+
+// Service-worker start. Two silent calls, never a consent window, and the
+// stored token is not deleted first. getAuthToken({interactive:false}) uses
+// the manifest Chrome-extension client. An implicit launchWebAuthFlow token
+// expires in about an hour and has no refresh token. When that expiry is
+// missing or past, the second call is launchWebAuthFlow with prompt=none,
+// the same scopes, and login_hint when one is known. That call uses the
+// Google session cookie. Reconnect is set only when both silent calls fail
+// on an account that had already connected.
+async function refreshGoogleSession() {
+  const now = Date.now();
+  const before = await chrome.storage.local.get([
+    GOOGLE_WEB_AUTH_STORAGE_KEY,
+    GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+    'googleTasksAuth'
+  ]);
+  const hadAccount = googleHadAccount(before);
+  const stored = before[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
+  const who = await googleAuthIdentity();
+  const ageMs = tokenAgeMs(stored, now);
+  await glanceAuthLog(Object.assign({
+    call: 'startup',
+    result: storedImplicitNeedsRefresh(stored, now) ? 'expired-or-missing' : 'usable',
+    message: hadAccount ? 'had account' : 'never connected',
+    expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+    ageMs: ageMs,
+    state: ''
+  }, who));
+  let chromeToken = '';
+  let chromeError = '';
+  try { chromeToken = await getGoogleAuthToken(false); }
+  catch (e) { chromeError = (e && e.message) || String(e); }
+  if (chromeToken && !(await chromeTokenIsConsented(chromeToken))) {
+    chromeToken = '';
+    chromeError = 'Chrome is signed in as another Google account.';
+  }
+  await glanceAuthLog(Object.assign({
+    call: 'getAuthToken',
+    interactive: false,
+    result: chromeToken ? 'ok' : 'error',
+    message: chromeToken ? '' : (chromeError || 'no token'),
+    expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+    ageMs: ageMs
+  }, who));
+  if (chromeToken && hadAccount) {
+    const expiresAt = now + CHROME_TOKEN_MS;
+    await persistGoogleAccessToken(chromeToken, 'chrome', { expiresAt: expiresAt });
+    await clearGoogleReconnect();
+    await glanceAuthLog(Object.assign({
+      call: 'final',
+      result: 'ok',
+      message: 'silent getAuthToken',
+      expiresAt: expiresAt,
+      ageMs: 0,
+      state: 'connected',
+      source: 'chrome'
+    }, who));
+    return { ok: true, source: 'chrome', token: chromeToken };
+  }
+  if (chromeToken && !hadAccount) {
+    await glanceAuthLog(Object.assign({
+      call: 'final',
+      result: 'ok',
+      message: 'silent getAuthToken ignored until this account has connected',
+      state: 'connect',
+      source: 'chrome'
+    }, who));
+    return { ok: true, source: 'chrome', token: chromeToken };
+  }
+  const needsWeb = hadAccount && storedImplicitNeedsRefresh(stored, now);
+  if (!needsWeb && webTokenUsable(stored, now)) {
+    if (hadAccount) await clearGoogleReconnect();
+    await glanceAuthLog(Object.assign({
+      call: 'launchWebAuthFlow',
+      interactive: false,
+      prompt: 'none',
+      result: 'skipped',
+      message: 'stored token still inside expiresAt',
+      expiresAt: stored.expiresAt,
+      ageMs: ageMs
+    }, who));
+    await glanceAuthLog(Object.assign({
+      call: 'final',
+      result: 'ok',
+      message: 'stored token still inside expiresAt; reading storage is not a refresh',
+      expiresAt: stored.expiresAt,
+      ageMs: ageMs,
+      state: 'stored',
+      source: 'stored'
+    }, who));
+    return { ok: true, source: 'stored', token: stored.accessToken };
+  }
+  if (needsWeb) {
+    let webError = '';
+    try {
+      const saved = await runGoogleWebAuth(false);
+      const fresh = await readGoogleWebAuth();
+      if (hadAccount) await clearGoogleReconnect();
+      await glanceAuthLog(Object.assign({
+        call: 'launchWebAuthFlow',
+        interactive: false,
+        prompt: 'none',
+        result: 'ok',
+        message: '',
+        expiresAt: fresh && fresh.expiresAt != null ? fresh.expiresAt : null,
+        ageMs: 0
+      }, who));
+      await glanceAuthLog(Object.assign({
+        call: 'final',
+        result: 'ok',
+        message: 'silent launchWebAuthFlow prompt=none',
+        expiresAt: fresh && fresh.expiresAt != null ? fresh.expiresAt : null,
+        ageMs: 0,
+        state: 'connected',
+        source: 'web'
+      }, who));
+      return { ok: true, source: 'web', token: saved.accessToken };
+    } catch (e) {
+      webError = (e && e.message) || String(e);
+      await glanceAuthLog(Object.assign({
+        call: 'launchWebAuthFlow',
+        interactive: false,
+        prompt: 'none',
+        result: 'error',
+        message: webError,
+        expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+        ageMs: ageMs
+      }, who));
+    }
+  } else {
+    await glanceAuthLog(Object.assign({
+      call: 'launchWebAuthFlow',
+      interactive: false,
+      prompt: 'none',
+      result: 'skipped',
+      message: hadAccount ? 'no stored token to refresh' : 'never connected',
+      expiresAt: null,
+      ageMs: null
+    }, who));
+  }
+  if (hadAccount) await markGoogleReconnect('not signed in');
+  await glanceAuthLog(Object.assign({
+    call: 'final',
+    result: 'error',
+    message: hadAccount ? 'both silent calls failed' : 'never connected',
+    expiresAt: stored && stored.expiresAt != null ? stored.expiresAt : null,
+    ageMs: ageMs,
+    state: hadAccount ? 'reconnect' : 'connect',
+    source: ''
+  }, who));
+  return { ok: false, source: null, token: '' };
+}
+
+// Google ends a grant with invalid_grant, or says it was revoked. Nothing
+// else a refresh can say (no window, no session, offline) ends it.
+function googleRefreshRevoked(err) {
+  return /invalid_grant|revoked/i.test(String((err && err.message) || err || ''));
+}
+
+// One silent refresh after a 401, then the caller retries once. Web tokens
+// use prompt=none. Chrome tokens use getAuthToken({ interactive: false }).
+// Neither opens a consent window. The stored token is kept when the refresh
+// fails: a 401 can be a single bad answer. Consent is dropped only when the
+// refresh itself says the grant is gone. A null result means: retry once
+// with the token already in hand.
+async function refreshLaneCredential(cred) {
+  const revoked = async () => {
+    if (cred && cred.source === 'web') await clearGoogleWebAuth();
+    await markGoogleReconnect('revoked');
+    return { revoked: true, token: '', source: cred && cred.source };
+  };
+  if (cred && cred.source === 'web') {
+    try {
+      const saved = await runGoogleWebAuth(false);
+      return { token: saved.accessToken, source: 'web' };
+    } catch (e) {
+      if (googleRefreshRevoked(e)) return revoked();
+    }
+  } else if (cred && cred.token) {
+    await removeCachedGoogleAuthToken(cred.token);
+  }
+  try {
+    const token = await getGoogleAuthToken(false);
+    return { token: token, source: 'chrome' };
+  } catch (e) {
+    if (googleRefreshRevoked(e)) return revoked();
+    return null;
+  }
+}
+
+// The lane host calls these. refreshSilent is getGoogleWebAccessToken(false):
+// expiry and prompt=none live in that function, not a second copy.
+globalThis.FlowGoogleAccess = {
+  refreshSilent() {
+    return getGoogleWebAccessToken(false);
+  },
+  refreshSession() {
+    return refreshGoogleSession();
+  },
+  retry(cred) {
+    return refreshLaneCredential(cred);
+  }
+};
+
+async function rememberGoogleAuthResult(res) {
+  if (!res) return res;
+  if (res.status === 401) await markGoogleReconnect('401');
+  else if (res.status === 403) await markGoogleReconnect('missing scope');
+  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
+  // after Connect stores a new token.
+  return res;
+}
+
+// options.soft marks a best-effort read (a thread lookup, a probe). Its 401
+// or 403 is that call's own answer: the token is kept, Reconnect is not
+// flagged, and nothing is refreshed. Only a write path can end the grant.
+async function googleConsentRevokedBlocksWrite() {
+  try {
+    const bag = await chrome.storage.local.get([
+      GOOGLE_RECONNECT_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY
+    ]);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    if (!flag || !flag.needed || !googleHadAccount(bag)) return false;
+    const r = String(flag.reason || '');
+    return r === 'revoked' || r === '401' || r === 'not signed in' || r === 'missing scope';
+  } catch (e) {
+    return false;
+  }
+}
+
+async function googleAuthedFetch(baseUrl, path, rawOptions) {
+  const soft = !!(rawOptions && rawOptions.soft === true);
+  const options = rawOptions ? Object.assign({}, rawOptions) : rawOptions;
+  if (options) delete options.soft;
+  const method = String((options && options.method) || 'GET').toUpperCase();
+  const isWrite = method !== 'GET' && method !== 'HEAD';
+  if (!soft && isWrite && await googleConsentRevokedBlocksWrite()) return googleAuthUnavailableResponse();
   let cred;
   try {
     cred = await getGoogleAccessToken(false);
   } catch (e) {
+    await markGoogleReconnect('not signed in');
     return googleAuthUnavailableResponse();
   }
-  const doFetch = (t) => fetch(baseUrl + path, Object.assign({}, options, {
+  const doFetch = (t) => fetch(glanceE2eRewrite(baseUrl + path), Object.assign({}, options, {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
   const res = await doFetch(cred.token);
-  if (res.status !== 401) return res;
-  // A cached token can go stale (revoked access from the Google Account
-  // permissions page, expired) without Chrome knowing yet — evict it and
-  // request a fresh one once before surfacing the failure, the same
-  // "refresh once, then fail loudly" shape every OAuth connector above uses.
-  // The refresh stays silent. prompt=none may run for a web token; a
-  // consent window may not.
-  await invalidateGoogleCredential(cred);
-  try {
-    if (cred.source === 'web') {
-      const saved = await runGoogleWebAuth(false);
-      cred = { token: saved.accessToken, source: 'web' };
-    } else {
-      cred = await getGoogleAccessToken(false);
-    }
-  } catch (e) {
-    return googleAuthUnavailableResponse();
-  }
-  return doFetch(cred.token);
+  if (soft) return res;
+  if (res.status !== 401) return rememberGoogleAuthResult(res);
+  // A cached token can go stale without Chrome knowing yet. One silent
+  // refresh and one retry, then fail loudly. The refresh stays silent:
+  // prompt=none may run for a web token; a consent window may not. The token
+  // is dropped only when the refresh says the grant was revoked.
+  const next = await refreshLaneCredential(cred);
+  if (next && next.revoked) return rememberGoogleAuthResult(res);
+  let retryToken = cred.token;
+  if (next && next.token && (next.source !== 'chrome' || await chromeTokenIsConsented(next.token))) retryToken = next.token;
+  return rememberGoogleAuthResult(await doFetch(retryToken));
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -1354,26 +2289,18 @@ async function googleConnected() {
   return Boolean(await getGoogleTasksAuth());
 }
 
-// Every write lands in the same list, found by title rather than an id
-// stashed only in local storage — reinstalling the extension (which clears
-// chrome.storage.local) still finds the same "Glance" list next time
-// instead of creating a second one.
-async function findOrCreateGlanceTaskList() {
-  const listRes = await googleTasksAuthedFetch('/users/@me/lists?maxResults=100');
-  if (!listRes.ok) throw new Error('Could not read your Google Task lists (' + listRes.status + ').');
-  const lists = (await listRes.json()).items || [];
-  const existing = lists.find((l) => l.title === GLANCE_TASK_LIST_TITLE);
-  if (existing) return existing.id;
-
-  const createRes = await googleTasksAuthedFetch('/users/@me/lists', {
-    method: 'POST',
-    body: JSON.stringify({ title: GLANCE_TASK_LIST_TITLE })
-  });
-  if (!createRes.ok) throw new Error('Could not create a Glance list in Google Tasks (' + createRes.status + ').');
-  return (await createRes.json()).id;
+// Every write lands in the list titled Glance. It is looked up by title,
+// so a reinstall finds the same list, and made only when the account has
+// none, once. The lane host owns that one lookup-then-create, so there is a
+// single place a task list can be created and its title is a constant.
+async function findGlanceTaskList() {
+  const lane = globalThis.FlowGoogleLaneAccount;
+  const id = lane && typeof lane.ensureGlanceList === 'function' ? await lane.ensureGlanceList() : '';
+  if (!id) throw new Error('Could not find or make the ' + GLANCE_TASK_LIST_TITLE + ' list in Google Tasks.');
+  return id;
 }
 
-async function connectGoogleTasks(interactive) {
+async function connectGoogleTasks(interactive, preset) {
   if (!googleTasksConfigured()) {
     throw new Error('Google isn’t configured on this build yet — manifest.json’s oauth2.client_id still needs a real Google OAuth Client ID (see the README’s “Set up Google” section).');
   }
@@ -1381,10 +2308,40 @@ async function connectGoogleTasks(interactive) {
   // script). The popup Connect click passes true. That is the one moment
   // Chrome may show the account chooser or, if browser sign-in is off, the
   // web-flow consent window. Later API calls stay silent.
-  await getGoogleAccessToken(interactive !== false);
-  const taskListId = await findOrCreateGlanceTaskList();
-  await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
+  const cred = preset || await getGoogleAccessToken(interactive !== false);
+  await rememberGoogleProfile(cred && cred.token);
+  await clearGoogleReconnect();
+  const taskListId = await findGlanceTaskList();
+  await chrome.storage.local.set({
+    googleTasksAuth: { taskListId },
+    [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
+  });
   return true;
+}
+
+// The Reconnect button on a card that refused to write because the account
+// could not be verified. It asks Google for the account of the Gmail tab
+// (login_hint) through the web flow, drops the stored token of the other
+// account first so it cannot be reused, and reports whose sign-in came back.
+async function reconnectGoogleForAccount(account) {
+  const hint = String(account || '').trim();
+  const wanted = hint.indexOf('@') > 0 ? hint : '';
+  if (!wanted) {
+    await connectGoogleTasks(true);
+    return { ok: true, account: await globalThis.FlowGoogleLaneAccount.read() };
+  }
+  await chrome.storage.local.set({ [GOOGLE_RECONNECT_STORAGE_KEY]: { needed: true, reason: 'account-unverified', account: wanted } });
+  invalidateGoogleWebAuthFlight();
+  await clearGoogleWebAuth();
+  const web = await getGoogleWebAccessToken(true);
+  await recordGoogleConsent(web.token, 'web');
+  const lane = globalThis.FlowGoogleLaneAccount;
+  const got = lane ? await lane.accountOf(web.token) : '';
+  if (!got || got.toLowerCase() !== wanted.toLowerCase()) {
+    return { ok: false, reason: got ? 'wrong-account' : 'account-unverified', account: got || '', wanted: wanted };
+  }
+  await connectGoogleTasks(true, web);
+  return { ok: true, account: got };
 }
 
 function googleTaskTitle(p) {
@@ -1523,14 +2480,14 @@ async function googleTasksWrite(p) {
   // the remedy. The only way out was Disconnect/Connect in the popup, which
   // nothing told the user to do.
   //
-  // findOrCreateGlanceTaskList already knows how to recover; it was simply
+  // findGlanceTaskList already knows how to recover; it was simply
   // only ever called at connect time. Calling it here on a 404 gives the
   // write path the same "re-resolve once, then fail loudly" shape
   // googleAuthedFetch already uses for a stale token one layer down. The new
   // id is persisted so the next write doesn't pay for the round trip again.
   if (res.status === 404) {
     try {
-      const freshListId = await findOrCreateGlanceTaskList();
+      const freshListId = await findGlanceTaskList();
       if (freshListId && freshListId !== taskListId) {
         taskListId = freshListId;
         await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, auth, { taskListId }) });
@@ -1566,7 +2523,7 @@ async function googleTasksWrite(p) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
   const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
-  const fetched = await googleTasksFetchBack(taskListId, task.id);
+  const fetched = await googleTasksFetchBack(taskListId, task.id, body.title);
   if (!fetched.ok) {
     return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
   }
@@ -1586,7 +2543,7 @@ async function googleTasksWrite(p) {
 // Read the task that was just created. fetchedBack is true only when this
 // GET returns that same id and the task is not deleted. A miss stays
 // verify_failed — the loop is not Handled.
-async function googleTasksFetchBack(taskListId, taskId) {
+async function googleTasksFetchBack(taskListId, taskId, sentTitle) {
   let res;
   try {
     res = await googleTasksAuthedFetch(
@@ -1600,6 +2557,7 @@ async function googleTasksFetchBack(taskListId, taskId) {
   let body = null;
   try { body = await res.json(); } catch (e) { return { ok: false }; }
   if (!body || body.id !== taskId || body.deleted) return { ok: false };
+  if (sentTitle != null && String(body.title || '') !== String(sentTitle)) return { ok: false };
   return { ok: true, task: body };
 }
 
@@ -1646,7 +2604,7 @@ async function followTaskCreate(p) {
   let res = await post(taskListId);
   if (res.status === 404) {
     try {
-      const fresh = await findOrCreateGlanceTaskList();
+      const fresh = await findGlanceTaskList();
       if (fresh && fresh !== taskListId) {
         taskListId = fresh;
         await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, auth, { taskListId }) });
@@ -1743,7 +2701,7 @@ async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
   try {
     const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
-    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q));
+    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
     if (!res.ok) return null;
     const data = await res.json();
     return (data.threads && data.threads[0] && data.threads[0].id) || null;
@@ -1797,6 +2755,20 @@ function localTimeZone() {
   } catch (e) {
     return 'UTC';
   }
+}
+
+// glanceTimeZone wins, then the host zone. A meeting hold does not
+// silently write UTC when the person is in another zone.
+async function outlookGlanceZone(explicit) {
+  const given = String(explicit || '').trim();
+  if (given) return given.slice(0, 80);
+  try {
+    const bag = await chrome.storage.local.get('glanceTimeZone');
+    const raw = bag && bag.glanceTimeZone;
+    if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 80);
+    if (raw && typeof raw.timeZone === 'string' && raw.timeZone.trim()) return raw.timeZone.trim().slice(0, 80);
+  } catch (e) { /* storage is optional */ }
+  return localTimeZone();
 }
 
 // No duration is ever stated in an email the way a date or time is, so
@@ -2190,7 +3162,7 @@ async function findThreadId(senderEmail, subject) {
   if (!senderEmail) return null;
   try {
     const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
-    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q));
+    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
     if (!res.ok) return null;
     const data = await res.json();
     return (data.threads && data.threads[0] && data.threads[0].id) || null;
@@ -3023,6 +3995,597 @@ async function notionUndo(ref) {
   return { ok: res.ok || res.status === 404 };
 }
 
+/* ---------------------------------------------------- Notion, with a proof */
+// docs/glance-ai/connectors/notion.md. Everything here is behind config/connectors.public.js (notionReadBack, notionOAuth), both off.
+
+const NOTION_RELAY_URL = 'https://theflow-ai.com/.netlify/functions/token-relay';
+const NOTION_AUTH_BASE = 'https://api.notion.com/v1/oauth/authorize';
+const NOTION_OUTCOME_KEY = 'connectorOutcomes';
+const NOTION_LEDGER_KEY = 'notionLedger';
+
+async function relayInstallId() {
+  const { glanceInstallId } = await chrome.storage.local.get('glanceInstallId');
+  if (glanceInstallId) return glanceInstallId;
+  const id = randomOAuthState();
+  await chrome.storage.local.set({ glanceInstallId: id });
+  return id;
+}
+
+async function relayTokenRequest(body) {
+  const res = await fetch(NOTION_RELAY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ vendor: 'notion', install_id: await relayInstallId() }, body))
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok || !data || typeof data.access_token !== 'string') return { ok: false, status: res.status, error: (data && data.error) || 'relay-failed' };
+  return { ok: true, data: data };
+}
+
+// "Sign in with Notion": the one-time code goes to the relay (which adds the secret); the token comes back and lives only on this device.
+async function connectNotionOAuth(databaseInput) {
+  if (!CONNECTORS.notionOAuth) throw new Error('Sign in with Notion is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.notionClientId);
+  if (!clientId) throw new Error('Notion sign-in isn’t configured on this build yet.');
+  const databaseId = parseNotionDatabaseId(databaseInput);
+  if (!databaseId) throw new Error('That doesn’t look like a Notion database link — open the database as a full page and copy the URL.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(NOTION_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&owner=user&redirect_uri=' + encodeURIComponent(redirectUri), 'Notion');
+  const got = await relayTokenRequest({ grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Notion connection failed (' + got.error + ').');
+  const res = await fetch(NOTION_API + '/databases/' + databaseId, { headers: notionHeaders(got.data.access_token) });
+  if (res.status === 404) throw new Error('Notion signed you in but that database was not shared with Glance — pick it on the Notion screen, or open it, click ⋯ › Connections and add Glance.');
+  if (!res.ok) throw new Error('Notion returned ' + res.status + '.');
+  const db = await res.json();
+  const title = (db.title || []).map((t) => t.plain_text).join('') || 'Untitled database';
+  await chrome.storage.local.set({ notionAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, databaseId, dbTitle: title, schema: db.properties || {}, via: 'oauth' } });
+  return { title };
+}
+
+async function notionRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+// The learning hook (core/connector-outcome.js): ids and enums only — never a title, address or text. Off with the switch.
+async function noteConnectorOutcome(stage, startedAt, extra) {
+  const O = globalThis.FlowConnectorOutcome;
+  const e = extra || {};
+  const connector = e.connector || 'notion';
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const enabled = ON[connector];
+  if (!O || !enabled) return;
+  const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
+  const ev = O.buildEvent(input, { enabled: enabled });
+  if (!ev) return;
+  try {
+    const cur = (await chrome.storage.local.get(NOTION_OUTCOME_KEY))[NOTION_OUTCOME_KEY];
+    await chrome.storage.local.set({ [NOTION_OUTCOME_KEY]: O.append(cur, ev) });
+  } catch (err) { /* a learning note never blocks a close */ }
+}
+
+function notionCloseEngine() {
+  return globalThis.FlowNotionClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getNotionAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ notionAuth: a }); },
+    refresh: notionRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(NOTION_LEDGER_KEY))[NOTION_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(NOTION_LEDGER_KEY))[NOTION_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [NOTION_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+function notionLoopKey(p, title) {
+  const base = String((p && (p.messageId || p.outlookIncomingId || p.incomingId || p.threadUrl)) || '');
+  let h = 0;
+  const s = String(title || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return 'notion:' + base + ':' + h.toString(36);
+}
+
+async function notionReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await notionCloseEngine().write({ key: notionLoopKey(p, title), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { lang: lang });
+    await noteConnectorOutcome('handled', started, { lang: lang });
+    return { ok: true, where: 'Notion', target: 'your database', written: 'Added to Notion.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Notion' };
+}
+
+async function notionReadBackUndo(ref) {
+  const r = await notionCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, {});
+  return r;
+}
+
+/* ----------------------------------------------------- Asana, with a proof */
+// docs/glance-ai/connectors/asana.md. Everything here is behind config/connectors.public.js (asanaReadBack, asanaOAuth), both off.
+
+const ASANA_API = 'https://app.asana.com/api/1.0';
+const ASANA_AUTH_BASE = 'https://app.asana.com/-/oauth_authorize';
+const ASANA_LEDGER_KEY = 'asanaLedger';
+
+async function getAsanaAuth() {
+  const { asanaAuth } = await chrome.storage.local.get('asanaAuth');
+  return asanaAuth || null;
+}
+
+// A project link is https://app.asana.com/0/<project>/list or .../project/<project>/...; a bare number also works.
+function parseAsanaProjectGid(input) {
+  const t = String(input || '').trim();
+  if (/^\d{6,30}$/.test(t)) return t;
+  const m = t.match(/\/project\/(\d{6,30})/) || t.match(/\/0\/(\d{6,30})/);
+  return m ? m[1] : null;
+}
+
+function base64Url(bytes) {
+  return btoa(String.fromCharCode.apply(null, Array.from(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// "Sign in with Asana" (OAuth with PKCE). The one-time code and the verifier go to the relay, which adds the secret.
+async function connectAsanaOAuth(projectInput) {
+  if (!CONNECTORS.asanaOAuth) throw new Error('Sign in with Asana is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.asanaClientId);
+  if (!clientId) throw new Error('Asana sign-in isn’t configured on this build yet.');
+  const projectGid = parseAsanaProjectGid(projectInput);
+  if (!projectGid) throw new Error('That doesn’t look like an Asana project link — open the project and copy the URL.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(ASANA_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&redirect_uri=' + encodeURIComponent(redirectUri) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Asana');
+  const got = await relayTokenRequest({ vendor: 'asana', grant: 'code', code: code, code_verifier: verifier, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Asana connection failed (' + got.error + ').');
+  const res = await fetch(ASANA_API + '/projects/' + projectGid + '?opt_fields=name', { headers: { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' } });
+  if (res.status === 403 || res.status === 404) throw new Error('Asana signed you in but cannot open that project — check the link and that you are a member.');
+  if (!res.ok) throw new Error('Asana returned ' + res.status + '.');
+  const body = await res.json();
+  const name = (body && body.data && body.data.name) || 'Asana project';
+  await chrome.storage.local.set({ asanaAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, projectGid: projectGid, projectName: name, via: 'oauth' } });
+  return { title: name };
+}
+
+async function asanaRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'asana', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function asanaCloseEngine() {
+  return globalThis.FlowAsanaClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getAsanaAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ asanaAuth: a }); },
+    refresh: asanaRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(ASANA_LEDGER_KEY))[ASANA_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(ASANA_LEDGER_KEY))[ASANA_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [ASANA_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function asanaReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await asanaCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'asana:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'asana', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'asana', lang: lang });
+    return { ok: true, where: 'Asana', target: 'your project', written: 'Added to Asana.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'asana', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Asana' };
+}
+
+async function asanaReadBackUndo(ref) {
+  const r = await asanaCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'asana' });
+  return r;
+}
+
+/* ------------------------------------------------------ Jira, with a proof */
+// docs/glance-ai/connectors/jira.md. Everything here is behind config/connectors.public.js (jiraReadBack, jiraOAuth), both off.
+
+const JIRA_AUTH_BASE = 'https://auth.atlassian.com/authorize';
+const JIRA_SCOPES = 'read:jira-work write:jira-work offline_access';
+const JIRA_LEDGER_KEY = 'jiraLedger';
+
+async function getJiraAuth() {
+  const { jiraAuth } = await chrome.storage.local.get('jiraAuth');
+  return jiraAuth || null;
+}
+
+// "OPS", a board/project URL (.../projects/OPS/...) or an issue URL (.../browse/OPS-12). Returns { key, host } or null.
+function parseJiraProject(input) {
+  const t = String(input || '').trim();
+  if (/^[A-Z][A-Z0-9_]{1,9}$/.test(t)) return { key: t, host: '' };
+  let host = '';
+  try { host = new URL(t).hostname; } catch (e) { return null; }
+  if (!/^[a-z0-9-]+\.atlassian\.net$/.test(host)) return null;
+  const m = t.match(/\/projects\/([A-Z][A-Z0-9_]{1,9})(?:[/?#]|$)/) || t.match(/\/browse\/([A-Z][A-Z0-9_]{1,9})-\d+/);
+  return m ? { key: m[1], host: host } : null;
+}
+
+// "Sign in with Atlassian" (OAuth 2.0 3LO). The one-time code goes to the relay, which adds the secret.
+async function connectJiraOAuth(projectInput) {
+  if (!CONNECTORS.jiraOAuth) throw new Error('Sign in with Jira is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.jiraClientId);
+  if (!clientId) throw new Error('Jira sign-in isn’t configured on this build yet.');
+  const proj = parseJiraProject(projectInput);
+  if (!proj) throw new Error('Paste the Jira project key (for example OPS) or a link to the project on your atlassian.net site.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(JIRA_AUTH_BASE + '?audience=api.atlassian.com&client_id=' + encodeURIComponent(clientId) + '&scope=' + encodeURIComponent(JIRA_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&response_type=code&prompt=consent', 'Jira');
+  const got = await relayTokenRequest({ vendor: 'jira', grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Jira connection failed (' + got.error + ').');
+  const bearer = { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' };
+  const sites = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', { headers: bearer });
+  if (!sites.ok) throw new Error('Jira returned ' + sites.status + ' when listing your sites.');
+  const list = (await sites.json()) || [];
+  const usable = (Array.isArray(list) ? list : []).filter((r) => r && /^[0-9a-f-]{36}$/.test(String(r.id)) && /^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/.test(String(r.url || '')));
+  const pick = proj.host ? usable.filter((r) => new URL(r.url).hostname === proj.host) : usable;
+  if (pick.length !== 1) throw new Error(pick.length ? 'You have several Jira sites; paste a link to the project so Glance knows which one.' : 'Glance found no Jira site it can use on that account.');
+  const site = pick[0];
+  const pr = await fetch('https://api.atlassian.com/ex/jira/' + site.id + '/rest/api/3/project/' + proj.key, { headers: bearer });
+  if (pr.status === 403 || pr.status === 404) throw new Error('Jira signed you in but cannot open project ' + proj.key + ' — check the key and that you can create issues in it.');
+  if (!pr.ok) throw new Error('Jira returned ' + pr.status + '.');
+  const project = await pr.json();
+  const types = (project && Array.isArray(project.issueTypes) ? project.issueTypes : []).filter((x) => x && /^\d{1,12}$/.test(String(x.id)) && !x.subtask);
+  const type = types.find((x) => x.name === 'Task') || types[0];
+  if (!type) throw new Error('That project has no issue type Glance can create.');
+  await chrome.storage.local.set({ jiraAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, cloudId: site.id, siteUrl: site.url.replace(/\/$/, ''), projectKey: proj.key, projectName: (project && project.name) || proj.key, issueTypeId: String(type.id), issueTypeName: type.name, via: 'oauth' } });
+  return { title: (project && project.name) || proj.key };
+}
+
+// Atlassian rotates the refresh token on every refresh: both new values are returned and saved.
+async function jiraRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'jira', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function jiraCloseEngine() {
+  return globalThis.FlowJiraClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getJiraAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ jiraAuth: a }); },
+    refresh: jiraRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(JIRA_LEDGER_KEY))[JIRA_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(JIRA_LEDGER_KEY))[JIRA_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [JIRA_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function jiraReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await jiraCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'jira:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'jira', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'jira', lang: lang });
+    return { ok: true, where: 'Jira', target: 'your project', written: 'Added to Jira.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'jira', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Jira' };
+}
+
+async function jiraReadBackUndo(ref) {
+  const r = await jiraCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'jira' });
+  return r;
+}
+
+/* ---------------------------------------------------- Linear, with a proof */
+// docs/glance-ai/connectors/linear.md. Everything here is behind config/connectors.public.js (linearReadBack, linearOAuth), both off.
+
+const LINEAR_AUTH_BASE = 'https://linear.app/oauth/authorize';
+const LINEAR_API = 'https://api.linear.app/graphql';
+const LINEAR_SCOPES = 'read,write';
+const LINEAR_LEDGER_KEY = 'linearLedger';
+
+async function getLinearAuth() {
+  const { linearAuth } = await chrome.storage.local.get('linearAuth');
+  return linearAuth || null;
+}
+
+// "ENG", or a Linear link (https://linear.app/<workspace>/team/ENG/...). Returns the team key or null.
+function parseLinearTeamKey(input) {
+  const t = String(input || '').trim();
+  if (/^[A-Z][A-Z0-9]{1,6}$/.test(t)) return t;
+  let u = null;
+  try { u = new URL(t); } catch (e) { return null; }
+  if (u.hostname !== 'linear.app') return null;
+  const m = u.pathname.match(/\/team\/([A-Z][A-Z0-9]{1,6})(?:\/|$)/);
+  return m ? m[1] : null;
+}
+
+// "Sign in with Linear" (OAuth 2.0 authorization code, PKCE S256). The one-time code and the verifier go to the relay, which adds the secret.
+async function connectLinearOAuth(teamInput) {
+  if (!CONNECTORS.linearOAuth) throw new Error('Sign in with Linear is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.linearClientId);
+  if (!clientId) throw new Error('Linear sign-in isn’t configured on this build yet.');
+  const teamKey = parseLinearTeamKey(teamInput);
+  if (!teamKey) throw new Error('Paste the Linear team key (for example ENG) or a link to the team.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(LINEAR_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&scope=' + encodeURIComponent(LINEAR_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Linear');
+  const got = await relayTokenRequest({ vendor: 'linear', grant: 'code', code: code, code_verifier: verifier, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Linear connection failed (' + got.error + ').');
+  const res = await fetch(LINEAR_API, { method: 'POST', headers: { Authorization: 'Bearer ' + got.data.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query { teams(first: 100) { nodes { id key name } } }' }) });
+  if (!res.ok) throw new Error('Linear returned ' + res.status + '.');
+  const body = await res.json();
+  const nodes = (body && body.data && body.data.teams && Array.isArray(body.data.teams.nodes)) ? body.data.teams.nodes : [];
+  const team = nodes.find((n) => n && n.key === teamKey && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(n.id)));
+  if (!team) throw new Error('Linear signed you in but found no team with the key ' + teamKey + ' that you belong to.');
+  await chrome.storage.local.set({ linearAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, teamId: team.id, teamKey: team.key, teamName: team.name || team.key, via: 'oauth' } });
+  return { title: team.name || team.key };
+}
+
+async function linearRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'linear', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function linearCloseEngine() {
+  return globalThis.FlowLinearClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getLinearAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ linearAuth: a }); },
+    refresh: linearRefreshToken,
+    uuid: () => crypto.randomUUID(),
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(LINEAR_LEDGER_KEY))[LINEAR_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(LINEAR_LEDGER_KEY))[LINEAR_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [LINEAR_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function linearReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await linearCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'linear:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'linear', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'linear', lang: lang });
+    return { ok: true, where: 'Linear', target: 'your team', written: 'Added to Linear.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'linear', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Linear' };
+}
+
+async function linearReadBackUndo(ref) {
+  const r = await linearCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'linear' });
+  return r;
+}
+
+/* -------------------------------------------------- DocuSign, read-only proof */
+// docs/glance-ai/connectors/docusign.md. READ-ONLY: Glance reads one envelope's status; it never creates, sends or changes an envelope.
+// Everything here is behind config/connectors.public.js (docusignReadBack, docusignOAuth, docusignDemo), all off.
+
+const DOCUSIGN_LEDGER_KEY = 'docusignLedger';
+
+function docusignHosts() {
+  const demo = CONNECTORS.docusignDemo === true;
+  return { vendor: demo ? 'docusign-demo' : 'docusign', auth: demo ? 'https://account-d.docusign.com/oauth/auth' : 'https://account.docusign.com/oauth/auth', userinfo: demo ? 'https://account-d.docusign.com/oauth/userinfo' : 'https://account.docusign.com/oauth/userinfo' };
+}
+
+async function getDocusignAuth() {
+  const { docusignAuth } = await chrome.storage.local.get('docusignAuth');
+  return docusignAuth || null;
+}
+
+// "Sign in with DocuSign" (OAuth 2.0 authorization code). The one-time code goes to the relay, which adds the secret.
+async function connectDocusignOAuth() {
+  if (!CONNECTORS.docusignOAuth) throw new Error('Sign in with DocuSign is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.docusignClientId);
+  if (!clientId) throw new Error('DocuSign sign-in isn’t configured on this build yet.');
+  const h = docusignHosts();
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(h.auth + '?response_type=code&scope=signature&client_id=' + encodeURIComponent(clientId) + '&redirect_uri=' + encodeURIComponent(redirectUri), 'DocuSign');
+  const got = await relayTokenRequest({ vendor: h.vendor, grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('DocuSign connection failed (' + got.error + ').');
+  const info = await fetch(h.userinfo, { headers: { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' } });
+  if (!info.ok) throw new Error('DocuSign returned ' + info.status + ' when reading your account.');
+  const body = await info.json();
+  const accounts = (body && Array.isArray(body.accounts) ? body.accounts : []).filter((a) => a && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(a.account_id)) && /^https:\/\/[a-z0-9-]+\.docusign\.net$/.test(String(a.base_uri || '')));
+  const acct = accounts.find((a) => a.is_default === true) || accounts[0];
+  if (!acct) throw new Error('DocuSign signed you in but found no account Glance can read.');
+  await chrome.storage.local.set({ docusignAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, accountId: acct.account_id, baseUri: acct.base_uri, accountName: String(acct.account_name || '').slice(0, 80), demo: CONNECTORS.docusignDemo === true, via: 'oauth' } });
+  return { title: String(acct.account_name || 'DocuSign').slice(0, 80) };
+}
+
+async function docusignRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: auth.demo ? 'docusign-demo' : 'docusign', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function docusignCloseEngine() {
+  return globalThis.FlowDocusignClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getDocusignAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ docusignAuth: a }); },
+    refresh: docusignRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(DOCUSIGN_LEDGER_KEY))[DOCUSIGN_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(DOCUSIGN_LEDGER_KEY))[DOCUSIGN_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [DOCUSIGN_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, envelope } — the loop's own id and the envelope id or DocuSign link the person linked to it.
+async function docusignCheck(payload) {
+  const started = Date.now();
+  const r = await docusignCloseEngine().check(payload || {});
+  if (r.closed) await noteConnectorOutcome('handled', started, { connector: 'docusign', closeType: 'signature' });
+  else if (r.reason === 'verify_failed') await noteConnectorOutcome('readback_failed', started, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+async function docusignRelease(payload) {
+  const r = await docusignCloseEngine().release((payload || {}).key);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+/* ------------------------------------------------------- Dropbox, with a proof */
+// docs/glance-ai/connectors/dropbox.md. One file saved into the person's Dropbox app folder, read back by id, size and content hash.
+// Everything here is behind config/connectors.public.js (dropboxReadBack, dropboxOAuth), both off.
+
+const DROPBOX_AUTH_BASE = 'https://www.dropbox.com/oauth2/authorize';
+const DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token';
+const DROPBOX_REVOKE_URL = 'https://api.dropboxapi.com/2/auth/token/revoke';
+const DROPBOX_SCOPES = 'files.content.write files.metadata.read';
+const DROPBOX_LEDGER_KEY = 'dropboxLedger';
+
+async function getDropboxAuth() {
+  const { dropboxAuth } = await chrome.storage.local.get('dropboxAuth');
+  return dropboxAuth || null;
+}
+
+// A public client with PKCE: no secret exists, so the token request goes straight to Dropbox (no relay).
+async function dropboxTokenRequest(form) {
+  const res = await fetch(DROPBOX_TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form).toString() });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok || !data || typeof data.access_token !== 'string') return { ok: false, error: (data && typeof data.error === 'string' && data.error.slice(0, 40)) || ('http-' + res.status) };
+  return { ok: true, data: data };
+}
+
+async function connectDropboxOAuth() {
+  if (!CONNECTORS.dropboxOAuth) throw new Error('Sign in with Dropbox is not switched on in this build.');
+  const appKey = publicClientId(OAUTH_PUBLIC.dropboxAppKey);
+  if (!appKey) throw new Error('Dropbox sign-in isn’t configured on this build yet.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(DROPBOX_AUTH_BASE + '?client_id=' + encodeURIComponent(appKey) + '&response_type=code&token_access_type=offline&scope=' + encodeURIComponent(DROPBOX_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Dropbox');
+  const got = await dropboxTokenRequest({ grant_type: 'authorization_code', code: code, client_id: appKey, redirect_uri: redirectUri, code_verifier: verifier });
+  if (!got.ok) throw new Error('Dropbox connection failed (' + got.error + ').');
+  await chrome.storage.local.set({ dropboxAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, via: 'oauth' } });
+  return { title: 'Dropbox' };
+}
+
+async function dropboxRefreshToken(auth) {
+  const appKey = publicClientId(OAUTH_PUBLIC.dropboxAppKey);
+  if (!auth || !auth.refreshToken || !appKey) return null;
+  const got = await dropboxTokenRequest({ grant_type: 'refresh_token', refresh_token: auth.refreshToken, client_id: appKey });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: auth.refreshToken };
+}
+
+// Best effort on Disconnect: ask Dropbox to end the token. The local token is removed either way.
+async function dropboxRevokeBestEffort() {
+  try {
+    const a = await getDropboxAuth();
+    if (a && a.token) await fetch(DROPBOX_REVOKE_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + a.token } });
+  } catch (e) { /* the token is removed locally regardless */ }
+}
+
+function dropboxCloseEngine() {
+  return globalThis.FlowDropboxClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getDropboxAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ dropboxAuth: a }); },
+    refresh: dropboxRefreshToken,
+    sha256: async (u8) => new Uint8Array(await crypto.subtle.digest('SHA-256', u8)),
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(DROPBOX_LEDGER_KEY))[DROPBOX_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(DROPBOX_LEDGER_KEY))[DROPBOX_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [DROPBOX_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, name, base64 } — the loop's own id, the file name and the file's bytes (base64), all from the person's own Do It.
+async function dropboxSave(payload) {
+  const started = Date.now();
+  const p = payload || {};
+  const b64 = typeof p.base64 === 'string' ? p.base64 : '';
+  if (!b64 || b64.length > Math.ceil(globalThis.FlowDropboxClose.MAX_BYTES * 4 / 3) + 8) return { ok: false, reason: b64 ? 'too-large' : 'bad-params' };
+  if (b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return { ok: false, reason: 'bad-params' };
+  let bytes;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); } catch (e) { return { ok: false, reason: 'bad-params' }; }
+  const lang = /[֐-׿]/.test(String(p.name || '')) ? 'he' : 'en';
+  const r = await dropboxCloseEngine().save({ key: String(p.key || ''), name: p.name, bytes: bytes });
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'dropbox', closeType: 'file', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'dropbox', closeType: 'file', lang: lang });
+  } else if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'dropbox', closeType: 'file', lang: lang });
+  return r;
+}
+
+async function dropboxUndo(payload) {
+  const r = await dropboxCloseEngine().undo((payload || {}).ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'dropbox', closeType: 'file' });
+  return r;
+}
+
 /* ------------------------------------------------------------- glance-assist */
 //
 // Feature 2 (Draft-It) and Feature 3 (attachment X-ray) both need real
@@ -3393,7 +4956,25 @@ const OUTLOOK_KEEPALIVE_MINUTES = 30;
 // minutes and, from hour 16 of the 24-hour single-page-application window, renews silently (prompt=none, no window) so a
 // new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
 // staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
+function outlookLaunchInteractive(url) {
+  return new Promise((resolve) => {
+    try {
+      chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => {
+        const err = chrome.runtime.lastError;
+        if (err || !r) resolve(null);
+        else resolve(r);
+      });
+    } catch (e) { resolve(null); }
+  });
+}
+
 function outlookLaunchSilent(url) {
+  // Headless regression only: the hidden login window cannot load there and
+  // would hold every 401 retry for the full 30s. Production never sets __glanceE2e.
+  const hooked = glanceE2eWebAuthFlow({ url, interactive: false });
+  if (hooked && typeof hooked.then === 'function') {
+    return hooked.then((r) => r || null, (e) => ({ error: String((e && e.message) || 'failed') }));
+  }
   return new Promise((resolve) => {
     try {
       chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 30000 }, (r) => {
@@ -3410,6 +4991,86 @@ function outlookPrimaryHint(auth) {
   const opaque = /^outlook_[0-9a-f]+@outlook\.com$/i;
   const list = [auth.account && auth.account.address, auth.account && auth.account.mail].concat(auth.ownAddresses || []).filter(Boolean).map((a) => String(a).toLowerCase());
   return list.find((a) => !opaque.test(a)) || list[0] || null;
+}
+
+// Hold asks for Calendars.ReadWrite only. Already granted scopes stay on the
+// request so Mail is not replaced. This does not call connect(), which clears
+// judgment. No new Chrome permission: launchWebAuthFlow is already the sign-in.
+async function outlookConsentScope(msg) {
+  const A = globalThis.FlowOutlookAuth;
+  const cfg = globalThis.FlowOutlookConfig;
+  if (!A || !cfg || typeof A.signIn !== 'function' || typeof cfg.incrementalConsentScopes !== 'function') {
+    return { ok: false, reason: 'not-configured' };
+  }
+  const scope = String((msg && msg.scope) || '');
+  const todoScope = scope === 'Tasks.ReadWrite';
+  const calendarScope = scope === 'Calendars.ReadWrite';
+  if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
+  const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = bag[OUTLOOK_AUTH_KEY];
+  if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
+  const scopes = cfg.incrementalConsentScopes(
+    [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []),
+    scope
+  );
+  if (!scopes) return { ok: false, reason: 'scope-refused' };
+  const r = await A.signIn({
+    fetch: (u, i) => fetch(u, i),
+    now: () => Date.now(),
+    random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+    sha256: (b) => crypto.subtle.digest('SHA-256', b),
+    launch: outlookLaunchInteractive
+  }, cfg, chrome.identity.getRedirectURL(), {
+    scopes: scopes,
+    prompt: 'consent',
+    loginHint: outlookPrimaryHint(auth)
+  });
+  if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
+  // The scopes we asked for are not a grant. The new token's scp (or its
+  // scope string, never the word unknown) is. A consent window that comes
+  // back without Calendars.ReadWrite does not count.
+  const Cal = globalThis.FlowOutlookCalendar;
+  const effective = (Cal && typeof Cal.scopesFromToken === 'function') ? Cal.scopesFromToken(r.token) : null;
+  const names = Array.isArray(effective) ? effective : [];
+  const has = names.some((s) => String(s).toLowerCase() === scope.toLowerCase());
+  if (calendarScope && (!Cal || !Cal.hasWriteScope(effective))) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (todoScope && !has) return { ok: false, reason: 'tasks-not-granted' };
+  const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
+  const policyKey = todoScope ? 'glanceTodoConsent' : 'glanceCalendarConsent';
+  const stored = {
+    [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {
+      token: r.token,
+      requestedScopes: scopes
+    })
+  };
+  stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
+  await chrome.storage.local.set(stored);
+  return { ok: true, policy: policy, scope: scope };
+}
+
+async function outlookReconcileProof(msg) {
+  const ref = (msg && msg.ref && typeof msg.ref === 'object') ? msg.ref : {};
+  const id = (msg && msg.externalId) || ref.externalId || ref.taskId || ref.fileId || ref.itemId || ref.eventId;
+  if (!id) return { ok: false, status: 0, reason: 'no-id' };
+  let url = '';
+  if (plannerRawId(id)) {
+    // A task the person's Planner plan holds (switch PLANNER_TASK): read by id, not from a To Do list.
+    url = OUTLOOK_GRAPH + '/planner/tasks/' + encodeURIComponent(plannerRawId(id));
+  } else if ((msg && msg.connectorId) === 'outlookCalendar' || ref.eventId) {
+    url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(ref.eventId || id);
+  } else if ((msg && (msg.connectorId === 'onedriveFile' || msg.system === 'microsoft/onedrive')) || ref.fileId) {
+    url = OUTLOOK_GRAPH + '/me/drive/items/' + encodeURIComponent(ref.fileId || ref.itemId || id);
+  } else {
+    const listId = ref.taskListId;
+    if (!listId) return { ok: false, status: 0, reason: 'no-id' };
+    url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId || id);
+  }
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); }
+  catch (e) { return { ok: false, status: 0, reason: 'error' }; }
+  if (!res) return { ok: false, status: 0, reason: 'error' };
+  return { ok: res.ok === true, status: Number(res.status) || 0 };
 }
 
 let outlookSessionBusy = null;
@@ -3494,12 +5155,33 @@ async function outlookAccessToken(opts) {
 }
 
 // A Graph call with the session's token; a 401 is answered once with a forced refresh (or silent renewal) and a retry.
+// A read-back GET gives up after 8s. The controller aborts the fetch. Undo then refuses and deletes nothing.
+const OUTLOOK_READ_MS = 8000;
 async function outlookFetch(url, init) {
   let token = await outlookAccessToken();
   if (!token) return { status: 0, ok: false, notConnected: true };
-  const call = (t) => fetch(url, Object.assign({}, init || {}, { headers: Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t }) }));
+  const call = async (t) => {
+    const method = String((init && init.method) || 'GET').toUpperCase();
+    const headers = Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t });
+    const opts = Object.assign({}, init || {}, { headers: headers });
+    let ctl = null;
+    let timer = null;
+    if (method === 'GET' && typeof AbortController === 'function') {
+      ctl = new AbortController();
+      timer = setTimeout(() => ctl.abort(), OUTLOOK_READ_MS);
+      opts.signal = ctl.signal;
+    }
+    try {
+      return await fetch(url, opts);
+    } catch (e) {
+      if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: 'verify-timeout', timedOut: true };
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
   let res = await call(token);
-  if (res.status === 401) {
+  if (res && res.status === 401) {
     token = await outlookAccessToken({ force: true });
     if (token) res = await call(token);
   }
@@ -3575,9 +5257,176 @@ async function outlookPreferredFrom(explicit) {
   }
   return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
 }
+async function outlookDraftMap() {
+  const bag = await chrome.storage.local.get(OUTLOOK_STATE_KEY);
+  const st = bag[OUTLOOK_STATE_KEY] || {};
+  return { st: st, map: Object.assign({}, st.glanceDraftByMessage || {}) };
+}
+async function outlookSaveDraftMap(st, map) {
+  await chrome.storage.local.set({ [OUTLOOK_STATE_KEY]: Object.assign({}, st, { glanceDraftByMessage: map }) });
+}
+function outlookUserEditedLine() {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.userEditedLine) ? N.userEditedLine() : 'You edited this. Undo left it alone.';
+}
+
+function outlookUnconfirmedLine() {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.unconfirmedLine) ? N.unconfirmedLine() : "Couldn't confirm it's unchanged. Undo left it alone.";
+}
+
+function outlookContentKeys() {
+  const N = globalThis.FlowNativeEdit;
+  if (N && Array.isArray(N.CONTENT_KEYS) && N.CONTENT_KEYS.length) return N.CONTENT_KEYS;
+  return ['title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end', 'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'];
+}
+
+// An owned content key is a snapshot, including an explicit null. An empty
+// object and a changeKey-only object are not.
+function outlookHasSnap(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+  const keys = outlookContentKeys();
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(snapshot, keys[i])) return true;
+  }
+  return false;
+}
+
+function outlookEditVerdict(snapshot, live) {
+  const N = globalThis.FlowNativeEdit;
+  if (N && N.compareContent) return N.compareContent(snapshot, live);
+  if (N && N.userEdited && N.userEdited(snapshot, live)) return 'edited';
+  return 'match';
+}
+
+function outlookUnconfirmed() {
+  return { ok: false, reason: 'unconfirmed', written: outlookUnconfirmedLine(), deleted: false };
+}
+
+function outlookCreationSnap(obj) {
+  const N = globalThis.FlowNativeEdit;
+  return (N && N.snapshotOf) ? N.snapshotOf(obj) : {};
+}
+
+async function outlookObjectSnap(url, prefer) {
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET', headers: prefer || {} }); }
+  catch (e) { return null; }
+  if (!res || !res.ok) return null;
+  const body = await outlookReadJson(res);
+  return body ? outlookCreationSnap(body) : null;
+}
+
+// The snapshot is a successful GET of the stored object, tried twice.
+// The POST body and the 201 body are not a snapshot. A miss is null,
+// and Undo then says it could not confirm the object is unchanged.
+async function outlookReadSnap(url, prefer) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const snap = await outlookObjectSnap(url, prefer);
+    if (outlookHasSnap(snap)) return snap;
+  }
+  return null;
+}
+
+// A draft verify read fails only when both GETs are not ok. A 200 whose
+// body has no content keys is a read: there is no snapshot, and the card
+// still says the draft is ready. Undo then cannot confirm it is unchanged.
+async function outlookDraftRead(url, prefer) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try { res = await outlookFetch(url, { method: 'GET', headers: prefer || {} }); }
+    catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const body = await outlookReadJson(res);
+    const snap = body ? outlookCreationSnap(body) : null;
+    return { ok: true, snap: outlookHasSnap(snap) ? snap : null };
+  }
+  return { ok: false, snap: null };
+}
+
+function outlookUnverifiedLine() {
+  return "Created, couldn't verify";
+}
+
+const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance,recurrence';
+
+async function outlookStoredEventSnap(eventId) {
+  return outlookReadSnap(
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT
+  );
+}
+
+// The proof is a GET of the event just created, not the POST body.
+async function outlookEventRead(eventId) {
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT;
+  outlookAssertNotSend(url);
+  let last = { snap: null, raw: null };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try { res = await outlookFetch(url, { method: 'GET' }); }
+    catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    const snap = raw ? outlookCreationSnap(raw) : null;
+    last = { snap: snap, raw: raw };
+    if (outlookHasSnap(snap)) return last;
+  }
+  return last;
+}
+
+// Read the object Glance created. Undo deletes only after this GET succeeds
+// and still matches the creation snapshot. 404 means it is already gone.
+// A 5xx, a network error, a timeout, or a body that will not parse refuses
+// with the unconfirmed line and does not delete. A field that changed is
+// an edit, and that is the only path that says the person edited it.
+async function outlookRefuseIfEdited(url, snapshot, prefer) {
+  if (!outlookHasSnap(snapshot)) return null;
+  let got;
+  try { got = await outlookUndoConfirm(url, prefer); }
+  catch (e) { return outlookUnconfirmed(); }
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (got && got.status === 404) return { ok: true, alreadyGone: true, fetchedBack: true };
+  const readable = got && (got.status === 200 || got.ok === true) && got.reason !== 'verify-timeout';
+  if (!readable) return outlookUnconfirmed();
+  let body = null;
+  try { body = await got.json(); } catch (e) { body = null; }
+  if (!body) return outlookUnconfirmed();
+  const verdict = outlookEditVerdict(snapshot, body);
+  if (verdict === 'edited') {
+    return { ok: false, reason: 'user-edited', written: outlookUserEditedLine(), fetchedBack: true };
+  }
+  if (verdict === 'unconfirmed') return outlookUnconfirmed();
+  return null;
+}
+
 async function outlookDraftWrite(p) {
   const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   if (!incomingId) return { ok: false, reason: 'no-message' };
+  const remembered = await outlookDraftMap();
+  const priorId = remembered.map[String(incomingId)] || '';
+  if (priorId) {
+    const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(priorId) + '?$select=id,isDraft,webLink';
+    outlookAssertNotSend(getUrl);
+    const got = await outlookFetch(getUrl, { method: 'GET' });
+    if (got && got.ok) {
+      let existing = null;
+      try { existing = await got.json(); } catch (e) { existing = null; }
+      if (existing && existing.isDraft !== false) {
+        return {
+          ok: true,
+          ref: existing.id || priorId,
+          where: existing.webLink || null,
+          url: existing.webLink || null,
+          reused: true,
+          reason: 'draft-already',
+          written: 'Reply draft already in Outlook Drafts. Not sent.'
+        };
+      }
+    } else if (!got || got.status === 404) {
+      delete remembered.map[String(incomingId)];
+      await outlookSaveDraftMap(remembered.st, remembered.map);
+    }
+  }
   // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
   // same composer gmailDraftWrite uses (FlowDraftReply.draftBodyText). A ready-made body is only a fallback for older callers.
   let comment = '';
@@ -3604,6 +5453,7 @@ async function outlookDraftWrite(p) {
   outlookAssertNotSend(patchUrl);
   const patchBody = { body: { contentType: 'Text', content: comment } };
   let fromSet = false;
+  let bodyWritten = false;
   if (wantFrom && draft.isDraft !== false && !outlookIsOpaqueMailbox(wantFrom)) {
     patchBody.from = { emailAddress: { address: wantFrom } };
     patchBody.sender = { emailAddress: { address: wantFrom } };
@@ -3611,10 +5461,12 @@ async function outlookDraftWrite(p) {
   if (draft.isDraft !== false) {
     try {
       const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
+      if (pr && pr.ok) bodyWritten = true;
       fromSet = Boolean(pr && pr.ok && patchBody.from);
-      if (pr && !pr.ok && patchBody.from) {
-        // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
-        await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+      // One body write. A refused From does not send the body again.
+      if (!bodyWritten && comment) {
+        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+        bodyWritten = Boolean(bodyOnly && bodyOnly.ok);
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
@@ -3645,18 +5497,38 @@ async function outlookDraftWrite(p) {
     }
     attachmentId = created.id;
   }
-  return {
-    ok: true,
+  const saved = await outlookDraftMap();
+  saved.map[String(incomingId)] = String(draft.id);
+  const keys = Object.keys(saved.map);
+  if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
+  await outlookSaveDraftMap(saved.st, saved.map);
+  const read = await outlookDraftRead(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
+  const base = {
     ref: draft.id,
     where: draft.webLink || null,
     url: draft.webLink || null,
     attachmentId: attachmentId,
-    written: attachmentId
-      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
-      : 'Reply draft ready in Outlook Drafts. Not sent.',
     fromAddress: wantFrom || null,
     fromSet: fromSet
   };
+  if (!read.ok) {
+    return Object.assign({}, base, {
+      ok: true,
+      fetchedBack: false,
+      reason: 'unverified',
+      created: null,
+      proof: null,
+      written: outlookUnverifiedLine()
+    });
+  }
+  return Object.assign({}, base, {
+    ok: true,
+    fetchedBack: read.snap ? true : undefined,
+    created: read.snap,
+    written: attachmentId
+      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+      : 'Reply draft ready in Outlook Drafts. Not sent.'
+  });
 }
 async function outlookFileForDraft(p) {
   if (p.driveFileId) {
@@ -3683,18 +5555,313 @@ async function outlookDeleteDraft(draftId, prefer) {
   const headers = prefer || {};
   try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
+// The owner's off switches live in one storage object. A missing key is off.
+async function glanceSwitchOn(name) {
+  try {
+    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+    return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+  } catch (e) { return false; }
+}
+
+async function outlookTeamsWanted(callText) {
+  const T = globalThis.FlowTeamsMeeting;
+  if (!T || typeof T.callAsked !== 'function' || !callText) return false;
+  if (!(await glanceSwitchOn(T.SWITCH))) return false;
+  return T.callAsked(callText);
+}
+
+// An empty Word document or Excel workbook in OneDrive > Glance for a mail that explicitly asks for one
+// with a name (core/onedrive-new-file.js). Off unless the owner's switch ONEDRIVE_NEW_FILE is true. The
+// plan is asked for by the page; the write reads the file back by id; Undo deletes it only while the
+// file is still the one Glance made. Nothing is shared, written into, or sent.
+async function newFilePlan(msg) {
+  const N = globalThis.FlowOnedriveNewFile;
+  if (!N || typeof N.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  const on = await glanceSwitchOn(N.SWITCH);
+  if (!on) return { action: 'off', reason: 'switch-off' };
+  return N.plan({ flags: { [N.SWITCH]: true }, text: String((msg && msg.text) || '').slice(0, 4000), now: new Date() });
+}
+
+async function onedriveNewFileCall(req) {
+  const r = req || {};
+  const url = OUTLOOK_GRAPH + String(r.path || '');
+  outlookAssertNotSend(url);
+  const init = { method: String(r.method || 'GET').toUpperCase() };
+  if (r.raw != null) {
+    init.body = r.raw;
+    init.headers = { 'Content-Type': r.contentType || 'application/octet-stream' };
+  }
+  let res = null;
+  try { res = await outlookFetch(url, init); } catch (e) { return { ok: false, status: 0, body: null }; }
+  if (!res || res.notConnected) return { ok: false, status: 401, body: null };
+  const status = res.status || 0;
+  let body = null;
+  if (status !== 204 && typeof res.json === 'function') { try { body = await res.json(); } catch (e) { body = null; } }
+  return { ok: !!res.ok, status: status, body: body };
+}
+
+async function onedriveNewFileWrite(p) {
+  const N = globalThis.FlowOnedriveNewFile;
+  if (!N) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(N.SWITCH);
+  const r = await N.create({ flags: { [N.SWITCH]: on }, fileKind: params.fileKind, fileName: params.fileName, grantedScopes: scopes }, { call: onedriveNewFileCall });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
+async function onedriveNewFileUndo(ref) {
+  const N = globalThis.FlowOnedriveNewFile;
+  if (!N) return { ok: false };
+  const u = await N.undo(ref, { call: onedriveNewFileCall });
+  if (u && u.ok) return { ok: true, written: 'File removed from OneDrive.' };
+  if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.error || '' };
+  return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+}
+
+// A Teams link on an event that is already on the calendar ("add a Teams link to the Thursday sync"),
+// core/outlook-event-call-link.js. Off unless the owner's switch OUTLOOK_EVENT_CALL_LINK is true. The
+// worker lists the next fortnight of the person's events (read only), the module picks the one event
+// that fits or stays silent; Do It turns on the Teams meeting of that one event only, reads it back by
+// id, and Undo turns it off again only while the event is as Glance left it. No guest, nothing sent.
+async function graphJson(method, path, body, headers) {
+  const url = OUTLOOK_GRAPH + String(path || '');
+  outlookAssertNotSend(url);
+  const init = { method: String(method || 'GET').toUpperCase() };
+  if (headers) init.headers = Object.assign({}, headers);
+  if (body != null) { init.body = JSON.stringify(body); init.headers = Object.assign({}, init.headers || {}, { 'Content-Type': 'application/json' }); }
+  let res = null;
+  try { res = await outlookFetch(url, init); } catch (e) { return { ok: false, status: 0, json: null }; }
+  if (!res || res.notConnected) return { ok: false, status: 401, json: null };
+  let json = null;
+  if (res.status !== 204 && typeof res.json === 'function') { try { json = await res.json(); } catch (e) { json = null; } }
+  return { ok: !!res.ok, status: res.status || 0, json: json };
+}
+
+async function eventLinkPlan(msg) {
+  const M = globalThis.FlowOutlookEventCallLink;
+  if (!M || typeof M.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  if (!(await glanceSwitchOn(M.SWITCH))) return { action: 'off', reason: 'switch-off' };
+  const text = String((msg && msg.text) || '').slice(0, 4000);
+  const now = new Date();
+  // Cheap first: no events are listed unless the mail asks for a link at all.
+  const asked = M.recognize(text, now);
+  if (!asked || asked.kind !== 'clear') return { action: 'silence', reason: (asked && asked.reason) || 'no-ask' };
+  const from = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+  const to = new Date(now.getTime() + 14 * 24 * 3600 * 1000).toISOString();
+  const listed = await graphJson('GET', '/me/calendarView?startDateTime=' + encodeURIComponent(from) + '&endDateTime=' + encodeURIComponent(to) +
+    '&$top=50&$select=id,subject,start,isOnlineMeeting,isOrganizer,isCancelled', null, { Prefer: 'outlook.timezone="' + localTimeZone() + '"' });
+  if (!listed.ok || !listed.json || !Array.isArray(listed.json.value)) return { action: 'silence', reason: 'not-searched' };
+  const plan = M.plan({ flags: { [M.SWITCH]: true }, text: text, now: now, events: listed.json.value });
+  return plan;
+}
+
+async function eventLinkWrite(p) {
+  const M = globalThis.FlowOutlookEventCallLink;
+  if (!M) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  if (!Cal || !Cal.hasWriteScope(scopes)) return { ok: false, reason: 'calendar-write-not-granted' };
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(M.SWITCH);
+  const r = await M.addLink({ flags: { [M.SWITCH]: on }, event: params.event }, { graph: graphJson });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
+async function eventLinkUndo(ref) {
+  const M = globalThis.FlowOutlookEventCallLink;
+  if (!M) return { ok: false };
+  const u = await M.undo(ref, { graph: graphJson });
+  if (u && u.ok) return { ok: true, written: 'Teams link removed from the event.' };
+  if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'link-changed')) return { ok: false, reason: u.reason, written: u.error || '' };
+  return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+}
+
+// A Hold It for "weekly sync every Tuesday at 10:00" is one meeting that repeats. With the
+// owner's switch RECURRING_HOLD on (default off, the same switch as the Gmail Hold It) and one
+// stated rule the hold's own date fits, the event becomes the series. Still no attendee.
+async function outlookSeriesWanted(callText, dateIso) {
+  const R = globalThis.FlowRecurringReminder;
+  const T = globalThis.FlowTodoRecurrence;
+  if (!R || !T || typeof R.seriesFor !== 'function' || !callText || !dateIso) return null;
+  if (!(await glanceSwitchOn(R.HOLD_SWITCH))) return null;
+  const rrule = R.seriesFor(callText, dateIso);
+  if (!rrule) return null;
+  const recurrence = T.fromRrule(rrule, dateIso);
+  return recurrence ? { rrule: rrule, recurrence: recurrence } : null;
+}
+
+// The series master read by id must carry exactly the rule asked for.
+async function outlookSeriesRuleOk(eventId, wanted) {
+  const T = globalThis.FlowTodoRecurrence;
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,recurrence,isCancelled';
+  outlookAssertNotSend(url);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 300 * attempt));
+    let res = null;
+    try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    if (raw && raw.id === eventId && raw.isCancelled !== true) return !!(T && T.agrees(wanted, raw.recurrence));
+  }
+  return false;
+}
+
+// The Teams join link the event really carries, read by id. Microsoft attaches
+// it a moment after the event exists, so the read repeats a few times.
+async function outlookTeamsJoinUrl(eventId) {
+  const T = globalThis.FlowTeamsMeeting;
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,isOnlineMeeting,onlineMeeting,isCancelled';
+  outlookAssertNotSend(url);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 300 * attempt));
+    let res = null;
+    try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    if (raw && raw.id === eventId && raw.isCancelled !== true) {
+      const link = T && T.joinUrlOf ? T.joinUrlOf(raw) : '';
+      if (link) return link;
+    }
+  }
+  return '';
+}
+
 // One calendar event for a Family B file-on-hold. The Calendar checkbox asks
 // for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
 // The body never includes attendees, so the write does not invite anyone.
+// A meeting Hold It names a clock. It is one event on the person's calendar.
+// attendees stays empty, so the write does not invite anyone.
+async function outlookMeetingWrite(p) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const meetingScopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : (session.token.grantedScopes);
+  if (!Cal || !Cal.hasWriteScope(meetingScopes)) {
+    return { ok: false, reason: 'calendar-write-not-granted' };
+  }
+  const params = (p && p.params) || {};
+  const dateIso = calendarIsoDate(params.dateIso);
+  const clock = calendarClock(params.hour, params.minute);
+  if (!dateIso || !clock || clock.invalid || clock.absent) {
+    return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
+  }
+  const title = String(params.title || 'Meeting').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting';
+  const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
+  const zone = await outlookGlanceZone(params.timeZone);
+  const lines = [];
+  if (quote && quote !== title) lines.push(quote);
+  if (p && p.threadUrl) lines.push(String(p.threadUrl));
+  const built = Cal.meetingBody({
+    dateIso: dateIso,
+    hour: clock.hour,
+    minute: clock.minute,
+    title: title,
+    quote: lines.length ? lines.join('\n') : title,
+    timeZone: zone
+  });
+  if (!built) return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
+  const body = built;
+  if ((Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) {
+    return { ok: false, reason: 'refused' };
+  }
+  // A Teams link only when the mail asks for a call and the owner's switch
+  // TEAMS_MEETING is on (default off). Still no attendee, so nobody is invited.
+  const teams = await outlookTeamsWanted(params.callText);
+  if (teams) {
+    body.isOnlineMeeting = true;
+    body.onlineMeetingProvider = 'teamsForBusiness';
+  }
+  const series = await outlookSeriesWanted(params.callText, dateIso);
+  if (series) body.recurrence = series.recurrence;
+  const url = OUTLOOK_GRAPH + '/me/events';
+  outlookAssertNotSend(url);
+  const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
+  const res = await outlookFetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'outlook.timezone="' + zoneHeader + '"'
+    },
+    body: JSON.stringify(body)
+  });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 403) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  let event = null;
+  try { event = await res.json(); } catch (e) { event = null; }
+  if (!event || typeof event.id !== 'string' || !event.id) {
+    return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
+  }
+  // Handled for a Teams hold needs the join link read back by id. Without it
+  // the event is removed again and nothing is claimed.
+  let joinUrl = '';
+  if (teams) {
+    joinUrl = await outlookTeamsJoinUrl(event.id);
+    if (!joinUrl) {
+      const delUrl = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id);
+      outlookAssertNotSend(delUrl);
+      let removed = false;
+      try {
+        const gone = await outlookFetch(delUrl, { method: 'DELETE' });
+        removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404));
+      } catch (e) { removed = false; }
+      return { ok: false, reason: 'teams-link-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
+    }
+  }
+  // Handled for a series needs the rule read back by id; otherwise the event is removed again.
+  if (series && !(await outlookSeriesRuleOk(event.id, series.recurrence))) {
+    const delUrl = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id);
+    outlookAssertNotSend(delUrl);
+    let removed = false;
+    try {
+      const gone = await outlookFetch(delUrl, { method: 'DELETE' });
+      removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404));
+    } catch (e) { removed = false; }
+    return { ok: false, reason: 'series-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
+  }
+  const proved = await outlookEventRead(event.id);
+  const eventSnap = proved && proved.snap;
+  const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
+  const ref = {
+    eventId: event.id,
+    created: eventSnap,
+    contentHash: Cal.contentHash(proved && proved.raw)
+  };
+  const base = {
+    where: 'Outlook Calendar',
+    target: 'your calendar',
+    url: event.webLink || null
+  };
+  if (joinUrl) base.joinUrl = joinUrl;
+  if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
+  return Object.assign({
+    ok: true,
+    fetchedBack: true,
+    written: 'Calendar · ' + title + (when ? ' · ' + when : '') + (joinUrl ? ' · Teams' : '') + (series ? ' · repeats' : ''),
+    ref: ref
+  }, base);
+}
+
 async function outlookCalendarWrite(p) {
+  const params = (p && p.params) || {};
+  if (params.meeting === true) return outlookMeetingWrite(p);
   const Cal = globalThis.FlowOutlookCalendar;
   if (!Cal || typeof Cal.eventBody !== 'function') return { ok: false, reason: 'not-configured' };
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
-  if (!Cal.hasWriteScope(session.token.grantedScopes)) {
+  const fileScopes = Cal.scopesFromToken ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  if (!Cal.hasWriteScope(fileScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
-  const params = (p && p.params) || {};
   const body = Cal.eventBody({
     dateIso: params.dateIso,
     hour: params.hour,
@@ -3729,23 +5896,44 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  return {
-    ok: true,
+  const eventSnap = await outlookStoredEventSnap(event.id);
+  const ref = { eventId: event.id, created: eventSnap };
+  const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
-    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
-    ref: { eventId: event.id },
     url: event.webLink || null
   };
+  if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
+  return Object.assign({
+    ok: true,
+    fetchedBack: true,
+    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
+    ref: ref
+  }, base);
 }
 
-async function outlookCalendarUndo(ref) {
+function outlookUnverifiedWrite(base, ref) {
+  return Object.assign({}, base, {
+    ok: true,
+    fetchedBack: false,
+    reason: 'unverified',
+    written: outlookUnverifiedLine(),
+    ref: ref,
+    proof: null
+  });
+}
+
+async function outlookCalendarUndo(ref, hint) {
   const Cal = globalThis.FlowOutlookCalendar;
   const id = ref && typeof ref === 'object' ? ref.eventId : ref;
   const req = Cal && Cal.undoRequest(id);
   if (!req || req.method !== 'DELETE' || !/^\/me\/events\/[^/]+$/.test(req.path)) return { ok: false };
   const url = OUTLOOK_GRAPH + req.path;
   outlookAssertNotSend(url);
+  const calSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  if (!outlookHasSnap(calSnap)) return outlookUnconfirmed();
+  const edited = await outlookRefuseIfEdited(url, calSnap);
+  if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del.notConnected) return { ok: false, reason: 'not-connected' };
   if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Calendar event removed.' };
@@ -3775,9 +5963,113 @@ function outlookTodoListIdFrom(body) {
   return first ? first.id : '';
 }
 
+// A repeating commitment becomes a repeating To Do task only when the owner's
+// switch RECURRING_TODO is on (default off) and the mail states one rule and
+// one clock. Otherwise the task is the one-off it has always been.
+async function outlookRecurrenceFor(text) {
+  const R = globalThis.FlowTodoRecurrence;
+  if (!R || !text) return null;
+  if (!(await glanceSwitchOn(R.SWITCH))) return null;
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayIso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  return R.plan({ flags: { [R.SWITCH]: true }, text: String(text).slice(0, 4000), todayIso: todayIso });
+}
+
+// A task card whose mail names one of the person's own Planner plans ("... on the Website
+// relaunch plan") writes the task to that plan instead of To Do, only when the owner's switch
+// PLANNER_TASK is on (default off). No assignee, so nobody is notified. Anything else about it
+// (no plan named, two plans, a plan list that cannot be read) leaves the task in To Do.
+const PLANNER_ID_PREFIX = 'planner:';
+const PLANNER_REFS_KEY = 'glancePlannerRefs';
+function plannerRawId(id) {
+  const s = String(id || '');
+  return s.indexOf(PLANNER_ID_PREFIX) === 0 ? s.slice(PLANNER_ID_PREFIX.length) : '';
+}
+async function outlookPlannerRefPut(rawId, ref) {
+  try {
+    const bag = await chrome.storage.local.get(PLANNER_REFS_KEY);
+    const map = Object.assign({}, bag[PLANNER_REFS_KEY] || {});
+    map[rawId] = { taskId: rawId, externalId: rawId, planId: ref.planId, etag: ref.etag || null, createdByGlance: true };
+    const keys = Object.keys(map);
+    if (keys.length > 200) delete map[keys[0]];
+    await chrome.storage.local.set({ [PLANNER_REFS_KEY]: map });
+  } catch (e) { /* Undo then says it cannot confirm */ }
+}
+async function outlookPlannerRefGet(rawId) {
+  try {
+    const bag = await chrome.storage.local.get(PLANNER_REFS_KEY);
+    return (bag[PLANNER_REFS_KEY] || {})[rawId] || null;
+  } catch (e) { return null; }
+}
+async function outlookPlannerRefDrop(rawId) {
+  try {
+    const bag = await chrome.storage.local.get(PLANNER_REFS_KEY);
+    const map = Object.assign({}, bag[PLANNER_REFS_KEY] || {});
+    delete map[rawId];
+    await chrome.storage.local.set({ [PLANNER_REFS_KEY]: map });
+  } catch (e) { /* nothing kept */ }
+}
+
+function outlookGraphCall() {
+  return async function graph(method, path, body, headers) {
+    const url = OUTLOOK_GRAPH + path;
+    outlookAssertNotSend(url);
+    const init = { method: method };
+    const hs = Object.assign({}, headers || {});
+    if (body !== undefined) { init.body = JSON.stringify(body); hs['Content-Type'] = 'application/json'; }
+    if (Object.keys(hs).length) init.headers = hs;
+    const res = await outlookFetch(url, init);
+    if (!res || res.notConnected) return { status: (res && res.status) || 401, ok: false, json: null };
+    let json = null;
+    try { if (res.status !== 204) json = await res.json(); } catch (e) { json = null; }
+    return { status: res.status, ok: !!res.ok, json: json };
+  };
+}
+
+async function outlookPlannerWrite(p, title, dueIso) {
+  const P = globalThis.FlowPlannerTask;
+  if (!P || typeof P.planNamed !== 'function' || !p || !p.text) return null;
+  if (!(await glanceSwitchOn(P.SWITCH))) return null;
+  const graph = outlookGraphCall();
+  const listed = await graph('GET', '/me/planner/plans');
+  if (!listed.ok || !listed.json || !Array.isArray(listed.json.value)) return null;
+  const named = P.planNamed(String(p.text).slice(0, 4000), listed.json.value);
+  if (!named.plan) return null;
+  const r = await P.create({ flags: { [P.SWITCH]: true }, plan: named.plan, title: title, dueIso: dueIso || null, now: new Date().toISOString() }, { graph: graph });
+  if (r && r.ok) {
+    // The page keeps only the ids of a task row, so the id itself says "Planner". The entity tag
+    // Undo needs stays in the worker, not in the page's row.
+    const raw = r.ref.taskId;
+    await outlookPlannerRefPut(raw, r.ref);
+    const shown = PLANNER_ID_PREFIX + raw;
+    return { ok: true, fetchedBack: true, where: 'Microsoft Planner', target: named.plan.title, written: r.written, url: null, ref: { taskId: shown, externalId: shown, planId: named.plan.id }, proof: Object.assign({}, r.proof, { externalId: shown }) };
+  }
+  return Object.assign({}, r, { where: 'Microsoft Planner', target: named.plan.title });
+}
+
+async function outlookPlannerUndo(ref) {
+  const P = globalThis.FlowPlannerTask;
+  if (!P) return { ok: false };
+  const raw = plannerRawId(ref && (ref.externalId || ref.taskId));
+  const kept = raw ? await outlookPlannerRefGet(raw) : null;
+  if (!kept) return { ok: false, reason: 'unconfirmed', written: "Couldn't confirm it's unchanged. Undo left it alone." };
+  const r = await P.undo(kept, { graph: outlookGraphCall() });
+  if (r && r.ok) {
+    await outlookPlannerRefDrop(raw);
+    return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. The Planner task is removed.' };
+  }
+  return Object.assign({}, r, { written: (r && r.error) || undefined });
+}
+
 async function outlookTaskWrite(p) {
   const session = await outlookSession({});
-  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  if (!session || !session.ok || !session.token) {
+    if (session && (session.needsSignIn || session.error === 'expired' || session.error === 'login_required')) {
+      return { ok: false, reason: 'token-expired' };
+    }
+    return { ok: false, reason: 'not-connected' };
+  }
   const scope = outlookHasTasksScope(session.token);
   if (scope === false) return { ok: false, reason: 'tasks-not-granted' };
 
@@ -3785,7 +6077,8 @@ async function outlookTaskWrite(p) {
   outlookAssertNotSend(listUrl);
   const listed = await outlookFetch(listUrl, { method: 'GET' });
   if (listed && listed.notConnected) return { ok: false, reason: 'not-connected' };
-  if (listed && (listed.status === 401 || listed.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (listed && listed.status === 401) return { ok: false, reason: 'token-expired' };
+  if (listed && listed.status === 403) return { ok: false, reason: 'tasks-not-granted' };
   if (!listed || !listed.ok) return { ok: false, reason: 'http-' + ((listed && listed.status) || 0) };
   let lists = null;
   try { lists = await listed.json(); } catch (e) { lists = null; }
@@ -3796,12 +6089,35 @@ async function outlookTaskWrite(p) {
   const titled = googleTaskTitle(p || {});
   const title = (typeof titled === 'string' ? titled : '').trim().slice(0, 255);
   if (!title) return { ok: false, reason: 'unclear', error: 'Nothing to put on the task.' };
+  const planned = await outlookPlannerWrite(p, title, close.dueIso);
+  if (planned) return planned;
   const notesLines = factLines(close.forNotes);
   if (p && p.threadUrl) notesLines.push(['Open in Outlook', p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n').slice(0, 8000);
   const body = { title: title };
   if (notes) body.body = { contentType: 'text', content: notes };
   if (close.dueIso) body.dueDateTime = { dateTime: close.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+  const reminder = p && p.params && p.params.reminder;
+  if (reminder) {
+    const remDay = calendarIsoDate(reminder.dateIso);
+    const remClock = calendarClock(reminder.hour, reminder.minute);
+    if (remDay && remClock && !remClock.invalid && !remClock.absent) {
+      body.isReminderOn = true;
+      body.reminderDateTime = {
+        dateTime: calendarDateTime(remDay, remClock.hour, remClock.minute),
+        timeZone: localTimeZone()
+      };
+    }
+  }
+
+  // To Do needs a due date for a repeat: the first occurrence is that date.
+  const rec = await outlookRecurrenceFor(p && p.text);
+  if (rec) {
+    body.recurrence = rec.recurrence;
+    body.dueDateTime = { dateTime: rec.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+    body.isReminderOn = true;
+    body.reminderDateTime = { dateTime: calendarDateTime(rec.dueIso, rec.hour, rec.minute), timeZone: localTimeZone() };
+  }
 
   const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
   outlookAssertNotSend(postUrl);
@@ -3811,22 +6127,28 @@ async function outlookTaskWrite(p) {
     body: JSON.stringify(body)
   });
   if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
-  if (res && (res.status === 401 || res.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (res && res.status === 401) return { ok: false, reason: 'token-expired' };
+  if (res && res.status === 403) return { ok: false, reason: 'tasks-not-granted' };
   if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
   let task = null;
   try { task = await res.json(); } catch (e) { task = null; }
-  const written = taskWrittenLine(close.dueIso, close.amount).replace(/^Google Task/, 'To Do');
+  const written = taskWrittenLine(rec ? rec.dueIso : close.dueIso, close.amount).replace(/^Google Task/, 'To Do') + (rec ? ' · repeats' : '');
   const base = { where: 'Microsoft To Do', target: 'default list', written: written, url: null };
+  if (rec) base.repeats = true;
   const Proof = globalThis.FlowProofOfClose;
   const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
   const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
   if (!task || typeof task.id !== 'string' || !task.id) {
     return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
   }
-  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
-  const fetched = await outlookTaskFetchBack(taskListId, task.id);
-  if (!fetched.ok) {
-    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  const wroteListId = (task && typeof task.listId === 'string' && task.listId) ? task.listId : taskListId;
+  const ref = { taskListId: wroteListId, taskId: task.id, externalId: task.id, created: null };
+  const fetched = await outlookTaskFetchBack(wroteListId, task.id, body);
+  if (fetched && fetched.task) ref.created = outlookCreationSnap(fetched.task);
+  if (!fetched.ok || !outlookHasSnap(ref.created)) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
+      written: outlookUnverifiedLine()
+    });
   }
   const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
   if (link) base.url = link;
@@ -3843,7 +6165,40 @@ async function outlookTaskWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
-async function outlookTaskFetchBack(taskListId, taskId) {
+function outlookZoneKey(zone) {
+  const s = String(zone || '').trim().toLowerCase();
+  if (!s) return '';
+  if (s === 'utc' || s === 'etc/utc' || s === 'tzone://microsoft/utc' || s === 'greenwich standard time') return 'utc';
+  return s;
+}
+
+function outlookClockKey(value) {
+  const clock = (globalThis.FlowNativeEdit && FlowNativeEdit.clockOf) ? FlowNativeEdit.clockOf(value) : '';
+  return clock || '';
+}
+
+// Title and dueDateTime, with timeZone. A missing field on the read is not
+// a disagreement. UTC and Etc/UTC are the same zone. A different title or
+// a different clock is not the task we wrote.
+function outlookTodoAgrees(sent, got) {
+  if (!got) return false;
+  const want = String((sent && sent.title) || '').trim();
+  const have = got.title == null ? '' : String(got.title).trim();
+  if (want && have && want !== have) return false;
+  // A repeat was asked for: the task read back must carry the same rule.
+  if (sent && sent.recurrence) {
+    const R = globalThis.FlowTodoRecurrence;
+    if (!R || !R.agrees(sent.recurrence, got.recurrence)) return false;
+  }
+  if (!(sent && sent.dueDateTime) || !got.dueDateTime) return true;
+  if (outlookClockKey(sent.dueDateTime) !== outlookClockKey(got.dueDateTime)) return false;
+  const a = outlookZoneKey(sent.dueDateTime.timeZone);
+  const b = outlookZoneKey(got.dueDateTime.timeZone);
+  if (a && b && a !== b) return false;
+  return true;
+}
+
+async function outlookTaskFetchOnce(taskListId, taskId) {
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
   let res;
@@ -3859,30 +6214,110 @@ async function outlookTaskFetchBack(taskListId, taskId) {
   return { ok: true, task: body };
 }
 
-async function outlookTaskUndo(ref) {
+// Graph's To Do list is eventually consistent. A 404 in the first second
+// is not proof the task is missing. Retry with backoff, up to about 3s.
+async function outlookTaskFetchBack(taskListId, taskId, sent) {
+  const waits = [0, 250, 500, 1000, 1250];
+  let last = { ok: false };
+  for (let attempt = 0; attempt < waits.length; attempt++) {
+    if (waits[attempt]) await new Promise((resolve) => setTimeout(resolve, waits[attempt]));
+    last = await outlookTaskFetchOnce(taskListId, taskId);
+    if (last.ok && outlookTodoAgrees(sent, last.task)) return last;
+    if (last.ok) last = { ok: false, mismatch: true, task: last.task };
+  }
+  return last;
+}
+
+async function outlookTaskUndo(ref, hint) {
+  if (plannerRawId(ref && (ref.externalId || ref.taskId))) return outlookPlannerUndo(ref);
   const taskId = ref && (ref.externalId || ref.taskId);
   const listId = ref && ref.taskListId;
   if (!taskId || !listId) return { ok: false };
   const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
   outlookAssertNotSend(url);
+  const taskSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  if (!outlookHasSnap(taskSnap)) return outlookUnconfirmed();
+  const edited = await outlookRefuseIfEdited(url, taskSnap);
+  if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
-  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'To Do task removed.' };
-  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  if (!(del && (del.ok || del.status === 204 || del.status === 404))) {
+    return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  }
+  let got;
+  try {
+    got = await outlookUndoConfirm(url);
+  } catch (e) {
+    return { ok: false, reason: 'verify-timeout', written: outlookVerifyTimeoutLine() };
+  }
+  if (got && got.reason === 'verify-timeout') return got;
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  const cache = (globalThis.FlowReceipt && FlowReceipt.todoUiCacheLine)
+    ? FlowReceipt.todoUiCacheLine()
+    : 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.';
+  if (got && got.status === 404) {
+    return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. ' + cache };
+  }
+  // A 200 means the task is still there. A deleted flag on that body is not a delete.
+  if (got && (got.status === 200 || got.ok)) {
+    return { ok: false, reason: 'still-present', fetchedBack: true, written: 'Still there — the To Do task was not removed.' };
+  }
+  return { ok: false, reason: 'http-' + ((got && got.status) || 0) };
+}
+
+function outlookVerifyTimeoutLine() {
+  return (globalThis.FlowReceipt && FlowReceipt.verifyTimeoutLine)
+    ? FlowReceipt.verifyTimeoutLine()
+    : "Couldn't verify, try again";
+}
+
+// The confirming GET is the read-back. If it does not answer, Undo stops.
+// A late 200 must not become Undone after this wait.
+function outlookUndoConfirm(url, prefer) {
+  const waitMs = 8000;
+  let timer = null;
+  const timed = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ verifyTimeout: true }), waitMs);
+  });
+  return Promise.race([
+    outlookFetch(url, { method: 'GET', headers: prefer || {} }).catch(() => ({ status: 0, ok: false })),
+    timed
+  ]).then((got) => {
+    if (timer != null) clearTimeout(timer);
+    if (got && got.verifyTimeout) {
+      return { ok: false, reason: 'verify-timeout', fetchedBack: false, written: outlookVerifyTimeoutLine() };
+    }
+    return got;
+  }, (e) => {
+    if (timer != null) clearTimeout(timer);
+    throw e;
+  });
 }
 
 async function outlookDraftUndo(ref, hint) {
-  if (!ref) return { ok: false };
+  const id = typeof ref === 'string' ? ref : (ref && (ref.draftId || ref.id));
+  if (!id) return { ok: false };
+  const snapshot = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
+  // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
+  if (!outlookHasSnap(snapshot)) return outlookUnconfirmed();
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,subject,body,toRecipients,ccRecipients,importance,categories';
   outlookAssertNotSend(getUrl);
-  const got = await outlookFetch(getUrl, { headers: prefer });
-  if (got.notConnected) return { ok: false, reason: 'not-connected' };
-  if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
-  if (!got.ok) return { ok: false, reason: 'http-' + got.status };
-  const msg = await got.json();
-  if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
-  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
+  let got;
+  try { got = await outlookUndoConfirm(getUrl, prefer); }
+  catch (e) { return outlookUnconfirmed(); }
+  if (got && got.reason === 'verify-timeout') return outlookUnconfirmed();
+  if (got && got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (got && got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+  if (!got || !got.ok) return outlookUnconfirmed();
+  let msg = null;
+  try { msg = await got.json(); } catch (e) { msg = null; }
+  if (!msg) return outlookUnconfirmed();
+  if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  const verdict = outlookEditVerdict(snapshot, msg);
+  if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  if (verdict === 'unconfirmed') return outlookUnconfirmed();
+  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id);
   outlookAssertNotSend(delUrl);
   const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });
   if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
@@ -4000,7 +6435,12 @@ async function outlookFileWrite(p) {
   const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
   if (previousVersionId) ref.previousVersionId = previousVersionId;
   const fetched = await outlookFileFetchBack(itemId);
-  if (!fetched.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  if (fetched && fetched.item) ref.editSnap = outlookCreationSnap(fetched.item);
+  if (!fetched.ok || !outlookHasSnap(ref.editSnap)) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null, fetchedBack: false }, base, {
+      written: outlookUnverifiedLine()
+    });
+  }
   const link = fetched.item && fetched.item.webUrl && String(fetched.item.webUrl).slice(0, 8) === 'https://' ? fetched.item.webUrl : null;
   if (link) base.url = link;
   const proof = Proof && Proof.buildProof({
@@ -4014,7 +6454,7 @@ async function outlookFileWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
-async function outlookFileFetchBack(itemId) {
+async function outlookFileFetchOnce(itemId) {
   const Files = globalThis.FlowOnedriveFile;
   if (!Files || !itemId) return { ok: false };
   const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
@@ -4027,10 +6467,23 @@ async function outlookFileFetchBack(itemId) {
   return { ok: true, item: body };
 }
 
+async function outlookFileFetchBack(itemId) {
+  let last = { ok: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    last = await outlookFileFetchOnce(itemId);
+    if (last.ok) return last;
+  }
+  return last;
+}
+
 async function outlookFileUndo(ref) {
   const Files = globalThis.FlowOnedriveFile;
   const itemId = ref && (ref.externalId || ref.fileId || ref.itemId);
   if (!Files || !itemId) return { ok: false };
+  const itemUrl = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(itemUrl);
+  const edited = await outlookRefuseIfEdited(itemUrl, ref && ref.editSnap);
+  if (edited) return edited;
   if (ref.created === false && ref.previousVersionId) {
     const url = OUTLOOK_GRAPH + Files.restorePath(itemId, ref.previousVersionId);
     outlookAssertNotSend(url);
@@ -4125,25 +6578,31 @@ async function attachmentSaveUndo(ref) {
 }
 
 const WRITERS = {
-  hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
+  hubspot: hubspotWrite, notion: CONNECTORS.notionReadBack ? notionReadBackWrite : notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
   outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
-  onedriveFile: outlookFileWrite,
+  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, outlookEventCallLink: eventLinkWrite,
   attachmentSave: attachmentSaveWrite
 };
+if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
+if (CONNECTORS.jiraReadBack) WRITERS.jira = jiraReadBackWrite;
+if (CONNECTORS.linearReadBack) WRITERS.linear = linearReadBackWrite;
 const UNDOERS = {
-  hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
+  hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
   outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
-  onedriveFile: outlookFileUndo,
+  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, outlookEventCallLink: eventLinkUndo,
   attachmentSave: attachmentSaveUndo
 };
+if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
+if (CONNECTORS.jiraReadBack) UNDOERS.jira = jiraReadBackUndo;
+if (CONNECTORS.linearReadBack) UNDOERS.linear = linearReadBackUndo;
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
@@ -4152,12 +6611,25 @@ async function connectorStatus() {
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
   const gt = await getGoogleTasksAuth();
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage']);
+  let uiLang = reconnectBag.glanceUiLanguage || reconnectBag.glanceHostLanguage || '';
+  if (!uiLang) {
+    try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
+  }
+  const grantedRec = reconnectBag[GOOGLE_GRANTED_SCOPES_KEY] || null;
+  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(googleManifestScopes()));
+  const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
+    configured: googleTasksConfigured(),
+    detail: GLANCE_TASK_LIST_TITLE + ' list',
+    warning: reconnectBag.googleLaneWarning || null,
+    lang: uiLang,
+    everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
+    webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
+    laneUndo: reconnectBag.glanceLaneUndo || null,
+    scopesGranted: scopesGranted
+  });
   return {
-    googleTasks: {
-      connected: Boolean(gt),
-      configured: googleTasksConfigured(),
-      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
-    },
+    googleTasks: googleTasks,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
@@ -4191,8 +6663,60 @@ function reply(sendResponse, promise) {
   return true;
 }
 
+// One grant at a time for log read-modify-write. Two open mails each run
+// storage.js, and chrome.storage.local.set keeps whichever log lands last.
+// The port is the hold: the page disconnects when the write finishes, and
+// a closed page disconnects on its own so the next Do It is not stuck.
+const glanceLogLockState = { held: null, waiters: [] };
+
+function glanceLogLockRelease(port) {
+  if (glanceLogLockState.held === port) glanceLogLockState.held = null;
+  glanceLogLockState.waiters = glanceLogLockState.waiters.filter((p) => p !== port);
+  glanceLogLockGrant();
+}
+
+function glanceLogLockGrant() {
+  if (glanceLogLockState.held || !glanceLogLockState.waiters.length) return;
+  const next = glanceLogLockState.waiters.shift();
+  glanceLogLockState.held = next;
+  // connect() returns before the page attaches onMessage. Deliver on the
+  // next turn so that listener is in place.
+  setTimeout(() => {
+    if (glanceLogLockState.held !== next) return;
+    try { next.postMessage({ ok: true }); }
+    catch (e) { glanceLogLockRelease(next); }
+  }, 0);
+}
+
+if (chrome.runtime.onConnect && typeof chrome.runtime.onConnect.addListener === 'function') {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (!port || port.name !== 'glance-log-lock') return;
+    glanceLogLockState.waiters.push(port);
+    port.onDisconnect.addListener(() => glanceLogLockRelease(port));
+    glanceLogLockGrant();
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  // Signup, later, opens the one Meta consent page. The prompt stays on that page.
+  if (msg.type === 'flow:open-meta-chats') {
+    const page = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.PAGE) || 'lane-chat/enable.html';
+    try {
+      if (chrome.tabs && typeof chrome.tabs.create === 'function') chrome.tabs.create({ url: chrome.runtime.getURL(page) });
+    } catch (e) { /* the signup page can open the link itself */ }
+    try { sendResponse({ ok: true, page: page }); } catch (e) { /* the caller closed */ }
+    return true;
+  }
+  // The person pressed רענן. Recovery never reloads a tab on its own.
+  if (msg.type === 'flow:outlook-refresh-tab') {
+    const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
+    if (typeof tabId === 'number' && chrome.tabs && typeof chrome.tabs.reload === 'function') {
+      try { chrome.tabs.reload(tabId); } catch (e) { /* the browser tab can be refreshed by hand */ }
+    }
+    try { sendResponse({ ok: true }); } catch (e) { /* the popup closed */ }
+    return true;
+  }
 
   const hybridAnswer = hybrid.handle(msg, sender);
   if (hybridAnswer) return reply(sendResponse, hybridAnswer);
@@ -4204,9 +6728,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, Promise.resolve({ ok: true, build: stamp }));
   }
 
+  if (msg.type === 'flow:google-reconnect') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
+  }
+
   if (msg.type === 'flow:connect') {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
+    if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
     if (msg.connectorId === 'slack') return reply(sendResponse, connectSlack(msg.channel).then((r) => ({ ok: true, detail: r.title })));
@@ -4220,6 +6755,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:fact-sources') {
     return reply(sendResponse, factSources(msg.payload || {}));
+  }
+
+  // Dropbox: save one file the person approved into their Dropbox app folder, read it back; undo removes it unless the person edited it. Off = not live.
+  if (msg.type === 'flow:dropbox-save' || msg.type === 'flow:dropbox-undo') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:dropbox-save' ? dropboxSave(msg.payload) : dropboxUndo(msg.payload));
+  }
+
+  // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.
+  if (msg.type === 'flow:signature-check' || msg.type === 'flow:signature-release') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.docusignReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:signature-check' ? docusignCheck(msg.payload) : docusignRelease(msg.payload));
+  }
+
+  if (msg.type === 'flow:event-link-plan') {
+    return reply(sendResponse, eventLinkPlan(msg));
+  }
+
+  if (msg.type === 'flow:new-file-plan') {
+    return reply(sendResponse, newFilePlan(msg));
   }
 
   if (msg.type === 'flow:execute-action') {
@@ -4276,6 +6833,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
   if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
+  if (msg.type === 'flow:outlook-consent-scope') return reply(sendResponse, outlookConsentScope(msg));
+  if (msg.type === 'flow:reconcile-proof') return reply(sendResponse, outlookReconcileProof(msg));
   if (msg.type === 'flow:outlook-keepalive') {
     if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
     return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());

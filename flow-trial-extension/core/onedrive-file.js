@@ -7,6 +7,9 @@ const FlowOnedriveFile = (() => {
   const SYSTEM = 'microsoft/onedrive';
   const CONNECTOR = 'onedriveFile';
   const WRITE_SCOPE = 'Files.ReadWrite';
+  // Every file Glance writes goes into this one folder, so the card can say
+  // exactly where it is and Undo never reaches anything else on the drive.
+  const FOLDER = 'Glance';
   const MAX_BYTES = 4 * 1024 * 1024;
 
   function scopeList(scopes) {
@@ -39,11 +42,18 @@ const FlowOnedriveFile = (() => {
   }
 
   function rootItemPath(name) {
-    return '/me/drive/root:/' + encodeName(name);
+    return '/me/drive/root:/' + encodeName(FOLDER) + '/' + encodeName(name);
   }
 
   function createContentPath(name) {
-    return '/me/drive/root:/' + encodeName(name) + ':/content';
+    return rootItemPath(name) + ':/content';
+  }
+
+  // 'OneDrive > Glance > passport.pdf'. Empty when there is no file name.
+  function destination(name, app) {
+    const n = String(name || '').trim();
+    if (!n) return '';
+    return (app || 'OneDrive') + ' > ' + FOLDER + ' > ' + n;
   }
 
   function itemPath(id) {
@@ -166,6 +176,8 @@ const FlowOnedriveFile = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     WRITE_SCOPE: WRITE_SCOPE,
+    FOLDER: FOLDER,
+    destination: destination,
     MAX_BYTES: MAX_BYTES,
     hasWriteScope: hasWriteScope,
     safeName: safeName,

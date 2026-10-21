@@ -6,11 +6,13 @@
 
 **Standing constraints.** Glance is not only a Gmail add-on (Gmail is the entry surface). Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox" (owner, 2026-10-09). Pro is the personal depth
 layer, not team or enterprise (that is Flow). Waiting or tracking alone is not success; true close is. Free must stay genuinely useful, never a dead demo. Zero-Prompt is sacred. Multi-platform means
-execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Do not describe Glance as "a Chrome
+execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Glance never blocks the user: a draft, task, event, or file it created stays editable, and Undo leaves an edited one alone. Do not describe Glance as "a Chrome
 extension for Gmail", "an AI email assistant" or "a smart inbox", and never describe tracking or a prepared draft as completion. Full rules, required framing and before/after examples: `docs/product-identity.md`.
 
 **Every report keeps two parts apart.** *Product definition (vision-locked)*: the block above, unchanged by what the code does today. *Current implementation status (code reality)*: what ships in this
 commit, stated as status. "It is a Chrome extension on Gmail" belongs in the second part only. Any description of Glance starts: "Glance closes open loops. Gmail is where it starts today."
+
+**Positioning (Sali, 2026-10-18).** Category: **Intent Closer / סוגר כוונות**; headline «לא עוזר. סוגר.». For people whose day moves between Gmail, Outlook and WhatsApp, in Hebrew and English, Glance spots anywhere what needs to happen and closes it with one Do It, with proof it was done. No chat, no setup, no bot to manage. Never call Glance an AI assistant, a chat, a bot or an email assistant. First user: an Israeli freelancer or small business on Gmail + WhatsApp («אף שקל לא נופל בין הכיסאות»). Public copy claims only what passed a live Gate, and "with proof it was done" only where ProofOfClose has a fetchedBack read-back. The block above, "Handled." and the distribution channel are unchanged pending Sali. Full wording: `docs/product-identity.md` "Positioning".
 
 ## Owner product locks (2026-10-06 to 2026-10-08) — scope around the locked block
 
@@ -26,7 +28,7 @@ Owner decisions, recorded here as the one source. The block above stays as writt
 - **Broad, does everything** (owner, 2026-10-08): «חייב להיות פה הרבה מעבר לשמירה בדרייב והוספה למשימות... המוצר חייב להיות הרבה יותר הוליסטי» (11:25). «אם המוצר לא יודע לעשות הכל הוא לא שווה כלום!» (11:26). «זה כלל. הוא חייב להיות רחב ולעשות הכל!» (12:16). A user's intent, wherever the user is (the floating extension on any site, plus the user's own computer), is closed end to end and proven.
 - **Per-user context** (owner, 2026-10-08, about 18:02 Israel): Glance keeps a profile of who the person is, their role, how they handled similar mail, and how they work. Offer or quiet uses that profile. On group or broadcast mail, a relevant mail with an explicit intent span and a possible close is offered; a mail that is not relevant stays quiet. "Hi all", "היי לכולם", a distribution list, and Cc are profile features, not a blanket quiet. Relevance is `relevant`, `not_relevant`, or `unknown`. `unknown` keeps today's behavior. The floor is unchanged: explicit intent span, hard quiets, Handled only after fetchedBack, send only after a preview and a click. Cc-only, addressed-to-other, and the no-To/Cc hedge in PR #118 stay until a contrast-pair shadow test. Full rule: `docs/glance-ai/user-context-v0.md`. The lab scorer under `glance-ai/profile/` is not wired into the extension.
 - **On HOLD until the owner writes «מאשר»:** Morning (invoices) and Netlify deploy.
-- **Auto-merge for Claude routines** (owner, 2026-10-10): a Claude routine merges its own PR into `claude/install-uiux-pro-max-skill-a4agox` (never into `main`) only when all three hold: (1) all green: every corpus and every GitHub check on the PR head, after a clean merge of the latest working branch; (2) behind an off switch: the switch defaults off and is named in the PR body, no switch is turned on, and nothing changes `manifest.json` permissions, hosts or scopes, `flow-landing/` copy, privacy text or the identity block; (3) no conflict with David's agents: no changed file is also changed by another open PR. Otherwise the PR stays a draft. Turning a switch on, merging to `main` and Netlify still need the owner's «מאשר».
+- **Auto-merge for Claude routines** (owner, 2026-10-10): a Claude routine merges its own PR into `claude/install-uiux-pro-max-skill-a4agox` (never into `main`) only when all three hold: (1) all green: every corpus and every GitHub check on the PR head, after a clean merge of the latest working branch; (2) behind an off switch: the switch defaults off and is named in the PR body, no switch is turned on, and nothing changes `manifest.json` permissions, hosts or scopes, `flow-landing/` copy, privacy text or the identity block; (3) no conflict with David's agents: no changed file is also changed by another open PR, except the shared status files every routine must update (`docs/open-tasks.md`, `flow-trial-extension/core/README.md`, `docs/vault/decisions.md`), which do not count (owner «מאשר», 2026-10-14); the routine merges the latest working branch first and resolves those files by keeping both sides. Otherwise the PR stays a draft. Turning a switch on, merging to `main` and Netlify still need the owner's «מאשר».
 
 ## Start here — the map of every document
 
@@ -107,9 +109,9 @@ just once.
 Our own code runs first, on the device: normalize, hard quiets, masking, lexicons and frames in `flow-trial-extension/core/`, the small model, the per-user profile. It settles the clear cases and keeps the safety floor (quiets, veto, strict gate), with corpus tests, and stays silent when unsure. **Owner, 2026-10-09:** Glance's own model (device model when present, Glance cloud on masked text) becomes the main reader of everything the device does not settle, and plans the close (`docs/glance-ai/ai-product.md`). A model's answer is a proposal that cites its evidence; it never closes, writes or sends alone, and a feature still works, more quietly, with the model off. Until the owner approves the new privacy and consent copy, that path stays behind its off switch and today's one-sentence deeper read (`docs/ai-ladder.md`) is the only external step. Full rule:
 `docs/local-first-principle.md`.
 
-## Product identity — an AI product; the close is what we sell
+## Product identity — an Intent Closer; the close is what we sell
 
-Glance is an AI product (owner, 2026-10-09): its own model understands each intention and plans the close, and it may say so. It is never worded as "an AI email assistant" that writes for you, "a smart inbox" or "a Gmail extension". Copy leads with the outcome: loops that are open, chased, yours or closed, and money at risk; the AI is named as what understands and plans, not as cleverness for its own sake. `docs/product-identity.md` has the rule and the
+Glance is an Intent Closer (סוגר כוונות; Sali, 2026-10-18): not an assistant, a closer. It is an AI product (owner, 2026-10-09): its own model understands each intention and plans the close, and it may say so. It is never worded as "an AI email assistant" that writes for you, "a smart inbox" or "a Gmail extension". Copy leads with the outcome: loops that are open, chased, yours or closed, and money at risk; the AI is named as what understands and plans, not as cleverness for its own sake. `docs/product-identity.md` has the rule and the
 list of phrases a Glance surface may not use (enforced by
 `flow-trial-extension/test/identity-copy-corpus.cjs`).
 
@@ -165,3 +167,25 @@ What Glance calls when it cannot recognise an intent (no external model by defau
 
 Headless regression for the unpacked extension runs in CI on pull requests into `claude/install-uiux-pro-max-skill-a4agox` (`.github/workflows/glance-e2e.yml`, suite under `flow-trial-extension/e2e/`). It runs before the owner's live browser Gate. The live Gate stays; this suite does not replace it. The command and what "the tests pass" means: `docs/README.md` §4. Status: `docs/open-tasks.md` row 56.
 
+## Product locks — read first
+
+Read these two notes before changing Glance scope, the site, or a bot rule.
+
+- Full dated rules (Product, Flow/Sales, Bot operations): `docs/vault/shared-rules.md`
+- Glance locks, short form: `docs/vault/product-locks.md`
+
+Every new rule or setting saved to the bots' shared memory must be added to `docs/vault/shared-rules.md` via PR by the bot that saved it.
+
+- **On by default, one consent per ecosystem.** Every integrated product is on. There is no off-by-default toggle.
+- **Intent detection on every site.**
+- **Native embeds are part of done.** Every integrated system's own apps, on every device type (iPhone, Android, iPad, Mac, Windows, web). Install once from signup and it appears on all devices.
+- **The Do It card pops up in native apps.** It appears on its own, not only on an icon tap. The Gmail add-on and the Outlook add-in start immediately, in parallel with the urgent ecosystems work. Where a platform forbids an automatic surface, use the closest official route: a prefetched card, push notifications with Do It, and event-based activation.
+- **Every ecosystem.** That auto-pop card and those native embeds apply to every ecosystem, across all apps and devices: Meta (WhatsApp, Messenger, Instagram); Google (Gmail, Calendar, Drive, Docs, Sheets); Microsoft (Outlook, Teams, Word, Excel, OneDrive, To Do).
+- **iPhone:** add-ins first, then Safari.
+- **Signup gate.** It lives only on the Glance page, `flow-landing/trial.html`: email, required Terms and Privacy, a mailing-list opt-in that is not pre-checked, double opt-in, then the store. The main Flow site keeps the top Glance intro and a nav link. The bottom Get Glance card stays off the main site.
+- **Public release.** A polished, complete product, not a friends-only build.
+- **Always ProofOfClose and Undo.** No auto-send. Never clobber a user edit. Undo refuses rather than overwriting one.
+
+## Graphify — every agent, to save tokens
+
+Run `scripts/graphify-setup.sh` once per checkout, then `graphify query "<question>"`, `graphify path`, `graphify explain` before reading or grepping code. Work that a routine or agent finishes and verifies goes to git on the working branch so every agent sees it. Rules: `docs/glance-ai/graphify.md`.

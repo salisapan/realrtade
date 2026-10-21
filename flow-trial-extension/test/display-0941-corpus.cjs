@@ -162,7 +162,7 @@ console.log('\n--- page wiring ---\n');
   check('the worker can read attachment bytes and the page does not ask it for a grant', bg.indexOf('function outlookAttachmentBytes') > 0 && bg.indexOf("msg.type === 'flow:onedrive-grant'") < 0);
   check('Activity uses the row title', popup.indexOf('FlowDisplay.activityTitle') > 0);
   check('Clear close memory re-renders the panel', /function wireClearCloseMemory\(\)[\s\S]{0,1200}renderSurfaces\(/.test(popup));
-  check('Why not shown can show every row', popup.indexOf('whyNotShownAll') > 0 && popup.indexOf('Show all') > 0);
+  check('Why not shown is one line for the current mail', popup.indexOf('glanceWhyCurrent') > 0 && popup.indexOf('data-glance-why-line') > 0 && popup.indexOf('Show all') < 0);
   check('clear drops Outlook loop rows', storage.indexOf('dropOutlookLoopRow') > 0);
   check('the panel lists proved Outlook receipts', storage.indexOf('isPanelReceipt') > 0);
   const js = manifest.content_scripts[0].js;
@@ -170,11 +170,34 @@ console.log('\n--- page wiring ---\n');
     js.indexOf('core/commitment-title.js') >= 0 && js.indexOf('core/display-copy.js') >= 0 &&
     js.indexOf('core/step-list.js') >= 0 && js.indexOf('src/step-list-view.js') >= 0 &&
     js.indexOf('core/onedrive-file.js') >= 0 && js.indexOf('src/step-kit.js') >= 0);
-  check('the extension version is 0.9.55', manifest.version === '0.9.55');
+  check('the extension version is 0.9.56', manifest.version === '0.9.56');
   check('permissions are unchanged', JSON.stringify(manifest.permissions) === JSON.stringify([
     'storage', 'identity', 'sidePanel', 'alarms', 'notifications', 'scripting', 'contextMenus', 'offscreen'
   ]));
   check('the manifest does not ask for Mail.Send', JSON.stringify(manifest).indexOf('Mail.Send') < 0);
+}
+
+{
+  const titles = ['Call about the pilot', 'Renew the domain', 'Renew my domain', 'Reply requested by Oct 23', 'Pay $4,200', 'Send the contract'];
+  const ctx = { process: { id: 'follow-up' } };
+  const hold = { glanceChain: 'calendar-hold', process: { id: 'hold' } };
+  for (const lang of ['he', 'en']) {
+    for (const t of titles) {
+      check('the written title is the card title: ' + lang + ' / ' + t,
+        FlowDisplay.artifactTitle(lang, ctx, t) === FlowDisplay.cardTitle(lang, ctx, t),
+        { artifact: FlowDisplay.artifactTitle(lang, ctx, t), card: FlowDisplay.cardTitle(lang, ctx, t) });
+    }
+  }
+  for (const name of ['Reply & Track', 'Schedule It', 'Follow Through']) {
+    check('a Hebrew card titled by its process name is Hebrew: ' + name,
+      /[\u0590-\u05FF]/.test(FlowDisplay.cardTitle('he', ctx, name)) && FlowDisplay.cardTitle('en', ctx, name) === name);
+  }
+  check('Hebrew call title is written in Hebrew', FlowDisplay.artifactTitle('he', ctx, 'Call about the pilot') === 'שיחה בנושא הפיילוט');
+  check('English call title is unchanged', FlowDisplay.artifactTitle('en', ctx, 'Call about the pilot') === 'Call about the pilot');
+  check('a hold keeps the sentence it closes', FlowDisplay.artifactTitle('he', hold, 'Hold the glance-pricing file') === 'Hold the glance-pricing file');
+  check('a file on a mail with no consent is named in the quiet line',
+    /OneDrive/.test(FlowDisplay.whyNotShownLine('suggest:no-consent')) && FlowDisplay.whyNotShownLine('suggest:no-consent') !== FlowDisplay.whyNotShownLine('intent-null'));
+  check('no request is still the line for an unrecognised ask', FlowDisplay.whyNotShownLine('intent-null') === 'לא זוהתה בקשה');
 }
 
 if (failures) {

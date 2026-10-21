@@ -100,6 +100,122 @@ test('resolver refuses a Graph sender that is not the open pane', async ({ glanc
   }).toEqual({ chips: 0, mismatch: true });
 });
 
+function conversationScenario(convId, messageId, from, sender) {
+  const row = {
+    id: messageId,
+    conversationId: convId,
+    receivedDateTime: new Date().toISOString(),
+    subject: 'Transfer',
+    from: { emailAddress: { name: 'From', address: from } }
+  };
+  if (sender) row.sender = { emailAddress: { name: 'Sender', address: sender } };
+  return {
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: {},
+    conversation: [row]
+  };
+}
+
+test('a case-only sender difference still shows the card', async ({ glance }) => {
+  await glance.seedOutlook();
+  await glance.setScenario(conversationScenario('AQQkGlanceE2ECaseConv', 'AQMkGlanceE2ECaseHit', 'dana@acme.com'));
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2ECaseConv',
+    subject: 'Transfer',
+    senderEmail: 'Dana@Acme.com',
+    senderName: 'Dana',
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+});
+
+test('the user alias agrees with Graph and shows the card', async ({ glance }) => {
+  await glance.seedOutlook();
+  const scenario = conversationScenario('AQQkGlanceE2EAliasConv', 'AQMkGlanceE2EAliasHit', S.ME);
+  scenario.me = {
+    mail: S.ME,
+    userPrincipalName: S.ME,
+    proxyAddresses: ['SMTP:' + S.ME, 'smtp:sali.alias@glance.test'],
+    otherMails: ['sali.alias@glance.test']
+  };
+  await glance.setScenario(scenario);
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EAliasConv',
+    subject: 'Transfer',
+    senderEmail: 'sali.alias@glance.test',
+    senderName: 'Sali',
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+});
+
+test('a forwarded mail stays a sender mismatch', async ({ glance }) => {
+  await glance.seedOutlook();
+  await glance.setScenario(conversationScenario('AQQkGlanceE2EForwardConv', 'AQMkGlanceE2EForwardHit', 'original@acme.com'));
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EForwardConv',
+    subject: 'Transfer',
+    senderEmail: 'forwarder@elsewhere.com',
+    senderName: 'Forwarder',
+    body: S.SHOW
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+    return {
+      chips,
+      mismatch: diags.some((d) => d && d.reason === 'page:sender-mismatch')
+    };
+  }).toEqual({ chips: 0, mismatch: true });
+});
+
+test('a delegate send stays a sender mismatch', async ({ glance }) => {
+  await glance.seedOutlook();
+  await glance.setScenario(conversationScenario('AQQkGlanceE2EDelegateConv', 'AQMkGlanceE2EDelegateHit', 'boss@acme.com', 'delegate@acme.com'));
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EDelegateConv',
+    subject: 'Transfer',
+    senderEmail: 'boss@acme.com',
+    senderName: 'Boss',
+    body: S.SHOW
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+    return {
+      chips,
+      mismatch: diags.some((d) => d && d.reason === 'page:sender-mismatch')
+    };
+  }).toEqual({ chips: 0, mismatch: true });
+});
+
+test('a failed profile read keeps the exact sender comparison', async ({ glance }) => {
+  await glance.seedOutlook();
+  const scenario = conversationScenario('AQQkGlanceE2EMeFailConv', 'AQMkGlanceE2EMeFailHit', 'sali.other@glance.test');
+  scenario.meFail = true;
+  await glance.setScenario(scenario);
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EMeFailConv',
+    subject: 'Transfer',
+    senderEmail: 'sali.alias@glance.test',
+    senderName: 'Sali',
+    body: S.SHOW
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+    return {
+      chips,
+      mismatch: diags.some((d) => d && d.reason === 'page:sender-mismatch')
+    };
+  }).toEqual({ chips: 0, mismatch: true });
+});
+
 test('a truncated bodyPreview is outlook:body-preview-only and not a card', async ({ glance }) => {
   const preview = ('Could you confirm the transfer by Friday? ').repeat(12);
   expect(preview.length).toBeGreaterThanOrEqual(255);
@@ -141,4 +257,164 @@ test('a truncated bodyPreview is outlook:body-preview-only and not a card', asyn
   expect(onPage.previewOnly).toBe(true);
   expect(onPage.fullBodyWins).toBe(true);
   expect(onPage.shortPreview).toBe(true);
+});
+
+// Dates are a week ahead of the real clock, so the spec does not go stale.
+const AHEAD = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+const AHEAD_DMY = AHEAD.getDate() + '/' + (AHEAD.getMonth() + 1);
+const SELF_SAVE = 'please save the report to Drive by ' + AHEAD_DMY;
+const SELF_HOLD = 'תשמור לי את הזמן לפגישה ב-' + AHEAD_DMY + ' ב-14:00';
+
+function reportFile() {
+  return [{ id: 'att-report', name: 'report.pdf', contentType: 'application/pdf', size: 4096, isInline: false }];
+}
+
+async function quietReason(glance, page) {
+  const bag = await glance.storage();
+  const diags = bag.outlookPageDiag || [];
+  return {
+    chips: await page.locator('#ReadingPaneContainerId .flow-chip-host').count(),
+    silenced: diags.some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender' || d.reason === 'page:sender-mismatch'))
+  };
+}
+
+test('Outlook self-sent save and Hebrew meeting get a card', async ({ glance }) => {
+  await glance.seedOutlook({}, { ownAddresses: [S.ME, S.SENDER] });
+  await glance.setScenario({
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: { AQMkGlanceSelfSaveGmail: reportFile() },
+    conversation: [],
+    me: {
+      mail: S.ME,
+      userPrincipalName: S.ME,
+      proxyAddresses: ['SMTP:' + S.ME],
+      otherMails: [S.SENDER]
+    }
+  });
+  const save = await glance.openOutlook({
+    id: 'AQMkGlanceSelfSaveGmail',
+    subject: 'Report',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    to: [S.SENDER],
+    body: SELF_SAVE,
+    attachments: reportFile()
+  });
+  await expect(save.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+  await expect.poll(async () => quietReason(glance, save)).toEqual({ chips: 1, silenced: false });
+
+  await glance.setScenario({
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: { AQMkGlanceSelfSaveOutlook: reportFile() },
+    conversation: [],
+    me: { mail: S.ME, userPrincipalName: S.ME, displayName: 'Glance' }
+  });
+  const saveOutlook = await glance.openOutlook({
+    id: 'AQMkGlanceSelfSaveOutlook',
+    subject: 'Report',
+    senderEmail: S.ME,
+    senderName: 'Glance',
+    to: [S.ME],
+    body: SELF_SAVE,
+    attachments: reportFile()
+  });
+  await expect(saveOutlook.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  const hold = await glance.openOutlook({
+    id: 'AQMkGlanceSelfHoldGmail',
+    subject: 'פגישה',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    to: [S.SENDER],
+    body: SELF_HOLD
+  });
+  await expect(hold.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  const holdOutlook = await glance.openOutlook({
+    id: 'AQMkGlanceSelfHoldOutlook',
+    subject: 'פגישה',
+    senderEmail: S.ME,
+    senderName: 'Glance',
+    to: [S.ME],
+    body: SELF_HOLD
+  });
+  await expect(holdOutlook.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  await glance.setScenario({
+    inbox: [],
+    sent: [],
+    messages: {},
+    attachments: {},
+    conversation: [],
+    me: {
+      mail: S.ME,
+      userPrincipalName: 'sali.upn@glance.test',
+      proxyAddresses: ['SMTP:' + S.ME, 'smtp:sali.alias@glance.test'],
+      otherMails: ['sali.other@glance.test']
+    }
+  });
+  const alias = await glance.openOutlook({
+    id: 'AQMkGlanceSelfHoldAlias',
+    subject: 'פגישה',
+    senderEmail: 'sali.alias@glance.test',
+    senderName: 'Sali',
+    to: ['sali.other@glance.test'],
+    body: SELF_HOLD
+  });
+  await expect(alias.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+
+  const outbound = await glance.openOutlook({
+    id: 'AQMkGlanceSelfOutbound',
+    subject: 'פגישה',
+    senderEmail: S.ME,
+    senderName: 'Glance',
+    to: ['dana@acme.com'],
+    body: SELF_HOLD
+  });
+  await expect.poll(async () => quietReason(glance, outbound)).toEqual({ chips: 0, silenced: true });
+});
+
+test('Gmail self-sent save and Hebrew meeting get a card', async ({ glance }) => {
+  await glance.seedGmail();
+  const save = await glance.openGmail({
+    messageId: 'm-self-save',
+    threadId: 't-self-save',
+    subject: 'Report',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    ownEmail: S.SENDER,
+    to: [S.SENDER],
+    body: SELF_SAVE,
+    attachments: [{ name: 'report.pdf', mimeType: 'application/pdf' }]
+  });
+  await expect(save.locator('div[role="main"] .flow-chip-host')).toHaveCount(1);
+
+  const hold = await glance.openGmail({
+    messageId: 'm-self-hold',
+    threadId: 't-self-hold',
+    subject: 'פגישה',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    ownEmail: S.SENDER,
+    to: [S.SENDER],
+    body: SELF_HOLD
+  });
+  await expect(hold.locator('div[role="main"] .flow-chip-host')).toHaveCount(1);
+
+  const outbound = await glance.openGmail({
+    messageId: 'm-self-out',
+    threadId: 't-self-out',
+    subject: 'פגישה',
+    senderEmail: S.SENDER,
+    senderName: 'Sali',
+    ownEmail: S.SENDER,
+    to: ['dana@acme.com'],
+    body: SELF_HOLD
+  });
+  await expect(outbound.locator('div.a3s')).toContainText(SELF_HOLD);
+  await expect.poll(async () => outbound.locator('div[role="main"] .flow-chip-host').count()).toBe(0);
 });

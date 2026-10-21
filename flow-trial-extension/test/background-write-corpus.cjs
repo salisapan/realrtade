@@ -43,7 +43,24 @@ function load(opts) {
   const bodies = [];
   const tokens = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
+  if (!Object.prototype.hasOwnProperty.call(stored, 'googleGrantedScopes')) {
+    stored.googleGrantedScopes = {
+      version: [
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'openid'
+      ].join('\n'),
+      status: 'granted',
+      source: 'chrome',
+      at: 1
+    };
+  }
   let tokenSeq = 0;
+  let lastTitle = '';
 
   const sandbox = {
     console,
@@ -62,6 +79,7 @@ function load(opts) {
       } else {
         bodies.push(null);
       }
+      if (method === 'POST' && /\/lists\/[^/]+\/tasks$/.test(String(url)) && bodies[bodies.length - 1] && bodies[bodies.length - 1].title) lastTitle = bodies[bodies.length - 1].title;
       const auth = options && options.headers && options.headers.Authorization;
       if (auth) tokens.push(String(auth).replace('Bearer ', ''));
       for (const [match, answer] of opts.routes || []) {
@@ -72,12 +90,12 @@ function load(opts) {
       // googleTasksWrite reads the created task back. A test that needs the
       // GET to fail registers its own route; anything else confirms the id.
       const taskRead = method === 'GET' && String(url).match(/\/lists\/[^/]+\/tasks\/([^/?]+)(?:\?.*)?$/);
-      if (taskRead) return res(200, { id: decodeURIComponent(taskRead[1]), status: 'needsAction' });
+      if (taskRead) return res(200, { id: decodeURIComponent(taskRead[1]), title: lastTitle, status: 'needsAction' });
       return res(500, { error: { message: 'unrouted: ' + method + ' ' + url } });
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
+        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com', scopes: ['https://www.googleapis.com/auth/tasks'] } }),
         onMessage: { addListener() {} },
         onInstalled: { addListener() {} },
         onStartup: { addListener() {} },
@@ -115,6 +133,7 @@ function load(opts) {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return {
     calls, bodies, tokens, stored,
     fn: (name) => vm.runInContext(name, sandbox)
@@ -159,7 +178,9 @@ function decodeDraftRaw(raw) {
   return { body: Buffer.from(bodyB64, 'base64').toString('utf8'), attachmentFilename: filenameMatch ? filenameMatch[1] : null };
 }
 
-const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' } };
+// A connected person has a granted-scope record for the scope list in the manifest; without it the first write drops
+// the cached token once and asks again (googleScopeAction), which is the upgrade path and not the ordinary write.
+const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: { version: 'https://www.googleapis.com/auth/tasks', status: 'granted' } };
 const PAYLOAD = { label: 'Send the signed SOW', facts: {}, senderName: 'Dana', threadUrl: 'https://mail.google.com/x' };
 
 async function run() {
@@ -422,7 +443,7 @@ async function run() {
       stored: CONNECTED,
       routes: [
         [/\/lists\/LIST_A\/tasks$/, { method: 'POST', reply: res(200, { id: 'task_proved', status: 'needsAction' }) }],
-        [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'GET', reply: res(200, { id: 'task_proved', status: 'needsAction' }) }],
+        [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'GET', reply: res(200, { id: 'task_proved', title: 'Send the signed SOW', status: 'needsAction' }) }],
         [/\/lists\/LIST_A\/tasks\/task_proved$/, { method: 'DELETE', reply: res(204, {}) }]
       ]
     });

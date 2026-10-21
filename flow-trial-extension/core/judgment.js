@@ -128,15 +128,160 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
   // HANDOFF on purpose — these go through directedAsk() below (negation and
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
-  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind)\b/i;
+  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
   const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
+  // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
+  // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
+  // Every way of asking for a time, a call, a meeting or the reader's availability. Each construct needs both halves
+  // (the ask and the thing asked about), so "what time is it" and "thanks for the call" stay out. They go through
+  // directedAsk(), so a hedged or withdrawn ask stays quiet.
+  const MEET_VERB = '(?:talk|chat|meet|call|connect|speak|catch up|sync|hop on|jump on|get together|touch base|check in|discuss|go over|have a (?:call|chat|word)|catch|grab|speak)';
+  const SLOT_ASKS = [
+    // when / what time / which day, with a word that makes it about fitting a time
+    /\bwhen\b[^.?!\n]{0,40}\b(?:free|available|around|good|best|convenient|suits?|works?|meet|talk|chat|call|speak|connect|catch up|sync|reach you|get together|discuss|open)\b/i,
+    /\bwhat(?:'s| is| are)?\s+(?:days?|times?|dates?|slots?)\b[^.?!\n]{0,40}\b(?:work|works|suit|suits|good|best|convenient|prefer|like|better)\b/i,
+    /\bwhich\s+(?:days?|times?|dates?|slots?)\b[^.?!\n]{0,40}\b(?:work|works|suit|suits|better|best|prefer|convenient)\b/i,
+    /\b(?:best|good|right|convenient|better)\s+time\s+to\s+(?:reach|call|contact|talk|meet|speak|catch|connect|chat)\b/i,
+    /\bis there (?:a|any)\s+(?:good |better |convenient |possible )?(?:time|slot|day|moment)\b/i,
+    // are you free / available / around, do you have time
+    /\b(?:are|will|were)\s+you\s+(?:free|available|around|open|up for|able to (?:meet|talk|chat|call|connect|speak|hop|jump))\b/i,
+    /\bfree\s+(?:for|to|on|at|this|next|tomorrow|today|later|sometime|one day)\b[^.?!\n]*\?/i,
+    /\b(?:are you )?(?:available|around)\s+(?:for|on|at|this|next|tomorrow|today|later)\b[^.?!\n]*\?/i,
+    /\bdo\s+you\s+have\s+(?:any |some |a |an |the |a few |\d+ )?(?:\w+ )?(?:time|minutes?|availability|slot|window|moment|opening|free)\b/i,
+    /\bwould\s+you\s+(?:be open to|be interested in|have time (?:for|to)|be up for|be willing to|be free)\b[^.?!\n]{0,30}\b(?:call|chat|meet|meeting|talk|speak|connect|demo|coffee|lunch|catch|sync|discuss|conversation)/i,
+    // can we / could we / shall we / may I + talk, meet, schedule, find a time
+    new RegExp('\\b(?:can|could|would|shall|may|might|should)\\s+(?:we|i)\\s+(?:possibly |maybe |quickly |just |perhaps )?(?:' + MEET_VERB.slice(3,-1) + '|schedule|set up|find|book|arrange|get on|fit|have)\\b(?!\\s+(?:the|our|your|their|this|that|these|those|my|his|her|expectations|requirements|deadlines?|goals?|targets?|budget)\\b)', 'i'),
+    /\bcan you (?:do|make|spare|find|fit)\s+(?:a |an |the |some )?(?:\d+[- ]?(?:min|minute|hour)\w* )?(?:call|meeting|chat|sync|session|lunch|coffee|catch|time|minutes|moment|slot)/i,
+    /\bany (?:chance|way|possibility)\b[^.?!\n]{0,30}\b(?:connect|chat|talk|meet|call|speak|catch up|sync|hop)\b/i,
+    /\bwould it be possible\b[^.?!\n]{0,25}\b(?:meet|talk|chat|call|connect|speak|catch up|get together)\b/i,
+    // would Thursday work, how about tomorrow, what about a call
+    /\bwould\s+(?:\w+day|tomorrow|today|next week|this week|the (?:morning|afternoon|evening)|\d{1,2}(?::\d\d)?\s?(?:am|pm)?)\b[^.?!\n]{0,25}\b(?:work|suit|be good|be fine|be ok|be okay|be better)\b/i,
+    /\b(?:how|what) about\b[^.?!\n]{0,40}\b(?:call|chat|meet|talk|tomorrow|today|\w+day|next week|this week|coffee|lunch|sync|morning|afternoon|evening)\b/i,
+    /\b(?:does|do|is)\s+(?:\w+day|tomorrow|today|next week|this week)\b[^.?!\n]{0,20}\b(?:work|suit)s?\b/i,
+    // let's, I'd love to, looking forward to, happy to
+    /\blet(?:'|’)?s\s+(?:find|set up|schedule|book|arrange|catch up|sync(?: up)?|talk|connect|touch base|hop on|jump on|get together|meet|speak|chat|grab|pick)\b/i,
+    /\b(?:i|we)(?:'d| would|'d really| really would| really)?\s+(?:love|like|appreciate|be happy|be glad|welcome|prefer|want|hope|wish|need)\s+(?:to\s+)?(?:set up|schedule|book|arrange|find a time|catch up|connect|chat|talk|meet|speak|get together|hop on|jump on|discuss|sync|touch base|hear|a few minutes|some of your time|a moment|\d+ minutes)\b/i,
+    /(?:^|[.!?,\n]\s*)(?:would |'d )?(?:really )?(?:love|like|appreciate) to\s+(?:set up|schedule|book|arrange|find a time|catch up|connect|chat|talk|meet|speak|get together|hop on|jump on|discuss|sync|touch base)\b/i,
+    /\b(?:looking|hoping|wanting|keen|eager)\s+(?:forward\s+)?to\s+(?:schedule|set up|book|connect|catch up|meet|talk|speak|chat|get together)/i,
+    /\bhappy to\s+(?:jump|hop|get)\s+on\b|\bhappy to\s+(?:meet|chat|talk|connect|catch up|speak|discuss|set up|schedule)\b/i,
+    // tell me when, send me times, pick a time, your calendar
+    /\b(?:(?:can|could|would|will) you (?:please )?)?(?:let me know|tell me|send me|share|give me|please advise|advise|come back (?:to me )?with|get back to me with|shoot me|text me)\b[^.?!\n]{0,40}\b(?:when|what time|your availability|a time|some times|a few times|times|what works|what day|which day|your schedule|slots?|the best time|what suits|whenever|availability)\b/i,
+    /\b(?:(?:can|could|would|will) you (?:please )?)?(?:suggest|propose|offer|give|send|share)\b[^.?!\n]{0,25}\b(?:slots?|times|options|windows|dates|days|timeframes?)\b/i,
+    /\b(?:what|how)(?:'s| is| does| are)\s+(?:your|the)\s+(?:calendar|schedule|availability|diary|week|day)\b/i,
+    /\bhow\s+(?:does|is|'s)\s+your\s+(?:calendar|schedule|week|availability|diary)\b/i,
+    /\bpick (?:a|the) (?:time|day|slot)\b|\bbook (?:a|some|me a) (?:time|slot)\b|\bget on your (?:calendar|schedule|diary)\b|\bfind (?:a|some|\d+ ?min\w*|\d+) (?:time|minutes?|slot)\b|\bfind a (?:time|day|slot)\b/i,
+    /\b(?:a few|a couple of|some|\d+) (?:minutes|mins)\b[^.?!\n]{0,20}\b(?:time|call|chat|talk|this week|today|tomorrow)\b/i
+  ];
+  const SLOT_ASKS_HE = [
+    /(?:^|[\s,.;:!?"(])מתי\s+(?:אפשר|נוח|מתאים|יתאים|יהיה\s+(?:לך|לכם|לכן|נוח|מתאים)|הכי|יוצא|תוכל(?:ו|י)?|אתה|את|אתם|אתן|ניתן|שנוח|שמתאים|תהיה|תהיו|פנוי|פנויה|פנויים|פנויות|נדבר|ניפגש|נקבע|נוכל|אוכל|אפשרי)/,
+    /(?:^|[\s,.;:!?"(])(?:אשמח|נשמח|הייתי\s+שמח|הייתי\s+שמחה|היינו\s+שמחים|הייתי\s+רוצה|היינו\s+רוצים|רציתי|רצינו|מעוניין|מעוניינת|מעוניינים)\s+(?:אם\s+)?(?:נוכל\s+|תוכל(?:ו|י)?\s+)?(?:ל(?:תאם|קבוע|דבר|היפגש|שוחח|פגוש|הכיר|התקשר|שמוע|סגור|מצוא|הציע)|שיחה|פגישה|דמו|הדגמה|זום|קפה)/,
+    /(?:^|[\s,.;:!?"(])(?:בוא|בואו|בואי)\s+(?:נ(?:קבע|תאם|דבר|פגש|סנכרן|שוחח|תקשר|מצא|סגור|כניס|סדר|ארגן|תחבר|עבור)|ניפגש)/,
+    /(?:^|[\s,.;:!?"(])(?:אפשר|ניתן|נוכל|יהיה\s+אפשר)\s+(?:\S+\s+){0,3}?(?:לקבוע|לתאם|לדבר|להיפגש|לשוחח|להתקשר|לסגור|שנדבר|שניפגש|שנקבע|שנתאם|זום|שיחה|פגישה|דמו)/,
+    /(?:^|[\s,.;:!?"(])(?:יש|יהיה)\s+(?:לך|לכם|לכן|לי)?\s*(?:קצת\s+)?(?:זמן|דקה|דקות|מצב|חלון|רגע|פנאי)\s+(?:קטן\s+|קצר\s+|פנוי\s+)?(?:(?:ל|ש)[א-ת]|השבוע|מחר|היום|בשבוע|ביום)/,
+    /(?:^|[\s,.;:!?"(])(?:תגיד|תגידי|תגידו|תכתוב|תכתבי|תכתבו|תעדכן|תעדכני|תעדכנו|תשלח|תשלחי|תשלחו|תחזור|תחזרי|תחזרו|תציע|תציעי|תציעו|תן|תני|תנו|שלח|שלחי|שלחו|עדכן|עדכני|עדכנו|הצע|הציעי|הציעו)\s+(?:לי\s+|לנו\s+)?(?:\S+\s+){0,3}?(?:מתי|מועד|מועדים|זמן|זמנים|זמינות|אילו\s+ימים|איזה\s+יום|איזו\s+שעה|שעות|חלונות)/,
+    /(?:^|[\s,.;:!?"(])(?:איזה|איזו|באיזה|באיזו)\s+(?:יום|שעה|ימים|שעות|מועד)\s+(?:\S+\s+){0,2}?(?:נוח|מתאים|עובד|טוב|הכי|מתאימים)/,
+    /(?:^|[\s,.;:!?"(])(?:מתאים|נוח|טוב|עובד|יתאים|יהיה\s+נוח)\s+(?:לך|לכם|לכן)\s+(?:ש(?:נדבר|ניפגש|נקבע|נתאם|אתקשר|אדבר|נסנכרן|נשוחח)|ביום|מחר|היום|בשבוע)/,
+    /(?:^|[\s,.;:!?"(])(?:נקבע|נתאם|נדבר|ניפגש|נסנכרן|נשוחח)\s+(?:משהו|שיחה|פגישה|זום|שוב|בקרוב|השבוע|מחר|בשבוע|ביום|ב\d)/,
+    /(?:^|[\s,.;:!?"(])(?:נוכל|אוכל|תוכל(?:ו|י)?)\s+(?:\S+\s+)?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח|להתחבר)/,
+    /(?:^|[\s,.;:!?"(])מה\s+(?:אצלך|אצלכם|אצלכן|עם)\s+(?:\S+\s+){0,2}?(?:ביום|בשבוע|מחר|היום|השבוע|בבוקר|בצהריים|בערב|ראשון|שני|שלישי|רביעי|חמישי|שישי)/,
+    /(?:^|[\s,.;:!?"(])מה\s+(?:ה)?(?:זמינות|יומן|לוח\s+הזמנים)\s+(?:שלך|שלכם)/,
+    /(?:^|[\s,.;:!?"(])מי\s+(?:מכם|מכן|מהצוות)\s+(?:פנוי|פנויה|יכול|יכולה)/,
+    /(?:^|[\s,.;:!?"(])(?:פנוי|פנויה|פנויים|פנויות)\s+(?:ל[א-ת]|ב(?!בקשה)[א-ת]|השבוע|מחר|היום)/,
+    /(?:^|[\s,.;:!?"(])(?:נשמח|אשמח)\s+(?:למצוא|לסגור|להציע)\s+(?:\S+\s+){0,2}?(?:זמן|מועד|שיחה|פגישה)/,
+    /(?:^|[\s,.;:!?"(])בא\s+(?:לך|לכם|לכן)\s+(?:ל|ש)(?:קבוע|דבר|היפגש|תאם|שוחח|התקשר)/
+  ];
+  // The structural half: a sentence that turns to the reader (a question, a request, an invitation, "whenever you") AND is
+  // about talking, meeting or fitting a time. This is what lets a phrasing nobody listed still count. A sentence that only
+  // states a fact (a call that happened, a meeting that is fixed, a schedule attached) has no turn to the reader.
+  const SLOT_COMM_EN = /\b(?:calls?|chat|talk|speak|spoke|meet|meeting|meetings|sync|catch[- ]?up|coffee|lunch|breakfast|drinks|dinner|demo|conversation|discuss|discussion|connect|touch base|walk you through|go (?:through|over)|video call|zoom|teams|hangout|visit|appointment|session|brainstorm|speak with|get together|meet up|hop on|jump on|walkthrough|briefing|kickoff|kick-off)\b/i;
+  const SLOT_TIME_EN = /\b(?:time|times|timing|slot|slots|availability|available|calendar|diary|schedule|minutes?|half an hour|an hour|spare|moment|gap|window|(?:mon|tues|wednes|thurs|fri|satur|sun)day|tomorrow|tonight|today|this week|next week|this afternoon|this morning|later|soon|sometime|end of the week|mornings?|afternoons?|evenings?)\b|\bfree(?! of charge| shipping| trial| to| for free)\b|\baround\b|\bfixed\b|\bconvenien(?:t|ce)\b|\bcouple of weeks\b|\bsometime\b|\bearliest\b/i;
+  const SLOT_TURN_EN = /\?|\b(?:could|can|would|might|will|shall|may|do|does|are|is|were)\s+(?:you|we|i|it|there|that|this|your)\b|\b(?:let me know|let us know|do let me|please|kindly|whenever|when ready|when you(?:'re| are)|if you(?:'re| are)? (?:free|available|around|able|open|keen|interested|up for)|i(?:'d| would) (?:really )?(?:love|like|welcome|appreciate|be grateful|be keen|be glad|be happy|be delighted|be pleased|prefer)|would (?:really )?(?:love|like|appreciate)|would be (?:great|nice|good|lovely|helpful|useful)|hoping (?:we|that|to)|i hope we|let us|how about|what about|any |care to|want to|up for|interested in|keen to|wondering|checking if|looking to|hoping to|just checking|perhaps|maybe|let(?:'|’)?s|wondered)\b/i;
+  const SLOT_FACT_EN = /\b(?:thanks for|thank you for|it was (?:great|good|nice) to|enjoyed|was scheduled|is scheduled|has been (?:scheduled|moved|cancelled|canceled|confirmed)|is confirmed|was cancelled|is cancelled|attached|recording|office hours|time zone|starts in|\bby (?:\w+day|tomorrow|tonight|eod|cob|end of (?:the )?(?:day|week))\b|\bwho (?:will|is|are|'s)\b|we (?:had|spoke|met|discussed)|i (?:had|spoke|met|called)|went well|free shipping|free trial|feel free|for free|no need|not needed|unsubscribe)\b/i;
+  const SLOT_COMM_HE = /(?:שיחה|שיחת|פגישה|פגישת|להיפגש|ניפגש|לדבר|נדבר|לשוחח|נשוחח|להתקשר|אתקשר|נתקשר|זום|טלפון|קפה|ארוחת|ארוחה|דמו|הדגמה|הכרות|סנכרון|נסנכרן|להתחבר|נתחבר|לקפוץ|וידאו|מפגש|לעבור על|נעבור על|לפגוש|נפגש|סשן|לדון|נדון|דיון|לארגן|ארגון|תדריך|סקירה|התנעה)/;
+  const SLOT_TIME_HE = /(?:זמן|זמנים|מועד|שעה|שעות|דקה|דקות|חצי שעה|פנוי|פנויה|פנויים|פנויות|זמין|זמינה|זמינים|זמינות|יומן|ביומן|חלון|רגע|פנאי|ימים|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|מחר|היום|השבוע|שבוע הבא|בקרוב|בהמשך|בבוקר|בצהריים|אחר הצהריים|בערב|לפני סוף|בארבע|בחמש|בשלוש|בעשר|שבועיים|בחודש|הקרובים|הקרוב|תאריך|תאריכים|נוח|מתאים|עובדים|טובים)/;
+  const SLOT_TURN_HE = /\?|(?:^|[\s,.;:!"(])(?:אפשר|נוכל|תוכל|תוכלו|תוכלי|אוכל|ניתן|יש\s+(?:לך|לכם)|יהיה\s+(?:לך|לכם)|בא\s+(?:לך|לכם)|מתאים|נוח|אשמח|נשמח|הייתי\s+(?:רוצה|שמח|שמחה)|אודה|רציתי|רצינו|מעוניין|מעוניינת|תגיד|תגידי|תגידו|תעדכן|תעדכני|תעדכנו|תשלח|תשלחי|תשלחו|תציע|תציעי|תציעו|בוא|בואו|בואי|נקבע|נתאם|אולי|האם|מה\s+עדיף|מה\s+דעתך|איך\s+נראה|מה\s+נראה|אכפת|מתי|איזה|איזו|אם\s+(?:אתה|את|אתם|אתן)|כש(?:יהיה|נוח|תוכל|תהיה)|רק\s+בודק|רק\s+בודקת|נגיד|נאמר|מעוניינים|בודק\s+אם|מקווה|מקווים|נסדר|נארגן|נציע|תהיה|תהיו|תהיי|זמין|זמינה|זמינים)/;
+  const SLOT_FACT_HE = /(?:תודה\s+על|נעים\s+להכיר|היה\s+(?:נעים|מצוין|כיף)|נקבע(?:ה)?\s+ל|בוטל|בוטלה|מצורפ|הקלטת|שעות\s+הפעילות|תזכורת:|בעוד\s+\S+\s+דקות|דיברנו|נפגשנו|דיברתי|משלוח\s+חינם|הסרה|אין\s+צורך|לא\s+צריך|הוא\s+אמר|היא\s+אמרה|אמר\s+ש|אמרה\s+ש|מי\s+(?:מכם\s+|מכן\s+)?(?:יגיע|תגיע|ישתתף|יצטרף|מגיע))/;
+  function slotAskSentence(sentence) {
+    const t = String(sentence || '');
+    if (t.length < 6 || t.length > 400) return false;
+    const he = /[֐-׿]/.test(t);
+    const comm = he ? SLOT_COMM_HE : SLOT_COMM_EN;
+    const time = he ? SLOT_TIME_HE : SLOT_TIME_EN;
+    const turn = he ? SLOT_TURN_HE : SLOT_TURN_EN;
+    const fact = he ? SLOT_FACT_HE : SLOT_FACT_EN;
+    if (fact.test(t)) return false;
+    // "Could you call me later?" asks the reader to do something; it does not ask when. A marker of availability or a time
+    // in the same sentence makes it an arrangement again.
+    if (!he && /\b(?:call|ring|phone)(?:ing)?\s+(?!me\b|us\b|back\b|in\b|with\b|about\b|this\b|it\b|today\b|tomorrow\b|later\b)(?:the |a |our |your |my )?(?:[A-Z][a-z]+|bank|office|supplier|vendor|client|customer|doctor|landlord)/.test(t) && !/\b(?:when|free|available|convenient|suits?|works?|availability)\b/i.test(t)) return false;
+    if (he && /(?:להתקשר|תתקשר|תתקשרי|תצלצל|תצלצלי)\s+ל(?!אחר)[א-ת]/.test(t) && !/(?:מתי|פנוי|זמין|נוח|מתאים|זמינות)/.test(t)) return false;
+    if (!he && /\b(?:call|ring|phone|text|ping|email|e-mail) me\b/i.test(t) && !/\b(?:when|whenever|free|available|convenient|suits?|works?|time|slot|slots|availability)\b/i.test(t)) return false;
+    if (he && /(?:להתקשר|תתקשר|תתקשרי|תצלצל|תצלצלי|לצלצל|תכתוב|תכתבי|לכתוב)\s+(?:אליי|אלי|לי)/.test(t) && !/(?:מתי|פנוי|זמין|נוח|מתאים|זמן|מועד|חלון|זמינות)/.test(t)) return false;
+    const question = /\?/.test(t);
+    // A statement that names a concrete day ("let's meet tomorrow", "we'll talk on Tuesday") proposes a meeting; the event and
+    // Schedule meeting gates already decide it. Only a question about a day asks the reader for a time.
+    const findsATime = /\b(?:find|pick|set|choose|fix|arrange)\s+(?:a|some|the)\s+(?:\w+\s+)?(?:time|day|slot)\b|(?:נמצא|נקבע|נבחר|נסדר|נתאם)\s+(?:לנו\s+)?(?:זמן|מועד|יום)/i.test(t);
+    if (!question && !findsATime && /\b(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|tomorrow|tonight|today)\b|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|(?:^|\s)(?:מחר|היום|הערב)(?:\s|$|[.,])/i.test(t)) return false;
+    // Listed constructs: each already names both the ask and the thing asked about.
+    for (const re of SLOT_ASKS.concat(SLOT_ASKS_HE)) {
+      const m = t.match(re);
+      if (m && !isNegatedBefore(t.slice(0, m.index))) return true;
+    }
+    const mComm = t.match(comm);
+    if (!turn.test(t)) return false;
+    // Negation in front of the topic withdraws it ("no need for a call", "I can't meet").
+    if (mComm && isNegatedBefore(t.slice(0, mComm.index))) return false;
+    if (mComm && (time.test(t) || question)) return true;
+    // A question about which days, dates or hours suit the reader.
+    if (question && !he && /\b(?:which|what)\s+(?:days?|dates?|times?|hours?|slots?)\b/i.test(t) && /\b(?:you|your|suits?|works?|convenient|best|better|good|free|available|prefer)\b/i.test(t)) return true;
+    if (question && he && /(?:אילו|איזה|איזו|באיזה|באיזו)\s+(?:ימים|יום|שעה|שעות|מועד|מועדים|תאריכים|תאריך)/.test(t)) return true;
+    // "When are you next in the office?" "When can you do?": the reader is asked for a when.
+    if (question && !he && /\bwhen\s+(?:are|will|can|could|would|do|does|did)\s+(?:you|we|i)\b/i.test(t)) return true;
+    if (question && he && /(?:^|[\s,.;:!"(])מתי\s+(?:אתה|את|אתם|אתן|תוכל|תוכלו|תוכלי|תהיה|תהיו|נוכל|אפשר|נוח|מתאים|טוב|הכי)/.test(t)) return true;
+    // Setting time aside for the reader.
+    if (!he && /\b(?:set aside|block out|carve out|find|make|spare|take|allocate|reserve)\s+(?:some |a bit of |a little |a few |an? |\d+ )?(?:\w+ )?(?:time|minutes|moment|hour)\b/i.test(t)) return true;
+    // An invitation from the sender that names a meeting or a call ("we'd love a call", "נשמח לשיחה").
+    if (!he && /\b(?:i|we)(?:'d| would)? ?(?:love|like|be delighted|be keen|be happy|be glad|welcome)\b[^.?!\n]{0,25}\b(?:call|chat|conversation|meeting|catch up|coffee|lunch|demo)\b/i.test(t) && !/\b(?:thank|thanks)\b/i.test(t)) return true;
+    if (he && /(?:נשמח|אשמח|הייתי\s+רוצה|רוצה)\s+(?:ל\S+\s+)?(?:איתך\s+|איתכם\s+)?(?:שיחה|פגישה|קפה|דמו|לארגן)/.test(t)) return true;
+    // Putting something in the reader's calendar is the same ask.
+    if (!he && /\b(?:on|in|into|to) (?:the |our |my |your )?(?:calendar|diary|schedule)\b/i.test(t)) return true;
+    if (he && /(?:ליומן|ביומן)/.test(t)) return true;
+    // "Let me know a day that suits you": the thing asked for is a day, a date or a time.
+    if (!he && /\b(?:let me know|tell me|send me|share|give me|suggest|propose)\b[^.?!\n]{0,30}\b(?:day|days|date|dates|time|times|slot|slots|when)\b/i.test(t)) return true;
+    // A time with no talk word still counts when it is a question about the reader's availability or calendar.
+    return Boolean(!he && question && /\b(?:availability|available|calendar|diary|schedule|timing|free|spare|slot|slots|time works|times work|what does .{0,20} look like for you|how are you fixed)\b/i.test(t))
+      || Boolean(he && question && /(?:זמינות|פנוי|זמין|יומן|ביומן|חלון|איך\s+נראה\s+לך)/.test(t));
+  }
+  function slotAskText(text) {
+    return String(text || '').split(SENTENCE_SPLIT).some(slotAskSentence);
+  }
+
+  // A request to make a work product: a spreadsheet, a table, a report, a summary, a deck. The product has to be named, so
+  // "please create an account" and "write back when you can" stay quiet, and a bare "document" stays quiet on purpose
+  // (the create-when-missing family decides that). Kept out of HANDOFF so the sentence Glance quotes does not change.
+  const WORK_ASK = /\bplease (?:can you |could you )?(?:draft|write up|write|create|compile|put|enter|fill (?:in|out)|summari[sz]e|make|build) (?:\S+ ){0,5}?(?:spreadsheet|sheet|table|report|summary|figures|numbers|data|deck|presentation|proposal|memo)/i;
+  const WORK_ASK_HE = /(?:^|\s)(?:תכין|תכיני|תכינו|תכתוב|תכתבי|תכתבו|תיצור|תיצרי|תיצרו|תכניס|תכניסי|תכניסו|תסכם|תסכמי|תסכמו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?(?:את\s+)?(?:ה)?(?:מסמך\s+(?:סיכום|סטטוס|תקציב|הצעה|דוח)|טבלה|דוח|דו"ח|סיכום|נתונים|מספרים|גיליון|הצעה|מצגת)/;
+  // Asks for an update or an introduction. Each names the reader as the one who acts ("update me", "introduce me"), so a
+  // status line or a thank-you that merely mentions an update stays quiet. Kept out of HANDOFF so the quoted sentence is unchanged.
+  const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
+  const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|אשמח\s+לעדכון|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
+  // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
+  // longer text, a bare "really?" and a greeting stay on the normal path.
+  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
+  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
+  function shortAskText(text) {
+    const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
+    if (t.length < 8 || t.length > 90) return false;
+    return SHORT_ASK_EN.test(t) || SHORT_ASK_HE.test(t);
+  }
   // A first-person delivery promise. Not a COMMIT word ("agreed",
   // "approved") and not a reader reminder ("you agreed to") — "I will send
   // the contract by Friday" is the sender closing a dated obligation on
@@ -507,6 +652,10 @@ const FlowJudgment = (() => {
     const lost = LOST.test(text) || LOST_HE.test(text);
     const obligation = anyOf(text, OBLIG_PATS, assertedIn);
     const followUpAsk = anyOf(text, [FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE], directedAsk);
+    // A clock in the text ("Tuesday at 3", "בשעה 16:00") belongs to the event and hold gates, which already decide it.
+    const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
+    const slotAsk = !clockNamed && slotAskText(text);
+    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE], directedAsk);
     const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
@@ -523,6 +672,9 @@ const FlowJudgment = (() => {
     if (facts.date && obligation) add('deadline', 26, 'Sets a dated obligation: ' + facts.date.raw);
     else if (facts.date) add('date', 12, 'Names a date: ' + facts.date.raw);
     if (handoff) add('handoff', 18, 'Asks you to do something specific');
+    if (slotAsk) add('slot-ask', 34, 'Asks you for a time');
+    const shortAsk = shortAskText(text);
+    if (shortAsk) add('short-ask', 60, 'A short direct ask');
     const onDomain = domain.entityWords.test(text);
     if (onDomain) add('domain', 14, 'About ' + domain.entity.toLowerCase());
     if (facts.isReply) add('reply', 8, 'Part of an ongoing thread');
@@ -557,7 +709,7 @@ const FlowJudgment = (() => {
     } else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
-    return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain, senderPromise, noise } };
+    return { total, signals, flags: { commit, lost, executed, obligation, handoff, slotAsk, workAsk, shortAsk, dispute, onDomain, senderPromise, noise } };
   }
 
   // The threshold is the only thing that learns. Clicking says "more like that",
@@ -762,7 +914,7 @@ const FlowJudgment = (() => {
   // drifting copy of the same judgment.
   return {
     evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
-    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE,
+    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
 })();

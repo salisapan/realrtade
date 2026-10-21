@@ -1,0 +1,53 @@
+{
+ "tier2Share": 0.1884422110552764,
+ "sysChars": 3058,
+ "inTokens": 1519,
+ "assumptions": {
+  "charsPerToken": 3,
+  "mailChars": 1500,
+  "outTokens": 250,
+  "callSecondsOnL4": 1
+ },
+ "rows": [
+  {
+   "host": "Managed endpoint, pay per token (DeepInfra list price for Qwen3.5-4B)",
+   "perCall": 0.00008306999999999999,
+   "monthly": [
+    0.014088505025125628,
+    0.046961683417085426,
+    0.14088505025125628
+   ]
+  },
+  {
+   "host": "Managed endpoint, pay per token (Fireworks list price, non-reasoning 4B)",
+   "perCall": 0.00035380000000000003,
+   "monthly": [
+    0.06000376884422112,
+    0.20001256281407037,
+    0.6000376884422112
+   ]
+  },
+  {
+   "host": "Serverless GPU, pay per second (Modal L4 ~$0.80/h)",
+   "perCall": 0.000222,
+   "monthly": [
+    0.037650753768844226,
+    0.12550251256281408,
+    0.3765075376884423
+   ]
+  },
+  {
+   "host": "Serverless GPU, pay per second (Runpod L4 ~$0.39/h)",
+   "perCall": 0.000108,
+   "monthly": [
+    0.018316582914572867,
+    0.06105527638190954,
+    0.18316582914572863
+   ]
+  },
+  {
+   "host": "Dedicated L4 always on (Runpod ~$0.39/h)",
+   "monthlyFixed": 280.79999999999995
+  }
+ ]
+}

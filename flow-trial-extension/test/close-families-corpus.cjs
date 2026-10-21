@@ -55,7 +55,7 @@ const exemplars = [
   ['F en', 'Please chase the vendor about the invoice.', 'F', true],
   ['F he', 'תעקוב אחרי החשבונית מול הספק.', 'F', true],
   ['G en new slot', 'Can we reschedule the Friday, September 18 at 3pm sync to Thursday, September 24 at 4pm?', 'G', true],
-  ['G he new slot', 'אפשר לדחות את הפגישה ליום חמישי בשעה 16:00?', 'G', true],
+  ['G he new slot', 'אפשר לדחות את הפגישה ליום חמישי בשעה 16:00?', 'G', false],
   ['I en template', 'Please draft the contract from our company template and send it to Dana.', 'I', true],
   ['I he template', 'אין חוזה בתיקייה. תכין אחד מהתבנית שלנו ותשלח לדנה.', 'I', true],
   ['I en quote from template', 'We don\'t have a quote for Acme. Draft one from our company template and send it to Dana.', 'I', true],
@@ -64,7 +64,8 @@ const exemplars = [
 for (const [name, text, family, wantChip] of exemplars) {
   const { intent, show } = chip(text);
   check(name + ' chips', show === wantChip, { type: intent.type, family: intent.closeFamily, conf: intent.confidence });
-  check(name + ' family ' + family, intent.closeFamily === family, { family: intent.closeFamily, type: intent.type, what: intent.entities && intent.entities.what });
+  if (wantChip) check(name + ' family ' + family, intent.closeFamily === family, { family: intent.closeFamily, type: intent.type, what: intent.entities && intent.entities.what });
+  else check(name + ' stays quiet', show === false && !intent.type, { type: intent.type, family: intent.closeFamily });
 }
 
 {
@@ -78,8 +79,8 @@ for (const [name, text, family, wantChip] of exemplars) {
       moved.entities.fromDateIso === '2026-09-18' && moved.entities.fromHour === 15,
     moved.personalClose);
   const held = classify('אפשר לדחות את הפגישה ליום חמישי בשעה 16:00?');
-  check('G with only a new slot stays one calendar hold',
-    held.personalClose === 'calendar-hold' && held.entities && held.entities.dateIso === '2026-09-24' && held.entities.hour === 16 && !held.entities.calendarOp,
+  check('G a postpone with one new slot is not a new hold',
+    !FlowIntent.shouldShowChip(held) && held.personalClose !== 'calendar-hold',
     held.personalClose);
   const created = classify('Please draft the contract from our company template and send it to Dana.');
   check('I is create-when-missing, not a found file', created.createWhenMissing === true && created.closeFamily === 'I', created.closeFamily);
@@ -120,7 +121,6 @@ const kills = [
   ['maybe cancel named', 'Maybe cancel the Friday, September 18 at 3pm sync.'],
   ['dont cancel named', "Please don't cancel the Friday, September 18 at 3pm sync."],
   ['reschedule no new clock', 'Can we reschedule the Friday, September 18 at 3pm sync to a better week?'],
-  ['find a time', "Let's find a time."],
   ['maybe chase later', 'Maybe chase the invoice later.'],
   ['chase nothing named', 'Please chase when you can.'],
   ['about amount', 'Confirming the fee is about $4,200.'],
@@ -138,7 +138,6 @@ const kills = [
   ['he quote no template', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.'],
   ['unclear template', 'Please draft something from our company template and send it to Dana.'],
   ['ask glance', 'Hey Glance, can we chat about what to do with this thread?'],
-  ['general chat', 'Let\'s chat and you can ask me whatever you need about the quote.'],
   ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
   ['retract', 'Could you send the invoice?\nNever mind.'],
   ['quote', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')]
@@ -715,8 +714,6 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
     ['maybe meet', "Maybe let's meet Tuesday at 3pm."],
     ['he hedge', 'נראה לי מחר.'],
     ['he hedge hold', 'נראה לי נקבע מחר ב-15:00.'],
-    ['find a time', 'Can we find a time on Thursday?'],
-    ['find a time he', 'בוא נמצא זמן ביום חמישי.'],
     ['ambiguous hour', "Let's meet Tuesday at 3."],
     ['past promise', "I'll send it by March 3, 2024."],
     ['two clocks', "Let's meet Tuesday at 3pm or Thursday at 4pm."],
@@ -726,10 +723,17 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
     const row = plan(text);
     check('D silence: ' + name, row.show === false, { type: row.intent.type, family: row.intent.closeFamily, hour: row.intent.entities && row.intent.entities.hour });
   }
+  // Asking the reader for a time names no slot, so it is never a hold. Since 2026-10-20 it is a request: the card is a reply
+  // that offers times (owner: every way of asking for a time must be recognised).
+  for (const [name, text] of [['find a time', "Let's find a time."], ['find a time on a day', 'Can we find a time on Thursday?'], ['find a time he', 'בוא נמצא זמן ביום חמישי.'], ['general chat', "Let's chat and you can ask me whatever you need about the quote."]]) {
+    const row = plan(text);
+    check('D asking for a time is a request, not a hold: ' + name, row.show === true && row.intent.type === 'request' && row.process && row.process.id === 'reply-track', { type: row.intent.type, proc: row.process && row.process.id });
+  }
   const bareDigit = plan('נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.');
-  check('D a bare digit hour is not written as 03:00',
-    bareDigit.intent.entities && bareDigit.intent.entities.hour == null && bareDigit.intent.personalClose !== 'calendar-hold',
-    bareDigit.intent.entities);
+  check('D a bare digit hour is a Meeting at 15:00 with a calendar step, not 03:00',
+    bareDigit.show && bareDigit.intent.entities && bareDigit.intent.entities.hour === 15 && bareDigit.intent.entities.minute === 0 &&
+    bareDigit.process && bareDigit.process.steps.some((s) => s.kind === 'calendar') && /^Meeting\b/.test(bareDigit.intent.label),
+    { hour: bareDigit.intent.entities && bareDigit.intent.entities.hour, label: bareDigit.intent.label, steps: bareDigit.process && bareDigit.process.steps.map((s) => s.kind) });
   const cancel = plan('Please cancel the Friday, September 18 at 3pm sync.');
   check('D does not steal a G cancel',
     cancel.show && cancel.intent.closeFamily === 'G' && cancel.intent.personalClose === 'calendar-cancel' && cancel.process && cancel.process.id === 'clear-it',
@@ -739,8 +743,9 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
     moved.show && moved.intent.closeFamily === 'G' && moved.intent.personalClose === 'calendar-move' && moved.process && moved.process.id === 'move-it',
     { family: moved.intent.closeFamily, close: moved.intent.personalClose });
   const announced = plan("Let's do a call Friday, September 18 at 3pm to review the contract.");
-  check('D leaves a bare announcement on the schedule path',
-    announced.show && announced.intent.personalClose !== 'calendar-hold' && announced.process && announced.process.id === 'schedule',
+  check('D a bare announcement with a clock is one hold',
+    announced.show && announced.process && announced.process.id === 'hold' &&
+    announced.process.steps.length === 1 && announced.process.steps[0].kind === 'calendar',
     { close: announced.intent.personalClose, proc: announced.process && announced.process.id });
 
   const lines = FlowActions.receiptWrittenLines([
@@ -818,7 +823,6 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
   const kills = [];
   for (const day of days) {
     kills.push(`Maybe let's meet ${day} at 3pm.`);
-    kills.push(`Can we find a time on ${day}?`);
     kills.push(`Let's meet ${day} at 3.`);
   }
   kills.push("I'll send it next week.", 'נראה לי מחר.', 'עד יום שישי.', 'by Friday', "I'll send it by March 3, 2024.");

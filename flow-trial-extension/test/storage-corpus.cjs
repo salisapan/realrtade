@@ -68,6 +68,12 @@ async function run() {
   {
     const pending = await FlowStorage.getPending();
     check('an untouched profile has nothing pending', Array.isArray(pending) && pending.length === 0, pending);
+    const fresh = await FlowStorage.get();
+    check('a fresh profile has no calendar consent policy', fresh.glanceCalendarConsent == null);
+    await FlowStorage.set({ glanceCalendarConsent: { mode: 'always', revoked: false, scope: 'Calendars.ReadWrite', at: 1 } });
+    const kept = await FlowStorage.get();
+    check('a stored Always policy comes back through get()', kept.glanceCalendarConsent && kept.glanceCalendarConsent.mode === 'always' && kept.glanceCalendarConsent.revoked === false);
+    await FlowStorage.set({ glanceCalendarConsent: null });
   }
 
   console.log('\n--- storage.js: a shown-with-process entry is pending ---\n');
@@ -383,6 +389,15 @@ async function run() {
 
     check('getWriteCounts() agrees with the synchronous form',
       JSON.stringify(await FlowStorage.getWriteCounts()) === JSON.stringify(c));
+  }
+
+  console.log('\n--- storage.js: one draft under two message ids is one write ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'scan-id', ref: 'draft-9', where: 'Outlook Drafts' });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'open-id', ref: 'draft-9', where: 'Outlook Drafts' });
+    const c = FlowStorage.writeCountsFrom(await FlowStorage.get());
+    check('two message ids for one draft count once, this week', c.total === 1 && c.week === 1, c);
   }
 
   console.log('\n--- storage.js: counters never regress on upgrade ---\n');
