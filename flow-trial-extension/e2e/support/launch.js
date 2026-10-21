@@ -808,13 +808,12 @@ async function boot() {
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
       googleGrantedScopes: {
         version: [
-          'https://www.googleapis.com/auth/calendar.events',
-          'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/gmail.compose',
-          'https://www.googleapis.com/auth/tasks',
+          'openid',
           'https://www.googleapis.com/auth/userinfo.profile',
-          'openid'
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/drive.file',
+          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/tasks'
         ].slice().sort().join('\n'),
         status: 'granted',
         source: 'chrome',

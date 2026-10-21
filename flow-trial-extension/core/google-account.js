@@ -1,6 +1,6 @@
 // Which Google account a write may go to. Portable: no chrome.*, no DOM, no
 // network. The host reads the account of each candidate token from the
-// Gmail profile and asks this module which one may be used.
+// OpenID userinfo and asks this module which one may be used.
 //
 // The account is the one the person consented to in Glance. A token that
 // the Chrome profile hands out is the profile's own account, which can be a
@@ -25,8 +25,7 @@ const FlowGoogleAccount = (() => {
   }
 
   // candidates: [{ token, source, email }] in the order they are preferred.
-  // email '' means the account could not be read (the profile call failed or
-  // the grant has no Gmail scope).
+  // email '' means the account could not be read (the userinfo call failed).
   //
   // The token is chosen by the account of the Gmail tab, never by which one
   // answers first. tab is the address the open tab shows; when the tab says

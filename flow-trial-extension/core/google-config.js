@@ -1,20 +1,19 @@
 // Google lane for the full flavor. Portable: no chrome.*, no DOM, no network.
 //
-// The Chrome-extension OAuth client is the full flavor
-// (93977330357-aup7do27a71h8sfhq4h35pogslt92iid). The manifest "key" is the
-// Chrome Web Store public key, so an unpacked load gets the id
-// lbihckfmoffgjjlnneoeaehbhoonfenh.
+// Unpacked manifest key → extension id dnjjhplgmnkabbjogfpbhofjedlkehkai, OAuth
+// client hsd2u2 (manifest.json). Store item lbihckfmoffgjjlnneoeaehbhoonfenh
+// uses client aup7do, swapped in by the store build. Web client gstvm1 is for
+// launchWebAuthFlow (config/oauth.public.js).
 //
-// Allowed scopes, and nothing else: openid, email, profile, drive.file,
-// calendar.events, tasks. Docs and Sheets are used only
-// on a file Glance created or the person picked. A gmail.* scope is refused
-// here. Gmail is read and filled on the Gmail page. Glance never presses Send.
+// Allowed scopes, and nothing else: openid, userinfo.profile, userinfo.email,
+// drive.file, calendar.events, tasks. A gmail.* or drive.readonly scope is
+// refused here. Gmail is read and filled on the Gmail page. Glance never sends.
 const FlowGoogleConfig = (() => {
-  const CLIENT_ID = '93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com';
-  const EXTENSION_ID = 'lbihckfmoffgjjlnneoeaehbhoonfenh';
+  const CLIENT_ID = '93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com'; // store build only
+  const EXTENSION_ID = 'lbihckfmoffgjjlnneoeaehbhoonfenh'; // store build only
   const SCOPE_OPENID = 'openid';
-  const SCOPE_EMAIL = 'email';
-  const SCOPE_PROFILE = 'profile';
+  const SCOPE_EMAIL = 'https://www.googleapis.com/auth/userinfo.email';
+  const SCOPE_PROFILE = 'https://www.googleapis.com/auth/userinfo.profile';
   const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
   const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar.events';
   const SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';

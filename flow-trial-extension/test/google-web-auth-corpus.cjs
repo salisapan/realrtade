@@ -14,13 +14,12 @@ const WEB_CLIENT = '93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleuser
 const CHROME_CLIENT = '93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com';
 const EXTENSION_ID = 'dnjhplgmnkabbjogfpbhofjedlkehkai';
 const SCOPES = [
-  'https://www.googleapis.com/auth/tasks',
-  'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/drive.readonly',
-  'https://www.googleapis.com/auth/drive.file',
   'openid',
-  'https://www.googleapis.com/auth/userinfo.profile'
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/tasks'
 ];
 const SIGNIN_OFF = 'The user turned off browser signin';
 const USER_CANCEL = 'The user did not approve access.';
@@ -313,10 +312,11 @@ async function run() {
   check('unpacked redirect', api.googleRedirectUriForExtension(EXTENSION_ID) === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/');
   check('store redirect', api.googleRedirectUriForExtension('lbihckfmoffgjjlnneoeaehbhoonfenh') === 'https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/');
   check('blank extension id has no redirect', api.googleRedirectUriForExtension('  ') === '');
-  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 7);
-  check('the one consent includes openid and userinfo.profile',
+  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 6);
+  check('the one consent includes openid, userinfo.profile, and userinfo.email',
     api.GOOGLE_OAUTH_SCOPES.indexOf('openid') !== -1 &&
-    api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/userinfo.profile') !== -1);
+    api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/userinfo.profile') !== -1 &&
+    api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/userinfo.email') !== -1);
   check('explicit scopes are trimmed and kept', JSON.stringify(api.googleOAuthScopesFrom(['', '  https://www.googleapis.com/auth/tasks  '])) === JSON.stringify(['https://www.googleapis.com/auth/tasks']));
   const built = new URL(api.googleImplicitAuthUrl({
     clientId: WEB_CLIENT,

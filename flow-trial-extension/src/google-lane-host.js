@@ -89,14 +89,14 @@ function identityToken() {
   });
 }
 
-// The address a token belongs to, from the Gmail profile (gmail.compose is
-// on the grant). A 401 here is this probe's answer: the token is kept.
+// The address a token belongs to, from OpenID userinfo (no Gmail API scope).
+// A 401 here is this probe's answer: the token is kept.
 async function accountOfToken(token) {
   const hit = seenAccounts.get(token);
   if (hit && Date.now() - hit.at < SEEN_MS) return hit.email;
   let email = '';
   try {
-    const res = await fetch(laneUrl('https://gmail.googleapis.com/gmail/v1/users/me/profile'), {
+    const res = await fetch(laneUrl('https://www.googleapis.com/oauth2/v3/userinfo'), {
       method: 'GET',
       headers: { Authorization: 'Bearer ' + token }
     });
