@@ -18,6 +18,14 @@ const ER = core('exec-router.js', 'FlowExecRouter');
 const Shield = core('privacyShield.js', 'FlowPrivacyShield');
 const MI = core('mask-ids.js', 'FlowMaskIds');
 const VIA_SERVER = process.argv.includes('--via-server');
+// --device: Tier 1 is the device adapter (core/understanding-device.js) with the cached answer playing the device model on the unmasked
+// text, both wordings alike. A SIMULATION of a device model as good as the cached one: its self-test on these cases decides per language
+// whether it may run at all. It is not a measurement of any real browser model.
+const DEVICE = process.argv.includes('--device');
+const Dev = core('understanding-device.js', 'FlowUnderstandingDevice');
+const BY_TEXT = new Map();
+const deviceSession = { prompt: async (text) => { const msg = String(text).split('\n\nMessage:\n').pop(); const c = BY_TEXT.get(msg); if (!c) return JSON.stringify({ intentions: [] }); return JSON.stringify(cachedTier2(c, LLM[c.id] && LLM[c.id].pred, { fn: (x) => x })(msg)); } };
+let DEVICE_STATUS = null;
 const UND = VIA_SERVER ? require(path.join(ROOT, 'flow-landing/netlify/functions/glance-assist/understand.js')) : null;
 const serverStore = UND ? UND.memoryStore() : null;
 const serverCodes = {};
@@ -85,6 +93,7 @@ async function run(c) {
       return LV.proposalVeto(ctx(c), c.own, { step: prop.step, action: p.action, title: p.title }, eng(c)) || capVeto(c.capFlags, 'x|' + prop.step) || (goodTitle(p.title, c.lang) ? null : 'title');
     },
   };
+  if (DEVICE) deps.tier1 = Dev.tier1For({ aiDeviceTier1: true }, deviceSession, DEVICE_STATUS, { now: DEVICE_STATUS.checkedAt, today: c.today, attachmentCount: c.attachmentCount || 0 }) || undefined;
   const input = { text: c.own, today: c.today, attachmentCount: c.attachmentCount || 0, direction: c.direction, cloudConsent: true,
     tier0: { quiet: quiet || null, step: quiet ? 'SILENT' : s, possible: !!LLM[c.id] } };
   return Router.route(input, deps, { aiPrimary: true });
@@ -93,6 +102,13 @@ async function run(c) {
 function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; return g === 'AMBIGUOUS' || g === 'ANY' ? null : g; }
 (async () => {
   const res = {};
+  if (DEVICE) {
+    for (const c of cases) BY_TEXT.set(c.own, c);
+    const audit = cases.filter((c) => c.direction === 'inbound' && LLM[c.id] && goldOf(c)).map((c) => ({ text: c.own, gold: goldOf(c) === 'file_save' ? 'SILENT' : goldOf(c), lang: c.lang === 'he' ? 'he' : 'en', today: c.today, attachmentCount: c.attachmentCount || 0 }));
+    DEVICE_STATUS = await Dev.selfTest(deviceSession, audit, { now: Date.parse('2026-10-07T09:00:00Z') });
+    // --device-pass: what-if only. Pretend the self-test passed, to see what a device model this good would save and whether the floor holds.
+    if (process.argv.includes('--device-pass')) DEVICE_STATUS = Object.assign({}, DEVICE_STATUS, { en: Object.assign({}, DEVICE_STATUS.en, { ok: true }), he: Object.assign({}, DEVICE_STATUS.he, { ok: true }) });
+  }
   for (const c of cases) res[c.id] = await run(c);
   const SETS = [['OSS 275', (c) => c.set === 'oss'], ['v2 held-out 400', (c) => c.set === 'v2test'], ['adversarial 72', (c) => c.set === 'adv'], ['injection 39', (c) => c.set === 'inj'], ['ALL pooled 786', () => true]];
   const R = { sets: {} };
@@ -106,13 +122,13 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
       const g = goldOf(c); if (!g) continue; m.n++; const L = c.lang === 'he' ? m.he : m.en;
       if (g === 'SILENT') { m.sil++; if (r.step !== 'SILENT') { m.wdi++; m.wdiIds.push(c.id); } }
       else { m.show++; L[1]++; if (r.step === 'SILENT') { m.miss++; L[0]++; }
-        else if (r.tier === 2 && r.step === g && c.gold.due && ['calendar', 'task', 'draft'].includes(r.step)) { m.dated++; if (r.proposal.due !== c.gold.due) { m.wrongDate++; m.wrongDateIds.push(`${c.id} card=${r.proposal.due} gold=${c.gold.due}`); } } }
+        else if (r.tier >= 1 && r.step === g && c.gold.due && ['calendar', 'task', 'draft'].includes(r.step)) { m.dated++; if (r.proposal.due !== c.gold.due) { m.wrongDate++; m.wrongDateIds.push(`${c.id} card=${r.proposal.due} gold=${c.gold.due}`); } } }
     }
     R.sets[title] = m;
     md += `| ${title} | ${m.n} | ${m.wdi}/${m.sil} | ${m.miss}/${m.show} | ${m.he[0]}/${m.he[1]} | ${m.en[0]}/${m.en[1]} | ${m.wrongDate}/${m.dated} | ${m.t2}/${m.all} | ${m.masked} |\n`;
   }
   const reasons = {};
-  for (const c of cases) { const r = res[c.id]; if (r.tier === 2 && r.step === 'SILENT') reasons[r.reason] = (reasons[r.reason] || 0) + 1; }
+  for (const c of cases) { const r = res[c.id]; if (r.tier >= 1 && r.step === 'SILENT') reasons[r.reason] = (reasons[r.reason] || 0) + 1; }
   R.tier2SilentReasons = reasons;
   md += '\n## Why a Tier 2 answer stayed silent\n\n' + Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, v]) => `- ${k}: ${v}`).join('\n') + '\n';
   // M5: every model proposal that reached the screen becomes a plan (core/model-plan.js, loaded the way the extension shares one scope).
@@ -126,7 +142,7 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
     const pm = { shown: 0, planned: 0, fileSave: 0, rejected: {}, anchorRight: 0, dated: 0, dateRight: 0, sendSteps: 0, doneWhen: 0, rows: 0, byProcess: {}, calendarSteps: 0, calendarClocked: 0, watches: 0, watchable: 0, watchDated: 0, watchOnGold: 0, watchMine: 0, watchTheirs: 0 };
     for (const c of cases) {
       const r = res[c.id];
-      if (r.tier !== 2 || r.step === 'SILENT') continue;
+      if (!(r.tier >= 1) || r.step === 'SILENT') continue;
       pm.shown++;
       const g = goldOf(c);
       const x = MP.plan({ aiPlanV1: true }, r.proposal, { text: c.own, today: c.today, lang: c.lang, surface: c.surface === 'outlook' ? 'outlook' : 'gmail' });
@@ -154,7 +170,12 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const g = c.gold.step; 
     R.server = { codes: serverCodes, spentMicroUsd: spent };
     md = md.replace('# Router v2 (M2) end to end', '# Router v2 + Glance cloud server path (M3) end to end') + `\n## Server path\n\nTier 2 went through \`glance-assist/understand.js\` (cached answer as the mock provider). Server answers: ${JSON.stringify(serverCodes)}. Counted against the spend cap: $${(spent / 1e6).toFixed(4)} at the default $0.0004 a read.\n`;
   }
-  const base = VIA_SERVER ? 'server-' : '';
+  if (DEVICE) {
+    const t1 = Object.values(res).filter((r) => r.calls && r.calls.tier1).length, t1ans = Object.values(res).filter((r) => r.tier === 1).length, t2 = Object.values(res).filter((r) => r.calls && r.calls.tier2).length;
+    R.device = { selfTest: DEVICE_STATUS, tier1Asked: t1, tier1Answered: t1ans, cloudCalls: t2 };
+    md = md.replace('# Router v2 (M2) end to end', '# Router v2 with a simulated device Tier 1 (M4) end to end') + `\n## Device Tier 1 (simulation: the cached answers play the device model)\n\nSelf-test on these cases: EN ${JSON.stringify(DEVICE_STATUS.en)}, HE ${JSON.stringify(DEVICE_STATUS.he)}. Tier 1 asked ${t1}, answered ${t1ans}; cloud calls ${t2}.\n`;
+  }
+  const base = VIA_SERVER ? 'server-' : DEVICE ? (process.argv.includes('--device-pass') ? 'device-pass-' : 'device-') : '';
   fs.writeFileSync(path.join(__dirname, base + 'router-tables.md'), md);
   fs.writeFileSync(path.join(__dirname, base + 'router-results.json'), JSON.stringify(R, null, 1) + '\n');
   console.log(md);

@@ -60,18 +60,6 @@ Strict gate, spec labels, wrong-Do-It is 0 on every set:
 
 The same file's no-gate propose-only row on the v2 held-out is 3.7% (8/218) wrong-Do-It on spec labels and 4.5% (10/220) on v2 labels. The gate is what brings that to zero.
 
-### Understanding validator (M1), 2026-10-11
-
-`flow-trial-extension/core/understanding.js` (switch `aiUnderstandingV1`, off) on the same cached answers. Scorer: `glance-ai/oss/shadow-combined/gated/score-understanding.cjs`; tables in `understanding-tables.md`. Pooled 786, spec labels: no gate 8/464 wrong Do It; validator alone 3/464; validator + strict gate 0/464 with 40/322 missed (strict gate alone 37/322). Model cards with a wrong date: 8/8 without the validator (all Hebrew weekdays, the strict gate included), 0/5 with it. Confidence is not in the cache and is not measured.
-
-2026-10-12: with the bare-weekday reader, validator + strict gate is 0/464 wrong Do It and 37/322 missed (the same as the strict gate alone), with 0/8 wrong-date model cards (gate alone 8/8). The Router v2 (`core/understanding-router.js`, switch `aiPrimary` off) gives the same numbers end to end with the device's real mask in front of Tier 2 (`score-router.cjs`, `router-tables.md`). 150 of 796 mails (19%) reach Tier 2.
-
-2026-10-13: the same run with Tier 2 through the Glance cloud server path (`glance-assist/understand.js`, mock provider = cached answers, `score-router.cjs --via-server`) gives the same numbers. 150/150 reads answered; $0.06 counted against the spend cap.
-
-2026-10-14 (M5, `core/model-plan.js`): the 9 model proposals on screen now get a plan. Before 0/9, now 9/9: Schedule It 3, Log It 4, Reply & Track 2. Every dated step on the gold day 8/8, 0 send steps, done-when 9/9.
-
-2026-10-18: calendar steps on model plans carry the clock read from the quote: 0/3 → 3/3 (the clock was dropped between `proposal()` and the plan). Model plans now also run `planFor`'s meeting veto (cancelled, past, out-of-office, webinar).
-
 The strict gate treats a save proposal as unread (`suggest:attachments-unread`) because the case file has counts and names only. The SENSITIVITY row models declared files as 240KB PDFs. That row is not a result.
 
 ## Blocked
