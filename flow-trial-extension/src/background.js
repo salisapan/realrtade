@@ -1485,6 +1485,17 @@ function glanceE2eRewrite(url) {
   }
 }
 
+// Headless lane only. tokenAccounts is the allow-list for bearer tokens; a
+// stored web-flow record from an earlier spec must not win over the chrome hook.
+function glanceE2eStoredTokenAllowed(token) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || !e2e.httpOrigin) return true;
+  const map = e2e.tokenAccounts;
+  if (!map || typeof map !== 'object') return false;
+  const key = String(token || '').trim();
+  return Boolean(key && Object.prototype.hasOwnProperty.call(map, key));
+}
+
 // Headless regression only. chrome.identity.launchWebAuthFlow cannot be
 // replaced inside the service worker, the same reason getAuthToken goes
 // through glanceE2eGoogleAuth. Production never sets __glanceE2e.
@@ -1586,7 +1597,9 @@ async function runGoogleWebAuth(interactive) {
 // with nothing to reuse fails instead of opening that window.
 async function getGoogleWebAccessToken(interactive) {
   const existing = await readGoogleWebAuth();
-  if (webTokenUsable(existing)) return { token: existing.accessToken, source: 'web' };
+  if (webTokenUsable(existing) && glanceE2eStoredTokenAllowed(existing.accessToken)) {
+    return { token: existing.accessToken, source: 'web' };
+  }
   const hadToken = Boolean(existing && existing.accessToken);
   if (hadToken) await clearGoogleWebAuth();
   if (hadToken) {
@@ -1771,7 +1784,8 @@ async function getGoogleAccessToken(interactive) {
   }
   if (!wantUi) {
     const webStored = await readGoogleWebAuth();
-    if (webStored && webStored.source === 'web' && webTokenUsable(webStored)) {
+    if (webStored && webStored.source === 'web' && webTokenUsable(webStored)
+      && glanceE2eStoredTokenAllowed(webStored.accessToken)) {
       return { token: webStored.accessToken, source: 'web' };
     }
   }
@@ -1887,7 +1901,8 @@ async function persistGoogleAccessToken(token, source, extra) {
   if (!accessToken) return false;
   const more = extra || {};
   const existing = await readGoogleWebAuth();
-  if ((source || '') === 'chrome' && existing && existing.source === 'web' && webTokenUsable(existing)) {
+  if ((source || '') === 'chrome' && existing && existing.source === 'web' && webTokenUsable(existing)
+    && glanceE2eStoredTokenAllowed(existing.accessToken)) {
     return true;
   }
   const record = {
@@ -2059,7 +2074,8 @@ async function refreshGoogleSession() {
   }, who));
   if (chromeToken && hadAccount) {
     const webStored = before[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
-    if (webStored && webStored.source === 'web' && webTokenUsable(webStored, now)) {
+    if (webStored && webStored.source === 'web' && webTokenUsable(webStored, now)
+      && glanceE2eStoredTokenAllowed(webStored.accessToken)) {
       await clearGoogleReconnect();
       await glanceAuthLog(Object.assign({
         call: 'final',
