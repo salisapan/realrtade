@@ -17,13 +17,13 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 
 | # | Connector | The close it makes real | Auth | State |
 |---|---|---|---|---|
-| 0 | FOUNDATION: token relay + consent catalogue + learning hook (build once, with row 1) | - | - | not started |
+| 0 | FOUNDATION: token relay + consent catalogue + learning hook (build once, with row 1) | - | - | **built 2026-10-14, tested against mocks, not deployed, not wired to any screen**: `token-relay/` ([doc](connectors/token-relay.md)), `core/consent-catalog.js` (the owner designs the screen), `core/connector-outcome.js` (events + pure conclusions; the card does not read the conclusions yet). The older exchange functions are not moved onto the relay yet |
 | 0b | LEARNING: per-user calibration (path C), then the path D design and its dormant code, one slice per run, after the foundation | - | - | not started |
-| 1 | Notion | a task or a page row exists | OAuth2 + secret (relay) | not started |
-| 2 | Asana | a task exists | OAuth2 PKCE | not started |
-| 3 | Jira | an issue exists | OAuth2 3LO + secret (relay) | not started |
-| 4 | Linear | an issue exists | OAuth2 | not started |
-| 5 | DocuSign | the envelope is signed | OAuth2 + secret (relay); vendor go-live review | not started |
+| 1 | Notion | a task or a page row exists | OAuth2 + secret (relay) | **ready, waiting for owner** (2026-10-14): [doc](connectors/notion.md); built and tested against a mock; DRAFT PR; switches `notionReadBack`, `notionOAuth` off. Waiting: app registration, relay deploy, `api.notion.com` host, unverified vendor facts, steps-list destination wiring |
+| 2 | Asana | a task exists | OAuth2 PKCE | **ready, waiting for owner** (2026-10-15): [doc](connectors/asana.md); built and tested against a mock; DRAFT PR #156 (stacked on #138); switches `asanaReadBack`, `asanaOAuth` off. Waiting: app registration, relay deploy, `app.asana.com` host, unverified vendor facts, steps-list destination wiring |
+| 3 | Jira | an issue exists | OAuth2 3LO + secret (relay) | **ready, waiting for owner** (2026-10-18): [doc](connectors/jira.md); built and tested against a mock; DRAFT PR #168 (stacked on #156); switches `jiraReadBack`, `jiraOAuth` off. Waiting: Atlassian app registration, relay deploy, `api.atlassian.com` host, unverified vendor facts, steps-list destination wiring |
+| 4 | Linear | an issue exists | OAuth2 | **ready, waiting for owner** (2026-10-19): [doc](connectors/linear.md); built and tested against a mock; DRAFT PR #172 (stacked on #168); switches `linearReadBack`, `linearOAuth` off. Waiting: Linear OAuth app registration, relay deploy, `api.linear.app` host, unverified vendor facts (above all the client-supplied issue id), steps-list destination wiring |
+| 5 | DocuSign | the envelope is signed | OAuth2 + secret (relay); vendor go-live review | **ready, waiting for owner** (2026-10-20): [doc](connectors/docusign.md); **read-only** (never sends an envelope); built and tested against a mock; DRAFT PR #177 (stacked on #172); switches `docusignReadBack`, `docusignOAuth`, `docusignDemo` off. Waiting: DocuSign developer account + integration key, the vendor go-live review, relay deploy, `*.docusign.net` host, unverified vendor facts, "Watch this envelope" wiring |
 | 6 | Dropbox | the file is saved | OAuth2 PKCE | not started |
 | 7 | Zoom | the meeting link exists | OAuth2 + secret (relay); marketplace review | not started |
 | 8 | Microsoft Teams via Graph | the answer arrived in the chat | same Entra app as Outlook, no secret | not started |
