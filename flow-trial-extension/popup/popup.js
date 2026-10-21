@@ -2409,7 +2409,8 @@
   }
 
   // Carry until closed (config/carry.public.js, off): read once per render through the service worker.
-  let carrySw = {};
+  // var, not let: the panel's startup calls renderWaiting before this line runs.
+  var carrySw = {};
   async function renderWaiting() {
     const all = await FlowStorage.getWatches();
     const now = Date.now();
@@ -2618,7 +2619,7 @@
     const acts = el('div', 'wait-acts');
 
     // After the third unanswered nudge: one other way to close it (CARRY.nextMove, off). Without a move, the nudge as before.
-    const move = carrySw.nextMove === true && FlowFollowUp.nextMove ? FlowFollowUp.nextMove(all || [], w, now, { enabled: true, threadPeople: w.threadPeople || [], apps: ['gmail', 'whatsapp'] }) : null;
+    const move = (carrySw || {}).nextMove === true && FlowFollowUp.nextMove ? FlowFollowUp.nextMove(all || [], w, now, { enabled: true, threadPeople: w.threadPeople || [], apps: ['gmail', 'whatsapp'] }) : null;
     if (move) {
       moveActions(w, move, acts, note, item);
     } else if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && w.counterpart.email) {

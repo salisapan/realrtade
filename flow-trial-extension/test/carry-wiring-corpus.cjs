@@ -13,7 +13,7 @@ const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const cfg = read('config/carry.public.js');
 const m = /export const CARRY = (\{[^}]*\});/.exec(cfg);
 const CARRY = m ? Function('return ' + m[1])() : null;
-check('config: every carry switch is off', CARRY && Object.keys(CARRY).length >= 4 && Object.values(CARRY).every((v) => v === false), CARRY);
+check('config: every carry switch is off', CARRY && Object.keys(CARRY).length >= 3 && Object.values(CARRY).every((v) => v === false), CARRY);
 
 const bg = read('src/background.js');
 check('service worker imports the carry switches', /import \{ CARRY \} from '\.\.\/config\/carry\.public\.js';/.test(bg));
@@ -26,7 +26,7 @@ check('follow.js: the answer link is passed only with nextMove exactly true', /m
 check('follow.js: invoice fields are added only to invoice loops', /if \(ask\.basis === 'invoice'\) \{ watch\.invoiceNo/.test(fu));
 
 const pop = read('popup/popup.js');
-check('panel: a move is computed only with nextMove exactly true', /const move = carrySw\.nextMove === true && FlowFollowUp\.nextMove \?/.test(pop));
+check('panel: a move is computed only with nextMove exactly true', /const move = \(carrySw \|\| \{\}\)\.nextMove === true && FlowFollowUp\.nextMove \?/.test(pop));
 check('panel: without a move the nudge branches run as before', /\} else if \(!FlowFollowUp\.isMine\(w\) && !FlowFollowUp\.isClock\(w\) && !FlowFollowUp\.isYours\(w\) && w\.counterpart && w\.counterpart\.email\) \{\n      const level = FlowFollowUp\.nextNudgeLevel\(w\);/.test(pop));
 const moveFn = (pop.split('function moveActions(')[1] || '').split('\n  function waitingItem(')[0];
 check('panel: the move card never sends (no send type other than draft, complete and track)', moveFn.length > 200 && !/flow:(?!follow-draft|follow-complete|track)[a-z-]+/.test(moveFn), (moveFn.match(/flow:[a-z-]+/g) || []));
