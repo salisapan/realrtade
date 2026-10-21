@@ -104,3 +104,12 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Action: one Do It. The receipt names the rule (for example `FREQ=WEEKLY;BYDAY=MO`) and the first date, with the calendar link. It does not say the ask is closed: each occurrence is still the person's to do.
 - Undo: deletes the whole series. If the person edited it (note, day, time, guests), the card says Undo unavailable and the series stays.
 
+## M2 — a Meet link added to an event that is already on the calendar
+
+- Module `flow-trial-extension/core/event-call-link.js`, switch `EVENT_CALL_LINK`.
+- When the card shows: someone asked the person to add a call link to an event they organize ("Can you add a Meet link to the Thursday sync?") and exactly one such event fits. An event with a link already, an event someone else organizes, Zoom or Teams named, or two events that fit shows no card.
+- Line: `להוסיף קישור Meet לאירוע: <event> (<date>)?` / `Add a Meet link to the event: <event> (<date>)?`
+- Step: `יצירת קישור Meet על האירוע ובדיקה חוזרת` / `Create a Meet link on the event and read it back`.
+- Action: one Do It. The receipt shows the link (`meetUrl`) with a Copy control and the calendar link. Glance does not send the link to anyone; guests' own calendars show it the way they show any edit, and no email goes out from Glance.
+- Undo: removes only the Meet link. If the person edited the event or changed the link, the card says Undo unavailable and nothing is removed.
+
