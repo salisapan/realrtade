@@ -199,3 +199,7 @@ No Google gap is both unblocked and of user value: every built Google module is 
 ## 2026-10-21 (Ecosystems builder B, fourteenth run) — idle
 
 - Nothing changed on the Microsoft and Meta side since the last run: SharePoint still waits on the owner's scope (row 79), PowerPoint on a way to verify a hand-built `.pptx`, Meta on the owner's setup. Nothing touched.
+
+## 2026-10-21 (Ecosystems builder A, sixteenth and seventeenth runs, 13:13 and 14:13) — idle by the run-discipline rule
+
+Nothing changed on the Google side since the fifteenth run: no new unwired module, no owner answer on row 79 (Forms scope), Keep has no public API. Nothing touched. The whole corpus sweep and the full e2e are still due once, on the last run of the day.
