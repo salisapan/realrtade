@@ -119,16 +119,25 @@ const FlowGoogleCalendar = (() => {
     }
     if (!startIso || !endIso) return null;
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
+    const explicitTitle = String(i.title || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
+    const summary = explicitTitle || (wantsFile && name ? name : title);
     const lines = [];
-    if (quote && quote !== title) lines.push(quote);
+    const seen = {};
+    function pushLine(line) {
+      const s = String(line || '').trim();
+      if (!s || seen[s]) return;
+      seen[s] = 1;
+      lines.push(s);
+    }
+    if (quote && quote !== summary) pushLine(quote);
     if (link && name) {
-      lines.push('File: ' + name);
-      lines.push(link);
-    } else if (quote) {
-      lines.push(quote);
+      pushLine('File: ' + name);
+      pushLine(link);
+    } else if (quote && quote !== summary) {
+      pushLine(quote);
     }
     return {
-      summary: name || title,
+      summary: summary,
       description: lines.join('\n'),
       start: { dateTime: startIso, timeZone: zone },
       end: { dateTime: endIso, timeZone: zone },
@@ -250,9 +259,10 @@ const FlowGoogleCalendar = (() => {
     }
   }
 
-  function authFail(status) {
-    if (status === 401 || status === 403) return { ok: false, reason: 'not-connected' };
-    return null;
+  function authFail(res) {
+    const C = cfg();
+    const reason = C && typeof C.authHttpReason === 'function' ? C.authHttpReason(res) : '';
+    return reason ? { ok: false, reason: reason } : null;
   }
 
   // The read of a new event can lag the create. A read that says not found,
@@ -288,7 +298,7 @@ const FlowGoogleCalendar = (() => {
     const req = createRequest(body);
     if (!req) return { ok: false, reason: 'unclear', error: 'No single time for this event.' };
     const posted = await call(http, Object.assign({ body: JSON.stringify(req.json), headers: { 'Content-Type': 'application/json' } }, req));
-    const denied = authFail(posted.status);
+    const denied = authFail(posted);
     if (denied) return denied;
     if (!posted.ok) return { ok: false, reason: 'http-' + posted.status };
     const event = posted.json || {};

@@ -67,6 +67,23 @@ function liveGmailPage(opts) {
       main.html = main.html + span;
     }
   }
+  if (o.liveMutate === 'signedContract184w') {
+    const msgId = o.messageId || '1a15ed1d116b46f7';
+    const subj = 'Signed contract attached (184w)';
+    const body = 'Attached is the signed contract, please file it.';
+    const pdfName = 'deck-series-a.pdf';
+    const url = 'https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(pdfName);
+    const dl = 'application/pdf:' + pdfName + ':' + url;
+    const span = '<span download_url="' + esc(dl) + '">' + esc(pdfName) + '</span>';
+    main.html = main.html
+      .replace(/data-legacy-message-id="[^"]+"/g, 'data-legacy-message-id="' + msgId + '"')
+      .replace(/data-legacy-thread-id="[^"]+"/g, 'data-legacy-thread-id="' + msgId + '"')
+      .replace(/<h2 class="hP"[^>]*>[\s\S]*?<\/h2>/, '<h2 class="hP" tabindex="-1" data-legacy-thread-id="' + msgId + '">' + esc(subj) + '</h2>')
+      .replace(/email="ai\.local\.flow@gmail\.com"[^>]*class="gD"/g, 'email="salisapan1@gmail.com" name="Sali Sapan" class="gD"')
+      .replace(/<div class="a3s[^"]*"[^>]*>[\s\S]*?<\/div>\s*<div class="yj6qo">/,
+        '<div class="a3s aiL ">' + esc(body) + span + '</div><div class="yj6qo">');
+    mutate += `var hb=document.querySelector('span.hb');if(hb)hb.innerHTML='<span email="ai.local.flow@gmail.com" data-hovercard-id="ai.local.flow@gmail.com" class="g2">ai.local.flow@gmail.com</span>';`;
+  }
   const toOnlyMeFix = o.liveMutate === 'toOnlyMe'
     ? `if(window.__glanceLiveMutate==='toOnlyMe'&&block){
         var own='${own}';

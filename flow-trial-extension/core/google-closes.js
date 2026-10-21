@@ -352,7 +352,11 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
+    const attachSave = Number(input.attachmentCount) === 1
+      && typeof FlowFileAttach !== 'undefined'
+      && typeof FlowFileAttach.threadEvidenceEligible === 'function'
+      && FlowFileAttach.threadEvidenceEligible(text, 1);
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || attachSave) {
       if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);

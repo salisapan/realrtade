@@ -1447,21 +1447,6 @@ function glanceE2eGoogleAuth(interactive) {
   return e2e.googleAuthToken(Boolean(interactive));
 }
 
-// Headless regression only. A local mock server sets httpOrigin. Production
-// never sets __glanceE2e, so the URL below is unchanged.
-function glanceE2eRewrite(url) {
-  const e2e = globalThis.__glanceE2e;
-  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
-  if (!origin || !url) return url;
-  try {
-    const u = new URL(url);
-    const base = new URL(origin);
-    return base.origin + u.pathname + u.search;
-  } catch (e) {
-    return url;
-  }
-}
-
 function getGoogleAuthToken(interactive) {
   const hooked = glanceE2eGoogleAuth(interactive);
   if (hooked && typeof hooked.then === 'function') return hooked;
@@ -1484,6 +1469,21 @@ function removeCachedGoogleAuthToken(token) {
     return Promise.resolve();
   }
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
+}
+
+// Headless regression only. A local mock server sets httpOrigin. Production
+// never sets __glanceE2e, so the URL below is unchanged.
+function glanceE2eRewrite(url) {
+  const e2e = globalThis.__glanceE2e;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
 }
 
 // Headless regression only. chrome.identity.launchWebAuthFlow cannot be
@@ -1770,6 +1770,12 @@ async function getGoogleAccessToken(interactive) {
   if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
+  if (!wantUi) {
+    const webStored = await readGoogleWebAuth();
+    if (webStored && webStored.source === 'web' && webTokenUsable(webStored)) {
+      return { token: webStored.accessToken, source: 'web' };
+    }
+  }
   try {
     const token = await getGoogleAuthToken(wantUi);
     if (wantUi) await recordGoogleConsent(token, 'chrome');
@@ -1881,6 +1887,10 @@ async function persistGoogleAccessToken(token, source, extra) {
   const accessToken = String(token || '').trim();
   if (!accessToken) return false;
   const more = extra || {};
+  const existing = await readGoogleWebAuth();
+  if ((source || '') === 'chrome' && existing && existing.source === 'web' && webTokenUsable(existing)) {
+    return true;
+  }
   const record = {
     accessToken: accessToken,
     source: source || null,
@@ -1888,7 +1898,6 @@ async function persistGoogleAccessToken(token, source, extra) {
   };
   if (more.expiresAt) record.expiresAt = more.expiresAt;
   else if ((source || '') === 'chrome') record.expiresAt = Date.now() + CHROME_TOKEN_MS;
-  const existing = await readGoogleWebAuth();
   const hint = more.loginHint || (existing && existing.loginHint) || '';
   if (hint) record.loginHint = hint;
   return commitGoogleWebAuth(record, googleWebAuthEpoch);
@@ -2050,6 +2059,20 @@ async function refreshGoogleSession() {
     ageMs: ageMs
   }, who));
   if (chromeToken && hadAccount) {
+    const webStored = before[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
+    if (webStored && webStored.source === 'web' && webTokenUsable(webStored, now)) {
+      await clearGoogleReconnect();
+      await glanceAuthLog(Object.assign({
+        call: 'final',
+        result: 'ok',
+        message: 'stored web token kept over silent getAuthToken',
+        expiresAt: webStored.expiresAt != null ? webStored.expiresAt : null,
+        ageMs: tokenAgeMs(webStored, now),
+        state: 'connected',
+        source: 'web'
+      }, who));
+      return { ok: true, source: 'web', token: webStored.accessToken };
+    }
     const expiresAt = now + CHROME_TOKEN_MS;
     await persistGoogleAccessToken(chromeToken, 'chrome', { expiresAt: expiresAt });
     await clearGoogleReconnect();
@@ -2209,12 +2232,9 @@ globalThis.FlowGoogleAccess = {
   }
 };
 
-async function rememberGoogleAuthResult(res) {
+async function rememberGoogleAuthResult(res, refreshed) {
   if (!res) return res;
-  if (res.status === 401) await markGoogleReconnect('401');
-  else if (res.status === 403) await markGoogleReconnect('missing scope');
-  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
-  // after Connect stores a new token.
+  if (res.status === 401 && refreshed) await markGoogleReconnect('401');
   return res;
 }
 
@@ -2257,16 +2277,19 @@ async function googleAuthedFetch(baseUrl, path, rawOptions) {
   }));
   const res = await doFetch(cred.token);
   if (soft) return res;
-  if (res.status !== 401) return rememberGoogleAuthResult(res);
+  if (res.status !== 401) return rememberGoogleAuthResult(res, false);
   // A cached token can go stale without Chrome knowing yet. One silent
   // refresh and one retry, then fail loudly. The refresh stays silent:
   // prompt=none may run for a web token; a consent window may not. The token
   // is dropped only when the refresh says the grant was revoked.
   const next = await refreshLaneCredential(cred);
-  if (next && next.revoked) return rememberGoogleAuthResult(res);
+  if (next && next.revoked) {
+    await markGoogleReconnect('revoked');
+    return rememberGoogleAuthResult(res, false);
+  }
   let retryToken = cred.token;
   if (next && next.token && (next.source !== 'chrome' || await chromeTokenIsConsented(next.token))) retryToken = next.token;
-  return rememberGoogleAuthResult(await doFetch(retryToken));
+  return rememberGoogleAuthResult(await doFetch(retryToken), true);
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -3220,9 +3243,9 @@ const DRIVE_SEARCH_PAGE_SIZE = 100;
 const DRIVE_SEARCH_MAX_FILES = 400;
 
 // A Drive files.list failure, as a silence the file chain can show.
-// 403 with an insufficient-scope body is drive-not-granted (the cached
-// chrome.identity token predates drive.readonly, or the grant never
-// included it). Any other failure is drive-search-failed. The list itself
+// 403 with an insufficient-scope body is drive-not-granted (stale token or
+// drive.file not granted for this path). Any other failure is drive-search-failed.
+// The list itself
 // stays null either way: a partial page is not "no file".
 function driveSearchFailure(status, body) {
   const err = body && body.error;
@@ -3268,9 +3291,8 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
-// One 403 for a missing Drive scope drops the cached Chrome token and asks
-// once more, silently. A grant that already includes drive.readonly can be
-// reused. This retry does not open a consent window. A second 403 stops.
+// One 403 for a missing Drive scope drops the cached Chrome token and retries
+// once, silently. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
@@ -3376,10 +3398,11 @@ async function fetchDriveFileAsAttachment(driveFileId) {
   }
 }
 
-// Reply-with-facts reads a Sheet or Doc through the Drive export endpoint.
-// drive.readonly already covers that. No spreadsheets scope, no picker,
-// and this function does not decide the match — it only returns the few
-// candidate texts. Listing goes through searchDriveFiles. More than three
+// Reply-with-facts reads a Sheet or Doc through Drive export for files the
+// person picked or Glance created (drive.file). No spreadsheets scope.
+// This function does not decide the match — it only returns the few
+// candidate texts. Listing goes through searchDriveFiles when enabled.
+// More than three
 // files, a failed page, or a file too large to prove it holds a single
 // cell is truncated so the caller stays silent.
 const FACT_SHEET_MIME = 'application/vnd.google-apps.spreadsheet';

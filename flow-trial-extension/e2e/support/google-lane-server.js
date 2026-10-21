@@ -13,6 +13,14 @@ function opaqueId(kind, n) {
 }
 
 const GOOGLE_AUTH_401 = { error: { code: 401, message: 'Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential.', status: 'UNAUTHENTICATED' } };
+const GOOGLE_AUTH_403_SCOPE = {
+  error: {
+    code: 403,
+    message: 'Request had insufficient authentication scopes.',
+    errors: [{ domain: 'global', reason: 'insufficientPermissions', message: 'Insufficient Permission' }],
+    status: 'PERMISSION_DENIED'
+  }
+};
 const GOOGLE_404 = (what) => ({ error: { code: 404, message: what || 'Not Found', errors: [{ message: what || 'Not Found', domain: 'global', reason: 'notFound' }], status: 'NOT_FOUND' } });
 const GOOGLE_400 = (msg) => ({ error: { code: 400, message: msg, status: 'INVALID_ARGUMENT' } });
 
@@ -147,7 +155,9 @@ function startGoogleLaneServer() {
     failGets: [],
     rejectOnce: [],
     driveHits: [],
-    lagGets: []
+    lagGets: [],
+    tasks401AfterRefresh: false,
+    tasks403Insufficient: false
   };
   seedLists();
 
@@ -178,6 +188,8 @@ function startGoogleLaneServer() {
     state.driveHits = [];
     state.lagGets = [];
     state.noMeetLink = false;
+    state.tasks401AfterRefresh = false;
+    state.tasks403Insufficient = false;
     seedLists();
   }
 
@@ -235,6 +247,12 @@ function startGoogleLaneServer() {
       const bearer = /^Bearer\s+\S+/.test(String(req.headers.authorization || ''));
       if (!e2ePath && !bearer) { send(res, 401, GOOGLE_AUTH_401); return; }
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
+
+      if (method === 'GET' && (path === '/oauth2/v3/userinfo' || path === '/oauth2/v2/userinfo')) {
+        const email = accountFor(req);
+        send(res, 200, { email: email, sub: 'e2e-sub-' + email });
+        return;
+      }
 
       if (!e2ePath) {
         const once = state.rejectOnce.findIndex((part) => path.indexOf(part) >= 0);
@@ -513,6 +531,14 @@ function startGoogleLaneServer() {
         if (!findList(listId)) { send(res, 404, GOOGLE_404('Invalid task list ID')); return; }
       }
       if (taskCol && method === 'POST') {
+        if (state.tasks403Insufficient) {
+          send(res, 403, GOOGLE_AUTH_403_SCOPE);
+          return;
+        }
+        if (state.tasks401AfterRefresh) {
+          send(res, 401, GOOGLE_AUTH_401);
+          return;
+        }
         const body = readJson(raw);
         const bad = unknownField(body, TASK_FIELDS);
         if (bad) { send(res, 400, GOOGLE_400('Invalid JSON payload received. Unknown name "' + bad + '": Cannot find field.')); return; }
@@ -625,6 +651,8 @@ function startGoogleLaneServer() {
         tasks: () => state.tasks,
         deleteEvent: (id) => { delete state.events[id]; },
         setNoMeetLink: (on) => { state.noMeetLink = on === true; },
+        setTasks401AfterRefresh: (on) => { state.tasks401AfterRefresh = on === true; },
+        setTasks403Insufficient: (on) => { state.tasks403Insufficient = on === true; },
         seedEvent: (ev) => {
           const id = opaqueId('event', state.seq++);
           const who = state.account;

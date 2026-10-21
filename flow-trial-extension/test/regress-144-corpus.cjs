@@ -19,7 +19,7 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const FIXTURE = path.join(__dirname, 'fixtures', 'regress-144-all-rounds.jsonl');
-const FIXTURE_SHA = 'd7741c38660db54001b0fb9db90af65912fb7c69d317bd681923f85c5bae6642';
+const FIXTURE_SHA = '7d78223a55e1b61000ea3b4f92323e3443d33cb583f0abc8fc4ac742ea79c55e';
 const engine = { module: undefined, console };
 vm.createContext(engine);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
@@ -244,7 +244,7 @@ if (sha !== FIXTURE_SHA) {
   process.exit(1);
 }
 const rows = bytes.toString('utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-if (rows.length !== 1983) {
+if (rows.length !== 1987) {
   console.log('FAIL: fixture rows ' + rows.length);
   process.exit(1);
 }
@@ -496,7 +496,7 @@ for (const row of rows) {
     process.exit(1);
   }
 }
-const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-2557','v2syn-3315','v2syn-3317','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787'];
+const REPLY_TRACK = ['v2syn-29','v2syn-55','v2syn-249','v2syn-333','v2syn-576','v2syn-593','v2syn-669','v2syn-3315','v2syn-3317','v2syn-11885','v2syn-11967','v2syn-12153','v2syn-12420','v2syn-12596','v2syn-12788','v2syn-12944','v2syn-13257','v2syn-13369','v2syn-13428','v2syn-13749','v2syn-13787'];
 for (const id of REPLY_TRACK) {
   const row = byId[id];
   if (!row || row.expected !== 'offer' || row.expectKind !== 'request') {
@@ -942,6 +942,6 @@ if (mixed.indexOf('latin') !== 0 || verbProbe !== 'verb-as-sicha' || nameProbe) 
   console.log('FAIL: Hebrew UI rule probe ' + JSON.stringify([mixed, verbProbe, nameProbe]));
   fails.push('he-ui-probe');
 }
-console.log('HE-UI scan: fixtureRows=1983 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
+console.log('HE-UI scan: fixtureRows=1987 offeredShown=' + heStats.shown + ' clean=' + heStats.clean + ' hebrew=' + heStats.hebrew + ' englishLeft=' + heStats.englishLeft + ' callVerbs=' + heStats.verb + ' verbBand=' + heStats.verbBand + ' faults=' + heStats.faults);
 console.log('FAILURES: ' + fails.length);
 process.exit(fails.length ? 1 : 0);

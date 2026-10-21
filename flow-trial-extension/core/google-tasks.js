@@ -122,12 +122,14 @@ const FlowGoogleTasks = (() => {
     // The list is read, never made. An id the API does not know is an
     // error that names it; no list is created to make the write succeed.
     const listed = await call(http, { method: 'GET', url: listUrl(listId) });
-    if (listed.status === 401 || listed.status === 403) return { ok: false, reason: 'not-connected' };
+    const listAuth = C && typeof C.authHttpReason === 'function' ? C.authHttpReason(listed) : '';
+    if (listAuth) return { ok: false, reason: listAuth };
     if (listed.status === 404 || listed.status === 400) return { ok: false, reason: 'list-missing', object: 'list', title: body.title, listId: listId };
     if (!listed.ok) return { ok: false, reason: 'http-' + listed.status };
     const listName = listed.json && listed.json.title ? String(listed.json.title) : '';
     const posted = await call(http, Object.assign({ body: JSON.stringify(req.json), headers: { 'Content-Type': 'application/json' } }, req));
-    if (posted.status === 401 || posted.status === 403) return { ok: false, reason: 'not-connected' };
+    const postAuth = C && typeof C.authHttpReason === 'function' ? C.authHttpReason(posted) : '';
+    if (postAuth) return { ok: false, reason: postAuth };
     if (!posted.ok) return { ok: false, reason: 'http-' + posted.status };
     const task = posted.json || {};
     const written = 'Google Task · ' + body.title;

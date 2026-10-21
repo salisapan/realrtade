@@ -70,6 +70,11 @@ function glanceUiCopy(kind) {
   if (kind === 'undoing') return he ? 'מבטל…' : 'Undoing…';
   if (kind === 'tryAgain') return he ? 'נסה שוב' : 'Try again';
   if (kind === 'panelHead') return he ? 'מה עדיין פתוח' : 'Still open';
+  if (kind === 'missingPermission') {
+    return he
+      ? 'חסרה הרשאה ל-Google לפעולה הזו. חבר מחדש את Google עם ההרשאות הנדרשות.'
+      : 'Google is missing permission for this action. Reconnect Google with the required access.';
+  }
   return '';
 }
 
@@ -1077,6 +1082,13 @@ function glanceUiCopy(kind) {
       };
     });
     try {
+      const bodyEl = messageNode && messageNode.querySelector && messageNode.querySelector('.a3s.aiL, .a3s');
+      const probeText = bodyEl ? String(bodyEl.textContent || '').trim() : '';
+      const probeSubject = currentSubject() || '';
+      if (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.threadEvidenceEligible === 'function'
+        && !FlowFileAttach.threadEvidenceEligible(probeText + '\n' + probeSubject, attachments.length)) {
+        return false;
+      }
       const decision = FlowSuggestSave.suggestSave({
         surface: 'gmail',
         direction: 'inbound',
@@ -1084,8 +1096,8 @@ function glanceUiCopy(kind) {
         consent: true,
         attachmentsRead: true,
         attachments: mapped,
-        text: '',
-        subject: '',
+        text: probeText,
+        subject: probeSubject,
         messageId: 'self-attach-probe',
         dismissed: [],
         log: []
@@ -2154,7 +2166,11 @@ function glanceUiCopy(kind) {
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
     const inboundHeAsk = inboundMail && text.length >= 12
       && /(?:תשמור|לשמור|שמור|תעלה|להעלות|בדרייב|ב-?דרייב|drive|save|upload)/i.test(text);
-    const inboundAttachAsk = inboundMail && attachments.length > 0 && inboundHeAsk;
+    const inboundAttachSave = inboundMail && attachments.length > 0
+      && typeof FlowFileAttach !== 'undefined'
+      && typeof FlowFileAttach.threadEvidenceEligible === 'function'
+      && FlowFileAttach.threadEvidenceEligible(String(text || '') + '\n' + String(subject || ''), attachments.length);
+    const inboundAttachAsk = inboundMail && attachments.length > 0 && (inboundHeAsk || inboundAttachSave);
     const audienceNeedsProbe = audienceUnclear(message, sender.email, ownEmail, audience);
     const attachKeep = selfMailAttachmentKeepCard(message, sender.email, ownEmail, audience, attachments);
     if (attachKeep && (!intent || !intent.type) && String(subject || '').trim()) {
@@ -2303,9 +2319,13 @@ function glanceUiCopy(kind) {
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
     if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
-      const searched = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
-      });
+      const threadEvidence = typeof FlowFileAttach.threadEvidenceEligible === 'function'
+        && FlowFileAttach.threadEvidenceEligible(String(text || '') + '\n' + String(subject || ''), attachments.length);
+      const searched = threadEvidence
+        ? { ok: true, files: [], reason: 'thread-attachment' }
+        : await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
+        });
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment
       // search is not connected (compose-only Gmail). Null Drive means the
@@ -3388,10 +3408,15 @@ function glanceUiCopy(kind) {
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return response.needsReconnect ? glanceUiCopy('reconnect') : glanceUiCopy('connect');
+    if (response.reason === 'missing-permission') {
+      return glanceUiCopy('missingPermission') || (glanceUiHebrew()
+        ? 'חסרה הרשאה ל-Google לפעולה הזו. חבר מחדש את Google עם ההרשאות הנדרשות.'
+        : 'Google is missing permission for this action. Reconnect Google with the required access.');
+    }
     if (response.reason === 'drive-not-granted') {
-      return glanceUiHebrew()
+      return glanceUiCopy('missingPermission') || (glanceUiHebrew()
         ? 'דרייב עדיין לא אושר. חבר מחדש את Google ואשר את Drive.'
-        : 'Drive is not allowed yet. Reconnect Google and allow Drive.';
+        : 'Drive is not allowed yet. Reconnect Google and allow Drive.');
     }
     if (response.reason === 'attachment-unreadable') {
       return glanceUiHebrew()
@@ -3588,7 +3613,7 @@ function glanceUiCopy(kind) {
         const zone = await glanceUserTimeZone();
         if (zone) params.timeZone = zone;
       }
-      params.title = renderedTitleFor(ctx, params.title);
+      params.title = writtenTitleFor(ctx, params.title);
       // The worker adds a Meet link only when this text proposes a video call and
       // the MEET_LINK switch is on (off by default). Text stays local.
       if (ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
@@ -3638,7 +3663,7 @@ function glanceUiCopy(kind) {
     const taskEntities = (ctx.intent && ctx.intent.entities)
       || (action.params && action.params.what ? { what: action.params.what } : null);
     return Object.assign(base, {
-      label: renderedTitleFor(ctx, action.params.title || action.label),
+      label: writtenTitleFor(ctx, action.params.title || action.label),
       params: {
         dateIso: action.params.dateIso || null,
         amount: action.params.amount || null,
@@ -3793,11 +3818,10 @@ function glanceUiCopy(kind) {
     });
   }
 
-  // The card shows the title in the UI language. The event and the task
-  // written on Do It carry that same title.
+  // Card chrome follows the UI locale (B3). Written titles follow the mail.
   function artifactTitleFor(ctx, title) {
     if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.artifactTitle !== 'function') return title;
-    return FlowDisplay.artifactTitle(glanceUiLang(), ctx, title);
+    return FlowDisplay.artifactTitle(mailLanguage(ctx), ctx, title);
   }
 
   // One source of truth for what Glance writes. The string the card showed is
@@ -3808,6 +3832,17 @@ function glanceUiCopy(kind) {
     const shown = ctx && typeof ctx.renderedTitle === 'string' ? ctx.renderedTitle.trim() : '';
     if (shown) return shown;
     return artifactTitleFor(ctx, fallback);
+  }
+
+  // What lands in Calendar / Tasks — never the hold chrome ("Hold Mon 10:00").
+  function writtenTitleFor(ctx, fallback) {
+    const proc = ctx && ctx.process;
+    const sub = ctx && ctx.subject ? String(ctx.subject).trim() : '';
+    const holdProc = proc && (proc.id === 'hold' || proc.id === 'schedule' || proc.id === 'schedule-confirm');
+    if (holdProc && sub) return artifactTitleFor(ctx, sub);
+    const base = fallback == null ? '' : String(fallback).trim();
+    if (base) return artifactTitleFor(ctx, base);
+    return artifactTitleFor(ctx, sub || base);
   }
 
   // The Activity row names what the card said. A Save the file? card is not a decision.
@@ -3853,24 +3888,6 @@ function glanceUiCopy(kind) {
     return !!FlowGoogleComposePage.findBody(document);
   }
 
-  // No compose window is open. The reply draft is saved in the thread
-  // through the Gmail drafts API and read back by its id. Glance never sends.
-  async function saveReplyDraft(payload, input) {
-    const planned = typeof FlowGoogleCompose !== 'undefined' && typeof FlowGoogleCompose.plan === 'function'
-      ? FlowGoogleCompose.plan(input)
-      : { ok: false };
-    const threadId = (payload && payload.threadId) || '';
-    if (!planned.ok || !threadId) {
-      return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: glanceUiHebrew() ? 'לא הצלחתי להכין טיוטת תשובה בשרשור הזה.' : 'Could not prepare a reply draft in this thread.' };
-    }
-    return sendRuntime(Object.assign({
-      type: 'flow:google-write',
-      connectorId: 'googleReplyDraft',
-      input: { to: planned.to, subject: planned.subject, body: planned.body, threadId: threadId }
-    }, laneAccountContext()));
-
-  }
-
   async function sendGmailCompose(payload) {
     const email = (payload && payload.senderEmail) || '';
     const input = {
@@ -3886,7 +3903,16 @@ function glanceUiCopy(kind) {
     };
     // The service-worker message stays so the lane hears the fill. Its
     // in-memory object is not the compose window and is not the receipt.
-    if (!composeBodyOpen()) return saveReplyDraft(payload, input);
+    if (!composeBodyOpen()) {
+      return {
+        ok: false,
+        reason: 'compose-closed',
+        preview: true,
+        closes: false,
+        sent: false,
+        error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
+      };
+    }
     const swPromise = sendRuntime({ type: 'flow:gmail-compose', connectorId: 'gmailCompose', input: input, payload: input });
     let page = null;
     if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.fill === 'function') {
@@ -4259,7 +4285,8 @@ function glanceUiCopy(kind) {
   function assertWrittenTitle(action, payload, response) {
     if (!response || response.ok !== true || typeof response.title !== 'string') return;
     let expected = '';
-    if (payload && payload.params && (payload.params.fileName || payload.params.fileTerm) && action.kind === 'calendar') expected = String(payload.params.fileName || payload.params.fileTerm);
+    if (payload && payload.params && typeof payload.params.title === 'string' && action.kind === 'calendar') expected = payload.params.title;
+    else if (payload && payload.params && (payload.params.fileName || payload.params.fileTerm) && action.kind === 'calendar') expected = String(payload.params.fileName || payload.params.fileTerm);
     else if (payload && payload.params && typeof payload.params.title === 'string') expected = payload.params.title;
     else if (payload && typeof payload.label === 'string') expected = payload.label;
     expected = expected.replace(/[\r\n]+/g, ' ').trim();

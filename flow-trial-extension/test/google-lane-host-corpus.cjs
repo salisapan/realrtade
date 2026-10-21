@@ -105,7 +105,7 @@ check('background.js imports the lane host once', imports.length === 1, imports.
 
 const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
 check('Hold It, Task, Save file, Doc and Sheet send flow:google-write', /type: 'flow:google-write'/.test(gmail) && /googleHold:/.test(gmail) === false && /calendar: 'googleHold'/.test(gmail) && /googleTask: 'googleLaneTask'/.test(gmail) && /driveFile: 'googleDriveSave'/.test(gmail) && /driveDoc: 'googleDoc'/.test(gmail) && /driveSheet: 'googleSheetAppend'/.test(gmail));
-check('Draft reply sends flow:gmail-compose, and with no reply open creates the draft through the drafts API (no contacts lookup, no contacts scope)', /type: 'flow:gmail-compose'/.test(gmail) && !/flow:google-contacts/.test(gmail) && /googleReplyDraft/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
+check('Draft reply uses flow:gmail-compose in the compose window only (no Gmail drafts API, no contacts lookup, no contacts scope)', /type: 'flow:gmail-compose'/.test(gmail) && !/flow:google-contacts/.test(gmail) && !/googleReplyDraft/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail) && /reason: 'compose-closed'/.test(gmail));
 check('the card Undo sends flow:google-undo', /type: 'flow:google-undo'/.test(gmail));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));

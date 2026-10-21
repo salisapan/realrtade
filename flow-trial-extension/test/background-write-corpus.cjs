@@ -46,13 +46,12 @@ function load(opts) {
   if (!Object.prototype.hasOwnProperty.call(stored, 'googleGrantedScopes')) {
     stored.googleGrantedScopes = {
       version: [
-        'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/drive.readonly',
-        'https://www.googleapis.com/auth/gmail.compose',
-        'https://www.googleapis.com/auth/tasks',
+        'openid',
         'https://www.googleapis.com/auth/userinfo.profile',
-        'openid'
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/tasks'
       ].join('\n'),
       status: 'granted',
       source: 'chrome',

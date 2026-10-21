@@ -150,7 +150,31 @@ function installE2EHooks() {
       return Promise.resolve(json(200, {}));
     }
     if (host === 'www.googleapis.com') {
-      if (path.indexOf('/calendar/') >= 0) {
+      if (path === '/oauth2/v3/userinfo' || path === '/oauth2/v2/userinfo') {
+        const auth = String((init && init.headers && (init.headers.Authorization || init.headers.authorization)) || '');
+        const token = auth.replace(/^Bearer\s+/i, '');
+        const email = (e2e.tokenAccounts || {})[token] || 'ai.local.flow@gmail.com';
+        return Promise.resolve(json(200, { email: email, emailAddress: email, sub: 'e2e-sub' }));
+      }
+      if (path.indexOf('/calendar/v3/calendars/') >= 0) {
+        if (method === 'POST' && /\/events$/.test(path)) {
+          const id = 'e2e-cal-' + (e2e.seq++);
+          let body = {};
+          try { body = JSON.parse((init && init.body) || '{}'); } catch (err) { body = {}; }
+          e2e.googleEvents = e2e.googleEvents || {};
+          const event = Object.assign({ id: id, status: 'confirmed', htmlLink: 'https://calendar.google.com/event?eid=' + id }, body);
+          e2e.googleEvents[id] = event;
+          return Promise.resolve(json(200, event));
+        }
+        const ev = path.match(/\/events\/([^/]+)$/);
+        if (ev && method === 'GET') {
+          const rec = (e2e.googleEvents || {})[ev[1]];
+          return Promise.resolve(rec ? json(200, rec) : json(404, { error: { message: 'missing' } }));
+        }
+        if (ev && method === 'DELETE') {
+          if (e2e.googleEvents) delete e2e.googleEvents[ev[1]];
+          return Promise.resolve(empty(204));
+        }
         const loc = scenario.chatGoogleLocation || '';
         const start = parsed.searchParams.get('timeMin');
         if (!loc || !start || !Number.isFinite(Date.parse(start))) return Promise.resolve(json(200, { items: [] }));
@@ -159,6 +183,9 @@ function installE2EHooks() {
         return Promise.resolve(json(200, {
           items: [{ id: 'e2e-gcal-1', status: 'confirmed', location: loc, start: { dateTime: when } }]
         }));
+      }
+      if (path.indexOf('/calendar/') >= 0) {
+        return Promise.resolve(json(200, { items: [] }));
       }
       if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0) {
         return Promise.resolve(json(200, { files: [], items: [] }));
@@ -180,6 +207,10 @@ function installE2EHooks() {
       }
       const knownList = (id) => id === 'glance-list' || id === '@default';
       if (col && !knownList(col[1])) return Promise.resolve(json(404, { error: { code: 404, message: 'Invalid task list ID', status: 'NOT_FOUND' } }));
+      if (col && method === 'POST' && scenario.tasksFirstPost500 && !e2e.tasksPost500Used) {
+        e2e.tasksPost500Used = true;
+        return Promise.resolve(json(500, { error: { message: 'transient' } }));
+      }
       if (col && method === 'POST') {
         const id = 'e2e-gtask-' + (e2e.seq++);
         let posted = {};
@@ -719,6 +750,7 @@ async function boot() {
       e.flows = [];
       e.authFail = false;
       e.scenario = { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
+      e.tasksPost500Used = false;
       e.googleTasks = {};
       e.todoTasks = {};
       e.outlookEvents = {};
@@ -808,13 +840,12 @@ async function boot() {
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
       googleGrantedScopes: {
         version: [
-          'https://www.googleapis.com/auth/calendar.events',
-          'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/gmail.compose',
-          'https://www.googleapis.com/auth/tasks',
+          'openid',
           'https://www.googleapis.com/auth/userinfo.profile',
-          'openid'
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/drive.file',
+          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/tasks'
         ].slice().sort().join('\n'),
         status: 'granted',
         source: 'chrome',

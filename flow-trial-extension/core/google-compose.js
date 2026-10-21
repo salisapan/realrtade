@@ -80,7 +80,7 @@ const FlowGoogleCompose = (() => {
     const base = {
       where: 'Gmail',
       target: planned.to,
-      written: 'Compose filled. You send it.',
+      written: 'Draft opened in compose. You send it.',
       undoHint: 'Undo clears the compose window.',
       preview: true,
       closes: false,

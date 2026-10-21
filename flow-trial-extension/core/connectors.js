@@ -39,7 +39,7 @@ const FLOW_CONNECTORS = [
     // chrome.identity.getAuthToken with no scopes override (and, only if
     // that fails because sign-in is off, a web flow with the same scopes),
     // so ONE consent here covers every scope in manifest.json's oauth2.scopes at once
-    // (tasks, calendar.events, gmail.compose, drive.readonly, drive.file),
+    // (openid, userinfo, drive.file, calendar.events, tasks),
     // not just Tasks.
     // A card titled 'Google Tasks' with a 'Connect Google Tasks' button
     // (popup.js builds both directly from this label) read as authorizing

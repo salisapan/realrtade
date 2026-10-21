@@ -89,14 +89,14 @@ function identityToken() {
   });
 }
 
-// The address a token belongs to, from the Gmail profile (gmail.compose is
-// on the grant). A 401 here is this probe's answer: the token is kept.
+// The address a token belongs to, from OpenID userinfo (no Gmail API scope).
+// A 401 here is this probe's answer: the token is kept.
 async function accountOfToken(token) {
   const hit = seenAccounts.get(token);
   if (hit && Date.now() - hit.at < SEEN_MS) return hit.email;
   let email = '';
   try {
-    const res = await fetch(laneUrl('https://gmail.googleapis.com/gmail/v1/users/me/profile'), {
+    const res = await fetch(laneUrl('https://www.googleapis.com/oauth2/v3/userinfo'), {
       method: 'GET',
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -154,10 +154,13 @@ async function laneCredential(tab) {
   const A = Account();
   const connected = await readConnectedAccount();
   const stored = await storedConnectToken();
-  const chromeToken = await identityToken();
   const candidates = [];
-  if (stored) candidates.push({ token: stored, source: 'web' });
-  if (chromeToken && chromeToken !== stored) candidates.push({ token: chromeToken, source: 'chrome' });
+  if (stored) {
+    candidates.push({ token: stored, source: 'web' });
+  } else {
+    const chromeToken = await identityToken();
+    if (chromeToken) candidates.push({ token: chromeToken, source: 'chrome' });
+  }
   for (let i = 0; i < candidates.length; i++) candidates[i].email = await accountOfToken(candidates[i].token);
   const picked = A.choose(connected, candidates, tab);
   if (picked.ok && picked.adopt) await recordConnectedAccount(picked.token, picked.source);
@@ -259,13 +262,17 @@ function criticalUrl(url) {
 // It does not say the token is wrong, so it neither flags Reconnect nor
 // triggers a refresh. Only the Tasks, Calendar, Drive, Docs, Sheets and
 // Gmail hosts can end the grant.
-function settleAuth(res, url) {
-  if (!res) return Promise.resolve(res);
-  if (url && !criticalUrl(url)) return Promise.resolve(res);
-  if (res.status === 401 || res.status === 403) {
-    const reason = res.status === 403 ? 'missing scope' : '401';
-    return noteGoogleAuthFailure(reason).then(() => res);
-  }
+function insufficientScope(res) {
+  const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
+  return !!(C && typeof C.insufficientScopeBody === 'function' && C.insufficientScopeBody(res && res.json));
+}
+
+function settleAuth(res, url, opts) {
+  if (!res || !url || !criticalUrl(url)) return Promise.resolve(res);
+  if (res.status === 403 && insufficientScope(res)) return Promise.resolve(res);
+  const o = opts || {};
+  if (res.status === 401 && o.revoked) return noteGoogleAuthFailure('revoked').then(() => res);
+  if (res.status === 401 && o.afterRefresh) return noteGoogleAuthFailure('401').then(() => res);
   return Promise.resolve(res);
 }
 
@@ -275,6 +282,10 @@ function laneUrl(url) {
   if (!origin || !url) return url;
   try {
     const u = new URL(url);
+    // OpenID userinfo is an account probe, not a lane write host. Headless
+    // lane tests keep it on the worker fetch shim (tokenAccounts), not the
+    // local Tasks/Calendar/Drive stand-in.
+    if (/^\/oauth2\/v[0-9]+\/userinfo/.test(u.pathname || '')) return url;
     const base = new URL(origin);
     return base.origin + u.pathname + u.search;
   } catch (e) {
@@ -378,7 +389,7 @@ function laneHttp(req) {
       if (!picked.ok && picked.reason !== 'no-token') return { status: 0, ok: false, json: null, account: picked };
       const token = picked.ok ? picked.token : '';
       const cred = token ? { token: token, source: picked.source } : null;
-      if (!token) return noteGoogleAuthFailure('not signed in').then(() => ({ status: 401, ok: false, json: null }));
+      if (!token) return { status: 401, ok: false, json: null };
       const trashGate = gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate) && !request.unverifiedUndo;
       if (trashGate) {
         return { status: 0, ok: false, json: null };
@@ -394,15 +405,15 @@ function laneHttp(req) {
           if (signal) init.signal = signal;
           return fetch(url, init).then(readBody);
         };
-        const settle = (res) => settleAuth(res, request.url);
+        const settle = (res, meta) => settleAuth(res, request.url, meta);
         return once(token).then((res) => {
           if (!res || res.status !== 401 || !criticalUrl(request.url)) return settle(res);
           return retryLane(cred).then((next) => {
-            if (next && next.revoked) return settle(res);
-            if (!next || !next.token || next.token === token) return once(token).then(settle);
+            if (next && next.revoked) return settle(res, { revoked: true });
+            if (!next || !next.token || next.token === token) return once(token).then((r2) => settle(r2, { afterRefresh: true }));
             return accountOfToken(next.token).then((email) => {
-              if (!email || !Account().same(email, picked.email)) return once(token).then(settle);
-              return once(next.token).then(settle);
+              if (!email || !Account().same(email, picked.email)) return once(token).then((r2) => settle(r2, { afterRefresh: true }));
+              return once(next.token).then((r2) => settle(r2, { afterRefresh: true }));
             });
           });
         });
@@ -837,10 +848,7 @@ function verifyUrlFor(connectorId, ref) {
     const id = r.taskId || r.externalId;
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
-  if (connectorId === 'gmailCompose' || connectorId === 'googleReplyDraft') {
-    const id = r.draftId;
-    return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
-  }
+  if (connectorId === 'gmailCompose') return '';
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
   if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');

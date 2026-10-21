@@ -49,6 +49,29 @@ const FlowFollow = (() => {
     });
   }
 
+  let followPickerSeq = 0;
+  const followPickerWait = new Map();
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'flow:drive-file-result') return;
+    const settle = followPickerWait.get(msg.requestId);
+    if (!settle) return;
+    followPickerWait.delete(msg.requestId);
+    settle(msg.cancelled ? null : (msg.file || null));
+  });
+  function pickDriveFile() {
+    const requestId = 'dpf_' + Date.now() + '_' + (++followPickerSeq);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (followPickerWait.delete(requestId)) resolve(null);
+      }, 10 * 60 * 1000);
+      const settle = (file) => { clearTimeout(timer); resolve(file); };
+      followPickerWait.set(requestId, settle);
+      send({ type: 'flow:open-drive-picker', payload: { requestId } }).then((res) => {
+        if (!res || !res.ok) settle(null);
+      });
+    });
+  }
+
   function track(event) {
     send({ type: 'flow:track', event, params: {} });
   }
@@ -304,15 +327,12 @@ const FlowFollow = (() => {
       }
       const need = FlowFilePath.askNeed(w.yoursLine);
       if (!need) return null;
-      const found = await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery(need) });
-      const pick = FlowFilePath.pickDrive(need, found && found.ok ? found.files : null, {}, w.yoursLine);
-      return pick ? { source: 'drive', id: pick.id, name: pick.name, mimeType: pick.mimeType } : null;
+      const picked = await pickDriveFile();
+      return picked ? { source: 'drive', id: picked.id, name: picked.name, mimeType: picked.mimeType } : null;
     } catch (e) { return null; }
   }
 
-  // The first draft of your answer, written into Gmail's Drafts in that thread, with the
-  // one file when there is one. Nothing is sent. Preparing is not closing: the loop
-  // stays yours until you actually send.
+  // A reply draft opened in the compose window — never a server draft. Nothing is sent.
   async function prepareReply(watch, choice, ctx) {
     const payload = { to: watch.counterpart.email, toName: watch.counterpart.name, subject: watch.subject };
     let used = null;
@@ -322,18 +342,13 @@ const FlowFollow = (() => {
     } else if (choice && choice.source === 'drive') {
       payload.driveFileId = choice.id; used = choice.name;
     }
-    let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body: await voiced(FlowFollowUp.replyDraft(watch, { fileName: used }), watch) }) });
-    let withoutFile = false;
-    if (used && res && res.reason === 'attach') {
-      // The file could not be read: the plain draft, never a body that claims a file.
-      used = null; withoutFile = true;
-      res = await send({ type: 'flow:follow-draft', payload: { to: payload.to, toName: payload.toName, subject: payload.subject, body: await voiced(FlowFollowUp.replyDraft(watch, {}), watch) } });
-    }
+    const body = await voiced(FlowFollowUp.replyDraft(watch, { fileName: used }), watch);
+    const res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body, threadId: watch.threadId || '' }) });
     track(used ? 'follow_file_prepared' : 'follow_reply_prepared');
     if (res && res.ok) {
       await FlowStorage.updateWatch(watch.id, FlowFilePath.preparedPatch(Date.now(), used));
-      receipt('Draft ready in Gmail' + (used ? ' with ' + used : '') + '. Nothing was sent.' + (withoutFile ? ' I could not attach the file, so add it yourself.' : ''), null);
-    } else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null);
+      receipt('Draft opened in compose. You send it.' + (used ? ' (' + used + ')' : ''), null);
+    } else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : (res && res.error) || 'Open the thread to draft.', null);
   }
 
   // You answered: the ball goes back to them, and the chase starts again.
@@ -994,7 +1009,7 @@ const FlowFollow = (() => {
         atts.forEach((a) => { if (a && a.filename) threadFiles.push({ filename: a.filename, by }); });
       });
     }
-    const found = typeof FlowFilePath !== 'undefined' ? await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery({ label: need.label }) }) : null;
+    const found = null;
     const watches = await FlowStorage.getWatches();
     const person = { email: sender.email, personKey: env.personKey || null };
     const payment = FlowResolution.paymentStatus({ facts: env.facts, person, watches, paymentsSeen: await FlowStorage.getPaymentsSeen(), state: env.state, now: Date.now() });

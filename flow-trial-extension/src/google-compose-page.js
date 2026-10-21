@@ -53,6 +53,19 @@ const FlowGoogleComposePage = (() => {
     };
   }
 
+  function openReply(root) {
+    const doc = root || (typeof document !== 'undefined' ? document : null);
+    if (!doc || typeof doc.querySelector !== 'function') return false;
+    const main = doc.querySelector('div[role="main"]');
+    const scope = main || doc;
+    const btn = scope.querySelector(
+      '[aria-label="Reply"], [data-tooltip="Reply"], [aria-label^="Reply"], [aria-label*="תשובה"]'
+    );
+    if (!btn || typeof btn.click !== 'function') return false;
+    btn.click();
+    return true;
+  }
+
   function edited() {
     return {
       ok: false,
@@ -195,6 +208,7 @@ const FlowGoogleComposePage = (() => {
     }
     const stamped = Compose.stamp(planned, before);
     if (!stamped || stamped.ok !== true) return stamped;
+    stamped.fetchedBack = true;
     stamped.seen = { to: seen.to, subject: seen.subject, body: seen.body };
     const domHash = typeof Compose.contentHash === 'function' ? Compose.contentHash(seen.to, seen.subject, seen.body) : '';
     if (stamped.ref) stamped.ref.contentHash = domHash;
@@ -258,6 +272,7 @@ const FlowGoogleComposePage = (() => {
     findTo: findTo,
     findSubject: findSubject,
     findBody: findBody,
+    openReply: openReply,
     fill: fill,
     undo: undo,
     isComposeMessage: isComposeMessage,

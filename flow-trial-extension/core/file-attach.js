@@ -502,6 +502,20 @@ const FlowFileAttach = (() => {
   // (core/file-path.js) to tell whether finishing an intention takes a file. Several
   // objects, a plural ("the invoices"), a hedge or a negation all mean null:
   // a loop is only file-backed when it is clear which file.
+  // Thread evidence for Drive close chains: only when the mail names a real
+  // attachment and explicitly asks to save, upload, attach to Drive, or sign it.
+  const THREAD_SAVE_EN = /\b(?:save|upload|store|file|put)\b[^.\n]{0,120}\b(?:attach(?:ed|ment)?|the\s+(?:pdf|file)|it)\b|\b(?:save|upload|store)\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\battach(?:ed|ment)?\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\bsign\b[^.\n]{0,80}\b(?:the\s+)?(?:attached|attachment|pdf|nda|contract)\b/i;
+  const THREAD_SAVE_HE = /(?:ל)?(?:שמור|להעלות|תעלה|תצרף|לצרף)[^.\n]{0,80}(?:מצורף|המצורף|קובץ|pdf)|(?:חתום|לחתום)[^.\n]{0,40}(?:מצורף|המצורף|קובץ|nda|חוזה)/i;
+
+  function threadEvidenceEligible(text, attachmentCount) {
+    const n = Number(attachmentCount) || 0;
+    if (n <= 0) return false;
+    const body = fresh(text);
+    if (!body.trim() || NEG_EN.test(body) || NEG_HE.test(body)) return false;
+    if (gate(body).kind === 'clear') return true;
+    return THREAD_SAVE_EN.test(body) || THREAD_SAVE_HE.test(body);
+  }
+
   function mention(text) {
     const body = fresh(text);
     if (!body.trim()) return null;
@@ -515,7 +529,7 @@ const FlowFileAttach = (() => {
   }
 
   return {
-    gate, decide, mention, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();
