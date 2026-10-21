@@ -83,3 +83,14 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Action: one Do It. After the read-back the receipt shows `Word · <file>` or `Excel · <file>` with the OneDrive link. The card asks nothing new: the OneDrive box (`Files.ReadWrite`) is the existing consent; without it the plan reports `files-not-granted`.
 - A name already taken in OneDrive > Glance is refused (`name-taken`), nothing is replaced. The card should say the name is used and leave the choice to the person.
 - Undo: deletes the file. If the person edited it, the card says Undo unavailable and the file stays.
+
+## P1 — a task added to a named Planner plan
+
+- Module `flow-trial-extension/core/planner-task.js`, switch `PLANNER_TASK`. Ecosystem gap "Planner" (`docs/glance-ai/ecosystem-coverage.md`). Outlook only (Microsoft account).
+- When the card shows: someone asked the person to add a task with a title to a plan that is named and is one of the person's own plans ("Please add the task 'Send contract to Dana' to the Website relaunch plan by Friday"). No plan named, an unknown or two same-named plans, or another tool shows no card.
+- Line: `להוסיף ל-Planner, בתוכנית <plan>, משימה: <title> (עד <date>)?` / `Add to Planner, in the <plan> plan, the task: <title> (due <date>)?` The date part appears only when the mail gave one.
+- Step: `יצירת המשימה בתוכנית ובדיקה חוזרת (בלי לשייך לאף אחד)` / `Create the task in the plan and read it back (assigned to no one)`.
+- Action: one Do It. The task has no assignee, so Planner notifies nobody.
+- Undo: deletes the task. If the person changed it, the card says Undo unavailable and the task stays.
+- Needed outside the card: the host reads the person's plans (`GET /me/planner/plans`, `Tasks.ReadWrite`, already requested when the To Do box is ticked; the Entra app must list it, open-tasks row 44).
+

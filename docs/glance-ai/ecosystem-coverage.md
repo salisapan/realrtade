@@ -40,7 +40,8 @@ Entra app `22682454-808b-41e5-80fe-6abadc1d5595`. Scopes in code (`core/outlook-
 | Word / Excel from a request | "Can you create a Word document called X?" / "תפתח מסמך בשם X" with no attachment becomes an empty `.docx` or `.xlsx` in OneDrive > Glance, never replacing a file; read back by id for name, a file, a size and not deleted (`core/onedrive-new-file.js`, switch `ONEDRIVE_NEW_FILE` off, not wired to a card). 2026-10-20 | Read back by id (`microsoft/word`, `microsoft/excel`); Undo deletes it and refuses after an edit | Not run | Card is in `card-requests-2026-10-20.md` (W2); wiring into the Outlook card and a live Gate. Glance writes no content and shares nothing. Needs the OneDrive box (`Files.ReadWrite`, already in code) |
 | Teams | Reads chats you are in (`Chat.Read`), shows a draft, never posts (`core/teams-chat.js`) | n/a, a draft is not a close | Not run | No post, by design. Meeting and channel signals not read |
 | Outlook Contacts | Name to address (`core/outlook-contacts.js`) | n/a | Not run | Split or unclear matches stay quiet |
-| SharePoint, OneNote, Planner, PowerPoint | Not built | n/a | n/a | Not started. SharePoint is the first one an organisation will ask for |
+| Planner | A task with a title and a named plan of the person's own becomes a Planner task with no assignee, with the date when given (`core/planner-task.js`, switch `PLANNER_TASK` off, not wired to a card, 2026-10-20) | Read back by id for title, plan and date; Undo deletes with If-Match and refuses after an edit | Not run | Card ask P1 for the Grok bot; the host must list the person's plans; Entra must list `Tasks.ReadWrite` (row 44). Bucket and assignee are not set |
+| SharePoint, OneNote, PowerPoint | Not built | n/a | n/a | Not started. SharePoint is the first one an organisation will ask for |
 
 ## Meta
 
@@ -59,6 +60,6 @@ One consent turns on Messenger, Facebook messages, Business Suite, Instagram and
 
 - **Closest to done:** Outlook mail, To Do and OneDrive (live Gates passed on earlier packages), then Gmail with Tasks, Calendar and Drive (built and heavily tested, no recorded PASS on 0.9.56).
 - **Built but never seen live:** Docs, Sheets, Word, Excel, Teams drafts, Contacts, and every Meta surface.
-- **Not started:** Slides, Forms, Keep, SharePoint, OneNote, Planner, PowerPoint, Facebook Pages, Threads, WhatsApp Business.
+- **Not started:** Slides, Forms, Keep, SharePoint, OneNote, PowerPoint, Facebook Pages, Threads, WhatsApp Business.
 - **The learning loop:** the on-device threshold and Execution Memory learn from each person's clicks. The export of own-use decisions for training the model (`docs/glance-ai/learning-from-use.md`, paths A to D) is not built in the extension, so "the system learns from everyone's use" is true per person and not yet across people.
 - **The release gate:** a package must pass the regression corpora first. On 2026-10-20 five corpora are red on the working branch tip: `card-decision` (Outlook Why-not-shown reason, PR #143), `flip-sample-0956`, and three that pass only with the clock set back to 2026-10-16 (`realshape-0956`, `negation-conditional`, `regress-144`), so they are date-bound fixtures. Four more were stale fixtures and are fixed. A fresh environment also needs `npm i` in `flow-trial-extension/` for jsdom.
