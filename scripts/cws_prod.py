@@ -741,6 +741,10 @@ def transform_google_lane_host(raw: str) -> str:
   if (!origin || !url) return url;
   try {
     const u = new URL(url);
+    // OpenID userinfo is an account probe, not a lane write host. Headless
+    // lane tests keep it on the worker fetch shim (tokenAccounts), not the
+    // local Tasks/Calendar/Drive stand-in.
+    if (/^\\/oauth2\\/v[0-9]+\\/userinfo/.test(u.pathname || '')) return url;
     const base = new URL(origin);
     return base.origin + u.pathname + u.search;
   } catch (e) {

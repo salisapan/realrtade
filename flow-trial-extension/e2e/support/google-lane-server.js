@@ -248,6 +248,12 @@ function startGoogleLaneServer() {
       if (!e2ePath && !bearer) { send(res, 401, GOOGLE_AUTH_401); return; }
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
 
+      if (method === 'GET' && (path === '/oauth2/v3/userinfo' || path === '/oauth2/v2/userinfo')) {
+        const email = accountFor(req);
+        send(res, 200, { email: email, sub: 'e2e-sub-' + email });
+        return;
+      }
+
       if (!e2ePath) {
         const once = state.rejectOnce.findIndex((part) => path.indexOf(part) >= 0);
         if (once >= 0) { state.rejectOnce.splice(once, 1); send(res, 401, GOOGLE_AUTH_401); return; }
