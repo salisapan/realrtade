@@ -60,16 +60,14 @@ FULL_HOSTS = (
     "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*",
 )
+# Chrome Web Store v1 optional hosts (dev manifest may also list loopback, Slack,
+# and Telegram; the full store transform strips those for review).
 FULL_OPTIONAL_HOSTS = (
     "https://api.dropboxapi.com/*",
     "https://content.dropboxapi.com/*",
     "https://web.whatsapp.com/*",
-    "https://app.slack.com/*",
-    "https://web.telegram.org/*",
     "https://graph.microsoft.com/*",
     "https://login.microsoftonline.com/*",
-    "http://127.0.0.1/*",
-    "http://localhost/*",
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
     "https://outlook.office365.com/*",
@@ -88,6 +86,7 @@ FULL_OPTIONAL_HOSTS = (
     "https://instagram.com/direct",
     "https://instagram.com/direct/*",
 )
+FULL_STORE_HOST_GRANTS = tuple(FULL_HOSTS) + tuple(FULL_OPTIONAL_HOSTS)
 FULL_SCOPES = (
     "openid",
     "https://www.googleapis.com/auth/userinfo.profile",
@@ -365,6 +364,9 @@ def transform_manifest(raw: str, flavor: str) -> str:
         oauth["client_id"] = STORE_CLIENT_ID
         oauth["scopes"] = list(FULL_SCOPES)
         manifest["oauth2"] = oauth
+        rules = FLAVOR_RULES["full"]
+        manifest["host_permissions"] = list(rules["hosts"])
+        manifest["optional_host_permissions"] = list(rules["optional_hosts"])
     if flavor == "outlook":
         rules = FLAVOR_RULES["outlook"]
         manifest["host_permissions"] = list(rules["hosts"])
@@ -964,6 +966,15 @@ def transform_release(raw: str, sha: str, flavor: str) -> str:
     )
 
 
+BUILD_STAMP_RE = re.compile(r"(const STAMP = ')[^']*(';)")
+
+
+def transform_build_stamp(raw: str, sha: str) -> str:
+    if not BUILD_STAMP_RE.search(raw):
+        die("core/build-stamp.js has no STAMP constant")
+    return BUILD_STAMP_RE.sub(lambda m: m.group(1) + sha + m.group(2), raw, count=1)
+
+
 TRANSFORM_FILES = {
     "manifest.json",
     "config/oauth.public.js",
@@ -973,6 +984,7 @@ TRANSFORM_FILES = {
     "src/google-lane-host.js",
     "src/lane-chat-worker.js",
     "config/release.public.js",
+    "core/build-stamp.js",
 }
 
 
@@ -993,6 +1005,8 @@ def transform_file(rel: str, text: str, sha: str, flavor: str) -> str:
         return transform_lane_chat_worker(text)
     if rel == "config/release.public.js":
         return transform_release(text, sha, flavor)
+    if rel == "core/build-stamp.js":
+        return transform_build_stamp(text, sha)
     return text
 
 
@@ -1144,6 +1158,14 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
         same("permissions", manifest.get("permissions"), ALLOWED_PERMISSIONS)
         same("host_permissions", manifest.get("host_permissions"), rules["hosts"])
         same("optional_host_permissions", manifest.get("optional_host_permissions"), rules["optional_hosts"])
+        if flavor == "full":
+            combined = list(manifest.get("host_permissions") or []) + list(
+                manifest.get("optional_host_permissions") or []
+            )
+            if combined != list(FULL_STORE_HOST_GRANTS):
+                failures.append(
+                    "host_permissions + optional_host_permissions must equal the v1 store allowlist exactly"
+                )
         if rules["oauth2"]:
             oauth = manifest.get("oauth2") or {}
             scopes = oauth.get("scopes") or []
@@ -1196,6 +1218,15 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
     sha = sha_match.group(1) if sha_match else ""
     if not sha:
         failures.append("config/release.public.js has no 7-character BUILD_SHA")
+    stamp_js = files.get("core/build-stamp.js", b"").decode("utf-8", errors="replace")
+    stamp_match = re.search(r"const STAMP = '([0-9a-f]{7})';", stamp_js)
+    stamp_sha = stamp_match.group(1) if stamp_match else ""
+    if not stamp_sha:
+        failures.append("core/build-stamp.js has no 7-character STAMP in the store zip")
+    elif sha and stamp_sha != sha:
+        failures.append(
+            f"core/build-stamp.js STAMP {stamp_sha!r} does not match BUILD_SHA {sha!r}"
+        )
     if "export const PRIVACY_URL = 'https://" not in release:
         failures.append("PRIVACY_URL is not an https constant")
     report = files.get("popup/report-problem.js", b"").decode("utf-8", errors="replace")
