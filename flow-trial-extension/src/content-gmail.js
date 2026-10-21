@@ -607,6 +607,9 @@ function glanceUiCopy(kind) {
       intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, ctx) : null;
     }
     if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
+    if (intent.systemNotice && intent.notice && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeProcess === 'function') {
+      return { show: true, intent: intent, process: FlowIncomingJudge.noticeProcess(intent.notice, ctx.threadUrl) };
+    }
     if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.shouldShowChip === 'function' && !FlowIntent.shouldShowChip(intent)) {
       return { show: false, reason: 'chip-low-confidence', intent: intent };
     }
@@ -1543,6 +1546,14 @@ function glanceUiCopy(kind) {
       : text;
     const template = await readCompanyTemplate();
     const ctx = Object.assign({ now: new Date() }, base, { companyTemplate: template });
+    // A known service's notice with a deadline and a preventing action is a task with the date (core/system-notice.js).
+    // Off unless glanceSwitches.SYSTEM_NOTICE is true.
+    let noticeOn = false;
+    try { const bag = await chrome.storage.local.get({ glanceSwitches: {} }); noticeOn = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); } catch (e) { noticeOn = false; }
+    if (noticeOn && typeof FlowSystemNotice !== 'undefined' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeIntent === 'function' && base && base.inbound !== false) {
+      const notice = FlowSystemNotice.detect({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now });
+      if (notice) return FlowIncomingJudge.noticeIntent(FlowIntent, notice);
+    }
     let intent = FlowIntent.classify(prepared, ctx);
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';

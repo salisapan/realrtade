@@ -219,3 +219,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 ## 2026-10-21 Ecosystems builder B (fifteenth run): idle by the run-discipline rule
 
 - The chat task card shipped in the previous run; what is left on the Microsoft and Meta side needs the owner (SharePoint scope, Meta business verification, live Gates) or a Grok card. Nothing else touched.
+
+## 2026-10-21 Ecosystems run A (16th): system notices with a deadline (owner priority 3)
+
+- **Capability:** a mail from a known service (Netlify, Vercel, Supabase, GitHub, Google, Microsoft, Namecheap, GoDaddy and others) that says something will be paused, suspended or expire on a date unless you act, now offers one Do It: a task "Update your billing details (Netlify) by Oct 28" with the date (Google Tasks on Gmail, Microsoft To Do on Outlook), English and Hebrew. Unknown or lookalike senders, newsletters, promotions, webinars and notices missing a deadline or an action stay quiet. Behind `glanceSwitches.SYSTEM_NOTICE` (off). Nothing is paid, renewed or signed in by Glance.
+- **Code:** `core/system-notice.js`, `core/incoming-judge.js`, `src/content-gmail.js` (`classifyForChip`, `planOpenMail`), `src/content-outlook.js`, `manifest.json` (one core file added to the content-script list, no permission change), add-on bundle rebuilt.
+- **Tests:** `test/system-notice-corpus.cjs` (all pass); surface-parity, gmail-outlook-parity, identity-copy, chat-task-card, cc-only, deadline-meeting, intent-model green. Not mine and already red before: `gate-0950-proof` (1) and the add-on `v1.test.cjs` (5). docs-consistency red only until this commit's README row. No e2e in a real browser for this card yet.
+- **Open:** live Gate (owner); the phone card and chat do not pass the switch; a sender list from the person's own correspondents; Gmail page path covered by wiring checks only.

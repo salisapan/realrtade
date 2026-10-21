@@ -103,6 +103,16 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
+    // A service's notice with a deadline and an action that prevents the loss ("your project will be paused on Oct 28 unless
+    // you update billing"). Known services only; a task with the date, never a payment. Runs before the person-to-person quiets
+    // because the sender is a no-reply address by nature. Off unless the host passes systemNoticeOn (glanceSwitches.SYSTEM_NOTICE).
+    const noticeApi = pick(d, 'systemNotice', sibling(typeof FlowSystemNotice !== 'undefined' ? FlowSystemNotice : null, './system-notice.js', 'FlowSystemNotice'));
+    if (i.systemNoticeOn === true && noticeApi && typeof noticeApi.detect === 'function' && i.senderIsUser !== true) {
+      const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+      const notice = noticeApi.detect({ text: prepareForJudge(i.text), subject: prepareForJudge(i.subject || ''), sender: i.sender || {}, now: now0, knownSenders: i.knownSenders || null });
+      if (notice) return { show: true, intent: noticeIntent(intentApi, notice), process: forSurface(noticeProcess(notice, i.threadUrl), i.surface || 'gmail') };
+    }
+
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
@@ -241,6 +251,27 @@ const FlowIncomingJudge = (() => {
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
+  function noticeIntent(intentApi, notice) {
+    return {
+      type: intentApi.TYPES ? intentApi.TYPES.REQUEST : 'request', label: 'Deadline notice', confidence: 0.9,
+      systemNotice: true, notice: notice, personalClose: 'system-notice', entities: { what: notice.action, deadline: notice.dueIso },
+      facts: { date: { iso: notice.dueIso } }
+    };
+  }
+
+  // Same step shape as the Log It task, so every surface's existing task writer carries it (Google Tasks, Microsoft To Do).
+  function noticeProcess(notice, threadUrl) {
+    return {
+      id: 'log-it', name: 'Log It', closingLine: 'Logging this so it stays tracked.', closedLine: 'Logged and tracked.',
+      needsDateChoice: false, dateChoices: null, systemNotice: true,
+      steps: [{
+        id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + notice.title,
+        params: { title: notice.title, dateIso: notice.dueIso, amount: null, what: notice.action, threadUrl: threadUrl || null },
+        dependsOn: null
+      }]
+    };
+  }
+
   function taskOnlyProcess(process) {
     const steps = (process && process.steps) || [];
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
@@ -309,7 +340,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
   }
 
-  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
+  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

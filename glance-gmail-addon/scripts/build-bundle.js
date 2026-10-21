@@ -24,6 +24,7 @@ const files = [
   'intent.js',
   'actions.js',
   'resolution.js',
+  'system-notice.js',
   'incoming-judge.js'
 ].map((name) => path.join(core, name)).concat([
   'i18n.js',

@@ -720,6 +720,13 @@
     return text.slice(0, OFFICE_READ_MAX_CHARS);
   }
 
+  // glanceSwitches.SYSTEM_NOTICE (off): a known service's deadline notice becomes a To Do task (core/system-notice.js).
+  let systemNoticeSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { systemNoticeSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) systemNoticeSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.SYSTEM_NOTICE === true); });
+  } catch (e) { systemNoticeSwitch = false; }
+
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
   async function decideFromText(pane, ownAddresses, mailbox) {
@@ -763,6 +770,7 @@
       forwarded: pane.onBehalf === true
     });
     const judgeWith = (text) => FlowIncomingJudge.judge({
+      systemNoticeOn: systemNoticeSwitch === true,
       text: text, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
       now: new Date(), threadUrl: location.href,
