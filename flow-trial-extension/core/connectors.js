@@ -150,6 +150,14 @@ const FLOW_CONNECTORS = [
     auth: 'oauth',
     note: 'Reads the status of one envelope you already sent and counts the loop closed when it is completed. Never sends or changes an envelope. Off in this build; needs a DocuSign integration key (docs/glance-ai/connectors/docusign.md).'
   },
+  {
+    id: 'dropbox',
+    label: 'Dropbox',
+    kind: 'File storage',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Saves one file you approve into a Glance folder in your Dropbox and reads it back before it counts as saved. Never overwrites. Off in this build; needs a Dropbox app key (docs/glance-ai/connectors/dropbox.md).'
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 
