@@ -2745,12 +2745,7 @@ const FlowIntent = (() => {
     const box = ctx && typeof ctx === 'object' ? ctx : { subject: ctx };
     const topic = callTopicPhrase(main, box.subject);
     if (topic) {
-      const he = /[\u0590-\u05FF]/.test(main) || /[\u0590-\u05FF]/.test(String(box.subject || '')) || (box.lang === 'he');
-      let t = topic;
-      if (he && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.localCallTopic === 'function') {
-        t = FlowDisplay.localCallTopic(topic, 'he') || topic;
-      }
-      return clipTitle(he ? ('שיחה בנושא ' + t) : ('Call about ' + topic));
+      return clipTitle('Call about ' + topic);
     }
     if (!addressedToSelf(box)) {
       const name = String(box.senderName || '').trim();

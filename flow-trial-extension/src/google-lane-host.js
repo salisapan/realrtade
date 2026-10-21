@@ -194,6 +194,8 @@ function everConnectedRecord(value) {
 
 function priorGoogleRecord(bag) {
   if (!bag) return false;
+  const connected = bag[CONNECTED_ACCOUNT_KEY];
+  if (connected && typeof connected.email === 'string' && connected.email.indexOf('@') > 0) return true;
   if (everConnectedRecord(bag[EVER_KEY]) || everConnectedRecord(bag.everConnected)) return true;
   if (bag.googleTasksAuth || bag.tasksAuth) return true;
   const web = bag.googleWebAuth || bag.webAuth;
@@ -279,10 +281,6 @@ function laneUrl(url) {
   if (!origin || !url) return url;
   try {
     const u = new URL(url);
-    // OpenID userinfo is an account probe, not a lane write host. Headless
-    // lane tests keep it on the worker fetch shim (tokenAccounts), not the
-    // local Tasks/Calendar/Drive stand-in.
-    if (/^\/oauth2\/v[0-9]+\/userinfo/.test(u.pathname || '')) return url;
     const base = new URL(origin);
     return base.origin + u.pathname + u.search;
   } catch (e) {

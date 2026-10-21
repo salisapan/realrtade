@@ -249,6 +249,10 @@ function startGoogleLaneServer() {
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
 
       if (method === 'GET' && (path === '/oauth2/v3/userinfo' || path === '/oauth2/v2/userinfo')) {
+        if (!e2ePath && state.failGets.some((part) => path.indexOf(part) >= 0)) {
+          send(res, 500, { error: { code: 500, message: 'Backend Error', status: 'INTERNAL' } });
+          return;
+        }
         const email = accountFor(req);
         send(res, 200, { email: email, sub: 'e2e-sub-' + email });
         return;
