@@ -20,9 +20,15 @@ const FlowNativeEdit = (() => {
 
   // Graph stores the same sentence as text or as HTML. Tags, CRLF, and
   // extra whitespace are not an edit. The words are.
+  // Microsoft appends a join block to an online meeting's body, sometimes
+  // after the first read. It is not the person's text: from its underscore
+  // rule to the end is left out, so it can never read as an edit.
+  const TEAMS_JOIN_BLOCK = /_{8,}\s*(?:Microsoft Teams|Join (?:the meeting|on your computer|with a video)|Meeting ID|הצטרפות|הצטרף)[\s\S]*$/i;
+
   function normText(value) {
     return textOf(value)
       .replace(/<[^>]+>/g, ' ')
+      .replace(TEAMS_JOIN_BLOCK, ' ')
       .replace(/&nbsp;/gi, ' ')
       .replace(/&amp;/gi, '&')
       .replace(/&lt;/gi, '<')

@@ -52,6 +52,7 @@ import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
@@ -4940,6 +4941,41 @@ async function outlookDeleteDraft(draftId, prefer) {
   const headers = prefer || {};
   try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
+// The owner's off switches live in one storage object. A missing key is off.
+async function glanceSwitchOn(name) {
+  try {
+    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+    return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+  } catch (e) { return false; }
+}
+
+async function outlookTeamsWanted(callText) {
+  const T = globalThis.FlowTeamsMeeting;
+  if (!T || typeof T.callAsked !== 'function' || !callText) return false;
+  if (!(await glanceSwitchOn(T.SWITCH))) return false;
+  return T.callAsked(callText);
+}
+
+// The Teams join link the event really carries, read by id. Microsoft attaches
+// it a moment after the event exists, so the read repeats a few times.
+async function outlookTeamsJoinUrl(eventId) {
+  const T = globalThis.FlowTeamsMeeting;
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,isOnlineMeeting,onlineMeeting,isCancelled';
+  outlookAssertNotSend(url);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 300 * attempt));
+    let res = null;
+    try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    if (raw && raw.id === eventId && raw.isCancelled !== true) {
+      const link = T && T.joinUrlOf ? T.joinUrlOf(raw) : '';
+      if (link) return link;
+    }
+  }
+  return '';
+}
+
 // One calendar event for a Family B file-on-hold. The Calendar checkbox asks
 // for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
 // The body never includes attendees, so the write does not invite anyone.
@@ -4978,6 +5014,13 @@ async function outlookMeetingWrite(p) {
   if ((Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) {
     return { ok: false, reason: 'refused' };
   }
+  // A Teams link only when the mail asks for a call and the owner's switch
+  // TEAMS_MEETING is on (default off). Still no attendee, so nobody is invited.
+  const teams = await outlookTeamsWanted(params.callText);
+  if (teams) {
+    body.isOnlineMeeting = true;
+    body.onlineMeetingProvider = 'teamsForBusiness';
+  }
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
   const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
@@ -4998,6 +5041,22 @@ async function outlookMeetingWrite(p) {
   if (!event || typeof event.id !== 'string' || !event.id) {
     return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
   }
+  // Handled for a Teams hold needs the join link read back by id. Without it
+  // the event is removed again and nothing is claimed.
+  let joinUrl = '';
+  if (teams) {
+    joinUrl = await outlookTeamsJoinUrl(event.id);
+    if (!joinUrl) {
+      const delUrl = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id);
+      outlookAssertNotSend(delUrl);
+      let removed = false;
+      try {
+        const gone = await outlookFetch(delUrl, { method: 'DELETE' });
+        removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404));
+      } catch (e) { removed = false; }
+      return { ok: false, reason: 'teams-link-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
+    }
+  }
   const proved = await outlookEventRead(event.id);
   const eventSnap = proved && proved.snap;
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
@@ -5011,11 +5070,12 @@ async function outlookMeetingWrite(p) {
     target: 'your calendar',
     url: event.webLink || null
   };
+  if (joinUrl) base.joinUrl = joinUrl;
   if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
   return Object.assign({
     ok: true,
     fetchedBack: true,
-    written: 'Calendar · ' + title + (when ? ' · ' + when : ''),
+    written: 'Calendar · ' + title + (when ? ' · ' + when : '') + (joinUrl ? ' · Teams' : ''),
     ref: ref
   }, base);
 }

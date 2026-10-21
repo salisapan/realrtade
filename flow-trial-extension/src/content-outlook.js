@@ -3430,6 +3430,9 @@
       await holdAsTodo(host, ctx);
       return;
     }
+    // The service worker adds a Teams link only when this text asks for a call
+    // and the TEAMS_MEETING switch is on (off by default). Text stays local.
+    if (params.meeting === true && ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
     const r = await send({
       type: 'flow:execute-action',
       payload: {

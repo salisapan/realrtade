@@ -270,7 +270,17 @@ const FlowTeamsMeeting = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.eventId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, plan, create, undo, joinUrlOf, contentHash };
+  // The light check for a host whose meeting pipeline already settled the day
+  // and the clock: the mail asks for a video or Teams call, and not for
+  // another tool, not as a hedge, not as a negation or FYI. No date is parsed.
+  function callAsked(text) {
+    const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
+    if (!s.trim() || !CALL.test(s)) return false;
+    if (NEG.test(s) || FYI.test(s) || HEDGE.test(s) || OTHER_TOOL.test(s) || THIRD.test(s)) return false;
+    return PROPOSE_EN.test(s) || PROPOSE_HE.test(s);
+  }
+
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, callAsked, plan, create, undo, joinUrlOf, contentHash };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowTeamsMeeting };
