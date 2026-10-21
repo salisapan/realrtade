@@ -304,6 +304,7 @@ function startGoogleLaneServer() {
         const meta = readJson(raw);
         const id = 'e2e-file-' + (state.seq++);
         const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, parents: meta.parents || null });
+        if (/^application\/vnd\.google-apps\./.test(String(meta.mimeType || ''))) file.webViewLink = 'https://docs.google.com/document/d/' + id + '/edit';
         state.files[id] = file;
         if (meta.mimeType === 'application/vnd.google-apps.document') {
           state.docs[id] = docBody('', '');

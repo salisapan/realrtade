@@ -8,6 +8,8 @@ import '../core/google-calendar.js';
 import '../core/meet-link.js';
 // FlowRecurringReminder: a repeat on the Hold It, switch RECURRING_HOLD, off.
 import '../core/recurring-reminder.js';
+// FlowWorkspaceFile: an empty Doc, Sheet or Slides deck from a request, switch WORKSPACE_FILE, off.
+import '../core/workspace-file.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
@@ -657,6 +659,15 @@ async function prepareWrite(connectorId, input, cred) {
       expectAccount: cred && cred.email ? cred.email : ''
     };
   }
+  if (connectorId === 'googleNewFile') {
+    const W = globalThis.FlowWorkspaceFile;
+    return {
+      flags: W ? { [W.SWITCH]: await laneSwitchOn(W.SWITCH) } : {},
+      fileKind: params.fileKind || i.fileKind || '',
+      name: params.name || i.name || '',
+      now: new Date().toISOString()
+    };
+  }
   if (connectorId === 'googleDriveSave') return i;
   if (connectorId === 'googleDoc') {
     const text = params.text || i.text || plainText(params.html || i.html || '');
@@ -821,7 +832,7 @@ function verifyUrlFor(connectorId, ref) {
     return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
   }
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
-  if (fileId && /^google(DriveSave|Doc|SheetAppend)$/.test(connectorId)) {
+  if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
   }
   return '';
@@ -861,6 +872,16 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve(guardedWrite(msg.connectorId, msg.input, { tab: msg.tabAccount, lang: msg.lang }))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-new-file-plan') {
+    // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
+    const W = globalThis.FlowWorkspaceFile;
+    Promise.resolve((async () => {
+      if (!W || typeof W.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(W.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return W.plan({ flags: { [W.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000) });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
   if (msg.type === 'flow:google-verify') {

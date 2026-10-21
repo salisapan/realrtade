@@ -2145,6 +2145,10 @@ function glanceUiCopy(kind) {
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
     const inboundMail = String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase();
+    // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
+    // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
+    // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
+    if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
     const inboundHeAsk = inboundMail && text.length >= 12
@@ -3099,6 +3103,44 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  async function showNewFileChip(message, c) {
+    let plan = null;
+    try {
+      plan = await sendRuntime({ type: 'flow:google-new-file-plan', text: String(c.subject || '').trim() ? c.subject + '. ' + c.text : c.text });
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.name || !plan.fileKind) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'new-file',
+      name: plan.name,
+      closingLine: plan.line,
+      closedLine: he ? 'נוצר ב-Drive.' : 'Created in Drive.',
+      steps: [{
+        id: 'file',
+        kind: 'driveNewFile',
+        label: plan.fileKind === 'sheet' ? 'Sheet' : plan.fileKind === 'slides' ? 'Slides' : 'Doc',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create the file in Drive and read it back',
+        dependsOn: null,
+        params: { fileKind: plan.fileKind, name: plan.name, destinationText: (he ? 'Drive · ' : 'Drive · ') + plan.name }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.name, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.name, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   function injectChip(messageNode, ctx) {
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
@@ -3466,6 +3508,13 @@ function glanceUiCopy(kind) {
       });
     }
 
+    // An empty Doc, Sheet or Slides deck asked for by name (switch WORKSPACE_FILE, off). Nothing is written into it.
+    if (action.kind === 'driveNewFile') {
+      const nf = action.params || {};
+      if (!nf.fileKind || !nf.name) return null;
+      return Object.assign(base, { params: { fileKind: nf.fileKind, name: nf.name } });
+    }
+
     if (action.kind === 'driveFile') {
       if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
       const listed = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
@@ -3642,6 +3691,7 @@ function glanceUiCopy(kind) {
     attachmentSave: 'googleDriveSave',
     driveDoc: 'googleDoc',
     driveSheet: 'googleSheetAppend',
+    driveNewFile: 'googleNewFile',
     gmailDraft: 'gmailCompose'
   };
 
@@ -4246,6 +4296,7 @@ function glanceUiCopy(kind) {
     calendar: 'scheduled',
     gmailDraft: 'drafted a reply',
     googleTask: 'set a reminder',
+    driveNewFile: 'created the file',
     driveDoc: 'wrote the doc',
     driveSheet: 'wrote the sheet',
     driveFile: 'saved the file'

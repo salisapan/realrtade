@@ -138,7 +138,7 @@ const FlowWorkspaceFile = (() => {
   }
 
   function filePath(id) {
-    return '/files/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,version,modifiedTime,webViewLink,owners(emailAddress,me)');
+    return '/files/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,version,modifiedTime,webViewLink');
   }
 
   function miss(reason, extra) {
@@ -149,10 +149,30 @@ const FlowWorkspaceFile = (() => {
     return { version: String(json.version == null ? '' : json.version), modifiedTime: String(json.modifiedTime || '') };
   }
 
+  // The Google lane hands its writers an http function (req -> { status, ok, json }); the module
+  // itself speaks drive(method, path, body). Either is accepted.
+  const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+  function ioOf(arg) {
+    if (typeof arg !== 'function') return arg || {};
+    return {
+      drive: (method, path, body) => arg({
+        method: method,
+        url: DRIVE_API + path,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' }
+      })
+    };
+  }
+
+  // The lane's writer signature: (input, http, clock).
+  function write(input, http) {
+    return create(input, http);
+  }
+
   // Do It. The host passes the plan's name and kind as the person saw them.
   async function create(input, io) {
     input = input || {};
-    io = io || {};
+    io = ioOf(io);
     if (!enabled(input.flags)) return miss('switch-off');
     if (typeof io.drive !== 'function') return miss('no-host');
     const kind = input.fileKind === 'sheet' ? 'sheet' : input.fileKind === 'slides' ? 'slides' : input.fileKind === 'doc' ? 'doc' : '';
@@ -200,7 +220,7 @@ const FlowWorkspaceFile = (() => {
 
   // Undo: trash the file, only while it is still exactly what Glance made.
   async function undo(ref, io) {
-    io = io || {};
+    io = ioOf(io);
     if (!ref || !ref.fileId || ref.createdByGlance !== true) return { ok: false, reason: 'not-ours' };
     if (typeof io.drive !== 'function') return { ok: false, reason: 'no-host' };
     const got = await io.drive('GET', filePath(ref.fileId));
@@ -224,7 +244,7 @@ const FlowWorkspaceFile = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.fileId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, SYSTEM_SLIDES, CONNECTOR, enabled, recognize, plan, create, undo };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, SYSTEM_SLIDES, CONNECTOR, enabled, recognize, plan, create, write, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowWorkspaceFile };
