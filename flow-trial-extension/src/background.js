@@ -5337,7 +5337,7 @@ function outlookUnverifiedLine() {
   return "Created, couldn't verify";
 }
 
-const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance';
+const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance,recurrence';
 
 async function outlookStoredEventSnap(eventId) {
   return outlookReadSnap(
@@ -5559,6 +5559,36 @@ async function outlookTeamsWanted(callText) {
   return T.callAsked(callText);
 }
 
+// A Hold It for "weekly sync every Tuesday at 10:00" is one meeting that repeats. With the
+// owner's switch RECURRING_HOLD on (default off, the same switch as the Gmail Hold It) and one
+// stated rule the hold's own date fits, the event becomes the series. Still no attendee.
+async function outlookSeriesWanted(callText, dateIso) {
+  const R = globalThis.FlowRecurringReminder;
+  const T = globalThis.FlowTodoRecurrence;
+  if (!R || !T || typeof R.seriesFor !== 'function' || !callText || !dateIso) return null;
+  if (!(await glanceSwitchOn(R.HOLD_SWITCH))) return null;
+  const rrule = R.seriesFor(callText, dateIso);
+  if (!rrule) return null;
+  const recurrence = T.fromRrule(rrule, dateIso);
+  return recurrence ? { rrule: rrule, recurrence: recurrence } : null;
+}
+
+// The series master read by id must carry exactly the rule asked for.
+async function outlookSeriesRuleOk(eventId, wanted) {
+  const T = globalThis.FlowTodoRecurrence;
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,recurrence,isCancelled';
+  outlookAssertNotSend(url);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 300 * attempt));
+    let res = null;
+    try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    if (raw && raw.id === eventId && raw.isCancelled !== true) return !!(T && T.agrees(wanted, raw.recurrence));
+  }
+  return false;
+}
+
 // The Teams join link the event really carries, read by id. Microsoft attaches
 // it a moment after the event exists, so the read repeats a few times.
 async function outlookTeamsJoinUrl(eventId) {
@@ -5624,6 +5654,8 @@ async function outlookMeetingWrite(p) {
     body.isOnlineMeeting = true;
     body.onlineMeetingProvider = 'teamsForBusiness';
   }
+  const series = await outlookSeriesWanted(params.callText, dateIso);
+  if (series) body.recurrence = series.recurrence;
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
   const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
@@ -5660,6 +5692,17 @@ async function outlookMeetingWrite(p) {
       return { ok: false, reason: 'teams-link-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
     }
   }
+  // Handled for a series needs the rule read back by id; otherwise the event is removed again.
+  if (series && !(await outlookSeriesRuleOk(event.id, series.recurrence))) {
+    const delUrl = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id);
+    outlookAssertNotSend(delUrl);
+    let removed = false;
+    try {
+      const gone = await outlookFetch(delUrl, { method: 'DELETE' });
+      removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404));
+    } catch (e) { removed = false; }
+    return { ok: false, reason: 'series-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
+  }
   const proved = await outlookEventRead(event.id);
   const eventSnap = proved && proved.snap;
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
@@ -5678,7 +5721,7 @@ async function outlookMeetingWrite(p) {
   return Object.assign({
     ok: true,
     fetchedBack: true,
-    written: 'Calendar · ' + title + (when ? ' · ' + when : '') + (joinUrl ? ' · Teams' : ''),
+    written: 'Calendar · ' + title + (when ? ' · ' + when : '') + (joinUrl ? ' · Teams' : '') + (series ? ' · repeats' : ''),
     ref: ref
   }, base);
 }
