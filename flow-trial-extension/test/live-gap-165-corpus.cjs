@@ -69,7 +69,7 @@ check('a failed write with a ref is not verified', Proof.laneStepVerified({ ok: 
 
 console.log('\n--- a 401 is the token\'s fault only from the APIs a card writes to ---\n');
 ['https://tasks.googleapis.com/tasks/v1/lists/x/tasks', 'https://www.googleapis.com/calendar/v3/calendars/primary/events', 'https://www.googleapis.com/drive/v3/files/x',
-  'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', 'https://gmail.googleapis.com/gmail/v1/users/me/drafts', 'https://docs.googleapis.com/v1/documents/x', 'https://sheets.googleapis.com/v4/spreadsheets/x'
+  'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', 'https://docs.googleapis.com/v1/documents/x', 'https://sheets.googleapis.com/v4/spreadsheets/x'
 ].forEach((u) => check('critical: ' + u, Cfg.isCriticalUrl(u) === true));
 ['https://people.googleapis.com/v1/people:searchContacts', 'https://www.googleapis.com/oauth2/v2/userinfo', 'https://example.com/', 'not a url', ''].forEach((u) => check('not critical: ' + u, Cfg.isCriticalUrl(u) === false));
 check('the contacts scope is not on the allowlist', !Cfg.SCOPES.some((s) => /contacts/.test(s)));

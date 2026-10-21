@@ -47,7 +47,7 @@ function load(opts) {
 }
 const CONNECTED = { dropboxAuth: { token: 'dbx_tok', refreshToken: 'dbx_ref' } };
 const ON = [['dropboxReadBack: false', 'dropboxReadBack: true']];
-const OAUTH = [['dropboxOAuth: false', 'dropboxOAuth: true'], ["dropboxAppKey: 'REPLACE_WITH_DROPBOX_APP_KEY'", "dropboxAppKey: 'app-key'"]];
+const OAUTH = [['dropboxOAuth: false', 'dropboxOAuth: true'], ["dropboxAppKey: 'fxsss86nh3anm2i'", "dropboxAppKey: 'app-key'"]];
 const goodAuth = (u) => REDIRECT + '?code=CODE1&state=' + new URL(u).searchParams.get('state');
 const dbx = (env) => env.calls.filter((c) => /dropboxapi\.com|dropbox\.com|token-relay/.test(c.url) || c.method === 'AUTH');
 const b64 = (s) => Buffer.from(s).toString('base64');

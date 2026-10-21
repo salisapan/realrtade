@@ -427,7 +427,7 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   const filled = Compose.fill({ to: 'ada@example.com', subject: 'Receipt', body: 'Attached.' }, state, CLOCK);
   check('compose fill is a preview with a read-back proof',
     proved(filled) && filled.preview === true && filled.closes === false && filled.sent === false &&
-    filled.written === 'Compose filled. You send it.' && state.sendClicks === 0 && state.body === 'Attached.', filled);
+    filled.written === 'Draft opened in compose. You send it.' && state.sendClicks === 0 && state.body === 'Attached.', filled);
   check('subject is a reply', state.subject === 'Re: Receipt');
   const sendAttempt = Compose.fill({ to: 'ada@example.com', send: true, body: 'No.' }, state, CLOCK);
   check('a send flag is refused and Send stays unpressed', sendAttempt.ok === false && sendAttempt.reason === 'never-sends' && state.sendClicks === 0, sendAttempt);

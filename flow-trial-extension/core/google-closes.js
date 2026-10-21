@@ -352,12 +352,12 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    const attachSave = Number(input.attachmentCount) === 1
-      && typeof FlowFileAttach !== 'undefined'
-      && typeof FlowFileAttach.threadEvidenceEligible === 'function'
-      && FlowFileAttach.threadEvidenceEligible(text, 1);
+    const OTHER_TARGET = /\bshared\s+(?:folder|drive|files?)\b|\bsharepoint\b|\bdropbox\b|\bbox\.com\b|\bteams\s+(?:folder|channel)\b|(?:ה)?תיקי(?:י)?ה\s+המשותפת|הקבצים\s+המשותפים|שרפוינט|דרופבוקס/i;
+    const presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|nda|pdf)\s+is\s+attached|\S+\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?/i.test(text);
+    const signedAttach = /\b(?:signed|executed|final)\b|חתום|נספח חתום/i.test(text);
+    const attachSave = Number(input.attachmentCount) === 1 && (presented || signedAttach) && !refusesSave(text) && !OTHER_TARGET.test(text);
     if (SAVE_EN.test(text) || SAVE_HE.test(text) || attachSave) {
-      if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
+      if (refusesSave(text) || input.attachmentCount !== 1 || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {

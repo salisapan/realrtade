@@ -90,9 +90,11 @@ console.log('\n--- Tasks card: non-anchor draft step is unchecked by default ---
       { id: 'draft', kind: 'gmailDraft', label: 'Draft link' }
     ]
   };
-  const rows = FlowStepList.rowsFromProcess(process, null);
-  check('file step checked', rows[0] && rows[0].checked === true, rows[0]);
-  check('draft step unchecked', rows[1] && rows[1].checked === false, rows[1]);
+  const rowsNoCompose = FlowStepList.rowsFromProcess(process, null, { composeOpen: false });
+  check('file step checked', rowsNoCompose[0] && rowsNoCompose[0].checked === true, rowsNoCompose[0]);
+  check('draft step unchecked without compose', rowsNoCompose[1] && rowsNoCompose[1].checked === false, rowsNoCompose[1]);
+  const rowsCompose = FlowStepList.rowsFromProcess({ id: 'reply-track', steps: [{ id: 'task', kind: 'googleTask' }, { id: 'draft', kind: 'gmailDraft' }] }, null, { composeOpen: true });
+  check('draft step checked when reply compose is open', rowsCompose[1] && rowsCompose[1].checked === true, rowsCompose[1]);
 }
 
 if (failed) {

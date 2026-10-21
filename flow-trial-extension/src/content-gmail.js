@@ -3259,7 +3259,7 @@ function glanceUiCopy(kind) {
     if (pillRow) host.appendChild(pillRow);
     if (stepsReady && typeof FlowStepKit !== 'undefined') {
       host.replaceChildren();
-      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang, composeOpen: composeBodyOpen() });
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
         intent: title,
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
@@ -3294,7 +3294,7 @@ function glanceUiCopy(kind) {
       return;
     }
     if (stepsReady) {
-      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang, composeOpen: composeBodyOpen() });
       const view = FlowStepListView.mount(host, rows, {
         uiLang: glanceUiLang(),
         onChange: (next) => {
@@ -4162,9 +4162,6 @@ function glanceUiCopy(kind) {
   function sendLaneUndo(kind, ref) {
     const lane = laneConnectorId(kind);
     if (!lane) return sendRuntime({ type: 'flow:undo-action', connectorId: kind, ref: ref });
-    if (lane === 'gmailCompose' && ref && ref.draftId) {
-      return sendRuntime(Object.assign({ type: 'flow:google-undo', connectorId: 'googleReplyDraft', ref: ref }, laneAccountContext()));
-    }
     if (lane === 'gmailCompose') {
       let page = null;
       if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.undo === 'function') {

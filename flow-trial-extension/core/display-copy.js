@@ -276,6 +276,14 @@ const FlowDisplay = (() => {
     return '';
   }
 
+  function localCallTopic(phrase, lang) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
+    if (/[\u0590-\u05FF]/.test(raw)) return raw;
+    const he = translateCallTopic(raw);
+    return he || raw;
+  }
+
   function hebrewCallAbout(phrase, extra) {
     const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
     if (/[\u0590-\u05FF]/.test(raw)) return 'שיחה בנושא ' + raw;
@@ -1091,14 +1099,23 @@ const FlowDisplay = (() => {
 
   // What Glance writes (a calendar event, a Google Task, a To Do) is titled
   // exactly as the card shows it. A hold keeps the sentence it closes.
+  function mailContentLang(ctx) {
+    const blob = String((ctx && (ctx.bodyText || ctx.text || ctx.body)) || '');
+    if (/[\u0590-\u05FF]/.test(blob)) return 'he';
+    if (ctx && ctx.intent && ctx.intent.lang === 'he') return 'he';
+    return 'en';
+  }
+
   function artifactTitle(lang, ctx, title) {
     const raw = title == null ? '' : String(title);
     if (!raw) return raw;
     const hold = ctx && (ctx.glanceChain === 'calendar-hold' || (ctx.process && ctx.process.id === 'hold'));
     if (hold) return raw;
+    const contentLang = mailContentLang(ctx);
+    const headingLang = contentLang === 'he' || uiLangFrom({ setting: lang }) === 'he' ? 'he' : lang;
     const p = ctx && ctx.process;
-    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(lang, SAVE_TITLE, ctx);
-    return localizeHeading(lang, raw, ctx);
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(contentLang === 'he' ? 'he' : headingLang, SAVE_TITLE, ctx);
+    return localizeHeading(headingLang, raw, ctx);
   }
 
   function activityMetric(lang, text) {
@@ -1179,6 +1196,7 @@ const FlowDisplay = (() => {
     holdClockFrom: holdClockFrom,
     cardTitle: cardTitle,
     artifactTitle: artifactTitle,
+    localCallTopic: localCallTopic,
     localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,

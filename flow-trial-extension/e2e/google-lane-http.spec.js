@@ -27,11 +27,16 @@ test.afterAll(async () => {
   if (server) await server.close();
 });
 
+test.afterEach(async ({ glance }) => {
+  await glance.evaluateWorker(() => { globalThis.__glanceE2e.tokenAccounts = {}; });
+});
+
 test.beforeEach(async ({ glance }) => {
   server.reset();
   server.setAccount('me@x.com');
   await glance.evaluateWorker((origin) => {
     globalThis.__glanceE2e.httpOrigin = origin;
+    globalThis.__glanceE2e.tokenAccounts = { 'ya29.e2e': 'me@x.com' };
   }, server.origin);
 });
 

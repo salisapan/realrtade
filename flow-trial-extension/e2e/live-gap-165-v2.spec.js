@@ -18,6 +18,7 @@ test.beforeEach(async ({ glance }) => {
   server.reset();
   await glance.evaluateWorker((origin) => {
     globalThis.__glanceE2e.httpOrigin = origin;
+    globalThis.__glanceE2e.tokenAccounts = {};
     globalThis.__glanceE2e.identityToken = '';
     globalThis.__glanceE2e.webFlowError = '';
     globalThis.__glanceE2e.authFail = false;
@@ -57,6 +58,13 @@ async function click(page) {
   await chip(page).click();
 }
 
+async function registerToken(glance, token, email) {
+  server.registerToken(token, email);
+  await glance.evaluateWorker((pair) => {
+    globalThis.__glanceE2e.tokenAccounts = Object.assign({}, globalThis.__glanceE2e.tokenAccounts || {}, { [pair.token]: pair.email });
+  }, { token, email });
+}
+
 test.describe('1. a single 401 on a write', () => {
   test('one 401 on the Calendar write: one silent refresh, one retry, the event is written and the token stays', async ({ glance }) => {
     await glance.seedGmail({});
@@ -86,7 +94,7 @@ test.describe('1. a single 401 on a write', () => {
 
   test('when consent is dropped, a Chrome token does not write and the flow stops at Reconnect', async ({ glance }) => {
     await glance.seedGmail({ googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
-    server.registerToken('ya29.chrome', SELF);
+    await registerToken(glance, 'ya29.chrome', SELF);
     await glance.evaluateWorker(() => {
       globalThis.__glanceE2e.identityToken = 'ya29.chrome';
       globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).';
@@ -183,7 +191,7 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('no account recorded and the only sign-in is another account: nothing is written, both addresses are named', async ({ glance }) => {
     await glance.seedGmail({});
-    server.registerToken('ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.e2e', OTHER);
     const page = await glance.openGmail(opts('acct-other', 'en'));
     await click(page);
     await expect(main(page)).toContainText(SELF, { timeout: 25000 });
@@ -200,7 +208,7 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('the same refusal in the Hebrew UI is Hebrew and names both accounts', async ({ glance }) => {
     await glance.seedGmail({ glanceUiLanguage: 'he' });
-    server.registerToken('ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.e2e', OTHER);
     const page = await glance.openGmail(opts('acct-other-he', 'he'));
     await click(page);
     await expect(main(page)).toContainText('לא כתבתי', { timeout: 25000 });
@@ -212,8 +220,8 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('a Chrome sign-in for the tab account is used even when the stored Connect token is another account', async ({ glance }) => {
     await glance.seedGmail({});
-    server.registerToken('ya29.e2e', OTHER);
-    server.registerToken('ya29.chrome', SELF);
+    await registerToken(glance, 'ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.chrome', SELF);
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.identityToken = 'ya29.chrome'; });
     const page = await glance.openGmail(opts('acct-chrome', 'en'));
     await click(page);
@@ -226,7 +234,7 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('a recorded other account does not outrank the tab: the tab account decides', async ({ glance }) => {
     await glance.seedGmail({ googleConnectedAccount: { email: OTHER, at: Date.now(), source: 'web' } });
-    server.registerToken('ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.e2e', OTHER);
     const page = await glance.openGmail(opts('acct-recorded', 'en'));
     await click(page);
     await expect(main(page)).toContainText(SELF, { timeout: 25000 });
@@ -235,8 +243,8 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('a recorded other account and a Chrome sign-in for the tab: every call of the write uses the tab token', async ({ glance }) => {
     await glance.seedGmail({ googleConnectedAccount: { email: OTHER, at: Date.now(), source: 'web' } });
-    server.registerToken('ya29.e2e', OTHER);
-    server.registerToken('ya29.chrome', SELF);
+    await registerToken(glance, 'ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.chrome', SELF);
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.identityToken = 'ya29.chrome'; });
     const page = await glance.openGmail(opts('acct-mixed', 'en'));
     await click(page);
@@ -248,7 +256,7 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('a readable mismatch also puts a Reconnect button for the tab account on the card', async ({ glance }) => {
     await glance.seedGmail({});
-    server.registerToken('ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.e2e', OTHER);
     const page = await glance.openGmail(opts('acct-mismatch-btn', 'en'));
     await click(page);
     await expect(main(page)).toContainText(OTHER, { timeout: 25000 });
@@ -261,7 +269,7 @@ test.describe('3. the write goes to the account of the Gmail tab', () => {
 
   test('Reconnect after a wrong-account refusal asks Google for the tab account', async ({ glance }) => {
     await glance.seedGmail({});
-    server.registerToken('ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.e2e', OTHER);
     const page = await glance.openGmail(opts('acct-hint', 'en'));
     await click(page);
     await expect(main(page)).toContainText(SELF, { timeout: 25000 });
@@ -316,7 +324,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('a recorded account but the profile cannot be read: nothing is written, Hebrew UI', async ({ glance }) => {
     await glance.seedGmail({ glanceUiLanguage: 'he', googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     const page = await glance.openGmail(opts('v-unread-he', 'he'));
     await click(page);
     await refused(page, glance, 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש', 'חבר מחדש את Google');
@@ -327,7 +335,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('profile unreadable with no record at all, English UI', async ({ glance }) => {
     await glance.seedGmail({});
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     const page = await glance.openGmail(opts('v-unread-en', 'en'));
     await click(page);
     await refused(page, glance, "Couldn't verify the account — reconnect Google", 'Reconnect Google');
@@ -336,7 +344,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('a readable mismatch against the recorded account: refused with both addresses, Hebrew', async ({ glance }) => {
     await glance.seedGmail({ glanceUiLanguage: 'he', googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
-    server.registerToken('ya29.e2e', OTHER);
+    await registerToken(glance, 'ya29.e2e', OTHER);
     const page = await glance.openGmail(opts('v-mismatch-he', 'he'));
     await click(page);
     await refused(page, glance, OTHER, 'חבר מחדש את Google');
@@ -363,7 +371,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('the Reconnect button asks Google for the tab account (login_hint, interactive) and writes nothing', async ({ glance }) => {
     await glance.seedGmail({});
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.flows = []; });
     const page = await glance.openGmail(opts('v-btn-flow', 'en'));
     await click(page);
@@ -485,32 +493,32 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     const page = await glance.openGmail(Object.assign({
       messageId: 'm-' + id, threadId: HEX, subject: 'Board pack',
       senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: lang || 'en',
-      body: body || 'Please save the attached pdf to Drive.', downloadUrl: BOARD
+      body: body || 'Please save the attached pdf to Drive.', downloadUrl: BOARD, composeReply: true
     }, extra || {}));
     const c = chip(page);
     await expect(c).toBeVisible({ timeout: 20000 });
     return { page: page, chip: c };
   }
 
-  test('the thread id only on h2.hP (hex): the draft is made in that thread', async ({ glance }) => {
+  test('the thread id only on h2.hP (hex): compose is filled and the Gmail drafts API is not used', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'hdr-hex', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
-    await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
-    expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(HEX);
+    expect(server.calls.some((c2) => c2.method === 'POST' && c2.path === '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('[aria-label="Message Body"]')).not.toHaveText(/^\s*$/);
   });
 
-  test('only the decimal data-thread-perm-id: it is converted to the hex thread id', async ({ glance }) => {
+  test('only the decimal data-thread-perm-id: compose fills without the drafts API', async ({ glance }) => {
     const dec = '1234567890123456789';
     const { page, chip: c } = await saveChain(glance, 'hdr-dec', { threadIdOnHeader: true, threadPermId: dec });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
-    await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
-    expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(BigInt(dec).toString(16));
+    expect(server.calls.some((c2) => c2.method === 'POST' && c2.path === '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('[aria-label="Message Body"]')).not.toHaveText(/^\s*$/);
   });
 
   test('no thread id anywhere and no reply open: the draft step is not offered up front, and nothing says it was made', async ({ glance }) => {
-    const { page, chip: c } = await saveChain(glance, 'hdr-none', { noThreadId: true });
+    const { page, chip: c } = await saveChain(glance, 'hdr-none', { noThreadId: true, composeReply: false });
     await expect(page.locator('div[role="main"]')).not.toContainText(/draft|reply/i);
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -518,28 +526,24 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect(page.locator('div[role="main"]')).not.toContainText(/could not prepare a reply draft/i);
   });
 
-  test('Undo of the Drive save also deletes the reply draft by its id', async ({ glance }) => {
+  test('Undo of the Drive save trashes the file and clears compose', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'undo-draft', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
-    await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
-    const draftId = Object.keys(drafts())[0];
     const fileId = server.last.file;
     await page.locator('div[role="main"] button.flow-chip-undo').click();
-    await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(0);
-    expect(server.calls.some((c2) => c2.method === 'DELETE' && c2.path.indexOf('/drafts/' + draftId) >= 0)).toBe(true);
     await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
+    expect(server.calls.some((c2) => c2.method === 'DELETE' && c2.path.indexOf('/drafts/') >= 0)).toBe(false);
   });
 
   test('the draft is in the language of the mail, whatever the UI language is', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'draft-he', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
-    await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
-    const msg = drafts()[Object.keys(drafts())[0]].message;
-    expect(msg.body).toContain('היי דנה,');
-    expect(msg.body).toContain('הקובץ מוכן.');
-    expect(msg.body).not.toContain('The file is ready');
-    expect(msg.body).not.toContain('Hi ');
+    const body = await page.locator('[aria-label="Message Body"]').innerText();
+    expect(body).toContain('היי דנה,');
+    expect(body).toContain('הקובץ מוכן.');
+    expect(body).not.toContain('The file is ready');
+    expect(body).not.toContain('Hi ');
   });
 });

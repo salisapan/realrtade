@@ -107,7 +107,7 @@ const FlowGoogleConfig = (() => {
     try { u = new URL(String(url || '')); } catch (e) { return false; }
     const host = u.hostname;
     const path = u.pathname || '';
-    if (host === 'tasks.googleapis.com' || host === 'docs.googleapis.com' || host === 'sheets.googleapis.com' || host === 'gmail.googleapis.com') return true;
+    if (host === 'tasks.googleapis.com' || host === 'docs.googleapis.com' || host === 'sheets.googleapis.com') return true;
     if (host === 'www.googleapis.com') return /^\/(calendar|drive|upload\/drive)\//.test(path);
     return false;
   }

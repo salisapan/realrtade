@@ -109,6 +109,9 @@ function chromeStub(w, store, sent) {
     sent.push(msg);
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth && store.outlookAuth.token, changed: false, how: 'fresh' };
     if (msg.type === 'flow:outlook-fetch') return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+    if (msg.type === 'flow:gmail-compose') {
+      return { ok: true, preview: true, closes: false, sent: false, ref: { externalId: 'compose:test' }, written: 'Draft opened in compose. You send it.' };
+    }
     if (msg.type === 'flow:execute-action') {
       const id = msg.payload && msg.payload.connectorId;
       if (id === 'outlookCalendar' || id === 'calendar') {
@@ -223,7 +226,7 @@ function planCtx(kind, surface) {
 async function bootGmail() {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   const files = manifest.content_scripts[0].js;
-  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body><a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a><h2 class="hP">Vendor</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1"><span email="dana@acme.io">Dana Levi</span><div class="a3s">Hello</div></div></div></body></html>';
+  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body><a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a><h2 class="hP">Vendor</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1"><span email="dana@acme.io">Dana Levi</span><div class="a3s">Hello</div></div></div><input name="to" value=""/><input name="subjectbox" value=""/><div aria-label="Message Body" contenteditable="true" role="textbox"></div></body></html>';
   const dom = new JSDOM(html, { url: 'https://mail.google.com/mail/u/0/#inbox/t1', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   pinDate(w);

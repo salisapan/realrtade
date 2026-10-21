@@ -50,8 +50,9 @@ async function laneFetch(url, init) {
   const auth = headers.Authorization || '';
   fetches.push({ url: String(url), method: method, auth: auth });
   const expect = storedBearer();
-  if (/\/gmail\/v1\/users\/me\/profile/.test(String(url))) {
-    return Object.assign(jsonResponse(200, { emailAddress: expect && auth === expect ? 'me@example.com' : 'other@example.com' }), { json: async () => ({ emailAddress: expect && auth === expect ? 'me@example.com' : 'other@example.com' }) });
+  if (/\/oauth2\/v[0-9]+\/userinfo/.test(String(url))) {
+    const email = expect && auth === expect ? 'me@example.com' : 'other@example.com';
+    return Object.assign(jsonResponse(200, { email: email }), { json: async () => ({ email: email }) });
   }
   if (!expect || auth !== expect) return jsonResponse(401, { error: { code: 401 } });
   const u = String(url);
@@ -175,7 +176,7 @@ vm.createContext(sandbox);
 
 const cores = [
   'google-config.js', 'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
-  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js'
+  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-proof.js'
 ];
 for (const f of cores) {
   vm.runInContext(fs.readFileSync(path.join(EXT, 'core', f), 'utf8'), sandbox, { filename: f });
@@ -314,6 +315,8 @@ async function main() {
   check('a 401 with no grant and no Connect is Connect', noGrant && noGrant.ok === false && !stored.googleReconnect && noGrantView.connected === false && noGrantView.needsReconnect === false && noGrantView.label === 'Connect Google', { noGrant, noGrantView });
 
   stored.googleEverConnected = { connected: true };
+  stored.googleWebAuth = { accessToken: STORED, expiresAt: Date.now() + 60 * 60 * 1000 };
+  stored.googleTasksAuth = { taskListId: LIST };
   delete stored.googleReconnect;
   resetFetches();
   const again = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });

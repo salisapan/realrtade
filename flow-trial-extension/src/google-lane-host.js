@@ -17,7 +17,6 @@ import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
 import '../core/google-compose.js';
-import '../core/google-drafts.js';
 import '../core/google-proof.js';
 import './google-lane.js';
 
@@ -154,13 +153,11 @@ async function laneCredential(tab) {
   const A = Account();
   const connected = await readConnectedAccount();
   const stored = await storedConnectToken();
+  const chromeToken = await identityToken();
   const candidates = [];
-  if (stored) {
-    candidates.push({ token: stored, source: 'web' });
-  } else {
-    const chromeToken = await identityToken();
-    if (chromeToken) candidates.push({ token: chromeToken, source: 'chrome' });
-  }
+  if (stored) candidates.push({ token: stored, source: 'web' });
+  else if (chromeToken) candidates.push({ token: chromeToken, source: 'chrome' });
+  if (stored && chromeToken && chromeToken !== stored) candidates.push({ token: chromeToken, source: 'chrome' });
   for (let i = 0; i < candidates.length; i++) candidates[i].email = await accountOfToken(candidates[i].token);
   const picked = A.choose(connected, candidates, tab);
   if (picked.ok && picked.adopt) await recordConnectedAccount(picked.token, picked.source);

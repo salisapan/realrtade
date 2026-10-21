@@ -1202,6 +1202,18 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
                     "store zip must not reference remote Google loader hosts:\n  "
                     + "\n  ".join(remote_hits[:20])
                 )
+            gmail_api_hits: list[str] = []
+            for rel, data in sorted(files.items()):
+                if not rel.endswith((".js", ".mjs", ".cjs")):
+                    continue
+                text = data.decode("utf-8", errors="replace")
+                if "gmail.googleapis.com" in text:
+                    gmail_api_hits.append(rel)
+            if gmail_api_hits:
+                failures.append(
+                    "store zip JS must not reference gmail.googleapis.com:\n  "
+                    + "\n  ".join(gmail_api_hits[:30])
+                )
         if rules["oauth2"]:
             oauth = manifest.get("oauth2") or {}
             scopes = oauth.get("scopes") or []

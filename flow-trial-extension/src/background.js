@@ -141,7 +141,6 @@ const GLANCE_TASK_LIST_TITLE = 'Glance';
 // manifest.json's oauth2.scopes at once — so there is one "connect Google"
 // step for the whole execution layer.
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
-const GOOGLE_GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
 // The Picker API key itself (a second, separate Google Cloud credential
 // from the OAuth Client ID above) lives only in picker/picker.js — that
@@ -2722,16 +2721,7 @@ async function followTaskReopen(ref, dueIso) {
 }
 
 async function findThreadIdTo(recipientEmail, subject) {
-  if (!recipientEmail) return null;
-  try {
-    const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
-    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data.threads && data.threads[0] && data.threads[0].id) || null;
-  } catch (e) {
-    return null;
-  }
+  return null;
 }
 
 async function followDraftCreate(p) {
@@ -3196,16 +3186,7 @@ function buildMimeMessage(opts) {
 // offering a draft at all, but a strictly better one than failing the
 // whole action because a search query came back empty.
 async function findThreadId(senderEmail, subject) {
-  if (!senderEmail) return null;
-  try {
-    const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
-    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data.threads && data.threads[0] && data.threads[0].id) || null;
-  } catch (e) {
-    return null;
-  }
+  return null;
 }
 
 // Raw byte estimate from the base64 length (4/3 inflation) rather than

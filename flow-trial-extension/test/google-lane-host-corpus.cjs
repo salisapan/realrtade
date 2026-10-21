@@ -70,11 +70,11 @@ const sandbox = {
 // checks below install, so the counted calls are the lane's own.
 {
   let inner = sandbox.fetch;
-  const profile = /\/gmail\/v1\/users\/me\/profile/;
-  const answer = { ok: true, status: 200, text: async () => '{"emailAddress":"host@example.com"}', json: async () => ({ emailAddress: 'host@example.com' }) };
+  const userinfo = /\/oauth2\/v[0-9]+\/userinfo/;
+  const answer = { ok: true, status: 200, text: async () => '{"email":"host@example.com"}', json: async () => ({ email: 'host@example.com' }) };
   Object.defineProperty(sandbox, 'fetch', {
     configurable: true,
-    get: () => (url, init) => (profile.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
+    get: () => (url, init) => (userinfo.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
     set: (fn) => { inner = fn; }
   });
 }
@@ -83,7 +83,7 @@ vm.createContext(sandbox);
 
 const cores = [
   'google-config.js', 'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
-  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js'
+  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-proof.js'
 ];
 for (const f of cores) {
   vm.runInContext(fs.readFileSync(path.join(EXT, 'core', f), 'utf8'), sandbox, { filename: f });

@@ -37,9 +37,10 @@ const FlowStepList = (() => {
     return FlowActions.isNetRejected(memoryStats(memory, processId, kind));
   }
 
-  function rowsFromProcess(process, memory) {
+  function rowsFromProcess(process, memory, opts) {
     const steps = (process && process.steps) || [];
     const id = process && process.id;
+    const composeOpen = !!(opts && opts.composeOpen);
     return steps.map((step, i) => {
       const kind = step && step.kind;
       const anchor = i === 0;
@@ -47,12 +48,13 @@ const FlowStepList = (() => {
       const draftStep = kind === 'gmailDraft' || kind === 'outlookDraft';
       const taskKind = kind === 'googleTask' || kind === 'task' || kind === 'outlookTask' || kind === 'microsoftTodo';
       const titled = taskKind && step && step.params && step.params.title ? String(step.params.title) : '';
+      const draftChecked = draftStep && composeOpen;
       return {
         id: (step && step.id) || (kind + ':' + i),
         kind: kind,
         copy: titled || (step && (step.label || step.kind)) || '',
         state: 'queued',
-        checked: anchor || (!off && !draftStep),
+        checked: anchor || (!off && (!draftStep || draftChecked)),
         suggested: false,
         manual: false,
         optional: false,
@@ -113,7 +115,7 @@ const FlowStepList = (() => {
 
   function rowsFor(process, opts) {
     const o = opts || {};
-    const base = rowsFromProcess(process, o.memory).map((row) => {
+    const base = rowsFromProcess(process, o.memory, o).map((row) => {
       if (row.kind === 'attachmentSave' && row.step) {
         const named = rowFromAttachmentStep(row.step, o.lang);
         return Object.assign({}, row, {

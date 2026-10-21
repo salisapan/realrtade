@@ -249,8 +249,7 @@ const CASES = [
     if (!gp) { check(m.name + ': (no draft step on either side)', !entry.process.steps.some((s) => s.kind === 'outlookDraft')); continue; }
     const bg = background();
     const gOut = await bg.fn('gmailDraftWrite')(gp);
-    const gCall = bg.calls.find((c) => c.method === 'POST' && /\/drafts$/.test(c.url));
-    const gmailText = gCall ? mimeBody(gCall.body.message.raw) : null;
+    const gmailText = J.draftText(g.process, { sender: m.from, subject: m.subject }, FlowDraftReply);
 
     // The Outlook-on-the-web card's Do It (src/content-outlook.js) -> background outlookDraftWrite.
     const sender = entry.sender || { name: entry.base.counterpart.name, email: entry.base.counterpart.email };
@@ -261,8 +260,9 @@ const CASES = [
     // The panel's Do It text (popup.js -> src/outlook.js createReplyDraft).
     const panelText = J.draftText(entry.process, { sender, subject: m.subject }, FlowDraftReply);
 
-    check(m.name + ': both writers made a draft, neither sent', gOut.ok && oOut.ok && !bg.calls.some((c) => /\/send\b|sendMail/.test(c.url)), { gOut, oOut });
-    check(m.name + ': the Outlook draft is word for word the Gmail draft', gmailText && outlookText === gmailText, { gmail: gmailText, outlook: outlookText });
+    check(m.name + ': Gmail fills compose only; Outlook keeps a server draft; neither sent',
+      gOut && gOut.reason === 'compose-only' && gOut.preview === true && oOut.ok && !bg.calls.some((c) => /\/send\b|sendMail/.test(c.url)), { gOut, oOut });
+    check(m.name + ': the Outlook draft is word for word the Gmail compose text', gmailText && outlookText === gmailText, { gmail: gmailText, outlook: outlookText });
     check(m.name + ': the panel writes the same text too', panelText === gmailText, { panel: panelText, gmail: gmailText });
     check(m.name + ': the Outlook draft replies to the message that was read', /\/me\/messages\/msg\d+\/createReply$/.test(oCall.url) && oCall.url.includes(entry.messageId), oCall.url);
   }
@@ -305,7 +305,7 @@ const CASES = [
     const judge = read('core/incoming-judge.js');
     check('the shared judge classifies with the same context keys', /senderEmail:[^\n]*\n\s*senderName:[^\n]*\n\s*subject:[^\n]*\n\s*calibration:[^\n]*\n\s*calibrationByType:[^\n]*\n\s*attachmentCount:/.test(judge));
     const bgSrc = read('src/background.js');
-    check('both writers compose with draftBodyText', /body: draftBodyText\(p, attachment, attachmentSource, shareUrl\)/.test(bgSrc) && /comment = draftBodyText\(p, null, null, null\)/.test(bgSrc));
+    check('Gmail compose and Outlook draft share draftBodyText', /function draftBodyText\(/.test(bgSrc) && /comment = draftBodyText\(p, null, null, null\)/.test(bgSrc));
     const sync = read('core/outlook-sync.js');
     check('the Outlook planner judges with the shared judge, not its own classify', /judge\.judge\(/.test(sync) && !/FlowIntent\.classify\(|intentApi\.classify\(/.test(sync));
     const page = read('src/content-outlook.js');

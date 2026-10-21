@@ -348,7 +348,8 @@ const FlowIntent = (() => {
   // Tasks title, Notion title, popup activity log) — kept alongside the full
   // quoted `entities.what` rather than replacing it, so nothing downstream
   // that read ctx.result.label before this change has to change.
-  function shortLabel(type, facts, enrichedFacts) {
+  function shortLabel(type, facts, enrichedFacts, langHint) {
+    const he = langHint === 'he';
     // extract.js's own `facts` never carries a human date string (only
     // judgment.js's private humanDate() computes one, for its own
     // evaluate()/factsOnly() callers) — humanDateFallback() is this file's
@@ -361,6 +362,9 @@ const FlowIntent = (() => {
       return 'Your commitment' + (dateText ? ', due ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
     }
     if (type === TYPES.REQUEST) {
+      if (he) {
+        return 'נדרשת תשובה' + (dateText ? ' עד ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
+      }
       return 'Reply requested' + (dateText ? ' by ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
     }
     return FlowJudgment.neutralTitle(enrichedFacts); // DECISION_TO_LOG and FOLLOW_UP
@@ -1602,7 +1606,8 @@ const FlowIntent = (() => {
     function labelFor(type) {
       const source = isPast ? Object.assign({}, facts, { date: null }) : facts;
       const enriched = isPast ? Object.assign({}, enrichedFacts, { dateText: null }) : enrichedFacts;
-      return shortLabel(type, source, enriched);
+      const mailHe = /[\u0590-\u05FF]/.test(String(text || '')) || (ctx && ctx.lang === 'he');
+      return shortLabel(type, source, enriched, mailHe ? 'he' : 'en');
     }
     // s.flags.noise: a pitch fingerprint, mailing-list boilerplate, calendar
     // acceptance mail, or an automated sender. The score already penalises
@@ -2727,14 +2732,26 @@ const FlowIntent = (() => {
     return '';
   }
   function callTopicPhrase(text, subject) {
-    return topicFromBody(text) || topicFromSubject(subject);
+    const fromBody = topicFromBody(text);
+    const fromSub = topicFromSubject(subject);
+    const subHe = /[\u0590-\u05FF]/.test(String(subject || ''));
+    const bodyHe = /[\u0590-\u05FF]/.test(String(text || ''));
+    if (subHe && !bodyHe && fromSub && (!fromBody || !/[\u0590-\u05FF]/.test(fromBody))) return fromSub;
+    return fromBody || fromSub;
   }
   function haveACallTitle(text, ctx, whenText) {
     const main = withoutIfClause(String(text || ''));
     if (!/\bhave a call\b/i.test(main)) return '';
     const box = ctx && typeof ctx === 'object' ? ctx : { subject: ctx };
     const topic = callTopicPhrase(main, box.subject);
-    if (topic) return clipTitle('Call about ' + topic);
+    if (topic) {
+      const he = /[\u0590-\u05FF]/.test(main) || /[\u0590-\u05FF]/.test(String(box.subject || '')) || (box.lang === 'he');
+      let t = topic;
+      if (he && typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.localCallTopic === 'function') {
+        t = FlowDisplay.localCallTopic(topic, 'he') || topic;
+      }
+      return clipTitle(he ? ('שיחה בנושא ' + t) : ('Call about ' + topic));
+    }
     if (!addressedToSelf(box)) {
       const name = String(box.senderName || '').trim();
       if (name && name.indexOf('@') < 0 && !/^me$/i.test(name)) return clipTitle('Call with ' + name);
