@@ -207,6 +207,10 @@ function installE2EHooks() {
       }
       const knownList = (id) => id === 'glance-list' || id === '@default';
       if (col && !knownList(col[1])) return Promise.resolve(json(404, { error: { code: 404, message: 'Invalid task list ID', status: 'NOT_FOUND' } }));
+      if (col && method === 'POST' && scenario.tasksFirstPost500 && !e2e.tasksPost500Used) {
+        e2e.tasksPost500Used = true;
+        return Promise.resolve(json(500, { error: { message: 'transient' } }));
+      }
       if (col && method === 'POST') {
         const id = 'e2e-gtask-' + (e2e.seq++);
         let posted = {};
@@ -746,6 +750,7 @@ async function boot() {
       e.flows = [];
       e.authFail = false;
       e.scenario = { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
+      e.tasksPost500Used = false;
       e.googleTasks = {};
       e.todoTasks = {};
       e.outlookEvents = {};

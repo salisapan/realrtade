@@ -236,6 +236,25 @@ console.log('\n--- writer ---\n');
   });
   check('undo deletes only the created ref', undone.deleted === 1 && undone.results.length === 1);
 
+console.log('\n--- attachment without explicit save ask stays quiet ---\n');
+{
+  const pdf = file();
+  check('inbound pdf no save verb', S.suggestSave(mail({ text: 'Thanks for the update. See attached invoice.', attachments: [pdf] })).reason === 'suggest:no-save-ask');
+  check('newsletter noreply pdf', S.suggestSave(mail({
+    text: 'Your monthly statement is attached. Unsubscribe anytime.',
+    subject: 'Newsletter',
+    headers: { listUnsubscribe: '<mailto:noreply@billing.example>' }
+  })).reason === 'suggest:bulk' || S.suggestSave(mail({
+    text: 'Your monthly statement is attached. Unsubscribe anytime.',
+    subject: 'Newsletter',
+    headers: { listUnsubscribe: '<mailto:noreply@billing.example>' }
+  })).reason === 'suggest:no-save-ask');
+  check('self note pdf no request', S.suggestSave(mail({
+    surface: 'gmail', inbound: false, direction: 'outbound', senderIsUser: true,
+    text: 'FYI — contract PDF attached.', attachments: [pdf]
+  })).reason === 'suggest:not-inbound');
+}
+
 console.log('\n--- nothing is drawn ---\n');
 {
   const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');

@@ -60,7 +60,7 @@ async function open(glance, opts) {
   return glance.openGmail(opts.mail);
 }
 
-test('A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it', async ({ glance }) => {
+test('A reply draft without an open compose window stays compose-closed and never hits the Gmail drafts API', async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-people',
@@ -73,15 +73,9 @@ test('A reply draft is a real drafts.create read back by id, nothing calls the p
   });
   await uncheck(page, 'task');
   await clickDoIt(page);
-  await expect.poll(() => wrote('POST', '/gmail/v1/users/me/drafts')).toBe(true);
-  const id = server.last.draft;
-  await expect.poll(() => server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
+  await expect(page.locator('div[role="main"]')).toContainText(/Open Reply first|compose/i, { timeout: 20000 });
+  expect(server.calls.some((c) => c.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
   expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
-  expect(server.drafts[id].message.threadId).toBe('t-people');
-  expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
-  await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
-  expect(server.drafts[id]).toBeUndefined();
 });
 
 test('Calendar Hold It posts to the local server, reads the event back, and Undo deletes it', async ({ glance }) => {

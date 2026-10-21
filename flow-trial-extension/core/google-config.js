@@ -118,6 +118,24 @@ const FlowGoogleConfig = (() => {
     return new Date().toISOString();
   }
 
+  function insufficientScopeBody(json) {
+    const err = json && json.error;
+    const reasons = err && Array.isArray(err.errors) ? err.errors.map((row) => String(row && row.reason || '')) : [];
+    const message = err && err.message ? String(err.message) : '';
+    return reasons.indexOf('insufficientPermissions') >= 0
+      || reasons.indexOf('ACCESS_TOKEN_SCOPE_INSUFFICIENT') >= 0
+      || /insufficient authentication scopes/i.test(message)
+      || /insufficient permission/i.test(message);
+  }
+
+  // Maps a Google API answer on a write host. Transient 5xx stays empty.
+  function authHttpReason(res) {
+    if (!res || !res.status) return '';
+    if (res.status === 401) return 'not-connected';
+    if (res.status === 403) return insufficientScopeBody(res.json) ? 'missing-permission' : 'not-connected';
+    return '';
+  }
+
   return {
     CLIENT_ID: CLIENT_ID,
     EXTENSION_ID: EXTENSION_ID,
@@ -136,7 +154,9 @@ const FlowGoogleConfig = (() => {
     gate: gate,
     proofOf: proofOf,
     isCriticalUrl: isCriticalUrl,
-    clockIso: clockIso
+    clockIso: clockIso,
+    authHttpReason: authHttpReason,
+    insufficientScopeBody: insufficientScopeBody
   };
 })();
 

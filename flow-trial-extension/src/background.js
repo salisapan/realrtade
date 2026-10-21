@@ -2232,7 +2232,9 @@ globalThis.FlowGoogleAccess = {
   }
 };
 
-async function rememberGoogleAuthResult(res) {
+async function rememberGoogleAuthResult(res, refreshed) {
+  if (!res) return res;
+  if (res.status === 401 && refreshed) await markGoogleReconnect('401');
   return res;
 }
 
@@ -2275,16 +2277,19 @@ async function googleAuthedFetch(baseUrl, path, rawOptions) {
   }));
   const res = await doFetch(cred.token);
   if (soft) return res;
-  if (res.status !== 401) return rememberGoogleAuthResult(res);
+  if (res.status !== 401) return rememberGoogleAuthResult(res, false);
   // A cached token can go stale without Chrome knowing yet. One silent
   // refresh and one retry, then fail loudly. The refresh stays silent:
   // prompt=none may run for a web token; a consent window may not. The token
   // is dropped only when the refresh says the grant was revoked.
   const next = await refreshLaneCredential(cred);
-  if (next && next.revoked) return rememberGoogleAuthResult(res);
+  if (next && next.revoked) {
+    await markGoogleReconnect('revoked');
+    return rememberGoogleAuthResult(res, false);
+  }
   let retryToken = cred.token;
   if (next && next.token && (next.source !== 'chrome' || await chromeTokenIsConsented(next.token))) retryToken = next.token;
-  return rememberGoogleAuthResult(await doFetch(retryToken));
+  return rememberGoogleAuthResult(await doFetch(retryToken), true);
 }
 
 function googleTasksAuthedFetch(path, options) {

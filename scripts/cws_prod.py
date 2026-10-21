@@ -56,7 +56,6 @@ FULL_HOSTS = (
     "https://www.googleapis.com/drive/*",
     "https://www.googleapis.com/oauth2/*",
     "https://www.googleapis.com/upload/drive/*",
-    "https://gmail.googleapis.com/*",
     "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*",
 )
@@ -1165,6 +1164,10 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
             if combined != list(FULL_STORE_HOST_GRANTS):
                 failures.append(
                     "host_permissions + optional_host_permissions must equal the v1 store allowlist exactly"
+                )
+            if any("gmail.googleapis.com" in str(h) for h in combined):
+                failures.append(
+                    "store build must not declare https://gmail.googleapis.com/* (compose-window drafts only)"
                 )
         if rules["oauth2"]:
             oauth = manifest.get("oauth2") or {}

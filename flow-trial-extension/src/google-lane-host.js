@@ -262,9 +262,17 @@ function criticalUrl(url) {
 // It does not say the token is wrong, so it neither flags Reconnect nor
 // triggers a refresh. Only the Tasks, Calendar, Drive, Docs, Sheets and
 // Gmail hosts can end the grant.
-function settleAuth(res, url) {
-  // A failed Calendar/Tasks/Drive call is returned to the card; it does not
-  // clear the stored Connect grant or flip the panel to Reconnect.
+function insufficientScope(res) {
+  const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
+  return !!(C && typeof C.insufficientScopeBody === 'function' && C.insufficientScopeBody(res && res.json));
+}
+
+function settleAuth(res, url, opts) {
+  if (!res || !url || !criticalUrl(url)) return Promise.resolve(res);
+  if (res.status === 403 && insufficientScope(res)) return Promise.resolve(res);
+  const o = opts || {};
+  if (res.status === 401 && o.revoked) return noteGoogleAuthFailure('revoked').then(() => res);
+  if (res.status === 401 && o.afterRefresh) return noteGoogleAuthFailure('401').then(() => res);
   return Promise.resolve(res);
 }
 
@@ -393,15 +401,15 @@ function laneHttp(req) {
           if (signal) init.signal = signal;
           return fetch(url, init).then(readBody);
         };
-        const settle = (res) => settleAuth(res, request.url);
+        const settle = (res, meta) => settleAuth(res, request.url, meta);
         return once(token).then((res) => {
           if (!res || res.status !== 401 || !criticalUrl(request.url)) return settle(res);
           return retryLane(cred).then((next) => {
-            if (next && next.revoked) return settle(res);
-            if (!next || !next.token || next.token === token) return once(token).then(settle);
+            if (next && next.revoked) return settle(res, { revoked: true });
+            if (!next || !next.token || next.token === token) return once(token).then((r2) => settle(r2, { afterRefresh: true }));
             return accountOfToken(next.token).then((email) => {
-              if (!email || !Account().same(email, picked.email)) return once(token).then(settle);
-              return once(next.token).then(settle);
+              if (!email || !Account().same(email, picked.email)) return once(token).then((r2) => settle(r2, { afterRefresh: true }));
+              return once(next.token).then((r2) => settle(r2, { afterRefresh: true }));
             });
           });
         });

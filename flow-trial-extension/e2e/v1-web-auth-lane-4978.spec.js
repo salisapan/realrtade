@@ -1,5 +1,6 @@
 // P0: web-flow Connect (gstvm1) must write with the stored token, not hsd2u2 getAuthToken.
 const { test, expect } = require('./support/harness');
+const { startGoogleLaneServer } = require('./support/google-lane-server');
 const S = require('./support/sentences');
 
 const SELF = 'ai.local.flow@gmail.com';
@@ -13,6 +14,19 @@ const V1_SCOPES = [
 ].sort().join('\n');
 
 const TASK = 'Could you review the deck and reply with your comments?';
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEK = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+const HOLD = 'Put the glance-pricing-q4.pdf file on my calendar on ' + MONTHS[WEEK.getMonth()] + ' ' + WEEK.getDate() + ', ' + WEEK.getFullYear() + ' at 10:00.';
+
+let laneServer;
+
+test.beforeAll(async () => {
+  laneServer = await startGoogleLaneServer();
+});
+
+test.afterAll(async () => {
+  if (laneServer) await laneServer.close();
+});
 
 async function seedWebOnly(glance) {
   await glance.setAuthFail(true);
@@ -52,6 +66,35 @@ test('web-only grant: Tasks Do It succeeds with ProofOfClose and no Reconnect', 
   expect(bag.googleReconnect).toBeFalsy();
   const calls = await glance.apiCalls();
   expect(calls.some((c) => c.url.indexOf('tasks.googleapis.com') >= 0 && c.method === 'POST')).toBe(true);
+});
+
+test('web-only grant: Calendar event create returns ProofOfClose and no Reconnect', async ({ glance }) => {
+  laneServer.reset();
+  laneServer.setAccount(SELF);
+  await glance.evaluateWorker((origin) => {
+    globalThis.__glanceE2e.httpOrigin = origin;
+  }, laneServer.origin);
+  await seedWebOnly(glance);
+  const dateIso = WEEK.getFullYear() + '-' + String(WEEK.getMonth() + 1).padStart(2, '0') + '-' + String(WEEK.getDate()).padStart(2, '0');
+  const out = await glance.evaluateWorker(async (holdDate) => {
+    const C = globalThis.FlowGoogleConfig;
+    const res = await globalThis.FlowGoogleLane.write('googleHold', {
+      dateIso: holdDate,
+      hour: 10,
+      minute: 0,
+      fileUrl: 'https://drive.google.com/file/d/pricing-pdf/view',
+      fileName: 'glance-pricing-q4.pdf',
+      fileTerm: 'glance-pricing-q4.pdf',
+      scopes: [C.SCOPE_CALENDAR, C.SCOPE_DRIVE_FILE, C.SCOPE_TASKS]
+    });
+    const bag = await chrome.storage.local.get('googleReconnect');
+    return { res, reconnect: bag.googleReconnect };
+  }, dateIso);
+  expect(out.res && out.res.ok).toBe(true);
+  expect(out.res.proof && out.res.proof.fetchedBack).toBe(true);
+  expect(out.reconnect).toBeFalsy();
+  expect(laneServer.calls.some((c) => c.method === 'POST' && c.path.indexOf('/calendar/v3/calendars/primary/events') >= 0)).toBe(true);
+  expect(laneServer.calls.some((c) => c.method === 'GET' && c.path.indexOf('/events/') >= 0)).toBe(true);
 });
 
 test('a PDF attachment still gets a Reply card under the six v1 scopes', async ({ glance }) => {

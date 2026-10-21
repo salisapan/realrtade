@@ -157,6 +157,14 @@ const FlowSuggestSave = (() => {
     if ((H.listUnsubscribe && String(H.listUnsubscribe).length) || /^(?:bulk|list|junk)$/i.test(String(H.precedence || '').trim())
       || J.reason === 'quiet:noise' || J.marketing === true || MARKETING.test(text) || MARKETING.test(subject)) return quiet('suggest:bulk');
     if (SAVE_NO.test(text) || NEG_SAVE.test(text)) return quiet('suggest:negated');
+    const attach = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null;
+    const blob = (text + ' ' + subject).trim();
+    const attachCount = Array.isArray(input.attachments) ? input.attachments.length : 0;
+    if (attachCount > 0 && attach && typeof attach.threadEvidenceEligible === 'function') {
+      if (!attach.threadEvidenceEligible(blob, attachCount)) return quiet('suggest:no-save-ask');
+    } else if (attachCount > 0 && !SAVE_VERB.test(blob) && !(J.explicit && J.explicit.step === 'file_save')) {
+      return quiet('suggest:no-save-ask');
+    }
     if (surface === 'gmail' && ONEDRIVE.test(text) && SAVE_VERB.test(text)) return quiet('suggest:onedrive-target-on-gmail');
     if (surface === 'outlook' && GDRIVE.test(text) && SAVE_VERB.test(text)) return quiet('suggest:drive-target-on-outlook');
     if (OTHER_TARGET.test(text) && SAVE_VERB.test(text)) return quiet('suggest:other-target');
