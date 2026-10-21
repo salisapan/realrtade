@@ -724,3 +724,4 @@ const FlowExtract = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExtract };
+else if (typeof globalThis !== 'undefined') globalThis.FlowExtract = FlowExtract;

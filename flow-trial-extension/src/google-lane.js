@@ -8,6 +8,8 @@ const FlowGoogleLane = (() => {
     googleDriveSave: 'FlowGoogleDrive',
     googleDoc: 'FlowGoogleDocs',
     googleSheetAppend: 'FlowGoogleSheets',
+    googleNewFile: 'FlowWorkspaceFile',
+    googleEventCallLink: 'FlowEventCallLink',
     googleReplyDraft: 'FlowGoogleDrafts'
   };
 

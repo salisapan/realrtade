@@ -181,6 +181,7 @@ function glanceUiCopy(kind) {
     }
     clearLaneTimers();
     removeOwnCards();
+    try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.stop(document, window); } catch (e) { /* nothing to stop */ }
   }
 
   // One read of chrome.runtime.id. When the extension context is gone that
@@ -1096,14 +1097,29 @@ function glanceUiCopy(kind) {
     }
   }
 
+  function messageDetailsOpen(messageNode) {
+    return !!(messageNode && messageNode.querySelector
+      && messageNode.querySelector('.ajB table, table.ajC, table.ajB'));
+  }
+
+  function removeMessageDetailsPanels(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return;
+    messageNode.querySelectorAll('.ajA').forEach((n) => n.remove());
+    messageNode.querySelectorAll('.ajB').forEach((n) => {
+      if (n.closest && n.closest('.ajA')) return;
+      n.remove();
+    });
+  }
+
   async function expandMessageDetails(messageNode) {
     const toggle = messageNode && messageNode.querySelector
       ? messageNode.querySelector(DETAILS_TOGGLE)
       : null;
     if (!toggle) return false;
+    if (messageDetailsOpen(messageNode)) return true;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 200));
-    return true;
+    return messageDetailsOpen(messageNode);
   }
 
   async function collapseMessageDetails(messageNode) {
@@ -1111,15 +1127,16 @@ function glanceUiCopy(kind) {
       ? messageNode.querySelector(DETAILS_TOGGLE)
       : null;
     if (!toggle || !messageNode.querySelector) return false;
-    if (!messageNode.querySelector('.ajB table, table.ajC, table.ajB')) return false;
+    if (!messageDetailsOpen(messageNode)) return true;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 120));
+    removeMessageDetailsPanels(messageNode);
     const row = toggle.closest('td') || toggle.parentElement;
     if (row) {
       const open = row.querySelector('.ajB');
       if (open) open.remove();
     }
-    return true;
+    return !messageDetailsOpen(messageNode);
   }
 
   // Collapsed Gmail header: "to me", and the me chip has no email attribute.
@@ -2128,6 +2145,11 @@ function glanceUiCopy(kind) {
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
     const inboundMail = String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase();
+    // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
+    // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
+    // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
+    if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
     const inboundHeAsk = inboundMail && text.length >= 12
@@ -3082,6 +3104,86 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  // A Meet link added to an event the person already organizes ("Can you add a Meet link to the Thursday sync?").
+  // The worker decides (flow:google-event-link-plan, only with the switch EVENT_CALL_LINK on) and reads the
+  // calendar; the page shows the canonical Do It card with a one-step list, or nothing.
+  async function showEventLinkChip(message, c) {
+    let plan = null;
+    try {
+      // The body only: a subject like "Sync notes" must not steer which event is picked.
+      plan = await sendRuntime(Object.assign({ type: 'flow:google-event-link-plan', text: c.text }, laneAccountContext()));
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.event || !plan.event.id) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'event-call-link',
+      name: plan.event.summary || 'Meet link',
+      closingLine: plan.line,
+      closedLine: he ? 'נוסף קישור Meet לאירוע.' : 'Meet link added to the event.',
+      steps: [{
+        id: 'link',
+        kind: 'calendarCallLink',
+        label: 'Calendar',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create a Meet link on the event and read it back',
+        dependsOn: null,
+        params: { event: plan.event }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.line, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
+  async function showNewFileChip(message, c) {
+    let plan = null;
+    try {
+      plan = await sendRuntime({ type: 'flow:google-new-file-plan', text: String(c.subject || '').trim() ? c.subject + '. ' + c.text : c.text });
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.name || !plan.fileKind) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'new-file',
+      name: plan.name,
+      closingLine: plan.line,
+      closedLine: he ? 'נוצר ב-Drive.' : 'Created in Drive.',
+      steps: [{
+        id: 'file',
+        kind: 'driveNewFile',
+        label: plan.fileKind === 'sheet' ? 'Sheet' : plan.fileKind === 'slides' ? 'Slides' : 'Doc',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create the file in Drive and read it back',
+        dependsOn: null,
+        params: { fileKind: plan.fileKind, name: plan.name, destinationText: (he ? 'Drive · ' : 'Drive · ') + plan.name }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.name, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.name, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   function injectChip(messageNode, ctx) {
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
@@ -3449,6 +3551,20 @@ function glanceUiCopy(kind) {
       });
     }
 
+    // A Meet link on an event already on the calendar (switch EVENT_CALL_LINK, off): only the event's id and title travel.
+    if (action.kind === 'calendarCallLink') {
+      const ev = action.params && action.params.event;
+      if (!ev || !ev.id) return null;
+      return Object.assign(base, { params: { event: { id: ev.id, summary: ev.summary || '', day: ev.day || '' } } });
+    }
+
+    // An empty Doc, Sheet or Slides deck asked for by name (switch WORKSPACE_FILE, off). Nothing is written into it.
+    if (action.kind === 'driveNewFile') {
+      const nf = action.params || {};
+      if (!nf.fileKind || !nf.name) return null;
+      return Object.assign(base, { params: { fileKind: nf.fileKind, name: nf.name } });
+    }
+
     if (action.kind === 'driveFile') {
       if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
       const listed = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
@@ -3473,6 +3589,9 @@ function glanceUiCopy(kind) {
         if (zone) params.timeZone = zone;
       }
       params.title = renderedTitleFor(ctx, params.title);
+      // The worker adds a Meet link only when this text proposes a video call and
+      // the MEET_LINK switch is on (off by default). Text stays local.
+      if (ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
       return Object.assign(base, { params: params, ownEmail: ownEmailFromThread() || lastOwnEmail || '' });
     }
 
@@ -3622,6 +3741,8 @@ function glanceUiCopy(kind) {
     attachmentSave: 'googleDriveSave',
     driveDoc: 'googleDoc',
     driveSheet: 'googleSheetAppend',
+    driveNewFile: 'googleNewFile',
+    calendarCallLink: 'googleEventCallLink',
     gmailDraft: 'gmailCompose'
   };
 
@@ -4226,6 +4347,8 @@ function glanceUiCopy(kind) {
     calendar: 'scheduled',
     gmailDraft: 'drafted a reply',
     googleTask: 'set a reminder',
+    driveNewFile: 'created the file',
+    calendarCallLink: 'added a call link',
     driveDoc: 'wrote the doc',
     driveSheet: 'wrote the sheet',
     driveFile: 'saved the file'
@@ -4357,7 +4480,7 @@ function glanceUiCopy(kind) {
     const nothingLeft = verdict.every((x) => x === 'missing');
     const anyUnknown = verdict.some((x) => x === 'unknown');
     const total = (record && record.total) || steps.length;
-    const partialReceipt = allPresent && total > steps.length;
+    const partialReceipt = allPresent && total > steps.length && !!(record && record.partial);
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
     host.setAttribute('data-glance-chain', 'lane-proof');
@@ -4512,10 +4635,13 @@ function glanceUiCopy(kind) {
       done.appendChild(detail);
     }
 
-    const undo = el('button', 'flow-chip-undo', glanceShow(copy.undoHint));
+    const undoLabel = glanceUiCopy('undo');
+    const undo = el('button', 'flow-chip-undo', glanceShow(undoLabel));
     undo.type = 'button';
+    undo.setAttribute('aria-label', glanceShow(undoLabel));
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (copy.undoHint && copy.undoHint !== undoLabel) hint.textContent = glanceShow(copy.undoHint);
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
@@ -4666,6 +4792,27 @@ function glanceUiCopy(kind) {
     return !!(res && res.ok === true && res.ref && res.ref.draftId && r.action && laneConnectorId(r.action.kind) === 'gmailCompose');
   }
 
+  function draftReadBackVerified(r) {
+    if (!savedReplyDraft(r)) return false;
+    const gate = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+    const proof = r.response && r.response.proof;
+    if (gate && typeof gate.isProof === 'function' && gate.isProof(proof)) return true;
+    return r.response && r.response.fetchedBack === true;
+  }
+
+  function composeDraftClosed(r) {
+    const res = r && r.response;
+    if (!res || res.ok !== true || res.skipped) return false;
+    if (!r.action || laneConnectorId(r.action.kind) !== 'gmailCompose') return false;
+    if (draftReadBackVerified(r)) return true;
+    return !!composeReadBack(res);
+  }
+
+  function receiptClosedStep(r) {
+    if (stepHandled(r)) return true;
+    return composeDraftClosed(r);
+  }
+
   function orphanLine(r) {
     const line = laneStepLine(laneConnectorId(r.action.kind), r.response);
     return line + ' — ' + glanceUiCopy('notVerified');
@@ -4803,14 +4950,16 @@ function glanceUiCopy(kind) {
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
     const taskSteps = results.filter(taskKind);
+    const attempted = results.filter((r) => r && r.action && !(r.response && r.response.skipped));
+    const closedSteps = attempted.filter(receiptClosedStep);
     const copy = FlowReceipt.confirmation({
-      succeeded: succeeded.length,
-      total: results.length,
+      succeeded: closedSteps.length,
+      total: attempted.length,
       priorCloses,
       lang: glanceUiLang(),
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
-        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        ? closedSteps.filter(taskKind).map((r) => r.response && r.response.proof)
         : undefined,
       verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
@@ -4859,11 +5008,13 @@ function glanceUiCopy(kind) {
 
     const sole = succeeded.length === 1 && !extra.length ? succeeded[0].response : null;
     const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
-    // The sentence is the control. A filled pill would be a second Do It.
-    const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
+    const undoLabel = glanceShow(copy.undoLabel || (attempted.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo')));
+    const undo = el('button', 'flow-chip-undo', undoLabel);
     undo.type = 'button';
+    undo.setAttribute('aria-label', undoLabel);
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (undoHint) hint.textContent = glanceShow(undoHint);
 
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
@@ -5764,6 +5915,9 @@ function glanceUiCopy(kind) {
       return mount.querySelector('.flow-chip-host');
     }
   };
+
+  // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
 
   init();
 })();

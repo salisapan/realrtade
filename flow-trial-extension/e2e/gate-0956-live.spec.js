@@ -3,7 +3,13 @@
 const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
-const GYM = 'please remember to renew your gym membership by Friday 23/10';
+// The next Friday at least three days out, so the spec does not go stale.
+const FRIDAY = (() => {
+  const d = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+  while (d.getDay() !== 5) d.setDate(d.getDate() + 1);
+  return d;
+})();
+const GYM = 'please remember to renew your gym membership by Friday ' + FRIDAY.getDate() + '/' + (FRIDAY.getMonth() + 1);
 const HOLD_BODY = 'תשמור לי את הזמן';
 const HOLD_OFFSET_DAYS = 7;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

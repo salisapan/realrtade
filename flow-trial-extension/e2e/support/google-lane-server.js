@@ -177,6 +177,7 @@ function startGoogleLaneServer() {
     state.rejectOnce = [];
     state.driveHits = [];
     state.lagGets = [];
+    state.noMeetLink = false;
     seedLists();
   }
 
@@ -303,6 +304,7 @@ function startGoogleLaneServer() {
         const meta = readJson(raw);
         const id = 'e2e-file-' + (state.seq++);
         const file = stampFile({ id: id, name: meta.name || 'file', mimeType: meta.mimeType || '', trashed: false, parents: meta.parents || null });
+        if (/^application\/vnd\.google-apps\./.test(String(meta.mimeType || ''))) file.webViewLink = 'https://docs.google.com/document/d/' + id + '/edit';
         state.files[id] = file;
         if (meta.mimeType === 'application/vnd.google-apps.document') {
           state.docs[id] = docBody('', '');
@@ -422,9 +424,49 @@ function startGoogleLaneServer() {
           if (event[k] && event[k].dateTime) event[k] = { dateTime: offsetForm(event[k].dateTime, event[k].timeZone), timeZone: event[k].timeZone };
         });
         delete event.attendees;
+        // Like Calendar: a conference request is honoured only with conferenceDataVersion=1,
+        // and then the event carries a Meet link. Without the parameter it is ignored.
+        if (event.conferenceData && event.conferenceData.createRequest) {
+          if (url.searchParams.get('conferenceDataVersion') === '1' && !state.noMeetLink) {
+            const link = 'https://meet.google.com/abc-defg-hij';
+            event.hangoutLink = link;
+            event.conferenceData = { createRequest: { requestId: event.conferenceData.createRequest.requestId, status: { statusCode: 'success' } }, entryPoints: [{ entryPointType: 'video', uri: link }], conferenceId: 'abc-defg-hij' };
+          } else {
+            delete event.conferenceData;
+          }
+        }
         Object.defineProperty(event, '__account', { value: who, enumerable: false });
         state.events[id] = event;
         state.last.event = id;
+        send(res, 200, event);
+        return;
+      }
+      if (calCol && method === 'GET') {
+        // The coming events of this account, as Calendar lists them (expanded, by start).
+        const items = Object.values(state.events).filter((e) => !e.__account || e.__account === who);
+        send(res, 200, { kind: 'calendar#events', items: JSON.parse(JSON.stringify(items)) });
+        return;
+      }
+      if (calOne && method === 'PATCH') {
+        const event = state.events[calOne[2]];
+        if (!event || (event.__account && event.__account !== who)) { send(res, 404, GOOGLE_404('Not Found')); return; }
+        const body = readJson(raw);
+        const bad = unknownField(body, EVENT_FIELDS);
+        if (bad) { send(res, 400, GOOGLE_400('Invalid JSON payload received. Unknown name "' + bad + '": Cannot find field.')); return; }
+        const withConf = url.searchParams.get('conferenceDataVersion') === '1';
+        if ('conferenceData' in body) {
+          if (body.conferenceData === null) {
+            delete event.conferenceData;
+            delete event.hangoutLink;
+          } else if (withConf && body.conferenceData.createRequest && !state.noMeetLink) {
+            const link = 'https://meet.google.com/abc-defg-hij';
+            event.hangoutLink = link;
+            event.conferenceData = { createRequest: { requestId: body.conferenceData.createRequest.requestId, status: { statusCode: 'success' } }, entryPoints: [{ entryPointType: 'video', uri: link }], conferenceId: 'abc-defg-hij' };
+          }
+          delete body.conferenceData;
+        }
+        Object.assign(event, body);
+        state.last.patched = calOne[2];
         send(res, 200, event);
         return;
       }
@@ -582,6 +624,15 @@ function startGoogleLaneServer() {
         events: () => state.events,
         tasks: () => state.tasks,
         deleteEvent: (id) => { delete state.events[id]; },
+        setNoMeetLink: (on) => { state.noMeetLink = on === true; },
+        seedEvent: (ev) => {
+          const id = opaqueId('event', state.seq++);
+          const who = state.account;
+          const event = Object.assign({ kind: 'calendar#event', id: id, status: 'confirmed', htmlLink: 'https://www.google.com/calendar/event?eid=' + id, creator: { email: who, self: true }, organizer: { email: who, self: true } }, ev);
+          Object.defineProperty(event, '__account', { value: who, enumerable: false });
+          state.events[id] = event;
+          return id;
+        },
         deleteTask: (id) => { delete state.tasks[id]; },
         task: (id) => state.tasks[id],
         event: (id) => state.events[id],

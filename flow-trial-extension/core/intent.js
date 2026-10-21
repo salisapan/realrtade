@@ -749,8 +749,8 @@ const FlowIntent = (() => {
   // not the reader's name. The reader's names are the account display
   // name and ownNames, in either script. A name in the other script is
   // still someone else.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|greetings|greeting|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
-  const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|greetings|greeting|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|actually|however|first|second|third|finally|meanwhile|otherwise|anyway|anyways|wait|sorry|yes|no|sure|please|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|בעצם|אגב|כמובן|סליחה|נכון|לכן|בנוסף|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
+  const DISCOURSE_OPEN = /^(?:also|separately|actually|however|first|second|third|finally|meanwhile|otherwise|anyway|anyways|בעצם|אגב|לכן|בנוסף)(?:\b|(?=\s*[,:،]))\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
   // To, Cc, Subject, and Body are header labels, not names.
@@ -812,7 +812,7 @@ const FlowIntent = (() => {
         return name;
       }
       if (/^\s*(?:,|،)/.test(after)) {
-        if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
+        if (!personToken(name)) return '';
         return name;
       }
       // "אבי שלום," is the same vocative as "שלום אבי,". שלום is already the
@@ -1214,6 +1214,7 @@ const FlowIntent = (() => {
     const signals = {
       hasMeetingNoun, hasConcreteAnchor, hasConcreteRequestObject, hasConcreteCommitmentObject, isReaderCommit,
       handoff: s.flags.handoff,
+      slotAsk: Boolean(s.flags.slotAsk),
       hasDate: Boolean(facts.date && facts.date.iso),
       hasTime: Boolean(facts.time),
       hasMoney: Boolean(facts.money),
@@ -1629,6 +1630,7 @@ const FlowIntent = (() => {
     // A greeting with no cached name is not that quiet and not an offer.
     // The host judges the same mail again once the profile names are stored,
     // or after the name wait (at most 2s), with whatever names are known.
+    if (mailIsOwn(ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
@@ -1651,7 +1653,10 @@ const FlowIntent = (() => {
         dateIso: null
       });
     }
-    if (familyBox.hit && familyBox.hit.suppress) {
+    // "Find a time" names no slot, so family D keeps it off the calendar, and family H reads "perhaps we could" as a hedge. Asking the reader for a time is still a
+    // request: the card is a reply that offers times, not a hold.
+    const slotOnly = Boolean(familyBox.hit && (familyBox.hit.family === 'D' || familyBox.hit.family === 'H') && s.flags && s.flags.slotAsk);
+    if (familyBox.hit && familyBox.hit.suppress && !slotOnly) {
       if (ctx.debug) {
         let matched = familyBox.hit.matched || null;
         if (Array.isArray(matched)) matched = matched.join(', ').slice(0, 80);
@@ -1974,7 +1979,8 @@ const FlowIntent = (() => {
     const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
     const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
     const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
-    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
+    // A slot ask ("when works for you?") names no object and no day on purpose: the time is the reply.
+    const requestEvidence = ((s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped)) || s.flags.slotAsk || s.flags.workAsk || s.flags.shortAsk;
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     // "any chance" is a hedge for every other sentence. These three
@@ -2342,8 +2348,15 @@ const FlowIntent = (() => {
     t = t.replace(re, (_, q) => {
       try { return decodeURIComponent(q); } catch (e) { return q; }
     });
+    const urlParam = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s&]*&)*url=([^&#\s]+)(?:&[^#\s&]*)*/gi;
+    t = t.replace(urlParam, (_, u) => {
+      try { return decodeURIComponent(u); } catch (e) { return u; }
+    });
+    const strip = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s&]*(?:&[^#\s&]+)*)/gi;
+    t = t.replace(strip, '');
     t = t.replace(/https?:\/\//gi, '');
     if (/^(?:www\.)?google\.com\/url\b/i.test(t.trim())) return '';
+    t = t.replace(/\s+(?:the|on)\s*$/i, '').replace(/\s{2,}/g, ' ').trim();
     return t.replace(/\s+/g, ' ').trim();
   }
   function takeObject(rest, keepThe) {
@@ -3072,6 +3085,9 @@ const FlowIntent = (() => {
       if (next === clause) break;
       clause = next;
     }
+    clause = unwrapGoogleRedirectUrl(clause);
+    clause = clause.replace(/(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^\s]+\s*)*/gi, ' ');
+    clause = clause.replace(/\bthe\s+on\b/i, 'on');
     clause = clause.replace(/[?].*$/, ' ').replace(/[.!]+$/g, '').replace(/\s+/g, ' ').trim();
     clause = clause.replace(/^מקווה[\s\S]*?[.]\s*/, '').trim();
     if (/\b(?:swing|stop|come|drop|pass)\s+by\b/i.test(clause)) {
@@ -3114,7 +3130,11 @@ const FlowIntent = (() => {
         const q = s.match(/google\.com\/url\?[^\s#]+/i);
         if (q) obj = unwrapGoogleRedirectUrl('https://www.' + q[0]);
       }
-      if (obj) return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      if (obj && !/google\.com\/url\b/i.test(obj)) {
+        return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      }
+      const renewWhen = s.match(/\bremind me to\s+renew(?:\s+the\s+https?:\/\/\S+)?\s+on\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i);
+      if (renewWhen) return 'Remind me to renew on ' + renewWhen[1].trim();
     }
     // "Remind me to renew the domain on Friday" is Renew the domain.
     // The day stays on the task. It is not a new verb.

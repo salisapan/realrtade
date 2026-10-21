@@ -1,0 +1,29 @@
+{
+ "set": "contrast-heldout-v0 (60 synthetic pairs, labeledBy synthetic-heldout, ownerVerified 0)",
+ "today": {
+  "pairAccuracy": "0.0% (0/60)",
+  "wrongDoIt": "16.7% (10/60)",
+  "missedCloseOnRelevant": "83.3% (50/60)",
+  "wrongAction": "1.7% (1/60)",
+  "wdi": 10,
+  "mcr": 50
+ },
+ "routerWithRelevance": {
+  "pairAccuracy": "8.3% (5/60)",
+  "wrongDoIt": "8.3% (5/60)",
+  "missedCloseOnRelevant": "83.3% (50/60)",
+  "wrongAction": "1.7% (1/60)",
+  "wdi": 5,
+  "mcr": 50
+ },
+ "shadowOfferSide": {
+  "pairAccuracy": "65.0% (39/60)",
+  "wrongDoIt": "16.7% (10/60)",
+  "missedCloseOnRelevant": "18.3% (11/60)",
+  "wrongAction": "5.0% (3/60)",
+  "wdi": 10,
+  "mcr": 11
+ },
+ "cardsSilencedByProfile": 5,
+ "mailsThatWouldHaveAskedAModel": 33
+}

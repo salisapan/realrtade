@@ -41,7 +41,8 @@
    The toggle only exists at all when there IS more than one action — see
    injectChip() in content-gmail.js. */
 
-.flow-chip-host {
+.flow-chip-host,
+#glance-peek {
   all: initial;
   display: flex;
   flex-direction: column;
@@ -735,7 +736,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flow-chip-host { animation: none; }
+  .flow-chip-host,
+  #glance-peek { animation: none; }
   .flow-chip:hover { transform: none; }
   .flow-chip-actions-row { transition: none; }
   .flow-chip .ring { animation: none; }
@@ -870,3 +872,16 @@
   border-radius: 999px;
   padding: 2px 8px;
 }
+
+/* The peek is the same card (same host rule above, same text, brand, Do It and dismiss components). It only pins a copy
+   of an offer that sits below the fold into view. Placement only; nothing about the card's look is redefined here. */
+#glance-peek {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 48px));
+  margin: 0;
+}
+.flow-chip-host.glance-peek-flash { box-shadow: 0 0 0 3px rgba(59,116,255,.4), 0 10px 26px -16px rgba(20,40,100,.35); transition: box-shadow 300ms ease; }
