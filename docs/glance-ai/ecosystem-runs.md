@@ -53,3 +53,9 @@ One short report per run of the ecosystems builder. Newest last. Status only; a 
 - **Not user-visible yet:** not wired into `src/`; card ask W1 now covers decks. A small run: this is a partial against the user-facing bar.
 - **Tests:** `test/workspace-file-corpus.cjs` extended (decks in both languages, PowerPoint stays silent, names containing "update" or "latest", deck create and plan). Whole regression of every `test/*corpus.cjs`: green.
 - **Open / blocked on the owner:** see `open-tasks.md` row 79 (SharePoint scope, Forms scope, no true Undo for an Outlook invite reply). Next buildable gaps: wiring the built modules behind the Gmail and Outlook cards once the Grok bot delivers designs; Facebook Pages and Threads (page-driven, no API).
+
+## 2026-10-21 (Ecosystems builder B, fourth run) — no user-facing capability
+
+- **Failed run against the user-facing bar, said plainly:** nothing a person can click changed. The Microsoft modules left (Planner task, Word or Excel from a request) have no existing card path to piggyback on the way the Teams link did on the meeting Hold It, so wiring them would need a new card, which belongs to the Grok bot. Facebook Pages, Threads and the WhatsApp Business API need the owner's Meta setup or a new surface. SharePoint, Forms and an Outlook invite reply are blocked on the owner (row 79).
+- **Done:** wrote the exact owner procedure for turning `TEAMS_MEETING` on and off for a live Gate round (Microsoft section of `ecosystem-coverage.md`), so the one wired path can actually be tried. Docs only; no code changed since the last full regression, which was green.
+- **Open:** the Grok cards (T1, M1, W1, W2, plus Planner); the live Gate for the Teams link; then wiring each remaining module behind its card. Graphify not run.

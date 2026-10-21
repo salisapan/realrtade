@@ -30,6 +30,8 @@ Scopes today (`manifest.json`, `docs/google-lane.md`): `openid`, `email`, `profi
 
 Entra app `22682454-808b-41e5-80fe-6abadc1d5595`. Scopes in code (`core/outlook-config.js`): mail sign-in asks `Mail.Read` and `Mail.ReadWrite`; each other scope is asked only when its Connect box is ticked (`Tasks.ReadWrite`, `Calendars.ReadWrite`, `Files.ReadWrite`; `Contacts.Read` and `Chat.Read` belong to the contacts and Teams lanes). `Mail.Send` is never requested; the preview sits behind `MAIL_SEND_ENABLED` false. The owner must confirm that every one of these is listed on the Entra app (rows 44, 45 of `open-tasks.md` still read "blocked").
 
+**Turning on `TEAMS_MEETING` for a live Gate round (owner only, off everywhere by default).** In `chrome://extensions`, open the extension's service worker (Inspect views) and run `chrome.storage.local.set({ glanceSwitches: { TEAMS_MEETING: true } })`. Check: connect Outlook with the Calendar box ticked, open a mail that asks "Can we do a Teams call tomorrow at 15:00?", click Hold It; the receipt should read `Calendar · ... · Teams` and the event in Outlook should carry a Teams join link with no guest. Undo on the untouched event should delete it. Turn it off with `chrome.storage.local.set({ glanceSwitches: {} })`. The gate result goes in `docs/open-tasks.md`; nothing here claims it passed.
+
 | Tool | Built | Proof | Live Gate | Gap |
 |---|---|---|---|---|
 | Outlook mail (web) | Same judge as Gmail, reply draft through Graph, never send. `src/content-outlook.js` | Draft read back, Undo deletes it | PASS through 0.9.39 (rows 47, 49, 50) | The below-the-fold peek card runs here too (same module as Gmail). 0.9.56 changes not re-run live |
