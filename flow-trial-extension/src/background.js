@@ -624,6 +624,20 @@ const LANE_CHAT = [
   }
 ];
 
+// The chat task card needs the one shared judge, the step kit and the canonical card, which the lean chat lists do
+// not carry. Each chat registration loads the same base the Outlook surface does (minus the Gmail-only pieces and the
+// Gmail follow-up scripts), the lane's own files, then the card, so the card file always loads after chat-lane.js.
+const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
+function laneChatScripts(lane) {
+  const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
+  const out = [];
+  for (const f of base.concat(lane.js, ['src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
+  return out;
+}
+const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
+globalThis.__glanceLaneChatScripts = laneChatScripts;
+globalThis.__glanceLaneChatDefs = LANE_CHAT;
+
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
   for (const lane of LANE_CHAT) {
@@ -657,7 +671,8 @@ async function restoreLaneChats() {
       await chrome.scripting.registerContentScripts([{
         id: lane.id,
         matches: lane.origins,
-        js: lane.js,
+        js: laneChatScripts(lane),
+        css: LANE_CHAT_CSS,
         runAt: 'document_idle',
         persistAcrossSessions: true
       }]);
@@ -679,7 +694,10 @@ async function restoreLaneChats() {
         alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
       } catch (e) { alive = false; }
       if (alive) continue;
-      try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: lane.js }); }
+      try {
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneChatScripts(lane) });
+      }
       catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
     }
   }
@@ -2273,6 +2291,39 @@ function googleTasksAuthedFetch(path, options) {
   return googleAuthedFetch(GOOGLE_TASKS_API, path, options);
 }
 
+// A task made from a chat names the chat (Open in WhatsApp), never "Open in Gmail". Only the three known labels count.
+function chatThreadLabel(p, fallback) {
+  const l = p && p.threadLabel;
+  return (l === 'Open in WhatsApp' || l === 'Open in Messenger' || l === 'Open in Instagram') ? l : fallback;
+}
+
+const CHAT_CARD_ASSETS = ['design/step-states-v1/do-it.png', 'design/step-states-v1/do-it-dark.png', 'design/step-states-v1/living/key-idle-512.png', 'design/step-states-v1/living/key-done-512.png'];
+const chatAssetCache = {};
+async function chatAssetData(file) {
+  if (CHAT_CARD_ASSETS.indexOf(file) < 0) return { ok: false, reason: 'not-allowed' };
+  if (chatAssetCache[file]) return { ok: true, url: chatAssetCache[file] };
+  try {
+    const bytes = new Uint8Array(await (await fetch(chrome.runtime.getURL(file))).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    chatAssetCache[file] = 'data:image/png;base64,' + btoa(bin);
+    return { ok: true, url: chatAssetCache[file] };
+  } catch (e) { return { ok: false, reason: 'read-failed' }; }
+}
+
+async function chatTaskTarget() {
+  if (!(await glanceSwitchOn('CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
+  // Google writes through the lane, which needs the connected account on record (a chat page has no mailbox to name it).
+  let account = '';
+  try { account = globalThis.FlowGoogleLaneAccount ? await globalThis.FlowGoogleLaneAccount.read() : ''; } catch (e) { account = ''; }
+  if (account && await getGoogleTasksAuth()) return { ok: true, connectorId: 'googleTask' };
+  try {
+    const session = await outlookSession({});
+    if (session && session.ok && session.token && outlookHasTasksScope(session.token) !== false) return { ok: true, connectorId: 'outlookTask' };
+  } catch (e) { /* not connected */ }
+  return { ok: false, reason: 'not-connected' };
+}
+
 async function getGoogleTasksAuth() {
   const { googleTasksAuth } = await chrome.storage.local.get('googleTasksAuth');
   return googleTasksAuth || null;
@@ -2456,7 +2507,7 @@ async function googleTasksWrite(p) {
   const close = taskClosePayload(p);
   const notesLines = factLines(close.forNotes);
   if (taskFile) notesLines.push(['File', taskFile.name + '\n' + taskFile.url]);
-  if (p.threadUrl) notesLines.push(['Open in Gmail', p.threadUrl]);
+  if (p.threadUrl) notesLines.push([chatThreadLabel(p, 'Open in Gmail'), p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n');
 
   const body = { title: googleTaskTitle(p).slice(0, 1024), notes: notes.slice(0, 8192) };
@@ -6093,7 +6144,7 @@ async function outlookTaskWrite(p) {
   const planned = await outlookPlannerWrite(p, title, close.dueIso);
   if (planned) return planned;
   const notesLines = factLines(close.forNotes);
-  if (p && p.threadUrl) notesLines.push(['Open in Outlook', p.threadUrl]);
+  if (p && p.threadUrl) notesLines.push([chatThreadLabel(p, 'Open in Outlook'), p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n').slice(0, 8000);
   const body = { title: title };
   if (notes) body.body = { contentType: 'text', content: notes };
@@ -6770,6 +6821,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.docusignReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:signature-check' ? docusignCheck(msg.payload) : docusignRelease(msg.payload));
+  }
+
+  // The chat task card (CHAT_TASK_CARD, off): which connected task app can take the task. Google Tasks first, then
+  // Microsoft To Do when the Tasks scope is granted. Nothing is written here.
+  // The card's own pictures are web-accessible on Gmail and Outlook only, and the manifest is not changed for chat sites.
+  // The worker reads its own four files and hands them back as data: URLs. Nothing else is readable this way.
+  if (msg.type === 'flow:asset-data') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, chatAssetData(msg.path));
+  }
+
+  if (msg.type === 'flow:chat-task-target') {
+    return reply(sendResponse, chatTaskTarget());
   }
 
   if (msg.type === 'flow:event-link-plan') {
