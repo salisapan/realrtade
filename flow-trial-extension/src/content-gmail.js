@@ -2303,9 +2303,11 @@ function glanceUiCopy(kind) {
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
     if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
-      const searched = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
-      });
+      const searched = attachments.length
+        ? { ok: true, files: [], reason: 'thread-attachment' }
+        : await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
+        });
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment
       // search is not connected (compose-only Gmail). Null Drive means the

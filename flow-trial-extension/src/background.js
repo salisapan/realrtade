@@ -1770,6 +1770,12 @@ async function getGoogleAccessToken(interactive) {
   if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
+  if (!wantUi) {
+    const webStored = await readGoogleWebAuth();
+    if (webStored && webStored.source === 'web' && webTokenUsable(webStored)) {
+      return { token: webStored.accessToken, source: 'web' };
+    }
+  }
   try {
     const token = await getGoogleAuthToken(wantUi);
     if (wantUi) await recordGoogleConsent(token, 'chrome');
@@ -1881,6 +1887,10 @@ async function persistGoogleAccessToken(token, source, extra) {
   const accessToken = String(token || '').trim();
   if (!accessToken) return false;
   const more = extra || {};
+  const existing = await readGoogleWebAuth();
+  if ((source || '') === 'chrome' && existing && existing.source === 'web' && webTokenUsable(existing)) {
+    return true;
+  }
   const record = {
     accessToken: accessToken,
     source: source || null,
@@ -1888,7 +1898,6 @@ async function persistGoogleAccessToken(token, source, extra) {
   };
   if (more.expiresAt) record.expiresAt = more.expiresAt;
   else if ((source || '') === 'chrome') record.expiresAt = Date.now() + CHROME_TOKEN_MS;
-  const existing = await readGoogleWebAuth();
   const hint = more.loginHint || (existing && existing.loginHint) || '';
   if (hint) record.loginHint = hint;
   return commitGoogleWebAuth(record, googleWebAuthEpoch);
@@ -2050,6 +2059,20 @@ async function refreshGoogleSession() {
     ageMs: ageMs
   }, who));
   if (chromeToken && hadAccount) {
+    const webStored = before[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
+    if (webStored && webStored.source === 'web' && webTokenUsable(webStored, now)) {
+      await clearGoogleReconnect();
+      await glanceAuthLog(Object.assign({
+        call: 'final',
+        result: 'ok',
+        message: 'stored web token kept over silent getAuthToken',
+        expiresAt: webStored.expiresAt != null ? webStored.expiresAt : null,
+        ageMs: tokenAgeMs(webStored, now),
+        state: 'connected',
+        source: 'web'
+      }, who));
+      return { ok: true, source: 'web', token: webStored.accessToken };
+    }
     const expiresAt = now + CHROME_TOKEN_MS;
     await persistGoogleAccessToken(chromeToken, 'chrome', { expiresAt: expiresAt });
     await clearGoogleReconnect();
@@ -2210,11 +2233,6 @@ globalThis.FlowGoogleAccess = {
 };
 
 async function rememberGoogleAuthResult(res) {
-  if (!res) return res;
-  if (res.status === 401) await markGoogleReconnect('401');
-  else if (res.status === 403) await markGoogleReconnect('missing scope');
-  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
-  // after Connect stores a new token.
   return res;
 }
 

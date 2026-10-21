@@ -154,10 +154,13 @@ async function laneCredential(tab) {
   const A = Account();
   const connected = await readConnectedAccount();
   const stored = await storedConnectToken();
-  const chromeToken = await identityToken();
   const candidates = [];
-  if (stored) candidates.push({ token: stored, source: 'web' });
-  if (chromeToken && chromeToken !== stored) candidates.push({ token: chromeToken, source: 'chrome' });
+  if (stored) {
+    candidates.push({ token: stored, source: 'web' });
+  } else {
+    const chromeToken = await identityToken();
+    if (chromeToken) candidates.push({ token: chromeToken, source: 'chrome' });
+  }
   for (let i = 0; i < candidates.length; i++) candidates[i].email = await accountOfToken(candidates[i].token);
   const picked = A.choose(connected, candidates, tab);
   if (picked.ok && picked.adopt) await recordConnectedAccount(picked.token, picked.source);
@@ -260,12 +263,8 @@ function criticalUrl(url) {
 // triggers a refresh. Only the Tasks, Calendar, Drive, Docs, Sheets and
 // Gmail hosts can end the grant.
 function settleAuth(res, url) {
-  if (!res) return Promise.resolve(res);
-  if (url && !criticalUrl(url)) return Promise.resolve(res);
-  if (res.status === 401 || res.status === 403) {
-    const reason = res.status === 403 ? 'missing scope' : '401';
-    return noteGoogleAuthFailure(reason).then(() => res);
-  }
+  // A failed Calendar/Tasks/Drive call is returned to the card; it does not
+  // clear the stored Connect grant or flip the panel to Reconnect.
   return Promise.resolve(res);
 }
 
@@ -378,7 +377,7 @@ function laneHttp(req) {
       if (!picked.ok && picked.reason !== 'no-token') return { status: 0, ok: false, json: null, account: picked };
       const token = picked.ok ? picked.token : '';
       const cred = token ? { token: token, source: picked.source } : null;
-      if (!token) return noteGoogleAuthFailure('not signed in').then(() => ({ status: 401, ok: false, json: null }));
+      if (!token) return { status: 401, ok: false, json: null };
       const trashGate = gate && isTrashOrDelete(method, url, request.body) && trashBlocked(gate) && !request.unverifiedUndo;
       if (trashGate) {
         return { status: 0, ok: false, json: null };
