@@ -144,7 +144,7 @@ const FlowNativeEdit = (() => {
   // Server fields (lastModifiedDateTime, @odata.etag, changeKey) are not here.
   const CONTENT_KEYS = [
     'title', 'subject', 'name', 'body', 'dueDateTime', 'status', 'start', 'end',
-    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance'
+    'location', 'to', 'cc', 'attendees', 'categories', 'isAllDay', 'importance', 'recurrence'
   ];
 
   function rawFor(key, o) {
@@ -166,10 +166,23 @@ const FlowNativeEdit = (() => {
     if (key === 'to' || key === 'cc' || key === 'attendees') return emptyToNull(addressesOf(raw));
     if (key === 'location') return emptyToNull(locationOf(raw));
     if (key === 'categories') return emptyToNull(categoriesOf(raw));
+    if (key === 'recurrence') return emptyToNull(recurrenceOf(raw));
     if (key === 'isAllDay') return boolOf(raw);
     if (key === 'importance') return importanceOf(raw);
     if (key === 'status') return emptyToNull(plain(raw));
     return emptyToNull(plain(raw));
+  }
+
+  // A repeat rule as one string: type, interval, days, day of month, range kind
+  // and start. Another spelling of the same rule is not an edit; another rule is.
+  function recurrenceOf(raw) {
+    if (typeof raw === 'string') return raw.trim() || null; // an already-stored snapshot value
+    if (!raw || typeof raw !== 'object' || !raw.pattern || typeof raw.pattern !== 'object') return null;
+    const p = raw.pattern;
+    const days = Array.isArray(p.daysOfWeek) ? p.daysOfWeek.map((d) => String(d).toLowerCase()).sort().join(',') : '';
+    const r = raw.range && typeof raw.range === 'object' ? raw.range : {};
+    return [String(p.type || '').toLowerCase(), String(p.interval == null ? 1 : p.interval), days, Number(p.dayOfMonth) > 0 ? String(p.dayOfMonth) : '',
+      String(r.type || '').toLowerCase(), String(r.startDate || '').slice(0, 10)].join('|');
   }
 
   // Graph's own default is normal. low and high are a star the person set.

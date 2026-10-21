@@ -53,6 +53,8 @@ import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConf
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
+import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
+import '../core/todo-recurrence.js'; // classic: sets globalThis.FlowTodoRecurrence (switch RECURRING_TODO, off)
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
@@ -5192,6 +5194,19 @@ function outlookTodoListIdFrom(body) {
   return first ? first.id : '';
 }
 
+// A repeating commitment becomes a repeating To Do task only when the owner's
+// switch RECURRING_TODO is on (default off) and the mail states one rule and
+// one clock. Otherwise the task is the one-off it has always been.
+async function outlookRecurrenceFor(text) {
+  const R = globalThis.FlowTodoRecurrence;
+  if (!R || !text) return null;
+  if (!(await glanceSwitchOn(R.SWITCH))) return null;
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayIso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  return R.plan({ flags: { [R.SWITCH]: true }, text: String(text).slice(0, 4000), todayIso: todayIso });
+}
+
 async function outlookTaskWrite(p) {
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) {
@@ -5238,6 +5253,15 @@ async function outlookTaskWrite(p) {
     }
   }
 
+  // To Do needs a due date for a repeat: the first occurrence is that date.
+  const rec = await outlookRecurrenceFor(p && p.text);
+  if (rec) {
+    body.recurrence = rec.recurrence;
+    body.dueDateTime = { dateTime: rec.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+    body.isReminderOn = true;
+    body.reminderDateTime = { dateTime: calendarDateTime(rec.dueIso, rec.hour, rec.minute), timeZone: localTimeZone() };
+  }
+
   const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
   outlookAssertNotSend(postUrl);
   const res = await outlookFetch(postUrl, {
@@ -5251,8 +5275,9 @@ async function outlookTaskWrite(p) {
   if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
   let task = null;
   try { task = await res.json(); } catch (e) { task = null; }
-  const written = taskWrittenLine(close.dueIso, close.amount).replace(/^Google Task/, 'To Do');
+  const written = taskWrittenLine(rec ? rec.dueIso : close.dueIso, close.amount).replace(/^Google Task/, 'To Do') + (rec ? ' · repeats' : '');
   const base = { where: 'Microsoft To Do', target: 'default list', written: written, url: null };
+  if (rec) base.repeats = true;
   const Proof = globalThis.FlowProofOfClose;
   const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
   const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
@@ -5303,6 +5328,11 @@ function outlookTodoAgrees(sent, got) {
   const want = String((sent && sent.title) || '').trim();
   const have = got.title == null ? '' : String(got.title).trim();
   if (want && have && want !== have) return false;
+  // A repeat was asked for: the task read back must carry the same rule.
+  if (sent && sent.recurrence) {
+    const R = globalThis.FlowTodoRecurrence;
+    if (!R || !R.agrees(sent.recurrence, got.recurrence)) return false;
+  }
   if (!(sent && sent.dueDateTime) || !got.dueDateTime) return true;
   if (outlookClockKey(sent.dueDateTime) !== outlookClockKey(got.dueDateTime)) return false;
   const a = outlookZoneKey(sent.dueDateTime.timeZone);
