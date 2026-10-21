@@ -195,3 +195,7 @@ One short report per run of the ecosystems builder. Newest last. Status only; a 
 ## 2026-10-21 (Ecosystems builder A, fifteenth run) — idle by the run-discipline rule
 
 No Google gap is both unblocked and of user value: every built Google module is wired on its card behind its switch; Forms needs the `forms.body` scope and Keep has no public API (open-tasks row 79). Nothing touched.
+
+## 2026-10-21 (Ecosystems builder B, fourteenth run) — idle
+
+- Nothing changed on the Microsoft and Meta side since the last run: SharePoint still waits on the owner's scope (row 79), PowerPoint on a way to verify a hand-built `.pptx`, Meta on the owner's setup. Nothing touched.
