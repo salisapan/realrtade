@@ -276,7 +276,75 @@ const FlowMeetLink = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.eventId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, plan, create, undo, meetUrlOf, contentHash };
+  // The light check for a host whose hold pipeline already settled the day and
+  // the clock: the mail proposes a video call, and not on another tool, not as
+  // a hedge, a negation, FYI or a third party. No date is parsed.
+  function callAsked(text) {
+    const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
+    if (!s.trim() || !CALL.test(s)) return false;
+    if (NEG.test(s) || FYI.test(s) || HEDGE.test(s) || OTHER_TOOL.test(s) || THIRD.test(s)) return false;
+    return PROPOSE_EN.test(s) || PROPOSE_HE.test(s);
+  }
+
+  const EVENTS = /^https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events/;
+
+  // An http function that makes the hold's own create and reads carry a Meet
+  // conference request. The hold's other behaviour is untouched: no attendee,
+  // sendUpdates=none, the same read-back and the same Undo.
+  function withMeet(http, requestId) {
+    return async function meetHttp(req) {
+      const r = req || {};
+      const url = String(r.url || '');
+      if (EVENTS.test(url)) {
+        if (r.method === 'POST' && /\?sendUpdates=none$/.test(url)) {
+          let json = r.json;
+          if (!json && typeof r.body === 'string') { try { json = JSON.parse(r.body); } catch (e) { json = null; } }
+          if (json) {
+            json = Object.assign({}, json, { attendees: [], conferenceData: { createRequest: { requestId: 'glance-' + String(requestId || hash(JSON.stringify(json))), conferenceSolutionKey: { type: 'hangoutsMeet' } } } });
+            return http(Object.assign({}, r, { url: url + '&conferenceDataVersion=1', json: json, body: JSON.stringify(json) }));
+          }
+        } else if (r.method === 'GET' && url.indexOf('conferenceDataVersion') === -1) {
+          return http(Object.assign({}, r, { url: url + (url.indexOf('?') === -1 ? '?' : '&') + 'conferenceDataVersion=1' }));
+        }
+      }
+      return http(r);
+    };
+  }
+
+  // The live hold with a Meet link. `calendarModule` is FlowGoogleCalendar. The
+  // hold is written and verified by that module, unchanged; this adds one
+  // condition to Handled: the event read back by id carries a created Meet link.
+  // Without it the event is deleted again and nothing is claimed.
+  async function holdWithMeet(input, http, clock, calendarModule) {
+    const Cal = calendarModule || calendar;
+    if (!Cal || typeof Cal.write !== 'function' || typeof http !== 'function') return { ok: false, reason: 'no-host' };
+    const sleep = (input && typeof input.sleep === 'function') ? input.sleep : (ms) => new Promise((r) => setTimeout(r, ms));
+    const delays = input && Array.isArray(input.meetDelays) ? input.meetDelays : READ_BACK_DELAYS;
+    const result = await Cal.write(input, withMeet(http, input && input.requestId), clock);
+    const ref = result && result.ref;
+    const id = ref && (ref.eventId || ref.externalId);
+    if (!result || result.ok !== true || !id) return result;
+    const readUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id) + '?conferenceDataVersion=1';
+    let link = '';
+    for (let n = 0; n <= delays.length; n++) {
+      let got = null;
+      try { got = await http({ method: 'GET', url: readUrl }); } catch (e) { got = null; }
+      if (got && got.ok && got.json && got.json.id === id && got.json.status !== 'cancelled' && conferenceReady(got.json)) { link = meetUrlOf(got.json); break; }
+      if (got && got.ok && got.json && got.json.conferenceData && got.json.conferenceData.createRequest && got.json.conferenceData.createRequest.status && got.json.conferenceData.createRequest.status.statusCode === 'failure') break;
+      if (n < delays.length) await sleep(delays[n]);
+    }
+    if (link) {
+      return Object.assign({}, result, { meetUrl: link, joinUrl: link, written: String(result.written || '') + ' · Meet' });
+    }
+    let removed = false;
+    try {
+      const gone = await http({ method: 'DELETE', url: 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id) + '?sendUpdates=none' });
+      removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410));
+    } catch (e) { removed = false; }
+    return { ok: false, reason: 'meet-link-failed', removed: removed, ref: removed ? null : ref, proof: null, written: '' };
+  }
+
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, callAsked, plan, create, undo, meetUrlOf, contentHash, withMeet, holdWithMeet };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowMeetLink };

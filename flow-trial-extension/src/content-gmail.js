@@ -3490,6 +3490,9 @@ function glanceUiCopy(kind) {
         if (zone) params.timeZone = zone;
       }
       params.title = renderedTitleFor(ctx, params.title);
+      // The worker adds a Meet link only when this text proposes a video call and
+      // the MEET_LINK switch is on (off by default). Text stays local.
+      if (ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
       return Object.assign(base, { params: params, ownEmail: ownEmailFromThread() || lastOwnEmail || '' });
     }
 

@@ -93,4 +93,5 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Action: one Do It. The task has no assignee, so Planner notifies nobody.
 - Undo: deletes the task. If the person changed it, the card says Undo unavailable and the task stays.
 - Needed outside the card: the host reads the person's plans (`GET /me/planner/plans`, `Tasks.ReadWrite`, already requested when the To Do box is ticked; the Entra app must list it, open-tasks row 44).
+- Update 2026-10-21: the Meet link now rides on the existing Gmail Hold It when `glanceSwitches.MEET_LINK` is on. The worker result carries `meetUrl` (also `joinUrl`) and the receipt row ends with `· Meet`. The card should show the link with a Copy control, as for Teams. Without the switch nothing changes.
 
