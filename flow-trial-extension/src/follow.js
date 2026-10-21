@@ -49,29 +49,6 @@ const FlowFollow = (() => {
     });
   }
 
-  let followPickerSeq = 0;
-  const followPickerWait = new Map();
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (!msg || msg.type !== 'flow:drive-file-result') return;
-    const settle = followPickerWait.get(msg.requestId);
-    if (!settle) return;
-    followPickerWait.delete(msg.requestId);
-    settle(msg.cancelled ? null : (msg.file || null));
-  });
-  function pickDriveFile() {
-    const requestId = 'dpf_' + Date.now() + '_' + (++followPickerSeq);
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        if (followPickerWait.delete(requestId)) resolve(null);
-      }, 10 * 60 * 1000);
-      const settle = (file) => { clearTimeout(timer); resolve(file); };
-      followPickerWait.set(requestId, settle);
-      send({ type: 'flow:open-drive-picker', payload: { requestId } }).then((res) => {
-        if (!res || !res.ok) settle(null);
-      });
-    });
-  }
-
   function track(event) {
     send({ type: 'flow:track', event, params: {} });
   }
@@ -327,7 +304,11 @@ const FlowFollow = (() => {
       }
       const need = FlowFilePath.askNeed(w.yoursLine);
       if (!need) return null;
-      const picked = await pickDriveFile();
+      const query = FlowFilePath.driveQuery(need);
+      if (!query) return null;
+      const search = await send({ type: 'flow:search-drive', query });
+      const files = search && search.files ? search.files : [];
+      const picked = FlowFilePath.pickDrive(need, files, {}, w.yoursLine);
       return picked ? { source: 'drive', id: picked.id, name: picked.name, mimeType: picked.mimeType } : null;
     } catch (e) { return null; }
   }
@@ -348,6 +329,11 @@ const FlowFollow = (() => {
     if (res && res.ok) {
       await FlowStorage.updateWatch(watch.id, FlowFilePath.preparedPatch(Date.now(), used));
       receipt('Draft opened in compose. You send it.' + (used ? ' (' + used + ')' : ''), null);
+    } else if (res && res.reason === 'drive-scope') {
+      const lang = (document.documentElement.lang || '').toLowerCase().startsWith('he') ? 'he' : 'en';
+      const line = (typeof FlowDisplay !== 'undefined' && FlowDisplay.copy(lang).driveFileScope)
+        || 'Glance can’t open that Drive file with the access in this version. Use a thread attachment, or a file Glance already saved for you.';
+      receipt(line, null);
     } else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : (res && res.error) || 'Open the thread to draft.', null);
   }
 

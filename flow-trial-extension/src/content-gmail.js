@@ -2584,57 +2584,7 @@ function glanceUiCopy(kind) {
     return svg;
   }
 
-  // content-gmail.js can't open a chrome.windows popup itself — that API
-  // isn't exposed to content scripts — so opening the Drive picker means
-  // asking background.js to do it, then waiting for the result to come back
-  // as its own message (the picker is a separate window the user interacts
-  // with for as long as they like, not something a single request/response
-  // round-trip can represent). resolves null on cancel, on a background.js
-  // failure (e.g. the picker API key isn't configured yet), or if the
-  // picker window is closed without picking anything.
-  //
-  // The one gap that pattern doesn't cover on its own: background.js's
-  // pendingDrivePickers map (the record of which requestId belongs to which
-  // Gmail tab) lives only in the service worker's memory. MV3 kills an idle
-  // service worker after a short window with no activity — entirely
-  // plausible while the user is just browsing folders in the picker with no
-  // messages passing through background.js — and a restart silently empties
-  // that map. picker.js still posts its result and still closes itself
-  // either way, so the window closing looks like nothing went wrong; but
-  // deliverDrivePickerResult() then finds no matching entry and treats it as
-  // "already delivered, or the tab is gone" (its own comment's other two
-  // cases), so flow:drive-file-result never arrives here. Without a bound,
-  // this promise — and the "Opening Drive…" chip that awaits it, disabled
-  // the whole time — would hang forever, exactly the "user gets stuck" this
-  // product treats as unacceptable everywhere else. DRIVE_PICKER_TIMEOUT_MS
-  // is generous enough to never fire on a real pick (minutes, not seconds)
-  // and simply resolves null — the same outcome an explicit cancel already
-  // produces — rather than inventing a new, scarier failure state for what
-  // is, from the user's side, indistinguishable from having closed the
-  // window themselves.
-  const DRIVE_PICKER_TIMEOUT_MS = 10 * 60 * 1000;
-  let drivePickerSeq = 0;
-  const pendingDrivePickerResolvers = new Map(); // requestId -> resolve(file|null)
-
-  function openDrivePicker() {
-    const requestId = 'dp_' + Date.now() + '_' + (++drivePickerSeq);
-    return new Promise((resolve) => {
-      const settle = (result) => {
-        if (!pendingDrivePickerResolvers.has(requestId)) return; // already settled via the other path
-        pendingDrivePickerResolvers.delete(requestId);
-        clearTimeout(timer);
-        resolve(result);
-      };
-      const timer = setTimeout(() => settle(null), DRIVE_PICKER_TIMEOUT_MS);
-      pendingDrivePickerResolvers.set(requestId, settle);
-      chrome.runtime.sendMessage({ type: 'flow:open-drive-picker', payload: { requestId } }, (response) => {
-        if (response && response.ok) return; // the real result arrives later via flow:drive-file-result
-        settle(null);
-      });
-    });
-  }
-
-  chrome.runtime.onMessage.addListener((msg) => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === 'flow:still-open-do-it' && msg.messageId) {
       runStillOpenDoIt(msg.messageId);
       return;
@@ -2647,18 +2597,20 @@ function glanceUiCopy(kind) {
         .catch((e) => console.error('[Glance] failed to open Still Open from the notification', e));
       return;
     }
-    if (!msg || msg.type !== 'flow:drive-file-result') return;
-    // settle() itself guards against a requestId that's already gone (the
-    // open-ack failure path, or DRIVE_PICKER_TIMEOUT_MS already firing) and
-    // does its own map cleanup — no separate get/delete needed here.
-    const settle = pendingDrivePickerResolvers.get(msg.requestId);
-    if (settle) settle(msg.cancelled ? null : (msg.file || null));
+    if (msg && msg.type === 'flow:follow-compose-fill') {
+      const p = msg.payload || {};
+      Promise.resolve(sendGmailCompose({
+        senderEmail: p.to,
+        senderName: p.toName,
+        subject: p.subject,
+        params: { body: p.body, useDraft: true, draft: p, lang: mailLanguage({ bodyText: p.body }) }
+      })).then(sendResponse);
+      return true;
+    }
   });
 
   // The attachment-choice row under the gmailDraft pill: one chip per real
-  // thread attachment (so the user can pick which one when there's more
-  // than one — this is the disambiguation surface, not a blocking prompt),
-  // plus a chip that opens the Drive picker as an alternative source.
+  // thread attachment when there is more than one.
   // Mutates action.params directly — buildActionPayload() below reads
   // whatever was last selected, defaulting to the thread's first attachment
   // when the user never opens this row at all (the ordinary, one-attachment
@@ -2687,27 +2639,6 @@ function glanceUiCopy(kind) {
       });
       row.appendChild(chip);
     });
-
-    const driveChip = el('button', 'flow-chip-attach-chip flow-chip-attach-drive', attachments.length ? 'Choose from Drive instead' : 'Attach from Drive');
-    driveChip.type = 'button';
-    driveChip.setAttribute('aria-pressed', 'false');
-    chips.push(driveChip);
-    driveChip.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const prevLabel = driveChip.textContent;
-      driveChip.textContent = 'Opening Drive…';
-      driveChip.disabled = true;
-      const picked = await openDrivePicker();
-      driveChip.disabled = false;
-      if (!picked) { driveChip.textContent = prevLabel; return; }
-      action.params.selectedAttachment = null;
-      action.params.driveFileId = picked.id;
-      action.params.driveFileName = picked.name;
-      action.params.driveMimeType = picked.mimeType;
-      driveChip.textContent = 'Drive: ' + picked.name;
-      selectChip(driveChip);
-    });
-    row.appendChild(driveChip);
 
     return row;
   }
@@ -2809,7 +2740,7 @@ function glanceUiCopy(kind) {
       undo.addEventListener('click', async (e) => {
         e.stopPropagation();
         const undone = await new Promise((resolve) => {
-          chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: 'gmailDraft', ref: res.ref }, resolve);
+          chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: 'gmailCompose', ref: res.ref }, resolve);
         });
         if (undone && undone.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
           await FlowStorage.updateWatch(ctx.threadId, { status: 'stopped', resolvedBy: 'undo' });
@@ -3418,6 +3349,11 @@ function glanceUiCopy(kind) {
         ? 'דרייב עדיין לא אושר. חבר מחדש את Google ואשר את Drive.'
         : 'Drive is not allowed yet. Reconnect Google and allow Drive.');
     }
+    if (response.reason === 'drive-scope') {
+      return glanceUiCopy('driveFileScope') || (glanceUiHebrew()
+        ? 'Glance עדיין לא יכול לפתוח את קובץ Drive הזה עם ההרשאות בגרסה הזו. השתמש בקובץ מצורף בשרשור, או בקובץ ש-Glance כבר שמר עבורך.'
+        : 'Glance can’t open that Drive file with the access in this version. Use a thread attachment, or a file Glance already saved for you.');
+    }
     if (response.reason === 'attachment-unreadable') {
       return glanceUiHebrew()
         ? 'לא הצלחתי לקרוא את הקובץ המצורף מג׳ימייל, לכן לא נשמר דבר.'
@@ -3636,6 +3572,14 @@ function glanceUiCopy(kind) {
           threadId: ctx.threadId || ''
         });
       }
+      if (driveFileId) {
+        const check = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'flow:drive-file-check', id: driveFileId }, resolve);
+        });
+        if (!check || !check.ok) {
+          return { fail: { reason: (check && check.reason) || 'drive-scope' } };
+        }
+      }
       const payload = Object.assign(base, {
         params: Object.assign({}, driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams, { lang: cleanParams.lang || mailLanguage(ctx) }),
         senderEmail: ctx.sender.email,
@@ -3644,8 +3588,7 @@ function glanceUiCopy(kind) {
         threadId: ctx.threadId || ''
       });
       if (driveFileId) {
-        // background.js fetches Drive bytes itself — it already holds the
-        // OAuth token that call needs, so there is nothing to attach here.
+        // Thread bytes are not used when a Glance-known Drive id was chosen.
       } else if (action.params.includeAttachment) {
         const chosen = selectedAttachment !== undefined ? selectedAttachment : ctx.attachment;
         if (chosen) {

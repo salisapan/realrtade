@@ -2699,6 +2699,8 @@
         if (!(driveFileId && !used)) note.textContent = 'A draft is waiting in Gmail' + (used ? ' with ' + used : '') + '. Nothing was sent. ' + (FlowFollowUp.isMine(w) ? 'Send it and I will close this.' : 'Send it and I will go back to waiting for them.');
         FlowStorage.updateWatch(w.id, FlowFilePath.preparedPatch(Date.now(), used)).catch(() => {});
         send({ type: 'flow:track', event: used ? 'follow_file_prepared' : 'follow_reply_prepared', params: {} });
+      } else if (res && res.reason === 'drive-scope') {
+        note.textContent = FlowDisplay.copy(uiLang()).driveFileScope;
       } else {
         note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.';
       }

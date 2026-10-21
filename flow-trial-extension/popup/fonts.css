@@ -1,7 +1,7 @@
 /* Self-hosted webfonts: Assistant (body), Rubik (display), JetBrains Mono
    (code/mono UI). Base64-embedded woff2, Latin + Hebrew subsets per family,
    because the fonts this site actually needs are already small in count and
-   this avoids a third-party request to fonts.googleapis.com/fonts.gstatic.com
+   this avoids a third-party request to external font CDNs
    entirely -- no extra DNS/TCP/TLS round trip, no dependency on Google's own
    uptime, and the exact same bytes render identically on every page.
 

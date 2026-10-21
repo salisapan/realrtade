@@ -2741,28 +2741,41 @@ async function followDraftCreate(p) {
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
   const base = String(p.subject || '').trim();
   const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
-  // A file prepared for this draft (docs/file-backed-closure-plan.md): either the one
-  // file already in the thread (bytes read by the content script) or the one Drive file
-  // core/file-path.js picked. If it cannot be read nothing is written: the body says
-  // a file is attached, so there is never a substitute file and never a draft that
-  // claims one it does not have. The caller then offers the plain draft instead.
   let attachment = null;
   if (p.attachment && p.attachment.base64) {
     const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
-    if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
+    if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) {
+      attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
+    }
   } else if (p.driveFileId) {
-    attachment = await fetchDriveFileAsAttachment(p.driveFileId);
+    const got = await fetchDriveFileResult(p.driveFileId);
+    if (!got.ok) {
+      return { ok: false, reason: got.reason || 'attach', error: got.error || 'Could not attach that file.' };
+    }
+    attachment = got.attachment;
   }
-  if ((p.attachment || p.driveFileId) && !attachment) return { ok: false, reason: 'attach', error: 'Could not attach that file.' };
-  const threadId = await findThreadIdTo(to, base);
-  const raw = base64UrlEncode(buildMimeMessage({ to: toHeaderValue(to, p.toName), subject, body: text, attachment }));
-  const message = { raw };
-  if (threadId) message.threadId = threadId;
-  const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts', { method: 'POST', body: JSON.stringify({ message }) });
-  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
-  if (!res.ok) throw new Error('Gmail draft creation failed (' + res.status + ')');
-  const draft = await res.json();
-  return { ok: true, where: 'Gmail', target: 'a draft follow-up', ref: { draftId: draft.id }, url: 'https://mail.google.com/mail/u/0/#drafts', attached: attachment ? attachment.filename : null };
+  if ((p.attachment || p.driveFileId) && !attachment) {
+    return { ok: false, reason: 'attach', error: 'Could not attach that file.' };
+  }
+  const payload = Object.assign({}, p, { to, body: text, subject, attachment });
+  const tabs = await chrome.tabs.query({ url: ['https://mail.google.com/*'] });
+  for (let i = 0; i < tabs.length; i++) {
+    const tab = tabs[i];
+    if (!tab || !tab.id) continue;
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, { type: 'flow:follow-compose-fill', payload });
+      if (res && res.ok) return res;
+      if (res && !res.ok && res.reason !== 'compose-closed') return res;
+    } catch (e) { /* tab has no content script yet */ }
+  }
+  return {
+    ok: false,
+    reason: 'compose-closed',
+    preview: true,
+    closes: false,
+    sent: false,
+    error: 'Open the Gmail thread and tap Reply first. Glance fills compose — it does not press Send.'
+  };
 }
 
 /* --------------------------------------------------------------- Calendar */
@@ -3366,36 +3379,45 @@ async function searchDriveMessage(msg) {
 // this worker when the worker can just call the Drive API directly.
 // Metadata first (cheap) so an oversized file never has its bytes
 // downloaded at all, not just rejected after the fact.
-async function fetchDriveFileAsAttachment(driveFileId) {
+async function fetchDriveFileResult(driveFileId) {
   try {
     const metaRes = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(driveFileId) + '?fields=name,mimeType,size');
-    if (!metaRes.ok) return null;
+    if (metaRes.status === 404 || metaRes.status === 403) {
+      return { ok: false, reason: 'drive-scope', status: metaRes.status, error: 'drive-scope' };
+    }
+    if (!metaRes.ok) return { ok: false, reason: 'attach', status: metaRes.status };
     const meta = await metaRes.json();
-    if (meta.size && Number(meta.size) > GMAIL_ATTACHMENT_MAX_BYTES) return null;
+    if (meta.size && Number(meta.size) > GMAIL_ATTACHMENT_MAX_BYTES) return { ok: false, reason: 'attach' };
 
     const exported = driveExportPlan(meta.mimeType);
-    // A Docs/Sheets/Slides file has no bytes at alt=media. Export it.
-    // Anything else in the google-apps family (a folder, a form) is not
-    // an attachment, and inventing an empty file for it is not a close.
-    if (!exported && String(meta.mimeType || '').indexOf('application/vnd.google-apps.') === 0) return null;
+    if (!exported && String(meta.mimeType || '').indexOf('application/vnd.google-apps.') === 0) return { ok: false, reason: 'attach' };
     const contentPath = exported
       ? '/files/' + encodeURIComponent(driveFileId) + '/export?mimeType=' + encodeURIComponent(exported.mime)
       : '/files/' + encodeURIComponent(driveFileId) + '?alt=media';
     const contentRes = await googleAuthedFetch(GOOGLE_DRIVE_API, contentPath);
-    if (!contentRes.ok) return null;
+    if (contentRes.status === 404 || contentRes.status === 403) {
+      return { ok: false, reason: 'drive-scope', status: contentRes.status, error: 'drive-scope' };
+    }
+    if (!contentRes.ok) return { ok: false, reason: 'attach', status: contentRes.status };
     const buf = await contentRes.arrayBuffer();
-    // Declared size can be absent or wrong; the actual byte count is the
-    // real guard — same policy as content-gmail.js's own attachment fetch.
-    if (buf.byteLength > GMAIL_ATTACHMENT_MAX_BYTES || buf.byteLength === 0) return null;
+    if (buf.byteLength > GMAIL_ATTACHMENT_MAX_BYTES || buf.byteLength === 0) return { ok: false, reason: 'attach' };
 
     return {
-      filename: exported ? withExportExtension(meta.name, exported.ext) : (meta.name || 'attachment'),
-      mimeType: exported ? exported.mime : (meta.mimeType || 'application/octet-stream'),
-      base64: arrayBufferToBase64(buf)
+      ok: true,
+      attachment: {
+        filename: exported ? withExportExtension(meta.name, exported.ext) : (meta.name || 'attachment'),
+        mimeType: exported ? exported.mime : (meta.mimeType || 'application/octet-stream'),
+        base64: arrayBufferToBase64(buf)
+      }
     };
   } catch (e) {
-    return null;
+    return { ok: false, reason: 'attach' };
   }
+}
+
+async function fetchDriveFileAsAttachment(driveFileId) {
+  const got = await fetchDriveFileResult(driveFileId);
+  return got.ok ? got.attachment : null;
 }
 
 // Reply-with-facts reads a Sheet or Doc through Drive export for files the
@@ -3455,109 +3477,14 @@ async function factSources(ask) {
 }
 
 async function gmailDraftWrite(p) {
-  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
-  if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
-
-  const params = p.params || {};
-  const shareUrl = googleShareUrl(params.shareUrl);
-  if (params.shareLink) {
-    if (!shareUrl) return { ok: false, reason: 'unclear', error: 'No file link to share.' };
-  }
-  // One fact into the shared draft POST. Undo deletes that draft. Never an
-  // attachment, never a send, and never a second Drive search that could
-  // swap the fact the chip already showed. A share-link draft is not this.
-  if (params.replyFact && !params.shareLink) {
-    const factLine = String(params.factLine || '').replace(/[\r\n]+/g, ' ').trim();
-    if (!factLine || factLine.length > 180) {
-      return { ok: false, reason: 'invalid', error: 'No single fact to insert.' };
-    }
-    params.factLine = factLine;
-  }
-  let attachment = null;
-  let createdFileId = null;
-  // 'thread' and 'picked' are files the user already saw. 'found' is the
-  // one file core/file-attach.js already ranked as the only high-confidence
-  // match — this writer does not search again and does not substitute a
-  // different file if that one cannot be read. 'template' is a new file
-  // made from an existing company template, never a blank document.
-  let attachmentSource = null;
-  if (!params.shareLink && !params.replyFact && params.includeAttachment && p.attachment && p.attachment.base64) {
-    const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
-    // Oversized attachments degrade to a plain draft rather than failing the
-    // whole action — the same "still useful, just not everything asked for"
-    // shape as findThreadId() above.
-    if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) {
-      attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
-      attachmentSource = 'thread';
-    }
-  }
-  // A share-link draft (a Doc, Sheet, or saved file this same click
-  // already created) and a one-fact reply do not search Drive and do not
-  // attach a second file. Family A attach stays on the branches below.
-  if (!params.shareLink && !params.replyFact) {
-    // Create-when-missing: copy an existing template into a new file, then
-    // attach that copy. Refuses when a required field is empty — a blank
-    // document is not this close. The company template itself is never
-    // modified or deleted.
-    if (!attachment && params.templateId) {
-      const fields = Array.isArray(params.fields) ? params.fields : [];
-      const incomplete = !fields.length || fields.some((field) => !field || !String(field.value || '').trim());
-      if (incomplete) return { ok: false, reason: 'error', error: 'Missing a fact the template needs.' };
-      const made = await materializeFromTemplate(params.templateId, params.copyTitle || params.what);
-      if (!made) return { ok: false, reason: 'error', error: 'Could not prepare a file from that template.' };
-      attachment = made.attachment;
-      createdFileId = made.createdFileId;
-      attachmentSource = 'template';
-    }
-    // A resolved Drive file (the one high-confidence match, or a file the
-    // user picked). If it cannot be read, stop — do not search for a
-    // substitute and do not send a draft that claims the file is attached.
-    if (!attachment && params.driveFileId) {
-      attachment = await fetchDriveFileAsAttachment(params.driveFileId);
-      if (!attachment) return { ok: false, reason: 'error', error: 'Could not attach that file.' };
-      attachmentSource = params.attachSource === 'found' ? 'found' : 'picked';
-    }
-  }
-
-  const threadId = await findThreadId(p.senderEmail, p.subject);
-  const raw = base64UrlEncode(buildMimeMessage({
-    to: toHeaderValue(p.senderEmail, p.senderName),
-    subject: draftSubject(p),
-    body: draftBodyText(p, attachment, attachmentSource, shareUrl),
-    attachment
-  }));
-
-  const message = { raw };
-  if (threadId) message.threadId = threadId;
-
-  const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts', {
-    method: 'POST',
-    body: JSON.stringify({ message })
-  });
-  if (res.status === 401 || res.status === 403) {
-    if (createdFileId) await deleteDriveFile(createdFileId);
-    return { ok: false, reason: 'not-connected' };
-  }
-  if (!res.ok) {
-    if (createdFileId) await deleteDriveFile(createdFileId);
-    let detail = '';
-    try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
-    throw new Error('Gmail draft creation failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
-  }
-  const draft = await res.json();
+  void p;
   return {
-    ok: true,
-    where: 'Gmail',
-    target: !attachment ? 'a draft reply'
-      : attachmentSource === 'template' ? 'a draft reply with a file prepared from your template'
-      : 'a draft reply with the attachment',
-    written: draftWrittenLine(params),
-    ref: createdFileId ? { draftId: draft.id, createdFileId } : { draftId: draft.id },
-    // The Drafts API doesn't return a stable, documented deep link to one
-    // specific draft the way Calendar's htmlLink does — linking to the
-    // Drafts folder itself is the honest version of "go see it" rather than
-    // a guessed URL that might not open the right thing.
-    url: 'https://mail.google.com/mail/u/0/#drafts'
+    ok: false,
+    reason: 'compose-only',
+    preview: true,
+    closes: false,
+    sent: false,
+    error: 'Reply drafts are filled in the open compose window only. Glance does not use the Gmail drafts API.'
   };
 }
 
@@ -3760,70 +3687,9 @@ async function deleteDriveFile(fileId) {
 }
 
 async function gmailDraftUndo(ref) {
-  if (!ref || !ref.draftId) return { ok: false };
-  const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
-    method: 'DELETE'
-  });
-  if (!(res.ok || res.status === 404)) return { ok: false };
-  // The draft carried a file this close created. Undo removes that file
-  // too. It never deletes the template the copy was made from.
-  if (ref.createdFileId && !(await deleteDriveFile(ref.createdFileId))) return { ok: false };
-  return { ok: true };
+  if (ref && ref.createdFileId && !(await deleteDriveFile(ref.createdFileId))) return { ok: false };
+  return { ok: false, reason: 'compose-only' };
 }
-
-/* ------------------------------------------------------ Google Drive picker */
-
-// content-gmail.js can't open chrome.windows itself (that API isn't exposed
-// to content scripts), and the picker has to live in its own extension page
-// rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether https://apis.google.com's gapi loader is even
-// allowed to run there, and there is no reason to depend on that. So the
-// content script asks this worker to open the window, and this worker
-// remembers which Gmail tab asked, keyed by the requestId the content
-// script minted — multiple Gmail tabs can each have a picker open at once
-// without their results crossing.
-const pendingDrivePickers = new Map(); // requestId -> { tabId, windowId }
-
-async function openDrivePicker(payload, sender) {
-  const requestId = payload && payload.requestId;
-  const tabId = sender && sender.tab && sender.tab.id;
-  if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
-
-  const win = await chrome.windows.create({
-    url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
-    type: 'popup',
-    width: 640,
-    height: 620
-  });
-  if (!win) return { ok: false, error: 'Could not open the Drive picker window.' };
-  pendingDrivePickers.set(requestId, { tabId, windowId: win.id });
-  return { ok: true };
-}
-
-// picker.js posts this once, then closes its own window — this only ever
-// routes the result back to the one Gmail tab that asked for it (via
-// chrome.tabs.sendMessage), never a broadcast, so a second open Gmail tab
-// never sees a file meant for the first.
-function deliverDrivePickerResult(payload) {
-  const { requestId, file, cancelled } = payload || {};
-  const info = pendingDrivePickers.get(requestId);
-  if (!info) return { ok: true }; // already delivered, or the requesting tab is gone
-  pendingDrivePickers.delete(requestId);
-  chrome.tabs.sendMessage(info.tabId, { type: 'flow:drive-file-result', requestId, file, cancelled }).catch(() => {});
-  return { ok: true };
-}
-
-// The user closing the picker window (Escape, the × button, alt-F4) is a
-// cancellation that never posts flow:drive-file-picked at all — without
-// this, the content script's awaiting promise would simply hang forever.
-chrome.windows.onRemoved.addListener((windowId) => {
-  for (const [requestId, info] of pendingDrivePickers) {
-    if (info.windowId === windowId) {
-      pendingDrivePickers.delete(requestId);
-      chrome.tabs.sendMessage(info.tabId, { type: 'flow:drive-file-result', requestId, cancelled: true }).catch(() => {});
-    }
-  }
-});
 
 /* ------------------------------------------------------------------ Notion */
 
@@ -6915,12 +6781,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, driveFindOneByName(msg.term));
   }
 
-  if (msg.type === 'flow:open-drive-picker') {
-    return reply(sendResponse, openDrivePicker(msg.payload || {}, sender));
-  }
-
-  if (msg.type === 'flow:drive-file-picked') {
-    return reply(sendResponse, Promise.resolve(deliverDrivePickerResult(msg.payload || {})));
+  if (msg.type === 'flow:drive-file-check') {
+    const id = msg.id || (msg.payload && msg.payload.id);
+    return reply(sendResponse, fetchDriveFileResult(String(id || '')).then((got) => {
+      if (got.ok) return { ok: true };
+      return { ok: false, reason: got.reason || 'attach', status: got.status || 0 };
+    }));
   }
 
   // Fire-and-forget, same as flow:track below — the caller already computed

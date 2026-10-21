@@ -188,4 +188,4 @@ Every new rule or setting saved to the bots' shared memory must be added to `doc
 
 ## Graphify — every agent, to save tokens
 
-Run `scripts/graphify-setup.sh` once per checkout, then `graphify query "<question>"`, `graphify path`, `graphify explain` before reading or grepping code. Work that a routine or agent finishes and verifies goes to git on the working branch so every agent sees it. Rules: `docs/glance-ai/graphify.md`.
+Run `scripts/graphify-setup.sh` once per checkout, then `graphify query "<question>"`, `graphify path`, `graphify explain` before reading or grepping code; read only the lines Graphify points to; run `graphify update .` after code changes. Work that a routine or agent finishes and verifies goes to git on the working branch so every agent sees it. Rules: `docs/vault/shared-rules.md` (Graphify) and `docs/glance-ai/graphify.md`.

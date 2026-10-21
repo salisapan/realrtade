@@ -136,7 +136,14 @@ DROPPED_PERMISSIONS = ("offscreen",)
 
 # Developer docs. They name HubSpot and Salesforce hosts on purpose. The
 # running extension does not load them.
-DROPPED_FILES = ("README.md", "docs/SETUP.md")
+DROPPED_FILES = (
+    "README.md",
+    "docs/SETUP.md",
+    "picker/picker.html",
+    "picker/picker.js",
+    "picker/sandbox.html",
+    "picker/sandbox.js",
+)
 
 # Strings that must not survive in the store zip. Hosts, scopes, client-id
 # keys, writer entry points, and the dev hooks the build strips.
@@ -366,6 +373,11 @@ def transform_manifest(raw: str, flavor: str) -> str:
         rules = FLAVOR_RULES["full"]
         manifest["host_permissions"] = list(rules["hosts"])
         manifest["optional_host_permissions"] = list(rules["optional_hosts"])
+        manifest.pop("sandbox", None)
+        csp = manifest.get("content_security_policy")
+        if isinstance(csp, dict):
+            csp.pop("sandbox", None)
+            manifest["content_security_policy"] = csp
     if flavor == "outlook":
         rules = FLAVOR_RULES["outlook"]
         manifest["host_permissions"] = list(rules["hosts"])
@@ -1172,6 +1184,23 @@ def check_files(files: dict[str, bytes], zip_path: Path | None = None) -> dict:
             if any("gmail.googleapis.com" in str(h) for h in combined):
                 failures.append(
                     "store build must not declare https://gmail.googleapis.com/* (compose-window drafts only)"
+                )
+            if "sandbox" in manifest:
+                failures.append("store manifest must not declare a sandbox pages block")
+            csp = manifest.get("content_security_policy") or {}
+            if isinstance(csp, dict) and csp.get("sandbox"):
+                failures.append("store manifest must not declare content_security_policy.sandbox")
+            remote_hits: list[str] = []
+            for rel, data in sorted(files.items()):
+                text = data.decode("utf-8", errors="replace")
+                if "apis.google.com" in text:
+                    remote_hits.append(f"{rel}: apis.google.com")
+                if "gstatic.com" in text:
+                    remote_hits.append(f"{rel}: gstatic.com")
+            if remote_hits:
+                failures.append(
+                    "store zip must not reference remote Google loader hosts:\n  "
+                    + "\n  ".join(remote_hits[:20])
                 )
         if rules["oauth2"]:
             oauth = manifest.get("oauth2") or {}
