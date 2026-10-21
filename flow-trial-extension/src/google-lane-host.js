@@ -4,6 +4,10 @@
 import '../core/google-config.js';
 import '../core/google-account.js';
 import '../core/google-calendar.js';
+// FlowMeetLink: the Meet link on a hold, switch MEET_LINK, off.
+import '../core/meet-link.js';
+// FlowRecurringReminder: a repeat on the Hold It, switch RECURRING_HOLD, off.
+import '../core/recurring-reminder.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
@@ -499,8 +503,48 @@ async function resolveExistingTaskList() {
   return id;
 }
 
+// The owner's off switches live in one storage object. A missing key is off.
+async function laneSwitchOn(name) {
+  try {
+    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+    return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+  } catch (e) { return false; }
+}
+
+// A Hold It for a mail that proposes a video call carries a Google Meet link,
+// only when MEET_LINK is on (default off). The link is read back by id; with no
+// link the event is deleted again. No attendee is added, so nobody is invited.
+async function meetWanted(connectorId, msgInput) {
+  const M = globalThis.FlowMeetLink;
+  if (connectorId !== 'googleHold' || !M || typeof M.callAsked !== 'function') return false;
+  const text = msgInput && msgInput.params && msgInput.params.callText;
+  if (!text || !M.callAsked(text)) return false;
+  return laneSwitchOn(M.SWITCH);
+}
+
+// A Hold It for "every Tuesday at 10:00" creates the repeating series, only when RECURRING_HOLD
+// is on (default off) and the hold's own date is an occurrence of the one rule the mail states.
+async function seriesWanted(connectorId, msgInput, first) {
+  const R = globalThis.FlowRecurringReminder;
+  if (connectorId !== 'googleHold' || !R || typeof R.seriesFor !== 'function') return '';
+  const text = msgInput && msgInput.params && msgInput.params.callText;
+  if (!text) return '';
+  const rule = R.seriesFor(text, first && first.dateIso);
+  if (!rule) return '';
+  return (await laneSwitchOn(R.HOLD_SWITCH)) ? rule : '';
+}
+
 async function writeWithListRecovery(connectorId, msgInput, cred) {
   const first = await prepareWrite(connectorId, msgInput, cred);
+  const rule = await seriesWanted(connectorId, msgInput, first);
+  const meet = await meetWanted(connectorId, msgInput);
+  if (rule || meet) {
+    const http = rule ? globalThis.FlowRecurringReminder.withRecurrence(laneHttp, rule) : laneHttp;
+    const written = meet
+      ? await globalThis.FlowMeetLink.holdWithMeet(first, http, undefined, globalThis.FlowGoogleCalendar)
+      : await globalThis.FlowGoogleCalendar.write(first, http);
+    return rule ? globalThis.FlowRecurringReminder.confirmSeries(written, rule, laneHttp) : written;
+  }
   const result = await Lane.write(connectorId, first);
   const given = msgInput && (msgInput.taskListId || (msgInput.params && msgInput.params.taskListId));
   if (connectorId !== 'googleLaneTask' || !result || result.reason !== 'list-missing' || given) return result;

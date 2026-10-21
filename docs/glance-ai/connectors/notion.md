@@ -34,7 +34,7 @@
 
 ## 5. The learning hook (path A/C inputs)
 
-`core/connector-outcome.js`: `{connector, closeType, stage, latencyMs, destinationSystem, lang, at}`; **no text, address or title** (keys outside the list are dropped; a value that is not a short token is dropped). Emitted from `notionReadBackWrite` / `notionReadBackUndo` for `approved`, `handled`, `readback_failed`, `undone`; `offered`, `edited` and `ignored` are defined and tested but have **no emitter yet** (they belong to the steps-list card, not the writer). Stored on the device in `connectorOutcomes` (capped at 400). Switch off: nothing is emitted. Conclusions are pure functions with tests: destination order, offer level (normal / reduced / withhold by undo rate), vendor failure memory, median latency. **Wiring those conclusions into what the card offers is not built yet** (same row 77); until then they move nothing.
+`core/connector-outcome.js`: `{connector, closeType, stage, latencyMs, destinationSystem, lang, at}`; **no text, address or title** (keys outside the list are dropped; a value that is not a short token is dropped). Emitted from `notionReadBackWrite` / `notionReadBackUndo` for `approved`, `handled`, `readback_failed`, `undone`; `offered`, `edited` and `ignored` are defined and tested but have **no emitter yet** (they belong to the steps-list card, not the writer). Stored on the device in `connectorOutcomes` (capped at 400). Switch off: nothing is emitted. Conclusions are pure functions with tests: destination order, offer level (normal / reduced / withhold by undo rate), vendor failure memory, median latency. **Wiring those conclusions into what the card offers is not built yet** (same row 80); until then they move nothing.
 
 ## 6. Tests (all against a mock; no real account, key or mail)
 
@@ -82,4 +82,4 @@
 
 ## 10. Blockers to going live
 
-(a) the owner registers the Notion public integration (§9.1) and sets the env vars; (b) the owner deploys the relay (`«מאשר»`; nothing here deploys); (c) `api.notion.com` host in `manifest.json` / optional permission + store re-review (`«מאשר»`); (d) privacy page and store text (§9.4, 9.5) applied by the owner; (e) the unverified vendor facts in §2 confirmed; (f) the steps-list destination wiring (row 77).
+(a) the owner registers the Notion public integration (§9.1) and sets the env vars; (b) the owner deploys the relay (`«מאשר»`; nothing here deploys); (c) `api.notion.com` host in `manifest.json` / optional permission + store re-review (`«מאשר»`); (d) privacy page and store text (§9.4, 9.5) applied by the owner; (e) the unverified vendor facts in §2 confirmed; (f) the steps-list destination wiring (row 80).

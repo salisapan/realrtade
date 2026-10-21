@@ -46,7 +46,7 @@ OAuth 2.0 authorization code grant. Authorize URL `https://account.docusign.com/
 ## 5. Recognition and the plan
 
 - **No new recognition.** The loops this closes are already recognised (an ask to sign, a promise to get a document signed: the "signed copy" class in `docs/resolution-paths.md`). Hebrew/English recognition, precision gates and hard quiets are untouched; no new loop type, so no new intent examples (quality bar §7: **not applicable**; no weights or gates changed).
-- **Appears in the steps list / Loops: NOT YET.** DocuSign is **evidence that finishes a resolution step**, not a destination a step writes to. Wiring it means: when a loop is of the signed-copy class and the mail carries a DocuSign link (or the person pastes one), offer "Watch this envelope" (the person's click), call `flow:signature-check` when the loop is opened or on Check now, and let `core/resolution.js` accept the proof as the step's close. Not built (`open-tasks.md` row 77); the message API and tests are ready.
+- **Appears in the steps list / Loops: NOT YET.** DocuSign is **evidence that finishes a resolution step**, not a destination a step writes to. Wiring it means: when a loop is of the signed-copy class and the mail carries a DocuSign link (or the person pastes one), offer "Watch this envelope" (the person's click), call `flow:signature-check` when the loop is opened or on Check now, and let `core/resolution.js` accept the proof as the step's close. Not built (`open-tasks.md` row 80); the message API and tests are ready.
 - **Silent when:** not connected, switch off, no envelope linked.
 
 ## 6. Learning hook
@@ -97,4 +97,4 @@ Authorize/token URLs for production and demo; HTTP Basic client auth with a form
 
 ## 12. Blockers to going live
 
-(a) owner creates the DocuSign developer account, integration key and secrets and sets the env vars; (b) the vendor **go-live review** (the long pole: demo calls, then promotion); (c) owner «מאשר» to deploy the relay; (d) the `*.docusign.net` and `account.docusign.com` hosts + store re-review (wildcard host); (e) privacy/store drafts applied; (f) the unverified vendor facts in §9; (g) the "Watch this envelope" offer and the resolution wiring (row 77); (h) an owner decision before any "send for signature" is considered.
+(a) owner creates the DocuSign developer account, integration key and secrets and sets the env vars; (b) the vendor **go-live review** (the long pole: demo calls, then promotion); (c) owner «מאשר» to deploy the relay; (d) the `*.docusign.net` and `account.docusign.com` hosts + store re-review (wildcard host); (e) privacy/store drafts applied; (f) the unverified vendor facts in §9; (g) the "Watch this envelope" offer and the resolution wiring (row 80); (h) an owner decision before any "send for signature" is considered.

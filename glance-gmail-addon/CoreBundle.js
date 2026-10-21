@@ -4877,8 +4877,8 @@ const FlowIntent = (() => {
   // not the reader's name. The reader's names are the account display
   // name and ownNames, in either script. A name in the other script is
   // still someone else.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
-  const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|actually|however|first|second|third|finally|meanwhile|otherwise|anyway|anyways|wait|sorry|yes|no|sure|please|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|בעצם|אגב|כמובן|סליחה|נכון|לכן|בנוסף|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
+  const DISCOURSE_OPEN = /^(?:also|separately|actually|however|first|second|third|finally|meanwhile|otherwise|anyway|anyways|בעצם|אגב|לכן|בנוסף)(?:\b|(?=\s*[,:،]))\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
   // To, Cc, Subject, and Body are header labels, not names.
@@ -4938,7 +4938,7 @@ const FlowIntent = (() => {
         return name;
       }
       if (/^\s*(?:,|،)/.test(after)) {
-        if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
+        if (!personToken(name)) return '';
         return name;
       }
       // "אבי שלום," is the same vocative as "שלום אבי,". שלום is already the
@@ -5607,11 +5607,12 @@ const FlowIntent = (() => {
     // A greeting with no cached name is not that quiet and not an offer.
     // The host judges the same mail again once the profile names are stored,
     // or after the name wait (at most 2s), with whatever names are known.
+    if (mailIsOwn(ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
     if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge');
-    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
+    if (vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {

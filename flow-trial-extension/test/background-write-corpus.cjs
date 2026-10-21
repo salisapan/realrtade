@@ -43,6 +43,22 @@ function load(opts) {
   const bodies = [];
   const tokens = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
+  if (!Object.prototype.hasOwnProperty.call(stored, 'googleGrantedScopes')) {
+    stored.googleGrantedScopes = {
+      version: [
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'openid'
+      ].join('\n'),
+      status: 'granted',
+      source: 'chrome',
+      at: 1
+    };
+  }
   let tokenSeq = 0;
   let lastTitle = '';
 
@@ -79,7 +95,7 @@ function load(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
+        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com', scopes: ['https://www.googleapis.com/auth/tasks'] } }),
         onMessage: { addListener() {} },
         onInstalled: { addListener() {} },
         onStartup: { addListener() {} },
@@ -162,7 +178,9 @@ function decodeDraftRaw(raw) {
   return { body: Buffer.from(bodyB64, 'base64').toString('utf8'), attachmentFilename: filenameMatch ? filenameMatch[1] : null };
 }
 
-const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' } };
+// A connected person has a granted-scope record for the scope list in the manifest; without it the first write drops
+// the cached token once and asks again (googleScopeAction), which is the upgrade path and not the ordinary write.
+const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: { version: 'https://www.googleapis.com/auth/tasks', status: 'granted' } };
 const PAYLOAD = { label: 'Send the signed SOW', facts: {}, senderName: 'Dana', threadUrl: 'https://mail.google.com/x' };
 
 async function run() {

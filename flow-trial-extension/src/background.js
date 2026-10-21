@@ -52,6 +52,9 @@ import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
+import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
+import '../core/todo-recurrence.js'; // classic: sets globalThis.FlowTodoRecurrence (switch RECURRING_TODO, off)
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
@@ -4857,6 +4860,12 @@ function outlookLaunchInteractive(url) {
 }
 
 function outlookLaunchSilent(url) {
+  // Headless regression only: the hidden login window cannot load there and
+  // would hold every 401 retry for the full 30s. Production never sets __glanceE2e.
+  const hooked = glanceE2eWebAuthFlow({ url, interactive: false });
+  if (hooked && typeof hooked.then === 'function') {
+    return hooked.then((r) => r || null, (e) => ({ error: String((e && e.message) || 'failed') }));
+  }
   return new Promise((resolve) => {
     try {
       chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 30000 }, (r) => {
@@ -5434,6 +5443,41 @@ async function outlookDeleteDraft(draftId, prefer) {
   const headers = prefer || {};
   try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
+// The owner's off switches live in one storage object. A missing key is off.
+async function glanceSwitchOn(name) {
+  try {
+    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+    return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+  } catch (e) { return false; }
+}
+
+async function outlookTeamsWanted(callText) {
+  const T = globalThis.FlowTeamsMeeting;
+  if (!T || typeof T.callAsked !== 'function' || !callText) return false;
+  if (!(await glanceSwitchOn(T.SWITCH))) return false;
+  return T.callAsked(callText);
+}
+
+// The Teams join link the event really carries, read by id. Microsoft attaches
+// it a moment after the event exists, so the read repeats a few times.
+async function outlookTeamsJoinUrl(eventId) {
+  const T = globalThis.FlowTeamsMeeting;
+  const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=id,isOnlineMeeting,onlineMeeting,isCancelled';
+  outlookAssertNotSend(url);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 300 * attempt));
+    let res = null;
+    try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+    if (!res || !res.ok) continue;
+    const raw = await outlookReadJson(res);
+    if (raw && raw.id === eventId && raw.isCancelled !== true) {
+      const link = T && T.joinUrlOf ? T.joinUrlOf(raw) : '';
+      if (link) return link;
+    }
+  }
+  return '';
+}
+
 // One calendar event for a Family B file-on-hold. The Calendar checkbox asks
 // for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
 // The body never includes attendees, so the write does not invite anyone.
@@ -5472,6 +5516,13 @@ async function outlookMeetingWrite(p) {
   if ((Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) {
     return { ok: false, reason: 'refused' };
   }
+  // A Teams link only when the mail asks for a call and the owner's switch
+  // TEAMS_MEETING is on (default off). Still no attendee, so nobody is invited.
+  const teams = await outlookTeamsWanted(params.callText);
+  if (teams) {
+    body.isOnlineMeeting = true;
+    body.onlineMeetingProvider = 'teamsForBusiness';
+  }
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
   const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
@@ -5492,6 +5543,22 @@ async function outlookMeetingWrite(p) {
   if (!event || typeof event.id !== 'string' || !event.id) {
     return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
   }
+  // Handled for a Teams hold needs the join link read back by id. Without it
+  // the event is removed again and nothing is claimed.
+  let joinUrl = '';
+  if (teams) {
+    joinUrl = await outlookTeamsJoinUrl(event.id);
+    if (!joinUrl) {
+      const delUrl = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(event.id);
+      outlookAssertNotSend(delUrl);
+      let removed = false;
+      try {
+        const gone = await outlookFetch(delUrl, { method: 'DELETE' });
+        removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404));
+      } catch (e) { removed = false; }
+      return { ok: false, reason: 'teams-link-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
+    }
+  }
   const proved = await outlookEventRead(event.id);
   const eventSnap = proved && proved.snap;
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
@@ -5505,11 +5572,12 @@ async function outlookMeetingWrite(p) {
     target: 'your calendar',
     url: event.webLink || null
   };
+  if (joinUrl) base.joinUrl = joinUrl;
   if (!outlookHasSnap(eventSnap)) return outlookUnverifiedWrite(base, ref);
   return Object.assign({
     ok: true,
     fetchedBack: true,
-    written: 'Calendar · ' + title + (when ? ' · ' + when : ''),
+    written: 'Calendar · ' + title + (when ? ' · ' + when : '') + (joinUrl ? ' · Teams' : ''),
     ref: ref
   }, base);
 }
@@ -5626,6 +5694,19 @@ function outlookTodoListIdFrom(body) {
   return first ? first.id : '';
 }
 
+// A repeating commitment becomes a repeating To Do task only when the owner's
+// switch RECURRING_TODO is on (default off) and the mail states one rule and
+// one clock. Otherwise the task is the one-off it has always been.
+async function outlookRecurrenceFor(text) {
+  const R = globalThis.FlowTodoRecurrence;
+  if (!R || !text) return null;
+  if (!(await glanceSwitchOn(R.SWITCH))) return null;
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayIso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  return R.plan({ flags: { [R.SWITCH]: true }, text: String(text).slice(0, 4000), todayIso: todayIso });
+}
+
 async function outlookTaskWrite(p) {
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) {
@@ -5672,6 +5753,15 @@ async function outlookTaskWrite(p) {
     }
   }
 
+  // To Do needs a due date for a repeat: the first occurrence is that date.
+  const rec = await outlookRecurrenceFor(p && p.text);
+  if (rec) {
+    body.recurrence = rec.recurrence;
+    body.dueDateTime = { dateTime: rec.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+    body.isReminderOn = true;
+    body.reminderDateTime = { dateTime: calendarDateTime(rec.dueIso, rec.hour, rec.minute), timeZone: localTimeZone() };
+  }
+
   const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
   outlookAssertNotSend(postUrl);
   const res = await outlookFetch(postUrl, {
@@ -5685,8 +5775,9 @@ async function outlookTaskWrite(p) {
   if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
   let task = null;
   try { task = await res.json(); } catch (e) { task = null; }
-  const written = taskWrittenLine(close.dueIso, close.amount).replace(/^Google Task/, 'To Do');
+  const written = taskWrittenLine(rec ? rec.dueIso : close.dueIso, close.amount).replace(/^Google Task/, 'To Do') + (rec ? ' · repeats' : '');
   const base = { where: 'Microsoft To Do', target: 'default list', written: written, url: null };
+  if (rec) base.repeats = true;
   const Proof = globalThis.FlowProofOfClose;
   const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
   const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
@@ -5737,6 +5828,11 @@ function outlookTodoAgrees(sent, got) {
   const want = String((sent && sent.title) || '').trim();
   const have = got.title == null ? '' : String(got.title).trim();
   if (want && have && want !== have) return false;
+  // A repeat was asked for: the task read back must carry the same rule.
+  if (sent && sent.recurrence) {
+    const R = globalThis.FlowTodoRecurrence;
+    if (!R || !R.agrees(sent.recurrence, got.recurrence)) return false;
+  }
   if (!(sent && sent.dueDateTime) || !got.dueDateTime) return true;
   if (outlookClockKey(sent.dueDateTime) !== outlookClockKey(got.dueDateTime)) return false;
   const a = outlookZoneKey(sent.dueDateTime.timeZone);

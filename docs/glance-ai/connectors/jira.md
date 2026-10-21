@@ -45,12 +45,12 @@ Every stored value is checked against a strict shape (project key `[A-Z][A-Z0-9_
 ## 5. Recognition and the plan
 
 - **No new recognition.** Jira is a **destination** for a close that is already recognised (a task-only Do It). The Hebrew/English recognition, the precision gates and the hard quiets are untouched. No new loop type, so no new intent examples (quality bar §7: **not applicable**; no weights or gates changed).
-- **Appears in the steps list / Loops: NOT YET** (same gap as Notion and Asana, `open-tasks.md` row 77): the steps list builds only `googleTask` / `outlookTask`; choosing Jira via `FlowConnectorOutcome.destinationOrder` needs an owner decision on the default when several task systems are connected.
+- **Appears in the steps list / Loops: NOT YET** (same gap as Notion and Asana, `open-tasks.md` row 80): the steps list builds only `googleTask` / `outlookTask`; choosing Jira via `FlowConnectorOutcome.destinationOrder` needs an owner decision on the default when several task systems are connected.
 - **Silent when:** not connected, switch off, no project, no title.
 
 ## 6. Learning hook
 
-`core/connector-outcome.js` events with `connector:"jira"`, `destinationSystem:"jira/issue"` from the writer: `approved`, `handled`, `readback_failed`, `undone`. `offered`, `edited`, `ignored` have no emitter yet (the steps-list card). No title, address, issue key or text (asserted). Off with the switch. Conclusions exist and are tested but no card reads them yet (row 77).
+`core/connector-outcome.js` events with `connector:"jira"`, `destinationSystem:"jira/issue"` from the writer: `approved`, `handled`, `readback_failed`, `undone`. `offered`, `edited`, `ignored` have no emitter yet (the steps-list card). No title, address, issue key or text (asserted). Off with the switch. Conclusions exist and are tested but no card reads them yet (row 80).
 
 ## 7. Tests (against a mock; no real account, key or mail)
 
@@ -96,4 +96,4 @@ The authorize/token URLs and JSON token body; `audience`, `prompt=consent` and t
 
 ## 12. Blockers to going live
 
-(a) owner registers the Atlassian app and sets the env vars; (b) owner «מאשר» to deploy the relay; (c) `api.atlassian.com` host + store re-review; (d) privacy/store drafts applied; (e) the unverified vendor facts in §9; (f) steps-list destination wiring (row 77).
+(a) owner registers the Atlassian app and sets the env vars; (b) owner «מאשר» to deploy the relay; (c) `api.atlassian.com` host + store re-review; (d) privacy/store drafts applied; (e) the unverified vendor facts in §9; (f) steps-list destination wiring (row 80).
