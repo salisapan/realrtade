@@ -6,8 +6,9 @@
 // launchWebAuthFlow (config/oauth.public.js).
 //
 // Allowed scopes, and nothing else: openid, userinfo.profile, userinfo.email,
-// drive.file, calendar.events, tasks. A gmail.* or drive.readonly scope is
-// refused here. Gmail is read and filled on the Gmail page. Glance never sends.
+// drive.file, calendar.events, tasks. Restricted Gmail scopes and drive-wide
+// read scopes are refused here. Gmail is read and filled on the Gmail page.
+// Glance never sends.
 const FlowGoogleConfig = (() => {
   const CLIENT_ID = '93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com'; // store build only
   const EXTENSION_ID = 'lbihckfmoffgjjlnneoeaehbhoonfenh'; // store build only
@@ -33,8 +34,8 @@ const FlowGoogleConfig = (() => {
     return null;
   }
 
-  // gmail.* needs CASA. drive.readonly and the full drive scope read the
-  // whole Drive. documents and spreadsheets scopes are not this grant:
+  // Restricted Gmail scopes need CASA. Drive-wide read scopes are refused.
+  // documents and spreadsheets scopes are not this grant:
   // those APIs are called only with drive.file, on a file this app created
   // or the person picked.
   function refusalReason(scope) {

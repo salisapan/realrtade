@@ -1447,21 +1447,6 @@ function glanceE2eGoogleAuth(interactive) {
   return e2e.googleAuthToken(Boolean(interactive));
 }
 
-// Headless regression only. A local mock server sets httpOrigin. Production
-// never sets __glanceE2e, so the URL below is unchanged.
-function glanceE2eRewrite(url) {
-  const e2e = globalThis.__glanceE2e;
-  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
-  if (!origin || !url) return url;
-  try {
-    const u = new URL(url);
-    const base = new URL(origin);
-    return base.origin + u.pathname + u.search;
-  } catch (e) {
-    return url;
-  }
-}
-
 function getGoogleAuthToken(interactive) {
   const hooked = glanceE2eGoogleAuth(interactive);
   if (hooked && typeof hooked.then === 'function') return hooked;
@@ -1484,6 +1469,21 @@ function removeCachedGoogleAuthToken(token) {
     return Promise.resolve();
   }
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
+}
+
+// Headless regression only. A local mock server sets httpOrigin. Production
+// never sets __glanceE2e, so the URL below is unchanged.
+function glanceE2eRewrite(url) {
+  const e2e = globalThis.__glanceE2e;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
 }
 
 // Headless regression only. chrome.identity.launchWebAuthFlow cannot be
@@ -3220,9 +3220,9 @@ const DRIVE_SEARCH_PAGE_SIZE = 100;
 const DRIVE_SEARCH_MAX_FILES = 400;
 
 // A Drive files.list failure, as a silence the file chain can show.
-// 403 with an insufficient-scope body is drive-not-granted (the cached
-// chrome.identity token predates drive.readonly, or the grant never
-// included it). Any other failure is drive-search-failed. The list itself
+// 403 with an insufficient-scope body is drive-not-granted (stale token or
+// drive.file not granted for this path). Any other failure is drive-search-failed.
+// The list itself
 // stays null either way: a partial page is not "no file".
 function driveSearchFailure(status, body) {
   const err = body && body.error;
@@ -3268,9 +3268,8 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
-// One 403 for a missing Drive scope drops the cached Chrome token and asks
-// once more, silently. A grant that already includes drive.readonly can be
-// reused. This retry does not open a consent window. A second 403 stops.
+// One 403 for a missing Drive scope drops the cached Chrome token and retries
+// once, silently. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
@@ -3376,10 +3375,11 @@ async function fetchDriveFileAsAttachment(driveFileId) {
   }
 }
 
-// Reply-with-facts reads a Sheet or Doc through the Drive export endpoint.
-// drive.readonly already covers that. No spreadsheets scope, no picker,
-// and this function does not decide the match — it only returns the few
-// candidate texts. Listing goes through searchDriveFiles. More than three
+// Reply-with-facts reads a Sheet or Doc through Drive export for files the
+// person picked or Glance created (drive.file). No spreadsheets scope.
+// This function does not decide the match — it only returns the few
+// candidate texts. Listing goes through searchDriveFiles when enabled.
+// More than three
 // files, a failed page, or a file too large to prove it holds a single
 // cell is truncated so the caller stays silent.
 const FACT_SHEET_MIME = 'application/vnd.google-apps.spreadsheet';

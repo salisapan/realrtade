@@ -19,6 +19,10 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
 import package_trial_extension as trial
 
 REPO_ROOT = trial.REPO_ROOT
@@ -53,9 +57,12 @@ FULL_HOSTS = (
     "https://www.googleapis.com/oauth2/*",
     "https://www.googleapis.com/upload/drive/*",
     "https://gmail.googleapis.com/*",
+    "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*",
 )
 FULL_OPTIONAL_HOSTS = (
+    "https://api.dropboxapi.com/*",
+    "https://content.dropboxapi.com/*",
     "https://web.whatsapp.com/*",
     "https://app.slack.com/*",
     "https://web.telegram.org/*",
@@ -66,6 +73,20 @@ FULL_OPTIONAL_HOSTS = (
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
     "https://outlook.office365.com/*",
+    "https://www.messenger.com/*",
+    "https://messenger.com/*",
+    "https://www.facebook.com/messages",
+    "https://www.facebook.com/messages/*",
+    "https://facebook.com/messages",
+    "https://facebook.com/messages/*",
+    "https://business.facebook.com/latest/inbox",
+    "https://business.facebook.com/latest/inbox/*",
+    "https://www.business.facebook.com/latest/inbox",
+    "https://www.business.facebook.com/latest/inbox/*",
+    "https://www.instagram.com/direct",
+    "https://www.instagram.com/direct/*",
+    "https://instagram.com/direct",
+    "https://instagram.com/direct/*",
 )
 FULL_SCOPES = (
     "openid",
@@ -451,71 +472,117 @@ function getGoogleAuthToken(interactive) {
     )
     raw = replace_once(
         raw,
-        "    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',\n",
-        "    notion: 'notionAuth', slack: 'slackAuth', monday: 'mondayAuth',\n",
+        """// Headless regression only. A local mock server sets httpOrigin. Production
+// never sets __glanceE2e, so the URL below is unchanged.
+function glanceE2eRewrite(url) {
+  const e2e = globalThis.__glanceE2e;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
+}
+
+""",
+        """function glanceE2eRewrite(url) {
+  return url;
+}
+
+""",
+        "e2e http rewrite hook",
+    )
+    raw = replace_once(
+        raw,
+        """// Headless regression only. chrome.identity.launchWebAuthFlow cannot be
+// replaced inside the service worker, the same reason getAuthToken goes
+// through glanceE2eGoogleAuth. Production never sets __glanceE2e.
+function glanceE2eWebAuthFlow(details) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || typeof e2e.launchWebAuthFlow !== 'function') return null;
+  return e2e.launchWebAuthFlow(details);
+}
+
+function launchGoogleWebAuthFlow(details) {
+  const hooked = glanceE2eWebAuthFlow(details);
+  if (hooked && typeof hooked.then === 'function') return hooked;
+  return new Promise((resolve, reject) => {
+""",
+        """function launchGoogleWebAuthFlow(details) {
+  return new Promise((resolve, reject) => {
+""",
+        "e2e web auth hook",
+    )
+    raw = replace_once(
+        raw,
+        "    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',\n",
+        "    notion: 'notionAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',\n",
         "disconnect storage keys",
     )
     raw = replace_once(
         raw,
-        """async function connectorStatus() {
-  const hs = await getHubspotAuth();
+        """  const hs = await getHubspotAuth();
   const nt = await getNotionAuth();
   const sf = await getSalesforceAuth();
   const sl = await getSlackAuth();
-  const md = await getMondayAuth();
-  const gt = await getGoogleTasksAuth();
-  return {
-    googleTasks: {
-      connected: Boolean(gt),
-      configured: googleTasksConfigured(),
-      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
-    },
-    hubspot: {
+""",
+        """  const nt = await getNotionAuth();
+  const sl = await getSlackAuth();
+""",
+        "connector status auth fetches",
+    )
+    raw = replace_once(
+        raw,
+        """    hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
     },
-    notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null },
-    salesforce: {
+    notion: { connected:""",
+        """    notion: { connected:""",
+        "connector status hubspot",
+    )
+    raw = replace_once(
+        raw,
+        """    salesforce: {
       connected: Boolean(sf),
       configured: Boolean(SALESFORCE_CLIENT_ID)
     },
     slack: {""",
-        """async function connectorStatus() {
-  const nt = await getNotionAuth();
-  const sl = await getSlackAuth();
-  const md = await getMondayAuth();
-  const gt = await getGoogleTasksAuth();
-  return {
-    googleTasks: {
-      connected: Boolean(gt),
-      configured: googleTasksConfigured(),
-      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
-    },
-    notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null },
-    slack: {""",
-        "connector status",
+        """    slack: {""",
+        "connector status salesforce",
     )
     raw = replace_once(
         raw,
-        "  hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,\n",
-        "  notion: notionWrite, slack: slackWrite, monday: mondayWrite,\n",
+        "  hubspot: hubspotWrite, notion: CONNECTORS.notionReadBack ? notionReadBackWrite : notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,\n",
+        "  notion: CONNECTORS.notionReadBack ? notionReadBackWrite : notionWrite, slack: slackWrite, monday: mondayWrite,\n",
         "writers",
     )
     raw = replace_once(
         raw,
-        "  hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,\n",
-        "  notion: notionUndo, slack: slackUndo, monday: mondayUndo,\n",
+        "  hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,\n",
+        "  notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, slack: slackUndo, monday: mondayUndo,\n",
         "undoers",
     )
     raw = replace_once(
         raw,
-        """    if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
-    if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
-    if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
-""",
-        """    if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
-""",
-        "connect handlers",
+        "    if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));\n",
+        "",
+        "connect handler hubspot",
+    )
+    raw = replace_once(
+        raw,
+        "    if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));\n",
+        "",
+        "connect handler salesforce",
+    )
+    raw = replace_once(
+        raw,
+        "  // would hold every 401 retry for the full 30s. Production never sets __glanceE2e.\n",
+        "  // would hold every 401 retry for the full 30s. Production never sets a test hook.\n",
+        "e2e comment scrub",
     )
     if flavor == "outlook":
         raw = strip_outlook_dead_connectors(raw)
@@ -664,6 +731,68 @@ def strip_outlook_dead_connectors(raw: str) -> str:
     return raw
 
 
+def transform_google_lane_host(raw: str) -> str:
+    return replace_once(
+        raw,
+        """function laneUrl(url) {
+  const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
+  const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
+  if (!origin || !url) return url;
+  try {
+    const u = new URL(url);
+    const base = new URL(origin);
+    return base.origin + u.pathname + u.search;
+  } catch (e) {
+    return url;
+  }
+}
+""",
+        """function laneUrl(url) {
+  return url;
+}
+""",
+        "lane host e2e url rewrite",
+    )
+
+
+def transform_lane_chat_worker(raw: str) -> str:
+    raw = replace_once(
+        raw,
+        """  // The headless copy sets __glanceE2e.installed. A store build has update_url
+  // and never takes this path, even if that global is present.
+  function e2eToken() {
+    const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
+    if (!e2e || e2e.installed !== true || typeof e2e.googleAuthToken !== 'function') return null;
+    try {
+      const manifest = typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function'
+        ? chrome.runtime.getManifest()
+        : null;
+      if (manifest && manifest.update_url) return null;
+    } catch (e) { return null; }
+    return e2e;
+  }
+
+  // chrome.identity cannot be replaced inside the service worker. The headless
+  // suite sets __glanceE2e.googleAuthToken, the same seam getGoogleAuthToken
+  // uses. Production never sets it, so the Chrome call below is unchanged.
+  function silentToken() {
+    return new Promise((resolve) => {
+      const e2e = e2eToken();
+      if (e2e) {
+        Promise.resolve().then(() => e2e.googleAuthToken(false)).then((token) => resolve(token || null)).catch(() => resolve(null));
+        return;
+      }
+      const identity = typeof chrome !== 'undefined' && chrome.identity;
+""",
+        """  function silentToken() {
+    return new Promise((resolve) => {
+      const identity = typeof chrome !== 'undefined' && chrome.identity;
+""",
+        "lane chat worker e2e token hook",
+    )
+    return raw
+
+
 def transform_outlook(raw: str) -> str:
     raw = cut_until(
         raw,
@@ -671,12 +800,18 @@ def transform_outlook(raw: str) -> str:
         "(() => {\n",
         "outlook debug comment",
     )
+    raw = replace_once(
+        raw,
+        "  try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }\n",
+        "",
+        "outlook local debug flag",
+    )
     raw = remove_brace_statement(raw, "globalThis.__flowDiag = Object.freeze(", "__flowDiag")
     raw = replace_once(
         raw,
-        """  try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }
-  try {
-    chrome.storage.local.get({ glanceDebug: false, glanceOutlookFileTrace: 0 }, (r) => {
+        """  try {
+    storageGet({ glanceDebug: false, glanceOutlookFileTrace: 0, glanceUiLanguage: null }, (r) => {
+      rememberUi(r);
       if (r && r.glanceDebug) debug = true;
       traceArmed = (Number(r && r.glanceOutlookFileTrace) || 0) > 0;
       dbg('injected', { version: VERSION, href: location.href });
@@ -712,12 +847,12 @@ def transform_outlook(raw: str) -> str:
     )
     raw = replace_once(
         raw,
-        """      if (area === 'local' && changes.glanceDebug) debug = Boolean(changes.glanceDebug.newValue);
-      if (area === 'local' && changes.glanceOutlookFileTrace) {
-        const n = Number(changes.glanceOutlookFileTrace.newValue) || 0;
-        traceArmed = n > 0;
-        if (n > 0) { lastSig = ''; schedule(); }
-      }
+        """        if (area === 'local' && changes.glanceDebug) debug = Boolean(changes.glanceDebug.newValue);
+        if (area === 'local' && changes.glanceOutlookFileTrace) {
+          const n = Number(changes.glanceOutlookFileTrace.newValue) || 0;
+          traceArmed = n > 0;
+          if (n > 0) { lastSig = ''; schedule(); }
+        }
 """,
         "",
         "outlook debug listener",
@@ -728,55 +863,68 @@ def transform_outlook(raw: str) -> str:
     raw = replace_once(
         raw,
         """    try {
-      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
-      const list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => d && d.key !== key);
-      list.unshift(Object.assign({
-        key, reason, at: Date.now(), source: 'page',
-        subject: (typeof FlowDisplay !== 'undefined' && FlowDisplay.sanitizeStoredSubject)
-          ? FlowDisplay.sanitizeStoredSubject(pane && pane.subject)
-          : String((pane && pane.subject) || '').slice(0, 120),
-        counterpart: (pane && pane.senderEmail) || null,
-        conversationId: (pane && pane.conversationId) || null,
-        messageId: (pane && (pane.itemId || pane.pathId)) || null
-      }, extra || {}));
-      await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 40) }, resolve));
-      lastReasonKey = key;
+      const bag = await new Promise((resolve) => storageGet({
+        [PAGE_DIAG_KEY]: [],
+        outlookSync: {},
+        glanceWhyCurrent: null,
+        glanceWhyByConv: {}
+      }, resolve));
+      if (stored.epoch !== mailEpoch) return;
+      const ids = recordIds(stored);
+      let list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => {
+        if (!d) return false;
+        if (sameRecordId(d.id, ids) || sameRecordId(d.messageId, ids) || sameRecordId(d.conversationId, ids)) return false;
+        if (stored.verdict === 'show' && d.verdict === 'quiet' && sameRecordId(d.priorConversationId, ids)) return false;
+        return true;
+      });
+      list.unshift(stored);
+      const patch = { [PAGE_DIAG_KEY]: list.slice(0, 40) };
+      const whyKey = String(stored.conversationId || stored.messageId || '');
+      const map = Object.assign({}, bag.glanceWhyByConv || {});
+      const entry = {
+        reason: stored.reason,
+        subject: stored.subject || '',
+        messageId: stored.messageId || null,
+        conversationId: stored.conversationId || stored.messageId || null,
+        at: stored.at
+      };
+      if (stored.verdict === 'show') {
+        if (whyKey && map[whyKey]) delete map[whyKey];
+      } else if (whyKey && stored.reason) {
+        map[whyKey] = entry;
+      }
+      patch.glanceWhyByConv = map;
+      const current = bag.glanceWhyCurrent;
+      const currentKey = current && String(current.conversationId || current.messageId || '');
+      if (stored.verdict === 'show') {
+        if (!current || !currentKey || currentKey === whyKey) patch.glanceWhyCurrent = null;
+      } else if (whyKey && stored.reason) {
+        patch.glanceWhyCurrent = entry;
+      }
+      const sync = bag.outlookSync || {};
+      if (Array.isArray(sync.diagnostics)) {
+        const diagnostics = sync.diagnostics.filter((d) => {
+          if (!d) return false;
+          if (sameRecordId(d.conversationId, ids) || sameRecordId(d.messageId, ids) || sameRecordId(d.id, ids)) return false;
+          return true;
+        });
+        if (diagnostics.length !== sync.diagnostics.length) patch.outlookSync = Object.assign({}, sync, { diagnostics: diagnostics });
+      }
+      if (!guardContext()) return;
+      await new Promise((resolve) => {
+        try { chrome.storage.local.set(patch, resolve); }
+        catch (e) { stopQuietly(); resolve(); }
+      });
+      lastReasonKey = stored.key;
       lastReasonStored = true;
     } catch (e) {
       lastReasonStored = false;
-      try { console.error('Glance: page reason not stored', reason); } catch (x) { /* console gone */ }
     }
 """,
-        """    lastReasonKey = key;
+        """    lastReasonKey = stored.key;
     lastReasonStored = true;
 """,
         "page diag write",
-    )
-    raw = replace_once(
-        raw,
-        """    try {
-      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
-      const ids = messageIdsOf(pane);
-      const id = pane && (pane.conversationId || pane.itemId || pane.subject);
-      const list = (bag[PAGE_DIAG_KEY] || []).filter((d) => {
-        if (!d) return false;
-        if (id && String(d.key || '').endsWith('|' + id)) return false;
-        if (idListed(d.conversationId, ids) || idListed(d.messageId, ids)) return false;
-        return true;
-      });
-      const sync = bag.outlookSync || {};
-      const patch = {};
-      if (list.length !== (bag[PAGE_DIAG_KEY] || []).length) patch[PAGE_DIAG_KEY] = list;
-      if (Array.isArray(sync.diagnostics)) {
-""",
-        """    try {
-      const bag = await new Promise((resolve) => chrome.storage.local.get({ outlookSync: {} }, resolve));
-      const ids = messageIdsOf(pane);
-      const sync = bag.outlookSync || {};
-      const patch = {};
-      if (Array.isArray(sync.diagnostics)) {
-""",
-        "page diag clear",
     )
     return raw
 
@@ -822,6 +970,8 @@ TRANSFORM_FILES = {
     "src/background.js",
     "src/content-outlook.js",
     "src/content-gmail.js",
+    "src/google-lane-host.js",
+    "src/lane-chat-worker.js",
     "config/release.public.js",
 }
 
@@ -837,6 +987,10 @@ def transform_file(rel: str, text: str, sha: str, flavor: str) -> str:
         return transform_outlook(text)
     if rel == "src/content-gmail.js":
         return transform_gmail(text)
+    if rel == "src/google-lane-host.js":
+        return transform_google_lane_host(text)
+    if rel == "src/lane-chat-worker.js":
+        return transform_lane_chat_worker(text)
     if rel == "config/release.public.js":
         return transform_release(text, sha, flavor)
     return text
@@ -878,9 +1032,27 @@ def build_bytes(sha: str, flavor: str) -> dict[str, bytes]:
         if rel.endswith(".js"):
             syntax_check(rel, raw)
         out[rel] = raw
-    if "config/release.public.js" not in out:
+    release_rel = "config/release.public.js"
+    if release_rel not in out:
+        release_path = EXTENSION_ROOT / release_rel
+        if not release_path.is_file():
+            die(f"missing {release_rel}")
+        release_text = transform_file(
+            release_rel, release_path.read_text(encoding="utf-8"), sha, flavor
+        )
+        syntax_check(release_rel, release_text.encode("utf-8"))
+        out[release_rel] = release_text.encode("utf-8")
+    if release_rel not in out:
         die("the store zip did not pick up config/release.public.js")
-    if "popup/report-problem.js" not in out:
+    report_rel = "popup/report-problem.js"
+    if report_rel not in out:
+        report_path = EXTENSION_ROOT / report_rel
+        if not report_path.is_file():
+            die(f"missing {report_rel}")
+        report_raw = report_path.read_bytes()
+        syntax_check(report_rel, report_raw)
+        out[report_rel] = report_raw
+    if report_rel not in out:
         die("the store zip did not pick up popup/report-problem.js")
     return out
 
@@ -1201,3 +1373,7 @@ def self_test() -> None:
     }
     _expect_fail(outlook_shaped, "glance-0.0.1-abcdef0-prod.zip", "an outlook package labeled as the full zip")
     print("PASS self-test: a broken zip is rejected")
+
+
+if __name__ == "__main__":
+    main_build(sys.argv[1:])

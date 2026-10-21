@@ -4,7 +4,8 @@
   "version": "0.9.56",
   "description": "Headless regression package for the Glance extension. Not shipped in the install zip.",
   "scripts": {
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "build:prod": "python3 ../scripts/cws_prod.py --flavor full"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1",

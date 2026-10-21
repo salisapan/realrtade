@@ -837,10 +837,7 @@ function verifyUrlFor(connectorId, ref) {
     const id = r.taskId || r.externalId;
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
-  if (connectorId === 'gmailCompose' || connectorId === 'googleReplyDraft') {
-    const id = r.draftId;
-    return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
-  }
+  if (connectorId === 'gmailCompose') return '';
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
   if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');

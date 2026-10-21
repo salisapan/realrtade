@@ -9,8 +9,7 @@ const FlowGoogleLane = (() => {
     googleDoc: 'FlowGoogleDocs',
     googleSheetAppend: 'FlowGoogleSheets',
     googleNewFile: 'FlowWorkspaceFile',
-    googleEventCallLink: 'FlowEventCallLink',
-    googleReplyDraft: 'FlowGoogleDrafts'
+    googleEventCallLink: 'FlowEventCallLink'
   };
 
   let injected = null;
