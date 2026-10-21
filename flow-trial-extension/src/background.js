@@ -86,6 +86,7 @@ import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
+import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
 
@@ -6807,6 +6808,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:follow-draft') return reply(sendResponse, followDraftCreate(msg.payload || {}));
 
   if (msg.type === 'flow:pro-status') return reply(sendResponse, proStatus());
+  // Carry until closed (config/carry.public.js): the switches the follow loop and the Loops panel read. All off in this build.
+  if (msg.type === 'flow:carry') return reply(sendResponse, Promise.resolve({ ok: true, nextMove: CARRY.nextMove === true, invoices: CARRY.invoices === true }));
   if (msg.type === 'flow:pro-activate') return reply(sendResponse, activatePro(msg.key));
   if (msg.type === 'flow:pro-deactivate') return reply(sendResponse, deactivatePro());
   if (msg.type === 'flow:pro-billing') return reply(sendResponse, openBillingPortal());

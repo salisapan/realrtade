@@ -148,7 +148,7 @@ const FlowPmfMetrics = (() => {
   // COUNTS only: an event name and a variant, never text, an address, a subject or a name. Nothing here
   // sends anything; a future upload of these counts goes through the same anonymous install-id pipe as
   // the weekly habit, and turning it on is the owner's decision with the privacy page changed in the same commit.
-  const EXPERIMENTS = { 'carry-next-move': { arms: ['A', 'B'] } };
+  const EXPERIMENTS = { 'carry-next-move': { arms: ['A', 'B'] }, 'invoice-loop': { arms: ['A', 'B'] } };
   // Each event is one counter. A move's type is part of the name so the fold never needs free text.
   const AB_EVENTS = [
     'loop_stuck',              // a loop reached its fourth chase day with no answer (both arms)
@@ -158,7 +158,12 @@ const FlowPmfMetrics = (() => {
     'answered_after_stuck',    // both: the loop got its real answer after it was stuck
     'released',                // both: the person let it go (B by the question, A by hand)
     'reopened_after_release',  // the person reopened a loop they released: the early-release signal
-    'open_at_day_90'           // both: still open 90 days after it opened
+    'open_at_day_90',          // both: still open 90 days after it opened
+    // invoice-loop (CARRY.invoices): B opens a loop from a sent invoice; both count the payment signals that closed one.
+    'invoice_sent',            // both: a sent message read as an invoice (B opens a loop, A only counts it)
+    'invoice_loop_opened',     // B: the loop was offered and the person kept it
+    'invoice_paid_signal',     // both: the client's paid reply, a bank or processor email, or the same in a chat
+    'invoice_released'         // the person let an invoice loop go
   ];
   function fnv(str) {
     let h = 2166136261 >>> 0;

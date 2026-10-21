@@ -1,0 +1,24 @@
+{"id":"jh01","lang":"he","text":"היי אבי, מצורפת החשבונית על התקנת המזגן, 2,850 ₪. אפשר להעביר בהעברה בנקאית.","owed":true,"amount":2850}
+{"id":"jh02","lang":"he","text":"שלום, רצ\"ב חשבונית מס 3310 על סך 6,960 ₪ כולל מע\"מ. תודה על שיתוף הפעולה!","owed":true,"amount":6960}
+{"id":"jh03","lang":"he","text":"מצרף את דרישת התשלום לחודש הזה, 1,400 ₪. שוטף + 45.","owed":true,"amount":1400}
+{"id":"jh04","lang":"he","text":"היי מיכל, החשבונית מצורפת. סה\"כ לתשלום 780 ₪.","owed":true,"amount":780}
+{"id":"jh05","lang":"he","text":"צירפתי חשבונית על 4,000 ₪ + מע\"מ עבור ההרצאה.","owed":true,"amount":4720}
+{"id":"jh06","lang":"he","text":"בוקר טוב, מצורפת חשבונית עסקה מספר 88 בסך 11,500 ₪. לתשלום עד 30/11.","owed":true,"amount":11500}
+{"id":"jh07","lang":"en","text":"Hi Jen, attached please find invoice #5521 for $3,300. Thank you!","owed":true,"amount":3300}
+{"id":"jh08","lang":"en","text":"Here is my invoice for the September sessions: $720 total. Due within 7 days.","owed":true,"amount":720}
+{"id":"jh09","lang":"en","text":"Invoice INV-1188 is attached. Balance due: €5,400, net 45.","owed":true,"amount":5400}
+{"id":"jh10","lang":"en","text":"Hey Sam, sending over the invoice for the website build - $6,000. Thanks again!","owed":true,"amount":6000}
+{"id":"jh11","lang":"en","text":"Please find our invoice attached for £2,250 (payment terms: 30 days).","owed":true,"amount":2250}
+{"id":"jh12","lang":"en","text":"Attached: invoice 4410, $1,575. Bank details are on page 2.","owed":true,"amount":1575}
+{"id":"jq01","lang":"he","text":"מצורפת קבלה על סך 2,850 ₪. תודה שבחרתם בנו!","owed":false}
+{"id":"jq02","lang":"he","text":"היי, אוציא לך חשבונית על 4,000 ₪ אחרי ההרצאה.","owed":false}
+{"id":"jq03","lang":"he","text":"קיבלתי את החשבונית על 6,960 ₪, תודה. אעביר לתשלום.","owed":false}
+{"id":"jq04","lang":"he","text":"מצורפת הצעת מחיר על סך 11,500 ₪ בתוקף לשבועיים.","owed":false}
+{"id":"jq05","lang":"he","text":"שלום, מצורפות החשבוניות לחודש ספטמבר להנהלת החשבונות, סה\"כ 22,100 ₪.","owed":false}
+{"id":"jq06","lang":"he","text":"מצורף אישור ההעברה על 1,400 ₪ לחשבונית שלכם.","owed":false}
+{"id":"jq07","lang":"en","text":"I'll invoice you $3,300 at the end of the month.","owed":false}
+{"id":"jq08","lang":"en","text":"Thanks, received your invoice for $720 and paid it today.","owed":false}
+{"id":"jq09","lang":"en","text":"Attached is the proposal for the website build, $6,000.","owed":false}
+{"id":"jq10","lang":"en","text":"FYI - the vendor invoice for $2,250 is attached, please approve it for payment.","owed":false}
+{"id":"jq11","lang":"en","text":"Attached is the corrected invoice; please ignore the previous one for $1,575.","owed":false}
+{"id":"jq12","lang":"en","text":"Attached is your receipt for $5,400. Thanks for your business!","owed":false}
