@@ -6,6 +6,8 @@ import '../core/google-account.js';
 import '../core/google-calendar.js';
 // FlowMeetLink: the Meet link on a hold, switch MEET_LINK, off.
 import '../core/meet-link.js';
+// FlowRecurringReminder: a repeat on the Hold It, switch RECURRING_HOLD, off.
+import '../core/recurring-reminder.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
@@ -520,10 +522,28 @@ async function meetWanted(connectorId, msgInput) {
   return laneSwitchOn(M.SWITCH);
 }
 
+// A Hold It for "every Tuesday at 10:00" creates the repeating series, only when RECURRING_HOLD
+// is on (default off) and the hold's own date is an occurrence of the one rule the mail states.
+async function seriesWanted(connectorId, msgInput, first) {
+  const R = globalThis.FlowRecurringReminder;
+  if (connectorId !== 'googleHold' || !R || typeof R.seriesFor !== 'function') return '';
+  const text = msgInput && msgInput.params && msgInput.params.callText;
+  if (!text) return '';
+  const rule = R.seriesFor(text, first && first.dateIso);
+  if (!rule) return '';
+  return (await laneSwitchOn(R.HOLD_SWITCH)) ? rule : '';
+}
+
 async function writeWithListRecovery(connectorId, msgInput, cred) {
   const first = await prepareWrite(connectorId, msgInput, cred);
-  if (await meetWanted(connectorId, msgInput)) {
-    return globalThis.FlowMeetLink.holdWithMeet(first, laneHttp, undefined, globalThis.FlowGoogleCalendar);
+  const rule = await seriesWanted(connectorId, msgInput, first);
+  const meet = await meetWanted(connectorId, msgInput);
+  if (rule || meet) {
+    const http = rule ? globalThis.FlowRecurringReminder.withRecurrence(laneHttp, rule) : laneHttp;
+    const written = meet
+      ? await globalThis.FlowMeetLink.holdWithMeet(first, http, undefined, globalThis.FlowGoogleCalendar)
+      : await globalThis.FlowGoogleCalendar.write(first, http);
+    return rule ? globalThis.FlowRecurringReminder.confirmSeries(written, rule, laneHttp) : written;
   }
   const result = await Lane.write(connectorId, first);
   const given = msgInput && (msgInput.taskListId || (msgInput.params && msgInput.params.taskListId));

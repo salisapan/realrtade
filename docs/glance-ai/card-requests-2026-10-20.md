@@ -121,4 +121,5 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Step: `יצירת קישור Teams על האירוע ובדיקה חוזרת` / `Create a Teams link on the event and read it back`.
 - Action: one Do It. The receipt shows the link (`joinUrl`) with a Copy control and the calendar link. Glance sends the link to no one.
 - Undo: turns the online meeting off. If the person edited the event or changed the link, the card says Undo unavailable and nothing is removed.
+- Update 2026-10-21 (T1): the same repeat now also rides on the existing Gmail Hold It when `glanceSwitches.RECURRING_HOLD` is on and the mail states one repeat that the hold's date is an occurrence of ("Weekly sync every Tuesday at 10:00"). The result's `written` ends with the frequency (for example `· weekly`) and carries `recurrence` (the rule). The card should say it repeats, in the receipt row. Undo deletes the whole series if unedited. Without the switch nothing changes.
 

@@ -49,7 +49,7 @@ const FlowRecurringReminder = (() => {
   const HEDGE = /\b(?:maybe|perhaps|if you want|if you'?d like|if possible|when you can|no pressure|might|ideally)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם\s+בא\s+לך|אם\s+אפשר/i;
   const FYI = /\b(?:fyi|for your information|no action needed|used to)\b|לידיעתך|לידיעה/i;
   const PAST = /\b(?:was|were|had|did|sent|used to|last)\b[^.!?\n]{0,40}\bevery\b/i;
-  const THIRD = /\b(?:ask|have|get|tell|let)\s+(?!(?:me|us|you)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,3}\s+(?:to\s+)?(?:send|remind|submit|file|pay|prepare|share|update|report|post)\b|תבקש(?:י|ו)?\s*מ|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))/i;
+  const THIRD = /\b(?:ask|have|get|tell|let)\s+(?!(?:me|us|you)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,3}\s+(?:to\s+)?(?:send|remind|submit|file|pay|prepare|share|update|report|post|hold|schedule|set\s+up|book|arrange|organi[sz]e|run|host)\b|תבקש(?:י|ו)?\s*מ|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))/i;
   const OTHER_RULE = /\bevery\s+(?:other|second|third|two|three|\d+)\b|\bbi-?(?:weekly|monthly)\b|\bquarterly\b|\bannually\b|\byearly\b|\bevery\s+(?:year|quarter)\b|כל\s+(?:שבועיים|שנה|רבעון)|דו[- ]?שבועי/i;
 
   const RULE_WEEKDAY_EN = new RegExp('\\bevery\\s+(' + DAYS.join('|') + ')s?\\b', 'ig');
@@ -305,7 +305,73 @@ const FlowRecurringReminder = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.eventId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, plan, create, undo, contentHash };
+  // ---- a repeat on the live Hold It --------------------------------------------
+  // A hold for "weekly sync every Tuesday at 10:00" is one meeting that repeats. The Hold It
+  // card already exists; with RECURRING_HOLD on it creates the series instead of one event.
+  // The rule must be the single one the mail states, and the hold's own date must be an
+  // occurrence of it (a Tuesday hold for "every Tuesday"), otherwise the hold stays a single event.
+  const HOLD_SWITCH = 'RECURRING_HOLD';
+  const EVENTS = /^https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events/;
+
+  function dowOf(dateIso) {
+    const d = new Date(String(dateIso) + 'T00:00:00Z');
+    return Number.isNaN(d.getTime()) ? -1 : d.getUTCDay();
+  }
+
+  function seriesFor(text, dateIso) {
+    const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
+    if (!s.trim() || !/\b(?:every|each|daily|weekly|monthly)\b|כל\s|לחודש/i.test(s)) return '';
+    if (OTHER_RULE.test(s) || PAST.test(s) || NEG.test(s) || FYI.test(s) || HEDGE.test(s) || THIRD.test(s)) return '';
+    const r = ruleOf(s);
+    if (!r.rule) return '';
+    const date = String(dateIso || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+    const dow = dowOf(date);
+    if (r.rule.freq === 'WEEKLY' && dow !== r.rule.day) return '';
+    if (r.rule.freq === 'WEEKDAYS' && (dow < 1 || dow > 5)) return '';
+    if (r.rule.freq === 'MONTHLY' && Number(date.slice(8, 10)) !== r.rule.dom) return '';
+    return r.rule.rrule;
+  }
+
+  // An http function that makes the hold's own create carry the repeat rule. Nothing else changes:
+  // no attendee, sendUpdates=none, the same read-back.
+  function withRecurrence(http, rrule) {
+    return async function seriesHttp(req) {
+      const r = req || {};
+      const url = String(r.url || '');
+      if (r.method === 'POST' && EVENTS.test(url) && /\?sendUpdates=none/.test(url)) {
+        let json = r.json;
+        if (!json && typeof r.body === 'string') { try { json = JSON.parse(r.body); } catch (e) { json = null; } }
+        if (json) {
+          json = Object.assign({}, json, { attendees: [], recurrence: [rrule] });
+          return http(Object.assign({}, r, { json: json, body: JSON.stringify(json) }));
+        }
+      }
+      return http(r);
+    };
+  }
+
+  // After the hold is proved, the master event read by id must carry exactly the rule.
+  // If not, the event is deleted again and nothing is claimed.
+  async function confirmSeries(result, rrule, http) {
+    const ref = result && result.ref;
+    const id = ref && (ref.eventId || ref.externalId);
+    if (!result || result.ok !== true || !id) return result;
+    let got = null;
+    try { got = await http({ method: 'GET', url: 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id) }); } catch (e) { got = null; }
+    const rule = got && got.ok && got.json && Array.isArray(got.json.recurrence) ? got.json.recurrence : null;
+    if (rule && rule.length === 1 && rule[0] === rrule && got.json.id === id) {
+      return Object.assign({}, result, { recurrence: rrule, written: String(result.written || '') + ' · ' + rrule.replace('RRULE:FREQ=', '').split(';')[0].toLowerCase() });
+    }
+    let removed = false;
+    try {
+      const gone = await http({ method: 'DELETE', url: 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id) + '?sendUpdates=none' });
+      removed = !!(gone && (gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410));
+    } catch (e) { removed = false; }
+    return { ok: false, reason: 'series-failed', removed: removed, ref: removed ? null : ref, proof: null, written: '' };
+  }
+
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, HOLD_SWITCH, enabled, recognize, plan, create, undo, contentHash, seriesFor, withRecurrence, confirmSeries };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowRecurringReminder };
