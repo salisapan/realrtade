@@ -1,6 +1,6 @@
 # The invoice you sent is the open loop
 
-- **Status:** proposed
+- **Status:** experiment built (approved by Sali 2026-10-20, «עשה הכל לבד. יש לך אישורים להכל»; finished and wired 2026-10-20/21)
 - **Date:** 2026-10-18 (product lab, Sunday run)
 - **Switch:** `CARRY.invoices` in `flow-trial-extension/config/carry.public.js`, **off**
 - **Code:**
@@ -142,3 +142,49 @@ Both are `follow-up.js` reading a figure plus a payment word as money owed to yo
 2. **Invoicing-system copies.** Morning / Green Invoice / iCount email the client and copy the person ("חשבונית נשלחה ל…"). Read that copy as the same loop, which needs no Morning API.
 3. **The real-user A/B** through `core/pmf-metrics.js` (already dormant): per-arm counts of loops opened, closed by a payment signal, and released.
 4. **For the owner:** the two `follow-up.js` wrong loops above, to fix after #164 merges.
+
+## Experiment built (2026-10-20 and 2026-10-21)
+
+### Fixes, measured on cases they were not written for
+
+I fixed only the three errors found on held-out v0:
+- "I'll invoice" and «אוציא לך חשבונית» now count as not yet sent;
+- "sending over the invoice", «צירפתי» and «רצ"ב» now count as on this message;
+- «שלחתי לך את החשבונית» opens a loop only when an invoice file is attached.
+
+Before those fixes I wrote and froze a new held-out set, `glance-ai/eval-data/invoice-loop-heldout-v1.jsonl` (24 mails, 12 Hebrew and 12 English, sha256 `c5e01b37…`). It was scored once, after the fixes, and the code was not changed after that (`node scripts/invoice-loop-heldout.cjs v1`).
+
+| set | arm | owed n | loop opened | missed | not owed n | wrong loop | new wrong loop (B only) | wrong amount |
+|---|---|---|---|---|---|---|---|---|
+| v1 (fresh) | A today | 12 | 4 | 8 | 12 | 2 | — | 0 |
+| v1 (fresh) | **B** | 12 | **11** | **1** | 12 | 2 | **0** | 0 |
+| v1 Hebrew | A / B | 6 | 2 / 5 | 4 / 1 | 6 | 0 / 0 | 0 | 0 |
+| v1 English | A / B | 6 | 2 / 6 | 4 / 0 | 6 | 2 / 2 | 0 | 0 |
+| v0 (after the fixes, no longer blind) | B | 12 | 11 | 1 | 12 | 2 | 0 | 0 |
+
+- **B's one miss on v1:** «מצרף את דרישת התשלום», where the definite article «ה» is not in the noun list. It goes into the next held-out set, not into a fix tuned on v1.
+- **The two wrong loops on v1** are today's path in `core/follow-up.js`:
+  - "please approve the vendor invoice for payment";
+  - "ignore the previous one for $1,575".
+
+  B inherits them and adds none. Fixing them waits on open PR #164, which owns that file.
+
+### Wired, behind the switch (off)
+
+- `src/follow.js`: when nothing else opened a loop on the person's own sent message, `invoiceLoop` is asked, with the names of the attached files. The loop keeps `invoiceNo` and `amountNet`.
+- The switch reaches the page through one read-only service-worker message, `flow:carry` (`src/background.js`). The corpus harness `test/load-background.cjs` loads that import.
+- **Real-user A/B (dormant):** the experiment `invoice-loop` is added to `core/pmf-metrics.js`, with the events `invoice_sent`, `invoice_loop_opened`, `invoice_paid_signal` and `invoice_released`. They are counts only, and nothing is counted or sent while `CARRY.abLive` is off.
+- `test/carry-wiring-corpus.cjs` pins it:
+  - every switch is off;
+  - every path is gated on `=== true`;
+  - nothing in the wiring sends.
+- **All 179 corpora pass after merging the working branch.** `live-gate-0956` failed once under load, then passed on two reruns and on the base. Wiring the panel also caught one real bug, now fixed: a variable read before it was set on panel start (`popup-open-corpus`).
+
+### Recommendation
+
+**Keep it, and turn on `CARRY.invoices` for dogfood after a live Gate** that runs:
+- one Hebrew invoice and one English invoice sent from Gmail;
+- the bank email that closes the Hebrew one;
+- «שילמתי» on WhatsApp closing the English one.
+
+Turning it on for real users is a separate decision. It needs the owner's «מאשר», because it changes what Glance tracks on its own.
