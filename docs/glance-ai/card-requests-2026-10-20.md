@@ -113,3 +113,12 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Action: one Do It. The receipt shows the link (`meetUrl`) with a Copy control and the calendar link. Glance does not send the link to anyone; guests' own calendars show it the way they show any edit, and no email goes out from Glance.
 - Undo: removes only the Meet link. If the person edited the event or changed the link, the card says Undo unavailable and nothing is removed.
 
+## M3 — a Teams link added to an Outlook event that is already on the calendar
+
+- Module `flow-trial-extension/core/outlook-event-call-link.js`, switch `OUTLOOK_EVENT_CALL_LINK`. Outlook only. The twin of M2.
+- When the card shows: someone asked the person to add a call link to an event they organize ("Can you add a Teams link to the Thursday sync?") and exactly one such event fits. An event that is already online, an event someone else organizes, Zoom or Meet named, or two events that fit shows no card.
+- Line: `להוסיף קישור Teams לאירוע: <event> (<date>)?` / `Add a Teams link to the event: <event> (<date>)?`
+- Step: `יצירת קישור Teams על האירוע ובדיקה חוזרת` / `Create a Teams link on the event and read it back`.
+- Action: one Do It. The receipt shows the link (`joinUrl`) with a Copy control and the calendar link. Glance sends the link to no one.
+- Undo: turns the online meeting off. If the person edited the event or changed the link, the card says Undo unavailable and nothing is removed.
+

@@ -51,7 +51,7 @@ const FlowEventCallLink = (() => {
   const THIRD = /\b(?:ask|have|get|tell|let)\s+(?!(?:me|us|you)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,3}\s+(?:to\s+)?(?:add|attach|include|put|create)\b|תבקש(?:י|ו)?\s*מ|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))/i;
   const ASKS = /\b(?:please|can you|could you|would you|will you|kindly|i need you to|we need you to|let'?s|need)\b|^\s*(?:add|attach|include|put|create)\b|בבקשה|אפשר|תוכל|תוכלי|תוכלו|^\s*(?:תוסיף|הוסף|תצרף|צרף)/i;
   const WEEKDAYS = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
-  const STOP = { please: 1, add: 1, attach: 1, include: 1, put: 1, create: 1, make: 1, generate: 1, meet: 1, google: 1, video: 1, call: 1, link: 1, invite: 1, meeting: 1, online: 1, conference: 1, the: 1, for: 1, and: 1, this: 1, that: 1, with: 1, can: 1, you: 1, could: 1, would: 1, will: 1, event: 1, next: 1, week: 1, tomorrow: 1, today: 1, tonight: 1, jan: 1, feb: 1, mar: 1, apr: 1, may: 1, jun: 1, jul: 1, aug: 1, sep: 1, oct: 1, nov: 1, dec: 1, בקשה: 1, אפשר: 1, הוסיף: 1, צרף: 1, ידאו: 1, מחר: 1, היום: 1, תוסיף: 1, הוסף: 1, תצרף: 1, בבקשה: 1, קישור: 1, לינק: 1, מיט: 1, גוגל: 1, שיחת: 1, וידאו: 1, את: 1, של: 1, עם: 1, ביום: 1, יום: 1, ראשון: 1, שני: 1, שלישי: 1, רביעי: 1, חמישי: 1, שישי: 1, monday: 1, tuesday: 1, wednesday: 1, thursday: 1, friday: 1, saturday: 1, sunday: 1 };
+  const STOP = { please: 1, add: 1, attach: 1, include: 1, put: 1, create: 1, make: 1, generate: 1, meet: 1, google: 1, video: 1, call: 1, link: 1, invite: 1, meeting: 1, online: 1, conference: 1, the: 1, for: 1, and: 1, this: 1, that: 1, with: 1, can: 1, you: 1, could: 1, would: 1, will: 1, event: 1, next: 1, week: 1, teams: 1, microsoft: 1, טימס: 1, tomorrow: 1, today: 1, tonight: 1, jan: 1, feb: 1, mar: 1, apr: 1, may: 1, jun: 1, jul: 1, aug: 1, sep: 1, oct: 1, nov: 1, dec: 1, בקשה: 1, אפשר: 1, הוסיף: 1, צרף: 1, ידאו: 1, מחר: 1, היום: 1, תוסיף: 1, הוסף: 1, תצרף: 1, בבקשה: 1, קישור: 1, לינק: 1, מיט: 1, גוגל: 1, שיחת: 1, וידאו: 1, את: 1, של: 1, עם: 1, ביום: 1, יום: 1, ראשון: 1, שני: 1, שלישי: 1, רביעי: 1, חמישי: 1, שישי: 1, monday: 1, tuesday: 1, wednesday: 1, thursday: 1, friday: 1, saturday: 1, sunday: 1 };
 
   function enabled(flags) {
     if (!flags || typeof flags !== 'object') return SWITCH_DEFAULT;
@@ -276,7 +276,7 @@ const FlowEventCallLink = (() => {
     return { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, dayOf, pickEvent, plan, addLink, undo, contentHash, meetUrlOf };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, dayOf, words, pickEvent, plan, addLink, undo, contentHash, meetUrlOf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowEventCallLink };
