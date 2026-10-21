@@ -40,7 +40,8 @@ const SHOW = [
   "מה הסטטוס של החשבונית? אשמח לעדכון עד מחר",
   "אפשר שתפגיש אותי עם איש הקשר אצלכם עד סוף השבוע?",
   "אשמח שתפגיש אותי עם מי שאחראי אצלכם על הדיגיטל",
-  "תעדכני אותי כשהתשלום יצא עד סוף היום"
+  "תעדכני אותי כשהתשלום יצא עד סוף היום",
+  "Can you approve the budget by Wednesday?"
 ];
 const QUIET = [
   "Thanks for the update, the status looks good.",
@@ -50,7 +51,8 @@ const QUIET = [
   "We updated the roadmap last week.",
   "תודה על העדכון, הכל ברור",
   "FYI the payment went out this morning.",
-  "Let me know if you have any questions."
+  "Let me know if you have any questions.",
+  "האם אתה מסכים להצעה?"
 ];
 for (const t of SHOW) { const r = judge(t); check('show: ' + t, r.show === true, r.reason); }
 for (const t of QUIET) { const r = judge(t); check('quiet: ' + t, r.show === false, r.reason); }

@@ -68,3 +68,12 @@ One consent turns on Messenger, Facebook messages, Business Suite, Instagram and
 - **Not started:** Forms, Keep, SharePoint, OneNote, PowerPoint, Facebook Pages, Threads, WhatsApp Business.
 - **The learning loop:** the on-device threshold and Execution Memory learn from each person's clicks. The export of own-use decisions for training the model (`docs/glance-ai/learning-from-use.md`, paths A to D) is not built in the extension, so "the system learns from everyone's use" is true per person and not yet across people.
 - **The release gate:** a package must pass the regression corpora first. On 2026-10-20 five corpora are red on the working branch tip: `card-decision` (Outlook Why-not-shown reason, PR #143), `flip-sample-0956`, and three that pass only with the clock set back to 2026-10-16 (`realshape-0956`, `negation-conditional`, `regress-144`), so they are date-bound fixtures. Four more were stale fixtures and are fixed. A fresh environment also needs `npm i` in `flow-trial-extension/` for jsdom.
+
+## Run discipline (read before every ecosystems run; owner asked to cut waste, 2026-10-21)
+
+- **Idle is allowed and cheap.** If no gap is both unblocked (no Grok card, no owner scope, no live Gate needed) and of user value, end the run with one line in `ecosystem-runs.md` and touch nothing else. Do not invent work.
+- **A and B do not share rows.** A takes Google, B takes Microsoft and Meta. If your side is empty, you are idle; do not take the other side's row.
+- **Tests:** run the corpora for what you touched plus `docs-consistency` and `identity-copy` on every run; run the whole corpus sweep and the full headless e2e once, on the last run you make in a day, not on every run.
+- **No result-recording commits.** A commit whose only content is "the suite passed" is waste. Put the numbers in the run report line of the commit that changed code.
+- **Read less:** use Graphify (`scripts/graphify-setup.sh`) before opening `src/content-gmail.js` or `core/intent.js`; read this page and `ecosystem-runs.md` (last three runs), not the whole of `open-tasks.md`.
+- **Never edit a shared status file by rewriting it.** Append or change the one row; a run that shrinks `docs/open-tasks.md` by more than a few lines has broken it (2026-10-21, 192 rows lost).
