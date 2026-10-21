@@ -65,11 +65,11 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - No guest is added, so no invitation goes out from Glance. `loopClosed` is false: Handled for the call itself waits for the other person's answer.
 - Undo: deletes the event. If the person edited it (agenda, guest, subject, time), the card says Undo unavailable and the event stays.
 
-## W1 — an empty Doc or Sheet created from a request
+## W1 — an empty Doc, Sheet or Slides deck created from a request
 
 - Module `flow-trial-extension/core/workspace-file.js`, switch `WORKSPACE_FILE`. Ecosystem gap "create a Doc or Sheet from a request" (`docs/glance-ai/ecosystem-coverage.md`).
 - When the card shows: someone asked the person to set up a doc, agenda, sheet or tracker and gave it a name or a topic ("Can you create a shared doc called Q4 launch plan?"). No name, a request to write the content, Word or Excel, or an existing file shows no card.
-- Line: `ליצור <מסמך|גיליון> ריק בשם "<name>" ב-Drive?` / `Create an empty <doc|sheet> called "<name>" in your Drive?`
+- Line: `ליצור <מסמך|גיליון|מצגת> ריק בשם "<name>" ב-Drive?` / `Create an empty <doc|sheet|slide deck> called "<name>" in your Drive?`
 - Steps: `יצירת הקובץ ב-Drive ובדיקה חוזרת` / `Create the file in Drive and read it back`, then `שיתוף והוספת תוכן: על פי בחירתך, גלאנס לא כותב ולא משתף` / `Share it and add content: your choice, Glance does not write or share` (the person's own step).
 - Action: one Do It. The receipt shows the file name and an Open link (`url`).
 - Undo: moves the file to the trash. If the person typed in it, the card says Undo unavailable and the file stays.

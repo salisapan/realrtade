@@ -34,26 +34,27 @@ const FlowWorkspaceFile = (() => {
   const SYSTEM_DOC = 'google/docs';
   const SYSTEM_SHEET = 'google/sheets';
   const CONNECTOR = 'googleNewFile';
-  const MIME = { doc: 'application/vnd.google-apps.document', sheet: 'application/vnd.google-apps.spreadsheet' };
+  const MIME = { doc: 'application/vnd.google-apps.document', sheet: 'application/vnd.google-apps.spreadsheet', slides: 'application/vnd.google-apps.presentation' };
+  const SYSTEM_SLIDES = 'google/slides';
   const PENDING = 'proof_pending';
   const FAILED = 'verify_failed';
 
-  const NOUN_EN = '(?:google\\s+)?(?:shared\\s+)?(doc(?:ument)?|notes?(?:\\s+doc)?|agenda|minutes|sheet|spreadsheet|tracker|budget\\s+sheet|checklist)';
+  const NOUN_EN = '(?:google\\s+)?(?:shared\\s+)?(doc(?:ument)?|notes?(?:\\s+doc)?|agenda|minutes|sheet|spreadsheet|tracker|budget\\s+sheet|checklist|slide\\s+deck|slides|deck|presentation)';
   const MAKE_EN = new RegExp('\\b(?:create|set\\s+up|start|open|make|build|put\\s+together|prepare|begin)\\s+(?:up\\s+)?(?:a|an|the|one)?\\s*(?:new\\s+)?(?:shared\\s+)?' + NOUN_EN + '\\b', 'i');
-  const MAKE_HE = /(?:תפתח(?:י|ו)?|תיצור|תיצרי|תיצרו|פתח(?:י|ו)?|צור|צרי|תכין|תכיני|תכינו|הכן|הכיני|נפתח|נכין|נקים|תקים|תקימי|תקימו)\s+(?:לנו\s+|לי\s+)?(?:בבקשה\s+)?(מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|רשימת\s+משימות)/;
+  const MAKE_HE = /(?:תפתח(?:י|ו)?|תיצור|תיצרי|תיצרו|פתח(?:י|ו)?|צור|צרי|תכין|תכיני|תכינו|הכן|הכיני|נפתח|נכין|נקים|תקים|תקימי|תקימו)\s+(?:לנו\s+|לי\s+)?(?:בבקשה\s+)?(מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|רשימת\s+משימות|מצגת)/;
   const ASK_EN = /\b(?:please|can you|could you|would you|will you|kindly|i need you to|let'?s|we need you to|we need to)\b|^\s*(?:create|set up|start|open|make|build|prepare)\b/i;
   const ASK_HE = /(?:בבקשה|נא\s|אפשר|תוכל|תוכלי|תוכלו|אתה יכול|את יכולה|בוא|בואו|צריך|צריכים|תפתח|תיצור|תכין|תקים|פתח|צור|הכן)/;
   const EXISTING = /\b(?:update|edit|fill\s+in|add\s+to|finish|review|attached|enclosed|already|existing|we\s+have|you\s+have|the\s+one\s+(?:we|i)|latest\s+version|latest|current)\b|עדכן|עדכני|תעדכן|מצורף|קיים|כבר\s+יש|הקיים/i;
   const CONTENT = /\b(?:write|draft|compose|summari[sz]e|fill\s+it\s+(?:in|out)|with\s+the\s+numbers|and\s+(?:write|fill|add|list|include)|that\s+(?:lists|includes|summari[sz]es|covers))\b|תכתוב|תנסח|תסכם|ותכתוב|וימלא|ותמלא|שמכיל|שמסכם/i;
-  const OTHER_APP = /\b(?:word|excel|pages|numbers|notion|confluence|onenote|powerpoint|slides?|deck)\b|וורד|אקסל|נושן/i;
+  const OTHER_APP = /\b(?:word|excel|pages|numbers|notion|confluence|onenote|powerpoint|keynote)\b|וורד|אקסל|נושן/i;
   const NEG = /\b(?:no need (?:to|for)|don'?t (?:need|create|make|open)|do not (?:create|make|open)|not necessary|without (?:a|an))\b|אין\s+צורך|אל\s+תפתח|לא\s+צריך/i;
   const HEDGE = /\b(?:maybe|perhaps|if you want|if you'?d like|if it helps|no pressure|sometime|at some point|one day|might)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם\s+בא\s+לך|אם\s+יש\s+זמן/i;
   const FYI = /\b(?:fyi|for your information|no action needed)\b|לידיעתך|לידיעה/i;
   const THIRD = /\b(?:ask|have|get|tell|let)\s+(?!(?:me|us|you)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,3}\s+(?:to\s+)?(?:create|set\s+up|start|open|make|build|prepare)\b|תבקש(?:י|ו)?\s*מ|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))/i;
   const NAMED_EN = /\b(?:called|named|titled|entitled)\s+["“'‘]?([^"”'’\n.;?!]{3,60}?)["”'’]?(?=\s*(?:[.;?!,]|\bso\b|\band\b|\bby\b|\bbefore\b|\bfor\s+(?:us|me|everyone|the\s+team)\b|$))/i;
-  const NAMED_HE = /(?:בשם|שנקרא|שכותרתו)\s+["“'‘]?([^"”'’\n.;?!,]{3,60}?)["”'’]?(?=\s*[.;?!,]|\s+(?:עד|לפני|בבקשה)(?:\s|$)|\s*$)/;
+  const NAMED_HE = /(?:בשם|שנקרא|שכותרתו)\s+["“'‘]?([^"”'’\n.;?!,]{3,60}?)["”'’]?(?=\s*[.;?!,]|\s+(?:עד|לפני|בבקשה)(?:\s|$)|\s+ו[\u0590-\u05FF]{2,}(?:\s|$)|\s*$)/;
   const FOR_EN = /\b(?:for|about|on)\s+(?:the\s+|our\s+|my\s+)?([A-Za-z0-9][\w'’&/-]*(?:\s+[A-Za-z0-9][\w'’&/-]*){0,4}?)(?=\s*(?:[.;?!,]|\bso\b|\band\b|\bby\b|\bbefore\b|\bfrom\b|\bwith\b|\bthis\b|\bnext\b|\btomorrow\b|\btoday\b|\bsoon\b|\bplease\b|$))/i;
-  const FOR_HE = /(?:מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|משימות)\s+(?:ל|עבור\s+|בנושא\s+)(?:ה)?([\u0590-\u05FFA-Za-z0-9][\u0590-\u05FF\w'’&/-]*(?:\s+[\u0590-\u05FFA-Za-z0-9][\u0590-\u05FF\w'’&/-]*){0,3}?)(?=\s*[.;?!,]|\s+(?:עד|לפני|בבקשה)(?:\s|$)|\s*$)/;
+  const FOR_HE = /(?:מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|משימות|מצגת)\s+(?:ל|עבור\s+|בנושא\s+)(?:ה)?([\u0590-\u05FFA-Za-z0-9][\u0590-\u05FF\w'’&/-]*(?:\s+[\u0590-\u05FFA-Za-z0-9][\u0590-\u05FF\w'’&/-]*){0,3}?)(?=\s*[.;?!,]|\s+(?:עד|לפני|בבקשה)(?:\s|$)|\s*$)/;
 
   function enabled(flags) {
     if (!flags || typeof flags !== 'object') return SWITCH_DEFAULT;
@@ -61,6 +62,7 @@ const FlowWorkspaceFile = (() => {
   }
 
   function kindOf(noun) {
+    if (/slide|deck|presentation|מצגת/i.test(noun)) return 'slides';
     return /sheet|spreadsheet|tracker|budget|checklist|גיליון|טבלה|מעקב|רשימת/i.test(noun) ? 'sheet' : 'doc';
   }
 
@@ -83,13 +85,15 @@ const FlowWorkspaceFile = (() => {
     if (FYI.test(s)) return { kind: 'block', reason: 'fyi' };
     if (HEDGE.test(s)) return { kind: 'block', reason: 'hedge' };
     if (THIRD.test(s) || (attach && attach.asksThirdParty && attach.asksThirdParty(s))) return { kind: 'block', reason: 'third-party' };
-    if (EXISTING.test(s)) return { kind: 'block', reason: 'existing-file' };
-    if (CONTENT.test(s)) return { kind: 'block', reason: 'asks-content' };
     if (!(ASK_EN.test(s) || ASK_HE.test(s))) return { kind: 'block', reason: 'no-request' };
     const lang = /[֐-׿]/.test(s) ? 'he' : 'en';
     const noun = (en ? en[1] : he[1]).toLowerCase();
     const kind = kindOf(noun);
     const named = s.match(lang === 'he' ? NAMED_HE : NAMED_EN) || s.match(NAMED_EN);
+    // A word inside the name the person gave ("Board update Q4") is not an instruction.
+    const rest = named ? s.replace(named[0], ' ') : s;
+    if (EXISTING.test(rest)) return { kind: 'block', reason: 'existing-file' };
+    if (CONTENT.test(rest)) return { kind: 'block', reason: 'asks-content' };
     let name = named ? cleanName(named[1]) : '';
     if (!name) {
       const about = s.match(lang === 'he' ? FOR_HE : FOR_EN);
@@ -104,6 +108,10 @@ const FlowWorkspaceFile = (() => {
     return { kind: 'clear', lang: lang, fileKind: kind, name: name };
   }
 
+  function systemOf(kind) {
+    return kind === 'sheet' ? SYSTEM_SHEET : kind === 'slides' ? SYSTEM_SLIDES : SYSTEM_DOC;
+  }
+
   function silence(reason) {
     return { action: 'silence', reason: reason };
   }
@@ -114,7 +122,7 @@ const FlowWorkspaceFile = (() => {
     const r = recognize(input.text);
     if (r.kind !== 'clear') return silence(r.reason || 'no-ask');
     const he = r.lang === 'he';
-    const kindLabel = r.fileKind === 'sheet' ? (he ? 'גיליון' : 'sheet') : (he ? 'מסמך' : 'doc');
+    const kindLabel = r.fileKind === 'sheet' ? (he ? 'גיליון' : 'sheet') : r.fileKind === 'slides' ? (he ? 'מצגת' : 'slide deck') : (he ? 'מסמך' : 'doc');
     return {
       action: 'offer',
       approval: 'DoIt',
@@ -122,7 +130,7 @@ const FlowWorkspaceFile = (() => {
       name: r.name,
       line: he ? 'ליצור ' + kindLabel + ' ריק בשם "' + r.name + '" ב-Drive?' : 'Create an empty ' + kindLabel + ' called "' + r.name + '" in your Drive?',
       steps: [
-        { id: 'create', kind: 'drive', label: he ? 'יצירת הקובץ ב-Drive ובדיקה חוזרת' : 'Create the file in Drive and read it back', proof: r.fileKind === 'sheet' ? SYSTEM_SHEET : SYSTEM_DOC },
+        { id: 'create', kind: 'drive', label: he ? 'יצירת הקובץ ב-Drive ובדיקה חוזרת' : 'Create the file in Drive and read it back', proof: systemOf(r.fileKind) },
         { id: 'share', kind: 'manual', label: he ? 'שיתוף והוספת תוכן: על פי בחירתך, גלאנס לא כותב ולא משתף' : 'Share it and add content: your choice, Glance does not write or share' }
       ],
       lang: r.lang
@@ -147,7 +155,7 @@ const FlowWorkspaceFile = (() => {
     io = io || {};
     if (!enabled(input.flags)) return miss('switch-off');
     if (typeof io.drive !== 'function') return miss('no-host');
-    const kind = input.fileKind === 'sheet' ? 'sheet' : input.fileKind === 'doc' ? 'doc' : '';
+    const kind = input.fileKind === 'sheet' ? 'sheet' : input.fileKind === 'slides' ? 'slides' : input.fileKind === 'doc' ? 'doc' : '';
     const name = cleanName(input.name);
     if (!kind || !name) return miss('unclear');
     const drive = io.drive;
@@ -155,7 +163,7 @@ const FlowWorkspaceFile = (() => {
     if (posted.status === 401 || posted.status === 403) return miss('not-connected');
     if (!posted.ok || !posted.json || !posted.json.id) return miss('write-failed');
     const id = posted.json.id;
-    const system = kind === 'sheet' ? SYSTEM_SHEET : SYSTEM_DOC;
+    const system = systemOf(kind);
     const ref = { fileId: id, externalId: id, kind: kind, createdByGlance: true };
     // Nothing stays in Drive that the card does not own: a file that cannot be
     // confirmed is trashed again, and if that fails the ref is kept for Undo.
@@ -178,9 +186,9 @@ const FlowWorkspaceFile = (() => {
     return {
       ok: true,
       connector: CONNECTOR,
-      where: kind === 'sheet' ? 'Google Sheets' : 'Google Docs',
+      where: kind === 'sheet' ? 'Google Sheets' : kind === 'slides' ? 'Google Slides' : 'Google Docs',
       target: name,
-      written: (kind === 'sheet' ? 'Sheet · ' : 'Doc · ') + name,
+      written: (kind === 'sheet' ? 'Sheet · ' : kind === 'slides' ? 'Slides · ' : 'Doc · ') + name,
       url: url || null,
       proof: proof,
       ref: finalRef,
@@ -216,7 +224,7 @@ const FlowWorkspaceFile = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.fileId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, CONNECTOR, enabled, recognize, plan, create, undo };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, SYSTEM_SLIDES, CONNECTOR, enabled, recognize, plan, create, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowWorkspaceFile };

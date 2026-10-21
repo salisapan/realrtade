@@ -24,7 +24,13 @@ const yes = [
   ['Could you make a budget sheet titled Office move 2027?', 'sheet', 'Office move 2027'],
   ['תפתח בבקשה מסמך בשם סיכום רבעון שלישי', 'doc', 'סיכום רבעון שלישי'],
   ['אפשר ליצור גיליון מעקב בשם תשלומים לספקים?', 'sheet', 'תשלומים לספקים'],
-  ['בבקשה תפתחי לנו מסמך לפגישת הצוות', 'doc', 'מסמך פגישת הצוות']
+  ['בבקשה תפתחי לנו מסמך לפגישת הצוות', 'doc', 'מסמך פגישת הצוות'],
+  ['Can you create a slide deck called Board update Q4?', 'slides', 'Board update Q4'],
+  ['Please set up a presentation for the investor meeting.', 'slides', 'investor meeting presentation'],
+  ['Could you start a deck for the offsite by Friday?', 'slides', 'offsite deck'],
+  ['Can you create a doc called Latest pricing update?', 'doc', 'Latest pricing update'],
+  ['תפתח בבקשה מצגת בשם עדכון דירקטוריון', 'slides', 'עדכון דירקטוריון'],
+  ['אפשר ליצור מצגת לפגישת לקוח', 'slides', 'מצגת פגישת לקוח']
 ];
 for (const [text, kind, name] of yes) {
   const r = W.recognize(text);
@@ -35,6 +41,7 @@ console.log('\n--- silence, with the reason ---\n');
 const no = [
   ['Please create a doc and write a one-page summary of Q3.', 'asks-content'],
   ['Please create a doc that summarizes the meeting.', 'asks-content'],
+  ['Please create a deck and write the slides for Q3.', 'asks-content'],
   ['Maybe create a doc for the launch if you want.', 'hedge'],
   ['Ask Dana to create a doc for the launch.', 'third-party'],
   ['No need to create a sheet for the launch.', 'negation'],
@@ -50,7 +57,7 @@ for (const [text, why] of no) {
   const r = W.recognize(text);
   check('silent (' + why + '): ' + text, r.kind !== 'clear' && r.kind !== 'ignore' && r.reason === why, r);
 }
-for (const text of ['Please create a Word document called Contract.', 'Can you set up an Excel sheet for the budget?', 'Please update the doc we have for the launch.', 'Here is the doc for the launch, thanks.', 'Lunch tomorrow?']) {
+for (const text of ['Please create a PowerPoint deck called Board.', 'Please create a Word document called Contract.', 'Can you set up an Excel sheet for the budget?', 'Please update the doc we have for the launch.', 'Here is the doc for the launch, thanks.', 'Lunch tomorrow?']) {
   check('ignored: ' + text, W.recognize(text).kind === 'ignore');
 }
 
@@ -111,6 +118,11 @@ const io = (d) => ({ drive: d.api });
   d = makeDrive();
   r = await W.create(Object.assign({}, input, { fileKind: 'sheet', name: 'Vendor payments' }), io(d));
   check('a Sheet is a native spreadsheet and proved as google/sheets', r.ok === true && d.log[0].body.mimeType === 'application/vnd.google-apps.spreadsheet' && r.proof.system === 'google/sheets', r);
+
+  d = makeDrive();
+  r = await W.create(Object.assign({}, input, { fileKind: 'slides', name: 'Board update Q4' }), io(d));
+  check('a Slides deck is a native presentation and proved as google/slides', r.ok === true && d.log[0].body.mimeType === 'application/vnd.google-apps.presentation' && r.proof.system === 'google/slides' && /^Slides/.test(r.written), r);
+  check('the plan for a deck says slide deck, empty', /empty slide deck called/.test(W.plan({ flags: ON, text: yes[9][0] }).line), W.plan({ flags: ON, text: yes[9][0] }));
 
   d = makeDrive({ mutate: (f) => { f.name = 'Other'; } });
   r = await W.create(input, io(d));
