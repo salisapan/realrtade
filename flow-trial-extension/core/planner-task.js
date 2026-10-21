@@ -221,7 +221,29 @@ const FlowPlannerTask = (() => {
     return after.status === 404 ? { ok: true, undone: true, externalId: ref.taskId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, pickPlan, plan, create, undo };
+  // The destination for a task card that already exists (the To Do card): the mail names
+  // one of the person's own plans in words ("... on the Website relaunch plan",
+  // "בתוכנית שיווק"). Exactly one plan of the listed ones must be named; none, several, or
+  // another tool named (Jira, Asana) leaves the task where it always went, in To Do.
+  function planNamed(text, plans) {
+    const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
+    if (!s.trim() || !Array.isArray(plans)) return { reason: 'not-named' };
+    if (OTHER_APP.test(s)) return { reason: 'other-app' };
+    const esc = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hits = plans.filter((p) => {
+      const title = p && typeof p.id === 'string' ? String(p.title || '').trim() : '';
+      if (title.length < 2) return false;
+      const t = esc(title).replace(/\s+/g, '\\s+');
+      return new RegExp('(?:^|[^\\p{L}\\p{N}])' + t + '\\s+(?:plan|board|planner)(?![\\p{L}\\p{N}])', 'iu').test(s) ||
+        new RegExp('(?:תוכנית|תכנית|לוח)\\s+(?:ה)?' + t + '(?![\\p{L}\\p{N}])', 'u').test(s) ||
+        new RegExp('(?:in|on|to)\\s+(?:the\\s+)?planner\\s+(?:plan\\s+)?(?:called\\s+|named\\s+)?["“\']?' + t + '["”\']?(?![\\p{L}\\p{N}])', 'iu').test(s);
+    });
+    if (hits.length === 0) return { reason: 'not-named' };
+    if (hits.length > 1) return { reason: 'ambiguous-plan' };
+    return { plan: { id: hits[0].id, title: String(hits[0].title) } };
+  }
+
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, enabled, recognize, pickPlan, planNamed, plan, create, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowPlannerTask };

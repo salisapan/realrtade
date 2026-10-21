@@ -57,6 +57,8 @@ import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat
 import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
 import '../core/todo-recurrence.js'; // classic: sets globalThis.FlowTodoRecurrence (switch RECURRING_TODO, off)
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
+// Loaded after proof-of-close.js on purpose: the module reads FlowProofOfClose when it loads.
+import '../core/planner-task.js'; // classic: sets globalThis.FlowPlannerTask (switch PLANNER_TASK, off)
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
@@ -5046,7 +5048,10 @@ async function outlookReconcileProof(msg) {
   const id = (msg && msg.externalId) || ref.externalId || ref.taskId || ref.fileId || ref.itemId || ref.eventId;
   if (!id) return { ok: false, status: 0, reason: 'no-id' };
   let url = '';
-  if ((msg && msg.connectorId) === 'outlookCalendar' || ref.eventId) {
+  if (plannerRawId(id)) {
+    // A task the person's Planner plan holds (switch PLANNER_TASK): read by id, not from a To Do list.
+    url = OUTLOOK_GRAPH + '/planner/tasks/' + encodeURIComponent(plannerRawId(id));
+  } else if ((msg && msg.connectorId) === 'outlookCalendar' || ref.eventId) {
     url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(ref.eventId || id);
   } else if ((msg && (msg.connectorId === 'onedriveFile' || msg.system === 'microsoft/onedrive')) || ref.fileId) {
     url = OUTLOOK_GRAPH + '/me/drive/items/' + encodeURIComponent(ref.fileId || ref.itemId || id);
@@ -5852,6 +5857,92 @@ async function outlookRecurrenceFor(text) {
   return R.plan({ flags: { [R.SWITCH]: true }, text: String(text).slice(0, 4000), todayIso: todayIso });
 }
 
+// A task card whose mail names one of the person's own Planner plans ("... on the Website
+// relaunch plan") writes the task to that plan instead of To Do, only when the owner's switch
+// PLANNER_TASK is on (default off). No assignee, so nobody is notified. Anything else about it
+// (no plan named, two plans, a plan list that cannot be read) leaves the task in To Do.
+const PLANNER_ID_PREFIX = 'planner:';
+const PLANNER_REFS_KEY = 'glancePlannerRefs';
+function plannerRawId(id) {
+  const s = String(id || '');
+  return s.indexOf(PLANNER_ID_PREFIX) === 0 ? s.slice(PLANNER_ID_PREFIX.length) : '';
+}
+async function outlookPlannerRefPut(rawId, ref) {
+  try {
+    const bag = await chrome.storage.local.get(PLANNER_REFS_KEY);
+    const map = Object.assign({}, bag[PLANNER_REFS_KEY] || {});
+    map[rawId] = { taskId: rawId, externalId: rawId, planId: ref.planId, etag: ref.etag || null, createdByGlance: true };
+    const keys = Object.keys(map);
+    if (keys.length > 200) delete map[keys[0]];
+    await chrome.storage.local.set({ [PLANNER_REFS_KEY]: map });
+  } catch (e) { /* Undo then says it cannot confirm */ }
+}
+async function outlookPlannerRefGet(rawId) {
+  try {
+    const bag = await chrome.storage.local.get(PLANNER_REFS_KEY);
+    return (bag[PLANNER_REFS_KEY] || {})[rawId] || null;
+  } catch (e) { return null; }
+}
+async function outlookPlannerRefDrop(rawId) {
+  try {
+    const bag = await chrome.storage.local.get(PLANNER_REFS_KEY);
+    const map = Object.assign({}, bag[PLANNER_REFS_KEY] || {});
+    delete map[rawId];
+    await chrome.storage.local.set({ [PLANNER_REFS_KEY]: map });
+  } catch (e) { /* nothing kept */ }
+}
+
+function outlookGraphCall() {
+  return async function graph(method, path, body, headers) {
+    const url = OUTLOOK_GRAPH + path;
+    outlookAssertNotSend(url);
+    const init = { method: method };
+    const hs = Object.assign({}, headers || {});
+    if (body !== undefined) { init.body = JSON.stringify(body); hs['Content-Type'] = 'application/json'; }
+    if (Object.keys(hs).length) init.headers = hs;
+    const res = await outlookFetch(url, init);
+    if (!res || res.notConnected) return { status: (res && res.status) || 401, ok: false, json: null };
+    let json = null;
+    try { if (res.status !== 204) json = await res.json(); } catch (e) { json = null; }
+    return { status: res.status, ok: !!res.ok, json: json };
+  };
+}
+
+async function outlookPlannerWrite(p, title, dueIso) {
+  const P = globalThis.FlowPlannerTask;
+  if (!P || typeof P.planNamed !== 'function' || !p || !p.text) return null;
+  if (!(await glanceSwitchOn(P.SWITCH))) return null;
+  const graph = outlookGraphCall();
+  const listed = await graph('GET', '/me/planner/plans');
+  if (!listed.ok || !listed.json || !Array.isArray(listed.json.value)) return null;
+  const named = P.planNamed(String(p.text).slice(0, 4000), listed.json.value);
+  if (!named.plan) return null;
+  const r = await P.create({ flags: { [P.SWITCH]: true }, plan: named.plan, title: title, dueIso: dueIso || null, now: new Date().toISOString() }, { graph: graph });
+  if (r && r.ok) {
+    // The page keeps only the ids of a task row, so the id itself says "Planner". The entity tag
+    // Undo needs stays in the worker, not in the page's row.
+    const raw = r.ref.taskId;
+    await outlookPlannerRefPut(raw, r.ref);
+    const shown = PLANNER_ID_PREFIX + raw;
+    return { ok: true, fetchedBack: true, where: 'Microsoft Planner', target: named.plan.title, written: r.written, url: null, ref: { taskId: shown, externalId: shown, planId: named.plan.id }, proof: Object.assign({}, r.proof, { externalId: shown }) };
+  }
+  return Object.assign({}, r, { where: 'Microsoft Planner', target: named.plan.title });
+}
+
+async function outlookPlannerUndo(ref) {
+  const P = globalThis.FlowPlannerTask;
+  if (!P) return { ok: false };
+  const raw = plannerRawId(ref && (ref.externalId || ref.taskId));
+  const kept = raw ? await outlookPlannerRefGet(raw) : null;
+  if (!kept) return { ok: false, reason: 'unconfirmed', written: "Couldn't confirm it's unchanged. Undo left it alone." };
+  const r = await P.undo(kept, { graph: outlookGraphCall() });
+  if (r && r.ok) {
+    await outlookPlannerRefDrop(raw);
+    return { ok: true, fetchedBack: true, deleted: true, written: 'Undone. The Planner task is removed.' };
+  }
+  return Object.assign({}, r, { written: (r && r.error) || undefined });
+}
+
 async function outlookTaskWrite(p) {
   const session = await outlookSession({});
   if (!session || !session.ok || !session.token) {
@@ -5879,6 +5970,8 @@ async function outlookTaskWrite(p) {
   const titled = googleTaskTitle(p || {});
   const title = (typeof titled === 'string' ? titled : '').trim().slice(0, 255);
   if (!title) return { ok: false, reason: 'unclear', error: 'Nothing to put on the task.' };
+  const planned = await outlookPlannerWrite(p, title, close.dueIso);
+  if (planned) return planned;
   const notesLines = factLines(close.forNotes);
   if (p && p.threadUrl) notesLines.push(['Open in Outlook', p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n').slice(0, 8000);
@@ -6017,6 +6110,7 @@ async function outlookTaskFetchBack(taskListId, taskId, sent) {
 }
 
 async function outlookTaskUndo(ref, hint) {
+  if (plannerRawId(ref && (ref.externalId || ref.taskId))) return outlookPlannerUndo(ref);
   const taskId = ref && (ref.externalId || ref.taskId);
   const listId = ref && ref.taskListId;
   if (!taskId || !listId) return { ok: false };

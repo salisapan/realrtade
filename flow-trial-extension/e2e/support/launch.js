@@ -346,6 +346,32 @@ function installE2EHooks() {
         e2e.todoTasks[id] = stored;
         return Promise.resolve(json(200, stored));
       }
+      // Planner, like Graph: the person's plans, a task with an entity tag, and a delete that needs If-Match.
+      if (path.endsWith('/me/planner/plans') && method === 'GET') {
+        return Promise.resolve(json(200, { value: scenario.plannerPlans || [{ id: 'plan-web', title: 'Website relaunch' }, { id: 'plan-off', title: 'Offsite' }] }));
+      }
+      if (path.endsWith('/planner/tasks') && method === 'POST') {
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        const id = 'e2e-planner-' + (e2e.seq++);
+        e2e.plannerTasks = e2e.plannerTasks || {};
+        const stored = Object.assign({ id: id, '@odata.etag': 'W/"p1"' }, posted);
+        e2e.plannerTasks[id] = stored;
+        return Promise.resolve(json(201, stored));
+      }
+      const plannerOne = path.match(/\/planner\/tasks\/([^/]+)$/);
+      if (plannerOne) {
+        const tasksNow = e2e.plannerTasks || {};
+        const task = tasksNow[decodeURIComponent(plannerOne[1])];
+        if (!task) return Promise.resolve(json(404, { error: { message: 'missing' } }));
+        if (method === 'DELETE') {
+          const given = init && init.headers && (init.headers['If-Match'] || init.headers['if-match']);
+          if (given !== task['@odata.etag']) return Promise.resolve(json(412, { error: { message: 'etag' } }));
+          delete tasksNow[task.id];
+          return Promise.resolve(empty(204));
+        }
+        return Promise.resolve(json(200, task));
+      }
       if (path === '/v1.0/me/todo/lists' || path.endsWith('/me/todo/lists')) {
         return Promise.resolve(json(200, { value: [{ id: 'todo-list', wellknownListName: 'defaultList', displayName: 'Tasks' }] }));
       }
