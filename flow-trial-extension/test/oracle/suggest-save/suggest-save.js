@@ -126,7 +126,7 @@
     if (ex) { if (ex.step === 'file_save' && files.length >= 2) mode = 'explicit-multi'; else return quiet('suggest:other-card', { excluded: excluded }); }
     var blob = (text + ' ' + subject).trim();
     var explicit = SAVE_VERB.test(blob) || (ex && ex.step === 'file_save');
-    var presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|pdf)\s+is\s+attached|\S+\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?|מצורפת?\s*$/i.test(blob);
+    var presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|pdf)\s+is\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?|מצורפת?\s*$/i.test(blob);
     var signed = /\b(?:signed|executed|final)\b|חתום|נספח חתום/i.test(blob);
     if (!explicit && !presented && !signed) return quiet('suggest:no-save-ask', { excluded: excluded });
     // 10 dedupe: a ProofOfClose for these files

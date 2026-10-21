@@ -46,13 +46,11 @@ const FlowStepList = (() => {
       const anchor = i === 0;
       const off = !anchor && rejected(memory, id, kind);
       const draftStep = kind === 'gmailDraft' || kind === 'outlookDraft';
-      const taskKind = kind === 'googleTask' || kind === 'task' || kind === 'outlookTask' || kind === 'microsoftTodo';
-      const titled = taskKind && step && step.params && step.params.title ? String(step.params.title) : '';
       const draftChecked = draftStep && composeOpen;
       return {
         id: (step && step.id) || (kind + ':' + i),
         kind: kind,
-        copy: titled || (step && (step.label || step.kind)) || '',
+        copy: (step && (step.label || step.kind)) || '',
         state: 'queued',
         checked: anchor || (!off && (!draftStep || draftChecked)),
         suggested: false,

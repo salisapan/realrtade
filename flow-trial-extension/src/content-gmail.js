@@ -735,6 +735,8 @@ function glanceUiCopy(kind) {
     if (!el || !el.getAttribute) return '';
     const email = String(el.getAttribute('email') || '').trim();
     if (email.indexOf('@') >= 0) return email;
+    const jid = String(el.getAttribute('jid') || '').trim();
+    if (jid.indexOf('@') >= 0) return jid;
     const hover = String(el.getAttribute('data-hovercard-id') || '').trim();
     if (hover.indexOf('@') >= 0) return hover;
     return email;
@@ -742,7 +744,10 @@ function glanceUiCopy(kind) {
 
   function extractSender(messageNode) {
     if (!messageNode || !messageNode.querySelector) return { email: null, name: null };
-    const el = messageNode.querySelector('[email], [data-hovercard-id]');
+    // Gmail stamps the From line with .gD; collapsed To/Cc chips also carry
+    // [email] and must not be mistaken for the sender.
+    const el = messageNode.querySelector('.gD[data-hovercard-id], .gD[email], .gD[jid], .go .gD')
+      || messageNode.querySelector('[email], [data-hovercard-id]');
     if (!el) return { email: null, name: null };
     const email = addressFrom(el);
     return { email: email || null, name: el.getAttribute('name') || el.textContent.trim() };
@@ -1296,7 +1301,17 @@ function glanceUiCopy(kind) {
         if (idx >= 0) cut = full.slice(0, idx).trim();
       }
     }
-    const plain = body ? cut : stripGmailReadingChrome(cut);
+    let plain = body ? cut : stripGmailReadingChrome(cut);
+    // Attachment chips render inside .a3s; their filename is not mail text.
+    if (body && typeof findAttachmentChips === 'function' && typeof parseDownloadUrl === 'function') {
+      for (const chip of findAttachmentChips(root)) {
+        const meta = parseDownloadUrl(chip.getAttribute('download_url'));
+        const label = (meta && meta.filename) ? String(meta.filename).trim() : String(chip.textContent || '').trim();
+        if (!label) continue;
+        if (plain.endsWith(label)) plain = plain.slice(0, plain.length - label.length).trim();
+        else plain = plain.replace(label, '').trim();
+      }
+    }
     if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function') {
       return FlowIncomingJudge.prepareForJudge(plain);
     }
@@ -2173,6 +2188,10 @@ function glanceUiCopy(kind) {
     const inboundAttachAsk = inboundMail && attachments.length > 0 && (inboundHeAsk || inboundAttachSave);
     const audienceNeedsProbe = audienceUnclear(message, sender.email, ownEmail, audience);
     const attachKeep = selfMailAttachmentKeepCard(message, sender.email, ownEmail, audience, attachments);
+    // Audience details must not silence an inbound attach-save the thread already
+    // proved (signed contract + please file it) — livedom headers often
+    // reclassify into a quiet miss even though the first pass was right.
+    const attachInboundHold = inboundAttachSave;
     if (attachKeep && (!intent || !intent.type) && String(subject || '').trim()) {
       intent = await classifyForChip(String(subject || '').trim(), {
         senderEmail: sender.email,
@@ -2210,37 +2229,73 @@ function glanceUiCopy(kind) {
     // Collapsed headers hide To vs Cc. Open Gmail's details at most once per
     // message, only after a real chip candidate exists, then close the box.
     if (audienceNeedsProbe && (FlowIntent.shouldShowChip(intent) || inboundAsk || inboundAttachAsk || attachKeep)) {
+      const intentPreAudience = intent;
       audience = await audienceAfterDetailsProbe(messageId, message, sender.email, ownEmail, audience);
       if (audienceUnclear(message, sender.email, ownEmail, audience)) {
         logScanSkip(messageId, 'audience');
         recordSilence(messageId, 'audience');
         return;
       }
-      intent = await classifyForChip(text, {
-        senderEmail: sender.email,
-        senderName: sender.name,
-        subject: subject,
-        calibration: state.calibration,
-        calibrationByType: state.calibrationByType,
-        attachmentCount: attachments.length,
-        messageId: messageId,
-        debug: debug,
-        to: audience.to,
-        cc: audience.cc,
-        ownAddresses: ownEmail ? [ownEmail] : [],
-        userName: audience.userName || null,
-        ownNames: ownNamesForChip(audience.userName),
-        namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
-        namesWaitDone: namesWaitDone === true,
-        inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
-      });
-      if (intent && intent.namesPending) {
-        paintNamesPending(message, messageId, subject);
-        armNamesHold();
-        logScanSkip(messageId, 'names-pending');
-        return;
+      if (!attachInboundHold) {
+        intent = await classifyForChip(text, {
+          senderEmail: sender.email,
+          senderName: sender.name,
+          subject: subject,
+          calibration: state.calibration,
+          calibrationByType: state.calibrationByType,
+          attachmentCount: attachments.length,
+          messageId: messageId,
+          debug: debug,
+          to: audience.to,
+          cc: audience.cc,
+          ownAddresses: ownEmail ? [ownEmail] : [],
+          userName: audience.userName || null,
+          ownNames: ownNamesForChip(audience.userName),
+          namesPending: namesWaitDone ? false : readerNamesNotCached(audience.userName),
+          namesWaitDone: namesWaitDone === true,
+          inbound: inboundMail
+        });
+        if (intent && intent.namesPending) {
+          paintNamesPending(message, messageId, subject);
+          armNamesHold();
+          logScanSkip(messageId, 'names-pending');
+          return;
+        }
+        if (!FlowIntent.shouldShowChip(intent) && !attachKeep) {
+          const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
+            || (factOwns && !intent.type ? 'fact' : null);
+          logScanSkip(messageId, reason || 'audience-reclassify');
+          recordSilence(messageId, reason || 'audience', {
+            family: intent.closeFamily || intent.quiet,
+            clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
+            debug: debug
+          });
+          return;
+        }
+      } else if (FlowIntent.shouldShowChip(intentPreAudience)) {
+        intent = intentPreAudience;
+      } else if (attachInboundHold) {
+        const own = ownEmail ? [ownEmail] : [];
+        intent = await classifyForChip(text, {
+          senderEmail: sender.email,
+          senderName: sender.name,
+          subject: subject,
+          calibration: state.calibration,
+          calibrationByType: state.calibrationByType,
+          attachmentCount: attachments.length,
+          messageId: messageId,
+          debug: debug,
+          to: own.length ? own : audience.to,
+          cc: [],
+          ownAddresses: own,
+          userName: audience.userName || null,
+          ownNames: ownNamesForChip(audience.userName),
+          namesPending: false,
+          namesWaitDone: true,
+          inbound: inboundMail
+        });
       }
-      if (!FlowIntent.shouldShowChip(intent) && !attachKeep) {
+      if (!attachInboundHold && !FlowIntent.shouldShowChip(intent) && !attachKeep) {
         const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
           || (factOwns && !intent.type ? 'fact' : null);
         logScanSkip(messageId, reason || 'audience-reclassify');
@@ -2391,6 +2446,30 @@ function glanceUiCopy(kind) {
       }
     }
 
+    if (attachInboundHold && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.judge === 'function') {
+      const ownList = ownEmail ? [ownEmail] : [];
+      const judged = FlowIncomingJudge.judge({
+        text: text,
+        subject: subject,
+        sender: sender,
+        surface: 'gmail',
+        to: ownList.length ? ownList : audience.to,
+        cc: audience.cc,
+        ownAddresses: ownList,
+        userName: audience.userName || null,
+        ownNames: ownNamesForChip(audience.userName),
+        inbound: inboundMail,
+        // Gmail may paint duplicate download chips for one file; judge treats
+        // attachmentCount > 1 as bulk and stays quiet.
+        attachmentCount: attachInboundHold ? 1 : attachments.length,
+        calibration: state.calibration,
+        calibrationByType: state.calibrationByType,
+        now: new Date()
+      });
+      if (judged && judged.show && judged.intent && FlowIntent.shouldShowChip(judged.intent)) {
+        intent = judged.intent;
+      }
+    }
     const planned = planOpenMail(text, {
       intent: intent,
       threadUrl: threadUrl(legacyId),
@@ -3481,12 +3560,16 @@ function glanceUiCopy(kind) {
   // choice when a message has more than one attachment, instead of always
   // silently picking the first one.
   function allRealAttachments(messageNode) {
-    const seen = new Set();
+    const seenUrl = new Set();
+    const seenName = new Set();
     const metas = [];
     for (const chip of findAttachmentChips(messageNode)) {
       const meta = parseDownloadUrl(chip.getAttribute('download_url'));
-      if (!meta || seen.has(meta.url)) continue;
-      seen.add(meta.url);
+      if (!meta) continue;
+      const nameKey = String(meta.filename || '').trim().toLowerCase();
+      if (seenUrl.has(meta.url) || (nameKey && seenName.has(nameKey))) continue;
+      seenUrl.add(meta.url);
+      if (nameKey) seenName.add(nameKey);
       metas.push(meta);
     }
     return metas;
@@ -3532,7 +3615,7 @@ function glanceUiCopy(kind) {
       const only = listed.length === 1 ? listed[0] : null;
       if (!only) return { fail: { reason: listed.length > 1 ? 'attachment-ambiguous' : 'attachment-unreadable' } };
       const fetched = await fetchAttachmentBase64(only);
-      if (!fetched) return { fail: { reason: 'attachment-unreadable' } };
+      if (!fetched || !fetched.base64) return { fail: { reason: 'attachment-unreadable' } };
       if (Math.floor(String(fetched.base64 || '').length * 3 / 4) > DRIVE_SAVE_MAX_BYTES) return { fail: { reason: 'attachment-too-big' } };
       return Object.assign(base, { attachment: fetched, params: { copyAttachment: true } });
     }
@@ -3777,14 +3860,22 @@ function glanceUiCopy(kind) {
     return artifactTitleFor(ctx, fallback);
   }
 
-  // What lands in Calendar / Tasks — never the hold chrome ("Hold Mon 10:00").
+  // What lands in Calendar / Tasks — never the hold chrome ("Hold Mon 10:00")
+  // and never the raw subject when the card already named the close.
   function writtenTitleFor(ctx, fallback) {
+    const shown = ctx && typeof ctx.renderedTitle === 'string' ? ctx.renderedTitle.trim() : '';
+    if (shown) return shown;
     const proc = ctx && ctx.process;
-    const sub = ctx && ctx.subject ? String(ctx.subject).trim() : '';
     const holdProc = proc && (proc.id === 'hold' || proc.id === 'schedule' || proc.id === 'schedule-confirm');
-    if (holdProc && sub) return artifactTitleFor(ctx, sub);
+    const fromIntent = ctx && ctx.intent && ctx.intent.label ? String(ctx.intent.label).trim() : '';
     const base = fallback == null ? '' : String(fallback).trim();
+    if (holdProc) {
+      const pick = base || fromIntent;
+      if (pick) return artifactTitleFor(ctx, pick);
+    }
     if (base) return artifactTitleFor(ctx, base);
+    if (fromIntent) return artifactTitleFor(ctx, fromIntent);
+    const sub = ctx && ctx.subject ? String(ctx.subject).trim() : '';
     return artifactTitleFor(ctx, sub || base);
   }
 

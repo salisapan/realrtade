@@ -289,6 +289,16 @@ function startGoogleLaneServer() {
         res.end('gone');
         return;
       }
+      if (method === 'GET' && (path === '/e2e/att/inv.pdf' || path === '/e2e/att/deck-series-a.pdf')) {
+        res.writeHead(200, { 'Content-Type': 'application/pdf' });
+        res.end(Buffer.from('%PDF-e2e-' + path.split('/').pop()));
+        return;
+      }
+      if (method === 'GET' && path === '/e2e/att/big.pdf') {
+        res.writeHead(200, { 'Content-Type': 'application/pdf' });
+        res.end(Buffer.alloc(5 * 1024 * 1024, 1));
+        return;
+      }
 
       if (method === 'GET' && path === '/drive/v3/files') {
         const q = url.searchParams.get('q') || '';

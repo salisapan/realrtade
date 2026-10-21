@@ -87,18 +87,13 @@ test('Undo in the Hebrew UI trashes the file the upload response named', async (
   await expect(page.locator('div[role="main"]')).not.toContainText('עדיין ב-Drive');
 });
 
-test('with no reply open, the save makes the draft through the Gmail drafts API, in the thread, with the Drive link', async ({ glance }) => {
+test('with no reply open, the save lands in Drive only: no draft step and no Gmail drafts API', async ({ glance }) => {
   const page = await run(glance, 'ch-nocompose', BOARD, 'en', true);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
-  const fileId = server.last.file;
-  await expect.poll(() => Object.keys(server.drafts).length, { timeout: 15000 }).toBe(1);
-  const draftId = Object.keys(server.drafts)[0];
-  const draft = server.drafts[draftId];
-  expect(draft.message.threadId).toBe('t-ch-nocompose');
-  expect(JSON.stringify(draft)).toContain('https://drive.google.com/file/d/' + fileId + '/view');
-  expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + draftId) >= 0)).toBe(true);
-  expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+  expect(uploads()).toHaveLength(1);
+  expect(server.calls.some((c) => c.method === 'POST' && c.path === '/gmail/v1/users/me/drafts')).toBe(false);
   await expect(page.locator('[aria-label="Message Body"]')).toHaveCount(0);
+  await expect(page.locator('div[role="main"]')).not.toContainText(/could not prepare a reply draft/i);
 });
 
 test('Undo after a version bump with the same md5Checksum still trashes the file', async ({ glance }) => {

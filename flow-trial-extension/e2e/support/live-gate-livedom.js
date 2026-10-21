@@ -58,7 +58,7 @@ function liveGmailPage(opts) {
   }
   if (o.liveMutate === 'selfPdfAttach') {
     const pdfName = o.attachName || 'חוזה-ברוש.pdf';
-    const url = 'https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(pdfName);
+    const url = 'https://mail.google.com/e2e/att/board.pdf';
     const dl = 'application/pdf:' + pdfName + ':' + url;
     const span = '<span download_url="' + esc(dl) + '">' + esc(pdfName) + '</span>';
     if (main.html.indexOf('class="a3s"') >= 0) {
@@ -72,7 +72,7 @@ function liveGmailPage(opts) {
     const subj = 'Signed contract attached (184w)';
     const body = 'Attached is the signed contract, please file it.';
     const pdfName = 'deck-series-a.pdf';
-    const url = 'https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(pdfName);
+    const url = 'https://mail.google.com/e2e/att/deck-series-a.pdf';
     const dl = 'application/pdf:' + pdfName + ':' + url;
     const span = '<span download_url="' + esc(dl) + '">' + esc(pdfName) + '</span>';
     main.html = main.html

@@ -277,12 +277,18 @@ function settleAuth(res, url, opts) {
 
 // Headless lane tests rewrite Google API hosts to a local stand-in when
 // __glanceE2e.httpOrigin is set (including OpenID userinfo for account probes).
+// Gmail attachment URLs and the mail page stay on their real hosts so the
+// worker fetch shim and Playwright routes can simulate unreadable files.
 function laneUrl(url) {
   const e2e = typeof globalThis !== 'undefined' ? globalThis.__glanceE2e : null;
   const origin = e2e && typeof e2e.httpOrigin === 'string' ? e2e.httpOrigin : '';
   if (!origin || !url) return url;
   try {
     const u = new URL(url);
+    const host = u.hostname;
+    const laneApi = host === 'tasks.googleapis.com' || host === 'gmail.googleapis.com' ||
+      host === 'www.googleapis.com' || host === 'oauth2.googleapis.com';
+    if (!laneApi) return url;
     const base = new URL(origin);
     return base.origin + u.pathname + u.search;
   } catch (e) {

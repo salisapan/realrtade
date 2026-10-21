@@ -185,7 +185,7 @@ const FlowSuggestSave = (() => {
     }
     const blob = (text + ' ' + subject).trim();
     const explicit = SAVE_VERB.test(blob) || (J.explicit && J.explicit.step === 'file_save');
-    const presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|pdf)\s+is\s+attached|\S+\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?|מצורפת?\s*$/i.test(blob);
+    const presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|pdf)\s+is\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?|מצורפת?\s*$/i.test(blob);
     const signed = /\b(?:signed|executed|final)\b|חתום|נספח חתום/i.test(blob);
     const kinds = (J.process && J.process.steps) || [];
     const otherCard = input.otherCard === true || (J.show === true && (

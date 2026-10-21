@@ -161,11 +161,22 @@ function installE2EHooks() {
     const host = parsed.hostname;
     const watched = host === 'graph.microsoft.com' || host === 'login.microsoftonline.com' ||
       host === 'tasks.googleapis.com' || host === 'gmail.googleapis.com' ||
-      host === 'www.googleapis.com' || host === 'oauth2.googleapis.com' || host === 'theflow-ai.com';
+      host === 'www.googleapis.com' || host === 'oauth2.googleapis.com' || host === 'theflow-ai.com' ||
+      host === 'mail.google.com' || host === 'mail.googleusercontent.com';
     if (!watched) return origFetch(input, init);
     const method = String((init && init.method) || (typeof input !== 'string' && input && input.method) || 'GET').toUpperCase();
     e2e.calls.push({ url: url, method: method, at: Date.now() });
     const path = decodeURIComponent(parsed.pathname);
+    const attachHost = host === 'mail.google.com' || host === 'mail.googleusercontent.com';
+    if (attachHost && e2e.httpOrigin && path.indexOf('/e2e/att/') >= 0) {
+      return origFetch(e2e.httpOrigin + path + parsed.search, init);
+    }
+    if (attachHost && path.indexOf('/e2e/') >= 0) {
+      return Promise.resolve(new Response('', { status: 404, statusText: 'Not Found' }));
+    }
+    if (attachHost) {
+      return Promise.resolve(new Response('', { status: 404, statusText: 'Not Found' }));
+    }
     const scenario = e2e.scenario || {};
 
     if (host === 'login.microsoftonline.com') return Promise.resolve(json(400, { error: 'e2e-no-login' }));

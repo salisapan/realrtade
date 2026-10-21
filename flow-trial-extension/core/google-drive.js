@@ -58,7 +58,12 @@ const FlowGoogleDrive = (() => {
     const att = i.attachment || (i.params && i.params.attachment) || {};
     const name = safeName(i.fileName || i.name || att.filename || att.name || '');
     const bytes = fileBytes(i);
-    if (!name || !bytes || !bytes.length || bytes.length > MAX_BYTES) return { ok: false, reason: 'unclear' };
+    const copyAttach = (i.params && i.params.copyAttachment === true) || i.copyAttachment === true;
+    if (!bytes || !bytes.length) {
+      if (copyAttach) return { ok: false, reason: 'attachment-unreadable' };
+      return { ok: false, reason: 'unclear' };
+    }
+    if (!name || bytes.length > MAX_BYTES) return { ok: false, reason: bytes.length > MAX_BYTES ? 'attachment-too-big' : 'unclear' };
     const mime = String(i.mimeType || att.mimeType || att.contentType || 'application/octet-stream').split(';')[0].trim() || 'application/octet-stream';
     if (!/^[\w.+-]+\/[\w.+-]+$/.test(mime) || mime.length > 120) return { ok: false, reason: 'unclear' };
     return { ok: true, name: name, bytes: bytes, mimeType: mime };
