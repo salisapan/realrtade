@@ -144,3 +144,9 @@ One short report per run of the ecosystems builder. Newest last. Status only; a 
 - **Specs (7, all pass):** with every switch off a hold is one plain event; `TEAMS_MEETING` on gives a Teams link, no guest, read back, receipt says Teams, Undo deletes it despite Microsoft's join block; no link returned removes the event and is not Handled; `RECURRING_HOLD` on gives the series, rule read back, receipt says repeats, Undo deletes it; a dropped rule removes the event; `RECURRING_TODO` off is the one-off task; on gives a repeating task read back with its rule and Undo deletes it. A day that does not fit the rule has no e2e: the card stays quiet when the mail's weekday and date disagree; the unit corpus covers the fit rule.
 - **Verification:** whole headless `e2e` suite 296 of 296 (284 plus the 7 new and A's 5); every `test/*corpus.cjs` green.
 - **Open:** live Gates; one real Graph read of `recurrence` on an event and a To Do task; the Grok cards. Graphify not run.
+
+## 2026-10-21 (Ecosystems builder A, eleventh run) — no new capability; the #128 merge checked
+
+- **Failed run against the user-facing bar, said plainly:** no new capability. Every buildable module left needs a Grok card or an owner scope (row 79), and two builders were already circling the same wired gaps. I did not add another unwired module.
+- **What I did instead:** after the large merge of the AI engine (#128, `440861a`) I ran every `test/*corpus.cjs` (all green) and the full headless e2e suite in a real Chromium with the unpacked extension: 289 of 289 pass (12.7 minutes, on the tree before builder B's seven new specs and fix). So the Meet link, the Gmail and Outlook repeat, the Teams link and the repeating To Do still work behind their switches after that merge.
+- **Open:** the Grok cards for M2, M3, P1, T1, W1; live Gates for `MEET_LINK`, `TEAMS_MEETING`, `RECURRING_HOLD`, `RECURRING_TODO`; row 79 for the owner. Graphify not run.
