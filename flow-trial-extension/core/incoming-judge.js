@@ -70,6 +70,29 @@ const FlowIncomingJudge = (() => {
     return rest.every((a) => own.indexOf(a) !== -1);
   }
 
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
+
+  // A sign-off line plus "please remember to remind/tell/ask …" is a relay to
+  // someone else, not a buried task for the reader.
+  function buriedRememberRelayQuiet(text) {
+    const raw = String(text || '');
+    const trim = raw.trim();
+    const enOpen = /^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(trim);
+    const heOpen = /^(?:שלום|היי|הי)[^\n]{0,40}[,!]?\s*(?:תזכיר(?:י)?\s+לי|תזכור(?:י)?\s+ל|אל\s+תשכח(?:י)?\s+ל)/.test(trim);
+    if (enOpen || heOpen) return false;
+    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return true;
+    return false;
+  }
+
   function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
@@ -175,6 +198,9 @@ const FlowIncomingJudge = (() => {
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
     if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
+    if (buriedRememberRelayQuiet(text)) {
+      return { show: false, reason: 'quiet:buried-remember-relay', intent: intent || null };
+    }
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
     }
@@ -187,10 +213,6 @@ const FlowIncomingJudge = (() => {
     if (!intentApi.shouldShowChip(intent)) {
       const named = quiet && typeof quiet.reasonFor === 'function' ? quiet.reasonFor(intent) : null;
       return { show: false, reason: named ? 'quiet:' + named : 'chip-low-confidence', intent };
-    }
-    // "Thanks for the update. Please remember to …" is not an opening remember-to ask.
-    if (/\bplease remember to\b/i.test(text) && !/^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(text.trim())) {
-      return { show: false, reason: 'quiet:buried-remember', intent };
     }
     // Gmail answers a fact ask from one Sheet cell in the open thread (FlowFactReply.apply); a surface without that lookup
     // stays quiet instead of offering a generic reply in its place.
@@ -223,7 +245,7 @@ const FlowIncomingJudge = (() => {
     // A deadline whose day was dropped (31/2, or a weekday that is not that
     // calendar day) is still the reply. The file chain is not that close.
     const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
-    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
+    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile) && !buriedReaderRememberAsk(text)) {
       if (resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
@@ -264,7 +286,8 @@ const FlowIncomingJudge = (() => {
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold) {
+    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi);
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold && !outlookInboundMeeting) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
@@ -446,6 +469,17 @@ const FlowIncomingJudge = (() => {
   function taskOnlyProcess(process) {
     const steps = (process && process.steps) || [];
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
+  }
+
+  function outlookInboundMeetingClose(process, text, actionsApi) {
+    const id = process && process.id;
+    if (!process || draftStepOf(process)) return false;
+    const src = String(text || '');
+    const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
+    const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    if (id === 'schedule' && announce && !timed) return true;
+    if (id === 'hold' && /\?/.test(src) && !announce) return true;
+    return false;
   }
 
   // The connector is the only difference: Outlook writes its reply draft through Graph instead of the Gmail API.

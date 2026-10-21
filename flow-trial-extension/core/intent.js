@@ -871,7 +871,17 @@ const FlowIntent = (() => {
     }
     return true;
   }
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
   function vocativeIsOther(text, ctx) {
+    if (buriedReaderRememberAsk(text)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
@@ -1495,7 +1505,7 @@ const FlowIntent = (() => {
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
       if (/\bwe had our\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) on\s+(?:moday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob)) return 'past';
-      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || /\bgreat (?:meeting|chatting)\b/i.test(blob)) return 'past';
+      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || (/\bgreat (?:meeting|chatting)\b/i.test(blob) && !/\bplease remember to\b/i.test(blob))) return 'past';
       if (/\bthanks for the\b/i.test(blob) && /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday)\b/i.test(blob)) return 'past';
       if (/אתמול|בשבוע שעבר|היה נעים|נהניתי|שמחתי שדיברנו|תודה שהקדשת|הייתה ביום|היה ביום|הפגישה הייתה/.test(blob)) return 'past';
       const year = blob.match(/\b(19\d{2}|20\d{2})\b/);

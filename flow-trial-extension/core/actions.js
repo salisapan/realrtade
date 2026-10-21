@@ -582,7 +582,10 @@ const FlowActions = (() => {
     if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
     if (/^פגישה\b/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
-    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) return true;
+    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
+      if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
+      return true;
+    }
     return false;
   }
   function meetingNarrow(intent, text) {
@@ -766,8 +769,17 @@ const FlowActions = (() => {
           intent.label = named ? named[1].replace(/\s+/g, ' ').trim() : (when ? ('Log commitment for ' + when) : 'Log this decision');
         }
       } else if (coordinate) {
-        proc = logIt;
-        intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
+        const sig = intent.signals || {};
+        const inboundMeetHold = /\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(untimedSrc)
+          || /^פגישה\b/.test(untimedSrc.trim())
+          || /(?:^|\n)\s*פגישה\s+ביום/.test(untimedSrc);
+        const meetCoord = Boolean(sig.hasMeetingNoun && e.dateIso && /\?/.test(untimedSrc) && inboundMeetHold);
+        if (meetCoord) {
+          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+        } else {
+          proc = logIt;
+          intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
+        }
       } else if ((readerWill || readerSaid) && !intent.selfTask) {
         proc = logIt;
       } else if ((answerAsk || handoff) && !intent.selfTask) {
@@ -940,7 +952,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
