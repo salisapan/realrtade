@@ -510,6 +510,27 @@ function glanceE2eRewrite(url) {
     )
     raw = replace_once(
         raw,
+        """// Headless lane only. tokenAccounts is the allow-list for bearer tokens; a
+// stored web-flow record from an earlier spec must not win over the chrome hook.
+function glanceE2eStoredTokenAllowed(token) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || !e2e.httpOrigin) return true;
+  const map = e2e.tokenAccounts;
+  if (!map || typeof map !== 'object') return false;
+  const key = String(token || '').trim();
+  return Boolean(key && Object.prototype.hasOwnProperty.call(map, key));
+}
+
+""",
+        """function glanceE2eStoredTokenAllowed(token) {
+  return true;
+}
+
+""",
+        "e2e stored token allow-list",
+    )
+    raw = replace_once(
+        raw,
         """// Headless regression only. chrome.identity.launchWebAuthFlow cannot be
 // replaced inside the service worker, the same reason getAuthToken goes
 // through glanceE2eGoogleAuth. Production never sets __glanceE2e.
