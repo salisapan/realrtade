@@ -26,3 +26,7 @@ Every new rule or setting saved to the bots' shared memory must be added to `doc
 ## Graphify — every agent, to save tokens
 
 Run `scripts/graphify-setup.sh` once per checkout, then `graphify query "<question>"`, `graphify path`, `graphify explain` before reading or grepping code. Work that a routine or agent finishes and verifies goes to git on the working branch so every agent sees it. Rules: `docs/glance-ai/graphify.md`.
+
+## What changed in the code — read this before saying nothing shipped
+
+`docs/glance-ai/shipped-in-code.md` is generated from git (`scripts/what-changed.sh`): every commit that changed `core/`, `src/`, `manifest.json` or the Gmail add-on, with its files. The working branch is far ahead of `main` and the manifest on it is 0.9.56; the paragraph above that says 0.9.55 is the last package written up, not the last code. How detection is shared across Gmail, Outlook, the phone card and chat: `docs/glance-ai/one-algorithm.md`.

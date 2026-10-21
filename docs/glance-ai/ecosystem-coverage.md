@@ -78,3 +78,9 @@ One consent turns on Messenger, Facebook messages, Business Suite, Instagram and
 - **No result-recording commits.** A commit whose only content is "the suite passed" is waste. Put the numbers in the run report line of the commit that changed code.
 - **Read less:** use Graphify (`scripts/graphify-setup.sh`) before opening `src/content-gmail.js` or `core/intent.js`; read this page and `ecosystem-runs.md` (last three runs), not the whole of `open-tasks.md`.
 - **Never edit a shared status file by rewriting it.** Append or change the one row; a run that shrinks `docs/open-tasks.md` by more than a few lines has broken it (2026-10-21, 192 rows lost).
+
+## Owner priority, 2026-10-21 (ahead of any other gap)
+
+1. **Chat task card** (WhatsApp, Messenger, Instagram): the full spec is `docs/glance-ai/chat-task-card-spec.md`. Builder B takes it first, builder A reviews and extends it to the Gmail app card once B has the chat card in. It ships behind `glanceSwitches.CHAT_TASK_CARD` (off).
+2. **One algorithm everywhere**: any change to recognition lands in `core/` and passes `test/surface-parity-corpus.cjs`; after a change to the judge run `node glance-gmail-addon/scripts/build-bundle.js` so the phone card ships the same core.
+3. **System notices with a deadline and a preventing action** ("your project will be paused", "your domain expires"): a new request kind in `core/`, from known senders only, with quiet negatives for newsletters.
