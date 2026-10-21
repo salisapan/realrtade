@@ -967,7 +967,7 @@ const FlowJudgment = (() => {
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
   const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)תזכור(?:י|ו)?\s+ל|(?:^|\s)אל\s+תשכח(?:י|ו)?\s+ל|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
   // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
   // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
   // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
@@ -5287,7 +5287,17 @@ const FlowIntent = (() => {
     }
     return true;
   }
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
   function vocativeIsOther(text, ctx) {
+    if (buriedReaderRememberAsk(text)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
@@ -5909,7 +5919,7 @@ const FlowIntent = (() => {
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
       if (/\bwe had our\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) on\s+(?:moday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob)) return 'past';
-      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || /\bgreat (?:meeting|chatting)\b/i.test(blob)) return 'past';
+      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || (/\bgreat (?:meeting|chatting)\b/i.test(blob) && !/\bplease remember to\b/i.test(blob))) return 'past';
       if (/\bthanks for the\b/i.test(blob) && /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday)\b/i.test(blob)) return 'past';
       if (/אתמול|בשבוע שעבר|היה נעים|נהניתי|שמחתי שדיברנו|תודה שהקדשת|הייתה ביום|היה ביום|הפגישה הייתה/.test(blob)) return 'past';
       const year = blob.match(/\b(19\d{2}|20\d{2})\b/);
@@ -8249,7 +8259,10 @@ const FlowActions = (() => {
     if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
     if (/^פגישה\b/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
-    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) return true;
+    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
+      if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
+      return true;
+    }
     return false;
   }
   function meetingNarrow(intent, text) {
@@ -8433,8 +8446,17 @@ const FlowActions = (() => {
           intent.label = named ? named[1].replace(/\s+/g, ' ').trim() : (when ? ('Log commitment for ' + when) : 'Log this decision');
         }
       } else if (coordinate) {
-        proc = logIt;
-        intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
+        const sig = intent.signals || {};
+        const inboundMeetHold = /\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(untimedSrc)
+          || /^פגישה\b/.test(untimedSrc.trim())
+          || /(?:^|\n)\s*פגישה\s+ביום/.test(untimedSrc);
+        const meetCoord = Boolean(sig.hasMeetingNoun && e.dateIso && /\?/.test(untimedSrc) && inboundMeetHold);
+        if (meetCoord) {
+          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+        } else {
+          proc = logIt;
+          intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
+        }
       } else if ((readerWill || readerSaid) && !intent.selfTask) {
         proc = logIt;
       } else if ((answerAsk || handoff) && !intent.selfTask) {
@@ -8607,7 +8629,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
@@ -9334,6 +9356,29 @@ const FlowIncomingJudge = (() => {
     return rest.every((a) => own.indexOf(a) !== -1);
   }
 
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
+
+  // A sign-off line plus "please remember to remind/tell/ask …" is a relay to
+  // someone else, not a buried task for the reader.
+  function buriedRememberRelayQuiet(text) {
+    const raw = String(text || '');
+    const trim = raw.trim();
+    const enOpen = /^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(trim);
+    const heOpen = /^(?:שלום|היי|הי)[^\n]{0,40}[,!]?\s*(?:תזכיר(?:י)?\s+לי|תזכור(?:י)?\s+ל|אל\s+תשכח(?:י)?\s+ל)/.test(trim);
+    if (enOpen || heOpen) return false;
+    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return true;
+    return false;
+  }
+
   function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
@@ -9414,6 +9459,9 @@ const FlowIncomingJudge = (() => {
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
     if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
+    if (buriedRememberRelayQuiet(text)) {
+      return { show: false, reason: 'quiet:buried-remember-relay', intent: intent || null };
+    }
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
     }
@@ -9426,10 +9474,6 @@ const FlowIncomingJudge = (() => {
     if (!intentApi.shouldShowChip(intent)) {
       const named = quiet && typeof quiet.reasonFor === 'function' ? quiet.reasonFor(intent) : null;
       return { show: false, reason: named ? 'quiet:' + named : 'chip-low-confidence', intent };
-    }
-    // "Thanks for the update. Please remember to …" is not an opening remember-to ask.
-    if (/\bplease remember to\b/i.test(text) && !/^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(text.trim())) {
-      return { show: false, reason: 'quiet:buried-remember', intent };
     }
     // Gmail answers a fact ask from one Sheet cell in the open thread (FlowFactReply.apply); a surface without that lookup
     // stays quiet instead of offering a generic reply in its place.
@@ -9462,7 +9506,7 @@ const FlowIncomingJudge = (() => {
     // A deadline whose day was dropped (31/2, or a weekday that is not that
     // calendar day) is still the reply. The file chain is not that close.
     const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
-    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
+    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile) && !buriedReaderRememberAsk(text)) {
       if (resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
@@ -9503,7 +9547,8 @@ const FlowIncomingJudge = (() => {
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold) {
+    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi);
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold && !outlookInboundMeeting) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
@@ -9543,6 +9588,17 @@ const FlowIncomingJudge = (() => {
   function taskOnlyProcess(process) {
     const steps = (process && process.steps) || [];
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
+  }
+
+  function outlookInboundMeetingClose(process, text, actionsApi) {
+    const id = process && process.id;
+    if (!process || draftStepOf(process)) return false;
+    const src = String(text || '');
+    const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
+    const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    if (id === 'schedule' && announce && !timed) return true;
+    if (id === 'hold' && /\?/.test(src) && !announce) return true;
+    return false;
   }
 
   // The connector is the only difference: Outlook writes its reply draft through Graph instead of the Gmail API.

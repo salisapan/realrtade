@@ -92,7 +92,18 @@ console.log('\n--- intent ---');
   const hi = judge('Hi Dana, please remember to call the client.');
   check('a greeting still leaves an explicit ask', hi.speak === true && hi.title === 'call the client', hi);
 }
-check('a remember phrase buried in the mail stays quiet', judge('Thanks for the update. Please remember to send the file.').speak === false);
+{
+  const buriedNda = judge('Hi Dana, great meeting today. Please remember to send me the signed NDA by Friday.');
+  check('a buried remember-to after a greeting still closes', buriedNda.speak === true && buriedNda.title && buriedNda.title.indexOf('NDA') !== -1, buriedNda);
+  const buriedPay = judge('Thanks for the update. Please remember to transfer the payment by Sunday.');
+  check('a buried remember-to with a deadline still closes', buriedPay.speak === true && buriedPay.title && buriedPay.title.indexOf('payment') !== -1, buriedPay);
+  const buriedHeSend = judge('שלום דנה,\n\nתודה על העדכון.\nאל תשכח לשלוח את החוזה החתום עד יום שישי.');
+  check('Hebrew buried remember-to still closes', buriedHeSend.speak === true && buriedHeSend.title && buriedHeSend.title.length > 2, buriedHeSend);
+  const buriedHePay = judge('היי,\n\nתזכור להעביר את התשלום עד יום ראשון.');
+  check('Hebrew buried transfer remember still closes', buriedHePay.speak === true && buriedHePay.title && buriedHePay.title.length > 2, buriedHePay);
+}
+check('a remember-to relay to someone else stays quiet', judge('Thanks for the update. Please remember to remind Sarah to send the NDA.').speak === false);
+check('a remember-to relay in Hebrew stays quiet', judge('תודה על העדכון. תזכור להזכיר ליוסי לשלוח את החוזה.').speak === false);
 check('small talk stays quiet', judge('Hope you are well. Just wanted to say hello and see how things are going this week.').speak === false);
 check('empty stays quiet', judge('').speak === false);
 check('a send ask is not rewritten into a task', judge('Could you please send the signed contract?').speak === false);
