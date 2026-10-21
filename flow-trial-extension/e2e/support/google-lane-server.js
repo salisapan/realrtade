@@ -177,6 +177,7 @@ function startGoogleLaneServer() {
     state.rejectOnce = [];
     state.driveHits = [];
     state.lagGets = [];
+    state.noMeetLink = false;
     seedLists();
   }
 
@@ -422,6 +423,17 @@ function startGoogleLaneServer() {
           if (event[k] && event[k].dateTime) event[k] = { dateTime: offsetForm(event[k].dateTime, event[k].timeZone), timeZone: event[k].timeZone };
         });
         delete event.attendees;
+        // Like Calendar: a conference request is honoured only with conferenceDataVersion=1,
+        // and then the event carries a Meet link. Without the parameter it is ignored.
+        if (event.conferenceData && event.conferenceData.createRequest) {
+          if (url.searchParams.get('conferenceDataVersion') === '1' && !state.noMeetLink) {
+            const link = 'https://meet.google.com/abc-defg-hij';
+            event.hangoutLink = link;
+            event.conferenceData = { createRequest: { requestId: event.conferenceData.createRequest.requestId, status: { statusCode: 'success' } }, entryPoints: [{ entryPointType: 'video', uri: link }], conferenceId: 'abc-defg-hij' };
+          } else {
+            delete event.conferenceData;
+          }
+        }
         Object.defineProperty(event, '__account', { value: who, enumerable: false });
         state.events[id] = event;
         state.last.event = id;
@@ -582,6 +594,7 @@ function startGoogleLaneServer() {
         events: () => state.events,
         tasks: () => state.tasks,
         deleteEvent: (id) => { delete state.events[id]; },
+        setNoMeetLink: (on) => { state.noMeetLink = on === true; },
         deleteTask: (id) => { delete state.tasks[id]; },
         task: (id) => state.tasks[id],
         event: (id) => state.events[id],

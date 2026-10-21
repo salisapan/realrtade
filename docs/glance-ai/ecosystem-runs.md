@@ -129,3 +129,10 @@ One short report per run of the ecosystems builder. Newest last. Status only; a 
 - **Undo kept honest:** the event read now includes `recurrence`, and the rule is in `src/native-edit.js`'s snapshot (added for the To Do repeat), so a person moving the series to Wednesday or ending the repeat reads as an edit and Undo leaves it alone. A single event is unchanged.
 - **Tests:** `test/recurring-hold-outlook-corpus.cjs` (switch gating, date fits and does not fit, Hebrew, monthly, 6 silences, master read-back ok, no rule, other day, unreadable, snapshot and edit cases, write-path source checks). Whole headless `e2e` suite: 284 of 284 pass; every `test/*corpus.cjs`: green.
 - **Open:** one live Graph read of an event `recurrence`; live Gate; the Grok cards for the unwired modules. Graphify not run.
+
+## 2026-10-21 (Ecosystems builder A, tenth run) — Meet link and Gmail repeat proved in a real browser
+
+- **Failed run against the user-facing bar, said plainly:** no new capability. Every buildable module left needs a Grok card or an owner scope (row 79). I did not add another unwired module.
+- **What I did instead:** wrote `e2e/meet-and-series.spec.js` (5 specs) and made the local Google lane server behave like Calendar (a conference request is honoured only with `conferenceDataVersion=1`). In a real headless Chromium with the unpacked extension and the real Gmail page flow: switches off, one plain event; `MEET_LINK` on, the create carries the conference request, no guest, the link is read back, Undo deletes; no link, the event is deleted and the card does not say Handled; `RECURRING_HOLD` on, the series master carries the rule; no stated repeat, one plain event. All 5 pass. Every `test/*corpus.cjs` green. The full e2e suite (289 specs) was started; its result is not yet recorded here.
+- **Not claimed:** this is a fake Google server, not Google. Live Gates for `MEET_LINK` and `RECURRING_HOLD` stay not run.
+- **Environment note:** Playwright wants chromium-1193 and the container has 1194; I symlinked 1193 to 1194 in `/opt/pw-browsers` (outside the repo).
