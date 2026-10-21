@@ -1779,7 +1779,8 @@ const FlowIntent = (() => {
         hasClock: Boolean(clock),
         template: ctx.companyTemplate || null,
         fileMatch: ctx.fileMatch || null,
-        attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount
+        attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount,
+        senderEmail: ctx.senderEmail || null
       });
       if (google && google.wait) {
         const rescued = rescueSelfSent('google-wait');

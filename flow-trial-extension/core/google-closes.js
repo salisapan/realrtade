@@ -59,7 +59,7 @@ const FlowGoogleCloses = (() => {
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b/i;
   const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
   // A refusal of that save is silence. The negation has to govern the verb
   // in the same clause, so a different "no need to" does not hide a real save.
@@ -353,10 +353,11 @@ const FlowGoogleCloses = (() => {
     }
 
     const OTHER_TARGET = /\bshared\s+(?:folder|drive|files?)\b|\bsharepoint\b|\bdropbox\b|\bbox\.com\b|\bteams\s+(?:folder|channel)\b|(?:ה)?תיקי(?:י)?ה\s+המשותפת|הקבצים\s+המשותפים|שרפוינט|דרופבוקס/i;
-    const presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|nda|pdf)\s+is\s+attached|\S+\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?/i.test(text);
-    const signedAttach = /\b(?:signed|executed|final)\b|חתום|נספח חתום/i.test(text);
-    const attachSave = Number(input.attachmentCount) === 1 && (presented || signedAttach) && !refusesSave(text) && !OTHER_TARGET.test(text);
-    if (SAVE_EN.test(text) || SAVE_HE.test(text) || attachSave) {
+    const signedAttach = /\b(?:signed|executed)\b|(?:\bfinal\b[^.\n]{0,60}\b(?:document|version|copy|pdf|contract|agreement|nda)\b)|חתום|נספח חתום/i.test(text);
+    const noreply = /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(input.senderEmail || '').trim());
+    const signedInbound = Number(input.attachmentCount) === 1 && signedAttach && !refusesSave(text)
+      && !OTHER_TARGET.test(text) && !noreply;
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
       if (refusesSave(text) || input.attachmentCount !== 1 || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);

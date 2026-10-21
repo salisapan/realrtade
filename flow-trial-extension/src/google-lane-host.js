@@ -286,7 +286,7 @@ function laneUrl(url) {
   try {
     const u = new URL(url);
     const host = u.hostname;
-    const laneApi = host === 'tasks.googleapis.com' || host === 'gmail.googleapis.com' ||
+    const laneApi = host === 'tasks.googleapis.com' ||
       host === 'docs.googleapis.com' || host === 'sheets.googleapis.com' ||
       host === 'www.googleapis.com' || host === 'oauth2.googleapis.com';
     if (!laneApi) return url;

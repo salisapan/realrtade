@@ -175,7 +175,7 @@ function installE2EHooks() {
       return Promise.resolve(new Response('', { status: 404, statusText: 'Not Found' }));
     }
     if (attachHost) {
-      return Promise.resolve(new Response('', { status: 404, statusText: 'Not Found' }));
+      return origFetch(input, init);
     }
     const scenario = e2e.scenario || {};
 

@@ -194,16 +194,15 @@ test('ONEDRIVE_NEW_FILE on: a mail that asks for the content to be written gets 
 });
 
 // ---- A Teams link on an event already on the calendar (switch OUTLOOK_EVENT_CALL_LINK) ---------------------
-// "Thursday" in the mail means the nearest coming Thursday, so the event is on that one.
-const NEXT_THURSDAY = (() => {
-  const d = new Date(Date.now() + 1 * 24 * 3600 * 1000);
-  while (d.getDay() !== 4) d.setDate(d.getDate() + 1);
-  return d;
-})();
-const THURSDAY_ISO = NEXT_THURSDAY.getFullYear() + '-' + String(NEXT_THURSDAY.getMonth() + 1).padStart(2, '0') + '-' + String(NEXT_THURSDAY.getDate()).padStart(2, '0');
+// "Thursday" in the mail means the nearest coming Thursday (same UTC rule as core/event-call-link.js).
+const { FlowEventCallLink } = require('../core/event-call-link.js');
 const ASK_LINK = 'Can you add a Teams link to the Thursday sync?';
+function thursdayIsoForEvent() {
+  return FlowEventCallLink.dayOf(ASK_LINK, new Date());
+}
 
 async function eventLinkMail(glance, switches, body, id, seed) {
+  const day = thursdayIsoForEvent();
   await glance.seedOutlook(switches ? { glanceSwitches: switches } : {}, { calendar: true });
   await glance.evaluateWorker((day) => {
     globalThis.__glanceE2e.outlookEvents['e2e-existing-sync'] = {
@@ -211,7 +210,7 @@ async function eventLinkMail(glance, switches, body, id, seed) {
       start: { dateTime: day + 'T10:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: day + 'T10:30:00.0000000', timeZone: 'UTC' },
       attendees: [], body: { contentType: 'text', content: 'Weekly sync' }, location: { displayName: '' }, webLink: 'https://outlook.office.com/calendar/item/e2e-existing-sync', recurrence: null
     };
-  }, THURSDAY_ISO);
+  }, day);
   if (seed) await glance.evaluateWorker(seed);
   return glance.openOutlook({ id: id, subject: 'Sync', senderEmail: S.SENDER, senderName: 'flow', body: body });
 }

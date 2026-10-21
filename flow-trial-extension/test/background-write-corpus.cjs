@@ -1220,6 +1220,32 @@ console.log('\n--- background.js: searchDriveFiles pages across hundreds of file
       quotedUrl.indexOf("a\\'b") !== -1 && quotedUrl.indexOf("name contains 'secret") === -1, quotedUrl);
   }
 
+  console.log('\n--- background.js: fetchDriveFileResult exports Docs and refuses oversized files ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/drive\/v3\/files\/doc_1\?fields=/, { reply: res(200, { name: 'Invoice', mimeType: 'application/vnd.google-apps.document' }) }],
+        [/\/drive\/v3\/files\/doc_1\/export/, { reply: resBuf(200, 'pdf-from-doc') }]
+      ]
+    });
+    const got = await attempt(env.fn('fetchDriveFileResult')('doc_1'));
+    check('a Google Doc is exported as PDF', got.ok === true && got.attachment && got.attachment.mimeType === 'application/pdf', got);
+    check('export uses the Drive export endpoint, not alt=media', env.calls.some((c) => c.includes('/files/doc_1/export') && c.includes('application%2Fpdf')), env.calls);
+    check('alt=media is not called for a Google Doc', !env.calls.some((c) => c.includes('doc_1') && c.includes('alt=media')), env.calls);
+    check('the exported attachment keeps a PDF filename', got.ok && got.attachment.filename === 'Invoice.pdf', got);
+
+    const big = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/drive\/v3\/files\/file_big\?fields=/, { reply: res(200, { name: 'Contract-4K-Scan.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) }) }]
+      ]
+    });
+    const refused = await attempt(big.fn('fetchDriveFileResult')('file_big'));
+    check('an oversized Drive file fails before download', refused.ok === false && refused.reason === 'attach', refused);
+    check('oversized bytes are never requested with alt=media', !big.calls.some((c) => c.includes('alt=media')), big.calls);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }
