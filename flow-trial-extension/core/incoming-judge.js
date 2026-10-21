@@ -106,7 +106,8 @@ const FlowIncomingJudge = (() => {
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
-    if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
+    const shortAsk = typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.shortAskText === 'function' && FlowJudgment.shortAskText(bodyOnly);
+    if (text.length < MIN_TEXT && !factProbe && !shortAsk) return { show: false, reason: 'too-short', intent: null };
 
     const sender = i.sender || {};
     // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.

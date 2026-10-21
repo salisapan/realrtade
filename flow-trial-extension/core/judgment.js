@@ -272,6 +272,16 @@ const FlowJudgment = (() => {
   // status line or a thank-you that merely mentions an update stays quiet. Kept out of HANDOFF so the quoted sentence is unchanged.
   const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
   const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|אשמח\s+לעדכון|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
+  // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
+  // longer text, a bare "really?" and a greeting stay on the normal path.
+  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
+  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
+  function shortAskText(text) {
+    const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
+    if (t.length < 8 || t.length > 90) return false;
+    return SHORT_ASK_EN.test(t) || SHORT_ASK_HE.test(t);
+  }
   // A first-person delivery promise. Not a COMMIT word ("agreed",
   // "approved") and not a reader reminder ("you agreed to") — "I will send
   // the contract by Friday" is the sender closing a dated obligation on
@@ -663,6 +673,8 @@ const FlowJudgment = (() => {
     else if (facts.date) add('date', 12, 'Names a date: ' + facts.date.raw);
     if (handoff) add('handoff', 18, 'Asks you to do something specific');
     if (slotAsk) add('slot-ask', 34, 'Asks you for a time');
+    const shortAsk = shortAskText(text);
+    if (shortAsk) add('short-ask', 60, 'A short direct ask');
     const onDomain = domain.entityWords.test(text);
     if (onDomain) add('domain', 14, 'About ' + domain.entity.toLowerCase());
     if (facts.isReply) add('reply', 8, 'Part of an ongoing thread');
@@ -697,7 +709,7 @@ const FlowJudgment = (() => {
     } else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
-    return { total, signals, flags: { commit, lost, executed, obligation, handoff, slotAsk, workAsk, dispute, onDomain, senderPromise, noise } };
+    return { total, signals, flags: { commit, lost, executed, obligation, handoff, slotAsk, workAsk, shortAsk, dispute, onDomain, senderPromise, noise } };
   }
 
   // The threshold is the only thing that learns. Clicking says "more like that",
@@ -902,7 +914,7 @@ const FlowJudgment = (() => {
   // drifting copy of the same judgment.
   return {
     evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
-    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, SLOT_ASKS, SLOT_ASKS_HE,
+    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
 })();
