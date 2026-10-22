@@ -48,10 +48,29 @@ No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `
 
 ```sh
 node glance-gmail-addon/scripts/build-bundle.js
+node glance-gmail-addon/scripts/check-core-bundle.cjs
 node glance-gmail-addon/test/v1.test.cjs
+node glance-gmail-addon/test/build-stamp.test.cjs
 ```
 
 Re-run the bundle script after changing `src/` or the classifier. `CoreBundle.js` is generated. Do not edit it.
+
+### BuildSha (`dev` in git, real SHA only at deploy)
+
+`BuildSha.js` and the trailing `// GLANCE_BUILD_SHA=…` line in `CoreBundle.js` stay **`dev`** in every commit. The homepage shows that value locally. A normal `node scripts/build-bundle.js` (or `npm run build`) syncs the bundle and keeps **`dev`**.
+
+Right before `clasp push`, stamp the current git short SHA, verify, then push:
+
+```sh
+cd glance-gmail-addon
+node scripts/build-bundle.js --deploy    # or: npm run deploy:stamp
+node scripts/check-core-bundle.cjs --deploy
+npx clasp push
+```
+
+`npm run predeploy` runs the deploy check (`check-core-bundle.cjs --deploy`) and fails if `BuildSha` is still `dev` or does not match `git rev-parse --short HEAD`. Do not commit the stamped files; run `node scripts/build-bundle.js` again after push to restore **`dev`** for the next change.
+
+`check-core-bundle.cjs` (without `--deploy`) compares bundle sources and ignores the stamp line; it does not rewrite `BuildSha.js`.
 
 ## Deploy as a test deployment
 
@@ -70,7 +89,7 @@ npx clasp create --type standalone --title "Glance" --rootDir .
 `.clasp.json` holds the script id and stays uncommitted.
 
 5. `npx clasp open`. **Project Settings → Google Cloud Platform (GCP) Project → Change project.** Paste the project **number** (not the id string).
-6. `node scripts/build-bundle.js` if `src/` is newer than `CoreBundle.js`, then `npx clasp push`. The push sends `appsscript.json`, `CoreBundle.js`, and `Code.js`.
+6. Sync and stamp, then push (see **BuildSha** above): `node scripts/build-bundle.js`, then `node scripts/build-bundle.js --deploy`, `node scripts/check-core-bundle.cjs --deploy`, then `npx clasp push`. The push sends `appsscript.json`, `CoreBundle.js`, `BuildSha.js`, and `Code.js`.
 7. In the Apps Script editor: **Deploy → Test deployments**. Install from that dialog. Do not use **Deploy → New deployment** for the Marketplace, and do not open the Workspace Marketplace SDK.
 8. Share the Apps Script project with each test account (editor is enough), and have each account open the test-deployment install link while logged into that account.
 
@@ -79,7 +98,7 @@ npx clasp create --type standalone --title "Glance" --rootDir .
 A test deployment keeps the manifest it was installed with. `npx clasp push` updates the script project. An already installed card does not ask for a new scope until that deployment is updated and the account installs it again.
 
 1. `appsscript.json` lists the Calendar advanced service under `dependencies.enabledAdvancedServices`: `userSymbol` `Calendar`, `serviceId` `calendar`, `version` `v3`. `oauthScopes` includes `https://www.googleapis.com/auth/calendar.events`. It does not include `https://www.googleapis.com/auth/calendar`.
-2. `node scripts/build-bundle.js`, then `npx clasp push`.
+2. `node scripts/build-bundle.js --deploy`, `node scripts/check-core-bundle.cjs --deploy`, then `npx clasp push`.
 3. In the Apps Script editor, open **Project Settings** and confirm the Calendar advanced service is on (identifier `Calendar`, version `v3`). If the editor added the full calendar scope, delete `https://www.googleapis.com/auth/calendar` from `appsscript.json` and keep `calendar.events`, then push again.
 4. **Deploy → Test deployments**. Update that test deployment, or delete it and create the test deployment again. Copy the new install link. An old link keeps the old manifest, so Gmail does not show a consent screen for `calendar.events`.
 5. Each test account opens that link and accepts the consent screen. If no consent screen appears, that account is still on the previous deployment.

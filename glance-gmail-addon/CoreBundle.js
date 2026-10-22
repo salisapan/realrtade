@@ -11391,3 +11391,4 @@ var Glance = {
   plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },
   judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }
 };
+// GLANCE_BUILD_SHA=dev
