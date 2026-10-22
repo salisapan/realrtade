@@ -5,8 +5,11 @@ var GlanceMarker = (function () {
   var PROCESSED_KEY = 'glanceMarkerProcessed';
   var DISMISSED_KEY = 'glanceMarkerDismissed';
   var UNDO_SNAP_KEY = 'glanceMarkerUndoSnap';
+  var MARK_META_KEY = 'glanceMarkerMarkMeta';
   var FIFO_CAP = 2000;
-  var SWEEP_BUDGET_MS = Math.floor(4.5 * 60 * 1000);
+  var MAX_PROP_CHARS = 9216;
+  var UNDO_SNAP_CAP = 400;
+  var SWEEP_BUDGET_MS = 3 * 60 * 1000;
   var SWEEP_QUERY = 'in:inbox newer_than:2d -label:Glance';
   var SWEEP_LIMIT = 50;
 
@@ -14,20 +17,58 @@ var GlanceMarker = (function () {
     return PropertiesService.getUserProperties();
   }
 
-  function readList(key) {
-    try {
-      var raw = userProps().getProperty(key);
-      if (!raw) return [];
-      var parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-      return [];
+  function chunkKey(base, index) {
+    return base + '__' + index;
+  }
+
+  function readChunkedList(base) {
+    var props = userProps();
+    var out = [];
+    for (var i = 0; ; i++) {
+      var raw = props.getProperty(chunkKey(base, i));
+      if (!raw) break;
+      try {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) out = out.concat(parsed);
+      } catch (err) { /* skip bad chunk */ }
+    }
+    return out;
+  }
+
+  function writeChunkedList(base, list) {
+    var trimmed = list.slice(-FIFO_CAP);
+    var props = userProps();
+    var chunkIndex = 0;
+    var start = 0;
+    while (start < trimmed.length) {
+      var chunk = [trimmed[start]];
+      var encoded = JSON.stringify(chunk);
+      var next = start + 1;
+      while (next < trimmed.length) {
+        var trial = trimmed.slice(start, next + 1);
+        var trialEnc = JSON.stringify(trial);
+        if (trialEnc.length > MAX_PROP_CHARS) break;
+        chunk = trial;
+        encoded = trialEnc;
+        next++;
+      }
+      props.setProperty(chunkKey(base, chunkIndex), encoded);
+      chunkIndex++;
+      start = next;
+    }
+    for (var c = chunkIndex; ; c++) {
+      var k = chunkKey(base, c);
+      if (!props.getProperty(k)) break;
+      props.deleteProperty(k);
     }
   }
 
+  function readList(key) {
+    return readChunkedList(key);
+  }
+
   function writeList(key, list) {
-    var trimmed = list.slice(-FIFO_CAP);
-    userProps().setProperty(key, JSON.stringify(trimmed));
+    writeChunkedList(key, list);
   }
 
   function pushId(key, id) {
@@ -45,6 +86,53 @@ var GlanceMarker = (function () {
     return readList(key).indexOf(id) >= 0;
   }
 
+  function readMarkMeta() {
+    try {
+      var raw = userProps().getProperty(MARK_META_KEY);
+      if (!raw) return {};
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writeMarkMeta(map) {
+    var keys = Object.keys(map || {});
+    if (keys.length > FIFO_CAP) {
+      keys.sort();
+      var drop = keys.length - FIFO_CAP;
+      for (var d = 0; d < drop; d++) delete map[keys[d]];
+    }
+    var encoded = JSON.stringify(map || {});
+    while (encoded.length > MAX_PROP_CHARS && keys.length > 1) {
+      delete map[keys[0]];
+      keys.shift();
+      encoded = JSON.stringify(map);
+    }
+    userProps().setProperty(MARK_META_KEY, encoded);
+  }
+
+  function rememberMarkMeta(messageId, meta) {
+    if (!messageId) return;
+    var map = readMarkMeta();
+    map[String(messageId)] = {
+      userHadStar: meta && meta.userHadStar === true
+    };
+    writeMarkMeta(map);
+  }
+
+  function takeMarkMeta(messageId) {
+    var map = readMarkMeta();
+    var key = String(messageId);
+    var meta = map[key] || null;
+    if (map[key]) {
+      delete map[key];
+      writeMarkMeta(map);
+    }
+    return meta;
+  }
+
   function readUndoSnap() {
     try {
       var raw = userProps().getProperty(UNDO_SNAP_KEY);
@@ -57,7 +145,19 @@ var GlanceMarker = (function () {
   }
 
   function writeUndoSnap(map) {
-    userProps().setProperty(UNDO_SNAP_KEY, JSON.stringify(map || {}));
+    var keys = Object.keys(map || {});
+    if (keys.length > UNDO_SNAP_CAP) {
+      keys.sort();
+      var drop = keys.length - UNDO_SNAP_CAP;
+      for (var d = 0; d < drop; d++) delete map[keys[d]];
+    }
+    var encoded = JSON.stringify(map || {});
+    while (encoded.length > MAX_PROP_CHARS && keys.length > 1) {
+      delete map[keys[0]];
+      keys.shift();
+      encoded = JSON.stringify(map);
+    }
+    userProps().setProperty(UNDO_SNAP_KEY, encoded);
   }
 
   function ensureLabel_(gmailApp) {
@@ -73,9 +173,18 @@ var GlanceMarker = (function () {
     return messages[messages.length - 1];
   }
 
+  function messageIsStarred_(latest) {
+    if (!latest) return false;
+    try {
+      if (typeof latest.isStarred === 'function') return latest.isStarred() === true;
+    } catch (err) { /* ignore */ }
+    return false;
+  }
+
   function applyMark_(thread, label, allowLabel) {
     var latest = latestMessage_(thread);
     if (!latest) return { ok: false };
+    var userHadStar = messageIsStarred_(latest);
     var starred = false;
     var labeled = false;
     if (allowLabel && label) {
@@ -92,15 +201,22 @@ var GlanceMarker = (function () {
     } catch (err2) {
       starred = false;
     }
-    return { ok: labeled || starred, labeled: labeled, starred: starred };
+    return {
+      ok: labeled || starred,
+      labeled: labeled,
+      starred: starred,
+      userHadStar: userHadStar,
+      glanceStarred: starred && !userHadStar
+    };
   }
 
-  function removeMark_(thread, label) {
+  function removeMark_(thread, label, meta) {
     var latest = latestMessage_(thread);
     if (label) {
       try { label.removeFromThread(thread); } catch (err) { /* label may be missing */ }
     }
-    if (latest) {
+    var userHadStar = meta && meta.userHadStar === true;
+    if (latest && !userHadStar) {
       try { latest.unstar(); } catch (err2) { /* ignore */ }
     }
   }
@@ -134,9 +250,13 @@ var GlanceMarker = (function () {
     pushId(PROCESSED_KEY, messageId);
   }
 
-  function rememberUndoSnap(messageId, hadMark) {
+  function rememberUndoSnap(messageId, snap) {
     var map = readUndoSnap();
-    map[String(messageId)] = { hadMark: hadMark === true };
+    map[String(messageId)] = {
+      hadMark: snap && snap.hadMark === true,
+      userHadStar: snap && snap.userHadStar === true,
+      glanceStarred: snap && snap.glanceStarred === true
+    };
     writeUndoSnap(map);
   }
 
@@ -158,19 +278,31 @@ var GlanceMarker = (function () {
     var thread = msg.getThread();
     var label = Gmail.getUserLabelByName(LABEL_NAME);
     var hadMark = label && thread.getLabels().some(function (l) { return l.getName() === LABEL_NAME; });
-    rememberUndoSnap(messageId, hadMark);
-    removeMark_(thread, label);
+    var meta = takeMarkMeta(messageId);
+    if (!meta) meta = { userHadStar: false };
+    var glanceStarred = !meta.userHadStar;
+    rememberUndoSnap(messageId, { hadMark: hadMark, userHadStar: meta.userHadStar, glanceStarred: glanceStarred });
+    removeMark_(thread, label, meta);
   }
 
   function onUndoRestore(messageId, gmailApp) {
     var snap = takeUndoSnap(messageId);
-    if (!snap || !snap.hadMark) return;
+    if (!snap) return;
     var Gmail = gmailApp || GmailApp;
     var msg = Gmail.getMessageById(String(messageId));
     if (!msg) return;
     var thread = msg.getThread();
-    var label = ensureLabel_(Gmail);
-    applyMark_(thread, label, true);
+    if (snap.hadMark) {
+      var label = ensureLabel_(Gmail);
+      applyMark_(thread, label, true);
+      return;
+    }
+    if (snap.glanceStarred) {
+      var latest = latestMessage_(thread);
+      if (latest) {
+        try { latest.star(); } catch (err) { /* ignore */ }
+      }
+    }
   }
 
   function onNotThis(messageId, gmailApp) {
@@ -180,7 +312,8 @@ var GlanceMarker = (function () {
     dismiss(String(messageId));
     var thread = msg.getThread();
     var label = Gmail.getUserLabelByName(LABEL_NAME);
-    removeMark_(thread, label);
+    var meta = takeMarkMeta(messageId) || { userHadStar: messageIsStarred_(msg) };
+    removeMark_(thread, label, meta);
     markProcessed(String(messageId));
   }
 
@@ -226,7 +359,10 @@ var GlanceMarker = (function () {
       }
 
       var result = applyMark_(thread, label, !!label);
-      if (result.ok) marked++;
+      if (result.ok) {
+        marked++;
+        rememberMarkMeta(messageId, { userHadStar: result.userHadStar });
+      }
       markProcessed(messageId);
     }
     return { scanned: scanned, marked: marked, stopped: 'done' };
@@ -235,6 +371,7 @@ var GlanceMarker = (function () {
   return {
     LABEL_NAME: LABEL_NAME,
     FIFO_CAP: FIFO_CAP,
+    MAX_PROP_CHARS: MAX_PROP_CHARS,
     SWEEP_BUDGET_MS: SWEEP_BUDGET_MS,
     SWEEP_QUERY: SWEEP_QUERY,
     installSweepTriggerIfNeeded: installSweepTriggerIfNeeded,
@@ -252,7 +389,11 @@ var GlanceMarker = (function () {
       pushId: pushId,
       applyMark_: applyMark_,
       removeMark_: removeMark_,
-      ensureLabel_: ensureLabel_
+      ensureLabel_: ensureLabel_,
+      chunkKey: chunkKey,
+      readUndoSnap: readUndoSnap,
+      writeUndoSnap: writeUndoSnap,
+      rememberMarkMeta: rememberMarkMeta
     }
   };
 })();

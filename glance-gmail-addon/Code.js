@@ -177,11 +177,14 @@ function silenceCard_(decision, messageId, lang) {
 function sweep() {
   var started = Date.now();
   var readerCtx = readerContextForSweep_();
+  var sweepZone = sweepTimeZone_();
   return GlanceMarker.sweep({
     startedMs: started,
     readerCtx: readerCtx,
     buildOpened: buildOpenedFromMessage_,
-    isClosable: isClosableForMarker_
+    isClosable: function (opened) {
+      return isClosableForMarker_(opened, sweepZone);
+    }
   });
 }
 
@@ -236,19 +239,23 @@ function buildOpenedFromMessage_(message, readerCtx) {
     userName: reader.userName,
     ownNames: reader.ownNames,
     readerEmail: reader.readerEmail,
-    toRecipients: reader.toRecipients || parseRecipientList_(toRaw),
-    ccRecipients: reader.ccRecipients || parseRecipientList_(ccRaw),
+    toRecipients: (reader.toRecipients && reader.toRecipients.length)
+      ? reader.toRecipients
+      : parseRecipientList_(toRaw),
+    ccRecipients: (reader.ccRecipients && reader.ccRecipients.length)
+      ? reader.ccRecipients
+      : parseRecipientList_(ccRaw),
     attachmentCount: attachmentCount
   };
 }
 
-function isClosableForMarker_(opened) {
+function isClosableForMarker_(opened, timeZone) {
   var now = new Date();
-  var timeZone = 'Asia/Jerusalem';
+  var zone = timeZone || sweepTimeZone_();
   var engine = function (raw) { return engineHit_(raw, opened, now); };
   var resolveCtx = {
     now: now,
-    timeZone: timeZone,
+    timeZone: zone,
     engine: engine,
     userName: opened.userName || null,
     ownNames: opened.ownNames || null,
@@ -263,6 +270,28 @@ function isClosableForMarker_(opened) {
     decision = Glance.intent.resolveTask(opened.subject, resolveCtx);
   }
   return decision.speak === true;
+}
+
+function sweepTimeZone_() {
+  var id = '';
+  try {
+    if (typeof CalendarApp !== 'undefined' && CalendarApp.getDefaultCalendar) {
+      var calendar = CalendarApp.getDefaultCalendar();
+      id = zoneId_(calendar && calendar.getTimeZone && calendar.getTimeZone());
+      if (id) return id;
+    }
+  } catch (err) {
+    console.warn('sweep calendar zone skipped ' + (err && err.message ? err.message : err));
+  }
+  try {
+    if (typeof Session !== 'undefined' && Session.getScriptTimeZone) {
+      id = zoneId_(Session.getScriptTimeZone());
+      if (id) return id;
+    }
+  } catch (err2) {
+    console.warn('sweep script zone skipped ' + (err2 && err2.message ? err2.message : err2));
+  }
+  return 'Asia/Jerusalem';
 }
 
 function onNotThis(e) {

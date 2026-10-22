@@ -238,7 +238,7 @@ console.log('\n--- cards ---');
 {
   const card = cards.proposal({ title: 'send the contract', due: '2026-10-16' }, 'abc123', 'en');
   const buttons = cards.buttons(card);
-  check('proposal has one Do it button', buttons.length === 1 && buttons[0].text === 'Do it' && buttons[0].action === 'onDoIt' && buttons[0].style === 'filled', buttons);
+  check('proposal has Do it and Not this', buttons.length === 2 && buttons[0].text === 'Do it' && buttons[0].action === 'onDoIt' && buttons[0].style === 'filled' && buttons[1].action === 'onNotThis', buttons);
   check('proposal shows title and due', widgetText(card).indexOf('send the contract') !== -1 && widgetText(card).some((line) => line.indexOf('2026-10-16') !== -1), widgetText(card));
   check('english card is not rtl', card.rtl === false && card.lang === 'en');
 }
