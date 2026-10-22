@@ -5,6 +5,7 @@
 <title>Glance</title>
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="popup.css">
+<link rel="stylesheet" href="connect-3.css">
 <link rel="stylesheet" href="../design/step-states-v1/scoped.css">
 </head>
 <body>
@@ -24,7 +25,10 @@
 
   <main>
     <section data-panel="setup" class="panel active">
-      <div class="block">
+      <div class="block" id="connectEcosystemBlock" hidden>
+        <div id="connect-ecosystem-host"></div>
+      </div>
+      <div class="block" id="legacyConnectorBlock">
         <p class="label">לאן Glance רושם?</p>
         <p class="hint">הרשאה, לא כלל. Glance רק מוסיף רשומה, וכל כתיבה ניתנת לביטול.</p>
         <div id="connector-list" class="conn-list"></div>
@@ -263,6 +267,8 @@
   <script src="../core/step-list.js"></script>
   <script src="../core/suggest-save.js"></script>
   <script src="../design/step-states-v1/glyphs.js"></script>
+  <script src="../design/connect-3/brands.js"></script>
+  <script src="connect-3.js"></script>
   <script src="../src/step-kit.js"></script>
   <script src="../src/step-list-view.js"></script>
   <script src="../lane-chat/meta-consent.js"></script>

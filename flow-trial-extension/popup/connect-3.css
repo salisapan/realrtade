@@ -1,0 +1,261 @@
+/* Connect per ecosystem (connect-3) — matches design/connect-3 mockup. */
+.connect-ecosystem {
+  --c3-bg: #f5f5f7;
+  --c3-sheet: #fff;
+  --c3-ink: #1d1d1f;
+  --c3-grey: #6e6e73;
+  --c3-grey2: #86868b;
+  --c3-line: rgba(0, 0, 0, 0.08);
+  --c3-quiet: #f5f5f7;
+  --c3-accent: #0071e3;
+  --c3-tile: #fff;
+  --c3-tile-ring: rgba(0, 0, 0, 0.06);
+  --c3-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 14px -8px rgba(0, 0, 0, 0.08), 0 24px 48px -28px rgba(0, 0, 0, 0.22);
+  --c3-h-btn: 52px;
+  --c3-font: 'Inter Tight', 'Heebo', 'Assistant', -apple-system, system-ui, sans-serif;
+  font-family: var(--c3-font);
+  color: var(--c3-ink);
+}
+.connect-ecosystem[data-theme="dark"] {
+  --c3-bg: #000;
+  --c3-sheet: #1c1c1e;
+  --c3-ink: #f5f5f7;
+  --c3-grey: #a1a1a6;
+  --c3-grey2: #8e8e93;
+  --c3-line: rgba(255, 255, 255, 0.08);
+  --c3-quiet: #2c2c2e;
+  --c3-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+}
+.connect-ecosystem .c3-sheet {
+  min-width: 0;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--c3-sheet);
+  border: 1px solid var(--c3-line);
+  border-radius: 22px;
+  padding: 32px 24px 24px;
+  box-shadow: var(--c3-shadow);
+}
+.connect-ecosystem .c3-kicker {
+  margin: 0 0 8px;
+  font: 600 13px/1 var(--c3-font);
+  color: var(--c3-accent);
+}
+.connect-ecosystem h2.c3-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+html[lang="he"] .connect-ecosystem h2.c3-title {
+  letter-spacing: -0.01em;
+}
+.connect-ecosystem .c3-lead {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--c3-grey);
+}
+.connect-ecosystem .c3-list {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.connect-ecosystem .c3-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.connect-ecosystem .c3-tools {
+  margin: 0;
+  padding-inline: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--c3-grey2);
+}
+.connect-ecosystem .c3-tools .t {
+  white-space: nowrap;
+}
+.connect-ecosystem .c3-doit {
+  position: relative;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--c3-h-btn);
+  gap: 12px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #fff;
+  font: 600 16px/1 var(--c3-font);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 46%),
+    linear-gradient(180deg, #3c98f2 0%, #0071e3 46%, #0064c8 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 8px -6px rgba(0, 0, 0, 0.22);
+}
+.connect-ecosystem .c3-doit::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+}
+.connect-ecosystem .c3-doit:focus-visible {
+  outline: 2px solid var(--c3-ink);
+  outline-offset: 3px;
+}
+.connect-ecosystem .c3-doit:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+.connect-ecosystem .c3-doit.busy {
+  cursor: progress;
+  opacity: 1;
+  justify-content: center;
+}
+.connect-ecosystem .c3-doit .marks {
+  display: flex;
+  flex: none;
+  width: 62px;
+}
+.connect-ecosystem .c3-doit .label {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  text-align: center;
+  padding-inline-end: 74px;
+  min-width: 0;
+}
+.connect-ecosystem .c3-doit.busy .label {
+  flex: none;
+  padding: 0;
+}
+.connect-ecosystem .c3-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--c3-tile);
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--c3-tile-ring), 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+.connect-ecosystem .c3-tile svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+.connect-ecosystem .c3-tile.ms svg {
+  width: 17px;
+  height: 17px;
+}
+.connect-ecosystem .marks .c3-tile + .c3-tile {
+  margin-inline-start: -10px;
+}
+.connect-ecosystem .c3-done {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--c3-h-btn);
+  padding: 0 8px;
+  padding-inline-end: 16px;
+  border-radius: 999px;
+  background: var(--c3-quiet);
+}
+.connect-ecosystem .c3-done .who {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.connect-ecosystem .c3-done .name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.connect-ecosystem .c3-done .mail {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--c3-grey2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connect-ecosystem .c3-done .ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c3-grey);
+  flex: none;
+}
+.connect-ecosystem .c3-done .ok svg {
+  width: 16px;
+  height: 16px;
+  color: var(--c3-ink);
+}
+.connect-ecosystem .c3-later {
+  margin: 24px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--c3-line);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--c3-grey2);
+  text-align: center;
+}
+.connect-ecosystem .c3-spin {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin-inline-end: 10px;
+  flex: none;
+}
+.connect-ecosystem .c3-spin i {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1.5px;
+  height: 28%;
+  margin-left: -0.75px;
+  border-radius: 999px;
+  background: #fff;
+  transform-origin: 50% 178.5%;
+  transform: rotate(calc(var(--i) * 30deg));
+  opacity: 0.22;
+  animation: c3sp 840ms linear infinite;
+  animation-delay: calc(var(--i) * -70ms);
+}
+@keyframes c3sp {
+  0% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .connect-ecosystem .c3-spin i {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+@media (max-width: 390px) {
+  .connect-ecosystem .c3-sheet {
+    padding: 28px 20px 20px;
+  }
+  .connect-ecosystem h2.c3-title {
+    font-size: 26px;
+  }
+  .connect-ecosystem .c3-doit .label {
+    padding-inline-end: 24px;
+  }
+}
