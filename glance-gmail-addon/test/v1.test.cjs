@@ -48,9 +48,12 @@ function loadEngine() {
   }
   const judgeShared = vm.runInContext('FlowIncomingJudge.judge', sandbox);
   // The same call Code.js engineHit_ makes: the one decision every Glance surface shares.
-  return function engine(text) {
+  const readerEmail = 'owner@ai.local.flow@gmail.com';
+  const readerTo = 'Sali Sapan <' + readerEmail + '>';
+  return function engine(text, readerOverride) {
+    const reader = readerOverride || { userName: 'Sali Sapan', ownNames: ['Sali Sapan', 'Sali'] };
     const judged = judgeShared({
-      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: ['owner@ai.local.flow@gmail.com'], ownAddresses: ['owner@ai.local.flow@gmail.com'], userName: 'Owner', ownNames: ['Owner', 'Sali', 'Sali Sapan'], now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
+      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [readerEmail], ownAddresses: [readerEmail], userName: reader.userName, ownNames: reader.ownNames, now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
     }, {});
     if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
     return { intent: judged.intent, plan: judged.process };
@@ -60,7 +63,17 @@ function loadEngine() {
 const engine = loadEngine();
 
 function judge(text, extra) {
-  return intent.resolveTask(text, Object.assign({ now: NOW, timeZone: TZ, engine: engine }, extra || {}));
+  const opts = extra || {};
+  const eng = opts.reader ? function (t) { return engine(t, opts.reader); } : engine;
+  const rest = Object.assign({}, opts);
+  delete rest.reader;
+  return intent.resolveTask(text, Object.assign({
+    now: NOW,
+    timeZone: TZ,
+    engine: eng,
+    userName: 'Sali Sapan',
+    ownNames: ['Sali Sapan', 'Sali']
+  }, rest));
 }
 
 console.log('\n--- intent ---');
@@ -90,14 +103,14 @@ console.log('\n--- intent ---');
 }
 {
   const hi = judge('Hi Dana, please remember to call the client.');
-  check('a greeting still leaves an explicit ask', hi.speak === true && hi.title === 'call the client', hi);
+  check('a greeting to someone else stays quiet for the reader', hi.speak === false, hi);
 }
 {
-  const buriedNda = judge('Hi Dana, great meeting today. Please remember to send me the signed NDA by Friday.');
-  check('a buried remember-to after a greeting still closes', buriedNda.speak === true && buriedNda.title && buriedNda.title.indexOf('NDA') !== -1, buriedNda);
+  const buriedNda = judge('Hi Dana, great meeting today. Please remember to send me the signed NDA by Friday.', { reader: { userName: 'Dana', ownNames: ['Dana', 'Dana Levi'] } });
+  check('a buried remember-to after a greeting still closes when the reader is greeted', buriedNda.speak === true && buriedNda.title && buriedNda.title.indexOf('NDA') !== -1, buriedNda);
   const buriedPay = judge('Thanks for the update. Please remember to transfer the payment by Sunday.');
   check('a buried remember-to with a deadline still closes', buriedPay.speak === true && buriedPay.title && buriedPay.title.indexOf('payment') !== -1, buriedPay);
-  const buriedHeSend = judge('שלום דנה,\n\nתודה על העדכון.\nאל תשכח לשלוח את החוזה החתום עד יום שישי.');
+  const buriedHeSend = judge('שלום,\n\nתודה על העדכון.\nאל תשכח לשלוח את החוזה החתום עד יום שישי.');
   check('Hebrew buried remember-to still closes', buriedHeSend.speak === true && buriedHeSend.title && buriedHeSend.title.length > 2, buriedHeSend);
   const buriedHePay = judge('היי,\n\nתזכור להעביר את התשלום עד יום ראשון.');
   check('Hebrew buried transfer remember still closes', buriedHePay.speak === true && buriedHePay.title && buriedHePay.title.length > 2, buriedHePay);
@@ -129,7 +142,7 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
       to: ['owner@ai.local.flow@gmail.com'],
       ownAddresses: ['owner@ai.local.flow@gmail.com'],
       userName: 'Owner',
-      ownNames: ['Owner', 'Sali', 'Sali Sapan'],
+      ownNames: ['Sali Sapan', 'Sali'],
       now: NOW,
       surface: 'gmail',
       attachmentCount: attachmentCount,
@@ -179,10 +192,9 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
 }
 {
   const meeting = judge('פגישה ביום חמישי 22/10');
-  check('the Hebrew meeting is a schedule, not silence', meeting.speak === true && meeting.kind === 'schedule' && meeting.dateIso === '2026-10-22' && meeting.hour === null, meeting);
-  check('a Hebrew meeting title comes from the mail', meeting.title === 'פגישה 22/10' && meeting.taskTitle === 'פגישה 22/10' && meeting.title.indexOf('Meeting') === -1, meeting);
+  check('a Hebrew meeting statement without a clock stays quiet', meeting.speak === false, meeting);
   const timedHe = judge('פגישה ביום חמישי 22/10 בשעה 14:00');
-  check('a Hebrew meeting with a clock keeps the Hebrew title', timedHe.speak === true && timedHe.title === 'פגישה 22/10 14:00' && timedHe.taskTitle === 'פגישה 22/10 14:00' && timedHe.hour === 14 && timedHe.minute === 0, timedHe);
+  check('a Hebrew meeting with a clock is a hold', timedHe.speak === true && timedHe.kind === 'hold' && timedHe.title === 'פגישה 22/10 14:00' && timedHe.hour === 14 && timedHe.minute === 0, timedHe);
 }
 
 {
@@ -233,6 +245,21 @@ check('other locales stay english', i18n.locale('en-US') === 'en' && i18n.locale
   check('homepage without a cache has no Do it', cards.buttons(home).length === 0 && plain(home.widgets[0].text) === 'Open a message.');
   const next = cards.homepage({ title: 'file the taxes', due: '2026-11-01' }, 'en');
   check('homepage shows the cached next action', widgetText(next).indexOf('file the taxes') !== -1 && cards.buttons(next).length === 1 && cards.buttons(next)[0].params.source === 'prefetch');
+  check('homepage shows the build sha when set', widgetText(cards.homepage(null, 'en', 'deadbeef')).some((line) => line.indexOf('deadbeef') !== -1));
+  const spotted = cards.spottedUnsupported({ reason: 'dropped', droppedPlanId: 'sheet' }, 'msg-sheet', 'en');
+  check('spotted unsupported names the plan', plain(widgetText(spotted)[0]).indexOf('Spotted, not supported yet: sheet') !== -1);
+  check('spotted unsupported offers Remind me', cards.buttons(spotted).length === 1 && cards.buttons(spotted)[0].action === 'onRemindMe');
+  const sheetDrop = intent.resolveTask('Please put the October sales numbers in a sheet', {
+    now: NOW,
+    timeZone: TZ,
+    engine: function () {
+      return {
+        intent: { type: 'request', signals: { workAsk: true } },
+        plan: { id: 'reply-track', steps: [{ kind: 'gmailDraft', params: {} }, { kind: 'googleTask', params: { title: 'Reply requested' } }] }
+      };
+    }
+  });
+  check('October sales in a sheet is spotted sheet, not a task', sheetDrop.speak === false && sheetDrop.reason === 'dropped' && sheetDrop.droppedPlanId === 'sheet', sheetDrop);
 }
 
 console.log('\n--- proof and undo ---');
@@ -536,6 +563,7 @@ function scopesRequiredByManifest(manifest, hostSource) {
     if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
   });
   if (hostSource && /UrlFetchApp/.test(hostSource)) add('script.external_request');
+  if (hostSource && /Session\.getActiveUser/.test(hostSource)) add('userinfo.email');
   return required.sort();
 }
 
@@ -844,8 +872,8 @@ console.log('\n--- message path parity ---');
     const reader = {
       to: ['owner@ai.local.flow@gmail.com'],
       ownAddresses: ['owner@ai.local.flow@gmail.com'],
-      userName: 'Owner',
-      ownNames: ['Owner', 'Sali', 'Sali Sapan']
+      userName: 'Sali Sapan',
+      ownNames: ['Sali Sapan', 'Sali']
     };
     const toList = String(fields.to || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
     const ownAddresses = reader.ownAddresses.slice();
@@ -950,7 +978,7 @@ console.log('\n--- message path parity ---');
     id: 'heb1',
     threadId: 'thread1',
     subject: 'פגישה ביום חמישי 22/10',
-    plain: 'שלום,\n\nפגישה ביום חמישי 22/10\n\nתודה,\nדנה',
+    plain: 'שלום,\n\nפגישה ביום חמישי 22/10 בשעה 14:00\n\nתודה,\nדנה',
     html: quietHtml,
     from: 'Dana Levi <dana@meridian.com>',
     date: new Date('2026-10-15T08:00:00Z')
@@ -961,7 +989,7 @@ console.log('\n--- message path parity ---');
     subject: 'Signed copy',
     plain: 'Attached is the signed copy',
     from: 'Dana Levi <dana@meridian.com>',
-    to: 'owner@ai.local.flow@gmail.com',
+    to: 'Sali Sapan <owner@ai.local.flow@gmail.com>',
     attachmentCount: 1
   };
   reset();
@@ -976,6 +1004,9 @@ console.log('\n--- message path parity ---');
   check('add-on judge plans file-it when the message has one attachment', filePlan && filePlan.id === 'file-it', filePlan);
   const fileNoAttach = judgedPlan(Object.assign({}, fileInbound, { attachmentCount: 0 }));
   check('add-on judge does not plan file-it without an attachment', !fileNoAttach || fileNoAttach.id !== 'file-it', fileNoAttach);
+  const fileTwo = judgedPlan(Object.assign({}, fileInbound, { attachmentCount: 2 }));
+  check('add-on judge does not plan file-it with two attachments', !fileTwo || fileTwo.id !== 'file-it', fileTwo);
+  check('getAttachments mock returns one file per count', gmailMessage({ attachmentCount: 2 }).getAttachments().length === 2);
 
   const opened = openOf(hebrew);
   check('heb1 does not invent a midnight clock', linesOf(openMessage({
@@ -1040,23 +1071,22 @@ console.log('\n--- message path parity ---');
   const proofLines = linesOf(proof).join('\n');
   const eventIds = Object.keys(state.events);
   const taskIds = Object.keys(state.tasks);
-  check('Do it writes one all-day event and one task', eventIds.length === 1 && taskIds.length === 1, { events: eventIds, tasks: taskIds });
+  check('Do it writes one timed hold event', eventIds.length === 1 && taskIds.length === 0, { events: eventIds, tasks: taskIds });
   const written = state.events[eventIds[0]];
   const originalSummary = written.summary;
-  check('the event is the plan date with no guests', written.start.date === opened.plan.steps[0].params.dateIso && written.end.date && !written.start.dateTime && !written.attendees, written);
-  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה 22/10' && state.tasks[taskIds[0]].title === 'פגישה 22/10', { event: written.summary, task: state.tasks[taskIds[0]].title });
-  check('the proof shows the event and the task that were read back',
+  check('the hold uses the plan date and clock', written.start.dateTime && written.start.dateTime.indexOf('2026-10-22T14:00') !== -1, written);
+  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה 22/10 14:00', { event: written.summary });
+  check('the proof shows the calendar hold that was read back',
     proofLines.indexOf('On your calendar.') !== -1 && proofLines.indexOf(eventIds[0]) !== -1 &&
-    proofLines.indexOf('In Google Tasks.') !== -1 && proofLines.indexOf(taskIds[0]) !== -1 &&
     buttonsOf(proof).length === 1 && buttonsOf(proof)[0].action === 'onUndo', proofLines);
   state.events[eventIds[0]].summary = 'Changed in Calendar';
   const refused = undo(click).card;
-  check('an edited event refuses undo for both writes',
+  check('an edited event refuses undo',
     plain(linesOf(refused)[0]) === "The event was edited, so I won't undo it" &&
-    state.events[eventIds[0]] && state.tasks[taskIds[0]], linesOf(refused));
+    state.events[eventIds[0]], linesOf(refused));
   state.events[eventIds[0]].summary = originalSummary;
   const undone = undo(click).card;
-  check('undo deletes both when the content hash still matches', plain(linesOf(undone)[0]) === 'Undone.' && !state.events[eventIds[0]] && !state.tasks[taskIds[0]], linesOf(undone));
+  check('undo deletes the hold when the content hash still matches', plain(linesOf(undone)[0]) === 'Undone.' && !state.events[eventIds[0]], linesOf(undone));
 
   reset();
   state.messages.hold1 = gmailMessage({
@@ -1163,7 +1193,7 @@ console.log('\n--- message path parity ---');
     to: 'owner@ai.local.flow',
     date: new Date('2026-10-15T08:00:00Z')
   });
-  check('rtl marks and a quoted reply still schedule', quoted.plan && quoted.plan.id === 'schedule', quoted.plan && quoted.plan.id);
+  check('rtl marks and a quoted reply drop an untimed meeting statement', !quoted.plan, quoted.plan && quoted.plan.id);
 
   const realId = 'msg-f:1762895788594548046';
   const realThread = 'thread-f:1762895788594548046';

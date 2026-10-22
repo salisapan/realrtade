@@ -159,7 +159,8 @@ var GlanceCards = (function () {
       'move-it': 'move calendar',
       'create-missing': 'draft from template',
       'file-on-hold': 'file on calendar',
-      'file-on-task': 'file on task'
+      'file-on-task': 'file on task',
+      'sheet': 'sheet'
     };
     var he = {
       'reply-track': 'מעקב תשובה',
@@ -175,7 +176,8 @@ var GlanceCards = (function () {
       'move-it': 'הזזה ביומן',
       'create-missing': 'טיוטה מתבנית',
       'file-on-hold': 'קובץ ביומן',
-      'file-on-task': 'קובץ במשימה'
+      'file-on-task': 'קובץ במשימה',
+      'sheet': 'גיליון'
     };
     var pack = lang === 'he' ? he : en;
     return pack[id] || en[id] || id || 'close';
