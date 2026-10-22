@@ -368,7 +368,9 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
     ['Here is the signed agreement', { attachmentCount: 1 }],
     ['שולח את ההסכם החתום', { attachmentCount: 1 }],
     ['Attached is the signed contract and the appendix', { attachmentCount: 2 }],
-    ['מצורף החוזה החתום והנספח', { attachmentCount: 2 }]
+    ['מצורף החוזה החתום והנספח', { attachmentCount: 2 }],
+    ['Here is the signed contract, as we agreed when we met', { attachmentCount: 1 }],
+    ['Attached is the final agreement we discussed last week', { attachmentCount: 1 }]
   ];
   broadPositives.forEach(([text, extra]) => {
     const row = plan(text, extra);
@@ -389,7 +391,8 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
     ['אשלח את החוזה החתום מחר', { attachmentCount: 1 }],
     ['מצורפת טיוטה; הגרסה הסופית של ההסכם תגיע בשבוע הבא', { attachmentCount: 1 }],
     ['מצורף החוזה, אנא חתום והחזר', { attachmentCount: 1 }],
-    ['מצורף ההסכם, בבקשה חתמי והחזירי', { attachmentCount: 1 }]
+    ['מצורף ההסכם, בבקשה חתמי והחזירי', { attachmentCount: 1 }],
+    ["I'll send the signed copy when legal approves", { attachmentCount: 1 }]
   ];
   negatives.forEach(([text, extra]) => {
     const row = plan(text, extra);

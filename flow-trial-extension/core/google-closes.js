@@ -125,11 +125,20 @@ const FlowGoogleCloses = (() => {
 
   function signedDeliveryFuture(clause) {
     const c = String(clause || '');
-    if (!c.trim()) return true;
-    if (/\b(?:will|going\s+to|tomorrow|next\s+week|later|once|when|after)\b/i.test(c)) return true;
+    if (!c.trim()) return false;
+    if (/\b(?:will|wont|won't)\b/i.test(c) || /\bi['’]ll\b/i.test(c) || /\b(?:he|she|they|we)['’]ll\b/i.test(c)) return true;
+    if (/\bgoing\s+to\b/i.test(c)) return true;
     if (/\bwill\s+be\s+sending\b/i.test(c)) return true;
+    if (/\bI\s+am\s+sending\b/i.test(c) && /\b(?:tomorrow|next\s+week|later)\b/i.test(c)) return true;
+    if (/אשלח|נשלח/.test(c)) return true;
+    if (/\b(?:tomorrow|next\s+week)\b/i.test(c)) return true;
+    if (/\blater\b/i.test(c)) return true;
+    if (/מחר|בשבוע הבא/.test(c)) return true;
     if (/\bcomes\s+next\s+week\b/i.test(c)) return true;
-    if (/מחר|בשבוע הבא|אשלח|נשלח|כשיאושר|אחרי ש/.test(c)) return true;
+    if (/תגיע\s+בשבוע/.test(c)) return true;
+    if (/\b(?:when|once|after)\b[^.!?\n]{0,100}\b(?:approves?|signs?|is\s+approved|are\s+approved)\b/i.test(c)) return true;
+    if (/כשיאושר|(?:^|[^\u0590-\u05FF])כש[^\n]{0,50}(?:יאושר|יחתום)/.test(c)) return true;
+    if (/אחרי\s+ש[^\n]{0,60}(?:יאושר|יחתום|מאושר)/.test(c)) return true;
     return false;
   }
 
