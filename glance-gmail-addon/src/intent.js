@@ -30,6 +30,7 @@ var GlanceIntent = (function () {
   function localizeEngineTitle(text, title) {
     var t = String(title || '');
     if (!t || !mailIsHebrew(text)) return sanitizeTitle(t);
+    if (!/\bby\b/i.test(t) && !/reply requested/i.test(t)) return sanitizeTitle(t);
     t = t.replace(/\s+by\s+/gi, ' עד ');
     return sanitizeTitle(t);
   }
@@ -543,6 +544,22 @@ var GlanceIntent = (function () {
     var he = mailIsHebrew(text);
     var isReplyLabel = /^reply requested\b/i.test(title);
     if (!isReplyLabel && !(he && /reply requested/i.test(title))) return sanitizeTitle(title);
+    var sendReportEn = /\b(?:please\s+)?send\b[^.\n]{0,80}\breport\b/i.test(text);
+    var sendReportHe = /(?:בבקשה\s+)?תשלח[^.\n]{0,80}דוח/.test(text);
+    if (sendReportEn || sendReportHe) {
+      var dueSend = writtenDate(text, dueIso || '');
+      if (he) return dueSend ? sanitizeTitle('תשלח את הדוח עד ' + dueSend) : sanitizeTitle('תשלח את הדוח');
+      return dueSend ? sanitizeTitle('Send the report by ' + dueSend) : sanitizeTitle('Send the report');
+    }
+    var payEn = /\b(?:please\s+)?pay\b[^.\n]{0,100}\binvoice\b/i.test(text);
+    var payHe = /(?:בבקשה\s+)?(?:ל)?שלם[^.\n]{0,100}חשבונית/.test(text);
+    if (payEn || payHe) {
+      var amt = title.match(/,\s*((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)\s*$/);
+      if (!amt) amt = String(text || '').match(/((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)/);
+      var suffix = amt ? ', ' + String(amt[1] || amt[0]).trim() : '';
+      if (he) return sanitizeTitle('לשלם חשבונית' + suffix);
+      return sanitizeTitle('Pay invoice' + suffix);
+    }
     var due = writtenDate(text, dueIso || '');
     if (he) {
       if (due) return sanitizeTitle('להשיב עד ' + due);

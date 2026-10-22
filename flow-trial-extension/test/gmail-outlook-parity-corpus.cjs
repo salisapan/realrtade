@@ -476,6 +476,15 @@ const CASES = [
       { incoming: fwd.incoming.length, why: (fwd.diagnostics || []).map((d) => d.reason) });
   }
 
+  console.log('\n--- Hebrew send-report notify (CTO item 4) ---\n');
+  {
+    const notifyHe = 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.';
+    const nG = FlowIntent.classify(notifyHe, { senderEmail: 'dana@acme.com', subject: 'דוח', now: new Date(NOW), inbound: true, to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] });
+    const nO = FlowIntent.classify(notifyHe, { senderEmail: 'dana@acme.com', subject: 'דוח', now: new Date(NOW), inbound: true, to: [ME], ownAddresses: [ME] });
+    check('Hebrew send-report notify classifies on Gmail', nG && nG.type === 'request' && !nG.quiet, nG);
+    check('Hebrew send-report notify classifies on Outlook', nO && nO.type === 'request' && !nO.quiet, nO);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();
