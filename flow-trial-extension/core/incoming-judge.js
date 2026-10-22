@@ -108,7 +108,8 @@ const FlowIncomingJudge = (() => {
     if (new RegExp('להזכיר\\s+ל' + heNotReader).test(raw)) return true;
     if (new RegExp('(?:^|[^\\u0590-\\u05FF])(?:תזכיר|תזכירי|תזכירו)\\s+ל' + heNotReader).test(raw)) return true;
     if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw) && !/לשאול\s+אתכם/.test(raw)) return true;
-    if (/להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(raw)) return true;
     return false;
   }
 
@@ -494,6 +495,10 @@ const FlowIncomingJudge = (() => {
   function meetingClockInText(text, intent) {
     const e = intent && intent.entities;
     if (e && Number.isInteger(e.hour) && Number.isInteger(e.minute)) return true;
+    if (typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.readSlot === 'function') {
+      const slot = FlowCloseFamilies.readSlot(String(text || ''), new Date());
+      if (slot && slot.time && Number.isInteger(slot.time.hour) && Number.isInteger(slot.time.minute)) return true;
+    }
     const extractApi = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
     if (extractApi && typeof extractApi.extract === 'function') {
       const facts = extractApi.extract(String(text || ''), {});

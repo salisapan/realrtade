@@ -27,6 +27,13 @@ var GlanceIntent = (function () {
     return text;
   }
 
+  function localizeEngineTitle(text, title) {
+    var t = String(title || '');
+    if (!t || !mailIsHebrew(text)) return sanitizeTitle(t);
+    t = t.replace(/\s+by\s+/gi, ' עד ');
+    return sanitizeTitle(t);
+  }
+
   function pad(n) {
     n = Number(n);
     return (n < 10 ? '0' : '') + n;
@@ -163,6 +170,9 @@ var GlanceIntent = (function () {
   }
 
   function nameMatchesRecipient(who, recipients) {
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient) {
+      return FlowNameMatch.matchesRecipient(who, recipients);
+    }
     var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
     if (!name || !recipients || !recipients.length) return false;
     for (var i = 0; i < recipients.length; i++) {
@@ -272,7 +282,9 @@ var GlanceIntent = (function () {
     if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
-    if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!לי(?:\s|[,،.!?]|$)|לנו(?:\s|[,،.!?]|$))/.test(text)) return true;
+    if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(text)) return true;
+    if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(text)) return true;
     return false;
   }
 
@@ -369,6 +381,7 @@ var GlanceIntent = (function () {
       if (planId === 'reply-track') {
         title = replyTrackCardTitle(sourceText || '', title, dueIso);
       }
+      title = localizeEngineTitle(sourceText || '', title);
       return {
         speak: true,
         source: 'engine',
@@ -589,11 +602,9 @@ var GlanceIntent = (function () {
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
         return silence(String(hit.reason).slice(6), null);
       }
-      if (hit && hit.plan && hit.plan.id) {
-        var sheetOnly = spottedSheetPlan(prepared, hit);
-        if (sheetOnly) {
-          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit.intent && hit.intent.type ? hit.intent.type : null });
-        }
+      var sheetOnly = spottedSheetPlan(prepared, hit);
+      if (sheetOnly) {
+        return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
       }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone, prepared);
       if (mapped) return contentTitle(prepared, mapped);

@@ -726,6 +726,11 @@ const FlowIntent = (() => {
     for (let a = 0; a < scriptAliases(named).length; a++) {
       if (list.indexOf(scriptAliases(named)[a]) !== -1) return true;
     }
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.equivalent) {
+      for (let r = 0; r < list.length; r++) {
+        if (FlowNameMatch.equivalent(named, list[r])) return true;
+      }
+    }
     const c = ctx || {};
     if (!c.readerEmail && c.namesWaitDone !== true) return false;
     const own = addressList(c.ownAddresses || c.own || []);
@@ -896,9 +901,32 @@ const FlowIntent = (() => {
     const c = ctx || {};
     if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    let greeted = '';
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
-      if (who && nameIsReader(who, c)) return false;
+      if (!who) continue;
+      if (!greeted) greeted = who;
+      if (nameIsReader(who, c)) return false;
+    }
+    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    const toOnly = addressList(c.to || []);
+    if (greeted && readerEmail && toOnly.length === 1 && toOnly[0] === readerEmail) {
+      const others = [];
+      const pushRecip = (entry) => {
+        if (!entry) return;
+        if (typeof entry === 'string') {
+          const e = entry.trim().toLowerCase();
+          if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
+          return;
+        }
+        const e = String(entry.email || '').trim().toLowerCase();
+        if (!e || e === readerEmail) return;
+        others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
+      };
+      (c.toRecipients || c.to || []).forEach(pushRecip);
+      (c.ccRecipients || c.cc || []).forEach(pushRecip);
+      if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return true;
+      return false;
     }
     return true;
   }
