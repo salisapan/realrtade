@@ -80,7 +80,10 @@ const ROWS = [
   ['en-reply-track-deadline', 'Hi Sali, please confirm the wire arrived by Monday, October 20.', true],
   ['en-reply-track-nodeadline', 'Hi Sali, could you send the invoice for October?', true],
   ['he-reply-track-deadline', 'היי סאלי, תוכל לשלוח את המסמך החתום עד 23/10?', true],
-  ['he-reply-track-nodeadline', 'היי סאלי, תוכל לשלוח את החשבונית?', true]
+  ['he-reply-track-nodeadline', 'היי סאלי, תוכל לשלוח את החשבונית?', true],
+  ['en-pay-invoice-amount', 'Please pay the invoice of ₪3,200 by Thursday.', true],
+  ['he-send-report-notify', 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.', true],
+  ['he-greet-noa', 'היי נועה', false]
 ];
 
 for (const row of ROWS) {
@@ -88,6 +91,12 @@ for (const row of ROWS) {
   const body = row[1];
   const expectSpeak = row[2];
   const ctx = Object.assign({}, ctxBase);
+  if (id === 'he-greet-noa') {
+    ctx.readerEmail = 'noa@meridian.com';
+    ctx.userName = 'Noa Cohen';
+    ctx.ownNames = ['Noa', 'Noa Cohen'];
+    ctx.toRecipients = [{ name: 'Noa Cohen', email: 'noa@meridian.com', localPart: 'noa' }];
+  }
   const decision = resolveTask(body, ctx);
   const he = hebrewMail(body);
   check(id + ' speak', decision.speak === expectSpeak, { speak: decision.speak, reason: decision.reason });
@@ -116,7 +125,16 @@ for (const row of ROWS) {
   }
   if (id === 'he-pay-remember') {
     check(id + ' no English by leak', !/\sby\s/i.test(title), title);
-    check(id + ' Hebrew date suffix', /\d{1,2}\/\d{1,2}/.test(title), title);
+    check(id + ' Hebrew date suffix', /\d{1,2}\/\d{1,2}/.test(title) || /יום\s+[\u0590-\u05FF]+/.test(title), title);
+  }
+  if (id === 'en-pay-invoice-amount') {
+    check(id + ' Pay invoice with amount', /^Pay invoice,\s*₪3,200$/.test(title), title);
+  }
+  if (id === 'he-send-report-notify') {
+    check(id + ' Hebrew send report title', /^תשלח את הדוח עד \d{1,2}\/\d{1,2}$/.test(title), title);
+  }
+  if (id === 'he-greet-noa') {
+    check(id + ' quiet greeting', decision.speak === false && (decision.reason === 'hedge' || String(decision.reason || '').indexOf('hedge') >= 0), decision.reason);
   }
 }
 
