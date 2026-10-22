@@ -49,18 +49,30 @@ function loadEngine() {
   const judgeShared = vm.runInContext('FlowIncomingJudge.judge', sandbox);
   // The same call Code.js engineHit_ makes: the one decision every Glance surface shares.
   const readerEmail = 'owner@ai.local.flow@gmail.com';
-  const readerTo = 'Sali Sapan <' + readerEmail + '>';
+  const readerDisplay = 'Owner User';
+  const readerNames = ['Owner User', 'Owner'];
+  const readerTo = readerDisplay + ' <' + readerEmail + '>';
   return function engine(text, readerOverride) {
-    const reader = readerOverride || { userName: 'Sali Sapan', ownNames: ['Sali Sapan', 'Sali'] };
+    const reader = readerOverride || { userName: readerDisplay, ownNames: readerNames };
     const judged = judgeShared({
       text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [readerEmail], ownAddresses: [readerEmail], userName: reader.userName, ownNames: reader.ownNames, now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
     }, {});
-    if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
+    if (!judged || !judged.show) {
+      return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
+    }
     return { intent: judged.intent, plan: judged.process };
   };
 }
 
 const engine = loadEngine();
+
+const READER_EMAIL = 'owner@ai.local.flow@gmail.com';
+const READER_DISPLAY = 'Owner User';
+const READER_NAMES = ['Owner User', 'Owner'];
+const DEFAULT_TO_RECIPIENTS = [
+  { name: READER_DISPLAY, email: READER_EMAIL, localPart: 'owner' },
+  { name: 'Dana Levi', email: 'dana@meridian.com', localPart: 'dana' }
+];
 
 function judge(text, extra) {
   const opts = extra || {};
@@ -71,8 +83,11 @@ function judge(text, extra) {
     now: NOW,
     timeZone: TZ,
     engine: eng,
-    userName: 'Sali Sapan',
-    ownNames: ['Sali Sapan', 'Sali']
+    userName: READER_DISPLAY,
+    ownNames: READER_NAMES,
+    readerEmail: READER_EMAIL,
+    toRecipients: DEFAULT_TO_RECIPIENTS,
+    ccRecipients: []
   }, rest));
 }
 
@@ -116,7 +131,9 @@ console.log('\n--- intent ---');
   check('Hebrew buried transfer remember still closes', buriedHePay.speak === true && buriedHePay.title && buriedHePay.title.length > 2, buriedHePay);
 }
 check('a remember-to relay to someone else stays quiet', judge('Thanks for the update. Please remember to remind Sarah to send the NDA.').speak === false);
+check('a buried remember relay row stays quiet', judge('Please remember to remind Sarah to call the client tomorrow').speak === false);
 check('a remember-to relay in Hebrew stays quiet', judge('תודה על העדכון. תזכור להזכיר ליוסי לשלוח את החוזה.').speak === false);
+check("don't forget to tell a third party stays quiet", judge("Don't forget to tell Noa that the meeting moved").speak === false);
 check('small talk stays quiet', judge('Hope you are well. Just wanted to say hello and see how things are going this week.').speak === false);
 check('empty stays quiet', judge('').speak === false);
 check('a send ask is not rewritten into a task', judge('Could you please send the signed contract?').speak === false);
@@ -142,7 +159,7 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
       to: ['owner@ai.local.flow@gmail.com'],
       ownAddresses: ['owner@ai.local.flow@gmail.com'],
       userName: 'Owner',
-      ownNames: ['Sali Sapan', 'Sali'],
+      ownNames: ['Owner User', 'Owner'],
       now: NOW,
       surface: 'gmail',
       attachmentCount: attachmentCount,
@@ -865,17 +882,41 @@ console.log('\n--- message path parity ---');
     if (!match) return { name: '', email: text.trim() };
     return { name: match[1].replace(/"/g, '').trim(), email: match[2].trim() };
   }
+  function recipientRows(raw) {
+    const out = [];
+    String(raw || '').split(/\s*(?:,|;)\s*/).forEach(function (part) {
+      if (!part) return;
+      const p = parsedFrom(part.trim());
+      if (!p.email) return;
+      const local = p.email.split('@')[0].toLowerCase();
+      out.push({ name: p.name || '', email: p.email.toLowerCase(), localPart: local });
+    });
+    return out;
+  }
+  function readerNamesForEmail(email) {
+    const local = String(email || '').split('@')[0] || '';
+    const display = local.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+    const names = [];
+    if (display) names.push(display);
+    if (local) names.push(local);
+    const first = display.split(/\s+/)[0];
+    if (first && names.indexOf(first) === -1) names.push(first);
+    return names.length ? names : ['Owner User', 'Owner'];
+  }
   function judgedPlan(fields) {
     const from = parsedFrom(fields.from);
     const fromEmail = from.email || null;
     const fromName = from.name || null;
+    const readerEmail = String(fields.readerEmail || READER_EMAIL).toLowerCase();
+    const ownNames = readerNamesForEmail(readerEmail);
     const reader = {
-      to: ['owner@ai.local.flow@gmail.com'],
-      ownAddresses: ['owner@ai.local.flow@gmail.com'],
-      userName: 'Sali Sapan',
-      ownNames: ['Sali Sapan', 'Sali']
+      to: [readerEmail],
+      ownAddresses: [readerEmail],
+      userName: ownNames[0],
+      ownNames: ownNames
     };
-    const toList = String(fields.to || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    const toRaw = fields.to == null ? readerEmail : fields.to;
+    const toList = String(toRaw).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
     const ownAddresses = reader.ownAddresses.slice();
     toList.forEach(function (addr) {
       const lower = String(addr).toLowerCase();
@@ -978,7 +1019,7 @@ console.log('\n--- message path parity ---');
     id: 'heb1',
     threadId: 'thread1',
     subject: 'פגישה ביום חמישי 22/10',
-    plain: 'שלום,\n\nפגישה ביום חמישי 22/10 בשעה 14:00\n\nתודה,\nדנה',
+    plain: 'שלום,\n\nפגישה ביום חמישי 22/10\n\nתודה,\nדנה',
     html: quietHtml,
     from: 'Dana Levi <dana@meridian.com>',
     date: new Date('2026-10-15T08:00:00Z')
@@ -1060,12 +1101,23 @@ console.log('\n--- message path parity ---');
     date: new Date('2026-10-15T10:30:00Z')
   });
 
+  check('untimed heb1 open stays quiet', judgedPlan(hebrew) === null);
   reset();
-  state.messages.heb1 = gmailMessage(hebrew);
+  const hebHold = {
+    id: 'hebclock',
+    threadId: 'threadclock',
+    subject: 'פגישה',
+    plain: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T08:00:00Z')
+  };
+  state.messages.hebclock = gmailMessage(hebHold);
   const click = {
-    gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
+    gmail: { messageId: 'hebclock', accessToken: 'token', threadId: 'threadclock' },
     commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
-    parameters: { messageId: 'heb1', source: 'message' }
+    parameters: { messageId: 'hebclock', source: 'message' }
   };
   const proof = doIt(click).card;
   const proofLines = linesOf(proof).join('\n');
@@ -1087,6 +1139,45 @@ console.log('\n--- message path parity ---');
   state.events[eventIds[0]].summary = originalSummary;
   const undone = undo(click).card;
   check('undo deletes the hold when the content hash still matches', plain(linesOf(undone)[0]) === 'Undone.' && !state.events[eventIds[0]], linesOf(undone));
+
+  reset();
+  const saliSession = {
+    getActiveUser: function () { return { getEmail: function () { return 'sali.sapan@ai.local.flow@gmail.com'; } }; },
+    getScriptTimeZone: function () { return 'Etc/UTC'; }
+  };
+  const priorSession = sandbox.Session;
+  sandbox.Session = saliSession;
+  state.messages.greetBareEn = gmailMessage({
+    id: 'greetBareEn',
+    threadId: 'threadGreetEn',
+    subject: 'Follow up',
+    plain: 'Hi Sali, please remember to call the client.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'sali.sapan@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T11:00:00Z')
+  });
+  const greetEnCard = openMessage({
+    gmail: { messageId: 'greetBareEn', accessToken: 'token', threadId: 'threadGreetEn' },
+    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
+  })[0];
+  check('bare To Hi Sali offers Do it', buttonsOf(greetEnCard).length === 1 && plain(buttonsOf(greetEnCard)[0].text) === 'Do it');
+  state.messages.greetBareHe = gmailMessage({
+    id: 'greetBareHe',
+    threadId: 'threadGreetHe',
+    subject: 'עדכון',
+    plain: 'היי סאלי, תזכיר לי לשלוח את החוזה מחר.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'sali.sapan@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T11:05:00Z')
+  });
+  const greetHeCard = openMessage({
+    gmail: { messageId: 'greetBareHe', accessToken: 'token', threadId: 'threadGreetHe' },
+    commonEventObject: { userLocale: 'he-IL', timeZone: 'Etc/UTC' }
+  })[0];
+  check('bare To Hebrew Sali offers Do it', buttonsOf(greetHeCard).length === 1 && plain(buttonsOf(greetHeCard)[0].text) === 'בצע');
+  sandbox.Session = priorSession;
 
   reset();
   state.messages.hold1 = gmailMessage({
@@ -1305,15 +1396,24 @@ console.log('\n--- message path parity ---');
   check('the live requireScopes message counts as a missing scope', authFailure({ name: 'Error', message: scopeMiss }) === true);
   reset();
   state.granted = state.granted.filter(function (scope) { return scope.indexOf('calendar.events') === -1; });
-  state.messages.heb1 = gmailMessage(hebrew);
+  state.messages.hebclock = gmailMessage({
+    id: 'hebclock',
+    threadId: 'threadclock',
+    subject: 'פגישה',
+    plain: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T08:00:00Z')
+  });
   let authErr = null;
   let returned = 'unset';
   const denied = withConsole(function () {
     try {
       returned = doIt({
-        gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
+        gmail: { messageId: 'hebclock', accessToken: 'token', threadId: 'threadclock' },
         commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
-        parameters: { messageId: 'heb1', source: 'message' }
+        parameters: { messageId: 'hebclock', source: 'message' }
       });
       return returned;
     } catch (err) {

@@ -47,7 +47,9 @@ const SHOW = [
   ['en nda after greeting', 'Hi Dana, great meeting today. Please remember to send me the signed NDA by Friday.', { userName: 'Dana', ownNames: ['Dana', 'Dana Levi'] }],
   ['en payment after thanks', 'Thanks for the update. Please remember to transfer the payment by Sunday.'],
   ['he send after greeting', 'שלום,\n\nתודה על העדכון.\nאל תשכח לשלוח את החוזה החתום עד יום שישי.'],
-  ['he transfer after greeting', 'היי,\n\nתזכור להעביר את התשלום עד יום ראשון.']
+  ['he transfer after greeting', 'היי,\n\nתזכור להעביר את התשלום עד יום ראשון.'],
+  ['en remind me', 'Please remind me to call the client tomorrow'],
+  ['he remind me', 'תזכיר לי לשלוח את הדוח מחר']
 ];
 for (const row of SHOW) {
   const name = row[0];
@@ -63,9 +65,13 @@ console.log('\n--- buried remember-to: relay to a third party stays quiet ---\n'
 const QUIET = [
   ['en remind sarah', 'Thanks for the update. Please remember to remind Sarah to send the NDA.'],
   ['he remind yossi', 'תודה על העדכון. תזכור להזכיר ליוסי לשלוח את החוזה.'],
-  ['en remember to remind sarah', 'Please remember to remind Sarah to call the client'],
+  ['en remember to remind sarah', 'Please remember to remind Sarah to call the client tomorrow'],
   ['he remind yossi verb', 'תזכור להזכיר ליוסי להתקשר'],
-  ['he tell dana', 'תודה על העדכון. תזכיר לדנה להתקשר ללקוח עד מחר.']
+  ['he tell dana', 'תודה על העדכון. תזכיר לדנה להתקשר ללקוח עד מחר.'],
+  ['en dont forget remind sarah', "Don't forget to remind Sarah to call the client tomorrow"],
+  ['he dont forget dana report', 'אל תשכח להזכיר לדנה לשלוח את הדוח'],
+  ['he remember ask accountant', 'תזכור לשאול את רואה החשבון על הדוח'],
+  ['en dont forget tell noa', "Don't forget to tell Noa that the meeting moved"]
 ];
 for (const [name, body] of QUIET) {
   for (const surface of ['gmail', 'outlook']) {
@@ -74,8 +80,8 @@ for (const [name, body] of QUIET) {
   }
 }
 
-console.log('\n--- inbound meeting: statement schedules, coordinating holds ---\n');
-const HOLD = [
+console.log('\n--- inbound meeting: statement schedules, coordinating logs ---\n');
+const LOGIT_COORD = [
   ['he coordinate', 'פגישה ביום חמישי? מתאים לך'],
   ['en coordinate', 'The review meeting is on Thursday, can you make it?']
 ];
@@ -86,10 +92,10 @@ const STATEMENT_QUIET = [
 const STATEMENT_HOLD = [
   ['he statement timed', 'פגישה ביום חמישי 22/10 בשעה 14:00']
 ];
-for (const [name, body] of HOLD) {
+for (const [name, body] of LOGIT_COORD) {
   for (const surface of ['gmail', 'outlook']) {
     const out = judge(body, surface);
-    check(name + ' hold on ' + surface, shown(out) && planId(out) === 'hold', { id: planId(out), reason: out.reason });
+    check(name + ' log-it on ' + surface, shown(out) && planId(out) === 'log-it', { id: planId(out), reason: out.reason });
   }
 }
 for (const [name, body] of STATEMENT_QUIET) {
@@ -99,12 +105,12 @@ for (const [name, body] of STATEMENT_QUIET) {
   }
 }
 for (const [name, body] of STATEMENT_HOLD) {
-  const outG = judge(body, 'gmail');
-  const outO = judge(body, 'outlook');
-  check(name + ' hold on gmail', shown(outG) && planId(outG) === 'hold', { id: planId(outG), reason: outG.reason });
-  check(name + ' quiet on outlook', !outO.show, outO.reason);
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(body, surface);
+    check(name + ' hold on ' + surface, shown(out) && planId(out) === 'hold', { id: planId(out), reason: out.reason });
+  }
 }
-check('he remind me shows', shown(judge('תזכור להזכיר לי להתקשר מחר', 'gmail')), { reason: judge('תזכור להזכיר לי להתקשר מחר', 'gmail').reason });
+check('he remind me relay shows', shown(judge('תזכור להזכיר לי להתקשר מחר', 'gmail')), { reason: judge('תזכור להזכיר לי להתקשר מחר', 'gmail').reason });
 
 console.log('\nFAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

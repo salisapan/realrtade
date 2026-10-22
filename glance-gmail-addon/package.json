@@ -5,6 +5,7 @@
     "build": "node scripts/build-bundle.js",
     "deploy:stamp": "node scripts/build-bundle.js --deploy",
     "check:bundle": "node scripts/check-core-bundle.cjs",
-    "predeploy": "node scripts/check-core-bundle.cjs --deploy"
+    "predeploy": "node scripts/check-core-bundle.cjs --deploy",
+    "deploy": "node scripts/build-bundle.js --deploy && node scripts/check-core-bundle.cjs --deploy && npx clasp push && node scripts/build-bundle.js"
   }
 }

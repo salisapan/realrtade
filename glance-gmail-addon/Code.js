@@ -211,6 +211,19 @@ function readerDisplayNameFromHeaders_(userEmail, toRaw, ccRaw) {
   return found;
 }
 
+function parseRecipientList_(raw) {
+  var out = [];
+  String(raw || '').split(/\s*(?:,|;)\s*/).forEach(function (part) {
+    if (!part) return;
+    var parsed = parseFrom_(part.trim());
+    if (parsed.email) {
+      var local = parsed.email.split('@')[0] || '';
+      out.push({ name: parsed.name || '', email: parsed.email.toLowerCase(), localPart: local.toLowerCase() });
+    }
+  });
+  return out;
+}
+
 function readerContext_(toRaw, ccRaw) {
   var email = activeUserEmail_();
   var display = readerDisplayNameFromHeaders_(email, toRaw, ccRaw);
@@ -233,7 +246,10 @@ function readerContext_(toRaw, ccRaw) {
   return {
     userName: display || null,
     ownNames: ownNames,
-    ownAddresses: ownAddresses
+    ownAddresses: ownAddresses,
+    readerEmail: email || null,
+    toRecipients: parseRecipientList_(toRaw),
+    ccRecipients: parseRecipientList_(ccRaw)
   };
 }
 
@@ -322,13 +338,23 @@ function judgeOpen_(opened, e) {
   var now = new Date();
   var timeZone = timeZoneOf_(e);
   var engine = function (raw) { return engineHit_(raw, opened, now); };
+  var resolveCtx = {
+    now: now,
+    timeZone: timeZone,
+    engine: engine,
+    userName: opened.userName || null,
+    ownNames: opened.ownNames || null,
+    readerEmail: opened.readerEmail || null,
+    toRecipients: opened.toRecipients || [],
+    ccRecipients: opened.ccRecipients || []
+  };
   var decision = Glance.intent.silence('no-plan', null);
   var body = String(opened.body || '').trim();
   if (body) {
-    decision = Glance.intent.resolveTask(opened.body, { now: now, timeZone: timeZone, engine: engine, userName: opened.userName || null, ownNames: opened.ownNames || null });
+    decision = Glance.intent.resolveTask(opened.body, resolveCtx);
   }
-  if (!decision.speak && opened.subject) {
-    decision = Glance.intent.resolveTask(opened.subject, { now: now, timeZone: timeZone, engine: engine, userName: opened.userName || null, ownNames: opened.ownNames || null });
+  if (!decision.speak && decision.reason !== 'dropped' && opened.subject) {
+    decision = Glance.intent.resolveTask(opened.subject, resolveCtx);
   }
   return decision;
 }
@@ -350,7 +376,9 @@ function engineHit_(text, opened, now) {
       attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
       inbound: true
     });
-    if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
+    if (!judged || !judged.show) {
+      return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
+    }
     return { intent: judged.intent, plan: judged.process };
   }
   if (typeof Glance.classify !== 'function' || typeof Glance.plan !== 'function') return null;
@@ -576,6 +604,9 @@ function readOpen_(e, read) {
     ownAddresses: ownAddresses,
     userName: reader.userName,
     ownNames: reader.ownNames,
+    readerEmail: reader.readerEmail,
+    toRecipients: reader.toRecipients,
+    ccRecipients: reader.ccRecipients,
     attachmentCount: attachmentCount
   };
 }

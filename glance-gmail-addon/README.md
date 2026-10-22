@@ -86,7 +86,7 @@ cp .clasp.json.example .clasp.json
 npx clasp create --type standalone --title "Glance" --rootDir .
 ```
 
-`.clasp.json` holds the script id and stays uncommitted.
+`.clasp.json` holds the script id and is committed for this test project (copy from `.clasp.json.example` when you fork).
 
 5. `npx clasp open`. **Project Settings → Google Cloud Platform (GCP) Project → Change project.** Paste the project **number** (not the id string).
 6. Sync and stamp, then push (see **BuildSha** above): `node scripts/build-bundle.js`, then `node scripts/build-bundle.js --deploy`, `node scripts/check-core-bundle.cjs --deploy`, then `npx clasp push`. The push sends `appsscript.json`, `CoreBundle.js`, `BuildSha.js`, and `Code.js`.
