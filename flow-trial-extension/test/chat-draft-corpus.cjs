@@ -624,6 +624,33 @@ check('undo clears the composer when the text is unchanged', cleared.ok === true
 const edited = box('Taizu - maps!');
 check('undo leaves the box alone after an edit', FlowChatCompose.undoDraft(edited, 'Taizu - maps').reason === 'edited' && edited.textContent === 'Taizu - maps!');
 
+let undoButtonCalled = false;
+const receiptBox = box('');
+FlowChatCompose.insertDraft(receiptBox, 'Taizu - maps');
+const hostStub = { remove() {} };
+const chipHost = {
+  showDraftReceipt(host, opts) {
+    undoButtonCalled = typeof opts.onUndo === 'function';
+    if (undoButtonCalled) {
+      const cleared = opts.onUndo();
+      check('chat lane undo button calls undoDraft', cleared.ok === true && receiptBox.textContent === '', cleared);
+    }
+  }
+};
+globalThis.FlowChipHost = chipHost;
+globalThis.FlowChatCompose = FlowChatCompose;
+Object.assign(global.document, {
+  getElementById(id) { return id === 'glance-chat-draft-receipt' ? hostStub : null; },
+  createElement() { return hostStub; },
+  body: global.document.body || { appendChild() {} },
+  documentElement: global.document.documentElement || { appendChild() {} }
+});
+delete require.cache[require.resolve('../src/chat-lane.js')];
+const { FlowChatLane: FlowChatLaneFresh } = require('../src/chat-lane.js');
+FlowChatLaneFresh.showComposerUndo(receiptBox, 'Taizu - maps', { text: 'maps?' });
+check('composer undo receipt is shown', undoButtonCalled === true);
+delete globalThis.FlowChipHost;
+
 console.log('\n--- calendar evidence ---\n');
 (async () => {
   const { FlowLaneChat } = require('../src/lane-chat-worker.js');
@@ -983,8 +1010,11 @@ console.log('\n--- calendar evidence ---\n');
       storage: o.storage
     };
     if (o.logs) w.console.info = function () { o.logs.push(Array.from(arguments).join(' ')); };
-    const lane = lanes.find((item) => item.js[item.js.length - 1] === surface);
-    const list = lane;
+    const lane = lanes.find((item) => {
+      const files = laneScriptFiles(item);
+      return files.length && files[files.length - 1] === surface;
+    });
+    const list = { js: laneScriptFiles(lane) };
     const ctx = dom.getInternalVMContext();
     list.js.forEach((rel) => {
       new vm.Script(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel }).runInContext(ctx);
@@ -1032,7 +1062,18 @@ console.log('\n--- calendar evidence ---\n');
   new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8'), { filename: 'meta-consent.js' }).runInContext(laneDom.getInternalVMContext());
   new vm.Script(fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8'), { filename: 'enable.js' }).runInContext(laneDom.getInternalVMContext());
   const lanes = laneDom.window.__glanceLaneChat;
-  check('runtime registration lists three chats and skips Gmail', Array.isArray(lanes) && lanes.length === 3 && lanes.every((lane) => lane.js.indexOf('src/content-gmail.js') < 0 && lane.js.indexOf('src/content-outlook.js') < 0));
+  const lean = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.LEAN_CHAT_BASE)
+    ? FlowLaneScripts.LEAN_CHAT_BASE
+    : ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js'];
+  function laneScriptFiles(item) {
+    if (!item) return [];
+    if (Array.isArray(item.js) && item.js.length) return item.js;
+    return lean.concat(item.tail || []);
+  }
+  check('runtime registration lists three chats and skips Gmail', Array.isArray(lanes) && lanes.length === 3 && lanes.every((lane) => {
+    const tail = lane.js || lean.concat(lane.tail || []);
+    return tail.indexOf('src/content-gmail.js') < 0 && tail.indexOf('src/content-outlook.js') < 0;
+  }));
   laneDom.window.close();
 
   const pages = [
@@ -1236,8 +1277,11 @@ console.log('\n--- calendar evidence ---\n');
   pin(guardDom.window);
   guardDom.window.chrome = { runtime: { id: 'glance-test', lastError: null, getManifest: () => ({}), sendMessage() {} } };
   const guardCtx = guardDom.getInternalVMContext();
-  const guardLane = lanes.find((item) => item.js[item.js.length - 1] === 'src/content-messenger.js');
-  guardLane.js.slice(0, -1).forEach((rel) => {
+  const guardLaneFiles = laneScriptFiles(lanes.find((item) => {
+    const files = laneScriptFiles(item);
+    return files.length && files[files.length - 1] === 'src/content-messenger.js';
+  }));
+  guardLaneFiles.slice(0, -1).forEach((rel) => {
     new vm.Script(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel }).runInContext(guardCtx);
   });
   const guardSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');

@@ -10,6 +10,8 @@ const FlowLaneScripts = (() => {
   const WHATSAPP_TAIL = [
     'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'
   ];
+  const CHAT_CARD_TAIL = ['src/chip-host.js', 'src/chat-task-card.js'];
+  const DEFAULT_CHAT_SKIP = ['src/follow.js', 'src/chip-peek.js'];
 
   function engineBase(manifestScripts) {
     return (manifestScripts || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
@@ -21,16 +23,25 @@ const FlowLaneScripts = (() => {
     return out;
   }
 
-  function whatsappLaneJs(manifestScripts, engineOn) {
-    if (engineOn) return unique(engineBase(manifestScripts).concat(WHATSAPP_TAIL));
-    return unique(LEAN_CHAT_BASE.concat(WHATSAPP_TAIL));
+  // Same shape as background.js laneChatScripts(lane): manifest engine base, lane files, card stack.
+  function chatLaneRegistrationJs(manifestScripts, laneTail, skip) {
+    const skipList = skip || DEFAULT_CHAT_SKIP;
+    const base = engineBase(manifestScripts).filter((f) => skipList.indexOf(f) < 0);
+    return unique(base.concat(laneTail || []).concat(CHAT_CARD_TAIL));
+  }
+
+  function whatsappLaneJs(manifestScripts, engineOn, laneTail, skip) {
+    return chatLaneRegistrationJs(manifestScripts, laneTail, skip);
   }
 
   return {
     GMAIL_ONLY_SCRIPTS: GMAIL_ONLY_SCRIPTS,
     LEAN_CHAT_BASE: LEAN_CHAT_BASE,
     WHATSAPP_TAIL: WHATSAPP_TAIL,
+    CHAT_CARD_TAIL: CHAT_CARD_TAIL,
+    DEFAULT_CHAT_SKIP: DEFAULT_CHAT_SKIP,
     engineBase: engineBase,
+    chatLaneRegistrationJs: chatLaneRegistrationJs,
     whatsappLaneJs: whatsappLaneJs
   };
 })();

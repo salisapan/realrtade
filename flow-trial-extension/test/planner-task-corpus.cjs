@@ -68,8 +68,11 @@ function makeGraph(opts) {
     if (opts.auth) return { status: opts.auth, ok: false, json: null };
     if (method === 'POST') {
       if (opts.postFails) return { status: 500, ok: false, json: null };
-      tasks.T1 = Object.assign({ id: 'T1', '@odata.etag': 'W/"e1"' }, body);
+      tasks.T1 = Object.assign({ id: 'T1', '@odata.etag': 'W/"e1"', bucketId: 'B1' }, body);
       return { status: 201, ok: true, json: JSON.parse(JSON.stringify(tasks.T1)) };
+    }
+    if (method === 'GET' && path.indexOf('/planner/buckets/') >= 0) {
+      return { status: 200, ok: true, json: { id: 'B1', name: 'Backlog' } };
     }
     const id = decodeURIComponent(path.split('/tasks/')[1]);
     if (method === 'GET') {
@@ -99,7 +102,8 @@ const io = (g) => ({ graph: g.api });
   const post = g.log.find((l) => l.method === 'POST');
   check('creates in the plan with no assignee (nobody is notified)', post.path === '/planner/tasks' && post.body.planId === 'P1' && Object.keys(post.body.assignments).length === 0 && post.body.dueDateTime === '2026-10-23T12:00:00Z', post);
   check('Handled needs the read-back: proof fetchedBack, system, id, etag kept', r.ok === true && r.proof.fetchedBack === true && r.proof.system === 'microsoft/planner' && r.proof.externalId === 'T1' && r.ref.etag === 'W/"e1"', r);
-  check('only Planner is called, nothing is sent', g.log.every((l) => /^\/planner\/tasks/.test(l.path)), g.log.map((l) => l.path));
+  check('bucket title is read back from Graph', r.bucketTitle === 'Backlog' && r.ref.bucketId === 'B1', r);
+  check('only Planner is called, nothing is sent', g.log.every((l) => /^\/planner\/(tasks|buckets)/.test(l.path)), g.log.map((l) => l.path));
 
   g = makeGraph();
   r = await P.create(Object.assign({}, input, { dueIso: null }), io(g));

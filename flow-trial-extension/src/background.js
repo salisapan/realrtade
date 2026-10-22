@@ -642,12 +642,6 @@ const LANE_CHAT = [
 // Gmail follow-up scripts), the lane's own files, then the card, so the card file always loads after chat-lane.js.
 const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
 async function laneScriptsFor(lane) {
-  if (lane && lane.id === 'glance-lane-whatsapp' && typeof FlowLaneScripts !== 'undefined') {
-    const W = typeof FlowWhatsappEngine !== 'undefined' ? FlowWhatsappEngine : null;
-    const engineOn = W && W.SWITCH ? await glanceSwitchOn(W.SWITCH) : false;
-    const list = (chrome.runtime.getManifest().content_scripts[0].js || []);
-    return FlowLaneScripts.whatsappLaneJs(list, engineOn);
-  }
   return laneChatScripts(lane);
 }
 
@@ -729,17 +723,24 @@ async function restoreLaneChats() {
   }
 }
 
+let laneChatRestoreTail = Promise.resolve();
+function enqueueRestoreLaneChats() {
+  laneChatRestoreTail = laneChatRestoreTail.then(() => restoreLaneChats()).catch(() => {});
+  return laneChatRestoreTail;
+}
+globalThis.__glanceRelaneChats = enqueueRestoreLaneChats;
+
 dropLegacyWhatsApp();
 restoreSurfaces();
-restoreLaneChats();
-chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+enqueueRestoreLaneChats();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); enqueueRestoreLaneChats(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); enqueueRestoreLaneChats(); });
 try {
   if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
-    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onAdded.addListener(() => { enqueueRestoreLaneChats(); });
   }
   if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
-    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onRemoved.addListener(() => { enqueueRestoreLaneChats(); });
   }
 } catch (e) { /* the next wake reads the grant again */ }
 
@@ -6102,6 +6103,19 @@ async function outlookPlannerRefDrop(rawId) {
   } catch (e) { /* nothing kept */ }
 }
 
+function outlookGraphObjectCall() {
+  const graph = outlookGraphCall();
+  return async function (req) {
+    const r = req || {};
+    const method = r.method || 'GET';
+    const path = r.path || '';
+    const headers = r.headers || {};
+    const body = r.body;
+    const out = await graph(method, path, body, headers);
+    return { ok: out.ok, status: out.status, body: out.json };
+  };
+}
+
 function outlookGraphCall() {
   return async function graph(method, path, body, headers) {
     const url = OUTLOOK_GRAPH + path;
@@ -6134,20 +6148,22 @@ async function outlookPlannerWrite(p, title, dueIso) {
     const raw = r.ref.taskId;
     await outlookPlannerRefPut(raw, r.ref);
     const shown = PLANNER_ID_PREFIX + raw;
+    const bucketTitle = r.bucketTitle || (r.ref && r.ref.bucketTitle) || null;
     return {
       ok: true,
       fetchedBack: true,
       where: 'Microsoft Planner',
       target: named.plan.title,
       planTitle: named.plan.title,
-      bucketTitle: 'To do',
+      bucketTitle: bucketTitle,
       written: r.written,
       url: null,
-      ref: { taskId: shown, externalId: shown, planId: named.plan.id },
+      ref: { taskId: shown, externalId: shown, planId: named.plan.id, bucketId: r.bucketId || (r.ref && r.ref.bucketId) || null, bucketTitle: bucketTitle },
       proof: Object.assign({}, r.proof, { externalId: shown })
     };
   }
-  return Object.assign({}, r, { where: 'Microsoft Planner', target: named.plan.title, planTitle: named.plan.title, bucketTitle: 'To do' });
+  const bucketTitle = r.bucketTitle || (r.ref && r.ref.bucketTitle) || null;
+  return Object.assign({}, r, { where: 'Microsoft Planner', target: named.plan.title, planTitle: named.plan.title, bucketTitle: bucketTitle });
 }
 
 async function outlookDraftRecipientFromText(p) {
@@ -6161,7 +6177,7 @@ async function outlookDraftRecipientFromText(p) {
   if (!session || !session.ok || !session.token) return null;
   const Cal = globalThis.FlowOutlookCalendar;
   const scopes = (Cal && typeof Cal.scopesFromToken === 'function') ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
-  const hit = await C.run({ params: offer.params, name: offer.params && offer.params.name, text: text }, { call: outlookGraphCall(), grantedScopes: scopes });
+  const hit = await C.run({ params: offer.params, name: offer.params && offer.params.name, text: text }, { call: outlookGraphObjectCall(), grantedScopes: scopes });
   return (hit && hit.ok && hit.recipient) ? hit.recipient : null;
 }
 

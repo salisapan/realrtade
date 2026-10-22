@@ -88,6 +88,8 @@ function dana() {
 
   const offer = C.offer({ text: 'Please look up the contact Dana Cohen.' });
   check('a lookup offer names Dana Cohen and does not close', offer.show === true && offer.params.name === 'Dana Cohen' && offer.closes === false && offer.button === 'Look up', offer);
+  const noaOffer = C.offer({ text: 'Please look up contact Noa and send the deck.' });
+  check('name capture stops before and', noaOffer.show === true && noaOffer.params.name === 'Noa', noaOffer);
   ['I\'ll send Dana the numbers by Thursday.', 'Please save the attachment to OneDrive.', 'We agreed to renew the passport application by Friday.', 'Thanks, attaching the board pack for your records today.', ''].forEach((text) => {
     check('stays quiet: ' + JSON.stringify(text).slice(0, 48), C.offer({ text: text }).show === false);
   });

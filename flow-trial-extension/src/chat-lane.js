@@ -76,10 +76,51 @@ const FlowChatLane = (() => {
     const wrote = FlowChatCompose.insertDraft(box, judged.draft);
     wrote.sends = false;
     wrote.judged = judged;
+    if (wrote.ok) showComposerUndo(box, judged.draft, i);
     return wrote;
   }
 
-  return { draftInto };
+  function pageDoc() {
+    if (typeof document !== 'undefined') return document;
+    return globalThis.document || null;
+  }
+
+  function draftReceiptHost() {
+    const document = pageDoc();
+    if (!document || typeof document.getElementById !== 'function') return null;
+    let el = document.getElementById('glance-chat-draft-receipt');
+    if (!el && typeof document.createElement === 'function') {
+      el = document.createElement('div');
+      el.id = 'glance-chat-draft-receipt';
+      el.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483000;width:min(360px,calc(100vw - 40px));';
+      const root = document.body || document.documentElement;
+      if (root && typeof root.appendChild === 'function') root.appendChild(el);
+    }
+    return el;
+  }
+
+  function showComposerUndo(box, draftText, input) {
+    const FlowChipHost = globalThis.FlowChipHost;
+    const FlowChatCompose = globalThis.FlowChatCompose;
+    if (!box || !draftText || typeof FlowChipHost === 'undefined' || typeof FlowChatCompose === 'undefined') return;
+    const host = draftReceiptHost();
+    if (!host) return;
+    const he = /[֐-׿]/.test(String((input && input.text) || draftText || ''));
+    FlowChipHost.showDraftReceipt(host, {
+      uiLang: he ? 'he' : 'en',
+      status: he ? 'טיוטה בתיבה.' : 'Draft in the box.',
+      written: he ? 'אפשר לערוך או לשלוח. Glance לא שולח.' : 'You can edit or send. Glance will not send.',
+      onUndo: () => {
+        const r = FlowChatCompose.undoDraft(box, draftText);
+        if (r && r.ok) {
+          try { host.remove(); } catch (e) { /* gone */ }
+        }
+        return r || { ok: false, sends: false };
+      }
+    });
+  }
+
+  return { draftInto, showComposerUndo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatLane };

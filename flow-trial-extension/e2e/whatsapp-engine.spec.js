@@ -62,25 +62,15 @@ async function armMeta(worker, engineOn) {
     const origins = globalThis.FlowMetaConsent.ORIGINS.slice();
     const granted = await chrome.permissions.contains({ origins: origins });
     if (!granted) throw new Error('meta-not-granted');
-    const lanes = globalThis.__glanceLaneChatDefs || [];
-    for (const lane of lanes) {
-      try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* first run */ }
+    if (typeof globalThis.__glanceRelaneChats === 'function') {
+      await globalThis.__glanceRelaneChats();
+      return;
     }
-    for (const lane of lanes) {
-      const laneJs = await globalThis.__glanceLaneScriptsFor(lane);
-      await chrome.scripting.registerContentScripts([{
-        id: lane.id,
-        matches: lane.origins,
-        js: laneJs,
-        css: globalThis.__glanceLaneChatCss || ['design/step-states-v1/scoped.css', 'src/chip.css'],
-        runAt: 'document_idle',
-        persistAcrossSessions: true
-      }]);
-    }
+    throw new Error('lane-rearm-missing');
   }, engineOn);
 }
 
-test('WHATSAPP_ENGINE off keeps the lean WhatsApp lane list', async () => {
+test('WHATSAPP_ENGINE off keeps the full WhatsApp lane list', async () => {
   test.setTimeout(90000);
   const extDir = copyExtension({ bare: true });
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-wa-engine-off-'));
@@ -100,7 +90,8 @@ test('WHATSAPP_ENGINE off keeps the lean WhatsApp lane list', async () => {
     worker = await readyWorker(context);
     await armMeta(worker, false);
     const js = await whatsappScripts(worker);
-    expect(js.indexOf('core/incoming-judge.js')).toBe(-1);
+    expect(js.indexOf('core/incoming-judge.js')).toBeGreaterThanOrEqual(0);
+    expect(js.indexOf('src/chat-task-card.js')).toBeGreaterThanOrEqual(0);
     expect(js.indexOf('src/content-whatsapp.js')).toBeGreaterThanOrEqual(0);
   } finally {
     if (context) await context.close();
@@ -128,6 +119,8 @@ test('WHATSAPP_ENGINE on registers the manifest engine base on WhatsApp', async 
     await armMeta(worker, true);
     const js = await whatsappScripts(worker);
     expect(js.indexOf('core/incoming-judge.js')).toBeGreaterThanOrEqual(0);
+    expect(js.indexOf('src/chat-compose.js')).toBeGreaterThanOrEqual(0);
+    expect(js.indexOf('src/chat-task-card.js')).toBeGreaterThanOrEqual(0);
     expect(js.indexOf('src/content-gmail.js')).toBe(-1);
     expect(js.indexOf('src/content-whatsapp.js')).toBeGreaterThanOrEqual(0);
   } finally {

@@ -148,10 +148,15 @@ async function whatsappEngineOn() {
 }
 
 async function laneJs(lane) {
-  if (lane.id === 'whatsapp' && typeof FlowLaneScripts !== 'undefined' && typeof FlowLaneScripts.whatsappLaneJs === 'function') {
-    const list = (chrome.runtime.getManifest().content_scripts[0].js || []);
-    const engineOn = await whatsappEngineOn();
-    return FlowLaneScripts.whatsappLaneJs(list, engineOn);
+  const list = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getManifest)
+    ? (chrome.runtime.getManifest().content_scripts[0].js || [])
+    : [];
+  const skip = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.DEFAULT_CHAT_SKIP)
+    ? FlowLaneScripts.DEFAULT_CHAT_SKIP
+    : ['src/follow.js', 'src/chip-peek.js'];
+  if (typeof FlowLaneScripts !== 'undefined' && typeof FlowLaneScripts.chatLaneRegistrationJs === 'function' && list.length) {
+    const tail = LEAN_BASE.concat(lane.tail || []);
+    return FlowLaneScripts.chatLaneRegistrationJs(list, tail, skip);
   }
   const out = [];
   LEAN_BASE.concat(lane.tail || []).forEach((f) => { if (f && out.indexOf(f) < 0) out.push(f); });
