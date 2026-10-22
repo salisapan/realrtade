@@ -200,6 +200,13 @@ const FlowChipHost = (() => {
     nameEl.setAttribute('data-glance-user', 'title');
     host.appendChild(nameEl);
 
+    const saveFileName = ctx.saveAttachmentName || (ctx.attachment && (ctx.attachment.filename || ctx.attachment.name));
+    if (face.fileCard && saveFileName && ctx.attachmentPickMode !== 'choice') {
+      const fileLine = el('p', 'flow-chip-save-file', saveFileName);
+      fileLine.setAttribute('data-glance-user', 'save-file');
+      host.appendChild(fileLine);
+    }
+
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));

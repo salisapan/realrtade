@@ -507,6 +507,64 @@ const FlowFileAttach = (() => {
   const THREAD_SAVE_EN = /\b(?:save|upload|store|file|put)\b[^.\n]{0,120}\b(?:attach(?:ed|ment)?|the\s+(?:pdf|file)|it)\b|\b(?:save|upload|store)\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\battach(?:ed|ment)?\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\bsign\b[^.\n]{0,80}\b(?:the\s+)?(?:attached|attachment|pdf|nda|contract)\b/i;
   const THREAD_SAVE_HE = /(?:ל)?(?:שמור|להעלות|תעלה|תצרף|לצרף)[^.\n]{0,80}(?:מצורף|המצורף|קובץ|pdf)|(?:חתום|לחתום)[^.\n]{0,40}(?:מצורף|המצורף|קובץ|nda|חוזה)/i;
 
+  function attachFileName(file) {
+    return String((file && (file.filename || file.name)) || '');
+  }
+
+  function attachMime(file) {
+    return String((file && (file.mimeType || file.contentType)) || '').toLowerCase();
+  }
+
+  function attachIsPdf(file) {
+    const name = attachFileName(file).toLowerCase();
+    return /\.pdf$/i.test(name) || attachMime(file) === 'application/pdf';
+  }
+
+  function attachIsImage(file) {
+    const name = attachFileName(file).toLowerCase();
+    return /\.(jpe?g|png|gif|webp|heic)$/i.test(name) || /^image\//.test(attachMime(file));
+  }
+
+  // Which thread attachment to save when the mail names a document (signed
+  // contract, agreement, NDA, חוזה, הסכם, חתום). PDF beats an image. No guess
+  // when scores tie — the card asks.
+  function pickSaveAttachment(text, attachments) {
+    const list = (attachments || []).filter((a) => a && attachFileName(a));
+    if (list.length <= 1) {
+      return { mode: list.length === 1 ? 'single' : 'none', file: list[0] || null, files: list };
+    }
+    const blob = norm(fresh(String(text || '')));
+    const hints = [
+      { body: /\bsigned\b|חתום|חתומ/, name: /signed|חתום|חתומ/, weight: 48 },
+      { body: /\bcontract\b|חוזה/, name: /contract|חוזה/, weight: 42 },
+      { body: /\bagreement\b|הסכם/, name: /agreement|הסכם/, weight: 40 },
+      { body: /\bnda\b/i, name: /nda/, weight: 36 }
+    ];
+    const scored = list.map((file) => {
+      const name = norm(attachFileName(file));
+      let score = 0;
+      hints.forEach((hint) => {
+        const bodyHit = hint.body.test(blob);
+        const nameHit = hint.name.test(name);
+        if (bodyHit && nameHit) score += hint.weight;
+        else if (nameHit && !bodyHit) score += Math.floor(hint.weight / 5);
+        else if (bodyHit && !nameHit) score += Math.floor(hint.weight / 6);
+      });
+      if (/\bappendix\b|נספח/.test(name) && !/\bappendix\b|נספח/.test(blob)) score -= 40;
+      if (attachIsPdf(file)) score += 14;
+      if (attachIsImage(file)) score -= 10;
+      return { file: file, score: score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored[0].score;
+    const second = scored[1].score;
+    const GAP = 18;
+    if (top >= 28 && top - second >= GAP) {
+      return { mode: 'picked', file: scored[0].file, files: list };
+    }
+    return { mode: 'choice', file: null, files: list };
+  }
+
   function threadEvidenceEligible(text, attachmentCount) {
     const n = Number(attachmentCount) || 0;
     if (n <= 0) return false;
@@ -529,7 +587,7 @@ const FlowFileAttach = (() => {
   }
 
   return {
-    gate, decide, mention, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, pickSaveAttachment, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();

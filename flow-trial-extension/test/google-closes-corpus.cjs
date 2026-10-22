@@ -382,7 +382,14 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
     ['החוזה עדיין לא חתום', { attachmentCount: 1 }],
     ['needs to be signed and returned by Thursday', { attachmentCount: 1 }],
     ['please return the NDA signed', { attachmentCount: 1 }],
-    ['have you signed the agreement yet?', { attachmentCount: 1 }]
+    ['have you signed the agreement yet?', { attachmentCount: 1 }],
+    ['I am sending the signed contract tomorrow', { attachmentCount: 1 }],
+    ['I will be sending the signed copy once legal approves', { attachmentCount: 1 }],
+    ['Here is the draft; the final version of the agreement comes next week', { attachmentCount: 1 }],
+    ['אשלח את החוזה החתום מחר', { attachmentCount: 1 }],
+    ['מצורפת טיוטה; הגרסה הסופית של ההסכם תגיע בשבוע הבא', { attachmentCount: 1 }],
+    ['מצורף החוזה, אנא חתום והחזר', { attachmentCount: 1 }],
+    ['מצורף ההסכם, בבקשה חתמי והחזירי', { attachmentCount: 1 }]
   ];
   negatives.forEach(([text, extra]) => {
     const row = plan(text, extra);

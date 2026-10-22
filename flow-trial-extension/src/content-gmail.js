@@ -2078,7 +2078,13 @@ function glanceUiCopy(kind) {
     // one Sheet cell or Doc paragraph, or stay quiet. It does not replace
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
-    const attachment = attachments[0] || null;
+    const attachJudgeText = (subject ? subject + '\n' : '') + text;
+    const saveAttachPick = (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.pickSaveAttachment === 'function')
+      ? FlowFileAttach.pickSaveAttachment(attachJudgeText, attachments)
+      : { mode: attachments.length === 1 ? 'single' : (attachments.length > 1 ? 'choice' : 'none'), file: attachments[0] || null, files: attachments };
+    const attachment = (saveAttachPick.mode === 'picked' || saveAttachPick.mode === 'single')
+      ? (saveAttachPick.file || attachments[0] || null)
+      : (attachments[0] || null);
     openSuggest = {
       messageId: messageId,
       text: text,
@@ -2092,6 +2098,7 @@ function glanceUiCopy(kind) {
       }))
     };
     let chosenAttachment = attachment;
+    let attachmentPickMode = saveAttachPick.mode;
     let intent = await classifyForChip(text, {
       senderEmail: sender.email,
       senderName: sender.name,
@@ -2499,7 +2506,7 @@ function glanceUiCopy(kind) {
     }
 
     injectChip(message, {
-      messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, laneIds: stable.laneIds, intent, process, sender, subject, attachment: chosenAttachment, attachments,
+      messageId, legacyMessageId: legacyId || null, messageIds: stable.messageIds, laneIds: stable.laneIds, intent, process, sender, subject, attachment: chosenAttachment, attachments, attachmentPickMode,
       threadUrl: threadUrl(legacyId),
       threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
@@ -2719,6 +2726,64 @@ function glanceUiCopy(kind) {
       row.appendChild(chip);
     });
 
+    return row;
+  }
+
+  // Which thread file Drive will save when the mail names one document but
+  // carries several attachments.
+  function appendSaveAttachmentUi(host, ctx) {
+    if (!host || !ctx || !ctx.process) return;
+    const fileCard = ctx.process.id === 'file-it' || ctx.process.id === 'suggest-save';
+    if (!fileCard) return;
+    const saveName = ctx.saveAttachmentName || (ctx.attachment && (ctx.attachment.filename || ctx.attachment.name));
+    if (saveName && ctx.attachmentPickMode !== 'choice' && !host.querySelector('.flow-chip-save-file')) {
+      const fileLine = el('p', 'flow-chip-save-file', saveName);
+      fileLine.setAttribute('data-glance-user', 'save-file');
+      host.insertBefore(fileLine, host.firstChild);
+      ctx.saveAttachmentName = saveName;
+    }
+    if (ctx.attachmentPickMode === 'choice' && ctx.attachments && ctx.attachments.length > 1 && !host.querySelector('.flow-chip-attach-row')) {
+      const saveChooser = buildSaveAttachChooser(ctx, host);
+      if (saveChooser) host.appendChild(saveChooser);
+    }
+  }
+
+  function buildSaveAttachChooser(ctx, host) {
+    const attachments = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
+    if (attachments.length < 2) return null;
+    const fileStep = (ctx.process && ctx.process.steps || []).find((step) => step && step.kind === 'driveFile');
+    const row = el('div', 'flow-chip-attach-row');
+    row.setAttribute('dir', 'ltr');
+    const chips = [];
+    attachments.forEach((meta) => {
+      const label = meta.filename || meta.name || 'Attachment';
+      const chip = el('button', 'flow-chip-attach-chip', label);
+      chip.type = 'button';
+      const chosen = ctx.attachment;
+      const on = chosen && (chosen.url === meta.url || chosen.filename === meta.filename || chosen.name === meta.name);
+      chip.setAttribute('aria-pressed', String(on));
+      chips.push(chip);
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ctx.attachment = meta;
+        ctx.saveAttachmentName = label;
+        if (fileStep && fileStep.params) fileStep.params.selectedAttachment = meta;
+        chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+        if (host) {
+          let line = host.querySelector('.flow-chip-save-file');
+          if (!line) {
+            line = el('p', 'flow-chip-save-file', label);
+            line.setAttribute('data-glance-user', 'save-file');
+            const anchor = host.querySelector('.flow-chip-process-name');
+            if (anchor && anchor.nextSibling) host.insertBefore(line, anchor.nextSibling);
+            else host.appendChild(line);
+          } else {
+            line.textContent = label;
+          }
+        }
+      });
+      row.appendChild(chip);
+    });
     return row;
   }
 
@@ -3235,6 +3300,8 @@ function glanceUiCopy(kind) {
     ctx.renderedTitle = title;
     host.appendChild(el('span', 'flow-chip-process-name', title));
 
+    const fileCard = face.fileCard === true;
+
     // loop mark + gradient "Glance" + the rest of the sentence as its own
     // text node — three children in that DOM order, mark first, right
     // before the brand name, same as before this was translated to
@@ -3243,7 +3310,7 @@ function glanceUiCopy(kind) {
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
-    const sentence = face.fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
+    const sentence = fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
     if (sentence) textEl.appendChild(document.createTextNode(' ' + sentence));
     if (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang === 'he') textEl.setAttribute('dir', 'auto');
     host.appendChild(textEl);
@@ -3368,6 +3435,7 @@ function glanceUiCopy(kind) {
       if (draft) host.appendChild(buildAttachChooser(draft, ctx));
       mountGoogleDetail(host, ctx);
       stampInviteDraft(host, ctx);
+      appendSaveAttachmentUi(host, ctx);
       appendCardWhen(host, ctx, lang);
       messageNode.insertBefore(host, messageNode.firstChild);
       return;
@@ -3389,6 +3457,7 @@ function glanceUiCopy(kind) {
     }
     mountGoogleDetail(host, ctx);
     stampInviteDraft(host, ctx);
+    appendSaveAttachmentUi(host, ctx);
     appendCardWhen(host, ctx, lang);
 
     messageNode.insertBefore(host, messageNode.firstChild);
@@ -3612,7 +3681,13 @@ function glanceUiCopy(kind) {
     if (action.kind === 'driveFile') {
       if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
       const listed = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
-      const only = listed.length === 1 ? listed[0] : null;
+      let only = listed.length === 1 ? listed[0] : null;
+      if (!only && action.params && action.params.selectedAttachment) only = action.params.selectedAttachment;
+      if (!only && ctx.attachment) only = ctx.attachment;
+      if (!only && listed.length > 1 && typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.pickSaveAttachment === 'function') {
+        const pick = FlowFileAttach.pickSaveAttachment((ctx.subject ? ctx.subject + '\n' : '') + (ctx.bodyText || ''), listed);
+        if (pick.mode === 'picked' || pick.mode === 'single') only = pick.file;
+      }
       if (!only) return { fail: { reason: listed.length > 1 ? 'attachment-ambiguous' : 'attachment-unreadable' } };
       const fetched = await fetchAttachmentBase64(only);
       if (!fetched || !fetched.base64) return { fail: { reason: 'attachment-unreadable' } };

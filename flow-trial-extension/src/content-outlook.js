@@ -1144,6 +1144,19 @@
       name: pane && pane.senderName,
       email: pane && pane.senderEmail
     };
+    const paneFiles = (pane && pane.attachments || []).map((a) => ({
+      id: a && a.id,
+      name: a && (a.name || a.filename),
+      filename: a && (a.name || a.filename),
+      contentType: a && (a.contentType || a.mimeType),
+      mimeType: a && (a.contentType || a.mimeType),
+      size: a && a.size
+    })).filter((a) => a && (a.name || a.filename));
+    const attachText = ((entry.subject || (pane && pane.subject) || '') + '\n' + (entry.bodyText || (pane && pane.text) || entry.text || '')).trim();
+    const savePick = (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.pickSaveAttachment === 'function' && paneFiles.length)
+      ? FlowFileAttach.pickSaveAttachment(attachText, paneFiles)
+      : { mode: paneFiles.length === 1 ? 'single' : (paneFiles.length > 1 ? 'choice' : 'none'), file: paneFiles[0] || null, files: paneFiles };
+    const pickedAttach = (savePick.mode === 'picked' || savePick.mode === 'single') ? savePick.file : null;
     return {
       app: 'outlook',
       surface: 'outlook-web',
@@ -1162,6 +1175,10 @@
       key: entry.key,
       hydrateHow: (pane && pane.hydrateHow) || null,
       priorConversationId: (pane && pane.priorConversationId) || null,
+      attachments: paneFiles,
+      attachment: pickedAttach || paneFiles[0] || null,
+      attachmentPickMode: savePick.mode,
+      saveAttachmentName: pickedAttach && (pickedAttach.name || pickedAttach.filename) || null,
       __epoch: paneEpoch(pane)
     };
   }

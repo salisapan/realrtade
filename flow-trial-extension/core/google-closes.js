@@ -119,8 +119,52 @@ const FlowGoogleCloses = (() => {
     return false;
   }
 
+  function signedDeliveryClauses(text) {
+    return String(text || '').split(/[.!?\n\r;]+/);
+  }
+
+  function signedDeliveryFuture(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return true;
+    if (/\b(?:will|going\s+to|tomorrow|next\s+week|later|once|when|after)\b/i.test(c)) return true;
+    if (/\bwill\s+be\s+sending\b/i.test(c)) return true;
+    if (/\bcomes\s+next\s+week\b/i.test(c)) return true;
+    if (/מחר|בשבוע הבא|אשלח|נשלח|כשיאושר|אחרי ש/.test(c)) return true;
+    return false;
+  }
+
+  function signedDeliveryVerb(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    if (/\b(?:attached|attaching|here\s+is|here'?s|enclosed|please\s+find)\b/i.test(c)) return true;
+    if (/\b(?:i(?:'m| am)\s+)?sending\b/i.test(c) && !signedDeliveryFuture(c)) return true;
+    return /(?:^|[^\u0590-\u05FF])(?:מצורף|מצורפת|שולח|שולחת|מעביר|מעבירה|הנה)(?:\s|[^\u0590-\u05FF]|$)/.test(c);
+  }
+
+  function signedFinalDoc(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    return /\b(?:signed|executed|countersigned)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(c) ||
+      /\b(?:final)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(c) ||
+      /\b(?:signed|executed|countersigned|final)\b[^.!?\n]{0,48}\b(?:agreement|contract|nda|copy|version|document)\b/i.test(c) ||
+      /\b(?:agreement|contract|nda|copy|version|document)\b[^.!?\n]{0,48}\b(?:signed|executed|countersigned|final)\b/i.test(c) ||
+      /(?:^|[^\u0590-\u05FF])(?:חתום|חתומה|סופי|סופית)[^\n]{0,40}(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)/.test(c) ||
+      /(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)[^\n]{0,24}(?:חתום|חתומה|סופי|סופית)/.test(c);
+  }
+
+  function hebrewAskToSign(text) {
+    const t = String(text || '');
+    if (/(?:נא|בבקשה|אנא)[^\n]{0,40}(?:לחתום|לחתימה|חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:חתום|חתמי|תחתום|תחתמי|לחתום)(?:\s|[^\u0590-\u05FF]|$)/.test(t)) return true;
+    if (/(?:חתום|חתמי|תחתום|תחתמי)[^\n]{0,30}(?:והחזר|והחזירי|ותחזיר)/.test(t)) return true;
+    if (/(?:והחזר|והחזירי|ותחזיר)[^\n]{0,30}(?:חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    return /(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t);
+  }
+
   // One attached file that is clearly a completed signing delivery (not a bare
   // "signed", not an ask to sign or return, not a negation or a question).
+  // Delivery verb and signed/final document must sit in the same clause, present
+  // or completed tense — not a future or conditional promise.
   function signedCopyDelivered(text) {
     const t = String(text || '');
     if (!t.trim()) return false;
@@ -131,18 +175,12 @@ const FlowGoogleCloses = (() => {
     if (/\b(?:need(?:s)?|needed)\s+to\s+be\s+signed\b/i.test(t)) return false;
     if (/\b(?:please\s+)?(?:return|send|get)\b[^.\n]{0,100}\b(?:the\s+)?(?:\w+\s+){0,4}signed\b/i.test(t)) return false;
     if (/\b(?:please\s+)?sign\b[^.\n]{0,40}\b(?:the|this|attached)\b/i.test(t)) return false;
-    if (/(?:נא|בבקשה|אנא)[^\n]{0,40}(?:לחתום|לחתימה|תחתום)|(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t)) return false;
-    const deliveryVerb =
-      /\b(?:attached|attaching|here\s+is|here'?s|sending|enclosed|please\s+find)\b/i.test(t) ||
-      /(?:^|[^\u0590-\u05FF])(?:מצורף|מצורפת|שולח|שולחת|מעביר|מעבירה|הנה)(?:\s|[^\u0590-\u05FF]|$)/.test(t);
-    const signedDoc =
-      /\b(?:signed|executed|countersigned)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(t) ||
-      /\b(?:final)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(t) ||
-      /\b(?:signed|executed|countersigned|final)\b[^.!?\n]{0,48}\b(?:agreement|contract|nda|copy|version|document)\b/i.test(t) ||
-      /\b(?:agreement|contract|nda|copy|version|document)\b[^.!?\n]{0,48}\b(?:signed|executed|countersigned|final)\b/i.test(t) ||
-      /(?:^|[^\u0590-\u05FF])(?:חתום|חתומה|סופי|סופית)[^\n]{0,40}(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)/.test(t) ||
-      /(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)[^\n]{0,24}(?:חתום|חתומה|סופי|סופית)/.test(t);
-    return deliveryVerb && signedDoc;
+    if (hebrewAskToSign(t)) return false;
+    for (const clause of signedDeliveryClauses(t)) {
+      if (!clause.trim() || signedDeliveryFuture(clause)) continue;
+      if (signedDeliveryVerb(clause) && signedFinalDoc(clause)) return true;
+    }
+    return false;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
