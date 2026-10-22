@@ -95,12 +95,14 @@ async function connectMicrosoftEcosystem(launchInteractive, deps) {
   return { ok: true, partial: partial };
 }
 
-async function disconnectMicrosoftEcosystem() {
+async function disconnectMicrosoftEcosystem(deps) {
   await chrome.storage.local.remove([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY, 'outlookPending']);
   try {
     await chrome.permissions.remove({ origins: OUTLOOK_GRAPH_ORIGINS.concat(OUTLOOK_OWA_ORIGINS) });
   } catch (e) { /* token cleared */ }
-  try { await chrome.runtime.sendMessage({ type: 'flow:surface-disable', id: 'outlook' }); } catch (e) { /* ignore */ }
+  if (deps && typeof deps.disableSurface === 'function') {
+    try { await deps.disableSurface('outlook'); } catch (e) { /* ignore */ }
+  }
   return { ok: true };
 }
 
@@ -148,7 +150,7 @@ export async function disconnectEcosystemConnector(connectorId, deps) {
   const E = eco();
   const id = E ? E.normalizeEco(connectorId) : connectorId;
   if (id === 'google' && typeof deps.disconnectConnector === 'function') return deps.disconnectConnector('googleTasks');
-  if (id === 'microsoft') return disconnectMicrosoftEcosystem();
+  if (id === 'microsoft') return disconnectMicrosoftEcosystem(deps);
   if (id === 'meta') return disconnectMetaEcosystem();
   return { ok: false };
 }
