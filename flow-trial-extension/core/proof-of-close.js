@@ -24,7 +24,9 @@
 const FlowProofOfClose = (() => {
   const SYSTEM_GOOGLE_TASKS = 'google/tasks';
   const SYSTEM_MICROSOFT_TODO = 'microsoft/todo';
+  const SYSTEM_MICROSOFT_PLANNER = 'microsoft/planner';
   const SYSTEM_MICROSOFT_ONEDRIVE = 'microsoft/onedrive';
+  const DEFAULT_PLANNER_BUCKET = 'To do';
   const SYSTEM_NOTION = 'notion/page';
   const SYSTEM_ASANA = 'asana/task';
   const SYSTEM_JIRA = 'jira/issue';
@@ -189,6 +191,21 @@ const FlowProofOfClose = (() => {
   const TODO_UNDO_HINT = 'Undo removes the To Do task.';
   const TODO_UNDONE_LINE = 'Undone — the To Do task was removed.';
   const TODO_UNDO_FAILED = 'Still there — the To Do task was not removed.';
+  function plannerUndoHint(planTitle, bucketTitle) {
+    const plan = clip(planTitle, 60) || 'your plan';
+    const bucket = clip(bucketTitle, 40) || DEFAULT_PLANNER_BUCKET;
+    return 'Undo removes the Planner task in ' + plan + ' · ' + bucket + '.';
+  }
+  function plannerUndoneLine(planTitle, bucketTitle) {
+    const plan = clip(planTitle, 60) || 'your plan';
+    const bucket = clip(bucketTitle, 40) || DEFAULT_PLANNER_BUCKET;
+    return 'Undone — the Planner task in ' + plan + ' · ' + bucket + ' was removed.';
+  }
+  function plannerUndoFailed(planTitle, bucketTitle) {
+    const plan = clip(planTitle, 60) || 'your plan';
+    const bucket = clip(bucketTitle, 40) || DEFAULT_PLANNER_BUCKET;
+    return 'Still there — the Planner task in ' + plan + ' · ' + bucket + ' was not removed.';
+  }
   const ONEDRIVE_UNDO_HINT = 'Undo removes the OneDrive file.';
   const ONEDRIVE_UNDONE_LINE = 'Undone — the OneDrive file was removed.';
   const ONEDRIVE_UNDO_FAILED = 'Still there — the OneDrive file was not removed.';
@@ -236,8 +253,31 @@ const FlowProofOfClose = (() => {
 
   function isMicrosoftTodoRow(row) {
     if (!row) return false;
+    if (isMicrosoftPlannerRow(row)) return false;
     if (clean(row.system) === SYSTEM_MICROSOFT_TODO) return true;
     return isMicrosoftTodoConnector(row);
+  }
+
+  function isPlannerExternalId(id) {
+    return String(id || '').indexOf('planner:') === 0;
+  }
+
+  function isMicrosoftPlannerConnector(row) {
+    const kind = row && row.connectorId;
+    return kind === 'plannerTask' || kind === 'planner';
+  }
+
+  function isMicrosoftPlannerRow(row) {
+    if (!row) return false;
+    if (clean(row.system) === SYSTEM_MICROSOFT_PLANNER) return true;
+    if (isPlannerExternalId(externalIdOf(row))) return true;
+    return isMicrosoftPlannerConnector(row);
+  }
+
+  function plannerReceiptNames(row) {
+    const plan = clip(row && (row.planTitle || row.target || row.processName), 60) || 'your plan';
+    const bucket = clip(row && row.bucketTitle, 40) || DEFAULT_PLANNER_BUCKET;
+    return { plan: plan, bucket: bucket };
   }
 
   function isOnedriveConnector(row) {
@@ -266,7 +306,7 @@ const FlowProofOfClose = (() => {
       if (!isComputerSystem(computerSystemName)) return false;
       return computerHostAllowlisted(computerSystemName.slice(SYSTEM_COMPUTER_PREFIX.length));
     }
-    if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
+    if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_PLANNER || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
     // Notion counts only with the read-back proof itself (the earlier token write kept none).
     if (clean(row.system) === SYSTEM_NOTION || clean(row.system) === SYSTEM_ASANA || clean(row.system) === SYSTEM_JIRA || clean(row.system) === SYSTEM_LINEAR || clean(row.system) === SYSTEM_DOCUSIGN || clean(row.system) === SYSTEM_DROPBOX) return row.fetchedBack === true && !!clean(row.verifiedAt);
     return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row) || isOnedriveConnector(row);
@@ -407,8 +447,8 @@ const FlowProofOfClose = (() => {
       if (!entry || !rowMatches(entry, found.messageIds, found.threadIds, found.fileNames)) continue;
       if (entry.kind === 'undone' || entry.kind === 'dismissed') {
         const sameMessage = rowMessageIds(entry).some((id) => found.messageIds.has(id));
-        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isOnedriveConnector(entry) || isComputerRow(entry)
-          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO || clean(entry.system) === SYSTEM_MICROSOFT_ONEDRIVE;
+        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isMicrosoftPlannerConnector(entry) || isOnedriveConnector(entry) || isComputerRow(entry)
+          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO || clean(entry.system) === SYSTEM_MICROSOFT_PLANNER || clean(entry.system) === SYSTEM_MICROSOFT_ONEDRIVE;
         if (sameMessage || taskUndo) return null;
         continue;
       }
@@ -462,27 +502,31 @@ const FlowProofOfClose = (() => {
         if (value != null && value !== '') ref[key] = value;
       });
     }
+    const planner = isMicrosoftPlannerRow(row);
     const microsoft = isMicrosoftTodoRow(row);
+    const names = planner ? plannerReceiptNames(row) : null;
     const deleted = row.glanceDeleted === true || row.deleted === true;
     const refusedLine = deleted ? '' : clip(row.undoLine, 180);
     const verifyNote = deleted ? '' : clip(row.verifyNote, 180);
-    const connector = microsoft
-      ? ((row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo') ? row.connectorId : 'outlookTask')
-      : ((row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask');
+    const connector = planner
+      ? 'plannerTask'
+      : microsoft
+        ? ((row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo') ? row.connectorId : 'outlookTask')
+        : ((row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask');
     const url = clean(row.url);
     return {
       status: receiptStatusOf(row),
-      writtenLine: clip(row.writtenLine, 180) || (microsoft ? 'To Do' : 'Google Task'),
+      writtenLine: clip(row.writtenLine, 180) || (planner ? 'Planner' : (microsoft ? 'To Do' : 'Google Task')),
       processName: clip(row.processName, 80),
       closedLine: clip(row.closedLine, 180),
-      undoHint: refusedLine || (microsoft ? TODO_UNDO_HINT : UNDO_HINT),
+      undoHint: refusedLine || (planner ? plannerUndoHint(names.plan, names.bucket) : (microsoft ? TODO_UNDO_HINT : UNDO_HINT)),
       undoLine: refusedLine,
       undoRefused: refusedLine ? (row.undoRefused || 'user-edited') : null,
       deleted: deleted,
       deletedLine: deleted ? (clip(row.deletedLine, 180) || clip(row.receiptStatus, 180)) : '',
       verifyNote: verifyNote,
-      undoneLine: microsoft ? TODO_UNDONE_LINE : UNDONE_LINE,
-      undoFailed: microsoft ? TODO_UNDO_FAILED : 'Still there — the Google Task was not removed.',
+      undoneLine: planner ? plannerUndoneLine(names.plan, names.bucket) : (microsoft ? TODO_UNDONE_LINE : UNDONE_LINE),
+      undoFailed: planner ? plannerUndoFailed(names.plan, names.bucket) : (microsoft ? TODO_UNDO_FAILED : 'Still there — the Google Task was not removed.'),
       url: url.slice(0, 8) === 'https://' ? url : '',
       connectorId: connector,
       externalId: externalId,
@@ -509,6 +553,10 @@ const FlowProofOfClose = (() => {
     if (writtenLine) record.writtenLine = writtenLine;
     if (processName) record.processName = processName;
     if (closedLine) record.closedLine = closedLine;
+    const planTitle = clip(display.planTitle, 80);
+    const bucketTitle = clip(display.bucketTitle, 40);
+    if (planTitle) record.planTitle = planTitle;
+    if (bucketTitle) record.bucketTitle = bucketTitle;
     if (display.status === STATUS_HANDLED || display.status === STATUS_HANDLED_HE || display.status === STATUS_PARTIAL) {
       record.receiptStatus = display.status;
     }
@@ -569,6 +617,7 @@ const FlowProofOfClose = (() => {
   function objectNameOf(row) {
     if (!row) return 'To Do';
     if (row.objectName) return String(row.objectName);
+    if (isMicrosoftPlannerRow(row)) return 'Planner';
     if (isOnedriveRow(row)) return 'OneDrive';
     return 'To Do';
   }
@@ -588,8 +637,8 @@ const FlowProofOfClose = (() => {
       messageId: String(row.messageId),
       ids: ids,
       kind: 'written',
-      connectorId: row.connectorId || (isOnedriveRow(row) ? 'onedriveFile' : 'outlookTask'),
-      system: row.system || (isOnedriveRow(row) ? SYSTEM_MICROSOFT_ONEDRIVE : SYSTEM_MICROSOFT_TODO),
+      connectorId: row.connectorId || (isOnedriveRow(row) ? 'onedriveFile' : (isMicrosoftPlannerRow(row) ? 'plannerTask' : 'outlookTask')),
+      system: row.system || (isOnedriveRow(row) ? SYSTEM_MICROSOFT_ONEDRIVE : (isMicrosoftPlannerRow(row) ? SYSTEM_MICROSOFT_PLANNER : SYSTEM_MICROSOFT_TODO)),
       externalId: externalId,
       ref: row.ref && typeof row.ref === 'object' ? row.ref : { externalId: externalId, taskId: externalId },
       created: (row.ref && row.ref.created) || row.created || null,
@@ -1164,6 +1213,7 @@ const FlowProofOfClose = (() => {
   return {
     SYSTEM_GOOGLE_TASKS: SYSTEM_GOOGLE_TASKS,
     SYSTEM_MICROSOFT_TODO: SYSTEM_MICROSOFT_TODO,
+    SYSTEM_MICROSOFT_PLANNER: SYSTEM_MICROSOFT_PLANNER,
     SYSTEM_MICROSOFT_ONEDRIVE: SYSTEM_MICROSOFT_ONEDRIVE,
     SYSTEM_NOTION: SYSTEM_NOTION,
     SYSTEM_ASANA: SYSTEM_ASANA,

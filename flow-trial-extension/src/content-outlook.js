@@ -1195,6 +1195,20 @@
     return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
   }
 
+  function outlookPlannerClose(r) {
+    if (!r) return false;
+    if (r.proof && r.proof.system === 'microsoft/planner') return true;
+    const id = r.ref && (r.ref.externalId || r.ref.taskId);
+    return typeof id === 'string' && id.indexOf('planner:') === 0;
+  }
+
+  function outlookPlannerProcessName(r, ctx) {
+    const plan = (r && (r.planTitle || r.target)) || '';
+    const bucket = (r && r.bucketTitle) || 'To do';
+    if (plan) return plan + ' · ' + bucket;
+    return faceTitle(ctx);
+  }
+
   function faceTitle(ctx) {
     if (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace && ctx && ctx.process) {
       const face = FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || ctx.text || '' });
@@ -1930,7 +1944,7 @@
         created: (copy.ref && copy.ref.created) || null
       });
       readBackOrTimeout(sent).then(async function applyUndo(result) {
-        const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.system === 'microsoft/todo';
+        const todoUndo = copy.connectorId === 'outlookTask' || copy.connectorId === 'microsoftTodo' || copy.connectorId === 'plannerTask' || copy.system === 'microsoft/todo' || copy.system === 'microsoft/planner';
         // The 8s clock can fire after Graph already deleted the row. Keep
         // the late success so Activity does not stay Handled.
         if (result && result.reason === 'verify-timeout' && !applyUndo.late) {
@@ -2450,10 +2464,15 @@
     }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
     const status = pageChrome().handled;
+    const plannerClose = outlookPlannerClose(r);
+    const connectorId = plannerClose ? 'plannerTask' : 'outlookTask';
+    const processName = plannerClose ? outlookPlannerProcessName(r, ctx) : faceTitle(ctx);
     const fields = FlowProofOfClose.receiptLogFields
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
-        processName: faceTitle(ctx),
+        processName: processName,
+        planTitle: plannerClose ? (r.planTitle || r.target) : null,
+        bucketTitle: plannerClose ? (r.bucketTitle || 'To do') : null,
         closedLine: ctx && ctx.process && ctx.process.closedLine,
         status: status,
         created: (r.ref && r.ref.created) || null
@@ -2461,7 +2480,7 @@
       : null;
     const threadId = (ctx && (ctx.threadId || ctx.conversationId)) || null;
     const taskTitle = actionTitle({
-      connectorId: 'outlookTask', process: ctx && ctx.process, intent: ctx && ctx.intent, text: ctx && ctx.bodyText,
+      connectorId: connectorId, process: ctx && ctx.process, intent: ctx && ctx.intent, text: ctx && ctx.bodyText,
       writtenLine: r.written, subject: ctx && ctx.subject, params: params
     });
     await FlowStorage.appendLog(Object.assign({
@@ -2475,11 +2494,13 @@
       outlookConversationId: (ctx && ctx.conversationId) || null,
       outlookIncomingId: (ctx && (ctx.outlookIncomingId || ctx.messageId)) || null,
       app: 'outlook',
-      connectorId: 'outlookTask',
+      connectorId: connectorId,
       ref: r.ref,
       created: (r.ref && r.ref.created) || null,
       where: r.where,
       url: r.url || null,
+      planTitle: plannerClose ? (r.planTitle || r.target) : null,
+      bucketTitle: plannerClose ? (r.bucketTitle || 'To do') : null,
       intent: ctx && ctx.intent,
       process: ctx && ctx.process,
       sender: ctx && ctx.sender,
@@ -2498,16 +2519,18 @@
       pathId: (ctx && ctx.pathId) || null,
       threadId: threadId,
       outlookConversationId: (ctx && ctx.conversationId) || null,
-      connectorId: 'outlookTask',
+      connectorId: connectorId,
       ref: r.ref,
       created: (r.ref && r.ref.created) || null,
       url: r.url || null,
-      system: 'microsoft/todo',
+      system: plannerClose ? 'microsoft/planner' : 'microsoft/todo',
       externalId: r.proof && r.proof.externalId,
       verifiedAt: r.proof && r.proof.verifiedAt,
       fetchedBack: true,
       writtenLine: r.written,
-      processName: faceTitle(ctx),
+      processName: processName,
+      planTitle: plannerClose ? (r.planTitle || r.target) : null,
+      bucketTitle: plannerClose ? (r.bucketTitle || 'To do') : null,
       closedLine: ctx && ctx.process && ctx.process.closedLine,
       receiptStatus: status,
       process: ctx && ctx.process,
