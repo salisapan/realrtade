@@ -2,8 +2,6 @@
 -- Repo-only in this change: do NOT apply until owner review. Never push to nlvljclvoguvrnntwufu.
 -- Mail.ReadWrite only; refresh tokens live in Vault (pgcrypto-backed secret ids on the row).
 
-create extension if not exists pgcrypto;
-
 create table if not exists public.outlook_graph_accounts (
   user_id uuid primary key references auth.users (id) on delete cascade,
   mailbox text not null default 'me',
@@ -28,7 +26,7 @@ revoke all on table public.outlook_graph_accounts from anon, authenticated;
 create or replace function public.outlook_graph_accounts_set_updated_at()
 returns trigger
 language plpgsql
-set search_path = public
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -36,6 +34,7 @@ begin
 end;
 $$;
 
+drop trigger if exists outlook_graph_accounts_updated_at on public.outlook_graph_accounts;
 create trigger outlook_graph_accounts_updated_at
   before update on public.outlook_graph_accounts
   for each row
@@ -46,7 +45,7 @@ create or replace function public.outlook_marker_read_refresh(secret_id uuid)
 returns text
 language plpgsql
 security definer
-set search_path = public, vault
+set search_path = ''
 as $$
 declare
   payload text;
@@ -66,7 +65,7 @@ create or replace function public.outlook_marker_write_refresh(secret_id uuid, t
 returns void
 language plpgsql
 security definer
-set search_path = public, vault
+set search_path = ''
 as $$
 begin
   perform vault.update_secret(secret_id, token);
@@ -76,6 +75,42 @@ $$;
 revoke all on function public.outlook_marker_write_refresh(uuid, text) from public;
 revoke execute on function public.outlook_marker_write_refresh(uuid, text) from anon, authenticated;
 grant execute on function public.outlook_marker_write_refresh(uuid, text) to service_role;
+
+create or replace function public.outlook_marker_delete_refresh(secret_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if secret_id is null then
+    return;
+  end if;
+  delete from vault.secrets where id = secret_id;
+end;
+$$;
+
+revoke all on function public.outlook_marker_delete_refresh(uuid) from public;
+revoke execute on function public.outlook_marker_delete_refresh(uuid) from anon, authenticated;
+grant execute on function public.outlook_marker_delete_refresh(uuid) to service_role;
+
+create or replace function public.outlook_graph_accounts_delete_refresh_secret()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.outlook_marker_delete_refresh(old.refresh_secret_id);
+  return old;
+end;
+$$;
+
+drop trigger if exists outlook_graph_accounts_delete_refresh on public.outlook_graph_accounts;
+create trigger outlook_graph_accounts_delete_refresh
+  before delete on public.outlook_graph_accounts
+  for each row
+  execute function public.outlook_graph_accounts_delete_refresh_secret();
 
 -- Sample scheduled sweep (comment only — enable pg_cron + pg_net after Edge deploy):
 -- select cron.schedule(

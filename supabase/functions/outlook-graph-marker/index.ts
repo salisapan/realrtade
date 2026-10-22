@@ -9,18 +9,25 @@ import {
   CRON_HEADER,
   doItLane,
   escapeValidationToken,
+  graphMessageGetQuery,
   markPatch,
+  MAX_DELTA_PAGES,
+  messageWithinLookback,
   nextDeltaPath,
   parseDeltaPage,
+  hasMarkerProperty,
+  readBackMarked,
   resolveAccountForNotification,
   shouldPersistRotatedRefresh,
   subscriptionExpirationIso,
   subscriptionNeedsRenewal,
   subscriptionRequestBody,
+  unmarkPatch,
 } from "./marker-core.mjs";
 
 const PROJECT_REF = "zjquktirlrhbqcnkfaok";
 const GRAPH = "https://graph.microsoft.com/v1.0";
+const GRAPH_TEXT_PREFER = "outlook.body-content-type=\"text\"";
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
@@ -33,14 +40,15 @@ function clientSecret() {
 }
 
 async function graphFetch(token: string, path: string, init?: RequestInit) {
-  const res = await fetch(GRAPH + path, {
-    ...init,
-    headers: {
-      Authorization: "Bearer " + token,
-      "Content-Type": "application/json",
-      ...(init && init.headers ? init.headers : {}),
-    },
-  });
+  const headers: Record<string, string> = {
+    Authorization: "Bearer " + token,
+    "Content-Type": "application/json",
+    ...(init && init.headers ? (init.headers as Record<string, string>) : {}),
+  };
+  if (path.indexOf("/messages/") >= 0 && (!init || !init.method || init.method === "GET")) {
+    headers.Prefer = GRAPH_TEXT_PREFER;
+  }
+  const res = await fetch(GRAPH + path, { ...init, headers });
   let json: any = null;
   try {
     if (res.status !== 204) json = await res.json();
@@ -128,10 +136,12 @@ async function renewSubscription(token: string, row: any, notificationUrl: strin
   const clientState = row.client_state || clientStateForUser(row.user_id, clientSecret());
   const expiresAt = subscriptionExpirationIso();
   const body = subscriptionRequestBody(notificationUrl, clientState, expiresAt);
-  const res = await graphFetch(token, row.subscription_id ? "/subscriptions/" + row.subscription_id : "/subscriptions", {
-    method: row.subscription_id ? "PATCH" : "POST",
-    body: JSON.stringify(body),
-  });
+  const path = row.subscription_id ? "/subscriptions/" + row.subscription_id : "/subscriptions";
+  const method = row.subscription_id ? "PATCH" : "POST";
+  let res = await graphFetch(token, path, { method, body: JSON.stringify(body) });
+  if (!res.ok && row.subscription_id && res.status === 404) {
+    res = await graphFetch(token, "/subscriptions", { method: "POST", body: JSON.stringify(body) });
+  }
   if (!res.ok || !res.json) return row;
   return {
     ...row,
@@ -141,39 +151,76 @@ async function renewSubscription(token: string, row: any, notificationUrl: strin
   };
 }
 
-async function deltaCatchUp(token: string, storedDeltaLink: string | null) {
-  let path = nextDeltaPath(storedDeltaLink, GRAPH);
-  const messages: any[] = [];
-  let deltaLink: string | null = storedDeltaLink;
-  while (path) {
-    const res = await graphFetch(token, path);
-    if (!res.ok || !res.json) break;
-    const page = parseDeltaPage(res.json);
-    page.messages.forEach((m) => messages.push(m));
-    if (page.deltaLink) {
-      deltaLink = page.deltaLink;
-      break;
-    }
-    if (page.nextLink) {
-      path = nextDeltaPath(page.nextLink, GRAPH);
-      continue;
-    }
-    break;
-  }
-  return { messages, deltaLink };
+async function fetchMessage(token: string, messageId: string) {
+  return graphFetch(
+    token,
+    "/me/messages/" + encodeURIComponent(messageId) + "?" + graphMessageGetQuery(),
+  );
 }
 
 async function processMessage(token: string, message: any, ownAddresses: string[]) {
   if (alreadyMarked(message)) return { skipped: "already-marked" };
   const decision = judgeOutlookInboxMessage(message, ownAddresses);
-  if (!doItLane(decision)) return { judged: true, marked: false };
+  if (!doItLane(decision)) return { judged: true, marked: false, show: decision && decision.show };
   const flagged = message.flag && message.flag.flagStatus === "flagged";
   const patch = markPatch(message.categories || [], flagged);
   const marked = await graphFetch(token, "/me/messages/" + encodeURIComponent(message.id), {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
-  return { judged: true, marked: marked.ok, status: marked.status };
+  if (!marked.ok) return { judged: true, marked: false, status: marked.status };
+  const got = await fetchMessage(token, message.id);
+  const proof = got.ok && got.json ? readBackMarked(got.json) : { ok: false, fetchedBack: false };
+  return {
+    judged: true,
+    marked: proof.ok === true,
+    fetchedBack: proof.fetchedBack === true,
+    proof,
+    status: marked.status,
+  };
+}
+
+async function unmarkMessage(token: string, messageId: string) {
+  const got = await fetchMessage(token, messageId);
+  if (!got.ok || !got.json) return { ok: false, reason: "get", status: got.status };
+  if (!hasMarkerProperty(got.json)) return { ok: false, reason: "not-glance-marker" };
+  const patch = unmarkPatch(got.json);
+  const cleared = await graphFetch(token, "/me/messages/" + encodeURIComponent(messageId), {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  if (!cleared.ok) return { ok: false, reason: "patch", status: cleared.status };
+  const read = await fetchMessage(token, messageId);
+  const proof = read.ok && read.json ? readBackMarked(read.json) : { ok: true, fetchedBack: false };
+  return { ok: true, fetchedBack: true, proof: Object.assign({}, proof, { cleared: proof.ok !== true }) };
+}
+
+async function deltaCatchUp(token: string, storedDeltaLink: string | null, nowMs = Date.now()) {
+  let path = nextDeltaPath(storedDeltaLink, GRAPH, { nowMs });
+  const messages: any[] = [];
+  let deltaLink: string | null = storedDeltaLink;
+  let pages = 0;
+  const firstSweep = !storedDeltaLink;
+  while (path && pages < MAX_DELTA_PAGES) {
+    pages += 1;
+    const res = await graphFetch(token, path);
+    if (!res.ok || !res.json) break;
+    const page = parseDeltaPage(res.json);
+    page.messages.forEach((m) => {
+      if (firstSweep && !messageWithinLookback(m, nowMs)) return;
+      messages.push(m);
+    });
+    if (page.deltaLink) {
+      deltaLink = page.deltaLink;
+      break;
+    }
+    if (page.nextLink) {
+      path = nextDeltaPath(page.nextLink, GRAPH, { nowMs });
+      continue;
+    }
+    break;
+  }
+  return { messages, deltaLink, pages };
 }
 
 async function runAccountMaintenance(supabase: ReturnType<typeof createClient>, row: any, notificationUrl: string) {
@@ -194,7 +241,7 @@ async function runAccountMaintenance(supabase: ReturnType<typeof createClient>, 
     delta_link: delta.deltaLink || current.delta_link,
     updated_at: new Date().toISOString(),
   }).eq("user_id", current.user_id);
-  return { user_id: current.user_id, renewed: renewed !== row, delta: delta.messages.length, outcomes };
+  return { user_id: current.user_id, renewed: renewed !== row, delta: delta.messages.length, pages: delta.pages, outcomes };
 }
 
 async function handleNotifications(supabase: ReturnType<typeof createClient>, payload: any) {
@@ -225,10 +272,7 @@ async function handleNotifications(supabase: ReturnType<typeof createClient>, pa
       results.push({ skipped: "resource" });
       continue;
     }
-    const got = await graphFetch(
-      token,
-      "/me/messages/" + encodeURIComponent(resourceId) + "?$select=id,subject,body,bodyPreview,from,hasAttachments,categories,flag,singleValueExtendedProperties",
-    );
+    const got = await fetchMessage(token, resourceId);
     if (!got.ok || !got.json) {
       results.push({ skipped: "get", status: got.status });
       continue;
@@ -236,6 +280,21 @@ async function handleNotifications(supabase: ReturnType<typeof createClient>, pa
     results.push(await processMessage(token, got.json, full.own_addresses || []));
   }
   return results;
+}
+
+async function handleUnmark(supabase: ReturnType<typeof createClient>, body: any) {
+  const userId = body && body.userId;
+  const messageId = body && body.messageId;
+  const action = body && body.action;
+  if (!userId || !messageId) return { ok: false, reason: "missing-fields" };
+  if (action !== "undo" && action !== "close" && action !== "not-this") {
+    return { ok: false, reason: "bad-action" };
+  }
+  const full = await loadAccount(supabase, userId);
+  if (!full) return { ok: false, reason: "account" };
+  const token = await ensureAccessToken(supabase, full);
+  if (!token) return { ok: false, reason: "token" };
+  return unmarkMessage(token, messageId);
 }
 
 async function handleScheduled(supabase: ReturnType<typeof createClient>) {
@@ -287,11 +346,15 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
   const work = scheduled
     ? handleScheduled(supabase)
-    : handleNotifications(supabase, payload);
+    : (payload && payload.unmark)
+      ? handleUnmark(supabase, payload.unmark)
+      : handleNotifications(supabase, payload);
 
   EdgeRuntime.waitUntil(
     work.then((results) => {
       console.log(JSON.stringify({ project: PROJECT_REF, scheduled, results }));
+    }).catch((err) => {
+      console.log(JSON.stringify({ project: PROJECT_REF, scheduled, error: String(err && err.message || err) }));
     }),
   );
 

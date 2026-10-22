@@ -7,7 +7,9 @@ const FlowOutlookGraphMarker = (() => {
   const EXTENSION_FLAG = 'glanceServerMarker';
   const EXT_PROPERTY_ID = 'String {66f5a359-4659-4830-9070-00047ec6ac6e} Name ' + EXTENSION_FLAG;
   const RENEW_WITHIN_MS = 24 * 60 * 60 * 1000;
-  const MAIL_SUBSCRIPTION_MAX_MINUTES = 4230;
+  const MAIL_SUBSCRIPTION_MAX_MINUTES = 4200;
+  const INITIAL_DELTA_LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000;
+  const MAX_DELTA_PAGES = 12;
   const MAIL_SCOPE = 'Mail.ReadWrite';
   const CHANGE_TYPE = 'created';
   const CRON_HEADER = 'x-glance-cron';
@@ -118,6 +120,58 @@ const FlowOutlookGraphMarker = (() => {
     return patch;
   }
 
+  function unmarkPatch(message) {
+    const msg = message || {};
+    const cats = (Array.isArray(msg.categories) ? msg.categories : []).filter((c) => c !== GLANCE_CATEGORY);
+    const patch = {
+      categories: cats,
+      singleValueExtendedProperties: [{ id: EXT_PROPERTY_ID, value: null }]
+    };
+    if (hasMarkerProperty(msg) && msg.flag && msg.flag.flagStatus === 'flagged') {
+      patch.flag = { flagStatus: 'notFlagged' };
+    }
+    return patch;
+  }
+
+  function readBackMarked(message) {
+    if (!message) return { ok: false, reason: 'no-message' };
+    const cats = message.categories || [];
+    const category = Array.isArray(cats) && cats.indexOf(GLANCE_CATEGORY) >= 0;
+    const flagged = message.flag && message.flag.flagStatus === 'flagged';
+    const prop = hasMarkerProperty(message);
+    return { ok: category && prop, category: category, flagged: flagged, property: prop, fetchedBack: true };
+  }
+
+  function odataQuote(value) {
+    return "'" + String(value || '').replace(/'/g, "''") + "'";
+  }
+
+  function graphExpandExtendedProps() {
+    return '$expand=singleValueExtendedProperties($filter=id eq ' + odataQuote(EXT_PROPERTY_ID) + ')';
+  }
+
+  function graphMessageSelectFields() {
+    return 'id,subject,body,bodyPreview,from,toRecipients,ccRecipients,hasAttachments,categories,flag,receivedDateTime';
+  }
+
+  function graphMessageGetQuery() {
+    return '$select=' + graphMessageSelectFields() + '&' + graphExpandExtendedProps();
+  }
+
+  function initialDeltaReceivedAfterIso(nowMs) {
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return new Date(now - INITIAL_DELTA_LOOKBACK_MS).toISOString();
+  }
+
+  function messageWithinLookback(message, nowMs) {
+    const iso = message && (message.receivedDateTime || message.sentDateTime);
+    if (!iso) return true;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return true;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return t >= now - INITIAL_DELTA_LOOKBACK_MS;
+  }
+
   function parseDeltaPage(json) {
     const body = json || {};
     const messages = Array.isArray(body.value) ? body.value : [];
@@ -136,10 +190,14 @@ const FlowOutlookGraphMarker = (() => {
     return { messages, deltaLink };
   }
 
-  function nextDeltaPath(deltaLink, graphBase) {
+  function nextDeltaPath(deltaLink, graphBase, opts) {
     const base = graphBase || 'https://graph.microsoft.com/v1.0';
+    const o = opts || {};
     if (!deltaLink) {
-      return "/me/mailFolders/inbox/messages/delta?$select=id,subject,body,bodyPreview,from,hasAttachments,categories,flag,singleValueExtendedProperties";
+      const after = initialDeltaReceivedAfterIso(o.nowMs);
+      const filter = "$filter=receivedDateTime ge " + after;
+      return '/me/mailFolders/inbox/messages/delta?$select=' + graphMessageSelectFields()
+        + '&' + filter + '&' + graphExpandExtendedProps();
     }
     if (deltaLink.indexOf(base) === 0) return deltaLink.slice(base.length);
     if (deltaLink.indexOf('/me/') >= 0) return deltaLink.replace(base, '');
@@ -201,6 +259,14 @@ const FlowOutlookGraphMarker = (() => {
     alreadyMarked: alreadyMarked,
     doItLane: doItLane,
     markPatch: markPatch,
+    unmarkPatch: unmarkPatch,
+    readBackMarked: readBackMarked,
+    graphMessageGetQuery: graphMessageGetQuery,
+    graphExpandExtendedProps: graphExpandExtendedProps,
+    initialDeltaReceivedAfterIso: initialDeltaReceivedAfterIso,
+    messageWithinLookback: messageWithinLookback,
+    MAX_DELTA_PAGES: MAX_DELTA_PAGES,
+    INITIAL_DELTA_LOOKBACK_MS: INITIAL_DELTA_LOOKBACK_MS,
     parseDeltaPage: parseDeltaPage,
     mergeDeltaPages: mergeDeltaPages,
     nextDeltaPath: nextDeltaPath,

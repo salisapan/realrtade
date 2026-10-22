@@ -42,7 +42,13 @@ const now = Date.now();
 const in23h = new Date(now + 23 * 60 * 60 * 1000).toISOString();
 const in25h = new Date(now + 25 * 60 * 60 * 1000).toISOString();
 check('renewal threshold is 24h', M.subscriptionNeedsRenewal(in23h, now) === true && M.subscriptionNeedsRenewal(in25h, now) === false);
-check('subscription expiry uses Graph mail max minutes', M.subscriptionExpirationIso(now).indexOf('T') > 0);
+check('subscription expiry is below Graph mail max minutes', M.MAIL_SUBSCRIPTION_MAX_MINUTES === 4200 && M.subscriptionExpirationIso(now).indexOf('T') > 0);
+check('initial delta lookback is two days', M.INITIAL_DELTA_LOOKBACK_MS === 2 * 24 * 60 * 60 * 1000);
+check('delta page cap is bounded', M.MAX_DELTA_PAGES >= 1 && M.MAX_DELTA_PAGES <= 20);
+check('unmark removes Glance category', M.unmarkPatch({ categories: ['Glance', 'Blue'], singleValueExtendedProperties: [{ id: M.EXT_PROPERTY_ID, value: '1' }], flag: { flagStatus: 'flagged' } }).categories.indexOf('Glance') < 0);
+check('read-back requires category and marker property', M.readBackMarked({ categories: ['Glance'], singleValueExtendedProperties: [{ id: M.EXT_PROPERTY_ID, value: '1' }] }).ok === true);
+check('graph GET uses expand for extended properties', M.graphMessageGetQuery().indexOf('$expand=singleValueExtendedProperties') >= 0);
+check('first delta path filters receivedDateTime', M.nextDeltaPath(null, 'https://graph.microsoft.com/v1.0', { nowMs: now }).indexOf('receivedDateTime ge') >= 0);
 const subBody = M.subscriptionRequestBody('https://example.com/hook', stateA, in25h);
 check('subscription is created-only', subBody.changeType === 'created');
 
@@ -76,6 +82,14 @@ const edge = fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'funct
 check('edge returns 202 before work finishes', edge.indexOf('status: 202') >= 0 && edge.indexOf('EdgeRuntime.waitUntil') >= 0);
 check('edge has scheduled renewal path', edge.indexOf('handleScheduled') >= 0 && /cron/.test(edge));
 check('edge imports judge bundle', edge.indexOf('judge.bundle.mjs') >= 0);
+check('edge read-back after PATCH', edge.indexOf('readBackMarked') >= 0 && edge.indexOf('fetchedBack') >= 0);
+check('edge unmark path for undo close not-this', edge.indexOf('handleUnmark') >= 0 && edge.indexOf('unmarkPatch') >= 0);
+check('edge recreates subscription on 404', edge.indexOf('status === 404') >= 0);
+check('edge prefers plain text bodies', edge.indexOf('outlook.body-content-type') >= 0);
+check('migration deletes vault secret on account row delete',
+  /outlook_marker_delete_refresh/.test(migration) && /outlook_graph_accounts_delete_refresh/.test(migration));
+check('migration trigger is idempotent', /drop trigger if exists outlook_graph_accounts_updated_at/.test(migration));
+check('migration RPC search_path empty', /set search_path = ''/.test(migration));
 check('validation token escaped', edge.indexOf('escapeValidationToken') >= 0);
 
 const CRON = 'cron-test-secret-value';

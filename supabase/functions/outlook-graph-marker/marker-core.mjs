@@ -5,7 +5,9 @@ export const GLANCE_CATEGORY = "Glance";
 export const EXTENSION_FLAG = "glanceServerMarker";
 export const EXT_PROPERTY_ID = "String {66f5a359-4659-4830-9070-00047ec6ac6e} Name " + EXTENSION_FLAG;
 export const RENEW_WITHIN_MS = 24 * 60 * 60 * 1000;
-export const MAIL_SUBSCRIPTION_MAX_MINUTES = 4230;
+export const MAIL_SUBSCRIPTION_MAX_MINUTES = 4200;
+export const INITIAL_DELTA_LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000;
+export const MAX_DELTA_PAGES = 12;
 export const CHANGE_TYPE = "created";
 export const CRON_HEADER = "x-glance-cron";
 
@@ -50,7 +52,9 @@ export function resolveAccountForNotification(note, rowBySubscription, secret) {
   }
   const uid = userIdFromClientState(note && note.clientState);
   if (!uid) return null;
-  if (secret && validateClientStateForUser(note.clientState, uid, secret)) return { user_id: uid, client_state: note.clientState };
+  if (secret && validateClientStateForUser(note.clientState, uid, secret)) {
+    return { user_id: uid, client_state: note.clientState };
+  }
   return null;
 }
 
@@ -110,6 +114,58 @@ export function markPatch(existingCategories, alreadyFlagged) {
   return patch;
 }
 
+export function unmarkPatch(message) {
+  const msg = message || {};
+  const cats = (Array.isArray(msg.categories) ? msg.categories : []).filter((c) => c !== GLANCE_CATEGORY);
+  const patch = {
+    categories: cats,
+    singleValueExtendedProperties: [{ id: EXT_PROPERTY_ID, value: null }],
+  };
+  if (hasMarkerProperty(msg) && msg.flag && msg.flag.flagStatus === "flagged") {
+    patch.flag = { flagStatus: "notFlagged" };
+  }
+  return patch;
+}
+
+export function readBackMarked(message) {
+  if (!message) return { ok: false, reason: "no-message" };
+  const cats = message.categories || [];
+  const category = Array.isArray(cats) && cats.indexOf(GLANCE_CATEGORY) >= 0;
+  const flagged = message.flag && message.flag.flagStatus === "flagged";
+  const prop = hasMarkerProperty(message);
+  return { ok: category && prop, category, flagged, property: prop, fetchedBack: true };
+}
+
+function odataQuote(value) {
+  return "'" + String(value || "").replace(/'/g, "''") + "'";
+}
+
+export function graphExpandExtendedProps() {
+  return "$expand=singleValueExtendedProperties($filter=id eq " + odataQuote(EXT_PROPERTY_ID) + ")";
+}
+
+export function graphMessageSelectFields() {
+  return "id,subject,body,bodyPreview,from,toRecipients,ccRecipients,hasAttachments,categories,flag,receivedDateTime";
+}
+
+export function graphMessageGetQuery() {
+  return "$select=" + graphMessageSelectFields() + "&" + graphExpandExtendedProps();
+}
+
+export function initialDeltaReceivedAfterIso(nowMs) {
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  return new Date(now - INITIAL_DELTA_LOOKBACK_MS).toISOString();
+}
+
+export function messageWithinLookback(message, nowMs) {
+  const iso = message && (message.receivedDateTime || message.sentDateTime);
+  if (!iso) return true;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return true;
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  return t >= now - INITIAL_DELTA_LOOKBACK_MS;
+}
+
 export function parseDeltaPage(json) {
   const body = json || {};
   return {
@@ -119,10 +175,14 @@ export function parseDeltaPage(json) {
   };
 }
 
-export function nextDeltaPath(deltaLink, graphBase) {
+export function nextDeltaPath(deltaLink, graphBase, opts) {
   const base = graphBase || "https://graph.microsoft.com/v1.0";
+  const o = opts || {};
   if (!deltaLink) {
-    return "/me/mailFolders/inbox/messages/delta?$select=id,subject,body,bodyPreview,from,hasAttachments,categories,flag,singleValueExtendedProperties";
+    const after = initialDeltaReceivedAfterIso(o.nowMs);
+    const filter = "$filter=receivedDateTime ge " + after;
+    return "/me/mailFolders/inbox/messages/delta?$select=" + graphMessageSelectFields()
+      + "&" + filter + "&" + graphExpandExtendedProps();
   }
   if (deltaLink.indexOf(base) === 0) return deltaLink.slice(base.length);
   if (deltaLink.indexOf("/me/") >= 0) return deltaLink.replace(base, "");
