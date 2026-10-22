@@ -10,6 +10,7 @@ const ConnectEcosystemUI = (function () {
       lead: 'כל חיבור הוא אישור אחד שכולל את כל הכלים של אותו ספק.',
       later: 'אפשר להוסיף גישה בהמשך, בדיוק איפה שצריך.',
       connected: 'מחובר',
+      partial: 'מחובר חלקית',
       eco: {
         google: {
           cta: 'חברו את <bdi>Google</bdi>',
@@ -39,6 +40,7 @@ const ConnectEcosystemUI = (function () {
       lead: 'Each one is a single approval for every tool from that provider.',
       later: 'You can add access later, right where you need it.',
       connected: 'Connected',
+      partial: 'Partly connected',
       eco: {
         google: {
           cta: 'Connect Google',
@@ -93,22 +95,39 @@ const ConnectEcosystemUI = (function () {
     return s + '</span>';
   }
 
+  function ecoRow(status, ecoId) {
+    const st = status || {};
+    const row = st[ecoId];
+    if (row && typeof row === 'object') return row;
+    return null;
+  }
+
   function googleConnected(status, state) {
+    const row = ecoRow(status, 'google');
+    if (row && (row.connected || row.partial)) return true;
     const st = status || {};
     if (st.googleTasks && st.googleTasks.connected) return true;
-    if (st.google && st.google.connected) return true;
     return Boolean(state && state.googleTasksAuth && state.googleTasksAuth.taskListId);
   }
 
   function microsoftConnected(status, state) {
+    const row = ecoRow(status, 'microsoft');
+    if (row && (row.connected || row.partial)) return true;
     const st = status || {};
     if (st.microsoft && st.microsoft.connected) return true;
     return Boolean(state && state.outlookAuth && state.outlookAuth.token);
   }
 
   function metaConnected(status) {
+    const row = ecoRow(status, 'meta');
+    if (row) return Boolean(row.connected);
     const st = status || {};
     return Boolean(st.meta && st.meta.connected);
+  }
+
+  function isPartial(ecoId, status) {
+    const row = ecoRow(status, ecoId);
+    return Boolean(row && row.partial && !row.connected);
   }
 
   function accountEmail(ecoId, status, state) {
@@ -168,6 +187,7 @@ const ConnectEcosystemUI = (function () {
     const list = ECOS.map((eco) => {
       const c = T.eco[eco.id];
       const done = isConnected(eco.id, status, state);
+      const partial = done && isPartial(eco.id, status);
       const busy = connectingId === eco.id;
       let body;
       if (done) {
@@ -175,9 +195,10 @@ const ConnectEcosystemUI = (function () {
         const mailHtml = mail
           ? '<span class="mail"><bdi dir="ltr">' + String(mail).replace(/</g, '&lt;') + '</bdi></span>'
           : '';
-        body = '<div class="c3-done" data-eco="' + eco.id + '"><span class="marks" style="display:flex">' + marksHtml(eco.marks) + '</span>' +
+        const okLabel = partial ? T.partial : T.connected;
+        body = '<div class="c3-done' + (partial ? ' c3-partial' : '') + '" data-eco="' + eco.id + '"><span class="marks" style="display:flex">' + marksHtml(eco.marks) + '</span>' +
           '<span class="who"><span class="name"><bdi>' + c.display + '</bdi></span>' + mailHtml + '</span>' +
-          '<span class="ok">' + (SVG.check || '') + T.connected + '</span></div>';
+          '<span class="ok">' + (partial ? '' : (SVG.check || '')) + okLabel + '</span></div>';
       } else if (busy) {
         body = '<button type="button" class="c3-doit busy" aria-busy="true" disabled>' + spinHtml() +
           '<span class="label">' + c.busy + '</span></button>';
@@ -186,7 +207,8 @@ const ConnectEcosystemUI = (function () {
           '<span class="marks">' + marksHtml(eco.marks) + '</span><span class="label">' + c.cta + '</span></button>';
       }
       const sub = busy ? c.hint : toolsLine(c.tools);
-      return '<li class="c3-item" data-state="' + (done ? 'done' : (busy ? 'busy' : 'idle')) + '">' + body +
+      const stateName = done ? (partial ? 'partial' : 'done') : (busy ? 'busy' : 'idle');
+      return '<li class="c3-item" data-state="' + stateName + '">' + body +
         '<p class="c3-tools">' + sub + '</p></li>';
     }).join('');
 
@@ -207,8 +229,10 @@ const ConnectEcosystemUI = (function () {
         paint(host, opts);
         const res = await send({ type: 'flow:connect', connectorId: row.connectorId });
         connectingId = null;
-        if (res && res.ok && refresh) await refresh();
-        else paint(host, opts);
+        if (res && res.ok) {
+          if (refresh) await refresh();
+          else paint(host, Object.assign({}, opts, { status: opts.status }));
+        } else paint(host, opts);
       });
     });
   }

@@ -52,6 +52,8 @@ import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/connect-ecosystem.js'; // classic: sets globalThis.FlowConnectEcosystem (C1)
+import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
 import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
@@ -1839,6 +1841,9 @@ async function disconnectConnector(connectorId) {
   // Google also evicts Chrome's cached getAuthToken AND the stored web-flow
   // token. Otherwise "Disconnect" then "Connect" silently reuses the same
   // grant instead of letting the user pick a different Google account.
+  if (connectorId === 'microsoft' || connectorId === 'meta') {
+    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector });
+  }
   if (connectorId === 'googleTasks') {
     // Invalidate before the clear. A consent window that resolves after
     // this point sees a new epoch and must not write googleWebAuth back.
@@ -6529,8 +6534,13 @@ async function connectorStatus() {
     laneUndo: reconnectBag.glanceLaneUndo || null,
     scopesGranted: scopesGranted
   });
+  const ecoBag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
+  const ecoSnap = await ecosystemStatusExtras(Object.assign({}, reconnectBag, ecoBag, { googleTasks: googleTasks }));
   return {
     googleTasks: googleTasks,
+    google: ecoSnap.google,
+    microsoft: ecoSnap.microsoft,
+    meta: ecoSnap.meta,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
@@ -6635,7 +6645,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'flow:connect') {
-    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
+    if (msg.connectorId === 'googleTasks' || msg.connectorId === 'microsoft' || msg.connectorId === 'meta') {
+      const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
+      return reply(sendResponse, connectEcosystemConnector(msg.connectorId, {
+        connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
+        launchInteractive: outlookLaunchInteractive,
+        enableSurface: enableSurface
+      }));
+    }
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
