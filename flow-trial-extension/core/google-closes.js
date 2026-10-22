@@ -80,11 +80,18 @@ const FlowGoogleCloses = (() => {
     return false;
   }
 
-  // Save-shaped only. The open Outlook page counts file attachments for
-  // this sentence and for no other, so the rest of show and silence stay put.
+  // Save-shaped only. Suggest-save and attachment-save cards use this gate
+  // alone so an inbound signed-copy delivery does not become "Save the file?".
   function needsOneAttachment(text) {
     const t = String(text || '');
-    return SAVE_EN.test(t) || SAVE_HE.test(t) || signedCopyDelivered(t);
+    return SAVE_EN.test(t) || SAVE_HE.test(t);
+  }
+
+  // Outlook/Gmail judge: count thread files for save-shaped asks and for
+  // signed-copy delivery (parity), without widening suggest-save.
+  function attachmentCountForJudge(text) {
+    const t = String(text || '');
+    return needsOneAttachment(t) || signedCopyDelivered(t);
   }
 
   function saveClauses(text) {
@@ -753,6 +760,7 @@ const FlowGoogleCloses = (() => {
   return {
     consider: consider,
     needsOneAttachment: needsOneAttachment,
+    attachmentCountForJudge: attachmentCountForJudge,
     refusesSave: refusesSave,
     refusesSave: refusesSave,
     detailMode: detailMode,

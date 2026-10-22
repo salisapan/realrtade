@@ -735,7 +735,12 @@
     // The address often carries only a conversation id. Counting files on that
     // id fails, and a failed read must not become a silent zero.
     let attachmentCount = 0;
-    if (typeof FlowGoogleCloses !== 'undefined' && typeof FlowGoogleCloses.needsOneAttachment === 'function' && FlowGoogleCloses.needsOneAttachment(own)) {
+    // Save-shaped mail only. Signed-copy delivery keeps count at zero on the
+    // open pane so suggest-save can show; sync still counts files on the message.
+    const countGate = typeof FlowGoogleCloses !== 'undefined' &&
+      typeof FlowGoogleCloses.needsOneAttachment === 'function' &&
+      FlowGoogleCloses.needsOneAttachment(own);
+    if (countGate) {
       let id = pane.itemId || null;
       if (!id) {
         const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);

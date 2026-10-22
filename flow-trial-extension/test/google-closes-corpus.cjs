@@ -349,8 +349,10 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
   check('shared files do not ask for an attachment count',
     FlowGoogleCloses.needsOneAttachment('Please save it to our shared files by Friday, October 9.') === false &&
     FlowGoogleCloses.needsOneAttachment('Please save the attachment to OneDrive.') === true);
-  check('signed-copy delivery asks Outlook/Gmail to count attachments',
-    FlowGoogleCloses.needsOneAttachment('Here is the signed contract, as we agreed when we met') === true);
+  check('signed-copy delivery asks judge to count attachments',
+    FlowGoogleCloses.attachmentCountForJudge('Here is the signed contract, as we agreed when we met') === true);
+  check('signed-copy delivery does not widen suggest-save attachment gate',
+    FlowGoogleCloses.needsOneAttachment('Here is the signed contract, as we agreed when we met') === false);
 }
 
 console.log('\n--- family C: signed copy delivered (one attachment, no save verb) ---\n');

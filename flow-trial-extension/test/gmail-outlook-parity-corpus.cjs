@@ -501,9 +501,27 @@ const CASES = [
     };
     const hsG = J.judge(Object.assign({ surface: 'gmail', to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] }, signBase), judgeDeps);
     const hsO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, signBase), judgeDeps);
-    check('Gmail Hebrew sign-and-return shows with draft', hsG.show && stepKinds(hsG).indexOf('gmailDraft') >= 0, { show: hsG.show, steps: stepKinds(hsG) });
-    check('Outlook Hebrew sign-and-return shows with draft', hsO.show && stepKinds(hsO).indexOf('outlookDraft') >= 0, { show: hsO.show, steps: stepKinds(hsO) });
-    check('needsOneAttachment counts signed-copy mail for Graph', E('FlowGoogleCloses').needsOneAttachment(signedBody) === true);
+    check('Gmail Hebrew sign-and-return has draft and task', hsG.show && stepKinds(hsG).indexOf('gmailDraft') >= 0 && stepKinds(hsG).indexOf('googleTask') >= 0, { show: hsG.show, steps: stepKinds(hsG) });
+    check('Outlook Hebrew sign-and-return has draft and task', hsO.show && stepKinds(hsO).indexOf('outlookDraft') >= 0 && stepKinds(hsO).indexOf('googleTask') >= 0, { show: hsO.show, steps: stepKinds(hsO) });
+    check('attachmentCountForJudge counts signed-copy mail for Graph', E('FlowGoogleCloses').attachmentCountForJudge(signedBody) === true);
+
+    const tieBody = 'Attached is the signed copy.';
+    const tieFiles = [
+      { name: 'scan-1.pdf', filename: 'scan-1.pdf', mimeType: 'application/pdf', size: 1000 },
+      { name: 'scan-2.pdf', filename: 'scan-2.pdf', mimeType: 'application/pdf', size: 2000 }
+    ];
+    const tiePick = FlowFileAttach.pickSaveAttachment(tieBody, tieFiles);
+    const outlookSrc = read('src/content-outlook.js');
+    check('contract+appendix tie is a chooser, not save-both', tiePick.mode === 'choice' && !tiePick.file, tiePick);
+    const tieInbound = {
+      text: tieBody, subject: 'Signed scans',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), attachmentCount: 2, hasThreadAttachment: false, inbound: true
+    };
+    const tieO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, tieInbound), judgeDeps);
+    check('Outlook two-file signed delivery is file-it', tieO.show && tieO.process && tieO.process.id === 'file-it', { show: tieO.show, id: tieO.process && tieO.process.id });
+    check('Outlook buildCtx leaves attachment null on chooser tie', /savePick\.mode === 'choice' \? null/.test(outlookSrc));
+    check('Outlook Do It can pass selectedAttachment on drive save', /selectedAttachment/.test(outlookSrc) || /attachFile/.test(outlookSrc));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

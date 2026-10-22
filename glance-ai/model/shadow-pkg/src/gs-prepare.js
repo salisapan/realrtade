@@ -59,7 +59,8 @@
         if (probe && probe.move === 'silent') return verdict(false, 'calendar-' + probe.reason, null);
       }
       if (fromOwn) return verdict(false, to.length && to.every(function (t) { return t === own; }) ? 'note-to-self' : 'own-sender', null);
-      var n = G.needsOneAttachment(text) ? (c.attachmentCount || 0) : 0;
+      var countGate = G.attachmentCountForJudge || G.needsOneAttachment;
+      var n = countGate && countGate(text) ? (c.attachmentCount || 0) : 0;
       var r2 = J.judge({ text: text, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
         threadUrl: 'https://outlook.live.com/x', hasThreadAttachment: n === 1, attachmentCount: n, surface: 'outlook' }, DEPS);
       if (r2.show) return verdict(true, null, r2.intent, r2.process.steps);

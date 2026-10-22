@@ -218,7 +218,9 @@ const FlowOutlook = (() => {
     // cannot walk the whole mailbox. Overflow stays unread, same as a failed GET.
     async function readMessageAttachments(token, messages) {
       const closes = googleCloses();
-      const needs = closes && typeof closes.needsOneAttachment === 'function' ? closes.needsOneAttachment : null;
+      const needs = closes && typeof closes.attachmentCountForJudge === 'function'
+        ? closes.attachmentCountForJudge
+        : (closes && typeof closes.needsOneAttachment === 'function' ? closes.needsOneAttachment : null);
       let reads = 0;
       const CAP = 20;
       for (const msg of messages || []) {
