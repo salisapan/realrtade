@@ -39,6 +39,9 @@ const tieFiles = [meta('scan-1.pdf'), meta('scan-2.pdf')];
 const pickTie = FA.pickSaveAttachment(tieBody, tieFiles);
 check('two scans with signed-copy wording need a chooser', pickTie.mode === 'choice' && !pickTie.file, pickTie);
 
+const noUrlId = FA.pickSaveAttachment(BODY, [meta('signed-contract.pdf', { url: '', id: undefined })]);
+check('catalog att-N id still resolves by file name on Gmail save path', (noUrlId.mode === 'picked' || noUrlId.mode === 'single') && noUrlId.file && noUrlId.file.filename === 'signed-contract.pdf', noUrlId);
+
 function gmailCatalogPickBlock() {
   const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
   const start = gmail.indexOf("if (!only && Array.isArray(catalog) && catalog.length) {");

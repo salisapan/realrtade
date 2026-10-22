@@ -463,6 +463,19 @@ console.log('\n--- signed delivery: past weekday must not read as future (N1/N2)
   check('negated sign-and-return is not reply-track',
     !(negSignReturn.process && negSignReturn.process.id === 'reply-track'),
     negSignReturn.process && negSignReturn.process.id);
+  [
+    'מלא את הטופס, חתום והחזר עד מחר.',
+    'החוזה המלא כולל נספח, חתום והחזר עד מחר.',
+    'לא דחוף, חתום והחזר כשאפשר.',
+    'לא נורא, חתום והחזר עד מחר.',
+    'אם לא קיבלת הערות, חתום והחזר עד מחר.'
+  ].forEach((line) => {
+    const row = plan(line, { attachmentCount: 1 });
+    check('HE comma sign-and-return TP is reply-track + task: ' + line.slice(0, 24),
+      row.process && row.process.id === 'reply-track'
+      && row.process.steps && row.process.steps.some((s) => s && (s.kind === 'googleTask' || s.kind === 'outlookTask')),
+      row.process && row.process.id);
+  });
 }
 
 console.log('\n--- family B: one file, one target ---\n');

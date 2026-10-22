@@ -278,16 +278,18 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
 console.log('\n--- two attachments: pick by fileName, GET item, PUT ---\n');
 {
   const signed = { id: 'FILE-SIGNED', name: 'signed-contract.pdf', webUrl: 'https://onedrive.live.com/edit.aspx?id=FILE-SIGNED' };
-  const b64 = Buffer.from('signed-pdf-bytes').toString('base64');
+  const signedBytes = Buffer.from('signed-pdf-bytes-only');
+  const appendixBytes = Buffer.from('appendix-pdf-different');
+  const signedB64 = signedBytes.toString('base64');
   const twoRoutes = [
     { method: 'GET', test: /\/messages\/MSG-TWO\/attachments\?\$select/, reply: () => ({ ok: true, status: 200, json: async () => ({
       value: [
-        { id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', size: 120, isInline: false },
-        { id: 'att1', name: 'appendix.pdf', contentType: 'application/pdf', size: 90, isInline: false }
+        { id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', size: signedBytes.length, isInline: false },
+        { id: 'att1', name: 'appendix.pdf', contentType: 'application/pdf', size: appendixBytes.length, isInline: false }
       ]
     }), text: async () => '' }) },
     { method: 'GET', test: /\/messages\/MSG-TWO\/attachments\/att0$/, reply: () => ({ ok: true, status: 200, json: async () => ({
-      id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', contentBytes: b64
+      id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', contentBytes: signedB64
     }), text: async () => '' }) },
     { method: 'GET', test: /\/me\/drive\/root:\/Glance\/signed-contract\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
     { method: 'PUT', test: /\/me\/drive\/root:\/Glance\/signed-contract\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => signed, text: async () => '' }) },
@@ -301,9 +303,17 @@ console.log('\n--- two attachments: pick by fileName, GET item, PUT ---\n');
   });
   const itemGet = env.calls.find((c) => c.method === 'GET' && /\/attachments\/att0$/.test(c.url));
   const put = env.calls.find((c) => c.method === 'PUT' && /signed-contract\.pdf/.test(c.url));
+  const att1Get = env.calls.find((c) => c.method === 'GET' && /\/attachments\/att1$/.test(c.url));
+  let putBuf = null;
+  if (put && put.body != null) {
+    if (Buffer.isBuffer(put.body)) putBuf = put.body;
+    else if (put.body instanceof Uint8Array) putBuf = Buffer.from(put.body);
+    else if (typeof put.body === 'string') putBuf = Buffer.from(put.body, 'binary');
+  }
   check('two-attachment file-it GETs the chosen Graph attachment then PUTs OneDrive',
-    out.ok === true && out.proof && out.proof.fetchedBack === true && itemGet && put,
-    { out, calls: env.calls.map((c) => c.method + ' ' + c.url) });
+    out.ok === true && out.proof && out.proof.fetchedBack === true && itemGet && put && !att1Get
+    && putBuf && putBuf.equals(signedBytes) && !putBuf.equals(appendixBytes),
+    { out, putLen: putBuf && putBuf.length, calls: env.calls.map((c) => c.method + ' ' + c.url) });
 }
 
 console.log('\n--- create, read back, undo ---\n');

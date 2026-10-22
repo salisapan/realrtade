@@ -544,18 +544,32 @@ const CASES = [
     const enriched = FlowFileAttach.enrichFileItChoiceCatalog(tieO.process, tieFiles, 'choice');
     const fileStep = (enriched.steps || []).find((s) => s && (s.kind === 'driveFile' || s.kind === 'onedriveFile'));
     check('P3 choice catalog lists both attachments on file step', fileStep && fileStep.params && fileStep.params.catalog && fileStep.params.catalog.length === 2, fileStep && fileStep.params);
-    vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', 'step-list.js'), 'utf8'), engine, { filename: 'step-list.js' });
-    const FlowStepList = E('FlowStepList');
-    const enrichedAmb = FlowFileAttach.enrichFileItChoiceCatalog(ambEnO.process, tieFiles, 'choice');
-    const ambRows = FlowStepList.rowsFor(enrichedAmb, { surface: 'outlook' });
-    let multiChoosers = 0;
-    ambRows.forEach((row) => {
-      const cat = row.step && row.step.params && (row.step.params.catalog || row.step.params.files);
-      if (Array.isArray(cat) && cat.length > 1) multiChoosers++;
-    });
-    check('amb Outlook file-it has exactly one multi-file chooser row', multiChoosers === 1, { multiChoosers });
-    check('Outlook skips suggest-save when file-it already has a 2-file catalog (content-outlook.js:5534)',
-      /catalog\.length >= 2/.test(outlookSrc));
+    function outlookFileItAlreadyPickedFn(src) {
+      const start = src.indexOf('function outlookFileItAlreadyPicked(host) {');
+      const end = src.indexOf('\n  async function recordSuggestNote', start);
+      if (start < 0 || end < 0) return null;
+      return new Function('host', src.slice(start, end) + '\nreturn outlookFileItAlreadyPicked(host);');
+    }
+    const alreadyPicked = outlookFileItAlreadyPickedFn(outlookSrc);
+    const ambHost = {
+      __glanceSteps: {
+        rows: function () {
+          return [{
+            step: {
+              kind: 'onedriveFile',
+              params: {
+                catalog: [
+                  { id: 'att-0', name: 'scan-1.pdf', on: false },
+                  { id: 'att-1', name: 'scan-2.pdf', on: false }
+                ]
+              }
+            }
+          }];
+        }
+      }
+    };
+    check('amb Outlook 2-file catalog blocks duplicate suggest-save (content-outlook.js:~5535)',
+      typeof alreadyPicked === 'function' && alreadyPicked(ambHost) === true, alreadyPicked && alreadyPicked(ambHost));
 
   }
 

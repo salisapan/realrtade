@@ -54,6 +54,11 @@ const LINES = [
   'Unsubscribe from this newsletter to stop receiving these emails.'
 ];
 
+const SIGN_LINES = [
+  { text: 'מצורף החוזה, חתום והחזר עד יום חמישי.', attachmentCount: 1, replyTrack: true },
+  { text: 'לא צריך, חתום והחזר כבר טופל.', attachmentCount: 1, replyTrack: false }
+];
+
 for (const text of LINES) {
   const input = Object.assign({ text }, base);
   const g = judgeCore(Object.assign({ surface: 'gmail' }, input), {});
@@ -65,6 +70,24 @@ for (const text of LINES) {
     type(g) === type(o) && type(g) === type(c) && type(g) === type(a), { gmail: type(g), outlook: type(o), chat: type(c), card: type(a) });
   check('the Workspace card decides exactly as Gmail does: ' + text, Boolean(g.show) === Boolean(a.show), { gmail: g.show, card: a.show });
 }
+
+for (const row of SIGN_LINES) {
+  const input = Object.assign({ text: row.text, attachmentCount: row.attachmentCount }, base);
+  const g = judgeCore(Object.assign({ surface: 'gmail' }, input), {});
+  const o = judgeCore(Object.assign({ surface: 'outlook' }, input), {});
+  const a = addon.judge(Object.assign({ surface: 'gmail' }, input));
+  const proc = (r) => (r && r.process && r.process.id) || null;
+  if (row.replyTrack) {
+    check('Hebrew sign-and-return is reply-track on Gmail: ' + row.text.slice(0, 28), proc(g) === 'reply-track' && g.show, { got: proc(g), show: g.show });
+    check('Hebrew sign-and-return is reply-track on Outlook: ' + row.text.slice(0, 28), proc(o) === 'reply-track' && o.show, { got: proc(o), show: o.show });
+  } else {
+    check('negated sign-and-return is not reply-track on Gmail: ' + row.text.slice(0, 28), proc(g) !== 'reply-track', { got: proc(g), show: g.show });
+    check('negated sign-and-return is not reply-track on Workspace card: ' + row.text.slice(0, 28), proc(a) !== 'reply-track', { got: proc(a), show: a.show });
+  }
+  check('Workspace card matches Gmail on sign-and-return: ' + row.text.slice(0, 28),
+    proc(g) === proc(a) && Boolean(g.show) === Boolean(a.show), { gmail: proc(g), card: proc(a), showG: g.show, showA: a.show });
+}
+
 // The chat lane runs this same judge and only adds its own place and fact detection on top.
 check('the chat lane carries the shared judge result', (() => {
   const r = FlowChatDraft.judge(Object.assign({ text: 'Where is the restaurant from last week?', evidence: {} }, base));
