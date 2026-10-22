@@ -32,6 +32,8 @@ function judge(text, surface, reader) {
     ownAddresses: [OWN],
     userName: reader.userName,
     ownNames: reader.ownNames,
+    readerEmail: OWN,
+    namesWaitDone: true,
     now: NOW,
     surface: surface || 'gmail',
     attachmentCount: 0,
@@ -111,6 +113,36 @@ for (const [name, body] of STATEMENT_HOLD) {
   }
 }
 check('he remind me relay shows', shown(judge('תזכור להזכיר לי להתקשר מחר', 'gmail')), { reason: judge('תזכור להזכיר לי להתקשר מחר', 'gmail').reason });
+
+console.log('\n--- relay: reader pronouns are not third-party relay ---\n');
+const READER_PRONOUN_NOT_RELAY = [
+  ['en remind you to', 'Please remind you to send the invoice by Friday.'],
+  ['en tell you that', "Don't forget to tell you that the meeting moved to 3pm."],
+  ['en ask you to', 'Please ask you to confirm the October numbers.'],
+  ['he remind you pl', 'תזכיר לכם לשלוח את הדוח עד יום שישי.'],
+  ['he tell you pl', 'תזכור להגיד לכם שהפגישה נדחתה.']
+];
+for (const [name, body] of READER_PRONOUN_NOT_RELAY) {
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(body, surface, { userName: 'Sali', ownNames: ['Sali', 'salisapan1'] });
+    check(name + ' not relay-quiet on ' + surface, !/quiet:relay/.test(String(out.reason || '')), out.reason);
+  }
+}
+
+console.log('\n--- shared clock extract: Gmail and Outlook hold ---\n');
+const CLOCK_HOLDS = [
+  ['en 3pm', 'Could we meet Thursday at 3pm?'],
+  ['en 15:00', 'Could we meet Thursday at 15:00?'],
+  ['en 3:30 PM', 'Could we meet Thursday at 3:30 PM?'],
+  ['he בשעה 3', 'נוכל להיפגש ביום חמישי בשעה 3?'],
+  ['he ב-15:00', 'נוכל להיפגש ביום חמישי ב-15:00?']
+];
+for (const [name, body] of CLOCK_HOLDS) {
+  for (const surface of ['gmail', 'outlook']) {
+    const out = judge(body, surface);
+    check(name + ' hold on ' + surface, shown(out) && planId(out) === 'hold', { reason: out.reason, id: planId(out) });
+  }
+}
 
 console.log('\nFAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
