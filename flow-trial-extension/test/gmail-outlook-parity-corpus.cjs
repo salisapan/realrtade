@@ -40,7 +40,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 // The engine, loaded as the content scripts load it (classic scripts in one realm).
 const engine = { module: undefined, console };
 vm.createContext(engine);
-for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js']) {
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
   const p = path.join(ROOT, 'core', f);
   if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), engine, { filename: f });
 }
@@ -531,6 +531,42 @@ const CASES = [
         namesWaitDone: true
       });
       check('Hi Lior reader-alone classifies on ' + surface, cls && cls.type === 'request' && !cls.quiet, cls);
+    }
+  }
+
+  console.log('\n--- extension: remember-ask card titles match on Gmail and Outlook ---\n');
+  {
+    const FlowDisplay = E('FlowDisplay');
+    const NOW_CARD = '2026-10-22T12:00:00Z';
+    const depsCard = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    const rows = [
+      ['he transfer after greeting', 'היי,\n\nתזכור להעביר את התשלום עד יום ראשון.\n\nיוסי', /^לשלם את התשלום עד \d{1,2}\/\d{1,2}$/],
+      ['he tell me status', 'תזכור להגיד לי מה הסטטוס של הדוח עד יום חמישי.', /^להגיד מה הסטטוס של הדוח עד \d{1,2}\/\d{1,2}$/]
+    ];
+    for (const [name, text, re] of rows) {
+      const titles = {};
+      for (const surface of ['gmail', 'outlook']) {
+        const judged = J.judge({
+          text,
+          subject: '',
+          sender: { email: 'dana@acme.com', name: 'Dana Levi' },
+          to: [ME],
+          ownAddresses: [ME],
+          readerEmail: ME,
+          namesWaitDone: true,
+          now: new Date(NOW_CARD),
+          surface,
+          inbound: true
+        }, depsCard);
+        const face = judged.show && judged.process
+          ? FlowDisplay.cardFace(judged.process, judged.intent, { bodyText: text })
+          : null;
+        titles[surface] = face && face.title ? String(face.title) : '';
+      }
+      check(name + ' Gmail title shape', re.test(titles.gmail), titles.gmail);
+      check(name + ' Outlook title shape', re.test(titles.outlook), titles.outlook);
+      check(name + ' Gmail and Outlook titles are identical', titles.gmail === titles.outlook && titles.gmail.length > 0, titles);
+      check(name + ' no English by leak', !/\sby\s/i.test(titles.gmail), titles);
     }
   }
 
