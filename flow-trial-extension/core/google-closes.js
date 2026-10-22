@@ -138,14 +138,13 @@ const FlowGoogleCloses = (() => {
     if (/\bwill\s+be\s+sending\b/i.test(c)) return true;
     if (/\bI\s+am\s+sending\b/i.test(c) && /\b(?:tomorrow|next\s+week|later)\b/i.test(c)) return true;
     if (/\b(?:i(?:'|')?m|i am|we(?:'|')?re|we are|i(?:'|')?ll|we(?:'|')?ll)\b[^.!?\n]{0,96}\b(?:send(?:ing)?)\b[^.!?\n]{0,48}\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|this\s+(?:afternoon|evening|tonight)|tonight)\b/i.test(c)) return true;
-    if (/\bon\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(c)) return true;
     if (/\bthis\s+(?:afternoon|evening|tonight)\b/i.test(c)) return true;
     if (/\btonight\b/i.test(c) && /\bsend/i.test(c)) return true;
     if (/אשלח|נשלח/.test(c)) return true;
     if (/\b(?:tomorrow|next\s+week)\b/i.test(c)) return true;
     if (/\blater\b/i.test(c)) return true;
     if (/מחר|בשבוע הבא/.test(c)) return true;
-    if (/ביום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(c)) return true;
+    if (/ביום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(c) && /(?:אשלח|נשלח|שולח|שולחת)/.test(c)) return true;
     if (/הערב/.test(c) && /(?:אשלח|שולח|שולחת|נשלח)/.test(c)) return true;
     if (/\bcomes\s+next\s+week\b/i.test(c)) return true;
     if (/תגיע\s+בשבוע/.test(c)) return true;

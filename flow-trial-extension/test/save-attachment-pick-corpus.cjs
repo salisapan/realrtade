@@ -45,6 +45,8 @@ const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlo
 check('Gmail uses pickSaveAttachment at scan', /FlowFileAttach\.pickSaveAttachment/.test(gmail));
 check('Gmail shows save file name on card', /flow-chip-save-file/.test(gmail));
 check('Gmail save attach chooser on ambiguous', /buildSaveAttachChooser/.test(gmail));
+check('core enriches file-it catalog for choice mode', typeof FA.enrichFileItChoiceCatalog === 'function'
+  && FA.enrichFileItChoiceCatalog({ id: 'file-it', steps: [{ kind: 'driveFile', params: {} }] }, tieFiles, 'choice').steps[0].params.catalog.length === 2);
 check('Outlook buildCtx uses pickSaveAttachment', /FlowFileAttach\.pickSaveAttachment/.test(outlook));
 check('Outlook ctx carries attachmentPickMode', /attachmentPickMode:\s*savePick\.mode/.test(outlook));
 

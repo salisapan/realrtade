@@ -1007,6 +1007,9 @@ const FlowDisplay = (() => {
       const nouns = nounsHe(m[1], false);
       return nouns ? nouns[0] + ' עדיין שם. בטל שוב כדי להסיר.' : raw;
     }
+    m = raw.match(/^Saved (.+?) to OneDrive$/i);
+    if (m) return 'נשמר ' + m[1] + ' ב-OneDrive';
+    if (raw === 'Save the file?') return 'לשמור את הקובץ?';
     return raw;
   }
 

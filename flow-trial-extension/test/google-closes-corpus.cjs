@@ -409,6 +409,23 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
   });
 }
 
+console.log('\n--- signed delivery: past weekday must not read as future (N1/N2) ---\n');
+{
+  const { FlowDisplay: D } = require('../core/display-copy.js');
+  const n1 = plan('Here is the signed contract we agreed on Monday', { attachmentCount: 1 });
+  check('N1 agreed on Monday is file-it', n1.process && n1.process.id === 'file-it', n1.process && n1.process.id);
+  const n2 = plan('מצורף החוזה החתום שסיכמנו ביום ראשון', { attachmentCount: 1 });
+  check('N2 Hebrew agreed on Sunday is file-it', n2.process && n2.process.id === 'file-it', n2.process && n2.process.id);
+  const nFuture = plan("I'm sending the signed contract on Monday", { attachmentCount: 1 });
+  check('future send on Monday stays non-delivery', !(nFuture.process && nFuture.process.id === 'file-it'), nFuture.process && nFuture.process.id);
+  check('P4 Hebrew localizes Saved file to OneDrive receipt line',
+    D.showChrome('he', 'Saved contract.pdf to OneDrive').indexOf('נשמר') >= 0
+    && D.showChrome('he', 'Save the file?') === 'לשמור את הקובץ?');
+  const heP1 = plan('מצורף חוזה חתום', { attachmentCount: 1 });
+  check('HE P1 signed-copy delivery is file-it (Gmail classifier path)', heP1.process && heP1.process.id === 'file-it', heP1.process && heP1.process.id);
+  check('HE P1 signed-copy delivery is file-it (Outlook uses same engine)', heP1.process && heP1.process.id === 'file-it', heP1.process && heP1.process.id);
+}
+
 console.log('\n--- family B: one file, one target ---\n');
 {
   const row = plan('Please add the agenda to the calendar for the call on Friday, September 18 at 3pm.', { fileMatch: 'one' });

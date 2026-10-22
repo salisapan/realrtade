@@ -2485,6 +2485,9 @@ function glanceUiCopy(kind) {
       attachFile: attachFile
     });
     let process = planned && planned.process;
+    if (process && typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.enrichFileItChoiceCatalog === 'function') {
+      process = FlowFileAttach.enrichFileItChoiceCatalog(process, attachments, attachmentPickMode);
+    }
     if (!process) {
       logScanSkip(messageId, 'no-process');
       void flushSuggest(false);
@@ -3512,10 +3515,12 @@ function glanceUiCopy(kind) {
         ? 'הקובץ גדול מ-4MB ולכן לא נשמר בדרייב.'
         : 'That file is over 4 MB, so it was not saved to Drive.';
     }
-    if (response.reason === 'attachment-ambiguous') {
+    if (response.reason === 'attachment-ambiguous' || response.reason === 'attachment-choice-required') {
       return glanceUiHebrew()
-        ? 'יש כמה קבצים מצורפים. פתח אחד ונסה שוב.'
-        : 'More than one file is attached. Open one and try again.';
+        ? 'יש כמה קבצים מצורפים. בחר איזה לשמור למטה.'
+        : (response.reason === 'attachment-choice-required'
+          ? 'More than one file is attached. Choose which to save below.'
+          : 'More than one file is attached. Open one and try again.');
     }
     if (response.reason === 'unclear' && /file and time|time for this event/i.test(response.error || '')) return glanceUiCopy('calendar');
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
@@ -3684,11 +3689,24 @@ function glanceUiCopy(kind) {
       let only = listed.length === 1 ? listed[0] : null;
       if (!only && action.params && action.params.selectedAttachment) only = action.params.selectedAttachment;
       if (!only && ctx.attachment) only = ctx.attachment;
+      const fileStep = (ctx.process && ctx.process.steps || []).find((s) => s && s.kind === 'driveFile');
+      const catalog = (action.params && (action.params.catalog || action.params.files))
+        || (fileStep && fileStep.params && (fileStep.params.catalog || fileStep.params.files));
+      if (!only && Array.isArray(catalog) && catalog.length) {
+        const picked = catalog.filter((f) => f && f.on && !f.skipped);
+        if (picked.length === 1) {
+          const key = String(picked[0].id || picked[0].name || '');
+          only = listed.find((m) => key && (String(m.url || '') === key || String(m.filename || m.name || '') === key || String(m.id || '') === key)) || null;
+        } else if (ctx.attachmentPickMode === 'choice' && listed.length > 1) {
+          return { fail: { reason: 'attachment-choice-required' } };
+        }
+      }
       if (!only && listed.length > 1 && typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.pickSaveAttachment === 'function') {
         const pick = FlowFileAttach.pickSaveAttachment((ctx.subject ? ctx.subject + '\n' : '') + (ctx.bodyText || ''), listed);
         if (pick.mode === 'picked' || pick.mode === 'single') only = pick.file;
+        else if (pick.mode === 'choice') return { fail: { reason: 'attachment-choice-required' } };
       }
-      if (!only) return { fail: { reason: listed.length > 1 ? 'attachment-ambiguous' : 'attachment-unreadable' } };
+      if (!only) return { fail: { reason: listed.length > 1 ? 'attachment-choice-required' : 'attachment-unreadable' } };
       const fetched = await fetchAttachmentBase64(only);
       if (!fetched || !fetched.base64) return { fail: { reason: 'attachment-unreadable' } };
       if (Math.floor(String(fetched.base64 || '').length * 3 / 4) > DRIVE_SAVE_MAX_BYTES) return { fail: { reason: 'attachment-too-big' } };

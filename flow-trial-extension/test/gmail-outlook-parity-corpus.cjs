@@ -521,7 +521,30 @@ const CASES = [
     const tieO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, tieInbound), judgeDeps);
     check('Outlook two-file signed delivery is file-it', tieO.show && tieO.process && tieO.process.id === 'file-it', { show: tieO.show, id: tieO.process && tieO.process.id });
     check('Outlook buildCtx leaves attachment null on chooser tie', /savePick\.mode === 'choice' \? null/.test(outlookSrc));
+    check('Outlook open pane counts signed-copy for judge', /attachmentCountForJudge/.test(outlookSrc));
     check('Outlook Do It can pass selectedAttachment on drive save', /selectedAttachment/.test(outlookSrc) || /attachFile/.test(outlookSrc));
+
+    const gmailSrc = read('src/content-gmail.js');
+    check('Gmail enriches file-it choice catalog on drive step', /enrichFileItChoiceCatalog/.test(gmailSrc));
+    check('Outlook enriches file-it choice catalog on drive step', /enrichFileItChoiceCatalog/.test(outlookSrc));
+
+    const ambEn = 'Attached is the signed copy.';
+    const ambHe = 'מצורף העותק החתום.';
+    const ambInbound = {
+      subject: 'Scans',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), attachmentCount: 2, hasThreadAttachment: false, inbound: true
+    };
+    const ambEnG = J.judge(Object.assign({ surface: 'gmail', text: ambEn, to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] }, ambInbound), judgeDeps);
+    const ambEnO = J.judge(Object.assign({ surface: 'outlook', text: ambEn, to: [ME], ownAddresses: [ME] }, ambInbound), judgeDeps);
+    check('EN P3 amb two-file signed copy is file-it on Gmail', ambEnG.show && ambEnG.process && ambEnG.process.id === 'file-it', { id: ambEnG.process && ambEnG.process.id });
+    check('EN P3 amb two-file signed copy is file-it on Outlook', ambEnO.show && ambEnO.process && ambEnO.process.id === 'file-it', { id: ambEnO.process && ambEnO.process.id });
+    const hePick = FlowFileAttach.pickSaveAttachment(ambHe, tieFiles);
+    check('HE P3 two scans need chooser on Gmail and Outlook', hePick.mode === 'choice' && !hePick.file, hePick);
+    const enriched = FlowFileAttach.enrichFileItChoiceCatalog(tieO.process, tieFiles, 'choice');
+    const fileStep = (enriched.steps || []).find((s) => s && (s.kind === 'driveFile' || s.kind === 'onedriveFile'));
+    check('P3 choice catalog lists both attachments on file step', fileStep && fileStep.params && fileStep.params.catalog && fileStep.params.catalog.length === 2, fileStep && fileStep.params);
+
   }
 
   console.log('\nTOTAL FAILURES:', failures);

@@ -565,6 +565,29 @@ const FlowFileAttach = (() => {
     return { mode: 'choice', file: null, files: list };
   }
 
+  // Multi-attachment file-it: step-list catalog (Gmail + Outlook parity).
+  function saveAttachmentCatalog(attachments) {
+    return (attachments || []).map((meta, i) => {
+      const name = attachFileName(meta);
+      const id = String((meta && (meta.id || meta.url)) || name || ('att-' + i));
+      return { id: id, name: name, label: name, on: false, skipped: !name };
+    });
+  }
+
+  function enrichFileItChoiceCatalog(process, attachments, pickMode) {
+    if (!process || process.id !== 'file-it' || pickMode !== 'choice') return process;
+    const list = (attachments || []).filter((a) => a && attachFileName(a));
+    if (list.length < 2) return process;
+    const catalog = saveAttachmentCatalog(list);
+    const steps = (process.steps || []).map((step) => {
+      if (!step || (step.kind !== 'driveFile' && step.kind !== 'onedriveFile')) return step;
+      return Object.assign({}, step, {
+        params: Object.assign({}, step.params || {}, { catalog: catalog, files: catalog.slice() })
+      });
+    });
+    return Object.assign({}, process, { steps: steps });
+  }
+
   function threadEvidenceEligible(text, attachmentCount) {
     const n = Number(attachmentCount) || 0;
     if (n <= 0) return false;
@@ -587,7 +610,7 @@ const FlowFileAttach = (() => {
   }
 
   return {
-    gate, decide, mention, pickSaveAttachment, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, pickSaveAttachment, saveAttachmentCatalog, enrichFileItChoiceCatalog, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();

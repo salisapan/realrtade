@@ -735,11 +735,10 @@
     // The address often carries only a conversation id. Counting files on that
     // id fails, and a failed read must not become a silent zero.
     let attachmentCount = 0;
-    // Save-shaped mail only. Signed-copy delivery keeps count at zero on the
-    // open pane so suggest-save can show; sync still counts files on the message.
+    // Save-shaped and signed-copy delivery (parity with Gmail judge + Graph sync).
     const countGate = typeof FlowGoogleCloses !== 'undefined' &&
-      typeof FlowGoogleCloses.needsOneAttachment === 'function' &&
-      FlowGoogleCloses.needsOneAttachment(own);
+      typeof FlowGoogleCloses.attachmentCountForJudge === 'function' &&
+      FlowGoogleCloses.attachmentCountForJudge(own);
     if (countGate) {
       let id = pane.itemId || null;
       if (!id) {
@@ -1162,6 +1161,9 @@
       ? FlowFileAttach.pickSaveAttachment(attachText, paneFiles)
       : { mode: paneFiles.length === 1 ? 'single' : (paneFiles.length > 1 ? 'choice' : 'none'), file: paneFiles[0] || null, files: paneFiles };
     const pickedAttach = (savePick.mode === 'picked' || savePick.mode === 'single') ? savePick.file : null;
+    if (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.enrichFileItChoiceCatalog === 'function') {
+      process = FlowFileAttach.enrichFileItChoiceCatalog(process, paneFiles, savePick.mode);
+    }
     return {
       app: 'outlook',
       surface: 'outlook-web',
@@ -1893,11 +1895,11 @@
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
     done.appendChild(el('span', 'flow-chip-handled', pageShow(deleted ? deletedLine : copy.status)));
-    if (!deleted && copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
+    if (!deleted && copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', pageShow(copy.writtenLine)));
     if (verifyNote) done.appendChild(el('span', 'flow-chip-label', pageShow(verifyNote)));
     if (copy.processName || copy.closedLine) {
       const detail = el('span', 'flow-chip-detail');
-      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
+      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', pageShow(copy.processName)));
       if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', pageShow(copy.closedLine)));
       done.appendChild(detail);
     }
