@@ -4,7 +4,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { judgeOutlookInboxMessage } from "./judge.bundle.mjs";
 import {
   alreadyMarked,
+  authorizeScheduledRequest,
   clientStateForUser,
+  CRON_HEADER,
   doItLane,
   escapeValidationToken,
   markPatch,
@@ -266,6 +268,13 @@ Deno.serve(async (req: Request) => {
 
   let payload: any = {};
   const scheduled = url.searchParams.get("cron") === "1" || url.searchParams.get("scheduled") === "1";
+  if (scheduled) {
+    const cronSecret = env("OUTLOOK_MARKER_CRON_SECRET");
+    const gotCron = req.headers.get(CRON_HEADER);
+    if (!authorizeScheduledRequest(gotCron, cronSecret)) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
   if (!scheduled) {
     try {
       payload = await req.json();

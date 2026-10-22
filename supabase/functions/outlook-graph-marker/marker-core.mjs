@@ -7,6 +7,7 @@ export const EXT_PROPERTY_ID = "String {66f5a359-4659-4830-9070-00047ec6ac6e} Na
 export const RENEW_WITHIN_MS = 24 * 60 * 60 * 1000;
 export const MAIL_SUBSCRIPTION_MAX_MINUTES = 4230;
 export const CHANGE_TYPE = "created";
+export const CRON_HEADER = "x-glance-cron";
 
 export function constantTimeEqual(a, b) {
   const x = Buffer.from(String(a || ""), "utf8");
@@ -134,6 +135,12 @@ export function escapeValidationToken(token) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+export function authorizeScheduledRequest(headerValue, configuredSecret) {
+  const expected = String(configuredSecret || "");
+  if (!expected) return false;
+  return constantTimeEqual(String(headerValue || ""), expected);
 }
 
 export function shouldPersistRotatedRefresh(oldToken, newToken) {

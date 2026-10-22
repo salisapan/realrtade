@@ -10,6 +10,7 @@ const FlowOutlookGraphMarker = (() => {
   const MAIL_SUBSCRIPTION_MAX_MINUTES = 4230;
   const MAIL_SCOPE = 'Mail.ReadWrite';
   const CHANGE_TYPE = 'created';
+  const CRON_HEADER = 'x-glance-cron';
 
   function constantTimeEqual(a, b) {
     const x = Buffer.from(String(a || ''), 'utf8');
@@ -173,6 +174,12 @@ const FlowOutlookGraphMarker = (() => {
       .replace(/"/g, '&quot;');
   }
 
+  function authorizeScheduledRequest(headerValue, configuredSecret) {
+    const expected = String(configuredSecret || '');
+    if (!expected) return false;
+    return constantTimeEqual(String(headerValue || ''), expected);
+  }
+
   return {
     GLANCE_CATEGORY: GLANCE_CATEGORY,
     EXTENSION_FLAG: EXTENSION_FLAG,
@@ -181,6 +188,7 @@ const FlowOutlookGraphMarker = (() => {
     RENEW_WITHIN_MS: RENEW_WITHIN_MS,
     MAIL_SUBSCRIPTION_MAX_MINUTES: MAIL_SUBSCRIPTION_MAX_MINUTES,
     CHANGE_TYPE: CHANGE_TYPE,
+    CRON_HEADER: CRON_HEADER,
     constantTimeEqual: constantTimeEqual,
     clientStateForUser: clientStateForUser,
     userIdFromClientState: userIdFromClientState,
@@ -198,7 +206,8 @@ const FlowOutlookGraphMarker = (() => {
     nextDeltaPath: nextDeltaPath,
     refreshBody: refreshBody,
     shouldPersistRotatedRefresh: shouldPersistRotatedRefresh,
-    escapeValidationToken: escapeValidationToken
+    escapeValidationToken: escapeValidationToken,
+    authorizeScheduledRequest: authorizeScheduledRequest
   };
 })();
 

@@ -55,3 +55,20 @@ $$;
 
 revoke all on function public.outlook_marker_write_refresh(uuid, text) from public;
 grant execute on function public.outlook_marker_write_refresh(uuid, text) to service_role;
+
+-- Sample scheduled sweep (comment only — enable pg_cron + pg_net after Edge deploy):
+-- select cron.schedule(
+--   'outlook-graph-marker-maintenance',
+--   '0 */6 * * *',
+--   $$
+--   select net.http_post(
+--     url := 'https://zjquktirlrhbqcnkfaok.supabase.co/functions/v1/outlook-graph-marker?cron=1',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'x-glance-cron', current_setting('app.outlook_marker_cron_secret', true)
+--     ),
+--     body := '{}'::jsonb
+--   ) as request_id;
+--   $$
+-- );
+-- Store the same value in Edge secrets as OUTLOOK_MARKER_CRON_SECRET (not in SQL).

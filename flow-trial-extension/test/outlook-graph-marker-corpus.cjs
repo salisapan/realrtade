@@ -67,6 +67,17 @@ check('edge has scheduled renewal path', edge.indexOf('handleScheduled') >= 0 &&
 check('edge imports judge bundle', edge.indexOf('judge.bundle.mjs') >= 0);
 check('validation token escaped', edge.indexOf('escapeValidationToken') >= 0);
 
+const CRON = 'cron-test-secret-value';
+check('scheduled 401 without cron header', M.authorizeScheduledRequest(undefined, CRON) === false);
+check('scheduled 401 with wrong cron secret', M.authorizeScheduledRequest('not-the-secret', CRON) === false);
+check('scheduled accepted with correct cron secret', M.authorizeScheduledRequest(CRON, CRON) === true);
+check('edge enforces OUTLOOK_MARKER_CRON_SECRET on scheduled path',
+  edge.indexOf('OUTLOOK_MARKER_CRON_SECRET') >= 0
+  && edge.indexOf('CRON_HEADER') >= 0
+  && /status:\s*401/.test(edge)
+  && edge.indexOf('authorizeScheduledRequest') >= 0);
+check('migration documents pg_cron http_post sample', /net\.http_post/.test(migration) && /x-glance-cron/.test(migration));
+
 if (failures) process.exit(1);
 console.log('outlook-graph-marker-corpus: all passed (' + checks + ' checks)');
 console.log('surfaces:');
