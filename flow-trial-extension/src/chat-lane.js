@@ -95,6 +95,7 @@ const FlowChatLane = (() => {
       mount = document.createElement('div');
       mount.id = 'glance-chat-draft';
       mount.setAttribute('data-glance-chain', DRAFT_RECEIPT_CHAIN);
+      mount.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483000;width:min(360px,calc(100vw - 40px));';
       const root = document.body || document.documentElement;
       if (root && typeof root.appendChild === 'function') root.appendChild(mount);
     }

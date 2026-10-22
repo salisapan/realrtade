@@ -281,8 +281,9 @@ const FlowChipHost = (() => {
     if (o.uiLang) setUiLang(o.uiLang);
     const L = words();
     host.classList.add('flow-chip-settled');
+    const lang = cardLang({ uiLang: o.uiLang });
     const done = el('div', 'flow-chip flow-chip-done');
-    done.setAttribute('dir', 'ltr');
+    done.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
     done.setAttribute('role', 'status');
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');

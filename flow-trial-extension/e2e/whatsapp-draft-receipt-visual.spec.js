@@ -9,6 +9,8 @@ const FIXTURE_NOW = '2026-10-12T11:00:00+03:00';
 const PLACE = 'Taizu, 23 Montefiore, Tel Aviv';
 const EN_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/whatsapp-place.html'), 'utf8');
 const HE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/whatsapp-place-he.html'), 'utf8');
+const LIGHT_DONE_BG = 'rgb(243, 250, 246)';
+const DARK_DONE_BG = 'rgb(16, 33, 24)';
 
 async function registerWhatsApp(glance) {
   const ok = await glance.evaluateWorker(async () => {
@@ -38,20 +40,34 @@ async function armEngine(glance) {
   });
 }
 
+async function assertReceiptVisual(page, dark, rtl) {
+  await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
+  const done = page.locator('#glance-chat-draft .flow-chip.flow-chip-done');
+  await expect(done).toBeVisible({ timeout: 15000 });
+  const metrics = await page.evaluate(() => {
+    const mount = document.getElementById('glance-chat-draft');
+    const card = mount && mount.querySelector('.flow-chip.flow-chip-done');
+    if (!card || !mount) return null;
+    const cs = getComputedStyle(card);
+    return {
+      bg: cs.backgroundColor,
+      dir: card.getAttribute('dir'),
+      mountWidth: mount.getBoundingClientRect().width
+    };
+  });
+  expect(metrics).not.toBeNull();
+  expect(metrics.bg).toBe(dark ? DARK_DONE_BG : LIGHT_DONE_BG);
+  expect(metrics.dir).toBe(rtl ? 'rtl' : 'ltr');
+  expect(metrics.mountWidth).toBeLessThanOrEqual(361);
+  expect(metrics.mountWidth).toBeGreaterThan(200);
+}
+
 async function shotReceipt(page, name, dark) {
   fs.mkdirSync(SHOTS, { recursive: true });
-  if (dark) {
-    await page.evaluate(() => {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      document.body.style.background = '#1c1c1e';
-      const host = document.querySelector('#glance-chat-draft .flow-chip-host');
-      if (host) host.setAttribute('data-theme', 'dark');
-    });
-  } else {
-    await page.evaluate(() => { document.body.style.background = '#f4f1ea'; });
-  }
+  await page.evaluate((isDark) => {
+    document.body.style.background = isDark ? '#1c1c1e' : '#f4f1ea';
+  }, dark);
   const receipt = page.locator('#glance-chat-draft .flow-chip-host');
-  await expect(receipt).toBeVisible({ timeout: 15000 });
   await receipt.screenshot({ path: path.join(SHOTS, name) });
 }
 
@@ -62,9 +78,12 @@ test('WhatsApp draft receipt uses chip-host tokens in light and dark', async ({ 
   await armEngine(glance);
   await glance.setScenario({ chatGoogleLocation: PLACE });
 
+  let lightBg = '';
+  let darkBg = '';
+
   for (const row of [
-    { html: EN_HTML, label: 'en-ltr', expectText: 'Draft in the box' },
-    { html: HE_HTML, label: 'he-rtl', expectText: 'טיוטה בתיבה' }
+    { html: EN_HTML, label: 'en-ltr', expectText: 'Draft in the box', rtl: false },
+    { html: HE_HTML, label: 'he-rtl', expectText: 'טיוטה בתיבה', rtl: true }
   ]) {
     for (const dark of [false, true]) {
       const page = await glance.openWhatsApp(row.html);
@@ -75,9 +94,19 @@ test('WhatsApp draft receipt uses chip-host tokens in light and dark', async ({ 
       });
       const box = page.locator('[data-glance-composer="1"]');
       await expect(box).toContainText('Taizu', { timeout: 25000 });
-      await expect(page.locator('#glance-chat-draft .flow-chip-handled')).toContainText(row.expectText, { timeout: 15000 });
+      const handled = page.locator('#glance-chat-draft .flow-chip-handled');
+      await expect(handled).toContainText(row.expectText, { timeout: 15000 });
+      if (row.rtl) {
+        const text = await handled.innerText();
+        expect(text.trim().indexOf('.')).not.toBe(0);
+      }
+      await assertReceiptVisual(page, dark, row.rtl);
+      const bg = await page.locator('#glance-chat-draft .flow-chip.flow-chip-done').evaluate((el) => getComputedStyle(el).backgroundColor);
+      if (dark) darkBg = bg;
+      else lightBg = bg;
       await shotReceipt(page, 'whatsapp-draft-receipt-' + row.label + '-' + (dark ? 'dark' : 'light') + '.png', dark);
       await page.close();
     }
   }
+  expect(lightBg).not.toBe(darkBg);
 });
