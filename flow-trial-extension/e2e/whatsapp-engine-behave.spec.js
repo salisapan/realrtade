@@ -30,7 +30,7 @@ async function setEngine(glance, on) {
   }, on);
 }
 
-test('WHATSAPP_ENGINE off is quiet; on drafts the place answer', async ({ glance }) => {
+test('WHATSAPP_ENGINE off still drafts; on adds engine judging', async ({ glance }) => {
   test.setTimeout(120000);
   await registerWhatsApp(glance);
   await glance.seedGmail();
@@ -42,10 +42,9 @@ test('WHATSAPP_ENGINE off is quiet; on drafts the place answer', async ({ glance
     const s = globalThis.__glanceChatSurfaces && globalThis.__glanceChatSurfaces.whatsapp;
     if (s && typeof s.scan === 'function') s.scan();
   });
-  await off.waitForTimeout(500);
-  const offText = await off.locator('[data-glance-composer="1"]').innerText().catch(() => '');
+  const offBox = off.locator('[data-glance-composer="1"]');
+  await expect(offBox).toContainText('Taizu', { timeout: 25000 });
   await off.close();
-  expect(offText.trim()).toBe('');
   await setEngine(glance, true);
   const page = await glance.openWhatsApp(WA_HTML);
   await freezeDate(page, FIXTURE_NOW);

@@ -24,10 +24,11 @@
       return switches[ENGINE_KEY] === true;
     } catch (e) { return false; }
   }
+
   const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
   let timer = null;
-  let enabled = false;
+  let engineEnabled = false;
   const drafted = new Set();
   const inflight = new Set();
 
@@ -74,10 +75,13 @@
     const last = list[list.length - 1];
     if (!last) return;
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
-    if (!parsed || parsed.fromMe) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
+    if (!parsed || parsed.fromMe) {
+      if (engineEnabled && typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null);
+      return;
+    }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
-    if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
+    if (engineEnabled && typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
     const ids = list.map((n) => n.getAttribute('data-id'));
@@ -94,13 +98,12 @@
       key: key
     };
     FlowChatLane.draftInto(composerBox(main), input).then((r) => {
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
+      if (engineEnabled && typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
 
   function scan() {
-    if (!enabled) return;
     const main = chatPane();
     if (!main) return;
     if (main.getAttribute('data-glance-chat') === 'group') return;
@@ -111,17 +114,11 @@
     maybeDraft(main, list);
   }
 
-  function schedule() {
-    if (!enabled) return;
-    clearTimeout(timer);
-    timer = setTimeout(scan, DEBOUNCE_MS);
-  }
+  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
+  const app = document.getElementById('app') || document.body;
+  if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
+  schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.whatsapp = { scan: scan };
-  engineOn().then((on) => {
-    enabled = on === true;
-    const app = document.getElementById('app') || document.body;
-    if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
-    if (enabled) schedule();
-  });
+  engineOn().then((on) => { engineEnabled = on === true; });
 })();

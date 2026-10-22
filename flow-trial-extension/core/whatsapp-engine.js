@@ -1,5 +1,5 @@
-// WhatsApp Web: optional place/fact draft engine on the lane (off by default).
-// Script lists stay the same on or off; content-whatsapp-draft.js reads this switch at runtime.
+// WhatsApp Web: optional X1 chat-task engine (incoming judge + task card) on the lane (off by default).
+// Place/fact drafts into the composer always run; script lists stay the same on or off.
 const FlowWhatsappEngine = {
   SWITCH: 'WHATSAPP_ENGINE',
   SWITCH_DEFAULT: false,
