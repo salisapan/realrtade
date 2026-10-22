@@ -364,6 +364,19 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
       row.intent && row.intent.personalClose === 'drive-file' && row.process && row.process.steps[0].kind === 'driveFile',
       row.intent && { personal: row.intent.personalClose, type: row.intent.type });
   });
+  const broadPositives = [
+    ['Here is the signed agreement', { attachmentCount: 1 }],
+    ['שולח את ההסכם החתום', { attachmentCount: 1 }],
+    ['Attached is the signed contract and the appendix', { attachmentCount: 2 }],
+    ['מצורף החוזה החתום והנספח', { attachmentCount: 2 }]
+  ];
+  broadPositives.forEach(([text, extra]) => {
+    const row = plan(text, extra);
+    check('signed delivery is file-it: ' + text,
+      row.intent && row.intent.personalClose === 'drive-file' && row.process && row.process.id === 'file-it' &&
+      row.process.steps[0].kind === 'driveFile',
+      row.intent && { personal: row.intent.personalClose, process: row.process && row.process.id });
+  });
   const negatives = [
     ['not signed yet. Draft attached', { attachmentCount: 1 }],
     ['החוזה עדיין לא חתום', { attachmentCount: 1 }],

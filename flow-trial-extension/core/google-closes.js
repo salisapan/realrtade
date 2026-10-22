@@ -132,9 +132,17 @@ const FlowGoogleCloses = (() => {
     if (/\b(?:please\s+)?(?:return|send|get)\b[^.\n]{0,100}\b(?:the\s+)?(?:\w+\s+){0,4}signed\b/i.test(t)) return false;
     if (/\b(?:please\s+)?sign\b[^.\n]{0,40}\b(?:the|this|attached)\b/i.test(t)) return false;
     if (/(?:נא|בבקשה|אנא)[^\n]{0,40}(?:לחתום|לחתימה|תחתום)|(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t)) return false;
-    const DELIVER_EN = /\battached\s+is\s+the\s+signed\b|\battached\s+the\s+signed\b|\bsigned\s+(?:copy|contract|agreement|nda|pdf|document)\s+attached\b|\bsigned\s+copy\s+attached\b|\bfinal\s+version\s+attached\b|\bfinal\s+(?:document|version|copy)\s+attached\b|\b(?:enclosed|attached)\s+is\s+the\s+(?:fully\s+)?(?:executed|signed)\b/i;
-    const DELIVER_HE = /מצורף\s+(?:ה)?(?:חוזה|הסכם|עותק|נספח)\s+(?:ה)?חתום|(?:החוזה|ההסכם|העותק)\s+החתום\s+מצורף|נספח\s+חתום|הגרסה\s+הסופית\s+מצורפת/i;
-    return DELIVER_EN.test(t) || DELIVER_HE.test(t);
+    const deliveryVerb =
+      /\b(?:attached|attaching|here\s+is|here'?s|sending|enclosed|please\s+find)\b/i.test(t) ||
+      /(?:^|[^\u0590-\u05FF])(?:מצורף|מצורפת|שולח|שולחת|מעביר|מעבירה|הנה)(?:\s|[^\u0590-\u05FF]|$)/.test(t);
+    const signedDoc =
+      /\b(?:signed|executed|countersigned)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(t) ||
+      /\b(?:final)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(t) ||
+      /\b(?:signed|executed|countersigned|final)\b[^.!?\n]{0,48}\b(?:agreement|contract|nda|copy|version|document)\b/i.test(t) ||
+      /\b(?:agreement|contract|nda|copy|version|document)\b[^.!?\n]{0,48}\b(?:signed|executed|countersigned|final)\b/i.test(t) ||
+      /(?:^|[^\u0590-\u05FF])(?:חתום|חתומה|סופי|סופית)[^\n]{0,40}(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)/.test(t) ||
+      /(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)[^\n]{0,24}(?:חתום|חתומה|סופי|סופית)/.test(t);
+    return deliveryVerb && signedDoc;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
@@ -372,10 +380,11 @@ const FlowGoogleCloses = (() => {
 
     const OTHER_TARGET = /\bshared\s+(?:folder|drive|files?)\b|\bsharepoint\b|\bdropbox\b|\bbox\.com\b|\bteams\s+(?:folder|channel)\b|(?:ה)?תיקי(?:י)?ה\s+המשותפת|הקבצים\s+המשותפים|שרפוינט|דרופבוקס/i;
     const noreply = /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(input.senderEmail || '').trim());
-    const signedInbound = Number(input.attachmentCount) === 1 && signedCopyDelivered(text) && !refusesSave(text)
+    const signedInbound = Number(input.attachmentCount) >= 1 && signedCopyDelivered(text) && !refusesSave(text)
       && !OTHER_TARGET.test(text) && !noreply;
     if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
-      if (refusesSave(text) || input.attachmentCount !== 1 || OTHER_TARGET.test(text)) return { silence: true };
+      const attachOk = signedInbound ? Number(input.attachmentCount) >= 1 : input.attachmentCount === 1;
+      if (refusesSave(text) || !attachOk || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {
