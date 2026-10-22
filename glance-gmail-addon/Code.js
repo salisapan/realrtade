@@ -272,8 +272,20 @@ function isClosableForMarker_(opened, timeZone) {
   return decision.speak === true;
 }
 
+function rememberGlanceUserTimeZone_(zone) {
+  var id = zoneId_(zone);
+  if (!id) return;
+  try {
+    PropertiesService.getUserProperties().setProperty('glanceUserTimeZone', id);
+  } catch (err) { /* ignore */ }
+}
+
 function sweepTimeZone_() {
   var id = '';
+  try {
+    id = zoneId_(PropertiesService.getUserProperties().getProperty('glanceUserTimeZone'));
+    if (id) return id;
+  } catch (errStored) { /* ignore */ }
   try {
     if (typeof CalendarApp !== 'undefined' && CalendarApp.getDefaultCalendar) {
       var calendar = CalendarApp.getDefaultCalendar();
