@@ -219,6 +219,43 @@ const FlowIntent = (() => {
     return months[dt.getMonth()] + ' ' + dt.getDate() + (sameYear ? '' : ' ' + dt.getFullYear());
   }
 
+  function heSlashDate(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const parts = iso.split('-');
+    return parts[2] + '/' + parts[1];
+  }
+
+  function stripOpeningGreetingLine(text) {
+    return String(text || '')
+      .replace(/^(?:hi|hello|hey|dear)(?:\s+[^,!\n]{1,40})?[,!]\s*/i, '')
+      .replace(/^(?:שלום|היי|הי)\s+[^,!\n]{1,40}[,!]\s*/, '')
+      .replace(/^(?:שלום|היי|הי)\s*,\s*/, '')
+      .trim();
+  }
+
+  function noReplyDraftLabel(text, ctx, intent) {
+    const subject = ctx && ctx.subject;
+    const he = /[\u0590-\u05FF]/.test(text);
+    let titled = selfAskTitle(text, subject, ctx);
+    if (!usableSelfTitle(titled)) {
+      let what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
+      what = stripOpeningGreetingLine(what).replace(/[.!?]+$/, '').trim();
+      titled = what;
+    }
+    const iso = intent.entities && intent.entities.dateIso;
+    if (iso) {
+      titled = String(titled || '')
+        .replace(HE_DATE_TAIL, '')
+        .replace(EN_DATE_TAIL, '')
+        .replace(/\s+by\s+[\s\S]*$/i, '')
+        .replace(/\s+עד(?:\s|$).*$/, '')
+        .trim();
+      if (he) titled += ' עד ' + heSlashDate(iso);
+      else titled += ' by ' + humanDateFallback({ iso: iso });
+    }
+    return titled;
+  }
+
   // The same HANDOFF/HANDOFF_HE patterns FlowJudgment.score() already tested
   // to set flags.handoff — reused here only to pick which sentence is the
   // "what" for a REQUEST, not re-tested for detection. A second, narrower
@@ -1396,11 +1433,9 @@ const FlowIntent = (() => {
         intent.inviteDraft = invitePlan.draft;
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft && !intent.inviteFile) {
-        const what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
-        const iso = intent.entities && intent.entities.dateIso;
-        const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-        if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
+      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
+        const titled = noReplyDraftLabel(text, ctx, intent);
+        if (titled) intent.label = titled;
       }
       // A note to self is that task. "I will <verb> X" is verb plus object.
       // Log commitment is a promise in a mail to someone else, never this note.
@@ -2915,6 +2950,8 @@ const FlowIntent = (() => {
   // The title is the body's verb and its object. The subject is not the object.
   function selfBodyTitle(src) {
     const t = String(src || '');
+    const tellStatus = t.match(/להגיד\s+(?:לי|לנו)\s+מה\s+(?:ה)?סטטוס\s+של\s+(.+?)(?:\s+עד(?:\s|$)|[.!?]|$)/);
+    if (tellStatus) return 'להגיד מה הסטטוס של ' + tellStatus[1].replace(/\s+עד.*$/, '').trim();
     const call = t.match(/להתקשר\s+ל([^\s.,!?]{1,24})/);
     if (call) return 'להתקשר ל' + call[1];
     const about = t.match(/(?:לעדכן|תעדכ[נן][ייו]?|לדכן)\s+(?:אותי\s+)?לגבי\s+(ה[\u0590-\u05FF]+)/);
