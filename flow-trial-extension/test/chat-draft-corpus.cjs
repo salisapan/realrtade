@@ -618,6 +618,11 @@ global.document = { execCommand() { return true; } };
 const missed = box('');
 const fell = FlowChatCompose.insertDraft(missed, '1840');
 check('a failed insertText still writes the box and still does not send', fell.ok === true && fell.sends === false && missed.clicked === false && missed.textContent === '1840');
+const undoBox = box('Taizu - maps');
+const cleared = FlowChatCompose.undoDraft(undoBox, 'Taizu - maps');
+check('undo clears the composer when the text is unchanged', cleared.ok === true && cleared.sends === false && undoBox.textContent === '', cleared);
+const edited = box('Taizu - maps!');
+check('undo leaves the box alone after an edit', FlowChatCompose.undoDraft(edited, 'Taizu - maps').reason === 'edited' && edited.textContent === 'Taizu - maps!');
 
 console.log('\n--- calendar evidence ---\n');
 (async () => {

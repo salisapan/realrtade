@@ -71,6 +71,9 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import '../core/lane-scripts.js'; // classic: FlowLaneScripts (chat lane script lists)
+import '../core/whatsapp-engine.js'; // classic: FlowWhatsappEngine (WHATSAPP_ENGINE, off)
+import '../core/outlook-contacts.js'; // classic: FlowOutlookContacts (draft To resolve)
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
@@ -282,10 +285,20 @@ const SURFACES = {
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
-const GMAIL_ONLY_SCRIPTS = ['core/draft-reply.js', 'core/google-config.js', 'core/google-compose.js', 'src/google-compose-page.js', 'src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
+const GMAIL_ONLY_SCRIPTS = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.GMAIL_ONLY_SCRIPTS)
+  ? FlowLaneScripts.GMAIL_ONLY_SCRIPTS
+  : ['core/draft-reply.js', 'core/google-config.js', 'core/google-compose.js', 'src/google-compose-page.js', 'src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
+
+function manifestEngineBase() {
+  const list = (chrome.runtime.getManifest().content_scripts[0].js || []);
+  if (typeof FlowLaneScripts !== 'undefined' && typeof FlowLaneScripts.engineBase === 'function') {
+    return FlowLaneScripts.engineBase(list);
+  }
+  return list.filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
+}
 
 function surfaceScripts(id) {
-  const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
+  const base = manifestEngineBase();
   return base.concat(SURFACES[id].extra);
 }
 
@@ -628,15 +641,27 @@ const LANE_CHAT = [
 // not carry. Each chat registration loads the same base the Outlook surface does (minus the Gmail-only pieces and the
 // Gmail follow-up scripts), the lane's own files, then the card, so the card file always loads after chat-lane.js.
 const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
+async function laneScriptsFor(lane) {
+  if (lane && lane.id === 'glance-lane-whatsapp' && typeof FlowLaneScripts !== 'undefined') {
+    const W = typeof FlowWhatsappEngine !== 'undefined' ? FlowWhatsappEngine : null;
+    const engineOn = W && W.SWITCH ? await glanceSwitchOn(W.SWITCH) : false;
+    const list = (chrome.runtime.getManifest().content_scripts[0].js || []);
+    return FlowLaneScripts.whatsappLaneJs(list, engineOn);
+  }
+  return laneChatScripts(lane);
+}
+
 function laneChatScripts(lane) {
-  const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
+  const base = manifestEngineBase().filter((f) => CHAT_CARD_SKIP.indexOf(f) < 0);
   const out = [];
   for (const f of base.concat(lane.js, ['src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
   return out;
 }
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
 globalThis.__glanceLaneChatScripts = laneChatScripts;
+globalThis.__glanceLaneScriptsFor = laneScriptsFor;
 globalThis.__glanceLaneChatDefs = LANE_CHAT;
+globalThis.__glanceLaneChatCss = LANE_CHAT_CSS;
 
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
@@ -667,11 +692,12 @@ async function restoreLaneChats() {
   }
   for (const lane of LANE_CHAT) {
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
+    const laneJs = await laneScriptsFor(lane);
     try {
       await chrome.scripting.registerContentScripts([{
         id: lane.id,
         matches: lane.origins,
-        js: laneChatScripts(lane),
+        js: laneJs,
         css: LANE_CHAT_CSS,
         runAt: 'document_idle',
         persistAcrossSessions: true
@@ -696,7 +722,7 @@ async function restoreLaneChats() {
       if (alive) continue;
       try {
         await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneChatScripts(lane) });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneJs });
       }
       catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
     }
@@ -5522,6 +5548,19 @@ async function outlookDraftWrite(p) {
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
+  const draftTo = await outlookDraftRecipientFromText(p);
+  if (draftTo && draft.isDraft !== false) {
+    try {
+      const toPatch = {
+        toRecipients: [{ emailAddress: { address: draftTo.address, name: draftTo.displayName || draftTo.address } }]
+      };
+      await outlookFetch(patchUrl, {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, prefer),
+        body: JSON.stringify(toPatch)
+      });
+    } catch (e) { /* the draft body is still there */ }
+  }
   let attachmentId = null;
   if (p && (p.driveFileId || (p.attachment && p.attachment.base64))) {
     const file = await outlookFileForDraft(p);
@@ -6095,9 +6134,35 @@ async function outlookPlannerWrite(p, title, dueIso) {
     const raw = r.ref.taskId;
     await outlookPlannerRefPut(raw, r.ref);
     const shown = PLANNER_ID_PREFIX + raw;
-    return { ok: true, fetchedBack: true, where: 'Microsoft Planner', target: named.plan.title, written: r.written, url: null, ref: { taskId: shown, externalId: shown, planId: named.plan.id }, proof: Object.assign({}, r.proof, { externalId: shown }) };
+    return {
+      ok: true,
+      fetchedBack: true,
+      where: 'Microsoft Planner',
+      target: named.plan.title,
+      planTitle: named.plan.title,
+      bucketTitle: 'To do',
+      written: r.written,
+      url: null,
+      ref: { taskId: shown, externalId: shown, planId: named.plan.id },
+      proof: Object.assign({}, r.proof, { externalId: shown })
+    };
   }
-  return Object.assign({}, r, { where: 'Microsoft Planner', target: named.plan.title });
+  return Object.assign({}, r, { where: 'Microsoft Planner', target: named.plan.title, planTitle: named.plan.title, bucketTitle: 'To do' });
+}
+
+async function outlookDraftRecipientFromText(p) {
+  const C = globalThis.FlowOutlookContacts;
+  if (!C || typeof C.offer !== 'function' || typeof C.run !== 'function') return null;
+  const text = String((p && (p.text || p.bodyText || (p.intent && (p.intent.sourceText || p.intent.text)))) || '').trim();
+  if (!text) return null;
+  const offer = C.offer({ text: text, body: text });
+  if (!offer || !offer.show) return null;
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return null;
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && typeof Cal.scopesFromToken === 'function') ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const hit = await C.run({ params: offer.params, name: offer.params && offer.params.name, text: text }, { call: outlookGraphCall(), grantedScopes: scopes });
+  return (hit && hit.ok && hit.recipient) ? hit.recipient : null;
 }
 
 async function outlookPlannerUndo(ref) {

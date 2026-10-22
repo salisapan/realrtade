@@ -212,7 +212,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
 
   // 8. Production wiring: every chat lane loads the judge, the card, the chip host and the css.
   const bg = fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8');
-  check('chat lanes load the shared judge base, chip host and the card', /function laneChatScripts/.test(bg) && /'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(bg) && /LANE_CHAT_CSS = \['design\/step-states-v1\/scoped\.css', 'src\/chip\.css'\]/.test(bg) && /js: laneChatScripts\(lane\),\s*css: LANE_CHAT_CSS/.test(bg));
+  check('chat lanes load the shared judge base, chip host and the card', /function laneChatScripts/.test(bg) && /'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(bg) && /LANE_CHAT_CSS = \['design\/step-states-v1\/scoped\.css', 'src\/chip\.css'\]/.test(bg) && /js: laneJs,\s*css: LANE_CHAT_CSS/.test(bg) && /async function laneScriptsFor/.test(bg));
   check('the worker answers flow:chat-task-target behind the switch', /flow:chat-task-target/.test(bg) && /glanceSwitchOn\('CHAT_TASK_CARD'\)/.test(bg));
   for (const f of ['content-whatsapp-draft.js', 'content-messenger.js', 'content-instagram.js']) {
     check(f + ' hands the message to the card', /FlowChatTaskCard\.afterDraft\(/.test(fs.readFileSync(path.join(ROOT, 'src', f), 'utf8')));

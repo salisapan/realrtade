@@ -2,19 +2,24 @@
 // Nothing here is a static content script. After the grant, every lane is on.
 // There is no per-feature switch to turn one of them off.
 // business.facebook.com stays an optional host. This page does not send.
-const SCRIPTS = [
-  'core/fact-reply.js',
-  'core/close-chains.js',
-  'src/chat-draft.js',
-  'src/chat-compose.js',
-  'src/chat-lane.js'
-];
+const LEAN_BASE = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.LEAN_CHAT_BASE)
+  ? FlowLaneScripts.LEAN_CHAT_BASE
+  : [
+    'core/fact-reply.js',
+    'core/close-chains.js',
+    'src/chat-draft.js',
+    'src/chat-compose.js',
+    'src/chat-lane.js'
+  ];
+const WHATSAPP_TAIL = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.WHATSAPP_TAIL)
+  ? FlowLaneScripts.WHATSAPP_TAIL
+  : ['src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'];
 const LANES = [
   {
     id: 'whatsapp',
     title: 'WhatsApp',
     origins: ['https://web.whatsapp.com/*'],
-    js: SCRIPTS.concat(['src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'])
+    tail: WHATSAPP_TAIL
   },
   {
     id: 'messenger',
@@ -31,7 +36,7 @@ const LANES = [
       'https://www.business.facebook.com/latest/inbox',
       'https://www.business.facebook.com/latest/inbox/*'
     ],
-    js: SCRIPTS.concat(['src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js'])
+    tail: ['src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
   },
   {
     id: 'instagram',
@@ -42,7 +47,7 @@ const LANES = [
       'https://instagram.com/direct',
       'https://instagram.com/direct/*'
     ],
-    js: SCRIPTS.concat(['src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js'])
+    tail: ['src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
   }
 ];
 globalThis.__glanceLaneChat = LANES;
@@ -133,18 +138,42 @@ async function granted(origins) {
   catch (e) { return false; }
 }
 
+async function whatsappEngineOn() {
+  const W = typeof FlowWhatsappEngine !== 'undefined' ? FlowWhatsappEngine : null;
+  const key = W && W.SWITCH ? W.SWITCH : 'WHATSAPP_ENGINE';
+  try {
+    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+    return !!(bag.glanceSwitches && bag.glanceSwitches[key] === true);
+  } catch (e) { return false; }
+}
+
+async function laneJs(lane) {
+  if (lane.id === 'whatsapp' && typeof FlowLaneScripts !== 'undefined' && typeof FlowLaneScripts.whatsappLaneJs === 'function') {
+    const list = (chrome.runtime.getManifest().content_scripts[0].js || []);
+    const engineOn = await whatsappEngineOn();
+    return FlowLaneScripts.whatsappLaneJs(list, engineOn);
+  }
+  const out = [];
+  LEAN_BASE.concat(lane.tail || []).forEach((f) => { if (f && out.indexOf(f) < 0) out.push(f); });
+  return out;
+}
+
 async function registerAll() {
   const scripting = typeof chrome !== 'undefined' && chrome.scripting;
   if (!scripting || !scripting.registerContentScripts) return;
   const ids = LANES.map((lane) => 'glance-lane-' + lane.id);
   try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* not registered yet */ }
-  await scripting.registerContentScripts(LANES.map((lane) => ({
-    id: 'glance-lane-' + lane.id,
-    matches: lane.origins,
-    js: lane.js,
-    runAt: 'document_idle',
-    persistAcrossSessions: true
-  })));
+  const rows = [];
+  for (const lane of LANES) {
+    rows.push({
+      id: 'glance-lane-' + lane.id,
+      matches: lane.origins,
+      js: await laneJs(lane),
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    });
+  }
+  await scripting.registerContentScripts(rows);
 }
 
 function showButton(code) {
