@@ -84,9 +84,19 @@ const FlowIncomingJudge = (() => {
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
+    if (/\b(?:please\s+)?remind\s+me\b/i.test(raw)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(raw)) return false;
+    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
     if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(raw)) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(raw)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל/.test(raw)) return true;
+    if (/להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/להגיד\s+ל[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -196,7 +206,7 @@ const FlowIncomingJudge = (() => {
     // The host judges this mail again when the names land.
     if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
     if (buriedRememberRelayQuiet(text)) {
-      return { show: false, reason: 'quiet:buried-remember-relay', intent: intent || null };
+      return { show: false, reason: 'quiet:relay', intent: intent || null };
     }
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
@@ -474,9 +484,9 @@ const FlowIncomingJudge = (() => {
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
     const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    if (id === 'hold' && timed) return true;
     if (id === 'schedule' && announce && !timed) return false;
     if (announce && (id === 'hold' || id === 'schedule')) return false;
-    if (id === 'hold' && /\?/.test(src) && !announce) return true;
     return false;
   }
 

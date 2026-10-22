@@ -8395,7 +8395,7 @@ const FlowActions = (() => {
     if (/\b(?:could|can|would|shall)\s+(?:we|you)\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
-    if (/^פגישה\b/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/^פגישה/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
     if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
       if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
       return true;
@@ -8591,17 +8591,8 @@ const FlowActions = (() => {
           intent.label = named ? named[1].replace(/\s+/g, ' ').trim() : (when ? ('Log commitment for ' + when) : 'Log this decision');
         }
       } else if (coordinate) {
-        const sig = intent.signals || {};
-        const inboundMeetHold = /\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(untimedSrc)
-          || /^פגישה\b/.test(untimedSrc.trim())
-          || /(?:^|\n)\s*פגישה\s+ביום/.test(untimedSrc);
-        const meetCoord = Boolean(sig.hasMeetingNoun && e.dateIso && /\?/.test(untimedSrc) && inboundMeetHold);
-        if (meetCoord) {
-          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
-        } else {
-          proc = logIt;
-          intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
-        }
+        proc = logIt;
+        intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
       } else if ((readerWill || readerSaid) && !intent.selfTask) {
         proc = logIt;
       } else if ((answerAsk || handoff) && !intent.selfTask) {
@@ -9516,9 +9507,19 @@ const FlowIncomingJudge = (() => {
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
+    if (/\b(?:please\s+)?remind\s+me\b/i.test(raw)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(raw)) return false;
+    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
     if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(raw)) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(raw)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל/.test(raw)) return true;
+    if (/להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/להגיד\s+ל[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -9628,7 +9629,7 @@ const FlowIncomingJudge = (() => {
     // The host judges this mail again when the names land.
     if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
     if (buriedRememberRelayQuiet(text)) {
-      return { show: false, reason: 'quiet:buried-remember-relay', intent: intent || null };
+      return { show: false, reason: 'quiet:relay', intent: intent || null };
     }
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
@@ -9906,9 +9907,9 @@ const FlowIncomingJudge = (() => {
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
     const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    if (id === 'hold' && timed) return true;
     if (id === 'schedule' && announce && !timed) return false;
     if (announce && (id === 'hold' || id === 'schedule')) return false;
-    if (id === 'hold' && /\?/.test(src) && !announce) return true;
     return false;
   }
 
@@ -10240,6 +10241,13 @@ var GlanceIntent = (function () {
         if (ctx.ownNames[i]) names.push(String(ctx.ownNames[i]).toLowerCase());
       }
     }
+    if (ctx && ctx.readerEmail) {
+      var local = String(ctx.readerEmail).split('@')[0] || '';
+      if (local) {
+        names.push(local.toLowerCase());
+        names.push(local.replace(/[._-]+/g, ' ').toLowerCase());
+      }
+    }
     return names;
   }
 
@@ -10254,13 +10262,97 @@ var GlanceIntent = (function () {
     return false;
   }
 
+  function nameMatchesRecipient(who, recipients) {
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name || !recipients || !recipients.length) return false;
+    for (var i = 0; i < recipients.length; i++) {
+      var r = recipients[i] || {};
+      var display = String(r.name || '').toLowerCase().trim();
+      var local = String(r.localPart || (r.email ? r.email.split('@')[0] : '') || '').toLowerCase();
+      if (display && (name === display || name.indexOf(display) !== -1 || display.indexOf(name) !== -1)) return true;
+      if (local && (name === local || name.replace(/\s+/g, '') === local.replace(/[._-]+/g, ''))) return true;
+    }
+    return false;
+  }
+
+  function readerInTo(ctx) {
+    var email = String((ctx && ctx.readerEmail) || '').toLowerCase();
+    if (!email) return true;
+    var all = ((ctx && ctx.toRecipients) || []).concat((ctx && ctx.ccRecipients) || []);
+    if (!all.length) return true;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] && String(all[i].email || '').toLowerCase() === email) return true;
+    }
+    return false;
+  }
+
   function greetingToOther(text, ctx) {
     var raw = String(text || '');
     var m = raw.match(/^(?:hi|hello|hey)(?:\s+there)?\s+([^,!\n]{1,40})[,!]/i);
-    if (!m) return false;
-    var who = m[1].trim();
+    var hm = raw.match(/^(?:שלום|היי|הי)\s+([^,!\n]{1,40})[,!]/);
+    var who = m ? m[1].trim() : (hm ? hm[1].trim() : '');
+    if (!who) return false;
     if (/^(there|team|all|everyone)$/i.test(who)) return false;
-    return !nameIsReader(who, ctx);
+    if (nameIsReader(who, ctx)) return false;
+    if (!readerInTo(ctx)) return true;
+    var others = ((ctx && ctx.toRecipients) || []).concat((ctx && ctx.ccRecipients) || []).filter(function (r) {
+      return r && String(r.email || '').toLowerCase() !== String((ctx && ctx.readerEmail) || '').toLowerCase();
+    });
+    return nameMatchesRecipient(who, others);
+  }
+
+  function stripSignatureFromText(text) {
+    var lines = String(text || '').split('\n');
+    var end = lines.length;
+    while (end > 0 && !String(lines[end - 1] || '').trim()) end--;
+    while (end > 0) {
+      var line = String(lines[end - 1] || '').trim();
+      if (!line) {
+        end--;
+        continue;
+      }
+      if (/^(?:thanks|thank you|best|regards|cheers|sincerely),?\.?$/i.test(line)) {
+        end--;
+        continue;
+      }
+      if (/^(?:תודה|בברכה|יום נעים),?\.?$/i.test(line)) {
+        end--;
+        continue;
+      }
+      if (end < lines.length && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s.-]{0,60}$/.test(line)) {
+        end--;
+        continue;
+      }
+      break;
+    }
+    return lines.slice(0, end).join('\n').trim();
+  }
+
+  function mailLang(text) {
+    return mailIsHebrew(text) ? 'he' : 'en';
+  }
+
+  function spottedSheetPlan(prepared, hit) {
+    if (!/\b(?:sheet|spreadsheet|גיליון)\b/i.test(prepared)) return null;
+    if (hit && hit.intent && hit.intent.signals && hit.intent.signals.workAsk) return 'sheet';
+    if (/\b(?:put|place|enter|add|save|log)\b[^.\n]{0,100}\b(?:sheet|spreadsheet)\b/i.test(prepared)) return 'sheet';
+    if (/\b(?:october|sales|numbers|figures|payment)\b/i.test(prepared)) return 'sheet';
+    if (/גיליון/.test(prepared) && /(?:תשלום|מספרים|נתונים|דוח|אוקטובר)/.test(prepared)) return 'sheet';
+    return null;
+  }
+
+  function localRelayQuiet(raw) {
+    var text = String(raw || '');
+    if (/\b(?:please\s+)?remind\s+me\b/i.test(text)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(text)) return false;
+    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
+    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
+    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(text)) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(text)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(text)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
+    return false;
   }
 
   function localRemember(text, ctx) {
@@ -10268,6 +10360,7 @@ var GlanceIntent = (function () {
     var timeZone = ctx && ctx.timeZone;
     var raw = collapse(text);
     if (!raw || raw.length > 8000) return null;
+    if (localRelayQuiet(raw)) return null;
     if (greetingToOther(raw, ctx)) return null;
     raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
     raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
@@ -10309,7 +10402,6 @@ var GlanceIntent = (function () {
 
   // A draft or a file step is not rewritten into a task or an event.
   var ADDON_UNSUPPORTED_PLAN = {
-    'reply-track': true,
     'reply-fact': true,
     'file-it': true,
     'attach-invite': true,
@@ -10320,11 +10412,15 @@ var GlanceIntent = (function () {
     'move-it': true
   };
 
-  function mapEngine(result, now, timeZone) {
+  function mapEngine(result, now, timeZone, sourceText) {
     if (!result || !result.plan || !result.plan.steps) return null;
     var planId = String(result.plan.id || '');
     if (ADDON_UNSUPPORTED_PLAN[planId]) return null;
     var steps = result.plan.steps;
+    if (planId === 'reply-track') {
+      steps = steps.filter(function (st) { return st && st.kind === 'googleTask'; });
+      if (!steps.length) return null;
+    }
     if (!steps.length) return null;
     // The shared plan may carry a reply draft beside the task ("Draft reply" + "Task"). This card writes no draft, so it
     // offers the task or hold step only; the detection is the same one every surface made.
@@ -10349,7 +10445,7 @@ var GlanceIntent = (function () {
         kind: 'task',
         title: title,
         due: isoOrNull(taskParams.dateIso, now, timeZone),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
       };
@@ -10371,7 +10467,7 @@ var GlanceIntent = (function () {
         hour: holdClock.hour,
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
       };
@@ -10404,7 +10500,7 @@ var GlanceIntent = (function () {
         quote: sanitizeTitle(calendarParams.quote || ''),
         taskTitle: taskTitle,
         taskDue: isoOrNull(reminderParams.dateIso, now, timeZone),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'schedule',
         planId: 'schedule'
       };
@@ -10534,7 +10630,7 @@ var GlanceIntent = (function () {
   function resolveTask(text, ctx) {
     ctx = ctx || {};
     var prepared;
-    try { prepared = prepareText(text); } catch (err) {
+    try { prepared = stripSignatureFromText(prepareText(text)); } catch (err) {
       err.diag = err.diag || 'judge';
       throw err;
     }
@@ -10542,18 +10638,23 @@ var GlanceIntent = (function () {
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
-      try { hit = ctx.engine(prepared, ctx); } catch (err) {
+      try { hit = ctx.engine(prepared); } catch (err) {
         err.diag = err.diag || 'judge';
         throw err;
       }
-      var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
+      if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
+        return silence(String(hit.reason).slice(6), null);
+      }
+      if (hit && hit.plan && hit.plan.id) {
+        var sheetOnly = spottedSheetPlan(prepared, hit);
+        if (sheetOnly) {
+          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit.intent && hit.intent.type ? hit.intent.type : null });
+        }
+      }
+      var mapped = mapEngine(hit, ctx.now, ctx.timeZone, prepared);
       if (mapped) return contentTitle(prepared, mapped);
       if (hit && hit.plan && hit.plan.id) {
-        var dropId = hit.plan.id;
-        if (dropId === 'reply-track' && hit.intent && hit.intent.signals && hit.intent.signals.workAsk
-          && /\b(?:sheet|spreadsheet|numbers|figures|גיליון)\b/i.test(prepared)) {
-          dropId = 'sheet';
-        }
+        var dropId = spottedSheetPlan(prepared, hit) || hit.plan.id;
         return silence('dropped', dropId, {
           droppedPlanId: dropId,
           intentType: hit.intent && hit.intent.type ? hit.intent.type : null

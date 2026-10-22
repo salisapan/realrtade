@@ -581,7 +581,7 @@ const FlowActions = (() => {
     if (/\b(?:could|can|would|shall)\s+(?:we|you)\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
-    if (/^פגישה\b/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/^פגישה/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
     if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
       if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
       return true;
@@ -777,17 +777,8 @@ const FlowActions = (() => {
           intent.label = named ? named[1].replace(/\s+/g, ' ').trim() : (when ? ('Log commitment for ' + when) : 'Log this decision');
         }
       } else if (coordinate) {
-        const sig = intent.signals || {};
-        const inboundMeetHold = /\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(untimedSrc)
-          || /^פגישה\b/.test(untimedSrc.trim())
-          || /(?:^|\n)\s*פגישה\s+ביום/.test(untimedSrc);
-        const meetCoord = Boolean(sig.hasMeetingNoun && e.dateIso && /\?/.test(untimedSrc) && inboundMeetHold);
-        if (meetCoord) {
-          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
-        } else {
-          proc = logIt;
-          intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
-        }
+        proc = logIt;
+        intent.label = heMail ? 'לתאם פגישה' : 'Schedule meeting';
       } else if ((readerWill || readerSaid) && !intent.selfTask) {
         proc = logIt;
       } else if ((answerAsk || handoff) && !intent.selfTask) {
