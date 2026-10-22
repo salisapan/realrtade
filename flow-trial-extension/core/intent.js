@@ -469,7 +469,10 @@ const FlowIntent = (() => {
     list.forEach((a) => {
       if (!a) return;
       const email = typeof a === 'string' ? a : (a.email || a.address || (a.emailAddress && a.emailAddress.address) || '');
-      const norm = String(email || '').trim().toLowerCase();
+      let norm = String(email || '').trim();
+      const bracket = norm.match(/<([^>]+)>/);
+      if (bracket) norm = bracket[1].trim();
+      norm = norm.toLowerCase();
       if (norm) out.push(norm);
     });
     return out;
@@ -893,9 +896,10 @@ const FlowIntent = (() => {
     if (!unresolved) return false;
     return greetedPerson(text);
   }
-  function greetingUnconfirmed(text, ctx) {
+  function readerAloneGreetingShows(text, ctx) {
     const c = ctx || {};
     if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
+    if (!readerNameList(c).length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     let greeted = '';
     for (let i = 0; i < chunks.length; i++) {
@@ -904,26 +908,43 @@ const FlowIntent = (() => {
       if (!greeted) greeted = who;
       if (nameIsReader(who, c)) return false;
     }
-    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
     const toOnly = addressList(c.to || []);
-    if (greeted && readerEmail && toOnly.length === 1 && toOnly[0] === readerEmail) {
-      const others = [];
-      const pushRecip = (entry) => {
-        if (!entry) return;
-        if (typeof entry === 'string') {
-          const e = entry.trim().toLowerCase();
-          if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
-          return;
-        }
-        const e = String(entry.email || '').trim().toLowerCase();
-        if (!e || e === readerEmail) return;
-        others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
-      };
-      (c.toRecipients || c.to || []).forEach(pushRecip);
-      (c.ccRecipients || c.cc || []).forEach(pushRecip);
-      if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return true;
-      return false;
+    let readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (!readerEmail && toOnly.length === 1) {
+      const own = addressList(c.ownAddresses || c.own || []);
+      if (own.length && own.indexOf(toOnly[0]) !== -1) readerEmail = toOnly[0];
     }
+    if (!greeted || !readerEmail || toOnly.length !== 1 || toOnly[0] !== readerEmail) return false;
+    const others = [];
+    const pushRecip = (entry) => {
+      if (!entry) return;
+      if (typeof entry === 'string') {
+        let e = entry.trim();
+        const bracket = e.match(/<([^>]+)>/);
+        if (bracket) e = bracket[1].trim();
+        e = e.toLowerCase();
+        if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
+        return;
+      }
+      const e = String(entry.email || '').trim().toLowerCase();
+      if (!e || e === readerEmail) return;
+      others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
+    };
+    (c.toRecipients || c.to || []).forEach(pushRecip);
+    (c.ccRecipients || c.cc || []).forEach(pushRecip);
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return false;
+    return true;
+  }
+  function greetingUnconfirmed(text, ctx) {
+    const c = ctx || {};
+    if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i], text);
+      if (!who) continue;
+      if (nameIsReader(who, c)) return false;
+    }
+    if (readerAloneGreetingShows(text, ctx)) return false;
     return true;
   }
   function buriedReaderRememberAsk(text) {
@@ -936,6 +957,7 @@ const FlowIntent = (() => {
     return false;
   }
   function vocativeIsOther(text, ctx) {
+    if (readerAloneGreetingShows(text, ctx)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);

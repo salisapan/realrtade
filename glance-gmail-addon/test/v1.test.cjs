@@ -288,6 +288,14 @@ check('other locales stay english', i18n.locale('en-US') === 'en' && i18n.locale
     }
   });
   check('October sales in a sheet is spotted sheet, not a task', sheetDrop.speak === false && sheetDrop.reason === 'dropped' && sheetDrop.droppedPlanId === 'sheet', sheetDrop);
+  const pricingSheet = intent.resolveTask('Please update the pricing sheet with the new rates.', {
+    now: NOW,
+    timeZone: TZ,
+    engine: function () {
+      return { intent: { type: null, quiet: 'relay' }, plan: null, reason: 'quiet:relay' };
+    }
+  });
+  check('pricing sheet update is spotted even when engine is quiet relay', pricingSheet.speak === false && pricingSheet.reason === 'dropped' && pricingSheet.droppedPlanId === 'sheet', pricingSheet);
 }
 
 console.log('\n--- proof and undo ---');

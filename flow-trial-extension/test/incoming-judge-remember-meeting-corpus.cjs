@@ -129,7 +129,9 @@ const READER_PRONOUN_NOT_RELAY = [
   ['en tell you that', "Don't forget to tell you that the meeting moved to 3pm."],
   ['en ask you to', 'Please ask you to confirm the October numbers.'],
   ['he remind you pl', 'תזכיר לכם לשלוח את הדוח עד יום שישי.'],
-  ['he tell you pl', 'תזכור להגיד לכם שהפגישה נדחתה.']
+  ['he tell you pl', 'תזכור להגיד לכם שהפגישה נדחתה.'],
+  ['he tell me status', 'תזכור להגיד לי מה הסטטוס של הדוח עד יום חמישי.'],
+  ['he tell us status', 'תזכור להגיד לנו מה הסטטוס של הדוח עד יום חמישי.']
 ];
 for (const [name, body] of READER_PRONOUN_NOT_RELAY) {
   for (const surface of ['gmail', 'outlook']) {
