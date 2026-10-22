@@ -17,6 +17,7 @@ const FlowConnectEcosystem = (() => {
     'People.Read'
   ];
 
+  // Same list as lane-chat/meta-consent.js FlowMetaConsent.ORIGINS (lane restoreLaneChats).
   const META_ORIGINS = [
     'https://web.whatsapp.com/*',
     'https://www.messenger.com/*',
@@ -25,6 +26,10 @@ const FlowConnectEcosystem = (() => {
     'https://www.facebook.com/messages/*',
     'https://facebook.com/messages',
     'https://facebook.com/messages/*',
+    'https://business.facebook.com/latest/inbox',
+    'https://business.facebook.com/latest/inbox/*',
+    'https://www.business.facebook.com/latest/inbox',
+    'https://www.business.facebook.com/latest/inbox/*',
     'https://www.instagram.com/direct',
     'https://www.instagram.com/direct/*',
     'https://instagram.com/direct',
@@ -126,6 +131,41 @@ const FlowConnectEcosystem = (() => {
     return OFFICE_CATALOG.map((row) => Object.assign({}, row));
   }
 
+  // Connect-3 tool lines (design/connect-3/index.html). Office names come from catalog().
+  const CONNECT_SCREEN_TOOLS = {
+    he: {
+      google: ['Gmail', 'יומן ו-<bdi>Meet</bdi>', 'משימות', 'Drive', 'Docs', 'Sheets', 'Slides', 'אנשי קשר'],
+      meta: ['WhatsApp', 'Messenger', 'Instagram']
+    },
+    en: {
+      google: ['Gmail', 'Calendar & Meet', 'Tasks', 'Drive', 'Docs', 'Sheets', 'Slides', 'Contacts'],
+      meta: ['WhatsApp', 'Messenger', 'Instagram']
+    }
+  };
+
+  function microsoftConnectTools(lang) {
+    const office = catalog().map((row) => row.label);
+    const word = office.find((l) => l === 'Word') || 'Word';
+    const excel = office.find((l) => l === 'Excel') || 'Excel';
+    const ppt = office.find((l) => l === 'PowerPoint') || 'PowerPoint';
+    const onenote = office.find((l) => l === 'OneNote') || 'OneNote';
+    const planner = office.find((l) => l === 'Planner') || 'Planner';
+    if (lang === 'en') {
+      return ['Outlook', 'Calendar', 'To Do', 'OneDrive', word, excel, ppt, 'Teams', onenote, planner];
+    }
+    return ['Outlook', 'יומן', 'To Do', 'OneDrive', word, excel, ppt, 'Teams', onenote, planner];
+  }
+
+  function connectScreenTools(ecoId, lang) {
+    const L = lang === 'en' ? 'en' : 'he';
+    const id = normalizeEco(ecoId);
+    if (id === 'microsoft') return microsoftConnectTools(L);
+    const pack = CONNECT_SCREEN_TOOLS[L] || CONNECT_SCREEN_TOOLS.he;
+    if (id === 'google') return pack.google.slice();
+    if (id === 'meta') return pack.meta.slice();
+    return [];
+  }
+
   function connectorIds() {
     return { google: 'googleTasks', microsoft: 'microsoft', meta: 'meta' };
   }
@@ -199,6 +239,7 @@ const FlowConnectEcosystem = (() => {
     META_ORIGINS: META_ORIGINS.slice(),
     PKCE_REFRESH_INTERFACE: PKCE_REFRESH_INTERFACE,
     catalog: catalog,
+    connectScreenTools: connectScreenTools,
     stepsFor: stepsFor,
     connectorIds: connectorIds,
     normalizeEco: normalizeEco,

@@ -16,21 +16,21 @@ const ConnectEcosystemUI = (function () {
           cta: 'חברו את <bdi>Google</bdi>',
           busy: 'מתחברים ל-<bdi>Google</bdi>…',
           hint: 'ממשיכים בחלון של <bdi>Google</bdi>.',
-          tools: ['Gmail', 'יומן ו-<bdi>Meet</bdi>', 'משימות', 'Drive', 'Docs', 'Sheets', 'Slides', 'אנשי קשר'],
+          tools: null,
           display: 'Google'
         },
         microsoft: {
           cta: 'חברו את <bdi>Microsoft</bdi>',
           busy: 'מתחברים ל-<bdi>Microsoft</bdi>…',
           hint: 'ממשיכים בחלון של <bdi>Microsoft</bdi>.',
-          tools: ['Outlook', 'יומן', 'To Do', 'OneDrive', 'Word', 'Excel', 'PowerPoint', 'Teams', 'OneNote', 'Planner'],
+          tools: null,
           display: 'Microsoft'
         },
         meta: {
           cta: 'חברו את <bdi>WhatsApp</bdi> ו-<bdi>Meta</bdi>',
           busy: 'מתחברים ל-<bdi>Meta</bdi>…',
           hint: 'ממשיכים בחלון של <bdi>Meta</bdi>.',
-          tools: ['WhatsApp', 'Messenger', 'Instagram'],
+          tools: null,
           display: 'WhatsApp + Meta'
         }
       }
@@ -46,21 +46,21 @@ const ConnectEcosystemUI = (function () {
           cta: 'Connect Google',
           busy: 'Connecting to Google…',
           hint: 'Continue in the Google window.',
-          tools: ['Gmail', 'Calendar & Meet', 'Tasks', 'Drive', 'Docs', 'Sheets', 'Slides', 'Contacts'],
+          tools: null,
           display: 'Google'
         },
         microsoft: {
           cta: 'Connect Microsoft',
           busy: 'Connecting to Microsoft…',
           hint: 'Continue in the Microsoft window.',
-          tools: ['Outlook', 'Calendar', 'To Do', 'OneDrive', 'Word', 'Excel', 'PowerPoint', 'Teams', 'OneNote', 'Planner'],
+          tools: null,
           display: 'Microsoft'
         },
         meta: {
           cta: 'Connect WhatsApp + Meta',
           busy: 'Connecting to Meta…',
           hint: 'Continue in the Meta window.',
-          tools: ['WhatsApp', 'Messenger', 'Instagram'],
+          tools: null,
           display: 'WhatsApp + Meta'
         }
       }
@@ -74,6 +74,16 @@ const ConnectEcosystemUI = (function () {
   ];
 
   let connectingId = null;
+
+  function ecoToolsList(ecoId, lang) {
+    const E = globalThis.FlowConnectEcosystem;
+    if (E && typeof E.connectScreenTools === 'function') {
+      const fromCore = E.connectScreenTools(ecoId, lang);
+      if (fromCore && fromCore.length) return fromCore;
+    }
+    const pack = COPY[lang] && COPY[lang].eco && COPY[lang].eco[ecoId];
+    return (pack && pack.tools) ? pack.tools : [];
+  }
 
   function toolsLine(list) {
     return list.map((t) => {
@@ -206,7 +216,7 @@ const ConnectEcosystemUI = (function () {
         body = '<button type="button" class="c3-doit" data-connect-eco="' + eco.id + '"' + (anyBusy ? ' disabled' : '') + '>' +
           '<span class="marks">' + marksHtml(eco.marks) + '</span><span class="label">' + c.cta + '</span></button>';
       }
-      const sub = busy ? c.hint : toolsLine(c.tools);
+      const sub = busy ? c.hint : toolsLine(ecoToolsList(eco.id, lang));
       const stateName = done ? (partial ? 'partial' : 'done') : (busy ? 'busy' : 'idle');
       return '<li class="c3-item" data-state="' + stateName + '">' + body +
         '<p class="c3-tools">' + sub + '</p></li>';

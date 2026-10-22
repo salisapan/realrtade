@@ -12,14 +12,19 @@ function eco() {
 
 async function metaGranted() {
   const Meta = globalThis.FlowMetaConsent;
-  const origins = (eco() && eco().META_ORIGINS) || (Meta && Meta.ORIGINS) || [];
+  const origins = (Meta && Meta.ORIGINS && Meta.ORIGINS.length)
+    ? Meta.ORIGINS.slice()
+    : ((eco() && eco().META_ORIGINS) || []);
   if (!origins.length || !chrome.permissions || typeof chrome.permissions.contains !== 'function') return false;
   try { return await chrome.permissions.contains({ origins: origins }); } catch (e) { return false; }
 }
 
 async function connectMetaEcosystem() {
+  const Meta = globalThis.FlowMetaConsent;
   const E = eco();
-  const origins = (E && E.META_ORIGINS) || [];
+  const origins = (Meta && Meta.ORIGINS && Meta.ORIGINS.length)
+    ? Meta.ORIGINS.slice()
+    : ((E && E.META_ORIGINS) || []);
   if (!origins.length) return { ok: false, reason: 'not-configured' };
   const granted = await new Promise((resolve) => {
     try {
@@ -102,7 +107,9 @@ async function disconnectMicrosoftEcosystem() {
 async function disconnectMetaEcosystem() {
   const Meta = globalThis.FlowMetaConsent;
   if (Meta && typeof Meta.disconnect === 'function') return Meta.disconnect(chrome);
-  const origins = (eco() && eco().META_ORIGINS) || [];
+  const origins = (Meta && Meta.ORIGINS && Meta.ORIGINS.length)
+    ? Meta.ORIGINS.slice()
+    : ((eco() && eco().META_ORIGINS) || []);
   if (!origins.length) return { ok: false };
   return new Promise((resolve) => {
     try { chrome.permissions.remove({ origins: origins }, (ok) => resolve({ ok: ok !== false })); }

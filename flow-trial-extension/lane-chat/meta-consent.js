@@ -23,23 +23,25 @@
     en: 'Chats',
     he: 'צ׳אטים'
   };
-  const ORIGINS = [
-    'https://web.whatsapp.com/*',
-    'https://www.messenger.com/*',
-    'https://messenger.com/*',
-    'https://www.facebook.com/messages',
-    'https://www.facebook.com/messages/*',
-    'https://facebook.com/messages',
-    'https://facebook.com/messages/*',
-    'https://business.facebook.com/latest/inbox',
-    'https://business.facebook.com/latest/inbox/*',
-    'https://www.business.facebook.com/latest/inbox',
-    'https://www.business.facebook.com/latest/inbox/*',
-    'https://www.instagram.com/direct',
-    'https://www.instagram.com/direct/*',
-    'https://instagram.com/direct',
-    'https://instagram.com/direct/*'
-  ];
+  const ORIGINS = (typeof FlowConnectEcosystem !== 'undefined' && FlowConnectEcosystem.META_ORIGINS)
+    ? FlowConnectEcosystem.META_ORIGINS.slice()
+    : [
+      'https://web.whatsapp.com/*',
+      'https://www.messenger.com/*',
+      'https://messenger.com/*',
+      'https://www.facebook.com/messages',
+      'https://www.facebook.com/messages/*',
+      'https://facebook.com/messages',
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*',
+      'https://www.instagram.com/direct',
+      'https://www.instagram.com/direct/*',
+      'https://instagram.com/direct',
+      'https://instagram.com/direct/*'
+    ];
 
   function label(code) {
     const raw = String(code || '').toLowerCase();
