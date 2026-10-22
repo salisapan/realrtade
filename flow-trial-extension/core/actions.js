@@ -614,8 +614,11 @@ const FlowActions = (() => {
     const timed = meetingClock(intent);
     if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
-    if (!timed) return proc;
-    if (inboundMeetingAnnouncement(text)) return proc;
+    if (!timed) {
+      if (inboundMeetingAnnouncement(text)) return null;
+      return proc;
+    }
+    if (inboundMeetingAnnouncement(text)) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
     return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
@@ -673,6 +676,11 @@ const FlowActions = (() => {
       : taskInstead
         ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
         : processFor(intent);
+    const dateConflict = Boolean(intent.facts && intent.facts.date && intent.facts.date.contradictsWeekday);
+    if (inboundMeetingAnnouncement(vetoText) && meetingClock(intent) && !dateConflict
+      && proc && (proc.id === 'schedule' || proc.id === 'schedule-confirm')) {
+      proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    }
     // A calendar step needs a clock the time parser actually resolved.
     // A date with no parsed time is a task. A delete or a move of a named
     // slot is still that calendar write.
@@ -789,7 +797,8 @@ const FlowActions = (() => {
         intent.label = 'Reply requested' + (when ? ' by ' + when : '');
       } else if (untimedCalendar && !intent.selfTask) {
         if (e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
-          proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+          if (!meetingClock(intent)) return null;
+          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
         } else {
           return null;
         }

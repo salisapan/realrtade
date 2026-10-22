@@ -73,7 +73,7 @@ const FlowIncomingJudge = (() => {
   function buriedReaderRememberAsk(text) {
     const raw = String(text || '');
     if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
       if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
       return true;
     }
@@ -84,12 +84,9 @@ const FlowIncomingJudge = (() => {
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
-    const trim = raw.trim();
-    const enOpen = /^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(trim);
-    const heOpen = /^(?:שלום|היי|הי)[^\n]{0,40}[,!]?\s*(?:תזכיר(?:י)?\s+לי|תזכור(?:י)?\s+ל|אל\s+תשכח(?:י)?\s+ל)/.test(trim);
-    if (enOpen || heOpen) return false;
     if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -310,7 +307,8 @@ const FlowIncomingJudge = (() => {
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
     const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
-    if (id === 'schedule' && announce && !timed) return true;
+    if (id === 'schedule' && announce && !timed) return false;
+    if (announce && (id === 'hold' || id === 'schedule')) return false;
     if (id === 'hold' && /\?/.test(src) && !announce) return true;
     return false;
   }
