@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-10-22T09:32:24.759Z",
+  "files": [
+    {
+      "file": "flow-trial-extension/core/domains.js",
+      "sha256": "1deeff165eaf251d6b3885eed2f6012ed8444bf4bc0d413d3fd6238a542ded42"
+    },
+    {
+      "file": "flow-trial-extension/core/extract.js",
+      "sha256": "a4f65bd652f035d108588c5c49a16cef588b70f75f27c6182957070db3a564af"
+    },
+    {
+      "file": "flow-trial-extension/core/judgment.js",
+      "sha256": "a1c4190a579e951a7f4fef8df10d34273cc8924e03ab9c2f3e6f27a47023b911"
+    },
+    {
+      "file": "flow-trial-extension/core/google-closes.js",
+      "sha256": "2bf7c11c76c25f119ed009fff69045c6798261baf3feb869aea79c77ffa4060c"
+    },
+    {
+      "file": "flow-trial-extension/core/close-families.js",
+      "sha256": "5241deef01d6d7cd8f52f95d88e2c9a315606236acdfeaf5de62b9e6123f26ea"
+    },
+    {
+      "file": "flow-trial-extension/core/fact-reply.js",
+      "sha256": "b39bf7a541a693802359c2fcdee98c452e30512c6d738fa3abe9b6dc33ec826e"
+    },
+    {
+      "file": "flow-trial-extension/core/file-attach.js",
+      "sha256": "64f6c356368afb73d9503884cafededcf1035844e9da16cba3bbe25575a5ed5e"
+    },
+    {
+      "file": "flow-trial-extension/core/intent.js",
+      "sha256": "95aefa2b3b1c40b3ab7d2cc49311183b81a0d964a8d2a6717cffe6a9895ea279"
+    },
+    {
+      "file": "flow-trial-extension/core/actions.js",
+      "sha256": "dd2eeb51140d2d9a2478c9558c7d3c30d5c9f68e4d564d618c37f7345ba654b7"
+    },
+    {
+      "file": "flow-trial-extension/core/resolution.js",
+      "sha256": "b83dec87e197f1629671f15c7d2f1d1f10696f0425c8f6f064bda1d0c94b9606"
+    },
+    {
+      "file": "flow-trial-extension/core/incoming-judge.js",
+      "sha256": "5baa87d90b8b4e716329feb4635c1f633af416d1c3002e44b3c3390b178b4160"
+    }
+  ]
+}

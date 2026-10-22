@@ -1,0 +1,22 @@
+[
+  {"id":"en-sign-deck","lang":"en","subject":"Pilot deck","body":"Can you please sign the pilot deck and send it back by Friday? We need it for the board meeting next week.","expectMark":true},
+  {"id":"en-pay-invoice","lang":"en","subject":"Invoice 204","body":"Please pay invoice 204 by end of week. Let me know if you have any questions about the line items.","expectMark":true},
+  {"id":"en-approve-expense","lang":"en","subject":"Expenses","body":"Can you approve the expense report I submitted yesterday? It is waiting in the system for your sign-off.","expectMark":true},
+  {"id":"en-budget-approval","lang":"en","subject":"Budget","body":"Can you approve the Q4 marketing budget request in the portal? Finance is blocked until you sign off.","expectMark":true},
+  {"id":"en-timeline","lang":"en","subject":"Rollout","body":"Please send me the updated timeline for the rollout by end of day Thursday for the steering committee.","expectMark":true},
+  {"id":"en-fyi-quiet","lang":"en","subject":"FYI","body":"Just a heads up that the all-hands moved to 3pm. No action needed from you on this thread.","expectMark":false},
+  {"id":"en-thanks-quiet","lang":"en","subject":"Thanks","body":"Thanks for the update yesterday, really appreciate all the work you put into the launch checklist.","expectMark":false},
+  {"id":"en-delivered-quiet","lang":"en","subject":"Package","body":"The package was marked delivered at 2:14 pm today according to the carrier tracking page.","expectMark":false},
+  {"id":"en-short-quiet","lang":"en","subject":"Ok","body":"Sounds good, thanks.","expectMark":false},
+  {"id":"en-hedge-quiet","lang":"en","subject":"Maybe","body":"We might circle back on this later in the quarter if priorities shift on the platform side.","expectMark":false},
+  {"id":"he-review-doc","lang":"he","subject":"מסמך","body":"בבקשה תעבור על המסמך המצורף ותחזיר הערות עד מחר בבוקר, זה דחוף ללקוח.","expectMark":true},
+  {"id":"he-resend-file","lang":"he","subject":"קובץ","body":"תוכל לשלוח לי את הקובץ המצורף שוב? לא נפתח אצלי במחשב.","expectMark":true},
+  {"id":"he-wire-details","lang":"he","subject":"תשלום","body":"אשמח אם תוכל לשלוח לי את פרטי ההעברה הבנקאית להשלמת התשלום עד יום רביעי.","expectMark":true},
+  {"id":"he-status","lang":"he","subject":"סטטוס","body":"תוכל לעדכן אותי מה סטטוס הבקשה שלי במערכת? אני מחכה כבר שבוע.","expectMark":true},
+  {"id":"he-zoom-link","lang":"he","subject":"זום","body":"תוכל לשלוח לי את הקישור לפגישת הזום מחדש? לא מצליח להיכנס מהטלפון.","expectMark":true},
+  {"id":"he-fyi-quiet","lang":"he","subject":"עדכון","body":"רק לעדכן שהפגישה הועברה לשלוש. אין צורך בפעולה מצדך בנושא הזה.","expectMark":false},
+  {"id":"he-thanks-quiet","lang":"he","subject":"תודה","body":"תודה רבה על העדכון המהיר, זה עזר לנו מאוד לסגור את הדוח לפני הדדליין.","expectMark":false},
+  {"id":"he-short-quiet","lang":"he","subject":"אוקי","body":"סבבה, תודה.","expectMark":false},
+  {"id":"he-maybe-quiet","lang":"he","subject":"אולי","body":"אולי נחזור לנושא הזה בהמשך הרבעון אם התעדוף ישתנה בצוות הפיתוח.","expectMark":false},
+  {"id":"he-delivered-quiet","lang":"he","subject":"משלוח","body":"החבילה סומנה כנמסרה בשעה 14:14 לפי מעקב השליח של החברה.","expectMark":false}
+]
