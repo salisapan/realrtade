@@ -27,11 +27,20 @@ var GlanceIntent = (function () {
     return text;
   }
 
+  function englishMonthDayToSlash(segment) {
+    var m = String(segment || '').match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})\b/i);
+    if (!m) return segment;
+    var mo = MONTHS[m[1].toLowerCase()];
+    if (!mo) return segment;
+    return String(+m[2]) + '/' + String(mo);
+  }
+
   function localizeEngineTitle(text, title) {
     var t = String(title || '');
     if (!t || !mailIsHebrew(text)) return sanitizeTitle(t);
-    if (!/\bby\b/i.test(t) && !/reply requested/i.test(t)) return sanitizeTitle(t);
+    if (!/\bby\b/i.test(t) && !/reply requested/i.test(t) && !/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i.test(t)) return sanitizeTitle(t);
     t = t.replace(/\s+by\s+/gi, ' עד ');
+    t = t.replace(/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+\d{1,2}\b/gi, englishMonthDayToSlash);
     return sanitizeTitle(t);
   }
 
@@ -246,7 +255,7 @@ var GlanceIntent = (function () {
         end--;
         continue;
       }
-      if (end < lines.length && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s.-]{0,60}$/.test(line)) {
+      if (lines.length > 1 && !/[.!?]/.test(line) && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s-]{0,50}$/.test(line) && line.split(/\s+/).length <= 3) {
         end--;
         continue;
       }
@@ -283,7 +292,7 @@ var GlanceIntent = (function () {
     if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
-    if (/תזכור\s+להגיד\s+ל(?!לי(?:\s|[,،.!?]|$)|לנו(?:\s|[,،.!?]|$))/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)/.test(text)) return true;
     if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(text)) return true;
     return false;
@@ -536,6 +545,11 @@ var GlanceIntent = (function () {
     }
     if (fallback) return fallback;
     if (wantDay != null) return String(wantDay) + '/' + String(wantMonth);
+    var en = raw.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})\b/i);
+    if (en) {
+      var mo = MONTHS[en[1].toLowerCase()];
+      if (mo) return String(+en[2]) + '/' + String(mo);
+    }
     return '';
   }
 
@@ -556,8 +570,18 @@ var GlanceIntent = (function () {
     if (payEn || payHe) {
       var amt = title.match(/,\s*((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)\s*$/);
       if (!amt) amt = String(text || '').match(/((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)/);
+      if (!amt) {
+        var amtAfter = String(text || '').match(/([\d,]+(?:\.\d+)?)\s*(₪|\$|€|£)/);
+        if (amtAfter) amt = [amtAfter[0], amtAfter[2] + amtAfter[1]];
+      }
       var suffix = amt ? ', ' + String(amt[1] || amt[0]).trim() : '';
-      if (he) return sanitizeTitle('לשלם חשבונית' + suffix);
+      if (he) {
+        if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\b/i.test(String(text || ''))) {
+          var dueEn = writtenDate(text, dueIso || '');
+          if (dueEn) return sanitizeTitle('לשלם חשבונית' + suffix + ' עד ' + dueEn);
+        }
+        return sanitizeTitle('לשלם חשבונית' + suffix);
+      }
       return sanitizeTitle('Pay invoice' + suffix);
     }
     var due = writtenDate(text, dueIso || '');
@@ -616,10 +640,13 @@ var GlanceIntent = (function () {
         err.diag = err.diag || 'judge';
         throw err;
       }
+      var sheetOnly = spottedSheetPlan(prepared, hit);
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
+        if (sheetOnly) {
+          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
+        }
         return silence(String(hit.reason).slice(6), null);
       }
-      var sheetOnly = spottedSheetPlan(prepared, hit);
       if (sheetOnly) {
         return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
       }

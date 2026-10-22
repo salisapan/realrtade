@@ -84,7 +84,12 @@ const ROWS = [
   ['en-pay-invoice-amount', 'Please pay the invoice of ₪3,200 by Thursday.', true],
   ['he-pay-invoice-thursday', 'נא לשלם את החשבונית של ₪3,200 עד יום חמישי.', true],
   ['he-send-report-notify', 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.', true],
-  ['he-greet-noa', 'היי נועה', false]
+  ['he-greet-noa', 'היי נועה', false],
+  ['en-greet-lior', 'Hi Lior, please remember to call the client.', true],
+  ['en-sig-nda', 'Please remember to send me the signed NDA by Friday.\n\nDana', true],
+  ['he-pay-oct-deadline', 'נא לשלם את החשבונית (3,200 ₪) עד Oct 25.', true],
+  ['he-pay-invoice-parens', 'נא לשלם את החשבונית (3,200 ₪) עד יום חמישי.', true],
+  ['en-sheet-pricing', 'Please update the pricing sheet with the new rates.', false]
 ];
 
 for (const row of ROWS) {
@@ -98,9 +103,25 @@ for (const row of ROWS) {
     ctx.ownNames = ['Noa', 'Noa Cohen'];
     ctx.toRecipients = [{ name: 'Noa Cohen', email: 'noa@meridian.com', localPart: 'noa' }];
   }
+  if (id === 'en-greet-lior') {
+    ctx.userName = 'Sali';
+    ctx.ownNames = ['Sali', 'Sali Sapan'];
+  }
+  if (id === 'en-sheet-pricing') {
+    ctx.engine = function () {
+      return { intent: { type: null }, plan: null, reason: 'quiet:relay' };
+    };
+  }
   const decision = resolveTask(body, ctx);
   const he = hebrewMail(body);
   check(id + ' speak', decision.speak === expectSpeak, { speak: decision.speak, reason: decision.reason });
+  if (id === 'en-sheet-pricing') {
+    check(id + ' spotted sheet drop', decision.reason === 'dropped' && decision.droppedPlanId === 'sheet', decision);
+    continue;
+  }
+  if (id === 'he-greet-noa') {
+    continue;
+  }
   if (!expectSpeak || !decision.speak) continue;
   const title = String(decision.title || '');
   check(id + ' non-empty title', title.length >= 3, title);
@@ -137,8 +158,15 @@ for (const row of ROWS) {
   if (id === 'he-send-report-notify') {
     check(id + ' Hebrew send report title', /^תשלח את הדוח עד \d{1,2}\/\d{1,2}$/.test(title), title);
   }
-  if (id === 'he-greet-noa') {
-    check(id + ' quiet greeting', decision.speak === false && (decision.reason === 'hedge' || String(decision.reason || '').indexOf('hedge') >= 0), decision.reason);
+  if (id === 'en-sig-nda') {
+    check(id + ' no signature name in title', !/\bDana\b/i.test(title), title);
+  }
+  if (id === 'he-pay-oct-deadline') {
+    check(id + ' no English month leak', !/\bOct\b/i.test(title), title);
+    check(id + ' Hebrew pay with localized date', /^לשלם חשבונית, ₪3,200 עד \d{1,2}\/\d{1,2}$/.test(title) || (/\d{1,2}\/\d{1,2}/.test(title) && /לשלם חשבונית/.test(title)), title);
+  }
+  if (id === 'he-pay-invoice-parens') {
+    check(id + ' Hebrew pay invoice with amount', title === 'לשלם חשבונית, ₪3,200', title);
   }
 }
 

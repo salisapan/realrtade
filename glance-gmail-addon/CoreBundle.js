@@ -4969,7 +4969,10 @@ const FlowIntent = (() => {
     list.forEach((a) => {
       if (!a) return;
       const email = typeof a === 'string' ? a : (a.email || a.address || (a.emailAddress && a.emailAddress.address) || '');
-      const norm = String(email || '').trim().toLowerCase();
+      let norm = String(email || '').trim();
+      const bracket = norm.match(/<([^>]+)>/);
+      if (bracket) norm = bracket[1].trim();
+      norm = norm.toLowerCase();
       if (norm) out.push(norm);
     });
     return out;
@@ -5393,9 +5396,10 @@ const FlowIntent = (() => {
     if (!unresolved) return false;
     return greetedPerson(text);
   }
-  function greetingUnconfirmed(text, ctx) {
+  function readerAloneGreetingShows(text, ctx) {
     const c = ctx || {};
     if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
+    if (!readerNameList(c).length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     let greeted = '';
     for (let i = 0; i < chunks.length; i++) {
@@ -5404,26 +5408,43 @@ const FlowIntent = (() => {
       if (!greeted) greeted = who;
       if (nameIsReader(who, c)) return false;
     }
-    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
     const toOnly = addressList(c.to || []);
-    if (greeted && readerEmail && toOnly.length === 1 && toOnly[0] === readerEmail) {
-      const others = [];
-      const pushRecip = (entry) => {
-        if (!entry) return;
-        if (typeof entry === 'string') {
-          const e = entry.trim().toLowerCase();
-          if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
-          return;
-        }
-        const e = String(entry.email || '').trim().toLowerCase();
-        if (!e || e === readerEmail) return;
-        others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
-      };
-      (c.toRecipients || c.to || []).forEach(pushRecip);
-      (c.ccRecipients || c.cc || []).forEach(pushRecip);
-      if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return true;
-      return false;
+    let readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (!readerEmail && toOnly.length === 1) {
+      const own = addressList(c.ownAddresses || c.own || []);
+      if (own.length && own.indexOf(toOnly[0]) !== -1) readerEmail = toOnly[0];
     }
+    if (!greeted || !readerEmail || toOnly.length !== 1 || toOnly[0] !== readerEmail) return false;
+    const others = [];
+    const pushRecip = (entry) => {
+      if (!entry) return;
+      if (typeof entry === 'string') {
+        let e = entry.trim();
+        const bracket = e.match(/<([^>]+)>/);
+        if (bracket) e = bracket[1].trim();
+        e = e.toLowerCase();
+        if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
+        return;
+      }
+      const e = String(entry.email || '').trim().toLowerCase();
+      if (!e || e === readerEmail) return;
+      others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
+    };
+    (c.toRecipients || c.to || []).forEach(pushRecip);
+    (c.ccRecipients || c.cc || []).forEach(pushRecip);
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return false;
+    return true;
+  }
+  function greetingUnconfirmed(text, ctx) {
+    const c = ctx || {};
+    if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i], text);
+      if (!who) continue;
+      if (nameIsReader(who, c)) return false;
+    }
+    if (readerAloneGreetingShows(text, ctx)) return false;
     return true;
   }
   function buriedReaderRememberAsk(text) {
@@ -5436,6 +5457,7 @@ const FlowIntent = (() => {
     return false;
   }
   function vocativeIsOther(text, ctx) {
+    if (readerAloneGreetingShows(text, ctx)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
@@ -9529,7 +9551,7 @@ const FlowIncomingJudge = (() => {
     if (/אל\s+תשכח\s+להזכיר\s+ל/.test(raw) && !/אל\s+תשכח\s+להזכיר\s+ל(?:י|כם|נו|ך|אותך|אתכם|אותי)\b/.test(raw)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל/.test(raw) && new RegExp('תזכור\\s+ל(?:הזכיר|זכיר)\\s+ל' + heNotReader).test(raw)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(raw) && !/תזכור\s+לשאול\s+אתכם/.test(raw)) return true;
-    if (/תזכור\s+להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)/.test(raw)) return true;
     if (new RegExp('להזכיר\\s+ל' + heNotReader).test(raw)) return true;
     if (new RegExp('(?:^|[^\\u0590-\\u05FF])(?:תזכיר|תזכירי|תזכירו)\\s+ל' + heNotReader).test(raw)) return true;
     if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw) && !/לשאול\s+אתכם/.test(raw)) return true;
@@ -10006,11 +10028,20 @@ var GlanceIntent = (function () {
     return text;
   }
 
+  function englishMonthDayToSlash(segment) {
+    var m = String(segment || '').match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})\b/i);
+    if (!m) return segment;
+    var mo = MONTHS[m[1].toLowerCase()];
+    if (!mo) return segment;
+    return String(+m[2]) + '/' + String(mo);
+  }
+
   function localizeEngineTitle(text, title) {
     var t = String(title || '');
     if (!t || !mailIsHebrew(text)) return sanitizeTitle(t);
-    if (!/\bby\b/i.test(t) && !/reply requested/i.test(t)) return sanitizeTitle(t);
+    if (!/\bby\b/i.test(t) && !/reply requested/i.test(t) && !/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i.test(t)) return sanitizeTitle(t);
     t = t.replace(/\s+by\s+/gi, ' עד ');
+    t = t.replace(/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+\d{1,2}\b/gi, englishMonthDayToSlash);
     return sanitizeTitle(t);
   }
 
@@ -10225,7 +10256,7 @@ var GlanceIntent = (function () {
         end--;
         continue;
       }
-      if (end < lines.length && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s.-]{0,60}$/.test(line)) {
+      if (lines.length > 1 && !/[.!?]/.test(line) && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s-]{0,50}$/.test(line) && line.split(/\s+/).length <= 3) {
         end--;
         continue;
       }
@@ -10262,7 +10293,7 @@ var GlanceIntent = (function () {
     if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
-    if (/תזכור\s+להגיד\s+ל(?!לי(?:\s|[,،.!?]|$)|לנו(?:\s|[,،.!?]|$))/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)/.test(text)) return true;
     if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(text)) return true;
     return false;
@@ -10515,6 +10546,11 @@ var GlanceIntent = (function () {
     }
     if (fallback) return fallback;
     if (wantDay != null) return String(wantDay) + '/' + String(wantMonth);
+    var en = raw.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})\b/i);
+    if (en) {
+      var mo = MONTHS[en[1].toLowerCase()];
+      if (mo) return String(+en[2]) + '/' + String(mo);
+    }
     return '';
   }
 
@@ -10535,8 +10571,18 @@ var GlanceIntent = (function () {
     if (payEn || payHe) {
       var amt = title.match(/,\s*((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)\s*$/);
       if (!amt) amt = String(text || '').match(/((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)/);
+      if (!amt) {
+        var amtAfter = String(text || '').match(/([\d,]+(?:\.\d+)?)\s*(₪|\$|€|£)/);
+        if (amtAfter) amt = [amtAfter[0], amtAfter[2] + amtAfter[1]];
+      }
       var suffix = amt ? ', ' + String(amt[1] || amt[0]).trim() : '';
-      if (he) return sanitizeTitle('לשלם חשבונית' + suffix);
+      if (he) {
+        if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\b/i.test(String(text || ''))) {
+          var dueEn = writtenDate(text, dueIso || '');
+          if (dueEn) return sanitizeTitle('לשלם חשבונית' + suffix + ' עד ' + dueEn);
+        }
+        return sanitizeTitle('לשלם חשבונית' + suffix);
+      }
       return sanitizeTitle('Pay invoice' + suffix);
     }
     var due = writtenDate(text, dueIso || '');
@@ -10595,10 +10641,13 @@ var GlanceIntent = (function () {
         err.diag = err.diag || 'judge';
         throw err;
       }
+      var sheetOnly = spottedSheetPlan(prepared, hit);
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
+        if (sheetOnly) {
+          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
+        }
         return silence(String(hit.reason).slice(6), null);
       }
-      var sheetOnly = spottedSheetPlan(prepared, hit);
       if (sheetOnly) {
         return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
       }

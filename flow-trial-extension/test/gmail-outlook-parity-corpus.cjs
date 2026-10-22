@@ -501,6 +501,39 @@ const CASES = [
     check('Hebrew send-report notify shows on Outlook judge', judged.show && judged.process && judged.process.id === 'reply-track', { reason: judged.reason, id: judged.process && judged.process.id });
   }
 
+  console.log('\n--- extension: Hi Lior reader alone in To (CTO D3) ---\n');
+  {
+    const liorBody = 'Hi Lior,\n\nPlease pay invoice #4471 (3,200 ₪) by Sunday.\n\nDana';
+    const liorCtx = {
+      sender: { name: 'Dana Levi', email: 'dana@acme.com' },
+      to: ['Sali Sapan <ai.local.flow@gmail.com>'],
+      ownAddresses: ['ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      namesWaitDone: true,
+      now: new Date(NOW),
+      attachmentCount: 0,
+      inbound: true
+    };
+    for (const surface of ['gmail', 'outlook']) {
+      const judged = J.judge(Object.assign({ text: liorBody, subject: 'Invoice', surface }, liorCtx), { intent: FlowIntent, actions: FlowActions });
+      check('Hi Lior reader-alone shows on ' + surface, judged.show && judged.process && judged.process.id === 'reply-track', { reason: judged.reason, id: judged.process && judged.process.id });
+      const cls = FlowIntent.classify(liorBody, {
+        senderEmail: 'dana@acme.com',
+        subject: 'Invoice',
+        now: new Date(NOW),
+        inbound: true,
+        to: ['Sali Sapan <ai.local.flow@gmail.com>'],
+        ownAddresses: ['ai.local.flow@gmail.com'],
+        userName: 'Sali',
+        ownNames: ['Sali', 'Sali Sapan'],
+        readerEmail: 'ai.local.flow@gmail.com',
+        namesWaitDone: true
+      });
+      check('Hi Lior reader-alone classifies on ' + surface, cls && cls.type === 'request' && !cls.quiet, cls);
+    }
+  }
+
   console.log('\n--- extension: greeting names a To recipient (FlowNameMatch) ---\n');
   {
     const NOA = 'noa@meridian.com';
