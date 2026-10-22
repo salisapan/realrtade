@@ -1204,6 +1204,17 @@ console.log('\n--- message path parity ---');
     date: new Date('2026-10-15T11:10:00Z')
   });
   check('Hi Noa when Noa is on To stays quiet', buttonsOf(quietNoa).length === 0, linesOf(quietNoa));
+  const quietNoaHe = openBareGreet({
+    id: 'gQuietNoaHe',
+    threadId: 'tNoaHe',
+    subject: 'היי',
+    plain: 'היי נועה, תזכיר לי להתקשר ללקוח.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: SALI_EMAIL + ', Noa Cohen <noa@meridian.com>',
+    date: new Date('2026-10-15T11:11:00Z')
+  });
+  check('היי נועה when Noa is on To stays quiet', buttonsOf(quietNoaHe).length === 0, linesOf(quietNoaHe));
   const showLior = openBareGreet({
     id: 'gShowLior',
     threadId: 'tLior',

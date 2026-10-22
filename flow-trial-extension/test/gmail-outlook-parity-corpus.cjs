@@ -483,6 +483,53 @@ const CASES = [
     const nO = FlowIntent.classify(notifyHe, { senderEmail: 'dana@acme.com', subject: 'דוח', now: new Date(NOW), inbound: true, to: [ME], ownAddresses: [ME] });
     check('Hebrew send-report notify classifies on Gmail', nG && nG.type === 'request' && !nG.quiet, nG);
     check('Hebrew send-report notify classifies on Outlook', nO && nO.type === 'request' && !nO.quiet, nO);
+    const judged = J.judge({
+      text: notifyHe,
+      subject: 'דוח',
+      sender: { name: 'Dana Levi', email: 'dana@acme.com' },
+      to: [ME],
+      ownAddresses: [ME, 'ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      readerEmail: ME,
+      namesWaitDone: true,
+      now: new Date(NOW),
+      surface: 'outlook',
+      attachmentCount: 0,
+      inbound: true
+    }, { intent: FlowIntent, actions: FlowActions });
+    check('Hebrew send-report notify shows on Outlook judge', judged.show && judged.process && judged.process.id === 'reply-track', { reason: judged.reason, id: judged.process && judged.process.id });
+  }
+
+  console.log('\n--- extension: greeting names a To recipient (FlowNameMatch) ---\n');
+  {
+    const NOA = 'noa@meridian.com';
+    const readerCtx = {
+      sender: { name: 'Dana Levi', email: 'dana@meridian.com' },
+      to: [ME, NOA],
+      toRecipients: [
+        { name: 'Glance', email: ME, localPart: 'glance.salisapan' },
+        { name: 'Noa Cohen', email: NOA, localPart: 'noa' }
+      ],
+      ownAddresses: [ME, 'ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      readerEmail: ME,
+      namesWaitDone: true,
+      now: new Date(NOW),
+      attachmentCount: 0,
+      inbound: true
+    };
+    const rows = [
+      ['Hi Noa', 'Hi Noa, please remember to call the client.'],
+      ['היי נועה', 'היי נועה, תזכיר לי להתקשר ללקוח.']
+    ];
+    for (const [label, text] of rows) {
+      for (const surface of ['gmail', 'outlook']) {
+        const judged = J.judge(Object.assign({ text, subject: 'Hi', surface }, readerCtx), { intent: FlowIntent, actions: FlowActions });
+        check(label + ' quiet on ' + surface + ' extension judge', !judged.show && (judged.reason === 'quiet:hedge' || String(judged.reason || '').indexOf('hedge') >= 0 || judged.reason === 'chip-low-confidence'), { reason: judged.reason });
+      }
+    }
   }
 
   console.log('\nTOTAL FAILURES:', failures);
