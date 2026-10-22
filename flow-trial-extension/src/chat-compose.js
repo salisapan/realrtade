@@ -27,7 +27,12 @@ const FlowChatCompose = (() => {
     el.textContent = body;
   }
 
-  // Returns { ok, sends: false, reason }. Never sends.
+  function clearBox(el) {
+    writeBox(el, '');
+    if (typeof el.dispatchEvent === 'function') el.dispatchEvent(inputEvent(''));
+  }
+
+  // Returns { ok, sends: false, reason, draftText }. Never sends.
   function insertDraft(el, text) {
     const body = String(text || '').replace(/[\r\n]+/g, ' ').trim();
     if (!el || !body) return { ok: false, sends: false, reason: el ? 'empty' : 'no-box' };
@@ -43,10 +48,23 @@ const FlowChatCompose = (() => {
       writeBox(el, body);
       if (typeof el.dispatchEvent === 'function') el.dispatchEvent(inputEvent(body));
     }
-    return { ok: textOf(el).indexOf(body) >= 0, sends: false, reason: 'drafted' };
+    const ok = textOf(el).indexOf(body) >= 0;
+    return { ok: ok, sends: false, reason: ok ? 'drafted' : 'draft-mismatch', draftText: body };
   }
 
-  return { insertDraft };
+  // Undo for a chat draft: clear only when the box still holds exactly what Glance inserted.
+  function undoDraft(el, draftText) {
+    if (!el) return { ok: false, sends: false, reason: 'no-box' };
+    const expected = String(draftText || '').replace(/[\r\n]+/g, ' ').trim();
+    if (!expected) return { ok: false, sends: false, reason: 'empty' };
+    const now = textOf(el).trim();
+    if (!now) return { ok: false, sends: false, reason: 'already-empty' };
+    if (now !== expected) return { ok: false, sends: false, reason: 'edited' };
+    clearBox(el);
+    return { ok: true, sends: false, reason: 'cleared' };
+  }
+
+  return { insertDraft, undoDraft, textOf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatCompose };

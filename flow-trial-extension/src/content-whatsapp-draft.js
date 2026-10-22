@@ -9,9 +9,26 @@
 (() => {
   if (typeof FlowWhatsAppParse === 'undefined' || typeof FlowChatLane === 'undefined') return;
   const P = FlowWhatsAppParse;
+  const ENGINE_KEY = (typeof FlowWhatsappEngine !== 'undefined' && FlowWhatsappEngine.SWITCH)
+    ? FlowWhatsappEngine.SWITCH
+    : 'WHATSAPP_ENGINE';
+
+  async function engineOn() {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return false;
+      const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+      const switches = (bag && bag.glanceSwitches) || {};
+      if (typeof FlowWhatsappEngine !== 'undefined' && typeof FlowWhatsappEngine.isOn === 'function') {
+        return FlowWhatsappEngine.isOn(switches);
+      }
+      return switches[ENGINE_KEY] === true;
+    } catch (e) { return false; }
+  }
+
   const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
   let timer = null;
+  let engineEnabled = false;
   const drafted = new Set();
   const inflight = new Set();
 
@@ -58,10 +75,13 @@
     const last = list[list.length - 1];
     if (!last) return;
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
-    if (!parsed || parsed.fromMe) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
+    if (!parsed || parsed.fromMe) {
+      if (engineEnabled && typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null);
+      return;
+    }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
-    if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
+    if (engineEnabled && typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
     const ids = list.map((n) => n.getAttribute('data-id'));
@@ -78,7 +98,7 @@
       key: key
     };
     FlowChatLane.draftInto(composerBox(main), input).then((r) => {
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
+      if (engineEnabled && typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
@@ -100,4 +120,5 @@
   schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.whatsapp = { scan: scan };
+  engineOn().then((on) => { engineEnabled = on === true; });
 })();

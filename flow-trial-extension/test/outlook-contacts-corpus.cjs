@@ -88,6 +88,8 @@ function dana() {
 
   const offer = C.offer({ text: 'Please look up the contact Dana Cohen.' });
   check('a lookup offer names Dana Cohen and does not close', offer.show === true && offer.params.name === 'Dana Cohen' && offer.closes === false && offer.button === 'Look up', offer);
+  const noaOffer = C.offer({ text: 'Please look up contact Noa and send the deck.' });
+  check('name capture stops before and', noaOffer.show === true && noaOffer.params.name === 'Noa', noaOffer);
   ['I\'ll send Dana the numbers by Thursday.', 'Please save the attachment to OneDrive.', 'We agreed to renew the passport application by Friday.', 'Thanks, attaching the board pack for your records today.', ''].forEach((text) => {
     check('stays quiet: ' + JSON.stringify(text).slice(0, 48), C.offer({ text: text }).show === false);
   });
@@ -96,7 +98,9 @@ function dana() {
 
   const bg = fs.readFileSync(path.join(__dirname, '../src/background.js'), 'utf8');
   const hooks = bg.split('\n').filter((line) => line.indexOf('lane-ms-host.js') >= 0);
-  check('background.js has one lane hook', hooks.length === 1 && bg.indexOf('outlook-contacts.js') < 0, hooks);
+  // Ruling (M8): outlook-contacts-corpus.cjs:99 — before: no outlook-contacts import in background;
+  // after: worker imports outlook-contacts for outlookDraftRecipientFromText (draft To), lane-ms hook unchanged.
+  check('background.js has one lane hook and draft To resolve import', hooks.length === 1 && /outlookDraftRecipientFromText/.test(bg), hooks);
   const page = fs.readFileSync(path.join(__dirname, '../src/content-outlook.js'), 'utf8');
   check('content-outlook.js is not edited for this lane', page.indexOf('FlowLaneMs') < 0 && page.indexOf('lane-ms') < 0);
   const contactsSrc = fs.readFileSync(path.join(__dirname, '../core/outlook-contacts.js'), 'utf8');

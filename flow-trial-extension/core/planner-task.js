@@ -184,8 +184,14 @@ const FlowPlannerTask = (() => {
     if (t.planId !== planId) return withdraw('plan-differs', etag);
     if (dueIso && dayOf(t.dueDateTime) !== dueIso) return withdraw('date-differs', etag);
     if (t.assignments && Object.keys(t.assignments).length) return withdraw('has-assignee', etag);
+    let bucketTitle = null;
+    const bucketId = t.bucketId || null;
+    if (bucketId) {
+      const buck = await graph('GET', '/planner/buckets/' + encodeURIComponent(bucketId));
+      if (buck.ok && buck.json && buck.json.name) bucketTitle = String(buck.json.name);
+    }
     const verifiedAt = typeof input.now === 'string' ? input.now : new Date().toISOString();
-    const finalRef = Object.assign({}, ref, { etag: etag || null });
+    const finalRef = Object.assign({}, ref, { etag: etag || null, bucketId: bucketId, bucketTitle: bucketTitle });
     const proof = proofs ? proofs.buildProof({ system: SYSTEM, externalId: id, url: '', fetchedBack: true, verifiedAt: verifiedAt }) : null;
     if (!proof) return miss(PENDING, { ref: finalRef });
     return {
@@ -196,6 +202,8 @@ const FlowPlannerTask = (() => {
       written: 'Planner · ' + title + (dueIso ? ' · ' + dueIso : ''),
       proof: proof,
       ref: finalRef,
+      bucketTitle: bucketTitle,
+      bucketId: bucketId,
       // The task exists in the plan; whether the work is done is not claimed.
       loopClosed: true
     };

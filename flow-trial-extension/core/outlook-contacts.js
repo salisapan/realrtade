@@ -58,8 +58,9 @@ const FlowOutlookContacts = (() => {
 
   function offer(ctx) {
     const text = String((ctx && (ctx.text || ctx.body)) || '');
-    const m = text.match(/\b(?:look up|lookup|find|resolve)\b[\s\S]{0,40}\bcontacts?\b\s+([A-Za-z][\w.'-]{0,40}(?:\s+[A-Za-z][\w.'-]{0,40})?)/i);
-    const name = m ? cleanName(m[1]) : '';
+    const m = text.match(/\b(?:look up|lookup|find|resolve)\b[\s\S]{0,40}\bcontacts?\b\s+([A-Za-z][\w.'-]{0,40}(?:\s+[A-Za-z][\w.'-]{0,40})?)(?=\s+and\b|[\s,.;!?]|$)/i);
+    let name = m ? cleanName(m[1]) : '';
+    if (name) name = cleanName(name.replace(/\s+and\s*$/i, ''));
     if (!name) return { show: false };
     return {
       show: true,

@@ -118,7 +118,17 @@ const FlowChipHost = (() => {
   function words(lang) {
     const which = lang || uiLang;
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(which);
-    return { dismiss: 'Dismiss', doIt: 'Do It', undo: 'Undo', undoing: 'Undoing…', openDraft: 'Open draft', view: 'View' };
+    // Chat lanes load chip-host without the full Gmail engine stack; mirror display-copy CHROME.he/en.
+    if (which === 'he') {
+      return {
+        dismiss: 'הסתר', doIt: 'בצע', undo: 'בטל', undoing: 'מבטל…', openDraft: 'פתח טיוטה', view: 'הצג',
+        draftReady: 'טיוטה מוכנה.', draftReadyLong: 'טיוטת תשובה מוכנה. לא נשלח.', draftRemoved: 'טיוטת התשובה הוסרה. לא נשלח.'
+      };
+    }
+    return {
+      dismiss: 'Dismiss', doIt: 'Do It', undo: 'Undo', undoing: 'Undoing…', openDraft: 'Open draft', view: 'View',
+      draftReady: 'Draft ready.', draftReadyLong: 'Reply draft ready in Outlook Drafts. Not sent.', draftRemoved: 'Reply draft removed. Not sent.'
+    };
   }
 
   // mountNode: DOM parent. ctx: { process, intent, messageId, app }.
@@ -279,10 +289,11 @@ const FlowChipHost = (() => {
   function showDraftReceipt(host, opts) {
     const o = opts || {};
     if (o.uiLang) setUiLang(o.uiLang);
-    const L = words();
+    const lang = cardLang({ uiLang: o.uiLang });
+    const L = words(lang);
     host.classList.add('flow-chip-settled');
     const done = el('div', 'flow-chip flow-chip-done');
-    done.setAttribute('dir', 'ltr');
+    done.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
     done.setAttribute('role', 'status');
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
