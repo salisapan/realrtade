@@ -1164,6 +1164,29 @@
     if (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.enrichFileItChoiceCatalog === 'function') {
       process = FlowFileAttach.enrichFileItChoiceCatalog(process, paneFiles, savePick.mode);
     }
+    const saveName = pickedAttach && (pickedAttach.name || pickedAttach.filename);
+    if (saveName && (savePick.mode === 'single' || savePick.mode === 'picked')) {
+      const catalogOne = [{
+        id: String((pickedAttach && pickedAttach.id) || 'att-0'),
+        name: saveName,
+        label: saveName,
+        on: true,
+        skipped: false
+      }];
+      process = Object.assign({}, process, {
+        steps: (process.steps || []).map((s) => {
+          if (!s || (s.kind !== 'driveFile' && s.kind !== 'onedriveFile' && s.kind !== 'attachmentSave')) return s;
+          const kind = s.kind === 'driveFile' ? 'onedriveFile' : s.kind;
+          const params = Object.assign({}, s.params || {}, {
+            fileName: saveName,
+            selectedAttachment: pickedAttach,
+            catalog: catalogOne,
+            files: catalogOne
+          });
+          return Object.assign({}, s, { kind: kind, params: params });
+        })
+      });
+    }
     return {
       app: 'outlook',
       surface: 'outlook-web',
@@ -5271,12 +5294,13 @@
     const source = full ? raw : (eligible || []).concat(excluded || []);
     const seen = {};
     const out = [];
-    source.forEach((a) => {
-      if (!a || seen[a.id]) return;
-      if (a.id) seen[a.id] = 1;
+    source.forEach((a, idx) => {
+      const idKey = a && (a.id || ('att-' + idx));
+      if (!a || seen[idKey]) return;
+      seen[idKey] = 1;
       const ex = a.id && skip[a.id];
-      const rawName = String((ex && ex.name) || a.name || '').trim();
-      const id = String(a.id == null ? '' : a.id);
+      const rawName = String((ex && ex.name) || a.name || a.filename || '').trim();
+      const id = String(a.id == null || a.id === '' ? ('att-' + idx) : a.id);
       const named = Boolean(rawName) && rawName !== id;
       const why = (ex && (ex.why || ex.reason)) || a.why || a.reason || '';
       const skipped = Boolean(ex) || !named;
@@ -5295,7 +5319,7 @@
           ? (FlowSuggestSave.fileLabel(file) || rawName)
           : rawName);
       out.push({
-        id: a.id,
+        id: id,
         name: named ? rawName : '',
         label: label,
         size: file.size,

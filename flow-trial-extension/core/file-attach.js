@@ -569,7 +569,7 @@ const FlowFileAttach = (() => {
   function saveAttachmentCatalog(attachments) {
     return (attachments || []).map((meta, i) => {
       const name = attachFileName(meta);
-      const id = String((meta && (meta.id || meta.url)) || name || ('att-' + i));
+      const id = String((meta && meta.id) || (meta && meta.url) || ('att-' + i));
       return { id: id, name: name, label: name, on: false, skipped: !name };
     });
   }

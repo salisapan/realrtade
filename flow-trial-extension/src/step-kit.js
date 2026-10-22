@@ -172,7 +172,7 @@ const FlowStepKit = (() => {
     const icon = cfg.icon === 'done' ? 'living/key-done-512.png' : 'living/key-idle-512.png';
     return '<div class="gs-head"><img class="living-ico" src="' + esc(asset(icon)) + '" alt="" width="26" height="26">' +
       '<div class="gs-head-meta"><div class="gs-brand">' + L.brand + '</div><div class="gs-intent-label">' + L.intentLabel + '</div></div></div>' +
-      '<p class="gs-intent flow-chip-process-name">' + esc(cfg.intent || '') + '</p>';
+      (cfg.intent ? '<p class="gs-intent flow-chip-process-name">' + esc(cfg.intent) + '</p>' : '');
   }
 
   function rowsHTML(rows, L) {

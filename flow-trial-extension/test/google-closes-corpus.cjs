@@ -423,7 +423,9 @@ console.log('\n--- signed delivery: past weekday must not read as future (N1/N2)
     && D.showChrome('he', 'Save the file?') === 'לשמור את הקובץ?');
   const heP1 = plan('מצורף חוזה חתום', { attachmentCount: 1 });
   check('HE P1 signed-copy delivery is file-it (Gmail classifier path)', heP1.process && heP1.process.id === 'file-it', heP1.process && heP1.process.id);
-  check('HE P1 signed-copy delivery is file-it (Outlook uses same engine)', heP1.process && heP1.process.id === 'file-it', heP1.process && heP1.process.id);
+  const { FlowIncomingJudge } = require('../core/incoming-judge.js');
+  const heP1Outlook = FlowIncomingJudge.judge({ text: 'מצורף חוזה חתום', attachmentCount: 1, app: 'outlook', surface: 'outlook-web' });
+  check('HE P1 signed-copy delivery is file-it (Outlook judge input)', heP1Outlook && heP1Outlook.show && heP1Outlook.process && heP1Outlook.process.id === 'file-it', heP1Outlook && heP1Outlook.process && heP1Outlook.process.id);
 }
 
 console.log('\n--- family B: one file, one target ---\n');
