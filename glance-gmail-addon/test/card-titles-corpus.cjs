@@ -76,6 +76,7 @@ const ROWS = [
   ['he-sig', 'היי סאלי, תוכל לשלוח את החשבונית?\n\nבברכה,\nדנה לוי', true],
   ['he-meaningful', 'היי סאלי, תוכל לשלוח את החשבונית?', true],
   ['he-no-en-title', 'תשלח את הדוח עד יום חמישי.', true],
+  ['he-pay-remember', 'תזכור להעביר את התשלום עד יום ראשון.', true],
   ['en-reply-track-deadline', 'Hi Sali, please confirm the wire arrived by Monday, October 20.', true],
   ['en-reply-track-nodeadline', 'Hi Sali, could you send the invoice for October?', true],
   ['he-reply-track-deadline', 'היי סאלי, תוכל לשלוח את המסמך החתום עד 23/10?', true],
@@ -112,6 +113,10 @@ for (const row of ROWS) {
   }
   if (id === 'he-reply-track-nodeadline') {
     check(id + ' נדרשת תשובה', title === 'נדרשת תשובה', title);
+  }
+  if (id === 'he-pay-remember') {
+    check(id + ' no English by leak', !/\sby\s/i.test(title), title);
+    check(id + ' Hebrew date suffix', /\d{1,2}\/\d{1,2}/.test(title), title);
   }
 }
 

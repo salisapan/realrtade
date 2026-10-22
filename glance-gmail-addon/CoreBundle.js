@@ -4416,6 +4416,84 @@ const FlowFileAttach = (() => {
 
 if (typeof module !== 'undefined') module.exports = { FlowFileAttach };
 
+// ----- flow-trial-extension/core/name-match.js -----
+// Hebrew ↔ Latin display-name matching for vocative / greeting gates.
+// Portable: no chrome, no DOM, no network.
+
+const FlowNameMatch = (() => {
+  const PAIRS = [
+    { he: 'נועה', en: ['noa', 'noah'] },
+    { he: 'ליאור', en: ['lior'] },
+    { he: 'דנה', en: ['dana'] },
+    { he: 'שרה', en: ['sarah', 'sara'] },
+    { he: 'נועם', en: ['noam'] },
+    { he: 'יוסי', en: ['yossi', 'joseph'] },
+    { he: 'מיכל', en: ['michal', 'michelle'] }
+  ];
+
+  function cleanName(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^\w\u0590-\u05FF'’\s.-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function tokens(name) {
+    const c = cleanName(name);
+    if (!c) return [];
+    return c.split(/\s+/).filter(Boolean);
+  }
+
+  function latinForms(hebrewToken) {
+    const t = cleanName(hebrewToken);
+    for (const row of PAIRS) {
+      if (t === row.he || t.indexOf(row.he) !== -1) return row.en.slice();
+    }
+    return [];
+  }
+
+  function equivalent(a, b) {
+    const x = cleanName(a);
+    const y = cleanName(b);
+    if (!x || !y) return false;
+    if (x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1) return true;
+    const xt = tokens(x);
+    const yt = tokens(y);
+    for (const tx of xt) {
+      for (const ty of yt) {
+        if (tx === ty) return true;
+        const lat = latinForms(tx);
+        for (let i = 0; i < lat.length; i++) {
+          if (ty === lat[i] || ty.indexOf(lat[i]) !== -1 || lat[i].indexOf(ty) !== -1) return true;
+        }
+        const latB = latinForms(ty);
+        for (let j = 0; j < latB.length; j++) {
+          if (tx === latB[j] || tx.indexOf(latB[j]) !== -1) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function matchesRecipient(who, recipients) {
+    const name = cleanName(who);
+    if (!name || !recipients || !recipients.length) return false;
+    for (const r of recipients) {
+      if (!r) continue;
+      const display = cleanName(r.name || r.displayName || '');
+      const local = cleanName(r.localPart || (r.email ? String(r.email).split('@')[0] : ''));
+      if (display && equivalent(name, display)) return true;
+      if (local && (equivalent(name, local) || name.replace(/\s+/g, '') === local.replace(/[._-]+/g, ''))) return true;
+    }
+    return false;
+  }
+
+  return { equivalent, matchesRecipient, cleanName };
+})();
+
+if (typeof module !== 'undefined') module.exports = { FlowNameMatch };
+
 // ----- flow-trial-extension/core/intent.js -----
 // The decision layer: takes one email's text and classifies it into exactly
 // one of five intent types, or into nothing at all.
@@ -5141,6 +5219,11 @@ const FlowIntent = (() => {
     for (let a = 0; a < scriptAliases(named).length; a++) {
       if (list.indexOf(scriptAliases(named)[a]) !== -1) return true;
     }
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.equivalent) {
+      for (let r = 0; r < list.length; r++) {
+        if (FlowNameMatch.equivalent(named, list[r])) return true;
+      }
+    }
     const c = ctx || {};
     if (!c.readerEmail && c.namesWaitDone !== true) return false;
     const own = addressList(c.ownAddresses || c.own || []);
@@ -5311,9 +5394,32 @@ const FlowIntent = (() => {
     const c = ctx || {};
     if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    let greeted = '';
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
-      if (who && nameIsReader(who, c)) return false;
+      if (!who) continue;
+      if (!greeted) greeted = who;
+      if (nameIsReader(who, c)) return false;
+    }
+    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    const toOnly = addressList(c.to || []);
+    if (greeted && readerEmail && toOnly.length === 1 && toOnly[0] === readerEmail) {
+      const others = [];
+      const pushRecip = (entry) => {
+        if (!entry) return;
+        if (typeof entry === 'string') {
+          const e = entry.trim().toLowerCase();
+          if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
+          return;
+        }
+        const e = String(entry.email || '').trim().toLowerCase();
+        if (!e || e === readerEmail) return;
+        others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
+      };
+      (c.toRecipients || c.to || []).forEach(pushRecip);
+      (c.ccRecipients || c.cc || []).forEach(pushRecip);
+      if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return true;
+      return false;
     }
     return true;
   }
@@ -8288,6 +8394,7 @@ const FlowActions = (() => {
     if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
     if (/^פגישה/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/פגישה[^\n]{0,80}בשעה\s*\d{1,2}/.test(src)) return true;
     if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
       if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
       return true;
@@ -9423,7 +9530,8 @@ const FlowIncomingJudge = (() => {
     if (new RegExp('להזכיר\\s+ל' + heNotReader).test(raw)) return true;
     if (new RegExp('(?:^|[^\\u0590-\\u05FF])(?:תזכיר|תזכירי|תזכירו)\\s+ל' + heNotReader).test(raw)) return true;
     if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw) && !/לשאול\s+אתכם/.test(raw)) return true;
-    if (/להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(raw)) return true;
     return false;
   }
 
@@ -9642,6 +9750,10 @@ const FlowIncomingJudge = (() => {
   function meetingClockInText(text, intent) {
     const e = intent && intent.entities;
     if (e && Number.isInteger(e.hour) && Number.isInteger(e.minute)) return true;
+    if (typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.readSlot === 'function') {
+      const slot = FlowCloseFamilies.readSlot(String(text || ''), new Date());
+      if (slot && slot.time && Number.isInteger(slot.time.hour) && Number.isInteger(slot.time.minute)) return true;
+    }
     const extractApi = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
     if (extractApi && typeof extractApi.extract === 'function') {
       const facts = extractApi.extract(String(text || ''), {});
@@ -9880,6 +9992,13 @@ var GlanceIntent = (function () {
     return text;
   }
 
+  function localizeEngineTitle(text, title) {
+    var t = String(title || '');
+    if (!t || !mailIsHebrew(text)) return sanitizeTitle(t);
+    t = t.replace(/\s+by\s+/gi, ' עד ');
+    return sanitizeTitle(t);
+  }
+
   function pad(n) {
     n = Number(n);
     return (n < 10 ? '0' : '') + n;
@@ -10016,6 +10135,9 @@ var GlanceIntent = (function () {
   }
 
   function nameMatchesRecipient(who, recipients) {
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient) {
+      return FlowNameMatch.matchesRecipient(who, recipients);
+    }
     var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
     if (!name || !recipients || !recipients.length) return false;
     for (var i = 0; i < recipients.length; i++) {
@@ -10125,7 +10247,9 @@ var GlanceIntent = (function () {
     if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
     if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
-    if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!לי(?:\s|[,،.!?]|$)|לנו(?:\s|[,،.!?]|$))/.test(text)) return true;
+    if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(text)) return true;
+    if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(text)) return true;
     return false;
   }
 
@@ -10222,6 +10346,7 @@ var GlanceIntent = (function () {
       if (planId === 'reply-track') {
         title = replyTrackCardTitle(sourceText || '', title, dueIso);
       }
+      title = localizeEngineTitle(sourceText || '', title);
       return {
         speak: true,
         source: 'engine',
@@ -10442,11 +10567,9 @@ var GlanceIntent = (function () {
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
         return silence(String(hit.reason).slice(6), null);
       }
-      if (hit && hit.plan && hit.plan.id) {
-        var sheetOnly = spottedSheetPlan(prepared, hit);
-        if (sheetOnly) {
-          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit.intent && hit.intent.type ? hit.intent.type : null });
-        }
+      var sheetOnly = spottedSheetPlan(prepared, hit);
+      if (sheetOnly) {
+        return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
       }
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone, prepared);
       if (mapped) return contentTitle(prepared, mapped);

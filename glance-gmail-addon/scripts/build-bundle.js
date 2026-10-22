@@ -25,6 +25,7 @@ const files = [
   'close-families.js',
   'fact-reply.js',
   'file-attach.js',
+  'name-match.js',
   'intent.js',
   'actions.js',
   'resolution.js',

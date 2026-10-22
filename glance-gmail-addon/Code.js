@@ -186,18 +186,22 @@ function buildSha_() {
   return '';
 }
 
-function activeUserEmail_() {
+function readerEmailFromEvent_(e) {
+  if (!e) return '';
+  if (e.userEmail) return String(e.userEmail).trim().toLowerCase();
+  var common = e.commonEventObject;
+  if (common && common.userEmail) return String(common.userEmail).trim().toLowerCase();
+  return '';
+}
+
+function activeUserEmail_(e) {
   try {
     if (typeof Session !== 'undefined' && Session.getActiveUser) {
       var email = Session.getActiveUser().getEmail();
       if (email) return String(email).trim().toLowerCase();
     }
-    if (typeof Session !== 'undefined' && Session.getEffectiveUser) {
-      var eff = Session.getEffectiveUser().getEmail();
-      if (eff) return String(eff).trim().toLowerCase();
-    }
   } catch (err) { /* add-on sandbox */ }
-  return '';
+  return readerEmailFromEvent_(e);
 }
 
 function readerDisplayNameFromHeaders_(userEmail, toRaw, ccRaw) {
@@ -229,8 +233,8 @@ function parseRecipientList_(raw) {
   return out;
 }
 
-function readerContext_(toRaw, ccRaw) {
-  var email = activeUserEmail_();
+function readerContext_(toRaw, ccRaw, e) {
+  var email = activeUserEmail_(e);
   var display = readerDisplayNameFromHeaders_(email, toRaw, ccRaw);
   if (!display && email) {
     var local = email.split('@')[0] || '';
@@ -582,7 +586,7 @@ function readOpen_(e, read) {
   var from = parseFrom_(fromRaw);
   var threadId = e.gmail.threadId ? String(e.gmail.threadId) : '';
   var toList = emailsIn_(toRaw);
-  var reader = readerContext_(toRaw, ccRaw);
+  var reader = readerContext_(toRaw, ccRaw, e);
   var ownAddresses = reader.ownAddresses.slice();
   if (read.isSelf && from.email) {
     var fromLower = String(from.email).trim().toLowerCase();

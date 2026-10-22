@@ -582,6 +582,7 @@ const FlowActions = (() => {
     if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
     if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
     if (/^פגישה/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/פגישה[^\n]{0,80}בשעה\s*\d{1,2}/.test(src)) return true;
     if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
       if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
       return true;
