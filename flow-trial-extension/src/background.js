@@ -1832,7 +1832,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   if (connectorId === 'microsoft' || connectorId === 'meta') {
-    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector });
+    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
   }
   const STORAGE_KEYS = {
     hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',

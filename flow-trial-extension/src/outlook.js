@@ -341,7 +341,10 @@ const FlowOutlook = (() => {
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
       const storedProfile = { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile });
+      await write(AUTH_KEY, {
+        token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile,
+        ecosystem: Boolean(prev && prev.ecosystem)
+      });
       await rememberProfileNames(storedProfile);
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
