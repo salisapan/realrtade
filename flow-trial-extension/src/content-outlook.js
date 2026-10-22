@@ -735,10 +735,17 @@
     // The address often carries only a conversation id. Counting files on that
     // id fails, and a failed read must not become a silent zero.
     let attachmentCount = 0;
-    // Save-shaped and signed-copy delivery (parity with Gmail judge + Graph sync).
-    const countGate = typeof FlowGoogleCloses !== 'undefined' &&
-      typeof FlowGoogleCloses.attachmentCountForJudge === 'function' &&
-      FlowGoogleCloses.attachmentCountForJudge(own);
+    const closes = typeof FlowGoogleCloses !== 'undefined' ? FlowGoogleCloses : null;
+    const needsSave = closes && typeof closes.needsOneAttachment === 'function' && closes.needsOneAttachment(own);
+    // Signed-copy on the open pane stays at zero for one file (suggest-save). Two or
+    // more visible files use attachmentCountForJudge parity so file-it can choose.
+    const signedForJudge = closes && typeof closes.attachmentCountForJudge === 'function' &&
+      closes.attachmentCountForJudge(own) && !needsSave;
+    const localAttachN = ((pane && pane.attachments) || []).filter((a) => {
+      if (!a || a.isInline === true) return false;
+      return !/itemAttachment/i.test(String(a['@odata.type'] || ''));
+    }).length;
+    const countGate = needsSave || (signedForJudge && localAttachN >= 2);
     if (countGate) {
       let id = pane.itemId || null;
       if (!id) {

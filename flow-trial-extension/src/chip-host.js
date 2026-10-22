@@ -148,7 +148,7 @@ const FlowChipHost = (() => {
     const taskOnly = ((ctx.process && ctx.process.steps) || []).length > 0 &&
       (ctx.process.steps || []).every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'task'));
     const kitReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && typeof FlowStepKit !== 'undefined' && (ctx.process.steps || []).length;
-    if (kitReady && face.fileCard !== true && ctx.fileCard !== true) {
+    if (kitReady) {
       const liveSteps = (ctx.process.steps || []).slice();
       const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
       host.__glanceSteps = FlowStepListView.mount(host, rows, {
