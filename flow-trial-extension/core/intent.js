@@ -1434,8 +1434,17 @@ const FlowIntent = (() => {
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
       if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
-        const titled = noReplyDraftLabel(text, ctx, intent);
-        if (titled) intent.label = titled;
+        const createTask = text.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n]+)/i);
+        if (createTask) {
+          let clause = createTask[1].trim();
+          clause = clause.replace(/\.\s*(?:thanks|thank you|best regards|cheers|many thanks|regards)\b.*$/i, '').trim();
+          clause = clause.replace(/\s+(?:thanks|thank you|best regards|cheers|many thanks|regards)\b.*$/i, '').trim();
+          clause = clause.replace(/[.!?]+$/, '').trim();
+          if (clause) intent.label = clause;
+        } else {
+          const titled = noReplyDraftLabel(text, ctx, intent);
+          if (titled) intent.label = titled;
+        }
       }
       // A note to self is that task. "I will <verb> X" is verb plus object.
       // Log commitment is a promise in a mail to someone else, never this note.
