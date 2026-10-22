@@ -109,6 +109,41 @@ check('empty stays quiet', judge('').speak === false);
 check('a send ask is not rewritten into a task', judge('Could you please send the signed contract?').speak === false);
 
 {
+  const FILE_BODY = 'Attached is the signed copy';
+  const repo = path.join(__dirname, '..', '..');
+  const files = [
+    'domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js',
+    'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
+  ];
+  const sandbox = { console, module: undefined };
+  vm.createContext(sandbox);
+  for (const name of files) {
+    vm.runInContext(fs.readFileSync(path.join(repo, 'flow-trial-extension', 'core', name), 'utf8'), sandbox, { filename: name });
+  }
+  const judgeFile = vm.runInContext('FlowIncomingJudge.judge', sandbox);
+  function filePlan(attachmentCount) {
+    const judged = judgeFile({
+      text: FILE_BODY,
+      subject: '',
+      sender: { email: 'dana@meridian.com', name: 'Dana Levi' },
+      to: ['owner@ai.local.flow@gmail.com'],
+      ownAddresses: ['owner@ai.local.flow@gmail.com'],
+      userName: 'Owner',
+      ownNames: ['Owner', 'Sali', 'Sali Sapan'],
+      now: NOW,
+      surface: 'gmail',
+      attachmentCount: attachmentCount,
+      inbound: true
+    }, {});
+    return judged && judged.show && judged.process ? judged.process : null;
+  }
+  const fileOne = filePlan(1);
+  const fileZero = filePlan(0);
+  check('one attachment on a signed-copy delivery is file-it', fileOne && fileOne.id === 'file-it', fileOne);
+  check('the same line with no attachment is not file-it', !fileZero || fileZero.id !== 'file-it', fileZero);
+}
+
+{
   const forced = intent.resolveTask('Please remember to call the client tomorrow.', {
     now: NOW,
     timeZone: TZ,
@@ -769,7 +804,14 @@ console.log('\n--- message path parity ---');
       getBody: function () { calls.push('getBody'); return fields.html; },
       getFrom: function () { calls.push('getFrom'); return fields.from; },
       getTo: function () { calls.push('getTo'); return fields.to == null ? '' : fields.to; },
-      getDate: function () { calls.push('getDate'); return fields.date; }
+      getDate: function () { calls.push('getDate'); return fields.date; },
+      getAttachments: function () {
+        calls.push('getAttachments');
+        const n = fields.attachmentCount == null ? 0 : fields.attachmentCount;
+        const out = [];
+        for (let i = 0; i < n; i++) out.push({ getName: function () { return 'signed-copy.pdf'; } });
+        return out;
+      }
     };
   }
   function extensionOffer(text, fromEmail, fromName, threadUrl) {
@@ -826,7 +868,7 @@ console.log('\n--- message path parity ---');
         ownNames: reader.ownNames,
         now: NOW,
         surface: 'gmail',
-        attachmentCount: 0,
+        attachmentCount: fields.attachmentCount == null ? 0 : fields.attachmentCount,
         inbound: true
       }, {});
       if (!judged || !judged.show || !judged.process) return null;
@@ -894,6 +936,9 @@ console.log('\n--- message path parity ---');
     };
     const cards = openMessage(event);
     check(fields.id + ' reads the plain body, not the html', message.calls.indexOf('getPlainBody') !== -1 && message.calls.indexOf('getSubject') !== -1 && message.calls.indexOf('getFrom') !== -1 && message.calls.indexOf('getTo') !== -1 && message.calls.indexOf('getBody') === -1, message.calls);
+    if (fields.attachmentCount > 0) {
+      check(fields.id + ' reads attachment count from the message', message.calls.indexOf('getAttachments') !== -1, message.calls);
+    }
     check(fields.id + ' sets the message access token', state.tokenCalls === 1 && state.lastToken === 'token', state.tokenCalls);
     check(fields.id + ' does not call prefetch', state.fetches === 0);
     const sourceText = extensionOffer(String(fields.plain || ''), null, null, null) ? fields.plain : (fields.subject || '');
@@ -910,6 +955,28 @@ console.log('\n--- message path parity ---');
     from: 'Dana Levi <dana@meridian.com>',
     date: new Date('2026-10-15T08:00:00Z')
   };
+  const fileInbound = {
+    id: 'filecopy1',
+    threadId: 'threadfile',
+    subject: 'Signed copy',
+    plain: 'Attached is the signed copy',
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    attachmentCount: 1
+  };
+  reset();
+  const fileMessage = gmailMessage(fileInbound);
+  state.messages[fileInbound.id] = fileMessage;
+  openMessage({
+    gmail: { messageId: fileInbound.id, accessToken: 'token', threadId: fileInbound.threadId },
+    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
+  });
+  const filePlan = judgedPlan(fileInbound);
+  check('add-on passes attachment count into the shared judge', fileMessage.calls.indexOf('getAttachments') !== -1, fileMessage.calls);
+  check('add-on judge plans file-it when the message has one attachment', filePlan && filePlan.id === 'file-it', filePlan);
+  const fileNoAttach = judgedPlan(Object.assign({}, fileInbound, { attachmentCount: 0 }));
+  check('add-on judge does not plan file-it without an attachment', !fileNoAttach || fileNoAttach.id !== 'file-it', fileNoAttach);
+
   const opened = openOf(hebrew);
   check('heb1 does not invent a midnight clock', linesOf(openMessage({
     gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },

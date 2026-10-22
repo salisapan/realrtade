@@ -2107,7 +2107,10 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
+    const inboundAttachedCopy = input.attachmentCount === 1 &&
+      /\battached is\b/i.test(text) &&
+      /\bsigned (?:pdf|copy|scan|form)\b/i.test(text);
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || inboundAttachedCopy) {
       if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
