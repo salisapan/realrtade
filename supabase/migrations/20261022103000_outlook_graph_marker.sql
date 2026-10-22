@@ -20,6 +20,27 @@ create table if not exists public.outlook_graph_accounts (
 comment on table public.outlook_graph_accounts is
   'Graph webhook marker state for Glance (server-side category). Tokens via Vault secret id.';
 
+alter table public.outlook_graph_accounts enable row level security;
+alter table public.outlook_graph_accounts force row level security;
+-- No policies for anon/authenticated; service_role bypasses RLS for the Edge worker.
+revoke all on table public.outlook_graph_accounts from anon, authenticated;
+
+create or replace function public.outlook_graph_accounts_set_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger outlook_graph_accounts_updated_at
+  before update on public.outlook_graph_accounts
+  for each row
+  execute function public.outlook_graph_accounts_set_updated_at();
+
 -- Read refresh token material for the Edge worker (service role only).
 create or replace function public.outlook_marker_read_refresh(secret_id uuid)
 returns text
