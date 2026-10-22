@@ -39,6 +39,7 @@ test('chat draft receipt on messenger', async ({ glance }) => {
       await expect(box).toContainText('Taizu', { timeout: 25000 });
       const handled = page.locator('#glance-chat-draft .flow-chip-handled');
       await expect(handled).toContainText(row.expectText, { timeout: 15000 });
+      await expect(page.locator('#glance-chat-draft .flow-chip-undo')).toHaveText(row.rtl ? 'בטל' : 'Undo');
       await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
       const done = page.locator('#glance-chat-draft .flow-chip.flow-chip-done');
       await expect(done).toBeVisible({ timeout: 15000 });

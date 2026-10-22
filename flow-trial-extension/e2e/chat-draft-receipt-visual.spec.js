@@ -112,6 +112,7 @@ for (const surface of SURFACES) {
         await expect(box).toContainText('Taizu', { timeout: 25000 });
         const handled = page.locator('#glance-chat-draft .flow-chip-handled');
         await expect(handled).toContainText(row.expectText, { timeout: 15000 });
+        await expect(page.locator('#glance-chat-draft .flow-chip-undo')).toHaveText(row.rtl ? 'בטל' : 'Undo');
         if (row.rtl) {
           const text = await handled.innerText();
           expect(text.trim().indexOf('.')).not.toBe(0);
