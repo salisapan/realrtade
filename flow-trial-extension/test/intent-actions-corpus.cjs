@@ -1601,5 +1601,34 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   check('Lior, could you stays quiet even when the user is in To', otherEn && !otherEn.type && otherEn.quiet === 'hedge', { type: otherEn && otherEn.type, quiet: otherEn && otherEn.quiet });
 }
 
+console.log('\n--- #179 5a/5b inbound פעולה נדרשת and OneDrive (PR #186) ---\n');
+{
+  const inbound = {
+    senderEmail: 'dana@acme.io',
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'Sali',
+    ownNames: ['Sali', 'Sali Sapan'],
+    readerEmail: 'ai.local.flow@gmail.com',
+    namesWaitDone: true,
+    surface: 'gmail',
+    attachmentCount: 1
+  };
+  const showDeck = classify('פעולה נדרשת מצד: חתימה על ה-deck', inbound);
+  check('HE action-required unnamed party shows', showDeck && showDeck.type === 'request' && showDeck.selfTask === true, showDeck);
+  const showReader = classify('פעולה נדרשת מצדך: חתימה על החוזה', inbound);
+  check('HE action-required מצדך shows', showReader && showReader.type === 'request' && showReader.selfTask === true, showReader);
+  const quietNamed = classify('פעולה נדרשת מצד: יוסי כהן — חתימה על ה-deck', inbound);
+  check('HE action-required names someone else stays quiet', quietNamed && !quietNamed.type && quietNamed.quiet === 'hedge', quietNamed);
+  const quietRole = classify('פעולה נדרשת מצד: רואה החשבון\nחתימה על הדוח השנתי', inbound);
+  check('HE action-required names a role stays quiet', quietRole && !quietRole.type && quietRole.quiet === 'hedge', quietRole);
+  const signoffLine = classify('פעולה נדרשת מצד: חתימה על ה-deck  בתודה, דנה', inbound);
+  check('HE action-required sign-off on same line does not leave dangling ב', signoffLine && signoffLine.label === 'לחתום על ה-deck', signoffLine && signoffLine.label);
+  const enOd = classify('Please save the attachment to OneDrive.', inbound);
+  check('EN save to OneDrive on Gmail is not a selfTask bypass', enOd && !enOd.selfTask, enOd);
+  const heOd = classify('תשמרי את המצורף בוואן דרייב', Object.assign({}, inbound, { senderEmail: 'dana@meridian.com' }));
+  check('HE save to OneDrive inbound on Gmail is a selfTask', heOd && heOd.type === 'request' && heOd.selfTask === true, heOd);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

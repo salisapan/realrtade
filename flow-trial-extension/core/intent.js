@@ -1518,14 +1518,35 @@ const FlowIntent = (() => {
       if (/\b(?:postpon(?:e|ed|ing)|cancel(?:led|ed|ing)?|called off|won'?t happen|will not happen|isn'?t happening)\b/i.test(blob)) return 'negative';
       return '';
     }
+    function inboundActionRequiredPartyOk() {
+      if (thirdPartyQuote(text)) return false;
+      if (/["«][^"\n]{0,200}פעולה\s+נדרשת\s+מצד/i.test(text)) return false;
+      if (/(?:^|[^\u0590-\u05FF])(?:שלחתי|העברתי|רק\s+לעדכון)\s+[^.\n]{0,80}:\s*["«]?[^"\n]*פעולה\s+נדרשת\s+מצד/i.test(text)) return false;
+      if (/פעולה\s+נדרשת\s+מצדך:/i.test(text)) return true;
+      const after = text.split(/פעולה\s+נדרשת\s+מצד:\s*/i)[1];
+      if (!after) return false;
+      const lines = String(after).split('\n').map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) return false;
+      let head = lines[0].replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+      if (lines.length > 1 && !/חתימה|לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן/i.test(head)) return false;
+      const dash = head.match(/^(.+?)\s*[—–-]\s+(.+)$/);
+      if (dash) {
+        const who = dash[1].trim();
+        if (who && !/^חתימה/i.test(who)) return false;
+        head = dash[2].trim();
+      }
+      if (/^[\u0590-\u05FF][\u0590-\u05FF'’\s.-]{0,50}$/.test(head) && !/חתימה|לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן/i.test(head)) return false;
+      return /^חתימה\s+על\s+/i.test(head) || /^(?:לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן)/i.test(head);
+    }
     function rescueInboundActionRequired() {
       if (addressedToSelf(ctx)) return null;
       if (!/פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) return null;
+      if (!inboundActionRequiredPartyOk()) return null;
       const subject = ctx && ctx.subject;
       let titled = '';
       const actionLine = text.match(/פעולה\s+נדרשת\s+מצד(?:ך)?:\s*([^\n]+)/i);
       if (actionLine) {
-        const action = String(actionLine[1] || '').replace(/\s*תודה.*$/i, '').trim();
+        const action = String(actionLine[1] || '').replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
         if (/^חתימה\s+על\s+/i.test(action)) titled = clipTitle('לחתום על ' + action.replace(/^חתימה\s+על\s+/i, ''));
       }
       const decided = selfDecisionTitle(text, facts);
@@ -1565,8 +1586,6 @@ const FlowIntent = (() => {
       // a past recap, a negation, a conditional). Any other self-sent
       // note is still the task, including one this path had filed as quiet.
       if (!(extra && extra.noRescue)) {
-        const inboundAction = rescueInboundActionRequired();
-        if (inboundAction) return inboundAction;
         const rescued = rescueSelfSent(code);
         if (rescued) return rescued;
       }
@@ -1659,15 +1678,16 @@ const FlowIntent = (() => {
     // The host judges the same mail again once the profile names are stored,
     // or after the name wait (at most 2s), with whatever names are known.
     if (mailIsOwn(ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
-    if (!addressedToSelf(ctx)) {
-      const inboundActionEarly = rescueInboundActionRequired();
-      if (inboundActionEarly) return inboundActionEarly;
-    }
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
     if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge', { noRescue: true });
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
+    if (!addressedToSelf(ctx) && /פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) {
+      if (!inboundActionRequiredPartyOk()) return stayQuiet('hedge');
+      const inboundAction = rescueInboundActionRequired();
+      if (inboundAction) return inboundAction;
+    }
     if (bankChangePayment(text)) return stayQuiet('family');
     // A negated or conditional ask stays quiet. A sentence that still asks
     // (please pay, if you can send, let's meet) is the close.
@@ -1819,7 +1839,8 @@ const FlowIntent = (() => {
       }
       if (google && google.close) {
         const g = google.close;
-        if (g.copyAttachment && g.target === 'onedrive' && !addressedToSelf(ctx) && ctx.surface !== 'outlook') {
+        const heOneDriveSave = /(?:תשמור|תשמר(?:י|ו)?|שמור|לשמור|תתייק)[^\n]{0,60}(?:בוואן\s*דרייב|ב[-\u05BE]?\s*one\s?drive|את\s+המצורף\s+בוואן\s*דרייב)/i.test(text);
+        if (g.copyAttachment && g.target === 'onedrive' && heOneDriveSave && !addressedToSelf(ctx) && ctx.surface !== 'outlook') {
           const subject = ctx && ctx.subject;
           let titled = selfAskTitle(text, subject, ctx);
           if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
