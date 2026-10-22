@@ -84,7 +84,7 @@ const FlowGoogleCloses = (() => {
   // this sentence and for no other, so the rest of show and silence stay put.
   function needsOneAttachment(text) {
     const t = String(text || '');
-    return SAVE_EN.test(t) || SAVE_HE.test(t);
+    return SAVE_EN.test(t) || SAVE_HE.test(t) || signedCopyDelivered(t);
   }
 
   function saveClauses(text) {
@@ -130,10 +130,16 @@ const FlowGoogleCloses = (() => {
     if (/\bgoing\s+to\b/i.test(c)) return true;
     if (/\bwill\s+be\s+sending\b/i.test(c)) return true;
     if (/\bI\s+am\s+sending\b/i.test(c) && /\b(?:tomorrow|next\s+week|later)\b/i.test(c)) return true;
+    if (/\b(?:i(?:'|')?m|i am|we(?:'|')?re|we are|i(?:'|')?ll|we(?:'|')?ll)\b[^.!?\n]{0,96}\b(?:send(?:ing)?)\b[^.!?\n]{0,48}\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|this\s+(?:afternoon|evening|tonight)|tonight)\b/i.test(c)) return true;
+    if (/\bon\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(c)) return true;
+    if (/\bthis\s+(?:afternoon|evening|tonight)\b/i.test(c)) return true;
+    if (/\btonight\b/i.test(c) && /\bsend/i.test(c)) return true;
     if (/אשלח|נשלח/.test(c)) return true;
     if (/\b(?:tomorrow|next\s+week)\b/i.test(c)) return true;
     if (/\blater\b/i.test(c)) return true;
     if (/מחר|בשבוע הבא/.test(c)) return true;
+    if (/ביום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(c)) return true;
+    if (/הערב/.test(c) && /(?:אשלח|שולח|שולחת|נשלח)/.test(c)) return true;
     if (/\bcomes\s+next\s+week\b/i.test(c)) return true;
     if (/תגיע\s+בשבוע/.test(c)) return true;
     if (/\b(?:when|once|after)\b[^.!?\n]{0,100}\b(?:approves?|signs?|is\s+approved|are\s+approved)\b/i.test(c)) return true;
@@ -161,11 +167,18 @@ const FlowGoogleCloses = (() => {
       /(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)[^\n]{0,24}(?:חתום|חתומה|סופי|סופית)/.test(c);
   }
 
+  function hebrewSignedAdjective(text) {
+    const t = String(text || '');
+    if (/חתום\s+על\s+ידי/.test(t)) return true;
+    if (/(?:חוזה|הסכם|עותק|מסמך)\s+חתום/.test(t)) return true;
+    return false;
+  }
+
   function hebrewAskToSign(text) {
     const t = String(text || '');
-    if (/(?:נא|בבקשה|אנא)[^\n]{0,40}(?:לחתום|לחתימה|חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:חתום|חתמי|תחתום|תחתמי|לחתום)(?:\s|[^\u0590-\u05FF]|$)/.test(t)) return true;
-    if (/(?:חתום|חתמי|תחתום|תחתמי)[^\n]{0,30}(?:והחזר|והחזירי|ותחזיר)/.test(t)) return true;
+    if (hebrewSignedAdjective(t)) return false;
+    if (/(?:אנא|בבקשה|נא|תוכל|צריך)[^\n]{0,40}(?:לחתום|לחתימה|חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    if (/(?:^|[.!?\n;]\s*)(?:חתום|חתמי)(?:\s|[^\u0590-\u05FF]|$)[^\n]{0,40}(?:והחזר|והחזירי|ותחזיר)/m.test(t)) return true;
     if (/(?:והחזר|והחזירי|ותחזיר)[^\n]{0,30}(?:חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
     return /(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t);
   }

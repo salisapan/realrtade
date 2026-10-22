@@ -1176,7 +1176,7 @@
       hydrateHow: (pane && pane.hydrateHow) || null,
       priorConversationId: (pane && pane.priorConversationId) || null,
       attachments: paneFiles,
-      attachment: pickedAttach || paneFiles[0] || null,
+      attachment: pickedAttach || (savePick.mode === 'choice' ? null : (paneFiles[0] || null)),
       attachmentPickMode: savePick.mode,
       saveAttachmentName: pickedAttach && (pickedAttach.name || pickedAttach.filename) || null,
       __epoch: paneEpoch(pane)

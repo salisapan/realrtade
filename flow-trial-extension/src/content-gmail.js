@@ -2084,7 +2084,7 @@ function glanceUiCopy(kind) {
       : { mode: attachments.length === 1 ? 'single' : (attachments.length > 1 ? 'choice' : 'none'), file: attachments[0] || null, files: attachments };
     const attachment = (saveAttachPick.mode === 'picked' || saveAttachPick.mode === 'single')
       ? (saveAttachPick.file || attachments[0] || null)
-      : (attachments[0] || null);
+      : (saveAttachPick.mode === 'choice' ? null : (attachments[0] || null));
     openSuggest = {
       messageId: messageId,
       text: text,

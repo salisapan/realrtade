@@ -34,6 +34,11 @@ check('two similar files need a choice', pickAmb.mode === 'choice' && !pickAmb.f
 const single = FA.pickSaveAttachment('Attached is the invoice.', [meta('invoice.pdf')]);
 check('one file stays single', single.mode === 'single' && single.file.filename === 'invoice.pdf', single);
 
+const tieBody = 'Attached is the signed copy.';
+const tieFiles = [meta('scan-1.pdf'), meta('scan-2.pdf')];
+const pickTie = FA.pickSaveAttachment(tieBody, tieFiles);
+check('two scans with signed-copy wording need a chooser', pickTie.mode === 'choice' && !pickTie.file, pickTie);
+
 console.log('\n--- Gmail and Outlook pages call pickSaveAttachment ---\n');
 const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
 const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');

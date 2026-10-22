@@ -476,6 +476,36 @@ const CASES = [
       { incoming: fwd.incoming.length, why: (fwd.diagnostics || []).map((d) => d.reason) });
   }
 
+  console.log('\n--- signed-copy file-it and Hebrew sign-and-return (CTO delta) ---\n');
+  {
+    const judgeDeps = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    function stepKinds(r) {
+      return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
+    }
+    const signedBody = 'Here is the signed contract, as we agreed when we met';
+    const inbound = {
+      text: signedBody, subject: 'Contract',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'],
+      attachmentCount: 1, hasThreadAttachment: true, inbound: true
+    };
+    const fileG = J.judge(Object.assign({ surface: 'gmail' }, inbound), judgeDeps);
+    const fileO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, inbound), judgeDeps);
+    check('Gmail inbound signed-copy delivery is file-it', fileG.show && fileG.process && fileG.process.id === 'file-it', { show: fileG.show, id: fileG.process && fileG.process.id });
+    check('Outlook inbound signed-copy delivery is file-it', fileO.show && fileO.process && fileO.process.id === 'file-it', { show: fileO.show, id: fileO.process && fileO.process.id });
+    const heSign = 'מצורף החוזה, אנא חתום והחזר';
+    const signBase = {
+      text: heSign, subject: 'חוזה',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), attachmentCount: 1, hasThreadAttachment: true, inbound: true
+    };
+    const hsG = J.judge(Object.assign({ surface: 'gmail', to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] }, signBase), judgeDeps);
+    const hsO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, signBase), judgeDeps);
+    check('Gmail Hebrew sign-and-return shows with draft', hsG.show && stepKinds(hsG).indexOf('gmailDraft') >= 0, { show: hsG.show, steps: stepKinds(hsG) });
+    check('Outlook Hebrew sign-and-return shows with draft', hsO.show && stepKinds(hsO).indexOf('outlookDraft') >= 0, { show: hsO.show, steps: stepKinds(hsO) });
+    check('needsOneAttachment counts signed-copy mail for Graph', E('FlowGoogleCloses').needsOneAttachment(signedBody) === true);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();

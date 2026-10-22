@@ -349,6 +349,8 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
   check('shared files do not ask for an attachment count',
     FlowGoogleCloses.needsOneAttachment('Please save it to our shared files by Friday, October 9.') === false &&
     FlowGoogleCloses.needsOneAttachment('Please save the attachment to OneDrive.') === true);
+  check('signed-copy delivery asks Outlook/Gmail to count attachments',
+    FlowGoogleCloses.needsOneAttachment('Here is the signed contract, as we agreed when we met') === true);
 }
 
 console.log('\n--- family C: signed copy delivered (one attachment, no save verb) ---\n');
@@ -370,7 +372,9 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
     ['Attached is the signed contract and the appendix', { attachmentCount: 2 }],
     ['מצורף החוזה החתום והנספח', { attachmentCount: 2 }],
     ['Here is the signed contract, as we agreed when we met', { attachmentCount: 1 }],
-    ['Attached is the final agreement we discussed last week', { attachmentCount: 1 }]
+    ['Attached is the final agreement we discussed last week', { attachmentCount: 1 }],
+    ['מצורף חוזה חתום', { attachmentCount: 1 }],
+    ['הנה ההסכם, חתום על ידי שני הצדדים', { attachmentCount: 1 }]
   ];
   broadPositives.forEach(([text, extra]) => {
     const row = plan(text, extra);
@@ -386,6 +390,7 @@ console.log('\n--- family C: signed copy delivered (one attachment, no save verb
     ['please return the NDA signed', { attachmentCount: 1 }],
     ['have you signed the agreement yet?', { attachmentCount: 1 }],
     ['I am sending the signed contract tomorrow', { attachmentCount: 1 }],
+    ["I'm sending the signed contract on Monday", { attachmentCount: 1 }],
     ['I will be sending the signed copy once legal approves', { attachmentCount: 1 }],
     ['Here is the draft; the final version of the agreement comes next week', { attachmentCount: 1 }],
     ['אשלח את החוזה החתום מחר', { attachmentCount: 1 }],

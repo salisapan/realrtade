@@ -28,7 +28,7 @@ const FlowRequestTypes = (() => {
       he: ['לשלם', 'תשלם', 'תשלמו', 'להחזיר כסף', 'החזר כספי', 'העברת', 'שילמת', 'תעביר', 'תעבירי'] },
     { id: 'sign', days: 2, noun: 'signature',
       en: ['sign', 'signed it', 'countersign', 'initial', 'signature', 'signed copy'],
-      he: ['לחתום', 'תחתום', 'תחתמו', 'חתימה', 'חתימתך', 'חתמת', 'תחתמי'] },
+      he: ['לחתום', 'תחתום', 'תחתמו', 'חתימה', 'חתימתך', 'חתמת', 'תחתמי', 'חתום', 'חתמי'] },
     { id: 'approve', days: 2, noun: 'approval',
       en: ['approve', 'authori[sz]e', 'sign off', 'green-?light', 'approval', 'go-ahead', 'accept'],
       he: ['לאשר', 'תאשר', 'תאשרו', 'אישור', 'אישורך', 'אישרת', 'תאשרי'] },
