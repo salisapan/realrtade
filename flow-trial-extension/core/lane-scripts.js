@@ -8,6 +8,7 @@ const FlowLaneScripts = (() => {
     'core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js'
   ];
   const WHATSAPP_TAIL = [
+    'core/whatsapp-engine.js',
     'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'
   ];
   const CHAT_CARD_TAIL = ['src/chip-host.js', 'src/chat-task-card.js'];

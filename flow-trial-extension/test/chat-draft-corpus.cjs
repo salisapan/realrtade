@@ -627,7 +627,13 @@ check('undo leaves the box alone after an edit', FlowChatCompose.undoDraft(edite
 let undoButtonCalled = false;
 const receiptBox = box('');
 FlowChatCompose.insertDraft(receiptBox, 'Taizu - maps');
-const hostStub = { remove() {} };
+const hostStub = { remove() {}, className: '', appendChild() {} };
+const mountStub = {
+  remove() {},
+  appendChild(c) { this._host = c; },
+  querySelector(sel) { return sel === '.flow-chip-host' ? this._host : null; },
+  setAttribute() {}
+};
 const chipHost = {
   showDraftReceipt(host, opts) {
     undoButtonCalled = typeof opts.onUndo === 'function';
@@ -640,8 +646,14 @@ const chipHost = {
 globalThis.FlowChipHost = chipHost;
 globalThis.FlowChatCompose = FlowChatCompose;
 Object.assign(global.document, {
-  getElementById(id) { return id === 'glance-chat-draft-receipt' ? hostStub : null; },
-  createElement() { return hostStub; },
+  getElementById(id) {
+    if (id === 'glance-chat-draft') return mountStub;
+    return null;
+  },
+  createElement(tag) {
+    if (tag === 'div') return hostStub;
+    return hostStub;
+  },
   body: global.document.body || { appendChild() {} },
   documentElement: global.document.documentElement || { appendChild() {} }
 });
@@ -979,6 +991,11 @@ console.log('\n--- calendar evidence ---\n');
     const w = dom.window;
     pin(w);
     const sent = [];
+    if (!o.storage && surface.indexOf('whatsapp') >= 0) {
+      o.storage = memoryStorage({
+        glanceSwitches: { WHATSAPP_ENGINE: o.engineOff === true ? false : true }
+      });
+    }
     w.chrome = {
       runtime: {
         id: 'glance-test',
@@ -1021,8 +1038,11 @@ console.log('\n--- calendar evidence ---\n');
     });
     const key = surface.indexOf('whatsapp') >= 0 ? 'whatsapp' : (surface.indexOf('messenger') >= 0 ? 'messenger' : 'instagram');
     if (o.beforeScan) o.beforeScan(w);
-    if (!o.skipScan) vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
-    await new Promise((r) => setTimeout(r, 30));
+    if (!o.skipScan) {
+      if (key === 'whatsapp') await new Promise((r) => setTimeout(r, 5));
+      vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
+    }
+    await new Promise((r) => setTimeout(r, key === 'whatsapp' ? 50 : 30));
     const composer = w.document.querySelector('[data-glance-composer="1"]');
     const send = w.document.querySelector('[aria-label="Send"]');
     let sendClicks = 0;

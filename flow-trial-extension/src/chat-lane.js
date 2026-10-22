@@ -85,18 +85,26 @@ const FlowChatLane = (() => {
     return globalThis.document || null;
   }
 
+  const DRAFT_RECEIPT_CHAIN = 'chat-draft';
+
   function draftReceiptHost() {
     const document = pageDoc();
-    if (!document || typeof document.getElementById !== 'function') return null;
-    let el = document.getElementById('glance-chat-draft-receipt');
-    if (!el && typeof document.createElement === 'function') {
-      el = document.createElement('div');
-      el.id = 'glance-chat-draft-receipt';
-      el.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483000;width:min(360px,calc(100vw - 40px));';
+    if (!document || typeof document.getElementById !== 'function' || typeof document.createElement !== 'function') return null;
+    let mount = document.getElementById('glance-chat-draft');
+    if (!mount) {
+      mount = document.createElement('div');
+      mount.id = 'glance-chat-draft';
+      mount.setAttribute('data-glance-chain', DRAFT_RECEIPT_CHAIN);
       const root = document.body || document.documentElement;
-      if (root && typeof root.appendChild === 'function') root.appendChild(el);
+      if (root && typeof root.appendChild === 'function') root.appendChild(mount);
     }
-    return el;
+    let host = mount.querySelector && mount.querySelector('.flow-chip-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.className = 'flow-chip-host';
+      mount.appendChild(host);
+    }
+    return host;
   }
 
   function showComposerUndo(box, draftText, input) {
@@ -113,7 +121,11 @@ const FlowChatLane = (() => {
       onUndo: () => {
         const r = FlowChatCompose.undoDraft(box, draftText);
         if (r && r.ok) {
-          try { host.remove(); } catch (e) { /* gone */ }
+          try {
+            const document = pageDoc();
+            const mount = document && document.getElementById('glance-chat-draft');
+            if (mount) mount.remove();
+          } catch (e) { /* gone */ }
         }
         return r || { ok: false, sends: false };
       }

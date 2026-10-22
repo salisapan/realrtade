@@ -9,9 +9,25 @@
 (() => {
   if (typeof FlowWhatsAppParse === 'undefined' || typeof FlowChatLane === 'undefined') return;
   const P = FlowWhatsAppParse;
+  const ENGINE_KEY = (typeof FlowWhatsappEngine !== 'undefined' && FlowWhatsappEngine.SWITCH)
+    ? FlowWhatsappEngine.SWITCH
+    : 'WHATSAPP_ENGINE';
+
+  async function engineOn() {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return false;
+      const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+      const switches = (bag && bag.glanceSwitches) || {};
+      if (typeof FlowWhatsappEngine !== 'undefined' && typeof FlowWhatsappEngine.isOn === 'function') {
+        return FlowWhatsappEngine.isOn(switches);
+      }
+      return switches[ENGINE_KEY] === true;
+    } catch (e) { return false; }
+  }
   const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
   let timer = null;
+  let enabled = false;
   const drafted = new Set();
   const inflight = new Set();
 
@@ -84,6 +100,7 @@
   }
 
   function scan() {
+    if (!enabled) return;
     const main = chatPane();
     if (!main) return;
     if (main.getAttribute('data-glance-chat') === 'group') return;
@@ -94,10 +111,17 @@
     maybeDraft(main, list);
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-  const app = document.getElementById('app') || document.body;
-  if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
-  schedule();
+  function schedule() {
+    if (!enabled) return;
+    clearTimeout(timer);
+    timer = setTimeout(scan, DEBOUNCE_MS);
+  }
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.whatsapp = { scan: scan };
+  engineOn().then((on) => {
+    enabled = on === true;
+    const app = document.getElementById('app') || document.body;
+    if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
+    if (enabled) schedule();
+  });
 })();

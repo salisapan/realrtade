@@ -13,7 +13,7 @@ const LEAN_BASE = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.LEA
   ];
 const WHATSAPP_TAIL = (typeof FlowLaneScripts !== 'undefined' && FlowLaneScripts.WHATSAPP_TAIL)
   ? FlowLaneScripts.WHATSAPP_TAIL
-  : ['src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'];
+  : ['core/whatsapp-engine.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'];
 const LANES = [
   {
     id: 'whatsapp',
@@ -136,15 +136,6 @@ async function granted(origins) {
   if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.contains) return false;
   try { return await chrome.permissions.contains({ origins: origins }); }
   catch (e) { return false; }
-}
-
-async function whatsappEngineOn() {
-  const W = typeof FlowWhatsappEngine !== 'undefined' ? FlowWhatsappEngine : null;
-  const key = W && W.SWITCH ? W.SWITCH : 'WHATSAPP_ENGINE';
-  try {
-    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
-    return !!(bag.glanceSwitches && bag.glanceSwitches[key] === true);
-  } catch (e) { return false; }
 }
 
 async function laneJs(lane) {
