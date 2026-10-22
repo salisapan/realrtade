@@ -195,10 +195,26 @@ function activeUserEmail_() {
   return '';
 }
 
-function readerContext_() {
+function readerDisplayNameFromHeaders_(userEmail, toRaw, ccRaw) {
+  var want = String(userEmail || '').trim().toLowerCase();
+  if (!want) return '';
+  var found = '';
+  function scan(raw) {
+    String(raw || '').split(/\s*(?:,|;)\s*/).forEach(function (part) {
+      if (!part) return;
+      var parsed = parseFrom_(part.trim());
+      if (parsed.email && parsed.email.toLowerCase() === want && parsed.name) found = parsed.name;
+    });
+  }
+  scan(toRaw);
+  scan(ccRaw);
+  return found;
+}
+
+function readerContext_(toRaw, ccRaw) {
   var email = activeUserEmail_();
-  var display = '';
-  if (email) {
+  var display = readerDisplayNameFromHeaders_(email, toRaw, ccRaw);
+  if (!display && email) {
     var local = email.split('@')[0] || '';
     if (local) {
       display = local.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
@@ -309,10 +325,10 @@ function judgeOpen_(opened, e) {
   var decision = Glance.intent.silence('no-plan', null);
   var body = String(opened.body || '').trim();
   if (body) {
-    decision = Glance.intent.resolveTask(opened.body, { now: now, timeZone: timeZone, engine: engine });
+    decision = Glance.intent.resolveTask(opened.body, { now: now, timeZone: timeZone, engine: engine, userName: opened.userName || null, ownNames: opened.ownNames || null });
   }
   if (!decision.speak && opened.subject) {
-    decision = Glance.intent.resolveTask(opened.subject, { now: now, timeZone: timeZone, engine: engine });
+    decision = Glance.intent.resolveTask(opened.subject, { now: now, timeZone: timeZone, engine: engine, userName: opened.userName || null, ownNames: opened.ownNames || null });
   }
   return decision;
 }
@@ -517,6 +533,7 @@ function readOpen_(e, read) {
     var parsed = parseFrom_(fromRaw);
     read.from = parsed.email;
     toRaw = typeof message.getTo === 'function' ? message.getTo() : '';
+    var ccRaw = typeof message.getCc === 'function' ? message.getCc() : '';
     read.isSelf = isSelfMail_(parsed.email, toRaw);
     if (typeof message.getAttachments === 'function') {
       var attachments = message.getAttachments();
@@ -528,7 +545,7 @@ function readOpen_(e, read) {
   var from = parseFrom_(fromRaw);
   var threadId = e.gmail.threadId ? String(e.gmail.threadId) : '';
   var toList = emailsIn_(toRaw);
-  var reader = readerContext_();
+  var reader = readerContext_(toRaw, ccRaw);
   var ownAddresses = reader.ownAddresses.slice();
   for (var ti = 0; ti < toList.length; ti++) {
     if (ownAddresses.indexOf(toList[ti]) < 0) ownAddresses.push(toList[ti]);
@@ -920,7 +937,7 @@ function render_(model) {
     var widget = widgets[i];
     if (widget.type === 'text') section.addWidget(text_(widget.text));
     if (widget.type === 'button' && widget.action === 'authorize') section.addWidget(authButton_(widget));
-    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo')) {
+    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onRemindMe')) {
       section.addWidget(button_(widget));
     }
   }

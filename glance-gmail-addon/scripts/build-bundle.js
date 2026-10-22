@@ -70,8 +70,13 @@ const parts = files.map((file) => {
 });
 
 const outPath = process.env.GLANCE_BUNDLE_OUT || out;
+const bundleOnly = Boolean(process.env.GLANCE_BUNDLE_OUT);
 fs.writeFileSync(outPath, header + parts.join('\n') + footer);
 console.log('wrote ' + path.relative(repo, outPath) + ' (' + files.length + ' sources)');
+
+if (bundleOnly) {
+  process.exit(0);
+}
 
 let shortSha = String(process.env.GLANCE_BUILD_SHA || '').trim();
 if (!shortSha) {
