@@ -264,8 +264,8 @@ check('weekday and 22/10 and בשעה 14:00 is Thu 22 Oct 2026 at 14:00',
 check('the meeting plan is a hold with no file step, and it is not an explicit hold',
   heHold.type === 'event' && heHold.personalClose !== 'calendar-hold' && heHold.explicitHold !== true &&
   heHold.planId === 'hold' && heHold.steps && heHold.steps.length === 1 && heHold.steps[0] === 'calendar', heHold);
-check('Outlook stays quiet: the base judge does not offer this hold',
-  heHold.show === false && heHold.reason === 'no-draft-close', heHold);
+check('Outlook shows a hold for a timed inbound statement',
+  heHold.show === true && heHold.judgedId === 'hold', heHold);
 check('a weekday that contradicts 22/10 stays a schedule and does not book one day',
   heHold.quietType === 'event' && heHold.quietPlan === 'schedule' && heHold.quietNeeds !== true &&
   heHold.quietIso == null, heHold);
