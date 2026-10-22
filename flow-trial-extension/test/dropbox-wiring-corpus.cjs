@@ -118,7 +118,7 @@ const SAVE = (over) => ({ type: 'flow:dropbox-save', payload: Object.assign({ ke
     check('oauth: forged state refused before any token request', /could not be verified/.test(threw) && !env.calls.some((c) => c.url.indexOf('oauth2/token') >= 0), threw);
   }
   {
-    const env = load({ patch: [['dropboxOAuth: false', 'dropboxOAuth: true']] });
+    const env = load({ patch: [['dropboxOAuth: false', 'dropboxOAuth: true'], ["dropboxAppKey: 'fxsss86nh3anm2i'", "dropboxAppKey: ''"]] });
     let threw = ''; try { await env.fn('connectDropboxOAuth')(); } catch (e) { threw = e.message; }
     check('oauth: no app key -> says so, asks nothing', /isn’t configured/.test(threw) && !env.calls.some((c) => c.method === 'AUTH'), threw);
   }

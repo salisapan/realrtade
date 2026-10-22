@@ -31,7 +31,13 @@ function gitShow(file) {
 
 const baseContents = {};
 for (const f of CORE_FILES) {
-  try { baseContents[f] = gitShow(f); } catch (e) { baseContents[f] = fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'); }
+  try {
+    baseContents[f] = gitShow(f);
+  } catch (e) {
+    console.error(`compare-inbound-flips-aaa15fa: could not read base ${BASE} for core/${f}: ${e.message || e}`);
+    console.error('Fetch the base commit (git fetch origin) and ensure aaa15fa exists in this clone.');
+    process.exit(2);
+  }
 }
 const JBase = loadJudge(baseContents);
 const JNow = loadJudge({});

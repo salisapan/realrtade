@@ -351,6 +351,34 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
     FlowGoogleCloses.needsOneAttachment('Please save the attachment to OneDrive.') === true);
 }
 
+console.log('\n--- family C: signed copy delivered (one attachment, no save verb) ---\n');
+{
+  const positives = [
+    ['Attached is the signed copy', { attachmentCount: 1 }],
+    ['מצורף החוזה החתום', { attachmentCount: 1 }],
+    ['Final version attached', { attachmentCount: 1 }]
+  ];
+  positives.forEach(([text, extra]) => {
+    const row = plan(text, extra);
+    check('signed delivery is drive-file: ' + text,
+      row.intent && row.intent.personalClose === 'drive-file' && row.process && row.process.steps[0].kind === 'driveFile',
+      row.intent && { personal: row.intent.personalClose, type: row.intent.type });
+  });
+  const negatives = [
+    ['not signed yet. Draft attached', { attachmentCount: 1 }],
+    ['החוזה עדיין לא חתום', { attachmentCount: 1 }],
+    ['needs to be signed and returned by Thursday', { attachmentCount: 1 }],
+    ['please return the NDA signed', { attachmentCount: 1 }],
+    ['have you signed the agreement yet?', { attachmentCount: 1 }]
+  ];
+  negatives.forEach(([text, extra]) => {
+    const row = plan(text, extra);
+    check('signed ask or negation is not drive-file: ' + text,
+      row.intent && row.intent.personalClose !== 'drive-file' && !(row.process && row.process.steps && row.process.steps.some((s) => s.kind === 'driveFile')),
+      row.intent && { personal: row.intent.personalClose, type: row.intent.type, process: row.process && row.process.id });
+  });
+}
+
 console.log('\n--- family B: one file, one target ---\n');
 {
   const row = plan('Please add the agenda to the calendar for the call on Friday, September 18 at 3pm.', { fileMatch: 'one' });

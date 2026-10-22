@@ -118,6 +118,24 @@ const FlowGoogleCloses = (() => {
     if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return saveRefused(raw);
     return false;
   }
+
+  // One attached file that is clearly a completed signing delivery (not a bare
+  // "signed", not an ask to sign or return, not a negation or a question).
+  function signedCopyDelivered(text) {
+    const t = String(text || '');
+    if (!t.trim()) return false;
+    if (/\bnot\s+signed\b|\bnot\s+yet\s+signed\b|\bunsigned\b/i.test(t)) return false;
+    if (/עדיין\s+לא\s+חתום|לא\s+חתום\s+עדיין/.test(t)) return false;
+    if (/\bhave you signed\b|\bdid you sign\b|\bare you signing\b/i.test(t)) return false;
+    if (/(?:האם|כבר)\s*[^?\n]{0,50}חתום\s*\?/.test(t)) return false;
+    if (/\b(?:need(?:s)?|needed)\s+to\s+be\s+signed\b/i.test(t)) return false;
+    if (/\b(?:please\s+)?(?:return|send|get)\b[^.\n]{0,100}\b(?:the\s+)?(?:\w+\s+){0,4}signed\b/i.test(t)) return false;
+    if (/\b(?:please\s+)?sign\b[^.\n]{0,40}\b(?:the|this|attached)\b/i.test(t)) return false;
+    if (/(?:נא|בבקשה|אנא)[^\n]{0,40}(?:לחתום|לחתימה|תחתום)|(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t)) return false;
+    const DELIVER_EN = /\battached\s+is\s+the\s+signed\b|\battached\s+the\s+signed\b|\bsigned\s+(?:copy|contract|agreement|nda|pdf|document)\s+attached\b|\bsigned\s+copy\s+attached\b|\bfinal\s+version\s+attached\b|\bfinal\s+(?:document|version|copy)\s+attached\b|\b(?:enclosed|attached)\s+is\s+the\s+(?:fully\s+)?(?:executed|signed)\b/i;
+    const DELIVER_HE = /מצורף\s+(?:ה)?(?:חוזה|הסכם|עותק|נספח)\s+(?:ה)?חתום|(?:החוזה|ההסכם|העותק)\s+החתום\s+מצורף|נספח\s+חתום|הגרסה\s+הסופית\s+מצורפת/i;
+    return DELIVER_EN.test(t) || DELIVER_HE.test(t);
+  }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
   const HEDGE = /\b(?:maybe|might|perhaps|possibly)\b|(?:^|\s)(?:אולי|ייתכן)/i;
@@ -353,9 +371,8 @@ const FlowGoogleCloses = (() => {
     }
 
     const OTHER_TARGET = /\bshared\s+(?:folder|drive|files?)\b|\bsharepoint\b|\bdropbox\b|\bbox\.com\b|\bteams\s+(?:folder|channel)\b|(?:ה)?תיקי(?:י)?ה\s+המשותפת|הקבצים\s+המשותפים|שרפוינט|דרופבוקס/i;
-    const signedAttach = /\b(?:signed|executed)\b|(?:\bfinal\b[^.\n]{0,60}\b(?:document|version|copy|pdf|contract|agreement|nda)\b)|חתום|נספח חתום/i.test(text);
     const noreply = /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(input.senderEmail || '').trim());
-    const signedInbound = Number(input.attachmentCount) === 1 && signedAttach && !refusesSave(text)
+    const signedInbound = Number(input.attachmentCount) === 1 && signedCopyDelivered(text) && !refusesSave(text)
       && !OTHER_TARGET.test(text) && !noreply;
     if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
       if (refusesSave(text) || input.attachmentCount !== 1 || OTHER_TARGET.test(text)) return { silence: true };
