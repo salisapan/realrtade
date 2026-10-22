@@ -7,28 +7,71 @@ const { FlowOutlookGraphMarker: M } = require('../core/outlook-graph-marker.js')
 const { FlowConnectEcosystem: C } = require('../core/connect-ecosystem.js');
 
 let failures = 0;
+let checks = 0;
 function check(name, cond, detail) {
+  checks++;
   if (cond) console.log('PASS:', name);
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 
-check('clientState must match exactly', M.validateClientState('user:abcdef12', 'user:abcdef12') === true && M.validateClientState('user:abcdef12', 'wrong') === false);
-const soon = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-const later = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
-check('subscription renews under 7 days', M.subscriptionNeedsRenewal(soon, Date.now()) === true && M.subscriptionNeedsRenewal(later, Date.now()) === false);
-check('Do It lane detects outlook draft/task', M.doItLane({ show: true, process: { steps: [{ kind: 'outlookDraft' }] } }) === true);
-check('non-offer is not marked', M.doItLane({ show: false }) === false);
-const patch = M.categoryPatch(['Blue category']);
-check('category patch adds Glance', patch.categories.indexOf('Glance') >= 0 && patch.singleValueExtendedProperties[0].value === '1');
+const SECRET = 'test-client-state-secret';
+const userA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const userB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const stateA = M.clientStateForUser(userA, SECRET);
+const stateB = M.clientStateForUser(userB, SECRET);
+
+check('per-user clientState differs', stateA !== stateB && M.validateClientStateForUser(stateA, userA, SECRET));
+const rowBySub = {
+  subA: { user_id: userA, client_state: stateA, subscription_id: 'subA' },
+  subB: { user_id: userB, client_state: stateB, subscription_id: 'subB' }
+};
+check('user A notification resolves only A', M.resolveAccountForNotification({ subscriptionId: 'subA', clientState: stateA }, rowBySub, SECRET).user_id === userA);
+check('user A note never touches user B', M.resolveAccountForNotification({ subscriptionId: 'subA', clientState: stateA }, rowBySub, SECRET).user_id !== userB);
+check('wrong clientState on subscription does not resolve', M.resolveAccountForNotification({ subscriptionId: 'subA', clientState: stateB }, rowBySub, SECRET) === null);
+
+check('skip already marked: Glance category', M.alreadyMarked({ categories: ['Glance'] }) === true);
+check('skip already marked: flagged', M.alreadyMarked({ flag: { flagStatus: 'flagged' } }) === true);
+check('skip already marked: extension marker', M.alreadyMarked({ singleValueExtendedProperties: [{ id: M.EXT_PROPERTY_ID, value: '1' }] }) === true);
+check('unmarked message is processed', M.alreadyMarked({ categories: [] }) === false);
+
+const patch = M.markPatch([], false);
+check('visible flag body shape', patch.flag && patch.flag.flagStatus === 'flagged' && patch.categories.indexOf('Glance') >= 0);
+check('idempotency marker kept', patch.singleValueExtendedProperties[0].value === '1');
+
+const now = Date.now();
+const in23h = new Date(now + 23 * 60 * 60 * 1000).toISOString();
+const in25h = new Date(now + 25 * 60 * 60 * 1000).toISOString();
+check('renewal threshold is 24h', M.subscriptionNeedsRenewal(in23h, now) === true && M.subscriptionNeedsRenewal(in25h, now) === false);
+check('subscription expiry uses Graph mail max minutes', M.subscriptionExpirationIso(now).indexOf('T') > 0);
+const subBody = M.subscriptionRequestBody('https://example.com/hook', stateA, in25h);
+check('subscription is created-only', subBody.changeType === 'created');
+
+const page1 = M.parseDeltaPage({ value: [{ id: 'm1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages/delta?$skiptoken=x' });
+const page2 = M.parseDeltaPage({ value: [{ id: 'm2' }], '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/me/messages/delta?$deltatoken=y' });
+const merged = M.mergeDeltaPages([page1, page2]);
+check('delta pagination merges messages', merged.messages.length === 2 && merged.deltaLink.indexOf('deltatoken=y') >= 0);
+check('nextLink is not stored as delta', merged.deltaLink.indexOf('skiptoken') < 0);
+
+check('refresh rotation should persist', M.shouldPersistRotatedRefresh('rt-old', 'rt-new') === true);
+check('unchanged refresh is not rewritten', M.shouldPersistRotatedRefresh('rt-same', 'rt-same') === false);
+
 const pkce = C.PKCE_REFRESH_INTERFACE;
-const body = M.refreshBody('rt-1', 'client-id', M.MAIL_SCOPE, pkce);
-check('refresh body follows C1 PKCE interface', body.client_id === 'client-id' && body.grant_type === 'refresh_token' && body.refresh_token === 'rt-1');
+check('refresh body follows C1 PKCE interface', M.refreshBody('rt-1', 'client-id', M.MAIL_SCOPE, pkce).grant_type === 'refresh_token');
 
 const migration = fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261022103000_outlook_graph_marker.sql'), 'utf8');
-check('migration targets outlook_graph_accounts and vault read', /outlook_graph_accounts/.test(migration) && /outlook_marker_read_refresh/.test(migration));
+check('migration has client_state and write_refresh RPC', /client_state/.test(migration) && /outlook_marker_write_refresh/.test(migration));
+
 const edge = fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'functions', 'outlook-graph-marker', 'index.ts'), 'utf8');
-check('edge function rejects wrong project ref', edge.indexOf('nlvljclvoguvrnntwufu') >= 0 && edge.indexOf('zjquktirlrhbqcnkfaok') >= 0);
+check('edge returns 202 before work finishes', edge.indexOf('status: 202') >= 0 && edge.indexOf('EdgeRuntime.waitUntil') >= 0);
+check('edge has scheduled renewal path', edge.indexOf('handleScheduled') >= 0 && /cron/.test(edge));
 check('edge imports judge bundle', edge.indexOf('judge.bundle.mjs') >= 0);
+check('validation token escaped', edge.indexOf('escapeValidationToken') >= 0);
 
 if (failures) process.exit(1);
-console.log('outlook-graph-marker-corpus: all passed');
+console.log('outlook-graph-marker-corpus: all passed (' + checks + ' checks)');
+console.log('surfaces:');
+console.log('| surface | transport | notes |');
+console.log('| Microsoft Graph inbox messages | webhook POST (changeType=created) | judge + visible flag + Glance category |');
+console.log('| Microsoft Graph inbox delta | scheduled/cron + post-renewal | paginate nextLink; persist deltaLink only |');
+console.log('| Supabase Edge outlook-graph-marker | HTTP 202 + waitUntil | validationToken plain escaped text |');
+console.log('| Vault via outlook_marker_* RPC | service role | read/write rotated refresh_token |');

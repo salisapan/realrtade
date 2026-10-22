@@ -10,6 +10,7 @@ create table if not exists public.outlook_graph_accounts (
   refresh_secret_id uuid not null,
   subscription_id text,
   subscription_expires_at timestamptz,
+  client_state text,
   delta_link text,
   own_addresses text[] not null default '{}',
   created_at timestamptz not null default now(),
@@ -38,3 +39,19 @@ $$;
 
 revoke all on function public.outlook_marker_read_refresh(uuid) from public;
 grant execute on function public.outlook_marker_read_refresh(uuid) to service_role;
+
+create or replace function public.outlook_marker_write_refresh(secret_id uuid, token text)
+returns void
+language plpgsql
+security definer
+set search_path = public, vault
+as $$
+begin
+  update vault.secrets
+  set secret = token
+  where id = secret_id;
+end;
+$$;
+
+revoke all on function public.outlook_marker_write_refresh(uuid, text) from public;
+grant execute on function public.outlook_marker_write_refresh(uuid, text) to service_role;
