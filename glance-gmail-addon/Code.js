@@ -331,7 +331,7 @@ function engineHit_(text, opened, now) {
       ownNames: opened.ownNames || [],
       now: now,
       surface: 'gmail',
-      attachmentCount: 0,
+      attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
       inbound: true
     });
     if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
@@ -507,6 +507,7 @@ function readOpen_(e, read) {
   var subject;
   var fromRaw;
   var toRaw;
+  var attachmentCount = 0;
   try {
     plain = String(message.getPlainBody() || '');
     read.plainBodyLength = plain.length;
@@ -517,6 +518,10 @@ function readOpen_(e, read) {
     read.from = parsed.email;
     toRaw = typeof message.getTo === 'function' ? message.getTo() : '';
     read.isSelf = isSelfMail_(parsed.email, toRaw);
+    if (typeof message.getAttachments === 'function') {
+      var attachments = message.getAttachments();
+      attachmentCount = attachments && attachments.length ? attachments.length : 0;
+    }
   } catch (err) {
     throw readFail_('body', read, err);
   }
@@ -553,7 +558,8 @@ function readOpen_(e, read) {
     toList: toList,
     ownAddresses: ownAddresses,
     userName: reader.userName,
-    ownNames: reader.ownNames
+    ownNames: reader.ownNames,
+    attachmentCount: attachmentCount
   };
 }
 
