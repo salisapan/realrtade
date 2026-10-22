@@ -19,7 +19,6 @@ for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), engine, { filename: f });
 }
 const J = vm.runInContext('FlowIncomingJudge', engine);
-const FlowIntent = vm.runInContext('FlowIntent', engine);
 const NOW = new Date('2026-10-15T12:00:00Z');
 const OWN = 'ai.local.flow@gmail.com';
 
@@ -46,18 +45,6 @@ function judge(text, surface, reader) {
 
 function shown(out) { return Boolean(out && out.show && out.process && out.process.steps && out.process.steps.length); }
 function planId(out) { return out && out.process && out.process.id; }
-function classifyShows(body) {
-  const intent = FlowIntent.classify(body, {
-    senderEmail: 'dana@meridian.com',
-    senderName: 'Dana Levi',
-    subject: '',
-    now: NOW,
-    inbound: true,
-    to: [OWN],
-    ownAddresses: [OWN]
-  });
-  return Boolean(intent && intent.type === 'request' && !intent.quiet);
-}
 
 console.log('\n--- buried remember-to: reader close must show ---\n');
 const SHOW = [
@@ -67,7 +54,8 @@ const SHOW = [
   ['he transfer after greeting', 'היי,\n\nתזכור להעביר את התשלום עד יום ראשון.'],
   ['en remind me', 'Please remind me to call the client tomorrow'],
   ['he remind me', 'תזכיר לי לשלוח את הדוח מחר'],
-  ['he send report notify', 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.']
+  ['he send report notify', 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.'],
+  ['en send report tell us', "Please send the report by Thursday and don't forget to tell us when it's ready."]
 ];
 for (const row of SHOW) {
   const name = row[0];
@@ -75,10 +63,10 @@ for (const row of SHOW) {
   const reader = row[2] || null;
   for (const surface of ['gmail', 'outlook']) {
     const out = judge(body, surface, reader);
-    const ok = surface === 'gmail'
-      ? shown(out)
-      : (shown(out) || (out.reason === 'file-chain-not-run' && classifyShows(body)));
-    check(name + ' shows on ' + surface, ok, { reason: out.reason, id: planId(out) });
+    check(name + ' shows on ' + surface, shown(out), { reason: out.reason, id: planId(out) });
+    if (/notify|tell us/.test(name)) {
+      check(name + ' reply-track on ' + surface, planId(out) === 'reply-track', { id: planId(out), reason: out.reason });
+    }
   }
 }
 

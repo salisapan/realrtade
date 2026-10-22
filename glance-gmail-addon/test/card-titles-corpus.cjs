@@ -82,6 +82,7 @@ const ROWS = [
   ['he-reply-track-deadline', 'היי סאלי, תוכל לשלוח את המסמך החתום עד 23/10?', true],
   ['he-reply-track-nodeadline', 'היי סאלי, תוכל לשלוח את החשבונית?', true],
   ['en-pay-invoice-amount', 'Please pay the invoice of ₪3,200 by Thursday.', true],
+  ['he-pay-invoice-thursday', 'נא לשלם את החשבונית של ₪3,200 עד יום חמישי.', true],
   ['he-send-report-notify', 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.', true],
   ['he-greet-noa', 'היי נועה', false]
 ];
@@ -129,6 +130,9 @@ for (const row of ROWS) {
   }
   if (id === 'en-pay-invoice-amount') {
     check(id + ' Pay invoice with amount', /^Pay invoice,\s*₪3,200$/.test(title), title);
+  }
+  if (id === 'he-pay-invoice-thursday') {
+    check(id + ' Hebrew pay invoice title', title === 'לשלם חשבונית, ₪3,200', title);
   }
   if (id === 'he-send-report-notify') {
     check(id + ' Hebrew send report title', /^תשלח את הדוח עד \d{1,2}\/\d{1,2}$/.test(title), title);

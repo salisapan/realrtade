@@ -113,6 +113,15 @@ const FlowIncomingJudge = (() => {
     return false;
   }
 
+  // A send-by deadline plus "tell us/me when it is ready" is reply-track, not
+  // a Drive file chain. Outlook must offer the same card Gmail shows after classify.
+  function notifyWhenDoneOnSendAsk(text) {
+    const raw = String(text || '');
+    if (/\b(?:do not|don't|dont)\s+forget\s+to\s+tell\s+(?:us|me)\s+when\b/i.test(raw)) return true;
+    if (/אל\s+תשכח(?:י|ו)?\s+ל(?:הגיד|הודיע|עדכן)\s+ל(?:נו|י|כם|ך)(?:\s|$|[,،.!?])/.test(raw)) return true;
+    return false;
+  }
+
   function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
@@ -246,7 +255,9 @@ const FlowIncomingJudge = (() => {
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
       // (task + short attached draft), on Outlook as well as Gmail.
-      if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile)) return { show: false, reason: 'file-chain-not-run', intent };
+      if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile) && !notifyWhenDoneOnSendAsk(text)) {
+        return { show: false, reason: 'file-chain-not-run', intent };
+      }
       // A contract, a quote, a proposal, or a signed copy is not a reply.
       // The page still searches Drive. The judge stays quiet until that search runs.
       if ((i.surface || 'gmail') === 'gmail' && resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
