@@ -1832,6 +1832,9 @@ async function clearCachedChromeGoogleTokens() {
 }
 
 async function disconnectConnector(connectorId) {
+  if (connectorId === 'microsoft' || connectorId === 'meta') {
+    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector });
+  }
   const STORAGE_KEYS = {
     hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
     googleTasks: 'googleTasksAuth'
@@ -1841,9 +1844,6 @@ async function disconnectConnector(connectorId) {
   // Google also evicts Chrome's cached getAuthToken AND the stored web-flow
   // token. Otherwise "Disconnect" then "Connect" silently reuses the same
   // grant instead of letting the user pick a different Google account.
-  if (connectorId === 'microsoft' || connectorId === 'meta') {
-    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector });
-  }
   if (connectorId === 'googleTasks') {
     // Invalidate before the clear. A consent window that resolves after
     // this point sees a new epoch and must not write googleWebAuth back.
@@ -6645,12 +6645,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'flow:connect') {
-    if (msg.connectorId === 'googleTasks' || msg.connectorId === 'microsoft' || msg.connectorId === 'meta') {
-      const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
-      return reply(sendResponse, connectEcosystemConnector(msg.connectorId, {
-        connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
-        launchInteractive: outlookLaunchInteractive,
-        enableSurface: enableSurface
+    const ecoConnector = msg.connectorId === 'googleTasks' || msg.connectorId === 'microsoft' || msg.connectorId === 'meta';
+    if (ecoConnector) {
+      return reply(sendResponse, glanceSwitchOn('CONNECT_ECOSYSTEM').then((ecoOn) => {
+        if (ecoOn) {
+          const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
+          return connectEcosystemConnector(msg.connectorId, {
+            connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
+            launchInteractive: outlookLaunchInteractive,
+            enableSurface: enableSurface
+          });
+        }
+        if (msg.connectorId === 'googleTasks') {
+          return connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true }));
+        }
+        return { ok: false, reason: 'connector-not-live' };
       }));
     }
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
