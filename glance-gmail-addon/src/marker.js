@@ -1,0 +1,258 @@
+// Gmail inbox Glance label + star marker. IDs only in PropertiesService — no mail content stored.
+
+var GlanceMarker = (function () {
+  var LABEL_NAME = 'Glance';
+  var PROCESSED_KEY = 'glanceMarkerProcessed';
+  var DISMISSED_KEY = 'glanceMarkerDismissed';
+  var UNDO_SNAP_KEY = 'glanceMarkerUndoSnap';
+  var FIFO_CAP = 2000;
+  var SWEEP_BUDGET_MS = Math.floor(4.5 * 60 * 1000);
+  var SWEEP_QUERY = 'in:inbox newer_than:2d -label:Glance';
+  var SWEEP_LIMIT = 50;
+
+  function userProps() {
+    return PropertiesService.getUserProperties();
+  }
+
+  function readList(key) {
+    try {
+      var raw = userProps().getProperty(key);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function writeList(key, list) {
+    var trimmed = list.slice(-FIFO_CAP);
+    userProps().setProperty(key, JSON.stringify(trimmed));
+  }
+
+  function pushId(key, id) {
+    if (!id) return;
+    var list = readList(key);
+    if (list.indexOf(id) >= 0) {
+      writeList(key, list);
+      return;
+    }
+    list.push(id);
+    writeList(key, list);
+  }
+
+  function hasId(key, id) {
+    return readList(key).indexOf(id) >= 0;
+  }
+
+  function readUndoSnap() {
+    try {
+      var raw = userProps().getProperty(UNDO_SNAP_KEY);
+      if (!raw) return {};
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writeUndoSnap(map) {
+    userProps().setProperty(UNDO_SNAP_KEY, JSON.stringify(map || {}));
+  }
+
+  function ensureLabel_(gmailApp) {
+    var Gmail = gmailApp || GmailApp;
+    var label = Gmail.getUserLabelByName(LABEL_NAME);
+    if (label) return label;
+    return Gmail.createLabel(LABEL_NAME);
+  }
+
+  function latestMessage_(thread) {
+    var messages = thread.getMessages();
+    if (!messages || !messages.length) return null;
+    return messages[messages.length - 1];
+  }
+
+  function applyMark_(thread, label, allowLabel) {
+    var latest = latestMessage_(thread);
+    if (!latest) return { ok: false };
+    var starred = false;
+    var labeled = false;
+    if (allowLabel && label) {
+      try {
+        label.addToThread(thread);
+        labeled = true;
+      } catch (err) {
+        labeled = false;
+      }
+    }
+    try {
+      latest.star();
+      starred = true;
+    } catch (err2) {
+      starred = false;
+    }
+    return { ok: labeled || starred, labeled: labeled, starred: starred };
+  }
+
+  function removeMark_(thread, label) {
+    var latest = latestMessage_(thread);
+    if (label) {
+      try { label.removeFromThread(thread); } catch (err) { /* label may be missing */ }
+    }
+    if (latest) {
+      try { latest.unstar(); } catch (err2) { /* ignore */ }
+    }
+  }
+
+  function installSweepTriggerIfNeeded(scriptApp) {
+    var Script = scriptApp || ScriptApp;
+    var triggers = Script.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      var tr = triggers[i];
+      if (tr.getHandlerFunction() === 'sweep' && tr.getEventType() === Script.EventType.CLOCK) {
+        return false;
+      }
+    }
+    Script.newTrigger('sweep').timeBased().everyHours(1).create();
+    return true;
+  }
+
+  function isDismissed(messageId) {
+    return hasId(DISMISSED_KEY, messageId);
+  }
+
+  function dismiss(messageId) {
+    pushId(DISMISSED_KEY, messageId);
+  }
+
+  function isProcessed(messageId) {
+    return hasId(PROCESSED_KEY, messageId);
+  }
+
+  function markProcessed(messageId) {
+    pushId(PROCESSED_KEY, messageId);
+  }
+
+  function rememberUndoSnap(messageId, hadMark) {
+    var map = readUndoSnap();
+    map[String(messageId)] = { hadMark: hadMark === true };
+    writeUndoSnap(map);
+  }
+
+  function takeUndoSnap(messageId) {
+    var map = readUndoSnap();
+    var key = String(messageId);
+    var snap = map[key] || null;
+    if (map[key]) {
+      delete map[key];
+      writeUndoSnap(map);
+    }
+    return snap;
+  }
+
+  function onProofClose(messageId, gmailApp) {
+    var Gmail = gmailApp || GmailApp;
+    var msg = Gmail.getMessageById(String(messageId));
+    if (!msg) return;
+    var thread = msg.getThread();
+    var label = Gmail.getUserLabelByName(LABEL_NAME);
+    var hadMark = label && thread.getLabels().some(function (l) { return l.getName() === LABEL_NAME; });
+    rememberUndoSnap(messageId, hadMark);
+    removeMark_(thread, label);
+  }
+
+  function onUndoRestore(messageId, gmailApp) {
+    var snap = takeUndoSnap(messageId);
+    if (!snap || !snap.hadMark) return;
+    var Gmail = gmailApp || GmailApp;
+    var msg = Gmail.getMessageById(String(messageId));
+    if (!msg) return;
+    var thread = msg.getThread();
+    var label = ensureLabel_(Gmail);
+    applyMark_(thread, label, true);
+  }
+
+  function onNotThis(messageId, gmailApp) {
+    var Gmail = gmailApp || GmailApp;
+    var msg = Gmail.getMessageById(String(messageId));
+    if (!msg) return;
+    dismiss(String(messageId));
+    var thread = msg.getThread();
+    var label = Gmail.getUserLabelByName(LABEL_NAME);
+    removeMark_(thread, label);
+    markProcessed(String(messageId));
+  }
+
+  /**
+   * deps: { startedMs, gmailApp, searchFn, isClosable(opened), buildOpened(message, readerCtx), readerCtx }
+   */
+  function sweep(deps) {
+    var d = deps || {};
+    var started = typeof d.startedMs === 'number' ? d.startedMs : Date.now();
+    var Gmail = d.gmailApp || GmailApp;
+    var search = d.searchFn || function (q, start, limit) { return Gmail.search(q, start, limit); };
+    var readerCtx = d.readerCtx || { ownAddresses: [], ownNames: [], readerEmail: null, toRecipients: [], ccRecipients: [] };
+    var buildOpened = d.buildOpened;
+    var isClosable = d.isClosable;
+    if (!buildOpened || !isClosable) return { scanned: 0, marked: 0, stopped: 'no-deps' };
+
+    var label = null;
+    try {
+      label = ensureLabel_(Gmail);
+    } catch (err) {
+      label = null;
+    }
+
+    var threads = search(SWEEP_QUERY, 0, SWEEP_LIMIT) || [];
+    var marked = 0;
+    var scanned = 0;
+    for (var i = 0; i < threads.length; i++) {
+      if (Date.now() - started > SWEEP_BUDGET_MS) {
+        return { scanned: scanned, marked: marked, stopped: 'budget' };
+      }
+      var thread = threads[i];
+      var latest = latestMessage_(thread);
+      if (!latest) continue;
+      var messageId = String(latest.getId());
+      scanned++;
+      if (isDismissed(messageId)) continue;
+      if (isProcessed(messageId)) continue;
+
+      var opened = buildOpened(latest, readerCtx);
+      if (!opened || !isClosable(opened)) {
+        markProcessed(messageId);
+        continue;
+      }
+
+      var result = applyMark_(thread, label, !!label);
+      if (result.ok) marked++;
+      markProcessed(messageId);
+    }
+    return { scanned: scanned, marked: marked, stopped: 'done' };
+  }
+
+  return {
+    LABEL_NAME: LABEL_NAME,
+    FIFO_CAP: FIFO_CAP,
+    SWEEP_BUDGET_MS: SWEEP_BUDGET_MS,
+    SWEEP_QUERY: SWEEP_QUERY,
+    installSweepTriggerIfNeeded: installSweepTriggerIfNeeded,
+    sweep: sweep,
+    isDismissed: isDismissed,
+    dismiss: dismiss,
+    isProcessed: isProcessed,
+    markProcessed: markProcessed,
+    onProofClose: onProofClose,
+    onUndoRestore: onUndoRestore,
+    onNotThis: onNotThis,
+    _test: {
+      readList: readList,
+      writeList: writeList,
+      pushId: pushId,
+      applyMark_: applyMark_,
+      removeMark_: removeMark_,
+      ensureLabel_: ensureLabel_
+    }
+  };
+})();

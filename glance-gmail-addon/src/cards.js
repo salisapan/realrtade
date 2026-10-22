@@ -183,9 +183,13 @@ var GlanceCards = (function () {
     return pack[id] || en[id] || id || 'close';
   }
 
-  function quiet(lang, reason) {
+  function quiet(lang, reason, opts) {
     var key = (!reason || reason === 'no-plan' || reason === 'intent-null' || reason === 'quiet') ? 'quietEmpty' : 'quiet';
-    return card(lang, [text(lang, i18n().t(lang, key))]);
+    var widgets = [text(lang, i18n().t(lang, key))];
+    if (opts && opts.messageId) {
+      widgets.push(button(lang, 'notThis', 'onNotThis', { messageId: String(opts.messageId) }));
+    }
+    return card(lang, widgets);
   }
 
   function spottedUnsupported(decision, messageId, lang) {

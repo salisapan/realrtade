@@ -1,0 +1,22 @@
+[
+  {"id":"en-sign-deck","lang":"en","body":"Can you please sign the pilot deck and send it back by Friday? We need it for the board meeting next week.","expectMark":true},
+  {"id":"en-pay-invoice","lang":"en","body":"Please pay invoice 204 by end of week. Let me know if you have any questions about the line items.","expectMark":true},
+  {"id":"en-approve-expense","lang":"en","body":"Can you approve the expense report I submitted yesterday? It is waiting in the system for your sign-off.","expectMark":true},
+  {"id":"en-remember-contract","lang":"en","body":"Please remember to send the signed contract by Friday.","expectMark":true},
+  {"id":"en-dont-forget","lang":"en","body":"Don't forget to file the taxes by 2026-11-01.","expectMark":true},
+  {"id":"en-fyi","lang":"en","body":"Just a heads up that the all-hands moved to 3pm. No action needed from you on this thread.","expectMark":false},
+  {"id":"en-thanks","lang":"en","body":"Thanks for the update yesterday, really appreciate all the work you put into the launch checklist.","expectMark":false},
+  {"id":"en-hedge","lang":"en","body":"We might circle back on this later in the quarter if priorities shift on the platform side.","expectMark":false},
+  {"id":"en-greeting-other","lang":"en","body":"Hi Dana, please remember to call the client.","expectMark":false},
+  {"id":"en-relay","lang":"en","body":"Thanks for the update. Please remember to remind Sarah to send the NDA.","expectMark":false},
+  {"id":"he-review","lang":"he","body":"בבקשה תעבור על המסמך המצורף ותחזיר הערות עד מחר בבוקר, זה דחוף ללקוח.","expectMark":true},
+  {"id":"he-remember-invoice","lang":"he","body":"תזכיר לי לשלוח את החשבונית","expectMark":true},
+  {"id":"he-remember-tomorrow","lang":"he","body":"תזכיר לי מחר לשלוח את החוזה","expectMark":true},
+  {"id":"he-dont-forget","lang":"he","body":"אל תשכח לשלוח את הקבלה עד סוף השבוע.","expectMark":true},
+  {"id":"he-forgot-file","lang":"he","body":"אל תשכח לשלוח את הקובץ המצורף עד מחר בבוקר.","expectMark":true},
+  {"id":"he-fyi","lang":"he","body":"רק לעדכן שהפגישה הועברה לשלוש. אין צורך בפעולה מצדך בנושא הזה.","expectMark":false},
+  {"id":"he-thanks","lang":"he","body":"תודה רבה על העדכון המהיר, זה עזר לנו מאוד לסגור את הדוח לפני הדדליין.","expectMark":false},
+  {"id":"he-hedge","lang":"he","body":"אולי נחזור לנושא הזה בהמשך הרבעון אם התעדוף ישתנה בצוות הפיתוח.","expectMark":false},
+  {"id":"he-greeting-other","lang":"he","body":"היי דנה, תזכירי לשלוח את המסמך מחר.","expectMark":false},
+  {"id":"he-relay","lang":"he","body":"תודה על העדכון. תזכור להזכיר ליוסי לשלוח את החוזה.","expectMark":false}
+]
