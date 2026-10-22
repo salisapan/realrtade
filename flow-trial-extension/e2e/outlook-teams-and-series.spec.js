@@ -8,7 +8,11 @@ const { test, expect } = require('./support/harness');
 const S = require('./support/sentences');
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const WHEN = new Date(Date.now() + 9 * 24 * 3600 * 1000);
+const MIN_FUTURE_MS = 7 * 24 * 3600 * 1000;
+let WHEN = new Date(Date.now() + 9 * 24 * 3600 * 1000);
+while (WHEN.getDate() <= 12 || WHEN.getTime() < Date.now() + MIN_FUTURE_MS) {
+  WHEN = new Date(WHEN.getTime() + 24 * 3600 * 1000);
+}
 const DM = WHEN.getDate() + '/' + (WHEN.getMonth() + 1);
 const DAY = WEEKDAYS[WHEN.getDay()];
 const BASE = 'Pricing meeting ' + DM + ' at 14:00, please confirm.';
