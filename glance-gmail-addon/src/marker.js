@@ -279,7 +279,7 @@ var GlanceMarker = (function () {
     var label = Gmail.getUserLabelByName(LABEL_NAME);
     var hadMark = label && thread.getLabels().some(function (l) { return l.getName() === LABEL_NAME; });
     var meta = takeMarkMeta(messageId);
-    if (!meta) meta = { userHadStar: false };
+    if (!meta) return;
     var glanceStarred = !meta.userHadStar;
     rememberUndoSnap(messageId, { hadMark: hadMark, userHadStar: meta.userHadStar, glanceStarred: glanceStarred });
     removeMark_(thread, label, meta);
@@ -310,10 +310,12 @@ var GlanceMarker = (function () {
     var msg = Gmail.getMessageById(String(messageId));
     if (!msg) return;
     dismiss(String(messageId));
-    var thread = msg.getThread();
-    var label = Gmail.getUserLabelByName(LABEL_NAME);
-    var meta = takeMarkMeta(messageId) || { userHadStar: messageIsStarred_(msg) };
-    removeMark_(thread, label, meta);
+    var meta = takeMarkMeta(messageId);
+    if (meta) {
+      var thread = msg.getThread();
+      var label = Gmail.getUserLabelByName(LABEL_NAME);
+      removeMark_(thread, label, meta);
+    }
     markProcessed(String(messageId));
   }
 
