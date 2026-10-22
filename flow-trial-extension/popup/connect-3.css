@@ -202,6 +202,9 @@ html[lang="he"] .connect-ecosystem h2.c3-title {
   color: var(--c3-grey);
   flex: none;
 }
+.connect-ecosystem .c3-done.c3-partial .ok {
+  color: var(--grey2, #86868b);
+}
 .connect-ecosystem .c3-done .ok svg {
   width: 16px;
   height: 16px;
