@@ -234,8 +234,12 @@ const FlowStepKit = (() => {
       stage.classList.toggle('no-actions', sel.length === 0);
       txt.innerHTML = sel.length ? L.count(sel.length, tools, sugg) : L.none;
     } else if (cfg.chip.mode === 'files') {
-      const files = (cfg.rows[0] && cfg.rows[0].files) || [];
-      const on = files.filter(function (f) { return f.on; }).length;
+      let files = [];
+      (cfg.rows || []).forEach(function (r) {
+        if (r && r.kind === 'multi' && r.files && r.files.length) files = r.files;
+      });
+      if (!files.length) files = (cfg.rows[0] && cfg.rows[0].files) || [];
+      const on = files.filter(function (f) { return f.on && !f.skipped; }).length;
       const cb = stage.querySelector('.act-check');
       const target = cfg.chip.target || 'Drive';
       stage.classList.toggle('no-actions', !(on > 0 && cb && cb.checked));

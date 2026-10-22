@@ -3695,8 +3695,15 @@ function glanceUiCopy(kind) {
       if (!only && Array.isArray(catalog) && catalog.length) {
         const picked = catalog.filter((f) => f && f.on && !f.skipped);
         if (picked.length === 1) {
-          const key = String(picked[0].id || picked[0].name || '');
-          only = listed.find((m) => key && (String(m.url || '') === key || String(m.filename || m.name || '') === key || String(m.id || '') === key)) || null;
+          const pickRow = picked[0];
+          const key = String(pickRow.id || pickRow.name || pickRow.label || '');
+          const pickName = String(pickRow.name || pickRow.label || '').trim();
+          only = listed.find((m) => {
+            if (!m) return false;
+            const fn = String(m.filename || m.name || '').trim();
+            if (key && (String(m.url || '') === key || String(m.id || '') === key || fn === key)) return true;
+            return Boolean(pickName && fn && fn === pickName);
+          }) || null;
         } else if (ctx.attachmentPickMode === 'choice' && listed.length > 1) {
           return { fail: { reason: 'attachment-choice-required' } };
         }

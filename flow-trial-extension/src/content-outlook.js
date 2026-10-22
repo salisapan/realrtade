@@ -737,8 +737,8 @@
     let attachmentCount = 0;
     const closes = typeof FlowGoogleCloses !== 'undefined' ? FlowGoogleCloses : null;
     const needsSave = closes && typeof closes.needsOneAttachment === 'function' && closes.needsOneAttachment(own);
-    // Signed-copy on the open pane stays at zero for one file (suggest-save). Two or
-    // more visible files use attachmentCountForJudge parity so file-it can choose.
+    // Signed-copy delivery: one visible file is enough for the judge (file-it on Outlook).
+    // Save-shaped asks still use the mailbox count when the pane lists attachments.
     const signedForJudge = closes && typeof closes.attachmentCountForJudge === 'function' &&
       closes.attachmentCountForJudge(own) && !needsSave;
     const localAttachN = ((pane && pane.attachments) || []).filter((a) => {
@@ -765,6 +765,7 @@
         }).length;
       }
     }
+    if (signedForJudge && localAttachN >= 1 && !needsSave) attachmentCount = localAttachN;
     const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
       senderEmail: pane.senderEmail,
       to: pane.to,
@@ -799,6 +800,9 @@
       }
     }
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
+    if (r && r.show && r.process && r.process.id === 'file-it' && signedForJudge && localAttachN === 1 && !needsSave) {
+      return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process };
+    }
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
   }
 
@@ -1172,8 +1176,9 @@
       process = FlowFileAttach.enrichFileItChoiceCatalog(process, paneFiles, savePick.mode);
     }
     const saveName = pickedAttach && (pickedAttach.name || pickedAttach.filename);
+    let catalogOne = null;
     if (saveName && (savePick.mode === 'single' || savePick.mode === 'picked')) {
-      const catalogOne = [{
+      catalogOne = [{
         id: String((pickedAttach && pickedAttach.id) || 'att-0'),
         name: saveName,
         label: saveName,
@@ -4524,6 +4529,11 @@
           return;
         }
         if (!decided || decided.none) {
+          if (decided && decided.reason === 'signed-save-suggest') {
+            dropStuckCard(pane);
+            await clearReason(pane);
+            return;
+          }
           const keepFile = typeof FlowOutlookSync !== 'undefined' && typeof FlowOutlookSync.keepMailboxFileCard === 'function'
             && FlowOutlookSync.keepMailboxFileCard(decided, entry);
           if (!keepFile) {
@@ -5510,6 +5520,23 @@
     return ids.some((id) => marked.indexOf(id) !== -1) ? host : null;
   }
 
+  function outlookFileItAlreadyPicked(host) {
+    if (!host || !host.__glanceSteps || typeof host.__glanceSteps.rows !== 'function') return false;
+    const rows = host.__glanceSteps.rows();
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.suggested || r.manual || r.role === 'close') continue;
+      const kind = String((r.step && r.step.kind) || r.kind || '');
+      if (kind !== 'driveFile' && kind !== 'onedriveFile' && kind !== 'attachmentSave') continue;
+      const params = r.step && r.step.params;
+      if (!params) continue;
+      if (params.fileName || params.selectedAttachment) return true;
+      const catalog = Array.isArray(params.catalog) && params.catalog.length ? params.catalog : (params.files || []);
+      if (catalog.some((f) => f && f.on && !f.skipped)) return true;
+    }
+    return false;
+  }
+
   async function recordSuggestNote() {
     const pane = suggestNote;
     suggestNote = null;
@@ -5592,7 +5619,12 @@
       log: bag.log || []
     });
     if (showed) {
-      const existing = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+      const existing = chipForThisPane(pane) || document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+      if (outlookFileItAlreadyPicked(existing)) {
+        await clearReason(pane);
+        await appendSuggestLog({ messageId: messageId, reason: 'suggest:file-it-picked', surface: 'outlook' });
+        return;
+      }
       if (existing && existing.__glanceSteps && existing.__glanceSteps.addSuggested && decision.step && decision.eligible) {
         const step = decision.step;
         const copy = step.copy || {};

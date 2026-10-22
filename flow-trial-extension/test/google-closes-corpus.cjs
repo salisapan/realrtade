@@ -442,11 +442,19 @@ console.log('\n--- signed delivery: past weekday must not read as future (N1/N2)
     attachmentCount: 1,
     hasThreadAttachment: true,
     inbound: true,
-    surface: 'outlook-web',
+    surface: 'outlook',
     to: ['glance.salisapan@outlook.com'],
     ownAddresses: ['glance.salisapan@outlook.com']
   }, judgeDeps);
+  const heP1Kinds = heP1Outlook && heP1Outlook.process && heP1Outlook.process.steps
+    ? heP1Outlook.process.steps.map((s) => s && s.kind).filter(Boolean) : [];
   check('HE P1 signed-copy delivery is file-it (Outlook judge input)', heP1Outlook && heP1Outlook.show && heP1Outlook.process && heP1Outlook.process.id === 'file-it', heP1Outlook && heP1Outlook.process && heP1Outlook.process.id);
+  check('HE P1 Outlook save uses onedriveFile + outlookDraft', heP1Kinds.indexOf('onedriveFile') >= 0 && heP1Kinds.indexOf('outlookDraft') >= 0, heP1Kinds);
+  const heCommaSign = plan('מצורף החוזה, חתום והחזר עד יום חמישי.', { attachmentCount: 1 });
+  check('HE comma sign-and-return is reply-track with a task, not file-it',
+    heCommaSign.process && heCommaSign.process.id === 'reply-track'
+    && heCommaSign.process.steps && heCommaSign.process.steps.some((s) => s && (s.kind === 'googleTask' || s.kind === 'outlookTask')),
+    heCommaSign.process && heCommaSign.process.id);
 }
 
 console.log('\n--- family B: one file, one target ---\n');
