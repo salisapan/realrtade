@@ -874,14 +874,13 @@ const FlowIntent = (() => {
   function buriedReaderRememberAsk(text) {
     const raw = String(text || '');
     if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
       if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
       return true;
     }
     return false;
   }
   function vocativeIsOther(text, ctx) {
-    if (buriedReaderRememberAsk(text)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
@@ -1289,7 +1288,7 @@ const FlowIntent = (() => {
       if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
-      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       // A note to self is a plain task. Family A is the file chain, and
       // this mail is not that chain and not an attach to an invite.

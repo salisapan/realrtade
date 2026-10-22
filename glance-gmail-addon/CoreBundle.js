@@ -5411,14 +5411,13 @@ const FlowIntent = (() => {
   function buriedReaderRememberAsk(text) {
     const raw = String(text || '');
     if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
       if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
       return true;
     }
     return false;
   }
   function vocativeIsOther(text, ctx) {
-    if (buriedReaderRememberAsk(text)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
@@ -5826,7 +5825,7 @@ const FlowIntent = (() => {
       if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
-      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       // A note to self is a plain task. Family A is the file chain, and
       // this mail is not that chain and not an attach to an invite.
@@ -8429,8 +8428,11 @@ const FlowActions = (() => {
     const timed = meetingClock(intent);
     if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
-    if (!timed) return proc;
-    if (inboundMeetingAnnouncement(text)) return proc;
+    if (!timed) {
+      if (inboundMeetingAnnouncement(text)) return null;
+      return proc;
+    }
+    if (inboundMeetingAnnouncement(text)) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
     return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
@@ -8488,6 +8490,11 @@ const FlowActions = (() => {
       : taskInstead
         ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
         : processFor(intent);
+    const dateConflict = Boolean(intent.facts && intent.facts.date && intent.facts.date.contradictsWeekday);
+    if (inboundMeetingAnnouncement(vetoText) && meetingClock(intent) && !dateConflict
+      && proc && (proc.id === 'schedule' || proc.id === 'schedule-confirm')) {
+      proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    }
     // A calendar step needs a clock the time parser actually resolved.
     // A date with no parsed time is a task. A delete or a move of a named
     // slot is still that calendar write.
@@ -8604,7 +8611,8 @@ const FlowActions = (() => {
         intent.label = 'Reply requested' + (when ? ' by ' + when : '');
       } else if (untimedCalendar && !intent.selfTask) {
         if (e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
-          proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+          if (!meetingClock(intent)) return null;
+          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
         } else {
           return null;
         }
@@ -9497,7 +9505,7 @@ const FlowIncomingJudge = (() => {
   function buriedReaderRememberAsk(text) {
     const raw = String(text || '');
     if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
       if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
       return true;
     }
@@ -9508,12 +9516,9 @@ const FlowIncomingJudge = (() => {
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
-    const trim = raw.trim();
-    const enOpen = /^(?:\s*(?:hi|hello|hey|dear)[,!]?\s*)?(?:please remember to|(?:do not|don't|dont) forget(?: to)?)/i.test(trim);
-    const heOpen = /^(?:שלום|היי|הי)[^\n]{0,40}[,!]?\s*(?:תזכיר(?:י)?\s+לי|תזכור(?:י)?\s+ל|אל\s+תשכח(?:י)?\s+ל)/.test(trim);
-    if (enOpen || heOpen) return false;
     if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -9901,7 +9906,8 @@ const FlowIncomingJudge = (() => {
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
     const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
-    if (id === 'schedule' && announce && !timed) return true;
+    if (id === 'schedule' && announce && !timed) return false;
+    if (announce && (id === 'hold' || id === 'schedule')) return false;
     if (id === 'hold' && /\?/.test(src) && !announce) return true;
     return false;
   }
@@ -10226,9 +10232,43 @@ var GlanceIntent = (function () {
     return { due: due, text: rest };
   }
 
-  function localRemember(text, now, timeZone) {
+  function readerNameList(ctx) {
+    var names = [];
+    if (ctx && ctx.userName) names.push(String(ctx.userName).toLowerCase());
+    if (ctx && ctx.ownNames) {
+      for (var i = 0; i < ctx.ownNames.length; i++) {
+        if (ctx.ownNames[i]) names.push(String(ctx.ownNames[i]).toLowerCase());
+      }
+    }
+    return names;
+  }
+
+  function nameIsReader(name, ctx) {
+    var who = String(name || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!who) return false;
+    var list = readerNameList(ctx);
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i];
+      if (who === n || who.indexOf(n) !== -1 || n.indexOf(who) !== -1) return true;
+    }
+    return false;
+  }
+
+  function greetingToOther(text, ctx) {
+    var raw = String(text || '');
+    var m = raw.match(/^(?:hi|hello|hey)(?:\s+there)?\s+([^,!\n]{1,40})[,!]/i);
+    if (!m) return false;
+    var who = m[1].trim();
+    if (/^(there|team|all|everyone)$/i.test(who)) return false;
+    return !nameIsReader(who, ctx);
+  }
+
+  function localRemember(text, ctx) {
+    var now = ctx && ctx.now;
+    var timeZone = ctx && ctx.timeZone;
     var raw = collapse(text);
     if (!raw || raw.length > 8000) return null;
+    if (greetingToOther(raw, ctx)) return null;
     raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
     raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
     raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
@@ -10268,8 +10308,22 @@ var GlanceIntent = (function () {
   }
 
   // A draft or a file step is not rewritten into a task or an event.
+  var ADDON_UNSUPPORTED_PLAN = {
+    'reply-track': true,
+    'reply-fact': true,
+    'file-it': true,
+    'attach-invite': true,
+    'create-missing': true,
+    'file-on-hold': true,
+    'file-on-task': true,
+    'clear-it': true,
+    'move-it': true
+  };
+
   function mapEngine(result, now, timeZone) {
     if (!result || !result.plan || !result.plan.steps) return null;
+    var planId = String(result.plan.id || '');
+    if (ADDON_UNSUPPORTED_PLAN[planId]) return null;
     var steps = result.plan.steps;
     if (!steps.length) return null;
     // The shared plan may carry a reply draft beside the task ("Draft reply" + "Task"). This card writes no draft, so it
@@ -10305,7 +10359,8 @@ var GlanceIntent = (function () {
       var holdClock = clockOf(holdParams);
       var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
-      if (!holdClock || !holdDate || !holdTitle || holdParams.requireTime === false) return null;
+      if (!holdClock || !holdDate || !holdTitle) return null;
+      if (holdParams.requireTime === false && !holdClock) return null;
       return {
         speak: true,
         source: 'engine',
@@ -10483,7 +10538,7 @@ var GlanceIntent = (function () {
       err.diag = err.diag || 'judge';
       throw err;
     }
-    var local = localRemember(prepared, ctx.now, ctx.timeZone);
+    var local = localRemember(prepared, ctx);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
@@ -10494,8 +10549,13 @@ var GlanceIntent = (function () {
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
       if (mapped) return contentTitle(prepared, mapped);
       if (hit && hit.plan && hit.plan.id) {
-        return silence('dropped', hit.plan.id, {
-          droppedPlanId: hit.plan.id,
+        var dropId = hit.plan.id;
+        if (dropId === 'reply-track' && hit.intent && hit.intent.signals && hit.intent.signals.workAsk
+          && /\b(?:sheet|spreadsheet|numbers|figures|גיליון)\b/i.test(prepared)) {
+          dropId = 'sheet';
+        }
+        return silence('dropped', dropId, {
+          droppedPlanId: dropId,
           intentType: hit.intent && hit.intent.type ? hit.intent.type : null
         });
       }
@@ -11131,7 +11191,8 @@ var GlanceCards = (function () {
       'move-it': 'move calendar',
       'create-missing': 'draft from template',
       'file-on-hold': 'file on calendar',
-      'file-on-task': 'file on task'
+      'file-on-task': 'file on task',
+      'sheet': 'sheet'
     };
     var he = {
       'reply-track': 'מעקב תשובה',
@@ -11147,7 +11208,8 @@ var GlanceCards = (function () {
       'move-it': 'הזזה ביומן',
       'create-missing': 'טיוטה מתבנית',
       'file-on-hold': 'קובץ ביומן',
-      'file-on-task': 'קובץ במשימה'
+      'file-on-task': 'קובץ במשימה',
+      'sheet': 'גיליון'
     };
     var pack = lang === 'he' ? he : en;
     return pack[id] || en[id] || id || 'close';
