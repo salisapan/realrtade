@@ -1527,7 +1527,7 @@ const FlowIntent = (() => {
       if (!after) return false;
       const lines = String(after).split('\n').map((l) => l.trim()).filter(Boolean);
       if (!lines.length) return false;
-      let head = lines[0].replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+      let head = stripInlineHeThanks(lines[0]).replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
       if (lines.length > 1 && !/חתימה|לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן/i.test(head)) return false;
       const dash = head.match(/^(.+?)\s*[—–-]\s+(.+)$/);
       if (dash) {
@@ -1546,7 +1546,7 @@ const FlowIntent = (() => {
       let titled = '';
       const actionLine = text.match(/פעולה\s+נדרשת\s+מצד(?:ך)?:\s*([^\n]+)/i);
       if (actionLine) {
-        const action = String(actionLine[1] || '').replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+        const action = stripInlineHeThanks(String(actionLine[1] || '')).replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
         if (/^חתימה\s+על\s+/i.test(action)) titled = clipTitle('לחתום על ' + action.replace(/^חתימה\s+על\s+/i, ''));
       }
       const decided = selfDecisionTitle(text, facts);
@@ -3045,12 +3045,19 @@ const FlowIntent = (() => {
   // with Initech at $4,850" is Decision: Initech, $4,850. Six words at most.
   const DECISION_NAME = '([A-Z][\\w&.\\-]*(?:[ \\t]+(?!(?:is|are|was|will|as|at|for|to|and|our|the)\\b)[A-Z][\\w&.\\-]*){0,2})';
   // A greeting or a sign-off ends the sentence. The name never runs into it.
-  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:תודה(?:\s+רבה)?|בתודה|בברכה|יום\s+(?:טוב|נעים)|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
+  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:בתודה|בברכה|יום\s+(?:טוב|נעים)|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
+  function stripInlineHeThanks(line) {
+    return String(line || '').replace(/\sתודה(?:\s+רבה)?\s*$/g, function (match, offset, whole) {
+      const before = whole.slice(0, offset).replace(/[ \t]+$/g, '');
+      if (/מכתב$/i.test(before)) return match;
+      return '';
+    });
+  }
   function selfDecisionTitle(raw, facts) {
     const money = facts && facts.moneyText ? ', ' + String(facts.moneyText).trim() : '';
     const lines = String(raw || '').replace(/\u00A0/g, ' ').split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
-      const t = lines[i].replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+      const t = stripInlineHeThanks(lines[i]).replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
       if (!t) continue;
       let m = t.match(new RegExp('(?:^|[.!]\\s*)(?:[Ff]inal[ \\t]+)?[Dd]ecision(?:[ \\t]+[Mm]ade)?[ \\t]*[:\\-–][ \\t]*' + DECISION_NAME));
       if (!m) m = t.match(new RegExp('\\b(?:[Ww]e(?:\'|’)re|[Ww]e are|[Ii](?:\'|’)m|[Ii] am)[ \\t]+going[ \\t]+with[ \\t]+' + DECISION_NAME));

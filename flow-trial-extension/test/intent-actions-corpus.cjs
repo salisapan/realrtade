@@ -1627,7 +1627,42 @@ console.log('\n--- #179 5a/5b inbound פעולה נדרשת and OneDrive (PR #18
   const enOd = classify('Please save the attachment to OneDrive.', inbound);
   check('EN save to OneDrive on Gmail is not a selfTask bypass', enOd && !enOd.selfTask, enOd);
   const heOd = classify('תשמרי את המצורף בוואן דרייב', Object.assign({}, inbound, { senderEmail: 'dana@meridian.com' }));
-  check('HE save to OneDrive inbound on Gmail is a selfTask', heOd && heOd.type === 'request' && heOd.selfTask === true, heOd);
+  check('heOneDriveSave selfTask block removed (no intent.js:1842 copyAttachment→selfTask)', heOd && !heOd.selfTask, heOd);
+  check('HE inbound OneDrive save uses google-closes SAVE_HE (drive-file), not intent selfTask', heOd && heOd.googleClose && heOd.googleClose.target === 'onedrive', heOd);
+}
+
+console.log('\n--- intent.js:638 / :1535 nameIsReader allows reader, blocks third party (PR #186) ---\n');
+{
+  const readerCtx = {
+    senderEmail: 'dana@acme.io',
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'Sali',
+    ownNames: ['Sali', 'Sali Sapan'],
+    readerEmail: 'ai.local.flow@gmail.com',
+    namesWaitDone: true,
+    inbound: true
+  };
+  const readerNamed = classify('פעולה נדרשת מצד: Sali Sapan — חתימה על ה-deck', readerCtx);
+  check('intent.js:1535 nameIsReader allows reader-named פעולה נדרשת', readerNamed && readerNamed.type === 'request' && readerNamed.selfTask === true, readerNamed);
+  const thirdParty = classify('פעולה נדרשת מצד: יוסי כהן — חתימה על ה-deck', readerCtx);
+  check('intent.js:1535 nameIsReader blocks third-party name', thirdParty && !thirdParty.type && thirdParty.quiet === 'hedge', thirdParty);
+  const handoff = classify('Hi Sali, please send the signed contract by Friday.', readerCtx);
+  check('intent.js:638 nameIsReader allows handoff when opening names reader', handoff && handoff.type === 'request', handoff);
+}
+
+console.log('\n--- intent.js:3048 SIGNOFF_TAIL anchored (ברכה הפקות, מכתב תודה ללקוח) ---\n');
+{
+  const self = {
+    senderEmail: 'ai.local.flow@gmail.com',
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    inbound: false
+  };
+  const prod = classify('הוחלט: ברכה הפקות הספק לקליטת העובד', self);
+  check('ברכה הפקות is not stripped as a sign-off tail', prod && prod.label && prod.label.indexOf('ברכה הפקות') !== -1, prod && prod.label);
+  const letter = classify('הוחלט סופית על מכתב תודה ללקוח', self);
+  check('מכתב תודה ללקוח is not stripped as בתודה sign-off (intent.js:3048)', letter && letter.label && letter.label.indexOf('מכתב תודה') !== -1, letter && letter.label);
 }
 
 console.log('\nTOTAL FAILURES:', failures);
