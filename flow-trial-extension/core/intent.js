@@ -91,7 +91,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח))/;
 
   // "This is not happening at the time this message names."
   //
@@ -717,7 +717,34 @@ const FlowIntent = (() => {
   function nameIsReader(token, ctx) {
     const named = String(token || '').trim().toLowerCase();
     if (!named) return false;
-    return readerNameList(ctx).indexOf(named) !== -1;
+    if (readerNameList(ctx).indexOf(named) !== -1) return true;
+    const list = readerNameList(ctx);
+    for (let a = 0; a < scriptAliases(named).length; a++) {
+      if (list.indexOf(scriptAliases(named)[a]) !== -1) return true;
+    }
+    const c = ctx || {};
+    if (!c.readerEmail && c.namesWaitDone !== true) return false;
+    const own = addressList(c.ownAddresses || c.own || []);
+    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (readerEmail && own.indexOf(readerEmail) === -1) own.push(readerEmail);
+    for (let i = 0; i < own.length; i++) {
+      const local = (String(own[i] || '').split('@')[0] || '').toLowerCase();
+      if (!local || named.length < 3) continue;
+      if (local === named || local.startsWith(named)) return true;
+      const parts = local.split(/[._-]+/);
+      for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        if (!part || part.length < 3) continue;
+        if (part === named || part.startsWith(named)) return true;
+      }
+      for (let n = 0; n < NAME_SCRIPT.length; n++) {
+        const latin = NAME_SCRIPT[n][0];
+        const heb = NAME_SCRIPT[n][1];
+        if (latin.length < 3 || !local.startsWith(latin)) continue;
+        if (named === latin || named === heb) return true;
+      }
+    }
+    return false;
   }
   // Display name, profile given name and surname, and the names the
   // person already stored. Hosts pass this list as ownNames. Latin and

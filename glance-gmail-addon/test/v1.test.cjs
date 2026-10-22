@@ -131,9 +131,20 @@ console.log('\n--- intent ---');
   check('Hebrew buried transfer remember still closes', buriedHePay.speak === true && buriedHePay.title && buriedHePay.title.length > 2, buriedHePay);
 }
 check('a remember-to relay to someone else stays quiet', judge('Thanks for the update. Please remember to remind Sarah to send the NDA.').speak === false);
-check('a buried remember relay row stays quiet', judge('Please remember to remind Sarah to call the client tomorrow').speak === false);
+check('a buried remember relay row stays quiet', judge('Please remember to remind Sarah to call the client').speak === false);
+check('a buried remember relay with a day stays quiet', judge('Please remember to remind Sarah to call the client tomorrow').speak === false);
+check('relay Sarah never becomes Handle this note', (function () {
+  const d = judge('Please remember to remind Sarah to call the client');
+  return d.speak === false || (d.title && d.title.toLowerCase().indexOf('handle this note') === -1);
+})());
 check('a remember-to relay in Hebrew stays quiet', judge('תודה על העדכון. תזכור להזכיר ליוסי לשלוח את החוזה.').speak === false);
 check("don't forget to tell a third party stays quiet", judge("Don't forget to tell Noa that the meeting moved").speak === false);
+{
+  const remindYou = judge('Please remind you that the contract is due Friday.');
+  check('remind you is not relay quiet', remindYou.speak === true && remindYou.title && remindYou.title.toLowerCase().indexOf('handle this note') === -1, remindYou);
+  const askYou = judge('Could you ask you to send the invoice?');
+  check('ask you is not relay quiet', askYou.speak === false || askYou.title !== 'Handle this note', askYou);
+}
 check('small talk stays quiet', judge('Hope you are well. Just wanted to say hello and see how things are going this week.').speak === false);
 check('empty stays quiet', judge('').speak === false);
 check('a send ask is not rewritten into a task', judge('Could you please send the signed contract?').speak === false);
@@ -1141,42 +1152,69 @@ console.log('\n--- message path parity ---');
   check('undo deletes the hold when the content hash still matches', plain(linesOf(undone)[0]) === 'Undone.' && !state.events[eventIds[0]], linesOf(undone));
 
   reset();
+  const SALI_EMAIL = 'salisapan1@gmail.com';
   const saliSession = {
-    getActiveUser: function () { return { getEmail: function () { return 'sali.sapan@ai.local.flow@gmail.com'; } }; },
+    getActiveUser: function () { return { getEmail: function () { return SALI_EMAIL; } }; },
+    getEffectiveUser: function () { return { getEmail: function () { return SALI_EMAIL; } }; },
     getScriptTimeZone: function () { return 'Etc/UTC'; }
   };
   const priorSession = sandbox.Session;
   sandbox.Session = saliSession;
-  state.messages.greetBareEn = gmailMessage({
-    id: 'greetBareEn',
-    threadId: 'threadGreetEn',
-    subject: 'Follow up',
-    plain: 'Hi Sali, please remember to call the client.',
+  function openBareGreet(fields) {
+    reset();
+    state.messages[fields.id] = gmailMessage(fields);
+    return openMessage({
+      gmail: { messageId: fields.id, accessToken: 'token', threadId: fields.threadId },
+      commonEventObject: { userLocale: fields.locale || 'en', timeZone: 'Etc/UTC' }
+    })[0];
+  }
+  function expectDoIt(card, he) {
+    const btns = buttonsOf(card);
+    return btns.length === 1 && plain(btns[0].text) === (he ? 'בצע' : 'Do it');
+  }
+  const greetAsks = [
+    { id: 'gEnDoc', threadId: 't1', plain: 'Hi Sali, could you send the signed document by Friday?', locale: 'en' },
+    { id: 'gEnInv', threadId: 't2', plain: 'Hi Sali, could you send the invoice for October?', locale: 'en' },
+    { id: 'gEnMeet', threadId: 't3', plain: 'Hi Sali, could we meet Thursday at 3pm?', locale: 'en' },
+    { id: 'gEnRem', threadId: 't4', plain: 'Hi Sali, please remember to call the client.', locale: 'en' },
+    { id: 'gHeDoc', threadId: 't5', plain: 'היי סאלי, תוכל לשלוח את המסמך החתום?', locale: 'he-IL' },
+    { id: 'gHeInv', threadId: 't6', plain: 'היי סאלי, תוכל לשלוח את החשבונית?', locale: 'he-IL' },
+    { id: 'gHeMeet', threadId: 't7', plain: 'היי סאלי, נוכל להיפגש ביום חמישי בשעה 15:00?', locale: 'he-IL' },
+    { id: 'gHeRem', threadId: 't8', plain: 'היי סאלי, תזכיר לי לשלוח את החוזה מחר.', locale: 'he-IL' }
+  ];
+  greetAsks.forEach(function (fields) {
+    const base = {
+      subject: 'Follow up',
+      html: quietHtml,
+      from: 'Dana Levi <dana@meridian.com>',
+      to: SALI_EMAIL,
+      date: new Date('2026-10-15T11:00:00Z')
+    };
+    const card = openBareGreet(Object.assign(base, fields));
+    check(fields.id + ' bare To greeting shows Do it', expectDoIt(card, fields.locale === 'he-IL'), linesOf(card));
+  });
+  const quietNoa = openBareGreet({
+    id: 'gQuietNoa',
+    threadId: 'tNoa',
+    subject: 'Hi',
+    plain: 'Hi Noa, please remember to call the client.',
     html: quietHtml,
     from: 'Dana Levi <dana@meridian.com>',
-    to: 'sali.sapan@ai.local.flow@gmail.com',
-    date: new Date('2026-10-15T11:00:00Z')
+    to: SALI_EMAIL + ', Noa Cohen <noa@meridian.com>',
+    date: new Date('2026-10-15T11:10:00Z')
   });
-  const greetEnCard = openMessage({
-    gmail: { messageId: 'greetBareEn', accessToken: 'token', threadId: 'threadGreetEn' },
-    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
-  })[0];
-  check('bare To Hi Sali offers Do it', buttonsOf(greetEnCard).length === 1 && plain(buttonsOf(greetEnCard)[0].text) === 'Do it');
-  state.messages.greetBareHe = gmailMessage({
-    id: 'greetBareHe',
-    threadId: 'threadGreetHe',
-    subject: 'עדכון',
-    plain: 'היי סאלי, תזכיר לי לשלוח את החוזה מחר.',
+  check('Hi Noa when Noa is on To stays quiet', buttonsOf(quietNoa).length === 0, linesOf(quietNoa));
+  const showLior = openBareGreet({
+    id: 'gShowLior',
+    threadId: 'tLior',
+    subject: 'Hi',
+    plain: 'Hi Lior, please remember to call the client.',
     html: quietHtml,
     from: 'Dana Levi <dana@meridian.com>',
-    to: 'sali.sapan@ai.local.flow@gmail.com',
-    date: new Date('2026-10-15T11:05:00Z')
+    to: SALI_EMAIL,
+    date: new Date('2026-10-15T11:12:00Z')
   });
-  const greetHeCard = openMessage({
-    gmail: { messageId: 'greetBareHe', accessToken: 'token', threadId: 'threadGreetHe' },
-    commonEventObject: { userLocale: 'he-IL', timeZone: 'Etc/UTC' }
-  })[0];
-  check('bare To Hebrew Sali offers Do it', buttonsOf(greetHeCard).length === 1 && plain(buttonsOf(greetHeCard)[0].text) === 'בצע');
+  check('Hi Lior when Lior is not a recipient still shows Do it', expectDoIt(showLior, false), linesOf(showLior));
   sandbox.Session = priorSession;
 
   reset();

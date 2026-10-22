@@ -4510,7 +4510,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח))/;
 
   // "This is not happening at the time this message names."
   //
@@ -5136,7 +5136,34 @@ const FlowIntent = (() => {
   function nameIsReader(token, ctx) {
     const named = String(token || '').trim().toLowerCase();
     if (!named) return false;
-    return readerNameList(ctx).indexOf(named) !== -1;
+    if (readerNameList(ctx).indexOf(named) !== -1) return true;
+    const list = readerNameList(ctx);
+    for (let a = 0; a < scriptAliases(named).length; a++) {
+      if (list.indexOf(scriptAliases(named)[a]) !== -1) return true;
+    }
+    const c = ctx || {};
+    if (!c.readerEmail && c.namesWaitDone !== true) return false;
+    const own = addressList(c.ownAddresses || c.own || []);
+    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (readerEmail && own.indexOf(readerEmail) === -1) own.push(readerEmail);
+    for (let i = 0; i < own.length; i++) {
+      const local = (String(own[i] || '').split('@')[0] || '').toLowerCase();
+      if (!local || named.length < 3) continue;
+      if (local === named || local.startsWith(named)) return true;
+      const parts = local.split(/[._-]+/);
+      for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        if (!part || part.length < 3) continue;
+        if (part === named || part.startsWith(named)) return true;
+      }
+      for (let n = 0; n < NAME_SCRIPT.length; n++) {
+        const latin = NAME_SCRIPT[n][0];
+        const heb = NAME_SCRIPT[n][1];
+        if (latin.length < 3 || !local.startsWith(latin)) continue;
+        if (named === latin || named === heb) return true;
+      }
+    }
+    return false;
   }
   // Display name, profile given name and surname, and the names the
   // person already stored. Hosts pass this list as ownNames. Latin and
@@ -9368,23 +9395,35 @@ const FlowIncomingJudge = (() => {
     return false;
   }
 
+  function relayTargetIsThirdParty(who) {
+    const name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
   // A sign-off line plus "please remember to remind/tell/ask …" is a relay to
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
+    const heNotReader = '(?!י(?:\\s|[,،.!?]|$)|כם(?:\\s|[,،.!?]|$)|נו(?:\\s|[,،.!?]|$)|ך(?:\\s|[,،.!?]|$)|אותך|אתכם|אותי)';
     if (/\b(?:please\s+)?remind\s+me\b/i.test(raw)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(raw)) return false;
-    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(raw)) return true;
-    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(raw)) return true;
-    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/תזכור\s+לשאול\s+את\s+/.test(raw)) return true;
-    if (/תזכור\s+להגיד\s+ל/.test(raw)) return true;
-    if (/להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/להגיד\s+ל[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    const enForgetRelay = raw.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    const enRememberRelay = raw.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    const enVerb = raw.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל/.test(raw) && !/אל\s+תשכח\s+להזכיר\s+ל(?:י|כם|נו|ך|אותך|אתכם|אותי)\b/.test(raw)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל/.test(raw) && new RegExp('תזכור\\s+ל(?:הזכיר|זכיר)\\s+ל' + heNotReader).test(raw)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(raw) && !/תזכור\s+לשאול\s+אתכם/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))/.test(raw)) return true;
+    if (new RegExp('להזכיר\\s+ל' + heNotReader).test(raw)) return true;
+    if (new RegExp('(?:^|[^\\u0590-\\u05FF])(?:תזכיר|תזכירי|תזכירו)\\s+ל' + heNotReader).test(raw)) return true;
+    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw) && !/לשאול\s+אתכם/.test(raw)) return true;
+    if (/להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -9463,7 +9502,8 @@ const FlowIncomingJudge = (() => {
       graphSender: i.graphSender || null,
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
-      namesWaitDone: i.namesWaitDone === true
+      namesWaitDone: i.namesWaitDone === true,
+      readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
@@ -9556,7 +9596,7 @@ const FlowIncomingJudge = (() => {
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi);
+    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi, intent);
     if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold && !outlookInboundMeeting) {
       return { show: false, reason: 'no-draft-close', intent };
     }
@@ -9599,12 +9639,27 @@ const FlowIncomingJudge = (() => {
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
   }
 
-  function outlookInboundMeetingClose(process, text, actionsApi) {
+  function meetingClockInText(text, intent) {
+    const e = intent && intent.entities;
+    if (e && Number.isInteger(e.hour) && Number.isInteger(e.minute)) return true;
+    const extractApi = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
+    if (extractApi && typeof extractApi.extract === 'function') {
+      const facts = extractApi.extract(String(text || ''), {});
+      if (facts && facts.time && Number.isInteger(facts.time.hour) && Number.isInteger(facts.time.minute)) return true;
+    }
+    if (extractApi && typeof extractApi.parseTime === 'function') {
+      const t = extractApi.parseTime(String(text || ''));
+      if (t && Number.isInteger(t.hour) && Number.isInteger(t.minute)) return true;
+    }
+    return false;
+  }
+
+  function outlookInboundMeetingClose(process, text, actionsApi, intent) {
     const id = process && process.id;
     if (!process || draftStepOf(process)) return false;
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
-    const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    const timed = meetingClockInText(src, intent);
     if (id === 'hold' && timed) return true;
     if (id === 'schedule' && announce && !timed) return false;
     if (announce && (id === 'hold' || id === 'schedule')) return false;
@@ -9999,6 +10054,22 @@ var GlanceIntent = (function () {
     return nameMatchesRecipient(who, others);
   }
 
+  function relayTargetIsThirdParty(who) {
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
+  function taskTitleIsMeaningful(title) {
+    var t = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length < 2) return false;
+    if (/^handle this note$/i.test(t)) return false;
+    if (t === 'לטפל בהערה') return false;
+    return true;
+  }
+
   function stripSignatureFromText(text) {
     var lines = String(text || '').split('\n');
     var end = lines.length;
@@ -10031,11 +10102,13 @@ var GlanceIntent = (function () {
   }
 
   function spottedSheetPlan(prepared, hit) {
-    if (!/\b(?:sheet|spreadsheet|גיליון)\b/i.test(prepared)) return null;
+    if (/\b(?:send|email|forward)\s+me\b[^.\n]{0,100}\b(?:sheet|spreadsheet|balance\s+sheet)\b/i.test(prepared)) return null;
+    if (!/\b(?:sheet|spreadsheet|excel)\b|(?:גיליון|טבלה|אקסל)/i.test(prepared)) return null;
+    var writeEn = /\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeEnAsk = /\b(?:can|could|would)\s+you\b[^.\n]{0,80}\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeHe = /(?:רשום|תרשום|להוסיף|לעדכן|להכניס|למלא|תמלא|תעדכן|תוסיף)/;
+    if (writeEn.test(prepared) || writeEnAsk.test(prepared) || writeHe.test(prepared)) return 'sheet';
     if (hit && hit.intent && hit.intent.signals && hit.intent.signals.workAsk) return 'sheet';
-    if (/\b(?:put|place|enter|add|save|log)\b[^.\n]{0,100}\b(?:sheet|spreadsheet)\b/i.test(prepared)) return 'sheet';
-    if (/\b(?:october|sales|numbers|figures|payment)\b/i.test(prepared)) return 'sheet';
-    if (/גיליון/.test(prepared) && /(?:תשלום|מספרים|נתונים|דוח|אוקטובר)/.test(prepared)) return 'sheet';
     return null;
   }
 
@@ -10043,11 +10116,14 @@ var GlanceIntent = (function () {
     var text = String(raw || '');
     if (/\b(?:please\s+)?remind\s+me\b/i.test(text)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(text)) return false;
-    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
-    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
-    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(text)) return true;
-    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(text)) return true;
-    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(text)) return true;
+    var enForgetRelay = text.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    var enRememberRelay = text.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    var enVerb = text.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
     if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
     return false;
@@ -10060,8 +10136,9 @@ var GlanceIntent = (function () {
     if (!raw || raw.length > 8000) return null;
     if (localRelayQuiet(raw)) return null;
     if (greetingToOther(raw, ctx)) return null;
-    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
+    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,!\n]{1,40})?[,!]\s*/i, '');
     raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    raw = raw.replace(/^(?:שלום|היי|הי)\s+[^,!\n]{1,40}[,!]\s*/, '');
     raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
     var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
     var lang = 'en';
@@ -10136,7 +10213,11 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'googleTask') {
       var taskParams = steps[0].params || {};
       var title = sanitizeTitle(taskParams.title || taskParams.what || steps[0].label || '');
-      if (!title) return null;
+      if (!taskTitleIsMeaningful(title) && result.intent && result.intent.entities) {
+        var alt = result.intent.entities.requestWhat || result.intent.entities.what;
+        if (alt) title = sanitizeTitle(alt);
+      }
+      if (!taskTitleIsMeaningful(title)) return null;
       return {
         speak: true,
         source: 'engine',

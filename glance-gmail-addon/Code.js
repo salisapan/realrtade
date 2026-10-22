@@ -189,7 +189,12 @@ function buildSha_() {
 function activeUserEmail_() {
   try {
     if (typeof Session !== 'undefined' && Session.getActiveUser) {
-      return String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+      var email = Session.getActiveUser().getEmail();
+      if (email) return String(email).trim().toLowerCase();
+    }
+    if (typeof Session !== 'undefined' && Session.getEffectiveUser) {
+      var eff = Session.getEffectiveUser().getEmail();
+      if (eff) return String(eff).trim().toLowerCase();
     }
   } catch (err) { /* add-on sandbox */ }
   return '';
@@ -368,9 +373,13 @@ function engineHit_(text, opened, now) {
       subject: opened.subject || '',
       sender: { email: opened.fromEmail || null, name: opened.fromName || null },
       to: opened.toList || [],
+      toRecipients: opened.toRecipients || [],
+      ccRecipients: opened.ccRecipients || [],
       ownAddresses: opened.ownAddresses || [],
       userName: opened.userName || null,
       ownNames: opened.ownNames || [],
+      readerEmail: opened.readerEmail || null,
+      namesWaitDone: Boolean(opened.readerEmail),
       now: now,
       surface: 'gmail',
       attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
@@ -575,9 +584,6 @@ function readOpen_(e, read) {
   var toList = emailsIn_(toRaw);
   var reader = readerContext_(toRaw, ccRaw);
   var ownAddresses = reader.ownAddresses.slice();
-  for (var ti = 0; ti < toList.length; ti++) {
-    if (ownAddresses.indexOf(toList[ti]) < 0) ownAddresses.push(toList[ti]);
-  }
   if (read.isSelf && from.email) {
     var fromLower = String(from.email).trim().toLowerCase();
     if (fromLower && ownAddresses.indexOf(fromLower) < 0) ownAddresses.push(fromLower);
