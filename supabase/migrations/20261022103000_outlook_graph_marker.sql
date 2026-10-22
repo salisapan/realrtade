@@ -38,6 +38,7 @@ end;
 $$;
 
 revoke all on function public.outlook_marker_read_refresh(uuid) from public;
+revoke execute on function public.outlook_marker_read_refresh(uuid) from anon, authenticated;
 grant execute on function public.outlook_marker_read_refresh(uuid) to service_role;
 
 create or replace function public.outlook_marker_write_refresh(secret_id uuid, token text)
@@ -47,13 +48,12 @@ security definer
 set search_path = public, vault
 as $$
 begin
-  update vault.secrets
-  set secret = token
-  where id = secret_id;
+  perform vault.update_secret(secret_id, token);
 end;
 $$;
 
 revoke all on function public.outlook_marker_write_refresh(uuid, text) from public;
+revoke execute on function public.outlook_marker_write_refresh(uuid, text) from anon, authenticated;
 grant execute on function public.outlook_marker_write_refresh(uuid, text) to service_role;
 
 -- Sample scheduled sweep (comment only — enable pg_cron + pg_net after Edge deploy):

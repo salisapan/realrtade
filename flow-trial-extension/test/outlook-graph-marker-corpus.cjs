@@ -60,6 +60,12 @@ check('refresh body follows C1 PKCE interface', M.refreshBody('rt-1', 'client-id
 
 const migration = fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261022103000_outlook_graph_marker.sql'), 'utf8');
 check('migration has client_state and write_refresh RPC', /client_state/.test(migration) && /outlook_marker_write_refresh/.test(migration));
+check('migration revokes vault RPC from anon and authenticated (read)',
+  /revoke execute on function public\.outlook_marker_read_refresh\(uuid\) from anon, authenticated/.test(migration));
+check('migration revokes vault RPC from anon and authenticated (write)',
+  /revoke execute on function public\.outlook_marker_write_refresh\(uuid, text\) from anon, authenticated/.test(migration));
+check('migration write_refresh uses vault.update_secret',
+  /perform vault\.update_secret\(secret_id, token\)/.test(migration));
 
 const edge = fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'functions', 'outlook-graph-marker', 'index.ts'), 'utf8');
 check('edge returns 202 before work finishes', edge.indexOf('status: 202') >= 0 && edge.indexOf('EdgeRuntime.waitUntil') >= 0);
