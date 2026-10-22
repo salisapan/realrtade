@@ -60,7 +60,7 @@ const FlowGoogleCloses = (() => {
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
   const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
+  const SAVE_HE = /(?:תשמור|תשמר(?:י|ו)?|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב|את\s+המצורף\s+בוואן\s*דרייב)/i;
   // A refusal of that save is silence. The negation has to govern the verb
   // in the same clause, so a different "no need to" does not hide a real save.
   // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"

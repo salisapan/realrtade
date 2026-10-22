@@ -119,6 +119,7 @@ const FlowIncomingJudge = (() => {
       calibration: i.calibration || null,
       calibrationByType: i.calibrationByType || null,
       attachmentCount: i.attachmentCount || 0,
+      surface: i.surface || null,
       now,
       to: i.to || i.toRecipients || null,
       cc: i.cc || i.ccRecipients || null,

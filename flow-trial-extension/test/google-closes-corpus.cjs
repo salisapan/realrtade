@@ -296,11 +296,11 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
     'Please upload the attachment to OneDrive.'
   ];
   fires.forEach((text) => {
-    const row = plan(text, { attachmentCount: 1 });
-    check('one file to OneDrive is a drive-file save: ' + text,
-      row.intent && row.intent.personalClose === 'drive-file' && row.intent.googleClose && row.intent.googleClose.target === 'onedrive' &&
-      row.process && row.process.steps[0].kind === 'driveFile' && row.process.steps[0].label === 'OneDrive',
-      row.intent && { type: row.intent.type, personal: row.intent.personalClose, quiet: row.intent.quiet, target: row.intent.googleClose && row.intent.googleClose.target });
+    const row = plan(text, { attachmentCount: 1, surface: 'gmail' });
+    check('Gmail OneDrive save ask is a task, not a Drive write: ' + text,
+      row.intent && row.intent.type === 'request' && row.intent.selfTask === true &&
+      row.process && row.process.steps[0].kind === 'googleTask',
+      row.intent && { type: row.intent.type, personal: row.intent.personalClose, quiet: row.intent.quiet, selfTask: row.intent.selfTask });
   });
   const heNo = [
     'אל תשמור את הקובץ המצורף בדרייב.',
@@ -329,10 +329,11 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
       row.intent && !row.intent.type && row.intent.googleSilence === true && !row.process,
       row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
   });
-  const forget = plan("Don't forget to save the attached file to OneDrive.", { attachmentCount: 1 });
-  check('don\'t forget to save still names OneDrive',
-    forget.intent && forget.intent.personalClose === 'drive-file' && forget.intent.googleClose && forget.intent.googleClose.target === 'onedrive',
-    forget.intent && { type: forget.intent.type, personal: forget.intent.personalClose, target: forget.intent.googleClose && forget.intent.googleClose.target });
+  const forget = plan("Don't forget to save the attached file to OneDrive.", { attachmentCount: 1, surface: 'gmail' });
+  check('don\'t forget to save on Gmail is still a OneDrive task',
+    forget.intent && forget.intent.type === 'request' && forget.intent.selfTask === true &&
+    forget.process && forget.process.steps[0].kind === 'googleTask',
+    forget.intent && { type: forget.intent.type, personal: forget.intent.personalClose, selfTask: forget.intent.selfTask });
   const zero = plan('Please save the attachment to OneDrive.', { attachmentCount: 0 });
   const two = plan('Please save the attachment to OneDrive.', { attachmentCount: 2 });
   check('zero or two OneDrive files stay silent',
