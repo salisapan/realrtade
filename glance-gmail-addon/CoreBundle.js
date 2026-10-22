@@ -967,7 +967,7 @@ const FlowJudgment = (() => {
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
   const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)תזכור(?:י|ו)?\s+ל|(?:^|\s)אל\s+תשכח(?:י|ו)?\s+ל|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
   // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
   // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
   // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
@@ -2107,7 +2107,10 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
+    const inboundAttachedCopy = input.attachmentCount === 1 &&
+      /\battached is\b/i.test(text) &&
+      /\bsigned (?:pdf|copy|scan|form)\b/i.test(text);
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || inboundAttachedCopy) {
       if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
@@ -5287,6 +5290,15 @@ const FlowIntent = (() => {
     }
     return true;
   }
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
   function vocativeIsOther(text, ctx) {
     const names = readerNameList(ctx);
     if (!names.length) return false;
@@ -5693,7 +5705,7 @@ const FlowIntent = (() => {
       if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
-      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       // A note to self is a plain task. Family A is the file chain, and
       // this mail is not that chain and not an attach to an invite.
@@ -5909,7 +5921,7 @@ const FlowIntent = (() => {
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
       if (/\bwe had our\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) on\s+(?:moday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob)) return 'past';
-      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || /\bgreat (?:meeting|chatting)\b/i.test(blob)) return 'past';
+      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || (/\bgreat (?:meeting|chatting)\b/i.test(blob) && !/\bplease remember to\b/i.test(blob))) return 'past';
       if (/\bthanks for the\b/i.test(blob) && /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday)\b/i.test(blob)) return 'past';
       if (/אתמול|בשבוע שעבר|היה נעים|נהניתי|שמחתי שדיברנו|תודה שהקדשת|הייתה ביום|היה ביום|הפגישה הייתה/.test(blob)) return 'past';
       const year = blob.match(/\b(19\d{2}|20\d{2})\b/);
@@ -8240,8 +8252,24 @@ const FlowActions = (() => {
     if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.soloPhoneTask === 'function') return FlowIntent.soloPhoneTask(text);
     return false;
   }
+  // Inbound meeting statements ("פגישה ביום חמישי 22/10", "the review meeting is on Thursday")
+  // are schedule plans, not timed holds. Coordinating asks stay holds.
+  function inboundMeetingAnnouncement(text) {
+    const src = String(text || '').trim();
+    if (!src || /\?/.test(src)) return false;
+    if (/\b(?:could|can|would|shall)\s+(?:we|you)\s+(?:meet|schedule|book)\b/i.test(src)) return false;
+    if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
+    if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
+    if (/^פגישה/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
+      if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
+      return true;
+    }
+    return false;
+  }
   function meetingNarrow(intent, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    if (inboundMeetingAnnouncement(text)) return false;
     if (soloPhoneTask(text)) return false;
     const close = intent.personalClose;
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
@@ -8251,7 +8279,7 @@ const FlowActions = (() => {
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return false;
     return Boolean(sig.hasMeetingNoun || close === 'calendar-hold');
   }
-  function meetingPlan(intent, proc) {
+  function meetingPlan(intent, proc, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
     const close = intent.personalClose;
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return proc;
@@ -8265,7 +8293,11 @@ const FlowActions = (() => {
     const timed = meetingClock(intent);
     if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
-    if (!timed) return proc;
+    if (!timed) {
+      if (inboundMeetingAnnouncement(text)) return null;
+      return proc;
+    }
+    if (inboundMeetingAnnouncement(text)) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
     return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
@@ -8319,10 +8351,15 @@ const FlowActions = (() => {
     const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent, vetoText);
     const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
     let proc = useMeeting
-      ? meetingPlan(intent, processFor(intent))
+      ? meetingPlan(intent, processFor(intent), vetoText)
       : taskInstead
         ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
         : processFor(intent);
+    const dateConflict = Boolean(intent.facts && intent.facts.date && intent.facts.date.contradictsWeekday);
+    if (inboundMeetingAnnouncement(vetoText) && meetingClock(intent) && !dateConflict
+      && proc && (proc.id === 'schedule' || proc.id === 'schedule-confirm')) {
+      proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    }
     // A calendar step needs a clock the time parser actually resolved.
     // A date with no parsed time is a task. A delete or a move of a named
     // slot is still that calendar write.
@@ -8397,7 +8434,13 @@ const FlowActions = (() => {
     const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
     // A note the user sent to themself is a task, including a dated call
     // and a save that would otherwise write Drive plus a draft.
-    if (intent.selfTask) proc = logIt;
+    if (intent.selfTask) {
+      if ((intent.type === 'event' || (intent.signals && intent.signals.hasMeetingNoun)) && e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
+        proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+      } else if (proc.id !== 'schedule') {
+        proc = logIt;
+      }
+    }
     // "I'll call you" is already the task. The untimed block would retitle
     // it Call when the subject says Reminder, and would return null when
     // the day has no clock ("I will call you on Friday.").
@@ -8423,7 +8466,12 @@ const FlowActions = (() => {
         const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
         intent.label = 'Reply requested' + (when ? ' by ' + when : '');
       } else if (untimedCalendar && !intent.selfTask) {
-        return null;
+        if (e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
+          if (!meetingClock(intent)) return null;
+          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+        } else {
+          return null;
+        }
       } else if (untimedCalendar) {
         proc = logIt;
       }
@@ -8441,6 +8489,7 @@ const FlowActions = (() => {
     // copied off the event classifier after the calendar step was dropped.
     // A self-sent phone task already named the person. Putting Call back
     // would drop that object. Inbound "add this to my tasks: call …" stays Call.
+    if (proc.id !== 'schedule') {
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && !intent.selfTask && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
@@ -8453,6 +8502,7 @@ const FlowActions = (() => {
           ? FlowJudgment.neutralTitle({ dateText: dateText })
           : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
       }
+    }
     }
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
@@ -8581,7 +8631,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
@@ -9308,6 +9358,36 @@ const FlowIncomingJudge = (() => {
     return rest.every((a) => own.indexOf(a) !== -1);
   }
 
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
+
+  // A sign-off line plus "please remember to remind/tell/ask …" is a relay to
+  // someone else, not a buried task for the reader.
+  function buriedRememberRelayQuiet(text) {
+    const raw = String(text || '');
+    if (/\b(?:please\s+)?remind\s+me\b/i.test(raw)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(raw)) return false;
+    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(raw)) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(raw)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל/.test(raw)) return true;
+    if (/להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    if (/להגיד\s+ל[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    return false;
+  }
+
   function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
@@ -9388,6 +9468,9 @@ const FlowIncomingJudge = (() => {
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
     if (intent && intent.namesPending) return { show: false, reason: 'names-pending', intent };
+    if (buriedRememberRelayQuiet(text)) {
+      return { show: false, reason: 'quiet:relay', intent: intent || null };
+    }
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
     }
@@ -9432,7 +9515,7 @@ const FlowIncomingJudge = (() => {
     // A deadline whose day was dropped (31/2, or a weekday that is not that
     // calendar day) is still the reply. The file chain is not that close.
     const droppedDeadline = Boolean(intent.facts && intent.facts.date && intent.facts.date.dropped);
-    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile)) {
+    if (!selfAttachTask && !selfSentTask && !replyInsteadOfFile && isRequest && gate.kind === 'clear' && !droppedDeadline && !(intent && intent.inviteFile) && !buriedReaderRememberAsk(text)) {
       if (resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent };
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
@@ -9473,7 +9556,8 @@ const FlowIncomingJudge = (() => {
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold) {
+    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi);
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold && !outlookInboundMeeting) {
       return { show: false, reason: 'no-draft-close', intent };
     }
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
@@ -9513,6 +9597,18 @@ const FlowIncomingJudge = (() => {
   function taskOnlyProcess(process) {
     const steps = (process && process.steps) || [];
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
+  }
+
+  function outlookInboundMeetingClose(process, text, actionsApi) {
+    const id = process && process.id;
+    if (!process || draftStepOf(process)) return false;
+    const src = String(text || '');
+    const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
+    const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    if (id === 'hold' && timed) return true;
+    if (id === 'schedule' && announce && !timed) return false;
+    if (announce && (id === 'hold' || id === 'schedule')) return false;
+    return false;
   }
 
   // The connector is the only difference: Outlook writes its reply draft through Graph instead of the Gmail API.
@@ -9599,6 +9695,10 @@ var GlanceI18n = (function () {
       diag: 'diag',
       edited: "The task was edited, so I won't undo it",
       quiet: 'Nothing to close.',
+      quietEmpty: 'Nothing to close in this email.',
+      spottedPrefix: 'Spotted, not supported yet: ',
+      remindMe: 'Remind me',
+      build: 'Build',
       openMessage: 'Open a message.',
       next: 'Next',
       due: 'Due',
@@ -9620,6 +9720,10 @@ var GlanceI18n = (function () {
       diag: 'diag',
       edited: 'המשימה נערכה, אז לא אבטל אותה',
       quiet: 'אין מה לסגור.',
+      quietEmpty: 'אין מה לסגור בהודעה הזו.',
+      spottedPrefix: 'זוהה, עדיין לא נתמך: ',
+      remindMe: 'תזכירו לי',
+      build: 'בנייה',
       openMessage: 'פתחו הודעה.',
       next: 'הפעולה הבאה',
       due: 'יעד',
@@ -9827,9 +9931,135 @@ var GlanceIntent = (function () {
     return { due: due, text: rest };
   }
 
-  function localRemember(text, now, timeZone) {
+  function readerNameList(ctx) {
+    var names = [];
+    if (ctx && ctx.userName) names.push(String(ctx.userName).toLowerCase());
+    if (ctx && ctx.ownNames) {
+      for (var i = 0; i < ctx.ownNames.length; i++) {
+        if (ctx.ownNames[i]) names.push(String(ctx.ownNames[i]).toLowerCase());
+      }
+    }
+    if (ctx && ctx.readerEmail) {
+      var local = String(ctx.readerEmail).split('@')[0] || '';
+      if (local) {
+        names.push(local.toLowerCase());
+        names.push(local.replace(/[._-]+/g, ' ').toLowerCase());
+      }
+    }
+    return names;
+  }
+
+  function nameIsReader(name, ctx) {
+    var who = String(name || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!who) return false;
+    var list = readerNameList(ctx);
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i];
+      if (who === n || who.indexOf(n) !== -1 || n.indexOf(who) !== -1) return true;
+    }
+    return false;
+  }
+
+  function nameMatchesRecipient(who, recipients) {
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name || !recipients || !recipients.length) return false;
+    for (var i = 0; i < recipients.length; i++) {
+      var r = recipients[i] || {};
+      var display = String(r.name || '').toLowerCase().trim();
+      var local = String(r.localPart || (r.email ? r.email.split('@')[0] : '') || '').toLowerCase();
+      if (display && (name === display || name.indexOf(display) !== -1 || display.indexOf(name) !== -1)) return true;
+      if (local && (name === local || name.replace(/\s+/g, '') === local.replace(/[._-]+/g, ''))) return true;
+    }
+    return false;
+  }
+
+  function readerInTo(ctx) {
+    var email = String((ctx && ctx.readerEmail) || '').toLowerCase();
+    if (!email) return true;
+    var all = ((ctx && ctx.toRecipients) || []).concat((ctx && ctx.ccRecipients) || []);
+    if (!all.length) return true;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] && String(all[i].email || '').toLowerCase() === email) return true;
+    }
+    return false;
+  }
+
+  function greetingToOther(text, ctx) {
+    var raw = String(text || '');
+    var m = raw.match(/^(?:hi|hello|hey)(?:\s+there)?\s+([^,!\n]{1,40})[,!]/i);
+    var hm = raw.match(/^(?:שלום|היי|הי)\s+([^,!\n]{1,40})[,!]/);
+    var who = m ? m[1].trim() : (hm ? hm[1].trim() : '');
+    if (!who) return false;
+    if (/^(there|team|all|everyone)$/i.test(who)) return false;
+    if (nameIsReader(who, ctx)) return false;
+    if (!readerInTo(ctx)) return true;
+    var others = ((ctx && ctx.toRecipients) || []).concat((ctx && ctx.ccRecipients) || []).filter(function (r) {
+      return r && String(r.email || '').toLowerCase() !== String((ctx && ctx.readerEmail) || '').toLowerCase();
+    });
+    return nameMatchesRecipient(who, others);
+  }
+
+  function stripSignatureFromText(text) {
+    var lines = String(text || '').split('\n');
+    var end = lines.length;
+    while (end > 0 && !String(lines[end - 1] || '').trim()) end--;
+    while (end > 0) {
+      var line = String(lines[end - 1] || '').trim();
+      if (!line) {
+        end--;
+        continue;
+      }
+      if (/^(?:thanks|thank you|best|regards|cheers|sincerely),?\.?$/i.test(line)) {
+        end--;
+        continue;
+      }
+      if (/^(?:תודה|בברכה|יום נעים),?\.?$/i.test(line)) {
+        end--;
+        continue;
+      }
+      if (end < lines.length && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s.-]{0,60}$/.test(line)) {
+        end--;
+        continue;
+      }
+      break;
+    }
+    return lines.slice(0, end).join('\n').trim();
+  }
+
+  function mailLang(text) {
+    return mailIsHebrew(text) ? 'he' : 'en';
+  }
+
+  function spottedSheetPlan(prepared, hit) {
+    if (!/\b(?:sheet|spreadsheet|גיליון)\b/i.test(prepared)) return null;
+    if (hit && hit.intent && hit.intent.signals && hit.intent.signals.workAsk) return 'sheet';
+    if (/\b(?:put|place|enter|add|save|log)\b[^.\n]{0,100}\b(?:sheet|spreadsheet)\b/i.test(prepared)) return 'sheet';
+    if (/\b(?:october|sales|numbers|figures|payment)\b/i.test(prepared)) return 'sheet';
+    if (/גיליון/.test(prepared) && /(?:תשלום|מספרים|נתונים|דוח|אוקטובר)/.test(prepared)) return 'sheet';
+    return null;
+  }
+
+  function localRelayQuiet(raw) {
+    var text = String(raw || '');
+    if (/\b(?:please\s+)?remind\s+me\b/i.test(text)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(text)) return false;
+    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
+    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
+    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(text)) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(text)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(text)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
+    return false;
+  }
+
+  function localRemember(text, ctx) {
+    var now = ctx && ctx.now;
+    var timeZone = ctx && ctx.timeZone;
     var raw = collapse(text);
     if (!raw || raw.length > 8000) return null;
+    if (localRelayQuiet(raw)) return null;
+    if (greetingToOther(raw, ctx)) return null;
     raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
     raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
     raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
@@ -9869,9 +10099,26 @@ var GlanceIntent = (function () {
   }
 
   // A draft or a file step is not rewritten into a task or an event.
-  function mapEngine(result, now, timeZone) {
+  var ADDON_UNSUPPORTED_PLAN = {
+    'reply-fact': true,
+    'file-it': true,
+    'attach-invite': true,
+    'create-missing': true,
+    'file-on-hold': true,
+    'file-on-task': true,
+    'clear-it': true,
+    'move-it': true
+  };
+
+  function mapEngine(result, now, timeZone, sourceText) {
     if (!result || !result.plan || !result.plan.steps) return null;
+    var planId = String(result.plan.id || '');
+    if (ADDON_UNSUPPORTED_PLAN[planId]) return null;
     var steps = result.plan.steps;
+    if (planId === 'reply-track') {
+      steps = steps.filter(function (st) { return st && st.kind === 'googleTask'; });
+      if (!steps.length) return null;
+    }
     if (!steps.length) return null;
     // The shared plan may carry a reply draft beside the task ("Draft reply" + "Task"). This card writes no draft, so it
     // offers the task or hold step only; the detection is the same one every surface made.
@@ -9896,7 +10143,7 @@ var GlanceIntent = (function () {
         kind: 'task',
         title: title,
         due: isoOrNull(taskParams.dateIso, now, timeZone),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
       };
@@ -9906,7 +10153,8 @@ var GlanceIntent = (function () {
       var holdClock = clockOf(holdParams);
       var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
-      if (!holdClock || !holdDate || !holdTitle || holdParams.requireTime === false) return null;
+      if (!holdClock || !holdDate || !holdTitle) return null;
+      if (holdParams.requireTime === false && !holdClock) return null;
       return {
         speak: true,
         source: 'engine',
@@ -9917,7 +10165,7 @@ var GlanceIntent = (function () {
         hour: holdClock.hour,
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
       };
@@ -9950,7 +10198,7 @@ var GlanceIntent = (function () {
         quote: sanitizeTitle(calendarParams.quote || ''),
         taskTitle: taskTitle,
         taskDue: isoOrNull(reminderParams.dateIso, now, timeZone),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'schedule',
         planId: 'schedule'
       };
@@ -10061,7 +10309,8 @@ var GlanceIntent = (function () {
     return decision;
   }
 
-  function silence(reason, planId) {
+  function silence(reason, planId, extra) {
+    extra = extra || {};
     return {
       speak: false,
       source: null,
@@ -10070,28 +10319,45 @@ var GlanceIntent = (function () {
       due: null,
       lang: null,
       reason: reason || 'quiet',
-      planId: planId || null
+      planId: planId || null,
+      droppedPlanId: extra.droppedPlanId || planId || null,
+      intentType: extra.intentType || null
     };
   }
 
   function resolveTask(text, ctx) {
     ctx = ctx || {};
     var prepared;
-    try { prepared = prepareText(text); } catch (err) {
+    try { prepared = stripSignatureFromText(prepareText(text)); } catch (err) {
       err.diag = err.diag || 'judge';
       throw err;
     }
-    var local = localRemember(prepared, ctx.now, ctx.timeZone);
+    var local = localRemember(prepared, ctx);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
-      try { hit = ctx.engine(prepared, ctx); } catch (err) {
+      try { hit = ctx.engine(prepared); } catch (err) {
         err.diag = err.diag || 'judge';
         throw err;
       }
-      var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
+      if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
+        return silence(String(hit.reason).slice(6), null);
+      }
+      if (hit && hit.plan && hit.plan.id) {
+        var sheetOnly = spottedSheetPlan(prepared, hit);
+        if (sheetOnly) {
+          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit.intent && hit.intent.type ? hit.intent.type : null });
+        }
+      }
+      var mapped = mapEngine(hit, ctx.now, ctx.timeZone, prepared);
       if (mapped) return contentTitle(prepared, mapped);
-      if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
+      if (hit && hit.plan && hit.plan.id) {
+        var dropId = spottedSheetPlan(prepared, hit) || hit.plan.id;
+        return silence('dropped', dropId, {
+          droppedPlanId: dropId,
+          intentType: hit.intent && hit.intent.type ? hit.intent.type : null
+        });
+      }
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
     }
@@ -10708,16 +10974,71 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function quiet(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
+  function planTypeLabel(lang, planId) {
+    var id = String(planId || '').toLowerCase();
+    var en = {
+      'reply-track': 'reply & track',
+      'reply-fact': 'fact reply',
+      'log-it': 'log it',
+      'follow-through': 'follow-through',
+      'hold': 'calendar hold',
+      'schedule': 'schedule meeting',
+      'schedule-confirm': 'schedule meeting',
+      'file-it': 'save to Drive',
+      'attach-invite': 'attach to invite',
+      'clear-it': 'clear calendar',
+      'move-it': 'move calendar',
+      'create-missing': 'draft from template',
+      'file-on-hold': 'file on calendar',
+      'file-on-task': 'file on task',
+      'sheet': 'sheet'
+    };
+    var he = {
+      'reply-track': 'מעקב תשובה',
+      'reply-fact': 'תשובה על עובדה',
+      'log-it': 'תיעוד',
+      'follow-through': 'מעקב',
+      'hold': 'החזקה ביומן',
+      'schedule': 'תיאום פגישה',
+      'schedule-confirm': 'תיאום פגישה',
+      'file-it': 'שמירה ב-Drive',
+      'attach-invite': 'צירוף לזימון',
+      'clear-it': 'ביטול ביומן',
+      'move-it': 'הזזה ביומן',
+      'create-missing': 'טיוטה מתבנית',
+      'file-on-hold': 'קובץ ביומן',
+      'file-on-task': 'קובץ במשימה',
+      'sheet': 'גיליון'
+    };
+    var pack = lang === 'he' ? he : en;
+    return pack[id] || en[id] || id || 'close';
   }
 
-  function homepage(next, lang) {
+  function quiet(lang, reason) {
+    var key = (!reason || reason === 'no-plan' || reason === 'intent-null' || reason === 'quiet') ? 'quietEmpty' : 'quiet';
+    return card(lang, [text(lang, i18n().t(lang, key))]);
+  }
+
+  function spottedUnsupported(decision, messageId, lang) {
     var L = i18n();
-    if (!next || !next.title) return card(lang, [text(lang, L.t(lang, 'openMessage'))]);
+    var label = planTypeLabel(lang, decision.droppedPlanId || decision.planId);
+    return card(lang, [
+      text(lang, L.t(lang, 'spottedPrefix') + label),
+      button(lang, 'remindMe', 'onRemindMe', { messageId: String(messageId || ''), source: 'message' })
+    ]);
+  }
+
+  function homepage(next, lang, buildSha) {
+    var L = i18n();
+    if (!next || !next.title) {
+      var widgets = [text(lang, L.t(lang, 'openMessage'))];
+      if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
+      return card(lang, widgets);
+    }
     var widgets = [text(lang, L.t(lang, 'next')), text(lang, next.title)];
     if (next.due) widgets.push(dueLine(lang, next.due));
     widgets.push(button(lang, 'doIt', 'onDoIt', { messageId: 'prefetch', source: 'prefetch' }));
+    if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
     return card(lang, widgets);
   }
 
@@ -10737,6 +11058,8 @@ var GlanceCards = (function () {
     undone: undone,
     grant: grant,
     quiet: quiet,
+    spottedUnsupported: spottedUnsupported,
+    planTypeLabel: planTypeLabel,
     homepage: homepage,
     buttons: buttons
   };
@@ -10867,3 +11190,4 @@ var Glance = {
   plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },
   judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }
 };
+// GLANCE_BUILD_SHA=dev

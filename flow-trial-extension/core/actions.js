@@ -573,8 +573,24 @@ const FlowActions = (() => {
     if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.soloPhoneTask === 'function') return FlowIntent.soloPhoneTask(text);
     return false;
   }
+  // Inbound meeting statements ("פגישה ביום חמישי 22/10", "the review meeting is on Thursday")
+  // are schedule plans, not timed holds. Coordinating asks stay holds.
+  function inboundMeetingAnnouncement(text) {
+    const src = String(text || '').trim();
+    if (!src || /\?/.test(src)) return false;
+    if (/\b(?:could|can|would|shall)\s+(?:we|you)\s+(?:meet|schedule|book)\b/i.test(src)) return false;
+    if (/\blet'?s\s+(?:meet|schedule|book)\b/i.test(src)) return false;
+    if (/אפשר|נתאם|נקבע|מה דעתך|בואו ניפגש/.test(src)) return false;
+    if (/^פגישה/.test(src) || /(?:^|\n)\s*פגישה\s+ביום/.test(src)) return true;
+    if (/\b(?:the\s+)?\w+\s+meeting\s+is\s+on\b/i.test(src)) {
+      if (/\b(?:can|could|would)\s+you\s+(?:make it|attend|join|come)\b/i.test(src)) return false;
+      return true;
+    }
+    return false;
+  }
   function meetingNarrow(intent, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return false;
+    if (inboundMeetingAnnouncement(text)) return false;
     if (soloPhoneTask(text)) return false;
     const close = intent.personalClose;
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return false;
@@ -584,7 +600,7 @@ const FlowActions = (() => {
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return false;
     return Boolean(sig.hasMeetingNoun || close === 'calendar-hold');
   }
-  function meetingPlan(intent, proc) {
+  function meetingPlan(intent, proc, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return proc;
     const close = intent.personalClose;
     if (close === 'calendar-cancel' || close === 'calendar-move' || close === 'file-on-hold') return proc;
@@ -598,7 +614,11 @@ const FlowActions = (() => {
     const timed = meetingClock(intent);
     if (openChoice) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (!sig.hasMeetingNoun) return proc;
-    if (!timed) return proc;
+    if (!timed) {
+      if (inboundMeetingAnnouncement(text)) return null;
+      return proc;
+    }
+    if (inboundMeetingAnnouncement(text)) return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     if (close !== 'calendar-hold' && !writtenDayNumber(intent)) return proc;
     return Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
   }
@@ -652,10 +672,15 @@ const FlowActions = (() => {
     const useMeeting = !ctx.baseOnly && !hedged && meetingNarrow(intent, vetoText);
     const taskInstead = !ctx.baseOnly && !useMeeting && taskNotMeeting(intent, vetoText);
     let proc = useMeeting
-      ? meetingPlan(intent, processFor(intent))
+      ? meetingPlan(intent, processFor(intent), vetoText)
       : taskInstead
         ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
         : processFor(intent);
+    const dateConflict = Boolean(intent.facts && intent.facts.date && intent.facts.date.contradictsWeekday);
+    if (inboundMeetingAnnouncement(vetoText) && meetingClock(intent) && !dateConflict
+      && proc && (proc.id === 'schedule' || proc.id === 'schedule-confirm')) {
+      proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    }
     // A calendar step needs a clock the time parser actually resolved.
     // A date with no parsed time is a task. A delete or a move of a named
     // slot is still that calendar write.
@@ -730,7 +755,13 @@ const FlowActions = (() => {
     const callNamesADate = /\bcall\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(String(vetoText || ''));
     // A note the user sent to themself is a task, including a dated call
     // and a save that would otherwise write Drive plus a draft.
-    if (intent.selfTask) proc = logIt;
+    if (intent.selfTask) {
+      if ((intent.type === 'event' || (intent.signals && intent.signals.hasMeetingNoun)) && e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
+        proc = Object.assign({ id: 'schedule' }, PROCESS_CATALOG.schedule);
+      } else if (proc.id !== 'schedule') {
+        proc = logIt;
+      }
+    }
     // "I'll call you" is already the task. The untimed block would retitle
     // it Call when the subject says Reminder, and would return null when
     // the day has no clock ("I will call you on Friday.").
@@ -756,7 +787,12 @@ const FlowActions = (() => {
         const when = e.when ? String(e.when).replace(/\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/, '').trim() : '';
         intent.label = 'Reply requested' + (when ? ' by ' + when : '');
       } else if (untimedCalendar && !intent.selfTask) {
-        return null;
+        if (e.dateIso && inboundMeetingAnnouncement(untimedSrc)) {
+          if (!meetingClock(intent)) return null;
+          proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+        } else {
+          return null;
+        }
       } else if (untimedCalendar) {
         proc = logIt;
       }
@@ -774,6 +810,7 @@ const FlowActions = (() => {
     // copied off the event classifier after the calendar step was dropped.
     // A self-sent phone task already named the person. Putting Call back
     // would drop that object. Inbound "add this to my tasks: call …" stays Call.
+    if (proc.id !== 'schedule') {
     if (taskPlan && soloPhoneTask(vetoText) && !readerSaid && !intent.selfTask) {
       intent.label = /[\u0590-\u05FF]/.test(String(vetoText || '')) ? 'שיחה' : 'Call';
     } else if (taskPlan && !intent.selfTask && (/^Meeting\b/.test(String(intent.label || '')) || intent.label === 'פגישה')) {
@@ -786,6 +823,7 @@ const FlowActions = (() => {
           ? FlowJudgment.neutralTitle({ dateText: dateText })
           : (dateText ? ('Log commitment for ' + dateText) : 'Log this decision');
       }
+    }
     }
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
@@ -914,7 +952,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
