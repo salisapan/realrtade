@@ -80,23 +80,35 @@ const FlowIncomingJudge = (() => {
     return false;
   }
 
+  function relayTargetIsThirdParty(who) {
+    const name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
   // A sign-off line plus "please remember to remind/tell/ask …" is a relay to
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
+    const heNotReader = '(?!י(?:\\s|[,،.!?]|$)|כם(?:\\s|[,،.!?]|$)|נו(?:\\s|[,،.!?]|$)|ך(?:\\s|[,،.!?]|$)|אותך|אתכם|אותי)';
     if (/\b(?:please\s+)?remind\s+me\b/i.test(raw)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(raw)) return false;
-    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(raw)) return true;
-    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(raw)) return true;
-    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/תזכור\s+לשאול\s+את\s+/.test(raw)) return true;
-    if (/תזכור\s+להגיד\s+ל/.test(raw)) return true;
-    if (/להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/להגיד\s+ל[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    const enForgetRelay = raw.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    const enRememberRelay = raw.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    const enVerb = raw.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל/.test(raw) && !/אל\s+תשכח\s+להזכיר\s+ל(?:י|כם|נו|ך|אותך|אתכם|אותי)\b/.test(raw)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל/.test(raw) && new RegExp('תזכור\\s+ל(?:הזכיר|זכיר)\\s+ל' + heNotReader).test(raw)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(raw) && !/תזכור\s+לשאול\s+אתכם/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))/.test(raw)) return true;
+    if (new RegExp('להזכיר\\s+ל' + heNotReader).test(raw)) return true;
+    if (new RegExp('(?:^|[^\\u0590-\\u05FF])(?:תזכיר|תזכירי|תזכירו)\\s+ל' + heNotReader).test(raw)) return true;
+    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw) && !/לשאול\s+אתכם/.test(raw)) return true;
+    if (/להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -200,7 +212,8 @@ const FlowIncomingJudge = (() => {
       graphSender: i.graphSender || null,
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
-      namesWaitDone: i.namesWaitDone === true
+      namesWaitDone: i.namesWaitDone === true,
+      readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
@@ -293,7 +306,7 @@ const FlowIncomingJudge = (() => {
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi);
+    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi, intent);
     if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold && !outlookInboundMeeting) {
       return { show: false, reason: 'no-draft-close', intent };
     }
@@ -478,12 +491,27 @@ const FlowIncomingJudge = (() => {
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
   }
 
-  function outlookInboundMeetingClose(process, text, actionsApi) {
+  function meetingClockInText(text, intent) {
+    const e = intent && intent.entities;
+    if (e && Number.isInteger(e.hour) && Number.isInteger(e.minute)) return true;
+    const extractApi = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
+    if (extractApi && typeof extractApi.extract === 'function') {
+      const facts = extractApi.extract(String(text || ''), {});
+      if (facts && facts.time && Number.isInteger(facts.time.hour) && Number.isInteger(facts.time.minute)) return true;
+    }
+    if (extractApi && typeof extractApi.parseTime === 'function') {
+      const t = extractApi.parseTime(String(text || ''));
+      if (t && Number.isInteger(t.hour) && Number.isInteger(t.minute)) return true;
+    }
+    return false;
+  }
+
+  function outlookInboundMeetingClose(process, text, actionsApi, intent) {
     const id = process && process.id;
     if (!process || draftStepOf(process)) return false;
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
-    const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    const timed = meetingClockInText(src, intent);
     if (id === 'hold' && timed) return true;
     if (id === 'schedule' && announce && !timed) return false;
     if (announce && (id === 'hold' || id === 'schedule')) return false;

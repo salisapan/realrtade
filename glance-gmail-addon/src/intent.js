@@ -201,6 +201,22 @@ var GlanceIntent = (function () {
     return nameMatchesRecipient(who, others);
   }
 
+  function relayTargetIsThirdParty(who) {
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
+  function taskTitleIsMeaningful(title) {
+    var t = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length < 2) return false;
+    if (/^handle this note$/i.test(t)) return false;
+    if (t === 'לטפל בהערה') return false;
+    return true;
+  }
+
   function stripSignatureFromText(text) {
     var lines = String(text || '').split('\n');
     var end = lines.length;
@@ -233,11 +249,13 @@ var GlanceIntent = (function () {
   }
 
   function spottedSheetPlan(prepared, hit) {
-    if (!/\b(?:sheet|spreadsheet|גיליון)\b/i.test(prepared)) return null;
+    if (/\b(?:send|email|forward)\s+me\b[^.\n]{0,100}\b(?:sheet|spreadsheet|balance\s+sheet)\b/i.test(prepared)) return null;
+    if (!/\b(?:sheet|spreadsheet|excel)\b|(?:גיליון|טבלה|אקסל)/i.test(prepared)) return null;
+    var writeEn = /\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeEnAsk = /\b(?:can|could|would)\s+you\b[^.\n]{0,80}\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeHe = /(?:רשום|תרשום|להוסיף|לעדכן|להכניס|למלא|תמלא|תעדכן|תוסיף)/;
+    if (writeEn.test(prepared) || writeEnAsk.test(prepared) || writeHe.test(prepared)) return 'sheet';
     if (hit && hit.intent && hit.intent.signals && hit.intent.signals.workAsk) return 'sheet';
-    if (/\b(?:put|place|enter|add|save|log)\b[^.\n]{0,100}\b(?:sheet|spreadsheet)\b/i.test(prepared)) return 'sheet';
-    if (/\b(?:october|sales|numbers|figures|payment)\b/i.test(prepared)) return 'sheet';
-    if (/גיליון/.test(prepared) && /(?:תשלום|מספרים|נתונים|דוח|אוקטובר)/.test(prepared)) return 'sheet';
     return null;
   }
 
@@ -245,11 +263,14 @@ var GlanceIntent = (function () {
     var text = String(raw || '');
     if (/\b(?:please\s+)?remind\s+me\b/i.test(text)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(text)) return false;
-    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
-    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
-    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(text)) return true;
-    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(text)) return true;
-    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(text)) return true;
+    var enForgetRelay = text.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    var enRememberRelay = text.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    var enVerb = text.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
     if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
     return false;
@@ -262,8 +283,9 @@ var GlanceIntent = (function () {
     if (!raw || raw.length > 8000) return null;
     if (localRelayQuiet(raw)) return null;
     if (greetingToOther(raw, ctx)) return null;
-    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
+    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,!\n]{1,40})?[,!]\s*/i, '');
     raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    raw = raw.replace(/^(?:שלום|היי|הי)\s+[^,!\n]{1,40}[,!]\s*/, '');
     raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
     var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
     var lang = 'en';
@@ -338,7 +360,11 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'googleTask') {
       var taskParams = steps[0].params || {};
       var title = sanitizeTitle(taskParams.title || taskParams.what || steps[0].label || '');
-      if (!title) return null;
+      if (!taskTitleIsMeaningful(title) && result.intent && result.intent.entities) {
+        var alt = result.intent.entities.requestWhat || result.intent.entities.what;
+        if (alt) title = sanitizeTitle(alt);
+      }
+      if (!taskTitleIsMeaningful(title)) return null;
       return {
         speak: true,
         source: 'engine',

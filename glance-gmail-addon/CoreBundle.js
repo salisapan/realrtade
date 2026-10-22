@@ -99,103 +99,6 @@ const FLOW_DOMAINS = [
 
 if (typeof module !== 'undefined') module.exports = { FLOW_DOMAINS };
 
-// ----- flow-trial-extension/core/day-words.js -----
-// Day words the date reader (core/extract.js) does not take, rewritten into forms it does, before a chat or mail reader looks
-// for its one day: Hebrew weekday abbreviations («יום א׳» to «יום ראשון»), the Hebrew hyphen (maqaf) in «ב־10:00», dotted dates
-// after a day marker («עד 28.10» to «עד 28/10», "by 28.10"), and relative spans («בעוד יומיים», «בעוד שלושה ימים», «בעוד שבוע»,
-// "in 3 days", "in two days", "in a week") to an ISO date. It only rewrites; it never decides anything. Portable: no
-// A clock with a part of the day («ב-7 בערב», «ב-4 אחה"צ», "at noon") becomes "at 7:00 pm".
-// chrome.*, no DOM, no network.
-const FlowDayWords = (() => {
-  const ABBR = { 'א': 'ראשון', 'ב': 'שני', 'ג': 'שלישי', 'ד': 'רביעי', 'ה': 'חמישי', 'ו': 'שישי', 'ש': 'שבת' };
-  const HE_NUM = { 'יומיים': 2, 'שלושה': 3, 'שלוש': 3, 'ארבעה': 4, 'ארבע': 4, 'חמישה': 5, 'חמש': 5, 'שישה': 6, 'שש': 6, 'שבעה': 7, 'שבע': 7 };
-  const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, a: 1 };
-
-  function pad(n) { return String(n).padStart(2, '0'); }
-  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function plus(at, days) { return iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days)); }
-
-  function normalize(text, now) {
-    let s = String(text == null ? '' : text);
-    if (!s) return s;
-    const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
-    s = s.replace(/־/g, '-');
-    s = s.replace(/(יום|ליום|ביום)\s+([אבגדהוש])[׳'’`]/g, (m, d, a) => d + ' ' + ABBR[a]);
-    // 28.10 or 28.10.2026 after a day marker, not a price or a version.
-    s = s.replace(/(^|[\s(])((?:עד|לפני|ב-?|ל-?|on|by|before|until|till)\s*)([0-3]?\d)\.([01]?\d)(\.\d{2,4})?(?![\d.]*\d)/gi, (m, pre, mark, d, mo, yr) => {
-      const dn = parseInt(d, 10); const mn = parseInt(mo, 10);
-      if (dn < 1 || dn > 31 || mn < 1 || mn > 12) return m;
-      // Always an ISO date: "5/11" is ambiguous (day or month first) to a reader, an ISO date is not. No year means the next such day.
-      let y = at.getFullYear();
-      if (yr) { y = parseInt(yr.slice(1), 10); if (y < 100) y += 2000; } else if (new Date(y, mn - 1, dn) < new Date(at.getFullYear(), at.getMonth(), at.getDate())) y += 1;
-      const probe = new Date(y, mn - 1, dn);
-      if (probe.getMonth() !== mn - 1 || probe.getDate() !== dn) return m;
-      return pre + mark + iso(probe);
-    });
-    // Clocks written the other ways: «ב-8 וחצי», «ב-8 ורבע», "half past 8", "quarter to 9", and a dotted clock («ב-20.00»,
-    // "at 8.30 pm"). The date reader would take "at 8.30 pm" for 8:00, a wrong hour, so these are made explicit first.
-    s = s.replace(/(^|[^\u0590-\u05FF\d])(ב-?|בשעה\s+)(\d{1,2})\s*ו-?(חצי|רבע)(?![\u0590-\u05FF])/g, (m, pre, lead, h, w) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? pre + lead + h + ':' + (w === 'חצי' ? '30' : '15') : m);
-    s = s.replace(/\bhalf\s+past\s+(\d{1,2})\b/gi, (m, h) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? h + ':30' : m);
-    s = s.replace(/\bquarter\s+past\s+(\d{1,2})\b/gi, (m, h) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? h + ':15' : m);
-    s = s.replace(/\bquarter\s+(?:to|of)\s+(\d{1,2})\b/gi, (m, h) => { const n = parseInt(h, 10); return (n >= 1 && n <= 12) ? ((n === 1 ? 12 : n - 1) + ':45') : m; });
-    s = s.replace(/(\d{1,2})\.([0-5]\d)(\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z]))/gi, (m, h, mi, mer) => parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12 ? h + ':' + mi + mer : m);
-    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)([01]?\d|2[0-3])\.([0-5]\d)(?![\d.])/gi, (m, lead, h, mi) => lead + h + ':' + mi);
-    // A clock written with a leading zero is a 24-hour clock ("06:30", «ב-06:30», "at 06:30"): the date reader leaves a bare 6:30
-    // unresolved, which is right for "6:30" and wrong for "06:30" on a boarding pass. Written out with am, it is 6:30 am.
-    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])0([1-9]):([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, h, mi) => 'at ' + h + ':' + mi + ' am');
-    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])00:([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, mi) => 'at 12:' + mi + ' am');
-    // A clock with a part of the day: «ב-7 בערב» to "at 7:00 pm", «ב-12 בצהריים» to "at 12:00 pm", "at noon" to "at 12:00 pm". The
-    // date reader leaves a bare 12 or 00 unresolved on purpose, and takes a written am or pm.
-    s = s.replace(/(ב-?|בשעה\s+)(\d{1,2})(?::([0-5]\d))?\s+(בבוקר|בצהריים|בצהרים|אחה["״]צ|אחר\s+הצהריים|אחרי\s+הצהריים|בערב|בלילה)/g, (m, lead, h, min, part) => {
-      const hh = parseInt(h, 10);
-      if (hh < 1 || hh > 12) return m;
-      let mer = '';
-      if (part === 'בבוקר') mer = hh === 12 ? '' : 'am';
-      else if (/^בצהר/.test(part)) mer = (hh === 12 || hh <= 5) ? 'pm' : '';
-      else if (part === 'בלילה') mer = hh === 12 || hh <= 5 ? 'am' : 'pm';
-      else mer = 'pm';
-      if (!mer) return m;
-      return 'at ' + hh + ':' + (min || '00') + ' ' + mer;
-    });
-    s = s.replace(/\bat\s+noon\b/gi, 'at 12:00 pm');
-    s = s.replace(/\bat\s+midnight\b/gi, 'at 12:00 am');
-    s = s.replace(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, (m, d, mo) => mo + ' ' + d);
-    // End of the week (Friday) and of the month, and a day of the month by itself: "by the 30th", «עד ה-30», «עד 30 לחודש».
-    // English: Friday. Hebrew «סוף השבוע» follows the product's Israeli work week, as core/follow-up.js does: Thursday.
-    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
-    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - at.getDay() + 7) % 7));
-    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => iso(new Date(at.getFullYear(), at.getMonth() + 1, 0)));
-    const dayOfMonth = (dn) => {
-      if (dn < 1 || dn > 31) return null;
-      for (let k = 0; k < 3; k++) {
-        const probe = new Date(at.getFullYear(), at.getMonth() + k, dn);
-        if (probe.getDate() === dn && probe >= new Date(at.getFullYear(), at.getMonth(), at.getDate())) return iso(probe);
-      }
-      return null;
-    };
-    s = s.replace(/\b(by|before|until|till|on)\s+the\s+(\d{1,2})(?:st|nd|rd|th)\b(?!\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/gi, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? mark + ' ' + v : m; });
-    s = s.replace(/(עד|לפני)\s+ה-?\s*(\d{1,2})(?:\s+לחודש)?(?![\d:./\u0590-\u05FF])/g, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? mark + ' ' + v : m; });
-    s = s.replace(/(עד|לפני|ב-?)\s*(\d{1,2})\s+לחודש(?![\u0590-\u05FF])/g, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? (/^ב-?$/.test(mark) ? 'ב-' : mark + ' ') + v : m; });
-    // Relative spans to an ISO date.
-    s = s.replace(/בעוד\s+(יומיים|(?:שלושה|שלוש|ארבעה|ארבע|חמישה|חמש|שישה|שש|שבעה|שבע|\d{1,2})\s+ימים)/g, (m, span) => {
-      const n = HE_NUM[span] || HE_NUM[span.split(/\s+/)[0]] || parseInt(span, 10);
-      return n >= 1 && n <= 60 ? plus(at, n) : m;
-    });
-    s = s.replace(/בעוד\s+שבוע(?![֐-׿])/g, () => plus(at, 7));
-    s = s.replace(/\bin\s+(a|one|two|three|four|five|six|seven|\d{1,2})\s+days?\b/gi, (m, w) => {
-      const n = EN_NUM[String(w).toLowerCase()] || parseInt(w, 10);
-      return n >= 1 && n <= 60 ? plus(at, n) : m;
-    });
-    s = s.replace(/\bin\s+(?:a|one)\s+week\b/gi, () => plus(at, 7));
-    return s;
-  }
-
-  return { normalize };
-})();
-
-if (typeof module !== 'undefined') module.exports = { FlowDayWords };
-else if (typeof globalThis !== 'undefined') globalThis.FlowDayWords = FlowDayWords;
-
 // ----- flow-trial-extension/core/extract.js -----
 // Pulls structured facts out of one email's visible text.
 //
@@ -429,8 +332,6 @@ const FlowExtract = (() => {
       let monthIdx = null;
       if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
       else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
-      // A Hebrew sentence writes day first (01/11 is 1 November): that is the convention in Israel. English stays ambiguous.
-      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; monthIdx = b - 1; }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
       if (year != null && year < 100) year += 2000;
@@ -547,17 +448,7 @@ const FlowExtract = (() => {
 
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
-  // Forms people really write that the readers below do not take (Hebrew weekday abbreviations, dotted dates, «ב-8 בערב»,
-  // "half past 8", "by the 30th", «בעוד יומיים») are made explicit first by core/day-words.js, when it is loaded.
-  function dayWordsFirst(text, now) {
-    try {
-      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
-      return D ? D.normalize(text, now) : text;
-    } catch (e) { return text; }
-  }
-
   function parseDate(text, now) {
-    text = dayWordsFirst(text, now);
     now = now || new Date();
     let m;
 
@@ -802,16 +693,7 @@ const FlowExtract = (() => {
   }
 
   function parseTime(text) {
-    text = dayWordsFirst(text);
     let m;
-
-    // "at 8.30 pm": a dotted clock that carries am or pm is that clock, not 8:00 with ".30 pm" left over.
-    m = text.match(/\bat\s+(\d{1,2})\.([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
-    if (m) {
-      const clock0 = resolveClock(+m[1], +m[2], m[3].toLowerCase().replace(/\./g, ''));
-      if (!clock0) return null;
-      return { raw: m[0], hour: clock0.hour, minute: clock0.minute };
-    }
 
     m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|(?:in the|this) (?:morning|afternoon|evening)|at night)?\b/i);
     if (m) {
@@ -4628,7 +4510,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגישה|שיחה)|(?:אפשר|נוכל|תוכל(?:י|ו)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח))/;
 
   // "This is not happening at the time this message names."
   //
@@ -5254,7 +5136,34 @@ const FlowIntent = (() => {
   function nameIsReader(token, ctx) {
     const named = String(token || '').trim().toLowerCase();
     if (!named) return false;
-    return readerNameList(ctx).indexOf(named) !== -1;
+    if (readerNameList(ctx).indexOf(named) !== -1) return true;
+    const list = readerNameList(ctx);
+    for (let a = 0; a < scriptAliases(named).length; a++) {
+      if (list.indexOf(scriptAliases(named)[a]) !== -1) return true;
+    }
+    const c = ctx || {};
+    if (!c.readerEmail && c.namesWaitDone !== true) return false;
+    const own = addressList(c.ownAddresses || c.own || []);
+    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (readerEmail && own.indexOf(readerEmail) === -1) own.push(readerEmail);
+    for (let i = 0; i < own.length; i++) {
+      const local = (String(own[i] || '').split('@')[0] || '').toLowerCase();
+      if (!local || named.length < 3) continue;
+      if (local === named || local.startsWith(named)) return true;
+      const parts = local.split(/[._-]+/);
+      for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        if (!part || part.length < 3) continue;
+        if (part === named || part.startsWith(named)) return true;
+      }
+      for (let n = 0; n < NAME_SCRIPT.length; n++) {
+        const latin = NAME_SCRIPT[n][0];
+        const heb = NAME_SCRIPT[n][1];
+        if (latin.length < 3 || !local.startsWith(latin)) continue;
+        if (named === latin || named === heb) return true;
+      }
+    }
+    return false;
   }
   // Display name, profile given name and surname, and the names the
   // person already stored. Hosts pass this list as ownNames. Latin and
@@ -5549,8 +5458,6 @@ const FlowIntent = (() => {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
     if (/\b(?:please|kindly|do you)\s+(?:agree|accept)\b/i.test(raw)) return true;
-    // Approving is the same decision. With a deadline it becomes a task (see the readerDecisionAsk caller); without one it stays quiet.
-    if (/\b(?:can|could|would|will) you\s+(?:please\s+)?approve\b/i.test(raw) || /\b(?:please|kindly)\s+approve\b/i.test(raw)) return true;
     if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw) && !/\bconfirm\s+by\b/i.test(raw)) return true;
     if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
     if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
@@ -6536,21 +6443,6 @@ const FlowIntent = (() => {
     const familyBlocks = familiesBlockAsk && !inboundAsk;
     if (!quietHint && (askIsSoft || familyBlocks) && requestEvidence) quietHint = 'hedge';
     if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && readerDecisionAsk(text) && !replyAsk) {
-      // Owner, 2026-10-24: a request to approve or accept, with a deadline, is a task: the decision stays the person's, the
-      // deadline is not lost. No reply draft and no answer on their behalf. Without a date it stays the reader's own and quiet.
-      if (hasResolvedDate && !isPast) {
-        const approve = finish(TYPES.REQUEST, 'medium', {
-          who, amount,
-          what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
-          when: humanWhen(facts.date, facts.time),
-          dateIso: facts.date && facts.date.iso
-        }, 'follow-up-ask');
-        if (approve && approve.type) {
-          approve.noReplyDraft = true;
-          approve.label = /[\u0590-\u05FF]/.test(text) ? 'אישור נדרש' : 'Approval requested';
-        }
-        return approve;
-      }
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
@@ -9503,23 +9395,35 @@ const FlowIncomingJudge = (() => {
     return false;
   }
 
+  function relayTargetIsThirdParty(who) {
+    const name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
   // A sign-off line plus "please remember to remind/tell/ask …" is a relay to
   // someone else, not a buried task for the reader.
   function buriedRememberRelayQuiet(text) {
     const raw = String(text || '');
+    const heNotReader = '(?!י(?:\\s|[,،.!?]|$)|כם(?:\\s|[,،.!?]|$)|נו(?:\\s|[,،.!?]|$)|ך(?:\\s|[,،.!?]|$)|אותך|אתכם|אותי)';
     if (/\b(?:please\s+)?remind\s+me\b/i.test(raw)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(raw)) return false;
-    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(raw)) return true;
-    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(raw)) return true;
-    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/תזכור\s+לשאול\s+את\s+/.test(raw)) return true;
-    if (/תזכור\s+להגיד\s+ל/.test(raw)) return true;
-    if (/להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר|תזכירי|תזכירו)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw)) return true;
-    if (/להגיד\s+ל[\u0590-\u05FF]{2,}/.test(raw)) return true;
+    const enForgetRelay = raw.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    const enRememberRelay = raw.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    const enVerb = raw.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל/.test(raw) && !/אל\s+תשכח\s+להזכיר\s+ל(?:י|כם|נו|ך|אותך|אתכם|אותי)\b/.test(raw)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל/.test(raw) && new RegExp('תזכור\\s+ל(?:הזכיר|זכיר)\\s+ל' + heNotReader).test(raw)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(raw) && !/תזכור\s+לשאול\s+אתכם/.test(raw)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))/.test(raw)) return true;
+    if (new RegExp('להזכיר\\s+ל' + heNotReader).test(raw)) return true;
+    if (new RegExp('(?:^|[^\\u0590-\\u05FF])(?:תזכיר|תזכירי|תזכירו)\\s+ל' + heNotReader).test(raw)) return true;
+    if (/לשאול\s+את\s+[\u0590-\u05FF]{2,}/.test(raw) && !/לשאול\s+אתכם/.test(raw)) return true;
+    if (/להגיד\s+ל(?!כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(raw)) return true;
     return false;
   }
 
@@ -9566,31 +9470,6 @@ const FlowIncomingJudge = (() => {
       if (notice) return { show: true, intent: noticeIntent(intentApi, notice), process: forSurface(noticeProcess(notice, i.threadUrl), i.surface || 'gmail') };
     }
 
-    // A booking the person is told about ("Your appointment is confirmed for Sunday at 10:00") becomes a hold on their own
-    // calendar, an invitation to an event the same, and a pickup with a last day ("Your order is ready for pickup until Friday") a task due that day. The same
-    // readers the chat card uses (core/chat-appointment-notice.js, core/chat-pickup-notice.js). Off unless the host passes
-    // bookingNoticeOn (glanceSwitches.BOOKING_NOTICE). Nobody is invited and nothing is sent.
-    if (i.bookingNoticeOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const booking = bookingNotice(i, prepareForJudge(i.text));
-      if (booking) return { show: true, intent: booking.intent, process: forSurface(booking.process, i.surface || 'gmail') };
-    }
-
-    // A reminder or a deadline asked without a question ("Don't forget to bring the signed form on Monday", "I need the signed
-    // contract by Wednesday") and a request to call back on a day become a task due that day (core/chat-reminder.js,
-    // chat-deadline-ask.js, chat-callback-ask.js). Only for a mail addressed to the person (their address on To, not Cc-only).
-    // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
-    if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const ask = taskAsk(i, prepareForJudge(i.text));
-      if (ask) return { show: true, intent: ask.intent, process: forSurface(ask.process, i.surface || 'gmail') };
-    }
-
-    // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
-    // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
-    if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const pay = paymentAsk(i, prepareForJudge(i.text));
-      if (pay) return { show: true, intent: pay.intent, process: forSurface(pay.process, i.surface || 'gmail') };
-    }
-
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
@@ -9623,7 +9502,8 @@ const FlowIncomingJudge = (() => {
       graphSender: i.graphSender || null,
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
-      namesWaitDone: i.namesWaitDone === true
+      namesWaitDone: i.namesWaitDone === true,
+      readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
@@ -9716,7 +9596,7 @@ const FlowIncomingJudge = (() => {
     // An explicit hold is the card. Missing Calendars.ReadWrite does not silence it.
     // A sender's promise, a postpone, or a file dropped on a calendar is not this exemption.
     const calendarHold = intent && intent.personalClose === 'calendar-hold' && intent.explicitHold === true;
-    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi);
+    const outlookInboundMeeting = outlookInboundMeetingClose(baseProcess, vetoText, actionsApi, intent);
     if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(baseProcess) && !taskOnlyProcess(baseProcess) && !calendarHold && !outlookInboundMeeting) {
       return { show: false, reason: 'no-draft-close', intent };
     }
@@ -9731,148 +9611,6 @@ const FlowIncomingJudge = (() => {
     const process = actionsApi.planFor(intent, planCtx);
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
-  }
-
-  // A real mail is longer than the one-line messages the readers were written for (greeting, a sentence, directions,
-  // a signature). Each reader is asked about one sentence, and about two neighbouring sentences, never the whole body, so a
-  // line that states a booking is found and the rest of the mail cannot add or take away from it.
-  function windowsOf(body) {
-    const text = String(body || '').replace(/\r/g, '');
-    const parts = text.split(/\n+|(?<=[.!?؟:;])\s+/).map((x) => x.trim()).filter((x) => x.length >= 8);
-    const out = [];
-    if (text.replace(/\s+/g, ' ').trim().length <= 200) out.push(text.replace(/\s+/g, ' ').trim());
-    for (let k = 0; k < parts.length && out.length < 60; k++) {
-      out.push(parts[k]);
-      const bare = parts[k].replace(/^(?:hi|hello|hey|dear|good\s+(?:morning|afternoon|evening)|שלום|היי|הי|בוקר\s+טוב|ערב\s+טוב)(?:\s+[^\s,]+)?\s*,\s*/i, '');
-      if (bare.length >= 8 && bare.length < parts[k].length) out.push(bare);
-      const lead = parts[k].split(/,\s+|\s+(?:so|because|since|as|and then)\s+/)[0];
-      if (lead && lead.length >= 8 && lead.length < parts[k].length) out.push(lead);
-      if (k + 1 < parts.length) out.push(parts[k] + ' ' + parts[k + 1]);
-    }
-    return out;
-  }
-
-  function firstHit(api, body, now, kind) {
-    if (!api || typeof api.recognize !== 'function') return null;
-    const wins = windowsOf(body);
-    for (let k = 0; k < wins.length; k++) {
-      const r = api.recognize(wins[k], now);
-      if (r && r.kind === kind) return r;
-    }
-    return null;
-  }
-
-  function addressedOnTo(i) {
-    const list = (v) => (Array.isArray(v) ? v : String(v || '').split(/[;,\s]+/)).map((x) => String(x || '').trim().toLowerCase()).filter((x) => x.indexOf('@') > 0);
-    const own = list(i.ownAddresses);
-    const to = list(i.to);
-    if (!own.length || !to.length || !to.some((a) => own.indexOf(a) !== -1)) return false;
-    const intentApi = typeof FlowIntent !== 'undefined' ? FlowIntent : null;
-    if (intentApi && typeof intentApi.copiedOnly === 'function' && intentApi.copiedOnly(i.text, i)) return false;
-    return true;
-  }
-
-  function taskAsk(i, body) {
-    if (!addressedOnTo(i)) return null;
-    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
-    const remApi = sibling(typeof FlowChatReminder !== 'undefined' ? FlowChatReminder : null, './chat-reminder.js', 'FlowChatReminder');
-    const dlApi = sibling(typeof FlowChatDeadlineAsk !== 'undefined' ? FlowChatDeadlineAsk : null, './chat-deadline-ask.js', 'FlowChatDeadlineAsk');
-    const cbApi = sibling(typeof FlowChatCallbackAsk !== 'undefined' ? FlowChatCallbackAsk : null, './chat-callback-ask.js', 'FlowChatCallbackAsk');
-    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-    let title = '';
-    let dateIso = '';
-    let lang = 'en';
-    const rem = firstHit(remApi, body, now0, 'reminder');
-    if (rem) { title = rem.what; dateIso = rem.dateIso; lang = rem.lang; }
-    if (!title) { const dl = firstHit(dlApi, body, now0, 'ask'); if (dl) { title = dl.what; dateIso = dl.dateIso; lang = dl.lang; } }
-    if (!title) { const cb = firstHit(cbApi, body, now0, 'ask'); if (cb) { title = (cb.lang === 'he' ? 'להתקשר' : 'Call back') + (who ? ' · ' + who : ''); dateIso = cb.dateIso; lang = cb.lang; } }
-    if (!title) return null;
-    title = title.slice(0, 120);
-    const he = lang === 'he';
-    return {
-      intent: { type: 'request', label: title, confidence: 0.9, taskAsk: true, personalClose: 'task-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: dateIso }, facts: { date: { iso: dateIso } } },
-      process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, taskAsk: true,
-        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-    };
-  }
-
-  function paymentAsk(i, body) {
-    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
-    const api = sibling(typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk : null, './chat-payment-ask.js', 'FlowChatPaymentAsk');
-    const pay = firstHit(api, body, now0, 'ask');
-    if (!pay) return null;
-    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
-    return {
-      intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
-      process: { id: 'log-it', name: 'Log It', closingLine: pay.lang === 'he' ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: pay.lang === 'he' ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, paymentAsk: true,
-        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pay.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-    };
-  }
-
-  function pad2(n) { return String(n).padStart(2, '0'); }
-
-  function bookingNotice(i, body) {
-    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
-    const apptApi = sibling(typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, './chat-appointment-notice.js', 'FlowChatAppointmentNotice');
-    const pickApi = sibling(typeof FlowChatPickupNotice !== 'undefined' ? FlowChatPickupNotice : null, './chat-pickup-notice.js', 'FlowChatPickupNotice');
-    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-    const tail = who ? ' · ' + who : '';
-    const appt = firstHit(apptApi, body, now0, 'appointment');
-    if (appt) {
-      const he = appt.lang === 'he';
-      const title = ((he ? 'תור' : 'Appointment') + tail).slice(0, 120);
-      return {
-        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
-        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-      };
-    }
-    const tripApi = sibling(typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, './chat-travel-notice.js', 'FlowChatTravelNotice');
-    const trip = firstHit(tripApi, body, now0, 'trip');
-    if (trip) {
-      const he = trip.lang === 'he';
-      const title = ((he ? 'נסיעה' : 'Trip') + tail).slice(0, 120);
-      return {
-        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'trip', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute }, facts: { date: { iso: trip.dateIso } } },
-        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-      };
-    }
-    const dlvApi = sibling(typeof FlowChatDeliveryWindow !== 'undefined' ? FlowChatDeliveryWindow : null, './chat-delivery-window.js', 'FlowChatDeliveryWindow');
-    const dlv = firstHit(dlvApi, body, now0, 'delivery');
-    if (dlv) {
-      const he = dlv.lang === 'he';
-      const win = dlv.endHour != null ? ' ' + pad2(dlv.hour) + ':' + pad2(dlv.minute) + '–' + pad2(dlv.endHour) + ':' + pad2(dlv.endMinute) : '';
-      const title = ((he ? 'משלוח' : 'Delivery') + win + tail).slice(0, 120);
-      return {
-        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'delivery', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: dlv.dateIso, hour: dlv.hour, minute: dlv.minute }, facts: { date: { iso: dlv.dateIso } } },
-        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: dlv.dateIso, hour: dlv.hour, minute: dlv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, durationMinutes: dlv.durationMinutes || undefined, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-      };
-    }
-    const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');
-    const inv = firstHit(invApi, body, now0, 'invitation');
-    if (inv) {
-      const he = inv.lang === 'he';
-      const title = ((he ? 'הזמנה' : 'Invitation') + tail).slice(0, 120);
-      return {
-        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'invitation', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
-        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-      };
-    }
-    const pick = firstHit(pickApi, body, now0, 'pickup');
-    if (pick) {
-      const he = pick.lang === 'he';
-      const title = ((he ? 'לאסוף הזמנה' : 'Pick up the order') + tail).slice(0, 120);
-      return {
-        intent: { type: 'request', label: title, confidence: 0.9, bookingNotice: 'pickup', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pick.dateIso }, facts: { date: { iso: pick.dateIso } } },
-        process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pick.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-      };
-    }
-    return null;
   }
 
   function noticeIntent(intentApi, notice) {
@@ -9901,12 +9639,27 @@ const FlowIncomingJudge = (() => {
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
   }
 
-  function outlookInboundMeetingClose(process, text, actionsApi) {
+  function meetingClockInText(text, intent) {
+    const e = intent && intent.entities;
+    if (e && Number.isInteger(e.hour) && Number.isInteger(e.minute)) return true;
+    const extractApi = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
+    if (extractApi && typeof extractApi.extract === 'function') {
+      const facts = extractApi.extract(String(text || ''), {});
+      if (facts && facts.time && Number.isInteger(facts.time.hour) && Number.isInteger(facts.time.minute)) return true;
+    }
+    if (extractApi && typeof extractApi.parseTime === 'function') {
+      const t = extractApi.parseTime(String(text || ''));
+      if (t && Number.isInteger(t.hour) && Number.isInteger(t.minute)) return true;
+    }
+    return false;
+  }
+
+  function outlookInboundMeetingClose(process, text, actionsApi, intent) {
     const id = process && process.id;
     if (!process || draftStepOf(process)) return false;
     const src = String(text || '');
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
-    const timed = /(?:בשעה\s*\d|\d{1,2}:\d{2}|\bat\s+\d{1,2}(?::\d{2})?\b)/i.test(src);
+    const timed = meetingClockInText(src, intent);
     if (id === 'hold' && timed) return true;
     if (id === 'schedule' && announce && !timed) return false;
     if (announce && (id === 'hold' || id === 'schedule')) return false;
@@ -9976,7 +9729,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
+  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
@@ -10301,6 +10054,22 @@ var GlanceIntent = (function () {
     return nameMatchesRecipient(who, others);
   }
 
+  function relayTargetIsThirdParty(who) {
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
+  function taskTitleIsMeaningful(title) {
+    var t = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length < 2) return false;
+    if (/^handle this note$/i.test(t)) return false;
+    if (t === 'לטפל בהערה') return false;
+    return true;
+  }
+
   function stripSignatureFromText(text) {
     var lines = String(text || '').split('\n');
     var end = lines.length;
@@ -10333,11 +10102,13 @@ var GlanceIntent = (function () {
   }
 
   function spottedSheetPlan(prepared, hit) {
-    if (!/\b(?:sheet|spreadsheet|גיליון)\b/i.test(prepared)) return null;
+    if (/\b(?:send|email|forward)\s+me\b[^.\n]{0,100}\b(?:sheet|spreadsheet|balance\s+sheet)\b/i.test(prepared)) return null;
+    if (!/\b(?:sheet|spreadsheet|excel)\b|(?:גיליון|טבלה|אקסל)/i.test(prepared)) return null;
+    var writeEn = /\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeEnAsk = /\b(?:can|could|would)\s+you\b[^.\n]{0,80}\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeHe = /(?:רשום|תרשום|להוסיף|לעדכן|להכניס|למלא|תמלא|תעדכן|תוסיף)/;
+    if (writeEn.test(prepared) || writeEnAsk.test(prepared) || writeHe.test(prepared)) return 'sheet';
     if (hit && hit.intent && hit.intent.signals && hit.intent.signals.workAsk) return 'sheet';
-    if (/\b(?:put|place|enter|add|save|log)\b[^.\n]{0,100}\b(?:sheet|spreadsheet)\b/i.test(prepared)) return 'sheet';
-    if (/\b(?:october|sales|numbers|figures|payment)\b/i.test(prepared)) return 'sheet';
-    if (/גיליון/.test(prepared) && /(?:תשלום|מספרים|נתונים|דוח|אוקטובר)/.test(prepared)) return 'sheet';
     return null;
   }
 
@@ -10345,11 +10116,14 @@ var GlanceIntent = (function () {
     var text = String(raw || '');
     if (/\b(?:please\s+)?remind\s+me\b/i.test(text)) return false;
     if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(text)) return false;
-    if (/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
-    if (/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(text)) return true;
-    if (/\b(?:remind|tell|ask|notify|ping|nudge)\s+(?!me\b)[A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40}\s+(?:to|that)\b/i.test(text)) return true;
-    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$))/.test(text)) return true;
-    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$))[\u0590-\u05FF]{2,}/.test(text)) return true;
+    var enForgetRelay = text.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    var enRememberRelay = text.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    var enVerb = text.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
     if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
     if (/תזכור\s+להגיד\s+ל/.test(text)) return true;
     return false;
@@ -10362,8 +10136,9 @@ var GlanceIntent = (function () {
     if (!raw || raw.length > 8000) return null;
     if (localRelayQuiet(raw)) return null;
     if (greetingToOther(raw, ctx)) return null;
-    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
+    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,!\n]{1,40})?[,!]\s*/i, '');
     raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    raw = raw.replace(/^(?:שלום|היי|הי)\s+[^,!\n]{1,40}[,!]\s*/, '');
     raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
     var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
     var lang = 'en';
@@ -10438,7 +10213,11 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'googleTask') {
       var taskParams = steps[0].params || {};
       var title = sanitizeTitle(taskParams.title || taskParams.what || steps[0].label || '');
-      if (!title) return null;
+      if (!taskTitleIsMeaningful(title) && result.intent && result.intent.entities) {
+        var alt = result.intent.entities.requestWhat || result.intent.entities.what;
+        if (alt) title = sanitizeTitle(alt);
+      }
+      if (!taskTitleIsMeaningful(title)) return null;
       return {
         speak: true,
         source: 'engine',
