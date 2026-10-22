@@ -75,7 +75,11 @@ const ROWS = [
   ['he-sheet', 'תוכל לרשום את התשלום בגיליון התשלומים?', false],
   ['he-sig', 'היי סאלי, תוכל לשלוח את החשבונית?\n\nבברכה,\nדנה לוי', true],
   ['he-meaningful', 'היי סאלי, תוכל לשלוח את החשבונית?', true],
-  ['he-no-en-title', 'תשלח את הדוח עד יום חמישי.', true]
+  ['he-no-en-title', 'תשלח את הדוח עד יום חמישי.', true],
+  ['en-reply-track-deadline', 'Hi Sali, please confirm the wire arrived by Monday, October 20.', true],
+  ['en-reply-track-nodeadline', 'Hi Sali, could you send the invoice for October?', true],
+  ['he-reply-track-deadline', 'היי סאלי, תוכל לשלוח את המסמך החתום עד 23/10?', true],
+  ['he-reply-track-nodeadline', 'היי סאלי, תוכל לשלוח את החשבונית?', true]
 ];
 
 for (const row of ROWS) {
@@ -97,6 +101,18 @@ for (const row of ROWS) {
     check(id + ' English title has no Hebrew', !/[\u0590-\u05FF]/.test(title), title);
   }
   check(id + ' title not signature name only', !/^dana levi$/i.test(title.trim()) && title !== 'דנה לוי', title);
+  if (id === 'en-reply-track-deadline') {
+    check(id + ' Reply by', /^Reply by \d{1,2}\/\d{1,2}$/.test(title), title);
+  }
+  if (id === 'en-reply-track-nodeadline') {
+    check(id + ' Reply requested', title === 'Reply requested', title);
+  }
+  if (id === 'he-reply-track-deadline') {
+    check(id + ' להשיב עד', /^להשיב עד \d{1,2}\/\d{1,2}$/.test(title), title);
+  }
+  if (id === 'he-reply-track-nodeadline') {
+    check(id + ' נדרשת תשובה', title === 'נדרשת תשובה', title);
+  }
 }
 
 console.log('\nFAILURES: ' + failures);

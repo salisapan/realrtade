@@ -10218,12 +10218,16 @@ var GlanceIntent = (function () {
         if (alt) title = sanitizeTitle(alt);
       }
       if (!taskTitleIsMeaningful(title)) return null;
+      var dueIso = isoOrNull(taskParams.dateIso, now, timeZone);
+      if (planId === 'reply-track') {
+        title = replyTrackCardTitle(sourceText || '', title, dueIso);
+      }
       return {
         speak: true,
         source: 'engine',
         kind: 'task',
         title: title,
-        due: isoOrNull(taskParams.dateIso, now, timeZone),
+        due: dueIso,
         lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
@@ -10374,6 +10378,20 @@ var GlanceIntent = (function () {
     return '';
   }
 
+  function replyTrackCardTitle(text, rawTitle, dueIso) {
+    var title = String(rawTitle || '').trim();
+    var he = mailIsHebrew(text);
+    var isReplyLabel = /^reply requested\b/i.test(title);
+    if (!isReplyLabel && !(he && /reply requested/i.test(title))) return sanitizeTitle(title);
+    var due = writtenDate(text, dueIso || '');
+    if (he) {
+      if (due) return sanitizeTitle('להשיב עד ' + due);
+      return 'נדרשת תשובה';
+    }
+    if (due) return sanitizeTitle('Reply by ' + due);
+    return 'Reply requested';
+  }
+
   function contentTitle(text, decision) {
     if (!decision || (decision.kind !== 'schedule' && decision.kind !== 'hold')) return decision;
     if (!mailIsHebrew(text)) return decision;
@@ -10457,6 +10475,7 @@ var GlanceIntent = (function () {
     sanitizeTitle: sanitizeTitle,
     prepareText: prepareText,
     contentTitle: contentTitle,
+    replyTrackCardTitle: replyTrackCardTitle,
     silence: silence
   };
 })();
