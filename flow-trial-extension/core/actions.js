@@ -635,6 +635,23 @@ const FlowActions = (() => {
   function planForRaw(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
+    if (intent.inboundOnedriveTask) {
+      const title = String(intent.label || (intent.entities && intent.entities.what) || 'Task').slice(0, 200);
+      return {
+        id: 'log-it',
+        name: 'Log it',
+        closingLine: title,
+        closedLine: 'On Google Tasks.',
+        steps: [{
+          id: 'task',
+          kind: 'googleTask',
+          label: 'Task',
+          hint: 'Track on Google Tasks',
+          dependsOn: null,
+          params: { title: title, what: title }
+        }]
+      };
+    }
     if (intent.googleClose && !intent.selfTask) return planGoogle(intent, ctx);
     // The classifier lives on the intent, and planFor calls it again when
     // the mail text is in hand. Either one vetoes the meeting plan.

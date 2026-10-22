@@ -2315,7 +2315,8 @@ function glanceUiCopy(kind) {
       }
     }
     // The ask named OneDrive. This surface writes Drive. Stay quiet rather than save it there.
-    if (intent.googleClose && intent.googleClose.target === 'onedrive') {
+    // Inbound Hebrew save-to-OneDrive is a Tasks card only (no Drive write).
+    if (intent.googleClose && intent.googleClose.target === 'onedrive' && !intent.inboundOnedriveTask) {
       logScanSkip(messageId, 'onedrive-target-on-gmail');
       recordSilence(messageId, 'onedrive-target-on-gmail');
       return;
@@ -2333,7 +2334,8 @@ function glanceUiCopy(kind) {
     // (task + short draft). The receipt chain does not own that ask.
     // The shared judge skips this silence when intent.inviteFile is set.
     const inviteAsked = Boolean(intent && intent.inviteFile);
-    if (!inviteAsked && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
+    const inboundOnedriveTask = Boolean(intent && intent.inboundOnedriveTask);
+    if (!inviteAsked && !inboundOnedriveTask && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
       const fileReason = fileGate.reason === 'third-party' ? 'third-party' : 'file';
       logScanSkip(messageId, fileReason);
       recordSilence(messageId, fileReason);
@@ -2342,7 +2344,7 @@ function glanceUiCopy(kind) {
     // A request that attests a payment (a receipt) takes more than one step.
     // The shared judge is the only receipt check on this page. A contract,
     // a quote, or a signed copy is a file to send, not that silence.
-    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
+    if (!inviteAsked && !inboundOnedriveTask && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
       logScanSkip(messageId, 'file');
       recordSilence(messageId, 'file');
       return;
@@ -2380,7 +2382,7 @@ function glanceUiCopy(kind) {
       ? FlowIntent.attachToInvitePlan(text) : null;
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
-    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
+    if (!invitePlan && !inboundOnedriveTask && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
       const threadEvidence = typeof FlowFileAttach.threadEvidenceEligible === 'function'
         && FlowFileAttach.threadEvidenceEligible(String(text || '') + '\n' + String(subject || ''), attachments.length);
       const searched = threadEvidence

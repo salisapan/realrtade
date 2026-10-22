@@ -659,6 +659,7 @@ const FlowIntent = (() => {
   // quiet when the reader is Sali. Nothing here is a setting.
   const NAME_SCRIPT = [
     ['sali', 'סאלי'],
+    ['sali', 'סלי'],
     ['noa', 'נועה'],
     ['dana', 'דנה'],
     ['maya', 'מאיה'],
@@ -1681,13 +1682,13 @@ const FlowIntent = (() => {
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
-    if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge', { noRescue: true });
-    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (!addressedToSelf(ctx) && /פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) {
       if (!inboundActionRequiredPartyOk()) return stayQuiet('hedge');
       const inboundAction = rescueInboundActionRequired();
       if (inboundAction) return inboundAction;
     }
+    if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge', { noRescue: true });
+    if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (bankChangePayment(text)) return stayQuiet('family');
     // A negated or conditional ask stays quiet. A sentence that still asks
     // (please pay, if you can send, let's meet) is the close.
@@ -1857,13 +1858,27 @@ const FlowIntent = (() => {
           entities.hour = clock.hour;
           entities.minute = clock.minute;
         }
-        return finish(
+        const closed = finish(
           hold ? TYPES.SCHEDULED_EVENT : TYPES.DECISION_TO_LOG,
           'high',
           entities,
           g.personalClose,
           g
         );
+        const senderAddr = String(ctx.senderEmail || '').trim().toLowerCase();
+        const ownList = addressList(ctx.ownAddresses || ctx.own);
+        const inboundFromOther = ctx.inbound === true || ctx.direction === 'inbound' ||
+          (ownList.length && senderAddr && ownList.indexOf(senderAddr) < 0);
+        if (closed && g.personalClose === 'drive-file' && g.target === 'onedrive' && g.lang === 'he' &&
+            inboundFromOther && !addressedToSelf(ctx) && !mailIsOwn(ctx) && /מצורף/.test(text) && Number(ctx.attachmentCount) >= 1) {
+          let titled = selfAskTitle(text, ctx && ctx.subject, ctx);
+          if (titled) titled = String(titled).replace(/\s+בבקשה\s*$/u, '').trim();
+          if (!usableSelfTitle(titled)) titled = 'לשמור את המצורף בוואן דרייב';
+          closed.label = titled;
+          closed.inboundOnedriveTask = true;
+          closed.noReplyDraft = true;
+        }
+        return closed;
       }
     }
 
