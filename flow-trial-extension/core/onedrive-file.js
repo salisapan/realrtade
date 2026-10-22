@@ -155,12 +155,17 @@ const FlowOnedriveFile = (() => {
     const params = (input && input.params) || {};
     const messageId = (input && (input.outlookIncomingId || input.messageId)) || params.messageId || '';
     if (!messageId) return { ok: false, reason: 'unclear' };
+    const sel = params.selectedAttachment || {};
+    const fileName = String(params.fileName || sel.name || sel.filename || '').trim();
+    const attachmentId = String(params.attachmentId || sel.id || '').trim();
     return {
       ok: true,
       name: named.name,
       nameLocked: named.nameLocked,
       fetchOne: true,
       messageId: String(messageId),
+      fileName: fileName,
+      attachmentId: attachmentId,
       contentType: 'application/octet-stream'
     };
   }

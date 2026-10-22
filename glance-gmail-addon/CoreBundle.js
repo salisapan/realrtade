@@ -959,7 +959,7 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?|חתום|חתמי|תחתום|תחתמי)|בבקשה (?:חתום|חתמי|תחתום|תחתמי)|(?<!לא\s[^,\n]{0,16},\s*)(?<!לא\s)(?:^|[.!?\n;,]\s*)(?:חתום|חתמי)(?:\s|[^\u0590-\u05FF]|$)[^\n]{0,40}(?:והחזר|והחזירי|ותחזיר)(?![\u0590-\u05FF])|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
@@ -1814,7 +1814,7 @@ const FlowGoogleCloses = (() => {
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b/i;
   const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
   // A refusal of that save is silence. The negation has to govern the verb
   // in the same clause, so a different "no need to" does not hide a real save.
@@ -1835,11 +1835,18 @@ const FlowGoogleCloses = (() => {
     return false;
   }
 
-  // Save-shaped only. The open Outlook page counts file attachments for
-  // this sentence and for no other, so the rest of show and silence stay put.
+  // Save-shaped only. Suggest-save and attachment-save cards use this gate
+  // alone so an inbound signed-copy delivery does not become "Save the file?".
   function needsOneAttachment(text) {
     const t = String(text || '');
     return SAVE_EN.test(t) || SAVE_HE.test(t);
+  }
+
+  // Outlook/Gmail judge: count thread files for save-shaped asks and for
+  // signed-copy delivery (parity), without widening suggest-save.
+  function attachmentCountForJudge(text) {
+    const t = String(text || '');
+    return needsOneAttachment(t) || signedCopyDelivered(t);
   }
 
   function saveClauses(text) {
@@ -1871,6 +1878,91 @@ const FlowGoogleCloses = (() => {
       if (clauseSaves(clause)) seenSave = true;
     }
     if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return saveRefused(raw);
+    return false;
+  }
+
+  function signedDeliveryClauses(text) {
+    return String(text || '').split(/[.!?\n\r;]+/);
+  }
+
+  function signedDeliveryFuture(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    if (/\b(?:will|wont|won't)\b/i.test(c) || /\bi['’]ll\b/i.test(c) || /\b(?:he|she|they|we)['’]ll\b/i.test(c)) return true;
+    if (/\bgoing\s+to\b/i.test(c)) return true;
+    if (/\bwill\s+be\s+sending\b/i.test(c)) return true;
+    if (/\bI\s+am\s+sending\b/i.test(c) && /\b(?:tomorrow|next\s+week|later)\b/i.test(c)) return true;
+    if (/\b(?:i(?:'|')?m|i am|we(?:'|')?re|we are|i(?:'|')?ll|we(?:'|')?ll)\b[^.!?\n]{0,96}\b(?:send(?:ing)?)\b[^.!?\n]{0,48}\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|this\s+(?:afternoon|evening|tonight)|tonight)\b/i.test(c)) return true;
+    if (/\bthis\s+(?:afternoon|evening|tonight)\b/i.test(c)) return true;
+    if (/\btonight\b/i.test(c) && /\bsend/i.test(c)) return true;
+    if (/אשלח|נשלח/.test(c)) return true;
+    if (/\b(?:tomorrow|next\s+week)\b/i.test(c)) return true;
+    if (/\blater\b/i.test(c)) return true;
+    if (/מחר|בשבוע הבא/.test(c)) return true;
+    if (/ביום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(c) && /(?:אשלח|נשלח|שולח|שולחת)/.test(c)) return true;
+    if (/הערב/.test(c) && /(?:אשלח|שולח|שולחת|נשלח)/.test(c)) return true;
+    if (/\bcomes\s+next\s+week\b/i.test(c)) return true;
+    if (/תגיע\s+בשבוע/.test(c)) return true;
+    if (/\b(?:when|once|after)\b[^.!?\n]{0,100}\b(?:approves?|signs?|is\s+approved|are\s+approved)\b/i.test(c)) return true;
+    if (/כשיאושר|(?:^|[^\u0590-\u05FF])כש[^\n]{0,50}(?:יאושר|יחתום)/.test(c)) return true;
+    if (/אחרי\s+ש[^\n]{0,60}(?:יאושר|יחתום|מאושר)/.test(c)) return true;
+    return false;
+  }
+
+  function signedDeliveryVerb(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    if (/\b(?:attached|attaching|here\s+is|here'?s|enclosed|please\s+find)\b/i.test(c)) return true;
+    if (/\b(?:i(?:'m| am)\s+)?sending\b/i.test(c) && !signedDeliveryFuture(c)) return true;
+    return /(?:^|[^\u0590-\u05FF])(?:מצורף|מצורפת|שולח|שולחת|מעביר|מעבירה|הנה)(?:\s|[^\u0590-\u05FF]|$)/.test(c);
+  }
+
+  function signedFinalDoc(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    return /\b(?:signed|executed|countersigned)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(c) ||
+      /\b(?:final)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(c) ||
+      /\b(?:signed|executed|countersigned|final)\b[^.!?\n]{0,48}\b(?:agreement|contract|nda|copy|version|document)\b/i.test(c) ||
+      /\b(?:agreement|contract|nda|copy|version|document)\b[^.!?\n]{0,48}\b(?:signed|executed|countersigned|final)\b/i.test(c) ||
+      /(?:^|[^\u0590-\u05FF])(?:חתום|חתומה|סופי|סופית)[^\n]{0,40}(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)/.test(c) ||
+      /(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)[^\n]{0,24}(?:חתום|חתומה|סופי|סופית)/.test(c);
+  }
+
+  function hebrewSignedAdjective(text) {
+    const t = String(text || '');
+    if (/חתום\s+על\s+ידי/.test(t)) return true;
+    if (/(?:חוזה|הסכם|עותק|מסמך)\s+חתום/.test(t)) return true;
+    return false;
+  }
+
+  function hebrewAskToSign(text) {
+    const t = String(text || '');
+    if (hebrewSignedAdjective(t)) return false;
+    if (/(?:אנא|בבקשה|נא|תוכל|צריך)[^\n]{0,40}(?:לחתום|לחתימה|חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    if (/(?<!לא\s[^,\n]{0,16},\s*)(?<!לא\s)(?:^|[.!?\n;,]\s*)(?:חתום|חתמי)(?:\s|[^\u0590-\u05FF]|$)[^\n]{0,40}(?:והחזר|והחזירי|ותחזיר)(?![\u0590-\u05FF])/m.test(t)) return true;
+    if (/(?:והחזר|והחזירי|ותחזיר)(?![\u0590-\u05FF])[^\n]{0,30}(?:חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    return /(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t);
+  }
+
+  // One attached file that is clearly a completed signing delivery (not a bare
+  // "signed", not an ask to sign or return, not a negation or a question).
+  // Delivery verb and signed/final document must sit in the same clause, present
+  // or completed tense — not a future or conditional promise.
+  function signedCopyDelivered(text) {
+    const t = String(text || '');
+    if (!t.trim()) return false;
+    if (/\bnot\s+signed\b|\bnot\s+yet\s+signed\b|\bunsigned\b/i.test(t)) return false;
+    if (/עדיין\s+לא\s+חתום|לא\s+חתום\s+עדיין/.test(t)) return false;
+    if (/\bhave you signed\b|\bdid you sign\b|\bare you signing\b/i.test(t)) return false;
+    if (/(?:האם|כבר)\s*[^?\n]{0,50}חתום\s*\?/.test(t)) return false;
+    if (/\b(?:need(?:s)?|needed)\s+to\s+be\s+signed\b/i.test(t)) return false;
+    if (/\b(?:please\s+)?(?:return|send|get)\b[^.\n]{0,100}\b(?:the\s+)?(?:\w+\s+){0,4}signed\b/i.test(t)) return false;
+    if (/\b(?:please\s+)?sign\b[^.\n]{0,40}\b(?:the|this|attached)\b/i.test(t)) return false;
+    if (hebrewAskToSign(t)) return false;
+    for (const clause of signedDeliveryClauses(t)) {
+      if (!clause.trim() || signedDeliveryFuture(clause)) continue;
+      if (signedDeliveryVerb(clause) && signedFinalDoc(clause)) return true;
+    }
     return false;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
@@ -2107,8 +2199,13 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
-      if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
+    const OTHER_TARGET = /\bshared\s+(?:folder|drive|files?)\b|\bsharepoint\b|\bdropbox\b|\bbox\.com\b|\bteams\s+(?:folder|channel)\b|(?:ה)?תיקי(?:י)?ה\s+המשותפת|הקבצים\s+המשותפים|שרפוינט|דרופבוקס/i;
+    const noreply = /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(input.senderEmail || '').trim());
+    const signedInbound = Number(input.attachmentCount) >= 1 && signedCopyDelivered(text) && !refusesSave(text)
+      && !OTHER_TARGET.test(text) && !noreply;
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
+      const attachOk = signedInbound ? Number(input.attachmentCount) >= 1 : input.attachmentCount === 1;
+      if (refusesSave(text) || !attachOk || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {
@@ -2417,6 +2514,7 @@ const FlowGoogleCloses = (() => {
   return {
     consider: consider,
     needsOneAttachment: needsOneAttachment,
+    attachmentCountForJudge: attachmentCountForJudge,
     refusesSave: refusesSave,
     refusesSave: refusesSave,
     detailMode: detailMode,
@@ -4393,6 +4491,101 @@ const FlowFileAttach = (() => {
   // (core/file-path.js) to tell whether finishing an intention takes a file. Several
   // objects, a plural ("the invoices"), a hedge or a negation all mean null:
   // a loop is only file-backed when it is clear which file.
+  // Thread evidence for Drive close chains: only when the mail names a real
+  // attachment and explicitly asks to save, upload, attach to Drive, or sign it.
+  const THREAD_SAVE_EN = /\b(?:save|upload|store|file|put)\b[^.\n]{0,120}\b(?:attach(?:ed|ment)?|the\s+(?:pdf|file)|it)\b|\b(?:save|upload|store)\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\battach(?:ed|ment)?\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\bsign\b[^.\n]{0,80}\b(?:the\s+)?(?:attached|attachment|pdf|nda|contract)\b/i;
+  const THREAD_SAVE_HE = /(?:ל)?(?:שמור|להעלות|תעלה|תצרף|לצרף)[^.\n]{0,80}(?:מצורף|המצורף|קובץ|pdf)|(?:חתום|לחתום)[^.\n]{0,40}(?:מצורף|המצורף|קובץ|nda|חוזה)/i;
+
+  function attachFileName(file) {
+    return String((file && (file.filename || file.name)) || '');
+  }
+
+  function attachMime(file) {
+    return String((file && (file.mimeType || file.contentType)) || '').toLowerCase();
+  }
+
+  function attachIsPdf(file) {
+    const name = attachFileName(file).toLowerCase();
+    return /\.pdf$/i.test(name) || attachMime(file) === 'application/pdf';
+  }
+
+  function attachIsImage(file) {
+    const name = attachFileName(file).toLowerCase();
+    return /\.(jpe?g|png|gif|webp|heic)$/i.test(name) || /^image\//.test(attachMime(file));
+  }
+
+  // Which thread attachment to save when the mail names a document (signed
+  // contract, agreement, NDA, חוזה, הסכם, חתום). PDF beats an image. No guess
+  // when scores tie — the card asks.
+  function pickSaveAttachment(text, attachments) {
+    const list = (attachments || []).filter((a) => a && attachFileName(a));
+    if (list.length <= 1) {
+      return { mode: list.length === 1 ? 'single' : 'none', file: list[0] || null, files: list };
+    }
+    const blob = norm(fresh(String(text || '')));
+    const hints = [
+      { body: /\bsigned\b|חתום|חתומ/, name: /signed|חתום|חתומ/, weight: 48 },
+      { body: /\bcontract\b|חוזה/, name: /contract|חוזה/, weight: 42 },
+      { body: /\bagreement\b|הסכם/, name: /agreement|הסכם/, weight: 40 },
+      { body: /\bnda\b/i, name: /nda/, weight: 36 }
+    ];
+    const scored = list.map((file) => {
+      const name = norm(attachFileName(file));
+      let score = 0;
+      hints.forEach((hint) => {
+        const bodyHit = hint.body.test(blob);
+        const nameHit = hint.name.test(name);
+        if (bodyHit && nameHit) score += hint.weight;
+        else if (nameHit && !bodyHit) score += Math.floor(hint.weight / 5);
+        else if (bodyHit && !nameHit) score += Math.floor(hint.weight / 6);
+      });
+      if (/\bappendix\b|נספח/.test(name) && !/\bappendix\b|נספח/.test(blob)) score -= 40;
+      if (attachIsPdf(file)) score += 14;
+      if (attachIsImage(file)) score -= 10;
+      return { file: file, score: score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored[0].score;
+    const second = scored[1].score;
+    const GAP = 18;
+    if (top >= 28 && top - second >= GAP) {
+      return { mode: 'picked', file: scored[0].file, files: list };
+    }
+    return { mode: 'choice', file: null, files: list };
+  }
+
+  // Multi-attachment file-it: step-list catalog (Gmail + Outlook parity).
+  function saveAttachmentCatalog(attachments) {
+    return (attachments || []).map((meta, i) => {
+      const name = attachFileName(meta);
+      const id = String((meta && meta.id) || (meta && meta.url) || ('att-' + i));
+      return { id: id, name: name, label: name, on: false, skipped: !name };
+    });
+  }
+
+  function enrichFileItChoiceCatalog(process, attachments, pickMode) {
+    if (!process || process.id !== 'file-it' || pickMode !== 'choice') return process;
+    const list = (attachments || []).filter((a) => a && attachFileName(a));
+    if (list.length < 2) return process;
+    const catalog = saveAttachmentCatalog(list);
+    const steps = (process.steps || []).map((step) => {
+      if (!step || (step.kind !== 'driveFile' && step.kind !== 'onedriveFile')) return step;
+      return Object.assign({}, step, {
+        params: Object.assign({}, step.params || {}, { catalog: catalog, files: catalog.slice() })
+      });
+    });
+    return Object.assign({}, process, { steps: steps });
+  }
+
+  function threadEvidenceEligible(text, attachmentCount) {
+    const n = Number(attachmentCount) || 0;
+    if (n <= 0) return false;
+    const body = fresh(text);
+    if (!body.trim() || NEG_EN.test(body) || NEG_HE.test(body)) return false;
+    if (gate(body).kind === 'clear') return true;
+    return THREAD_SAVE_EN.test(body) || THREAD_SAVE_HE.test(body);
+  }
+
   function mention(text) {
     const body = fresh(text);
     if (!body.trim()) return null;
@@ -4406,7 +4599,7 @@ const FlowFileAttach = (() => {
   }
 
   return {
-    gate, decide, mention, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, pickSaveAttachment, saveAttachmentCatalog, enrichFileItChoiceCatalog, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();
@@ -4764,7 +4957,8 @@ const FlowIntent = (() => {
   // Tasks title, Notion title, popup activity log) — kept alongside the full
   // quoted `entities.what` rather than replacing it, so nothing downstream
   // that read ctx.result.label before this change has to change.
-  function shortLabel(type, facts, enrichedFacts) {
+  function shortLabel(type, facts, enrichedFacts, langHint) {
+    const he = langHint === 'he';
     // extract.js's own `facts` never carries a human date string (only
     // judgment.js's private humanDate() computes one, for its own
     // evaluate()/factsOnly() callers) — humanDateFallback() is this file's
@@ -4777,6 +4971,9 @@ const FlowIntent = (() => {
       return 'Your commitment' + (dateText ? ', due ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
     }
     if (type === TYPES.REQUEST) {
+      if (he) {
+        return 'נדרשת תשובה' + (dateText ? ' עד ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
+      }
       return 'Reply requested' + (dateText ? ' by ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
     }
     return FlowJudgment.neutralTitle(enrichedFacts); // DECISION_TO_LOG and FOLLOW_UP
@@ -6018,7 +6215,8 @@ const FlowIntent = (() => {
     function labelFor(type) {
       const source = isPast ? Object.assign({}, facts, { date: null }) : facts;
       const enriched = isPast ? Object.assign({}, enrichedFacts, { dateText: null }) : enrichedFacts;
-      return shortLabel(type, source, enriched);
+      const mailHe = /[\u0590-\u05FF]/.test(String(text || '')) || (ctx && ctx.lang === 'he');
+      return shortLabel(type, source, enriched, mailHe ? 'he' : 'en');
     }
     // s.flags.noise: a pitch fingerprint, mailing-list boilerplate, calendar
     // acceptance mail, or an automated sender. The score already penalises
@@ -6190,7 +6388,8 @@ const FlowIntent = (() => {
         hasClock: Boolean(clock),
         template: ctx.companyTemplate || null,
         fileMatch: ctx.fileMatch || null,
-        attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount
+        attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount,
+        senderEmail: ctx.senderEmail || null
       });
       if (google && google.wait) {
         const rescued = rescueSelfSent('google-wait');
@@ -7143,14 +7342,21 @@ const FlowIntent = (() => {
     return '';
   }
   function callTopicPhrase(text, subject) {
-    return topicFromBody(text) || topicFromSubject(subject);
+    const fromBody = topicFromBody(text);
+    const fromSub = topicFromSubject(subject);
+    const subHe = /[\u0590-\u05FF]/.test(String(subject || ''));
+    const bodyHe = /[\u0590-\u05FF]/.test(String(text || ''));
+    if (subHe && !bodyHe && fromSub && (!fromBody || !/[\u0590-\u05FF]/.test(fromBody))) return fromSub;
+    return fromBody || fromSub;
   }
   function haveACallTitle(text, ctx, whenText) {
     const main = withoutIfClause(String(text || ''));
     if (!/\bhave a call\b/i.test(main)) return '';
     const box = ctx && typeof ctx === 'object' ? ctx : { subject: ctx };
     const topic = callTopicPhrase(main, box.subject);
-    if (topic) return clipTitle('Call about ' + topic);
+    if (topic) {
+      return clipTitle('Call about ' + topic);
+    }
     if (!addressedToSelf(box)) {
       const name = String(box.senderName || '').trim();
       if (name && name.indexOf('@') < 0 && !/^me$/i.test(name)) return clipTitle('Call with ' + name);

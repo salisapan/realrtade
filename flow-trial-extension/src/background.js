@@ -6222,9 +6222,14 @@ async function outlookReadJson(res) {
   try { return await res.json(); } catch (e) { return null; }
 }
 
-// Exactly one non-inline file on the message. Zero or two-plus is unclear.
-// The list call often omits contentBytes; the item call has them.
-async function outlookOneFileAttachment(messageId) {
+function outlookGraphAttachmentId(id) {
+  const s = String(id || '');
+  if (!s || /^att-\d+$/i.test(s)) return '';
+  return s;
+}
+
+// Pick one non-inline file on the message by name or Graph id. Pane ids like att-0 are not Graph ids.
+async function outlookPickFileAttachment(messageId, pick) {
   const Files = globalThis.FlowOnedriveFile;
   if (!Files || !messageId) return null;
   const listUrl = OUTLOOK_GRAPH + Files.attachmentsPath(messageId) + '?$select=id,name,contentType,size,isInline';
@@ -6234,8 +6239,14 @@ async function outlookOneFileAttachment(messageId) {
   const body = await outlookReadJson(listed);
   const rows = body && Array.isArray(body.value) ? body.value : [];
   const files = rows.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || '')));
-  if (files.length !== 1) return null;
-  const one = files[0];
+  if (!files.length) return null;
+  const wantName = pick && pick.fileName ? String(pick.fileName).trim() : '';
+  const wantId = pick && pick.attachmentId ? outlookGraphAttachmentId(pick.attachmentId) : '';
+  let one = null;
+  if (wantName) one = files.find((a) => String(a.name || '').trim() === wantName) || null;
+  if (!one && wantId) one = files.find((a) => String(a.id || '') === wantId) || null;
+  if (!one && files.length === 1) one = files[0];
+  if (!one) return null;
   if (one.size && Number(one.size) > Files.MAX_BYTES) return null;
   let b64 = one.contentBytes || '';
   if (!b64 && one.id) {
@@ -6269,7 +6280,10 @@ async function outlookFileWrite(p) {
   let bytes = prepared.bytes;
   let contentType = prepared.contentType || 'application/octet-stream';
   if (prepared.fetchOne) {
-    const got = await outlookOneFileAttachment(prepared.messageId);
+    const got = await outlookPickFileAttachment(prepared.messageId, {
+      fileName: prepared.fileName,
+      attachmentId: prepared.attachmentId
+    });
     if (!got) return { ok: false, reason: 'unclear' };
     bytes = got.bytes;
     contentType = got.contentType || contentType;

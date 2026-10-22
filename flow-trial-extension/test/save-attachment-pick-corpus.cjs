@@ -39,8 +39,33 @@ const tieFiles = [meta('scan-1.pdf'), meta('scan-2.pdf')];
 const pickTie = FA.pickSaveAttachment(tieBody, tieFiles);
 check('two scans with signed-copy wording need a chooser', pickTie.mode === 'choice' && !pickTie.file, pickTie);
 
-const noUrlId = FA.pickSaveAttachment(BODY, [meta('signed-contract.pdf', { url: '', id: undefined })]);
-check('catalog att-N id still resolves by file name on Gmail save path', (noUrlId.mode === 'picked' || noUrlId.mode === 'single') && noUrlId.file && noUrlId.file.filename === 'signed-contract.pdf', noUrlId);
+function gmailCatalogPickBlock() {
+  const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+  const start = gmail.indexOf("if (!only && Array.isArray(catalog) && catalog.length) {");
+  const end = gmail.indexOf("if (!only && listed.length > 1 && typeof FlowFileAttach", start);
+  const code = gmail.slice(start, end);
+  const line = gmail.slice(0, start).split('\n').length;
+  const fn = new Function('listed', 'catalog', 'ctx', 'let only=null;' + code + '\nreturn only;');
+  return { fn, line };
+}
+
+const { fn: pickFromCatalog, line: catalogLine } = gmailCatalogPickBlock();
+const listedNoId = [
+  { filename: 'signed-contract.pdf', mimeType: 'application/pdf', size: 1200 },
+  { filename: 'invoice.pdf', mimeType: 'application/pdf', size: 900 }
+];
+const catalogAttN = [
+  { id: 'att-0', name: 'signed-contract.pdf', label: 'signed-contract.pdf', on: true },
+  { id: 'att-1', name: 'invoice.pdf', on: false }
+];
+const picked = pickFromCatalog(listedNoId, catalogAttN, { attachmentPickMode: 'choice' });
+check('Gmail catalog att-N picks signed-contract (content-gmail.js:' + catalogLine + ')',
+  picked && picked.filename === 'signed-contract.pdf', picked);
+const pickSecond = pickFromCatalog(listedNoId, [
+  { id: 'att-0', name: 'signed-contract.pdf', on: false },
+  { id: 'att-1', name: 'invoice.pdf', on: true }
+], { attachmentPickMode: 'choice' });
+check('Gmail catalog picks second file by att-N row', pickSecond && pickSecond.filename === 'invoice.pdf', pickSecond);
 
 console.log('\n--- Gmail and Outlook pages call pickSaveAttachment ---\n');
 const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');

@@ -118,6 +118,13 @@ console.log('\n--- names, scope, one attachment ---\n');
   const big = { params: { content: 'x'.repeat(F.MAX_BYTES + 1), fileName: 'big.txt' } };
   check('a file over the simple upload cap is unclear', F.prepare(big).ok === false && F.prepare(big).reason === 'unclear');
   check('no bytes and no message is unclear', F.prepare({ label: 'Save' }).ok === false);
+  const twoPick = F.prepare({
+    outlookIncomingId: 'MSG-TWO',
+    params: { messageId: 'MSG-TWO', fileName: 'signed-contract.pdf' }
+  });
+  check('prepare carries fileName for multi-attachment Outlook pick',
+    twoPick.ok === true && twoPick.fetchOne === true && twoPick.fileName === 'signed-contract.pdf' && twoPick.messageId === 'MSG-TWO',
+    twoPick);
   check('save-shaped text is the only sentence that counts attachments',
     G.needsOneAttachment('Please save the attached file to Drive.') === true &&
     G.needsOneAttachment('Please save the attachment to OneDrive.') === true &&
@@ -268,6 +275,37 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
 }
 
 (async () => {
+console.log('\n--- two attachments: pick by fileName, GET item, PUT ---\n');
+{
+  const signed = { id: 'FILE-SIGNED', name: 'signed-contract.pdf', webUrl: 'https://onedrive.live.com/edit.aspx?id=FILE-SIGNED' };
+  const b64 = Buffer.from('signed-pdf-bytes').toString('base64');
+  const twoRoutes = [
+    { method: 'GET', test: /\/messages\/MSG-TWO\/attachments\?\$select/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      value: [
+        { id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', size: 120, isInline: false },
+        { id: 'att1', name: 'appendix.pdf', contentType: 'application/pdf', size: 90, isInline: false }
+      ]
+    }), text: async () => '' }) },
+    { method: 'GET', test: /\/messages\/MSG-TWO\/attachments\/att0$/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', contentBytes: b64
+    }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/signed-contract\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
+    { method: 'PUT', test: /\/me\/drive\/root:\/Glance\/signed-contract\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => signed, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/items\/FILE-SIGNED$/, reply: () => ({ ok: true, status: 200, json: async () => signed, text: async () => '' }) }
+  ];
+  const env = background({ routes: twoRoutes });
+  const out = await env.fn('outlookFileWrite')({
+    outlookIncomingId: 'MSG-TWO',
+    params: { messageId: 'MSG-TWO', fileName: 'signed-contract.pdf', content: '' },
+    label: 'File'
+  });
+  const itemGet = env.calls.find((c) => c.method === 'GET' && /\/attachments\/att0$/.test(c.url));
+  const put = env.calls.find((c) => c.method === 'PUT' && /signed-contract\.pdf/.test(c.url));
+  check('two-attachment file-it GETs the chosen Graph attachment then PUTs OneDrive',
+    out.ok === true && out.proof && out.proof.fetchedBack === true && itemGet && put,
+    { out, calls: env.calls.map((c) => c.method + ' ' + c.url) });
+}
+
 console.log('\n--- create, read back, undo ---\n');
 {
   const env = background({ routes: createRoutes(200, FILE) });

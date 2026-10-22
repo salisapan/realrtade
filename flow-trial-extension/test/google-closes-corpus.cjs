@@ -455,6 +455,14 @@ console.log('\n--- signed delivery: past weekday must not read as future (N1/N2)
     heCommaSign.process && heCommaSign.process.id === 'reply-track'
     && heCommaSign.process.steps && heCommaSign.process.steps.some((s) => s && (s.kind === 'googleTask' || s.kind === 'outlookTask')),
     heCommaSign.process && heCommaSign.process.id);
+  const pastReturned = plan('קיבלתי את החוזה, חתום והחזרתי אותו אתמול.', { attachmentCount: 1 });
+  check('past sign-and-return is not reply-track',
+    !(pastReturned.process && pastReturned.process.id === 'reply-track'),
+    pastReturned.process && pastReturned.process.id);
+  const negSignReturn = plan('לא צריך, חתום והחזר כבר טופל.', { attachmentCount: 1 });
+  check('negated sign-and-return is not reply-track',
+    !(negSignReturn.process && negSignReturn.process.id === 'reply-track'),
+    negSignReturn.process && negSignReturn.process.id);
 }
 
 console.log('\n--- family B: one file, one target ---\n');

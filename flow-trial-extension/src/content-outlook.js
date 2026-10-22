@@ -5532,6 +5532,7 @@
       if (!params) continue;
       if (params.fileName || params.selectedAttachment) return true;
       const catalog = Array.isArray(params.catalog) && params.catalog.length ? params.catalog : (params.files || []);
+      if (catalog.length >= 2) return true;
       if (catalog.some((f) => f && f.on && !f.skipped)) return true;
     }
     return false;
