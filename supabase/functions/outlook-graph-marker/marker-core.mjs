@@ -203,6 +203,20 @@ export function authorizeScheduledRequest(headerValue, configuredSecret) {
   return constantTimeEqual(String(headerValue || ""), expected);
 }
 
+export function parseBearerAuthorization(authHeader) {
+  const h = String(authHeader || "").trim();
+  const m = /^Bearer\s+(\S+)/i.exec(h);
+  return m ? m[1] : "";
+}
+
+export function authorizeUnmarkUser(jwtUserId, bodyUserId) {
+  const uid = String(jwtUserId || "").trim();
+  if (!uid) return { allowed: false, status: 401, reason: "no-auth", userId: "" };
+  const claimed = bodyUserId != null && String(bodyUserId).trim() !== "" ? String(bodyUserId).trim() : "";
+  if (claimed && claimed !== uid) return { allowed: false, status: 403, reason: "user-mismatch", userId: uid };
+  return { allowed: true, status: 200, reason: "ok", userId: uid };
+}
+
 export function shouldPersistRotatedRefresh(oldToken, newToken) {
   return Boolean(newToken && oldToken && !constantTimeEqual(oldToken, newToken));
 }

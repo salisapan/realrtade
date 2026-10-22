@@ -238,6 +238,21 @@ const FlowOutlookGraphMarker = (() => {
     return constantTimeEqual(String(headerValue || ''), expected);
   }
 
+  function parseBearerAuthorization(authHeader) {
+    const h = String(authHeader || '').trim();
+    const m = /^Bearer\s+(\S+)/i.exec(h);
+    return m ? m[1] : '';
+  }
+
+  // Unmark HTTP: caller must present a Supabase user JWT; body.userId is optional and must match.
+  function authorizeUnmarkUser(jwtUserId, bodyUserId) {
+    const uid = String(jwtUserId || '').trim();
+    if (!uid) return { allowed: false, status: 401, reason: 'no-auth', userId: '' };
+    const claimed = bodyUserId != null && String(bodyUserId).trim() !== '' ? String(bodyUserId).trim() : '';
+    if (claimed && claimed !== uid) return { allowed: false, status: 403, reason: 'user-mismatch', userId: uid };
+    return { allowed: true, status: 200, reason: 'ok', userId: uid };
+  }
+
   return {
     GLANCE_CATEGORY: GLANCE_CATEGORY,
     EXTENSION_FLAG: EXTENSION_FLAG,
@@ -273,7 +288,9 @@ const FlowOutlookGraphMarker = (() => {
     refreshBody: refreshBody,
     shouldPersistRotatedRefresh: shouldPersistRotatedRefresh,
     escapeValidationToken: escapeValidationToken,
-    authorizeScheduledRequest: authorizeScheduledRequest
+    authorizeScheduledRequest: authorizeScheduledRequest,
+    parseBearerAuthorization: parseBearerAuthorization,
+    authorizeUnmarkUser: authorizeUnmarkUser
   };
 })();
 

@@ -18,6 +18,8 @@ import {
   hasMarkerProperty,
   readBackMarked,
   resolveAccountForNotification,
+  authorizeUnmarkUser,
+  parseBearerAuthorization,
   shouldPersistRotatedRefresh,
   subscriptionExpirationIso,
   subscriptionNeedsRenewal,
@@ -297,6 +299,23 @@ async function handleUnmark(supabase: ReturnType<typeof createClient>, body: any
   return unmarkMessage(token, messageId);
 }
 
+async function verifySupabaseJwt(jwt: string) {
+  const url = env("SUPABASE_URL");
+  const anon = env("SUPABASE_ANON_KEY");
+  if (!url || !anon || !jwt) return null;
+  const authClient = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await authClient.auth.getUser(jwt);
+  if (error || !data || !data.user || !data.user.id) return null;
+  return data.user.id;
+}
+
+function jsonResponse(status: number, body: Record<string, unknown>) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 async function handleScheduled(supabase: ReturnType<typeof createClient>) {
   const notificationUrl = env("OUTLOOK_GRAPH_NOTIFICATION_URL");
   const rows = await loadAllAccounts(supabase);
@@ -344,11 +363,30 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
-  const work = scheduled
-    ? handleScheduled(supabase)
-    : (payload && payload.unmark)
-      ? handleUnmark(supabase, payload.unmark)
-      : handleNotifications(supabase, payload);
+
+  if (payload && payload.unmark) {
+    const jwt = parseBearerAuthorization(req.headers.get("Authorization") || req.headers.get("authorization"));
+    if (!jwt) return jsonResponse(401, { error: "Unauthorized" });
+    const authUserId = await verifySupabaseJwt(jwt);
+    const gate = authorizeUnmarkUser(authUserId, payload.unmark.userId);
+    if (!gate.allowed) {
+      return jsonResponse(gate.status, { error: gate.status === 403 ? "Forbidden" : "Unauthorized" });
+    }
+    const unmarkBody = Object.assign({}, payload.unmark, { userId: gate.userId });
+    EdgeRuntime.waitUntil(
+      handleUnmark(supabase, unmarkBody).then((results) => {
+        console.log(JSON.stringify({ project: PROJECT_REF, unmark: true, user_id: gate.userId, results }));
+      }).catch((err) => {
+        console.log(JSON.stringify({ project: PROJECT_REF, unmark: true, error: String(err && err.message || err) }));
+      }),
+    );
+    return new Response(JSON.stringify({ project: PROJECT_REF, accepted: true, unmark: true }), {
+      status: 202,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const work = scheduled ? handleScheduled(supabase) : handleNotifications(supabase, payload);
 
   EdgeRuntime.waitUntil(
     work.then((results) => {

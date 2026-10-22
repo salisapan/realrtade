@@ -103,6 +103,17 @@ check('edge enforces OUTLOOK_MARKER_CRON_SECRET on scheduled path',
   && edge.indexOf('authorizeScheduledRequest') >= 0);
 check('migration documents pg_cron http_post sample', /net\.http_post/.test(migration) && /x-glance-cron/.test(migration));
 
+check('unmark 401 without bearer jwt user', M.authorizeUnmarkUser('', userA).allowed === false && M.authorizeUnmarkUser('', userA).status === 401);
+check('unmark 403 when body userId is another user', M.authorizeUnmarkUser(userA, userB).allowed === false && M.authorizeUnmarkUser(userA, userB).status === 403);
+check('unmark uses jwt user id when body omits userId', M.authorizeUnmarkUser(userA, undefined).allowed === true && M.authorizeUnmarkUser(userA, undefined).userId === userA);
+check('unmark allows matching body userId', M.authorizeUnmarkUser(userA, userA).allowed === true && M.authorizeUnmarkUser(userA, userA).userId === userA);
+check('parseBearerAuthorization reads Authorization header', M.parseBearerAuthorization('Bearer jwt-token-abc') === 'jwt-token-abc' && M.parseBearerAuthorization('') === '');
+check('edge unmark verifies Supabase JWT before waitUntil', edge.indexOf('auth.getUser') >= 0 && edge.indexOf('SUPABASE_ANON_KEY') >= 0 && edge.indexOf('parseBearerAuthorization') >= 0);
+check('edge unmark returns 401 without Authorization', /payload\.unmark/.test(edge) && edge.indexOf('jsonResponse(401') >= 0);
+check('edge unmark returns 403 on user mismatch', edge.indexOf('authorizeUnmarkUser') >= 0 && edge.indexOf('jsonResponse(gate.status') >= 0);
+check('edge unmark passes jwt userId into handleUnmark', edge.indexOf('userId: gate.userId') >= 0);
+check('edge unmark still requires Glance marker property', edge.indexOf('hasMarkerProperty') >= 0 && edge.indexOf('not-glance-marker') >= 0);
+
 if (failures) process.exit(1);
 console.log('outlook-graph-marker-corpus: all passed (' + checks + ' checks)');
 console.log('surfaces:');
