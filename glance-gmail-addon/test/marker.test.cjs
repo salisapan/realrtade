@@ -139,13 +139,21 @@ function closable(body, row, tz) {
   return judgeRow(body, row, tz).speak === true;
 }
 
-function mockProps() {
+const MAX_PROP_CHARS = 9216;
+
+function mockProps(enforceLimit) {
   const store = {};
   return {
     getUserProperties() {
       return {
         getProperty(k) { return store[k] || null; },
-        setProperty(k, v) { store[k] = v; }
+        setProperty(k, v) {
+          if (enforceLimit && v && v.length > MAX_PROP_CHARS) {
+            throw new Error('Property value exceeds 9KB');
+          }
+          store[k] = v;
+        },
+        deleteProperty(k) { delete store[k]; }
       };
     },
     _store: store
@@ -287,6 +295,71 @@ M.onProofClose('m-proof', GmailApp);
 check('proof close clears mark path', !M.isProcessed('m-proof') || true);
 M.onNotThis('m-dismiss', GmailApp);
 check('not this dismisses', M.isDismissed('m-dismiss'));
+
+const propsLimited = mockProps(true);
+const Mlim = loadMarker(propsLimited);
+for (let i = 0; i < 1200; i++) Mlim.markProcessed('hex' + String(i).padStart(12, '0'));
+const allKeys = Object.keys(propsLimited._store);
+let maxLen = 0;
+for (const k of allKeys) {
+  const len = propsLimited._store[k].length;
+  if (len > maxLen) maxLen = len;
+  check('chunk under 9KB ' + k, len <= MAX_PROP_CHARS, { k, len });
+}
+check('1000+ processed IDs stored', Mlim._test.readList('glanceMarkerProcessed').length >= 1000);
+check('chunked across keys', allKeys.filter((k) => k.indexOf('glanceMarkerProcessed__') === 0).length >= 2);
+
+let unstarCalled = false;
+const threadUserStar = {
+  getLabels() { return [{ getName() { return 'Glance'; } }]; },
+  getMessages() {
+    return [{
+      isStarred() { return true; },
+      unstar() { unstarCalled = true; },
+      star() {}
+    }];
+  }
+};
+GmailApp.getMessageById = function () {
+  return { getId() { return 'm-user-star'; }, getThread() { return threadUserStar; } };
+};
+propsImpl._store = {};
+M._test.rememberMarkMeta('m-user-star', { userHadStar: true });
+M.onProofClose('m-user-star', GmailApp);
+check('proof close keeps user star', unstarCalled === false);
+
+const snapStore = {};
+const propsSnap = {
+  getUserProperties() {
+    return {
+      getProperty(k) { return snapStore[k] || null; },
+      setProperty(k, v) { snapStore[k] = v; },
+      deleteProperty(k) { delete snapStore[k]; }
+    };
+  },
+  _store: snapStore
+};
+const Mu = loadMarker(propsSnap);
+let starOnlyStarred = false;
+const starOnlyThread = {
+  getLabels() { return []; },
+  getMessages() {
+    return [{
+      isStarred() { return false; },
+      star() { starOnlyStarred = true; },
+      unstar() {}
+    }];
+  }
+};
+GmailApp.getMessageById = function (id) {
+  return { getId() { return id; }, getThread() { return starOnlyThread; } };
+};
+const failLbl = { addToThread() { throw new Error('deny'); }, removeFromThread() {} };
+const applyRes = Mu._test.applyMark_(starOnlyThread, failLbl, true);
+Mu._test.rememberMarkMeta('m-star-only', { userHadStar: applyRes.userHadStar });
+Mu.onProofClose('m-star-only', GmailApp);
+Mu.onUndoRestore('m-star-only', GmailApp);
+check('undo restores glance-only star', starOnlyStarred === true);
 
 const corpus = JSON.parse(fs.readFileSync(path.join(__dirname, 'marker-corpus-20.json'), 'utf8'));
 for (const tz of ['UTC', 'Asia/Jerusalem']) {
