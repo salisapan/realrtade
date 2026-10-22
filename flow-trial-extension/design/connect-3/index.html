@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Glance — חיבור חשבונות</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Heebo:wght@400;500;600&display=swap">
+<style>
+/* Glance connect-3 — design mock only. Tokens mirror gate-v1 (corner-v24 DNA). */
+:root{
+  --bg:#f5f5f7; --sheet:#fff; --ink:#1d1d1f; --grey:#6e6e73; --grey2:#86868b;
+  --line:rgba(0,0,0,.08); --quiet:#f5f5f7; --accent:#0071e3; --tile:#fff;
+  --tile-ring:rgba(0,0,0,.06);
+  --shadow-sheet:0 1px 2px rgba(0,0,0,.04),0 6px 14px -8px rgba(0,0,0,.08),0 24px 48px -28px rgba(0,0,0,.22);
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+  --r-sheet:22px; --r-tile:9px; --h-btn:52px;
+  --font:'Inter Tight','Heebo','Assistant',-apple-system,system-ui,sans-serif;
+}
+html[data-theme="dark"]{
+  --bg:#000; --sheet:#1c1c1e; --ink:#f5f5f7; --grey:#a1a1a6; --grey2:#8e8e93;
+  --line:rgba(255,255,255,.08); --quiet:#2c2c2e; --tile:#fff; --tile-ring:rgba(255,255,255,.0);
+  --shadow-sheet:0 1px 0 rgba(255,255,255,.04) inset,0 1px 2px rgba(0,0,0,.5),0 24px 48px -24px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:var(--font);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:var(--s7) var(--s4)}
+bdi{unicode-bidi:isolate}
+
+.sheet{min-width:0;width:min(480px,100%);background:var(--sheet);border:1px solid var(--line);border-radius:var(--r-sheet);
+  padding:var(--s6) var(--s5) var(--s5);box-shadow:var(--shadow-sheet)}
+.kicker{margin:0 0 var(--s2);font:600 13px/1 var(--font);color:var(--accent)}
+h1{margin:0;font-weight:600;font-size:28px;line-height:1.15;letter-spacing:-.03em}
+html[lang="he"] h1{letter-spacing:-.01em}
+.lead{margin:var(--s2) 0 0;font-size:15px;line-height:1.45;color:var(--grey)}
+
+.list{list-style:none;margin:var(--s5) 0 0;padding:0;display:flex;flex-direction:column;gap:20px}
+.item{display:flex;flex-direction:column;gap:var(--s2)}
+.tools{margin:0;padding-inline:var(--s4);font-size:13px;line-height:1.45;color:var(--grey2)}
+.tools .t{white-space:nowrap}
+
+/* Do It pill — same recipe as gate-v1 .g1-doit */
+.doit{position:relative;appearance:none;display:flex;align-items:center;justify-content:center;width:100%;height:var(--h-btn);
+  gap:12px;padding:0 8px;border:0;border-radius:999px;cursor:pointer;color:#fff;font:600 16px/1 var(--font);letter-spacing:-.015em;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(255,255,255,.32),rgba(255,255,255,0) 46%),linear-gradient(180deg,#3c98f2 0%,#0071e3 46%,#0064c8 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.12),0 4px 8px -6px rgba(0,0,0,.22)}
+.doit::after{content:"";position:absolute;inset:3px;border-radius:inherit;border:1px solid rgba(255,255,255,.42);pointer-events:none}
+.doit:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.doit:disabled{cursor:not-allowed;opacity:.42}
+.doit .marks{display:flex;flex:none;width:62px}
+.doit .label{position:relative;z-index:1;flex:1;text-align:center;padding-inline-end:74px;min-width:0}
+.doit.busy{justify-content:center}
+.doit.busy .label{flex:none;padding:0}
+.tile{width:36px;height:36px;border-radius:50%;background:var(--tile);display:grid;place-items:center;flex:none;
+  box-shadow:0 0 0 1px var(--tile-ring),0 1px 2px rgba(0,0,0,.14)}
+.tile svg{width:20px;height:20px;display:block}
+.tile.ms svg{width:17px;height:17px}
+.marks .tile+.tile{margin-inline-start:-10px}
+
+/* connecting */
+.doit.busy{cursor:progress;opacity:1}
+.spin{position:relative;width:18px;height:18px;margin-inline-end:10px;flex:none}
+.spin i{position:absolute;left:50%;top:0;width:1.5px;height:28%;margin-left:-.75px;border-radius:999px;background:#fff;
+  transform-origin:50% 178.5%;transform:rotate(calc(var(--i)*30deg));opacity:.22;animation:sp 840ms linear infinite;animation-delay:calc(var(--i)*-70ms)}
+@keyframes sp{0%{opacity:1}100%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.spin i{animation:none;opacity:.9}}
+
+/* connected row — quiet, no chrome */
+.done{display:flex;align-items:center;gap:var(--s3);height:var(--h-btn);padding:0 8px;padding-inline-end:var(--s4);border-radius:999px;background:var(--quiet)}
+.done .who{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.done .name{font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.done .mail{font-size:13px;line-height:1.2;color:var(--grey2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.done .ok{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;color:var(--grey);flex:none}
+.done .ok svg{width:16px;height:16px;color:var(--ink)}
+
+.later{margin:var(--s5) 0 0;padding-top:var(--s4);border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--grey2);text-align:center}
+
+/* review harness — not part of the design */
+.review{position:fixed;bottom:14px;inset-inline-start:14px;display:flex;gap:6px;flex-wrap:wrap;font:500 12px/1 var(--font)}
+.review a{padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--grey);text-decoration:none;background:var(--sheet)}
+.review a.on{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+html.shot .review{display:none}
+@media (max-width:480px){
+  body{align-items:flex-start;padding:var(--s5) var(--s3)}
+  .sheet{padding:28px 20px 20px}
+  h1{font-size:26px}
+  .doit .label{padding-inline-end:24px}
+}
+</style>
+</head>
+<body>
+<main class="sheet" aria-labelledby="h">
+  <p class="kicker"><bdi>Glance</bdi></p>
+  <h1 id="h" data-k="title"></h1>
+  <p class="lead" data-k="lead"></p>
+  <ul class="list" id="list"></ul>
+  <p class="later" data-k="later"></p>
+</main>
+<nav class="review" id="review" aria-label="review"></nav>
+
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var theme = q.get('theme') === 'dark' ? 'dark' : 'light';
+  var state = ['default','connecting','connected','partial'].indexOf(q.get('state')) > -1 ? q.get('state') : 'default';
+  var lang = q.get('lang') === 'en' ? 'en' : 'he';
+  var root = document.documentElement;
+  if (theme === 'dark') root.setAttribute('data-theme','dark');
+  if (q.get('shot')) root.classList.add('shot');
+  root.lang = lang; root.dir = lang === 'he' ? 'rtl' : 'ltr';
+
+  var SVG = {
+    google:'<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C39 35.2 44 30 44 24c0-1.3-.1-2.7-.4-3.9z"/></svg>',
+    microsoft:'<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#F25022" d="M1 1h10.5v10.5H1z"/><path fill="#7FBA00" d="M12.5 1H23v10.5H12.5z"/><path fill="#00A4EF" d="M1 12.5h10.5V23H1z"/><path fill="#FFB900" d="M12.5 12.5H23V23H12.5z"/></svg>',
+    whatsapp:'<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
+    meta:'<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#0668E1" d="M7.1 6.1c-2.5 0-4.5 2.2-4.5 5.9s2 5.9 4.5 5.9c1.8 0 3.2-.9 4.9-2.7 1.7 1.8 3.1 2.7 4.9 2.7 2.5 0 4.5-2.2 4.5-5.9s-2-5.9-4.5-5.9c-1.8 0-3.2.9-4.9 2.7-1.7-1.8-3.1-2.7-4.9-2.7zm0 2.2c.9 0 1.9.6 3.3 2.3L12 12.4 10.4 14c-1.4 1.6-2.4 2.2-3.3 2.2-1.4 0-2.3-1.5-2.3-3.7s.9-3.7 2.3-3.7zm9.8 0c1.4 0 2.3 1.5 2.3 3.7s-.9 3.7-2.3 3.7c-.9 0-1.9-.6-3.3-2.2L12 12.4 13.6 10.7c1.4-1.6 2.4-2.2 3.3-2.2z"/></svg>',
+    check:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.4l2.8 2.8 6.2-6.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+
+  var T = {
+    he:{
+      title:'חברו את החשבונות',
+      lead:'כל חיבור הוא אישור אחד שכולל את כל הכלים של אותו ספק.',
+      later:'אפשר להוסיף גישה בהמשך, בדיוק איפה שצריך.',
+      connected:'מחובר',
+      eco:{
+        google:{cta:'חברו את <bdi>Google</bdi>',busy:'מתחברים ל-<bdi>Google</bdi>…',hint:'ממשיכים בחלון של <bdi>Google</bdi>.',
+          tools:['Gmail','יומן ו-<bdi>Meet</bdi>','משימות','Drive','Docs','Sheets','Slides','אנשי קשר']},
+        microsoft:{cta:'חברו את <bdi>Microsoft</bdi>',busy:'מתחברים ל-<bdi>Microsoft</bdi>…',hint:'ממשיכים בחלון של <bdi>Microsoft</bdi>.',
+          tools:['Outlook','יומן','To Do','OneDrive','Word','Excel','PowerPoint','Teams','OneNote','Planner']},
+        meta:{cta:'חברו את <bdi>WhatsApp</bdi> ו-<bdi>Meta</bdi>',busy:'מתחברים ל-<bdi>Meta</bdi>…',hint:'ממשיכים בחלון של <bdi>Meta</bdi>.',
+          tools:['WhatsApp','Messenger','Instagram']}
+      }
+    },
+    en:{
+      title:'Connect your accounts',
+      lead:'Each one is a single approval for every tool from that provider.',
+      later:'You can add access later, right where you need it.',
+      connected:'Connected',
+      eco:{
+        google:{cta:'Connect Google',busy:'Connecting to Google…',hint:'Continue in the Google window.',
+          tools:['Gmail','Calendar & Meet','Tasks','Drive','Docs','Sheets','Slides','Contacts']},
+        microsoft:{cta:'Connect Microsoft',busy:'Connecting to Microsoft…',hint:'Continue in the Microsoft window.',
+          tools:['Outlook','Calendar','To Do','OneDrive','Word','Excel','PowerPoint','Teams','OneNote','Planner']},
+        meta:{cta:'Connect WhatsApp + Meta',busy:'Connecting to Meta…',hint:'Continue in the Meta window.',
+          tools:['WhatsApp','Messenger','Instagram']}
+      }
+    }
+  }[lang];
+
+  var ECO = [
+    {id:'google',name:'Google',marks:['google'],mail:'sali.sapan@gmail.com'},
+    {id:'microsoft',name:'Microsoft',marks:['microsoft'],mail:'sali.sapan@outlook.com'},
+    {id:'meta',name:'WhatsApp + Meta',marks:['whatsapp','meta'],mail:'sali.sapan@gmail.com'}
+  ];
+  var MAP = {
+    default:{},
+    connecting:{google:'busy'},
+    connected:{google:'done',microsoft:'done',meta:'done'},
+    partial:{google:'done'}
+  }[state];
+
+  function marks(m){return m.map(function(k){return '<span class="tile'+(k==='microsoft'?' ms':'')+'">'+SVG[k]+'</span>';}).join('');}
+  function tools(list){return list.map(function(t){return '<span class="t">'+(/<bdi>|[\u0590-\u05ff]/.test(t)?t:'<bdi>'+t+'</bdi>')+'</span>';}).join(', ');}
+
+  document.querySelectorAll('[data-k]').forEach(function(el){el.innerHTML=T[el.getAttribute('data-k')];});
+  var anyBusy = Object.keys(MAP).some(function(k){return MAP[k]==='busy';});
+  document.getElementById('list').innerHTML = ECO.map(function(e){
+    var s = MAP[e.id] || 'idle', c = T.eco[e.id], body;
+    if (s === 'done') {
+      body = '<div class="done" data-eco="'+e.id+'"><span class="marks" style="display:flex">'+marks(e.marks)+'</span>'+
+        '<span class="who"><span class="name"><bdi>'+e.name+'</bdi></span><span class="mail"><bdi dir="ltr">'+e.mail+'</bdi></span></span>'+
+        '<span class="ok">'+SVG.check+T.connected+'</span></div>';
+    } else if (s === 'busy') {
+      body = '<button type="button" class="doit busy" aria-busy="true" disabled><span class="spin" aria-hidden="true">'+
+        Array.from({length:12},function(_,i){return '<i style="--i:'+i+'"></i>';}).join('')+'</span><span class="label">'+c.busy+'</span></button>';
+    } else {
+      body = '<button type="button" class="doit"'+(anyBusy?' disabled':'')+'><span class="marks">'+marks(e.marks)+'</span><span class="label">'+c.cta+'</span></button>';
+    }
+    var sub = s === 'busy' ? c.hint : tools(c.tools);
+    return '<li class="item" data-state="'+s+'">'+body+'<p class="tools">'+sub+'</p></li>';
+  }).join('');
+
+  var rv = document.getElementById('review');
+  ['default','connecting','connected','partial'].forEach(function(s){
+    var p = new URLSearchParams(location.search); p.set('state',s);
+    rv.insertAdjacentHTML('beforeend','<a href="?'+p+'"'+(s===state?' class="on"':'')+'>'+s+'</a>');
+  });
+  var p2 = new URLSearchParams(location.search); p2.set('theme', theme==='dark'?'light':'dark');
+  rv.insertAdjacentHTML('beforeend','<a href="?'+p2+'">'+(theme==='dark'?'light':'dark')+'</a>');
+})();
+</script>
+</body>
+</html>

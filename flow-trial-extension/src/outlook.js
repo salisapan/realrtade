@@ -324,10 +324,11 @@ const FlowOutlook = (() => {
       const o = opts || {};
       const prev = await read(AUTH_KEY, null);
       const chosen = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
-      // Mail scopes stay on every sign-in. Tasks.ReadWrite is included only when
-      // the Connect screen passed it (the To Do checkbox). Mail.Send is never added.
+      // Ecosystem connect stores the catalogue scopes only (no cfg.SCOPES Mail.Read drift).
+      const catalogOnly = Boolean(prev && prev.ecosystem);
+      const scopeSources = catalogOnly ? (chosen || []) : (chosen || []).concat(cfg.SCOPES || []);
       const scopes = [];
-      (chosen || []).concat(cfg.SCOPES || []).forEach((s) => {
+      scopeSources.forEach((s) => {
         if (!s || /Mail\.Send/i.test(s) || /\.Send$/i.test(s)) return;
         if (scopes.indexOf(s) < 0) scopes.push(s);
       });
@@ -340,7 +341,10 @@ const FlowOutlook = (() => {
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
       const storedProfile = { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile });
+      await write(AUTH_KEY, {
+        token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile,
+        ecosystem: Boolean(prev && prev.ecosystem)
+      });
       await rememberProfileNames(storedProfile);
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
