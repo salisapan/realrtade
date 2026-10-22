@@ -1532,7 +1532,7 @@ const FlowIntent = (() => {
       const dash = head.match(/^(.+?)\s*[—–-]\s+(.+)$/);
       if (dash) {
         const who = dash[1].trim();
-        if (who && !/^חתימה/i.test(who)) return false;
+        if (who && !/^חתימה/i.test(who) && !nameIsReader(who, ctx)) return false;
         head = dash[2].trim();
       }
       if (/^[\u0590-\u05FF][\u0590-\u05FF'’\s.-]{0,50}$/.test(head) && !/חתימה|לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן/i.test(head)) return false;
@@ -1839,22 +1839,6 @@ const FlowIntent = (() => {
       }
       if (google && google.close) {
         const g = google.close;
-        const heOneDriveSave = /(?:תשמור|תשמר(?:י|ו)?|שמור|לשמור|תתייק)[^\n]{0,60}(?:בוואן\s*דרייב|ב[-\u05BE]?\s*one\s?drive|את\s+המצורף\s+בוואן\s*דרייב)/i.test(text);
-        if (g.copyAttachment && g.target === 'onedrive' && heOneDriveSave && !addressedToSelf(ctx) && ctx.surface !== 'outlook') {
-          const subject = ctx && ctx.subject;
-          let titled = selfAskTitle(text, subject, ctx);
-          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
-          if (usableSelfTitle(titled)) {
-            const label = String(titled).replace(/\s+בבקשה[.!]?\s*$/i, '').trim();
-            const tracked = finish(TYPES.REQUEST, 'high', { what: label });
-            if (tracked && tracked.type) {
-              tracked.label = label;
-              tracked.selfTask = true;
-              tracked.noReplyDraft = true;
-              return tracked;
-            }
-          }
-        }
         const hold = g.personalClose === 'file-on-hold';
         if (hold && suppressed(TYPES.SCHEDULED_EVENT)) {
           return stayQuiet('calibrated', { googleSilence: true });
@@ -3061,7 +3045,7 @@ const FlowIntent = (() => {
   // with Initech at $4,850" is Decision: Initech, $4,850. Six words at most.
   const DECISION_NAME = '([A-Z][\\w&.\\-]*(?:[ \\t]+(?!(?:is|are|was|will|as|at|for|to|and|our|the)\\b)[A-Z][\\w&.\\-]*){0,2})';
   // A greeting or a sign-off ends the sentence. The name never runs into it.
-  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:תודה(?:\s+רבה)?|בתודה|בברכה|ברכה|יום\s+(?:טוב|נעים)|המשך\s+יום|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
+  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:תודה(?:\s+רבה)?|בתודה|בברכה|יום\s+(?:טוב|נעים)|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
   function selfDecisionTitle(raw, facts) {
     const money = facts && facts.moneyText ? ', ' + String(facts.moneyText).trim() : '';
     const lines = String(raw || '').replace(/\u00A0/g, ' ').split(/\r?\n/);

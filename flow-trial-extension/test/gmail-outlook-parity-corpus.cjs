@@ -627,7 +627,7 @@ const CASES = [
       attachmentCount: 1,
       hasThreadAttachment: true
     }), judgeDeps);
-    check('HE OneDrive save inbound on Gmail is a task', heG.show && heG.process && heG.process.steps[0].kind === 'googleTask', { reason: heG.reason, kind: heG.process && heG.process.steps[0].kind });
+    check('HE OneDrive save inbound on Gmail stays quiet', !heG.show && heG.reason === 'onedrive-target-on-gmail', { reason: heG.reason });
   }
 
   console.log('\nTOTAL FAILURES:', failures);
