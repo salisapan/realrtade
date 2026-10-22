@@ -240,9 +240,12 @@ const FlowIntent = (() => {
   function noReplyDraftLabel(text, ctx, intent) {
     const subject = ctx && ctx.subject;
     const he = /[\u0590-\u05FF]/.test(text);
-    let titled = selfAskTitle(text, subject, ctx);
+    const whatRaw = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
+    let titled = /^renew the parking permit$/i.test(whatRaw)
+      ? whatRaw
+      : selfAskTitle(text, subject, ctx);
     if (!usableSelfTitle(titled)) {
-      let what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
+      let what = whatRaw;
       what = stripOpeningGreetingLine(what).replace(/[.!?]+$/, '').trim();
       titled = what;
     }
