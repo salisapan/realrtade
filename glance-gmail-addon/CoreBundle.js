@@ -10207,10 +10207,17 @@ var GlanceIntent = (function () {
     return false;
   }
 
+  function greetOnly(text) {
+    var t = String(text || '').trim();
+    if (!t) return false;
+    return /^(?:hi|hello|hey)\s+[A-Za-z][\w'’-]*\s*[!?.]?$/i.test(t)
+      || /^(?:שלום|היי|הי)\s+[\u0590-\u05FF][\w'’\s-]*\s*[!?.]?$/u.test(t);
+  }
+
   function greetingToOther(text, ctx) {
     var raw = String(text || '');
     var m = raw.match(/^(?:hi|hello|hey)(?:\s+there)?\s+([^,!\n]{1,40})[,!]/i);
-    var hm = raw.match(/^(?:שלום|היי|הי)\s+([^,!\n]{1,40})[,!]/);
+    var hm = raw.match(/^(?:שלום|היי|הי)\s+([^,!\n]{1,40})(?:[,!]|\s*$)/);
     var who = m ? m[1].trim() : (hm ? hm[1].trim() : '');
     if (!who) return false;
     if (/^(there|team|all|everyone)$/i.test(who)) return false;
@@ -10256,7 +10263,7 @@ var GlanceIntent = (function () {
         end--;
         continue;
       }
-      if (lines.length > 1 && !/[.!?]/.test(line) && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’\s-]{0,50}$/.test(line) && line.split(/\s+/).length <= 3) {
+      if (lines.length > 1 && line.split(/\s+/).length === 1 && !/[.!?,:]/.test(line) && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’-]{0,50}$/.test(line)) {
         end--;
         continue;
       }
@@ -10629,19 +10636,21 @@ var GlanceIntent = (function () {
   function resolveTask(text, ctx) {
     ctx = ctx || {};
     var prepared;
-    try { prepared = stripSignatureFromText(prepareText(text)); } catch (err) {
+    try { prepared = prepareText(text); } catch (err) {
       err.diag = err.diag || 'judge';
       throw err;
     }
-    var local = localRemember(prepared, ctx);
+    var bodyText = stripSignatureFromText(prepared);
+    if (greetingToOther(prepared, ctx) || greetingToOther(bodyText, ctx)) return silence('hedge', null);
+    var local = localRemember(bodyText, ctx);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
-      try { hit = ctx.engine(prepared); } catch (err) {
+      try { hit = ctx.engine(bodyText); } catch (err) {
         err.diag = err.diag || 'judge';
         throw err;
       }
-      var sheetOnly = spottedSheetPlan(prepared, hit);
+      var sheetOnly = spottedSheetPlan(bodyText, hit);
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
         if (sheetOnly) {
           return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
@@ -10651,7 +10660,7 @@ var GlanceIntent = (function () {
       if (sheetOnly) {
         return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
       }
-      var mapped = mapEngine(hit, ctx.now, ctx.timeZone, prepared);
+      var mapped = mapEngine(hit, ctx.now, ctx.timeZone, bodyText);
       if (mapped) return contentTitle(prepared, mapped);
       if (hit && hit.plan && hit.plan.id) {
         var dropId = spottedSheetPlan(prepared, hit) || hit.plan.id;
@@ -10661,12 +10670,14 @@ var GlanceIntent = (function () {
         });
       }
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
+      if (greetOnly(bodyText) || greetOnly(prepared)) return silence('hedge', null);
       return silence('no-plan', null);
     }
     if (ctx.classifierResult) {
       var fromApi = mapClassifierResult(ctx.classifierResult, ctx.now, ctx.timeZone);
       if (fromApi) return fromApi;
     }
+    if (greetOnly(bodyText) || greetOnly(prepared)) return silence('hedge', null);
     return silence('quiet', null);
   }
 

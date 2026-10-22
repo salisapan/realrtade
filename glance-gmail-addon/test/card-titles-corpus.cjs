@@ -30,6 +30,13 @@ const ctxBase = {
   toRecipients: [{ name: '', email: READER, localPart: 'salisapan1' }],
   ccRecipients: [],
   engine: function (text) {
+    const judgeDeps = {
+      intent: sandbox.FlowIntent,
+      actions: sandbox.FlowActions,
+      factReply: sandbox.FlowFactReply,
+      fileAttach: sandbox.FlowFileAttach,
+      resolution: sandbox.FlowResolution
+    };
     const j = sandbox.FlowIncomingJudge.judge({
       text,
       subject: '',
@@ -43,7 +50,7 @@ const ctxBase = {
       now: NOW,
       surface: 'gmail',
       inbound: true
-    }, {});
+    }, judgeDeps);
     if (!j || !j.show) return { intent: j && j.intent, plan: null, reason: j && j.reason };
     return { intent: j.intent, plan: j.process };
   }
@@ -102,6 +109,32 @@ for (const row of ROWS) {
     ctx.userName = 'Noa Cohen';
     ctx.ownNames = ['Noa', 'Noa Cohen'];
     ctx.toRecipients = [{ name: 'Noa Cohen', email: 'noa@meridian.com', localPart: 'noa' }];
+    const noa = 'noa@meridian.com';
+    const judgeDeps = {
+      intent: sandbox.FlowIntent,
+      actions: sandbox.FlowActions,
+      factReply: sandbox.FlowFactReply,
+      fileAttach: sandbox.FlowFileAttach,
+      resolution: sandbox.FlowResolution
+    };
+    ctx.engine = function (text) {
+      const j = sandbox.FlowIncomingJudge.judge({
+        text,
+        subject: '',
+        sender: { email: 'dana@meridian.com', name: 'Dana Levi' },
+        to: [noa],
+        ownAddresses: [noa],
+        userName: 'Noa Cohen',
+        ownNames: ['Noa', 'Noa Cohen'],
+        readerEmail: noa,
+        namesWaitDone: true,
+        now: NOW,
+        surface: 'gmail',
+        inbound: true
+      }, judgeDeps);
+      if (!j || !j.show) return { intent: j && j.intent, plan: null, reason: j && j.reason };
+      return { intent: j.intent, plan: j.process };
+    };
   }
   if (id === 'en-greet-lior') {
     ctx.userName = 'Sali';
@@ -120,6 +153,7 @@ for (const row of ROWS) {
     continue;
   }
   if (id === 'he-greet-noa') {
+    check(id + ' quiet hedge', decision.speak === false && decision.reason === 'hedge', decision);
     continue;
   }
   if (!expectSpeak || !decision.speak) continue;
