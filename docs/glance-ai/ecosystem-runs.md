@@ -397,3 +397,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-appointment-notice-corpus.cjs` (8 notices EN+HE, 16 quiet lines), chat card corpus, all corpora, chat browser spec.
 - **Open:** live Gate. Next buildable: a pickup deadline («ההזמנה מוכנה לאיסוף עד יום חמישי») as a task.
 
+## 2026-10-23 Ecosystems builder B (forty-third run) — pickup deadlines in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** a shop, courier or clinic that writes in WhatsApp, Messenger or Instagram that the person's order is ready for pickup until a day («ההזמנה שלך מוכנה לאיסוף עד יום חמישי», "Your order is ready for pickup until Friday") now gets the Do It card; Do It writes one task "Pick up the order · name" due that last day, read back by id, Undo refuses an edited task. A delivery that simply arrives, a pickup already made, a cancellation, a question, an offer and a missing deadline stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-pickup-notice-corpus.cjs` (8 notices EN+HE, 15 quiet lines), chat card corpus, all corpora, chat browser spec.
+- **Open:** live Gate; the chat modules (reminder, deadline, callback, payment, appointment, pickup) share the same fallback chain in `src/chat-task-card.js`, worth a measured pass on real, private lines by the owner.
+

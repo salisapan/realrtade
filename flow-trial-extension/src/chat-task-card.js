@@ -322,6 +322,21 @@ const FlowChatTaskCard = (() => {
           callProposal = true;
         }
       }
+      // "Your order is ready for pickup until Friday" / «ההזמנה שלך מוכנה לאיסוף עד יום חמישי» (core/chat-pickup-notice.js): a task
+      // to pick it up, due the last day, titled with the sender's name.
+      if ((!judged || !judged.show) && !own && typeof FlowChatPickupNotice !== 'undefined') {
+        let pk = null;
+        try { pk = FlowChatPickupNotice.recognize(i.text, i.now); } catch (e) { pk = null; }
+        if (pk && pk.kind === 'pickup') {
+          const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+          const title = ((pk.lang === 'he' ? 'לאסוף הזמנה' : 'Pick up the order') + (who ? ' · ' + who : '')).slice(0, 120);
+          judged = {
+            show: true,
+            intent: { type: 'request', label: title, entities: { dateIso: pk.dateIso, what: title } },
+            process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title: title, dateIso: pk.dateIso, what: title }, dependsOn: null }] }
+          };
+        }
+      }
       // "Please transfer 500 NIS to my account by Sunday" / «תעביר לי 500 שקל עד יום ראשון» (core/chat-payment-ask.js): a task
       // to pay, with the amount and the day. Glance never pays and never touches a bank.
       if ((!judged || !judged.show) && !own && typeof FlowChatPaymentAsk !== 'undefined') {
