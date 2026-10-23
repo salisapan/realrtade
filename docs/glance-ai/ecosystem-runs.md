@@ -404,3 +404,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-pickup-notice-corpus.cjs` (8 notices EN+HE, 15 quiet lines), chat card corpus, all corpora, chat browser spec.
 - **Open:** live Gate; the chat modules (reminder, deadline, callback, payment, appointment, pickup) share the same fallback chain in `src/chat-task-card.js`, worth a measured pass on real, private lines by the owner.
 
+## 2026-10-23 Ecosystems builder B (forty-fourth run) — invitations in chats, and a silence audit
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** an invitation in WhatsApp, Messenger or Instagram («מוזמן ליום ההולדת שלי ביום שישי ב-20:00», "You're invited to my birthday on Saturday at 8pm", «מזמינים אתכם לחתונה ביום חמישי בשעה 19:30») now gets the Do It card; Do It puts "Invitation · name" / «הזמנה · שם» on the person's own calendar, read back by id, Undo refuses an edited event, nobody is invited, and accepting or declining stays the person's. Promotions, webinars, thank-yous, cancellations, questions and a missing day or clock stay quiet.
+- **Audit (answers the open item of run 43):** new `test/chat-fallbacks-silence-corpus.cjs` runs all seven chat fallback readers (reminder, deadline, callback, payment, appointment, pickup, invitation) over 45 everyday EN+HE lines that carry a day, clock, number or request word: all stay silent. These are still invented lines; a measured pass on real private chat lines remains the owner's.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-invitation-notice-corpus.cjs` (8 invitations EN+HE, 16 quiet lines), the silence corpus (315 checks), chat card corpus, all corpora, chat browser spec.
+- **Open:** live Gate.
+

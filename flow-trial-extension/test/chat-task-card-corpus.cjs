@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -366,6 +366,23 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     }
   }
 
+  // 5o. An invitation sent to the person is a hold titled "Invitation · name"; accepting or declining stays theirs, nobody is invited.
+  {
+    for (const [text, titleRe, hour] of [["You're invited to my birthday on Saturday at 8pm", /^Invitation · Dana$/, 20], ['מוזמן ליום ההולדת שלי ביום שישי ב-20:00', /^הזמנה · Dana$/, 20]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleHold' } });
+      const r = await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      check('invitation offers one calendar step: ' + text, r.shown && g.injected[0].ctx.process.steps.length === 1 && g.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the hold is the invitation, no guest, no message text: ' + text, !!ge && titleRe.test(ge.input.title) && ge.input.hour === hour && !('attendees' in ge.input) && ge.input.quote.indexOf('birthday') < 0, ge && ge.input);
+    }
+    for (const quiet of ["You're invited to my birthday on Saturday", 'Join our webinar on Thursday at 19:00, register now', 'Thank you for the invitation to the party on Saturday at 8pm']) {
+      const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+      check('no invitation card for: ' + quiet, !(await q.Card.offer(input(quiet, { channel: 'whatsapp' }))).shown && q.injected.length === 0);
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -420,7 +437,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-invitation-notice\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {
