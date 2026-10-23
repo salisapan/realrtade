@@ -666,6 +666,11 @@ const FlowDisplay = (() => {
       missingPermission: 'Google is missing permission for this action. Reconnect Google with the required access.',
       composeEmpty: 'The compose window is still empty.',
       driveFileScope: 'Glance can’t open that Drive file with the access in this version. Use a thread attachment, or a file Glance already saved for you.',
+      googleContactAnswerTitle: "Answer with {name}'s address",
+      googleContactForwardTitle: 'Forward to {name}',
+      googleContactNotFound: 'No contact matched that name in Google Contacts.',
+      googleContactChoose: 'Which {name} did you mean?',
+      googleContactCopy: 'Copy',
       skippedEarlier: 'Skipped — an earlier step in this process didn’t complete.',
       todoUiCache: 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
       notAllGone: 'Not all of it is gone. Undo again to remove what’s left.',
@@ -821,6 +826,11 @@ const FlowDisplay = (() => {
       missingPermission: 'חסרה הרשאה ל-Google לפעולה הזו. חבר מחדש את Google עם ההרשאות הנדרשות.',
       composeEmpty: 'חלון הכתיבה עדיין ריק.',
       driveFileScope: 'Glance עדיין לא יכול לפתוח את קובץ Drive הזה עם ההרשאות בגרסה הזו. השתמש בקובץ מצורף בשרשור, או בקובץ ש-Glance כבר שמר עבורך.',
+      googleContactAnswerTitle: 'לענות עם הכתובת של {name}',
+      googleContactForwardTitle: 'להעביר ל{name}',
+      googleContactNotFound: 'לא נמצא איש קשר כזה ב-Google Contacts.',
+      googleContactChoose: 'איזו {name} התכוונת?',
+      googleContactCopy: 'העתק',
       skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',
       todoUiCache: 'ב-Microsoft To Do המשימה יכולה להישאר על המסך כשתי דקות. אחרי רענון היא נעלמת.',
       notAllGone: 'לא הכול הוסר. בטל שוב כדי להסיר את מה שנשאר.',
@@ -963,6 +973,21 @@ const FlowDisplay = (() => {
 
   function chrome(lang) {
     return CHROME[uiLangFrom({ setting: lang })] || CHROME.en;
+  }
+
+  function fillName(template, name) {
+    return String(template || '').replace(/\{name\}/g, String(name || '').trim());
+  }
+
+  function googleContactTitle(mode, name, lang) {
+    const L = chrome(lang);
+    const key = mode === 'forward' ? 'googleContactForwardTitle' : 'googleContactAnswerTitle';
+    return fillName(L[key] || CHROME.en[key], name);
+  }
+
+  function googleContactChoose(name, lang) {
+    const L = chrome(lang);
+    return fillName(L.googleContactChoose || CHROME.en.googleContactChoose, name);
   }
 
   // The primary button follows the plan and the UI language. A To Do
@@ -1284,6 +1309,8 @@ const FlowDisplay = (() => {
     ageLine: ageLine,
     namesPendingLine: namesPendingLine,
     chrome: chrome,
+    googleContactTitle: googleContactTitle,
+    googleContactChoose: googleContactChoose,
     actionLabel: actionLabel,
     fillChrome: fillChrome,
     showChrome: showChrome

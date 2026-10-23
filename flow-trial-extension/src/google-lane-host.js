@@ -12,6 +12,8 @@ import '../core/recurring-reminder.js';
 import '../core/workspace-file.js';
 // FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
 import '../core/event-call-link.js';
+// FlowGoogleContacts: resolve a name in Google Contacts (G8), switch GOOGLE_CONTACTS, off.
+import '../core/google-contacts.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
@@ -288,6 +290,7 @@ function laneUrl(url) {
     const host = u.hostname;
     const laneApi = host === 'tasks.googleapis.com' ||
       host === 'docs.googleapis.com' || host === 'sheets.googleapis.com' ||
+      host === 'people.googleapis.com' ||
       host === 'www.googleapis.com' || host === 'oauth2.googleapis.com';
     if (!laneApi) return url;
     const base = new URL(origin);
@@ -912,6 +915,26 @@ function onLaneMessage(msg, sender, sendResponse) {
       const listed = await laneHttp({ method: 'GET', url: url });
       if (!listed || !listed.ok || !listed.json || !Array.isArray(listed.json.items)) return { action: 'silence', reason: 'not-searched' };
       return E.plan({ flags: { [E.SWITCH]: true }, text: text, events: listed.json.items, now: from });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-contacts-plan') {
+    const G = globalThis.FlowGoogleContacts;
+    Promise.resolve((async () => {
+      if (!G || typeof G.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(G.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      const bag = await chrome.storage.local.get(['googleGrantedScopes', 'glanceUserContext']);
+      const grantedRec = bag.googleGrantedScopes;
+      const grantedScopes = grantedRec && typeof grantedRec.version === 'string'
+        ? grantedRec.version.split('\n').filter(Boolean)
+        : null;
+      const profile = bag.glanceUserContext && typeof bag.glanceUserContext === 'object' ? bag.glanceUserContext : {};
+      const text = String(msg.text || '').slice(0, 4000);
+      const choiceIndex = typeof msg.choiceIndex === 'number' ? msg.choiceIndex : undefined;
+      return G.plan(
+        { flags: { [G.SWITCH]: true }, text: text, choiceIndex: choiceIndex },
+        { http: laneHttp, grantedScopes: grantedScopes, profile: profile, flags: { [G.SWITCH]: true } }
+      );
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
