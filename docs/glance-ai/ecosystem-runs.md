@@ -363,3 +363,5 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-deadline-ask-corpus.cjs` (9 asks EN+HE, 15 quiet lines), chat card corpus, all corpora, chat browser spec.
 - **Open:** live Gate; "pay the deposit this week" (no named day) stays quiet by design.
 
+
+## 2026-10-23 Ecosystems run A (39th): idle. Same waits as the 37th; no «מאשר» yet.
