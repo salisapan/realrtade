@@ -102,9 +102,21 @@
         resolve({ ok: ok !== false });
       }
       try {
-        const result = api.permissions.remove({ origins: ORIGINS.slice() }, done);
+        const result = api.permissions.remove({ origins: ORIGINS.slice() }, (ok) => {
+          const hook = globalThis.FlowProfileHook;
+          if (hook && typeof hook.onDisconnect === 'function') {
+            try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+          }
+          done(ok);
+        });
         if (result && typeof result.then === 'function') {
-          result.then(done, () => done(false));
+          result.then((ok) => {
+            const hook = globalThis.FlowProfileHook;
+            if (hook && typeof hook.onDisconnect === 'function') {
+              try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+            }
+            done(ok);
+          }, () => done(false));
         }
       } catch (e) {
         done(false);
@@ -237,6 +249,7 @@
     onLabel: onLabel,
     paintLink: paintLink,
     paintConnection: paintConnection,
-    open: open
+    open: open,
+    disconnect: disconnect
   };
 })();

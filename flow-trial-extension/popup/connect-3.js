@@ -11,6 +11,8 @@ const ConnectEcosystemUI = (function () {
       later: 'אפשר להוסיף גישה בהמשך, בדיוק איפה שצריך.',
       connected: 'מחובר',
       partial: 'מחובר חלקית',
+      reconnect: 'חבר מחדש',
+      disconnect: 'נתק',
       eco: {
         google: {
           cta: 'חברו את <bdi>Google</bdi>',
@@ -41,6 +43,8 @@ const ConnectEcosystemUI = (function () {
       later: 'You can add access later, right where you need it.',
       connected: 'Connected',
       partial: 'Partly connected',
+      reconnect: 'Reconnect',
+      disconnect: 'Disconnect',
       eco: {
         google: {
           cta: 'Connect Google',
@@ -148,7 +152,8 @@ const ConnectEcosystemUI = (function () {
     }
     if (ecoId === 'microsoft') {
       const auth = state && state.outlookAuth;
-      return (auth && (auth.email || auth.loginHint)) || '';
+      const acct = auth && auth.account;
+      return (acct && (acct.address || acct.mail)) || (auth && (auth.email || auth.loginHint)) || '';
     }
     if (ecoId === 'meta') {
       const m = state && state.metaAuth;
@@ -206,9 +211,15 @@ const ConnectEcosystemUI = (function () {
           ? '<span class="mail"><bdi dir="ltr">' + String(mail).replace(/</g, '&lt;') + '</bdi></span>'
           : '';
         const okLabel = partial ? T.partial : T.connected;
+        const actions = partial && send
+          ? ('<div class="c3-actions">' +
+            '<button type="button" class="c3-reconnect" data-reconnect-eco="' + eco.id + '">' + T.reconnect + '</button>' +
+            '<button type="button" class="c3-disc" data-disconnect-eco="' + eco.id + '">' + T.disconnect + '</button>' +
+            '</div>')
+          : '';
         body = '<div class="c3-done' + (partial ? ' c3-partial' : '') + '" data-eco="' + eco.id + '"><span class="marks" style="display:flex">' + marksHtml(eco.marks) + '</span>' +
           '<span class="who"><span class="name"><bdi>' + c.display + '</bdi></span>' + mailHtml + '</span>' +
-          '<span class="ok">' + (partial ? '' : (SVG.check || '')) + okLabel + '</span></div>';
+          '<span class="ok">' + (partial ? '' : (SVG.check || '')) + okLabel + '</span>' + actions + '</div>';
       } else if (busy) {
         body = '<button type="button" class="c3-doit busy" aria-busy="true" disabled>' + spinHtml() +
           '<span class="label">' + c.busy + '</span></button>';
@@ -243,6 +254,32 @@ const ConnectEcosystemUI = (function () {
           if (refresh) await refresh();
           else paint(host, Object.assign({}, opts, { status: opts.status }));
         } else paint(host, opts);
+      });
+    });
+    host.querySelectorAll('[data-reconnect-eco]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const ecoId = btn.getAttribute('data-reconnect-eco');
+        const row = ECOS.find((e) => e.id === ecoId);
+        if (!row || !send) return;
+        connectingId = ecoId;
+        paint(host, opts);
+        const res = await send({ type: 'flow:connect', connectorId: row.connectorId });
+        connectingId = null;
+        if (res && res.ok) {
+          if (refresh) await refresh();
+          else paint(host, Object.assign({}, opts, { status: opts.status }));
+        } else paint(host, opts);
+      });
+    });
+    host.querySelectorAll('[data-disconnect-eco]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const ecoId = btn.getAttribute('data-disconnect-eco');
+        const row = ECOS.find((e) => e.id === ecoId);
+        if (!row || !send) return;
+        btn.disabled = true;
+        await send({ type: 'flow:disconnect', connectorId: row.connectorId });
+        if (refresh) await refresh();
+        else paint(host, opts);
       });
     });
   }

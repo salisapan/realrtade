@@ -14,14 +14,16 @@ const FlowConnectEcosystem = (() => {
     'Chat.Read',
     'Notes.ReadWrite',
     'MailboxSettings.Read',
-    'People.Read',
-    'OnlineMeetings.ReadWrite'
+    'People.Read'
   ];
 
-  // Work-account-only incremental scopes (not in one-consent). Planner plan pick (M8) may request Group.Read.All later.
+  // Work-account-only or card-time incremental scopes (not in one-consent).
   const MICROSOFT_OPTIONAL_SCOPES = {
-    planner: ['Group.Read.All']
+    planner: ['Group.Read.All'],
+    teamsMeeting: ['OnlineMeetings.ReadWrite']
   };
+
+  const MS_CONSUMER_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad';
 
   // Same list as lane-chat/meta-consent.js FlowMetaConsent.ORIGINS (lane restoreLaneChats).
   const META_ORIGINS = [
@@ -109,14 +111,65 @@ const FlowConnectEcosystem = (() => {
     return microsoftScopes().filter((s) => s !== 'offline_access');
   }
 
-  const MS_CONSUMER_HOSTS = {
-    'outlook.com': true,
-    'hotmail.com': true,
-    'live.com': true,
-    'msn.com': true
-  };
-
   const PLANNER_GROUP_SCOPE = 'Group.Read.All';
+
+  function decodeJwtPayload(idToken) {
+    const parts = String(idToken || '').split('.');
+    if (parts.length < 2 || !parts[1]) return null;
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const segment = parts[1].replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    let acc = 0;
+    let bits = 0;
+    const bytes = [];
+    for (let i = 0; i < segment.length; i++) {
+      const v = alphabet.indexOf(segment[i]);
+      if (v < 0) return null;
+      acc = (acc << 6) | v;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        bytes.push((acc >> bits) & 255);
+      }
+    }
+    let raw = '';
+    for (let i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i]);
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  function tenantIdFromIdToken(idToken) {
+    const json = decodeJwtPayload(idToken);
+    const tid = json && json.tid != null ? String(json.tid).trim().toLowerCase() : '';
+    return tid;
+  }
+
+  function microsoftOwnAddresses(profile) {
+    const s = new Set();
+    const add = (a) => {
+      const e = String(a || '').trim().toLowerCase();
+      if (e && e.indexOf('@') > 0) s.add(e);
+    };
+    const p = profile || {};
+    add(p.mail);
+    add(p.userPrincipalName);
+    (p.otherMails || []).forEach(add);
+    (p.proxyAddresses || []).forEach((raw) => {
+      const m = String(raw || '').match(/^smtp:(.+)$/i);
+      if (m) add(m[1]);
+    });
+    return Array.from(s);
+  }
+
+  // Personal vs work: token tid (consumer tenant), then Graph /me hints — never email-domain suffix alone.
+  function resolveMicrosoftAccountKind(idToken, profile) {
+    const tid = tenantIdFromIdToken(idToken);
+    if (tid === MS_CONSUMER_TENANT_ID) return 'personal';
+    if (tid) return 'work';
+    const upn = String(profile && profile.userPrincipalName || '').toLowerCase();
+    if (upn.indexOf('#ext#') >= 0) return 'work';
+    const mail = String(profile && profile.mail || '').toLowerCase();
+    if (mail.indexOf('#ext#') >= 0) return 'work';
+    return 'work';
+  }
 
   function primaryMicrosoftEmail(account) {
     const fields = [account && account.userPrincipalName, account && account.mail, account && account.address];
@@ -131,11 +184,10 @@ const FlowConnectEcosystem = (() => {
   function isPersonalMicrosoftAccount(account) {
     if (account && account.microsoftAccountKind === 'personal') return true;
     if (account && account.microsoftAccountKind === 'work') return false;
-    const email = primaryMicrosoftEmail(account);
-    if (!email) return false;
-    if (email.indexOf('#ext#') >= 0) return false;
-    const host = email.slice(email.lastIndexOf('@') + 1);
-    return Boolean(MS_CONSUMER_HOSTS[host]);
+    if (account && account.idToken) {
+      return resolveMicrosoftAccountKind(account.idToken, account) === 'personal';
+    }
+    return false;
   }
 
   function hasPlannerGroupScope(grantedScopes) {
@@ -338,7 +390,11 @@ const FlowConnectEcosystem = (() => {
     plannerShouldRequestGroupConsent: plannerShouldRequestGroupConsent,
     plannerConsentOutcome: plannerConsentOutcome,
     plannerExecutionRoute: plannerExecutionRoute,
-    isPersonalMicrosoftAccount: isPersonalMicrosoftAccount
+    isPersonalMicrosoftAccount: isPersonalMicrosoftAccount,
+    resolveMicrosoftAccountKind: resolveMicrosoftAccountKind,
+    microsoftOwnAddresses: microsoftOwnAddresses,
+    tenantIdFromIdToken: tenantIdFromIdToken,
+    MS_CONSUMER_TENANT_ID: MS_CONSUMER_TENANT_ID
   };
 })();
 

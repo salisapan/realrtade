@@ -6654,7 +6654,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return connectEcosystemConnector(msg.connectorId, {
             connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
             launchInteractive: outlookLaunchInteractive,
-            enableSurface: enableSurface
+            enableSurface: enableSurface,
+            syncOutlook: async () => {
+              try {
+                const tabs = await chrome.tabs.query({
+                  url: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*']
+                });
+                (tabs || []).forEach((tab) => {
+                  if (tab && tab.id) chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }).catch(() => {});
+                });
+              } catch (e) { /* OWA may be closed */ }
+            }
           });
         }
         if (msg.connectorId === 'googleTasks') {

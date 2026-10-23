@@ -3,6 +3,8 @@ import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleR
 
 const OUTLOOK_AUTH_KEY = 'outlookAuth';
 const OUTLOOK_STATE_KEY = 'outlookSync';
+const OUTLOOK_PENDING_KEY = 'outlookPending';
+const OUTLOOK_STATE_VERSION = 4;
 const OUTLOOK_GRAPH_ORIGINS = ['https://graph.microsoft.com/*', 'https://login.microsoftonline.com/*'];
 const OUTLOOK_OWA_ORIGINS = ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'];
 
@@ -57,6 +59,19 @@ function outlookAuthDeps(launch) {
   };
 }
 
+async function clearMicrosoftJudgmentState() {
+  await chrome.storage.local.set({ [OUTLOOK_PENDING_KEY]: { offers: [], asks: [], incoming: [] } });
+  const bag = await chrome.storage.local.get(OUTLOOK_STATE_KEY);
+  const st = bag[OUTLOOK_STATE_KEY] || {};
+  await chrome.storage.local.set({
+    [OUTLOOK_STATE_KEY]: Object.assign({}, st, {
+      offered: {}, declined: {}, incomingDeclined: {},
+      lastAt: null, lastCount: 0, lastIncoming: 0, lastOffers: 0,
+      error: null, stateVersion: OUTLOOK_STATE_VERSION, diagnostics: []
+    })
+  });
+}
+
 async function connectMicrosoftEcosystem(launchInteractive, deps) {
   const E = eco();
   const A = globalThis.FlowOutlookAuth;
@@ -72,29 +87,45 @@ async function connectMicrosoftEcosystem(launchInteractive, deps) {
   if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
   const profile = await outlookFetchProfile(r.token.accessToken);
   if (!profile) return { ok: false, reason: 'profile' };
-  const primary = String(profile.mail || profile.userPrincipalName || '').toLowerCase();
-  if (!primary) return { ok: false, reason: 'profile' };
-  const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
   const storedProfile = {
     mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null,
     givenName: profile.givenName || null, surname: profile.surname || null,
     otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || []
   };
+  const ownAddresses = (typeof E.microsoftOwnAddresses === 'function')
+    ? E.microsoftOwnAddresses(storedProfile)
+    : [];
+  const primary = ownAddresses[0] || String(profile.mail || profile.userPrincipalName || '').toLowerCase();
+  if (!primary) return { ok: false, reason: 'profile' };
+  const kind = (typeof E.resolveMicrosoftAccountKind === 'function')
+    ? E.resolveMicrosoftAccountKind(r.token.idToken, storedProfile)
+    : 'work';
+  const account = {
+    address: primary,
+    name: profile.displayName || null,
+    mail: profile.mail || null,
+    userPrincipalName: profile.userPrincipalName || null,
+    microsoftAccountKind: kind
+  };
   await chrome.storage.local.set({
     [OUTLOOK_AUTH_KEY]: {
       token: r.token,
       account,
-      ownAddresses: [primary],
+      ownAddresses: ownAddresses.length ? ownAddresses : [primary],
       requestedScopes: scopes,
       profile: storedProfile,
       ecosystem: true
     },
     [OUTLOOK_STATE_KEY]: { needsSignIn: false, error: null }
   });
+  await clearMicrosoftJudgmentState();
   const granted = E.scopeNames(r.token.grantedScopes || scopes);
   const partial = !E.hasScopes(granted, E.microsoftRequiredScopes());
   if (typeof deps.enableSurface === 'function') {
     try { await deps.enableSurface('outlook'); } catch (e) { /* panel may enable */ }
+  }
+  if (typeof deps.syncOutlook === 'function') {
+    try { await deps.syncOutlook({ force: true }); } catch (e) { /* panel sync optional */ }
   }
   const hook = globalThis.FlowProfileHook;
   if (hook && typeof hook.onConnect === 'function') {
@@ -104,7 +135,7 @@ async function connectMicrosoftEcosystem(launchInteractive, deps) {
 }
 
 async function disconnectMicrosoftEcosystem(deps) {
-  await chrome.storage.local.remove([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY, 'outlookPending']);
+  await chrome.storage.local.remove([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY, OUTLOOK_PENDING_KEY]);
   try {
     await chrome.permissions.remove({ origins: OUTLOOK_GRAPH_ORIGINS.concat(OUTLOOK_OWA_ORIGINS) });
   } catch (e) { /* token cleared */ }
