@@ -198,7 +198,22 @@ const CASES = [
     text: 'Could you send me the agenda, and are you free Thu 10:00 or 14:00?' }
 ];
 
+const H1_RULING = 'CTO H1 23/10: Outlook task = To Do';
+function logH1ParityChange(line, before, after) {
+  console.log('H1 parity: ' + line + ' | before: ' + before + ' | after: ' + after + ' | ' + H1_RULING);
+}
+
 (async () => {
+  logH1ParityChange(
+    'gmail-outlook-parity-corpus.cjs:244-246',
+    'same process (only the draft connector renamed); Outlook oKinds map outlookDraft→gmailDraft only',
+    'same process (draft and task connectors renamed); outlookDraft→gmailDraft and outlookTask→googleTask'
+  );
+  logH1ParityChange(
+    'gmail-outlook-parity-corpus.cjs:505',
+    'Outlook Hebrew sign-and-return expects googleTask step',
+    'Outlook Hebrew sign-and-return expects outlookTask step'
+  );
   console.log('\n--- the same email, two adapters, one decision and one draft ---\n');
   let shownBoth = 0;
   for (let i = 0; i < CASES.length; i++) {
@@ -241,9 +256,10 @@ const CASES = [
     if (!gShown || !oShown) continue;
     shownBoth++;
     check(m.name + ': same type and label', g.intent.type === entry.intent.type && g.intent.label === entry.intent.label, { g: [g.intent.type, g.intent.label], o: [entry.intent.type, entry.intent.label] });
-    const gKinds = g.process.steps.map((s) => s.kind).join(',');
-    const oKinds = entry.process.steps.map((s) => (s.kind === 'outlookDraft' ? 'gmailDraft' : s.kind)).join(',');
-    check(m.name + ': same process (only the draft connector renamed)', gKinds === oKinds && g.process.name === entry.process.name, { g: gKinds, o: entry.process.steps.map((s) => s.kind) });
+    const parityKind = (k) => (k === 'outlookDraft' ? 'gmailDraft' : k === 'outlookTask' || k === 'googleTasks' ? 'googleTask' : k);
+    const gKinds = g.process.steps.map((s) => parityKind(s.kind)).join(',');
+    const oKinds = entry.process.steps.map((s) => parityKind(s.kind)).join(',');
+    check(m.name + ': same process (draft and task connectors renamed)', gKinds === oKinds && g.process.name === entry.process.name, { g: gKinds, o: entry.process.steps.map((s) => s.kind) });
 
     const gp = gmailPayload(g.process, m);
     if (!gp) { check(m.name + ': (no draft step on either side)', !entry.process.steps.some((s) => s.kind === 'outlookDraft')); continue; }
@@ -502,7 +518,7 @@ const CASES = [
     const hsG = J.judge(Object.assign({ surface: 'gmail', to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] }, signBase), judgeDeps);
     const hsO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, signBase), judgeDeps);
     check('Gmail Hebrew sign-and-return has draft and task', hsG.show && stepKinds(hsG).indexOf('gmailDraft') >= 0 && stepKinds(hsG).indexOf('googleTask') >= 0, { show: hsG.show, steps: stepKinds(hsG) });
-    check('Outlook Hebrew sign-and-return has draft and task', hsO.show && stepKinds(hsO).indexOf('outlookDraft') >= 0 && stepKinds(hsO).indexOf('googleTask') >= 0, { show: hsO.show, steps: stepKinds(hsO) });
+    check('Outlook Hebrew sign-and-return has draft and task', hsO.show && stepKinds(hsO).indexOf('outlookDraft') >= 0 && stepKinds(hsO).indexOf('outlookTask') >= 0, { show: hsO.show, steps: stepKinds(hsO) });
     check('attachmentCountForJudge counts signed-copy mail for Graph', E('FlowGoogleCloses').attachmentCountForJudge(signedBody) === true);
 
     const tieBody = 'Attached is the signed copy.';
