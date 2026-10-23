@@ -3168,14 +3168,14 @@ function glanceUiCopy(kind) {
       id: 'new-file',
       name: plan.name,
       closingLine: plan.line,
-      closedLine: he ? 'נוצר ב-Drive.' : 'Created in Drive.',
+      closedLine: plan.fileKind === 'form' ? (he ? 'נוצר ב-Google Forms.' : 'Created in Google Forms.') : (he ? 'נוצר ב-Drive.' : 'Created in Drive.'),
       steps: [{
         id: 'file',
         kind: 'driveNewFile',
-        label: plan.fileKind === 'sheet' ? 'Sheet' : plan.fileKind === 'slides' ? 'Slides' : 'Doc',
+        label: plan.fileKind === 'sheet' ? 'Sheet' : plan.fileKind === 'slides' ? 'Slides' : plan.fileKind === 'form' ? 'Form' : 'Doc',
         hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create the file in Drive and read it back',
         dependsOn: null,
-        params: { fileKind: plan.fileKind, name: plan.name, destinationText: (he ? 'Drive · ' : 'Drive · ') + plan.name }
+        params: { fileKind: plan.fileKind, name: plan.name, destinationText: (plan.fileKind === 'form' ? 'Forms · ' : 'Drive · ') + plan.name }
       }]
     };
     const intent = Object.assign({}, c.intent, { label: plan.name, type: (c.intent && c.intent.type) || 'request' });

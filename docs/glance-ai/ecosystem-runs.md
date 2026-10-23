@@ -296,3 +296,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 ## 2026-10-23 Ecosystems builder B (thirty-second run): idle, nothing changed since the last run
 
 ## 2026-10-23 Ecosystems run A (33rd): idle. Same state as the 18th; no code touched.
+
+## 2026-10-23 Ecosystems run A (34th): Google Forms
+
+- **Capability:** a mail that asks "Can you create a feedback form for the Q4 launch?" or «תוכל לפתוח טופס הרשמה בשם ...» now gets the same Do It card as a Doc: an empty Google Form with that name, read back by id, with Undo that leaves a form the person edited alone. A form that asks for specific questions, a third party, a hedge or another app (Typeform, Microsoft Forms) stays silent. Behind `WORKSPACE_FILE` (off). Hebrew infinitives (לפתוח, ליצור, להכין, להקים) now also read as a request for Docs and Sheets.
+- **Code:** `core/workspace-file.js` (kind `form`), `src/content-gmail.js` (card label and closed line). The lane, verify and Undo wiring already carry the connector.
+- **Tests:** `test/google-form-corpus.cjs` (all pass: recognition both languages, create, read-back, withdraw on a different title, 403, Undo untouched, Undo edited, already deleted); workspace-file, gmail-new-file, docs-consistency, identity-copy, surface-parity, gmail-outlook-parity, system-notice green. No real-browser e2e for the form yet (the fake Google server has no Forms endpoint).
+- **Open:** the two manifest lines above (owner «מאשר»); until then the write answers not-connected. Live Gate not run.
