@@ -50,7 +50,7 @@ const FlowOutlookAttachmentEvidence = (() => {
     }
     const he = lang === 'he' || lang === 'iw';
     const withTask = opts && (opts.taskSuggested === true || opts.withTask === true);
-    if (withTask) return he ? 'ממך אליך — הוצעה משימה.' : 'From you to you — a task was suggested.';
+    if (withTask) return he ? 'ממך אליך — הוצעה משימה' : 'From you to you — a task was suggested.';
     return he ? 'ממך אליך' : 'From you to you';
   }
 

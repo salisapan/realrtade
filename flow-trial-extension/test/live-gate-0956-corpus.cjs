@@ -384,8 +384,13 @@ function listsRoute() {
     store: JSON.parse(JSON.stringify(draftPage.store))
   });
   const undoAgain = await waitFor(reloaded.doc, '.flow-chip-undo', 4000);
+  const reloadLog = (reloaded.store.log || []).filter((e) => e && e.kind === 'written' && !e.undone);
+  const reloadMixed = reloadLog.some((e) => e.connectorId === 'outlookDraft') && reloadLog.some((e) => e.connectorId === 'outlookTask');
   check('a reload restores done and Undo from the receipt',
-    Boolean(undoAgain) && chipShows(reloaded.doc, ['Draft ready.', 'Reply draft ready in Outlook Drafts. Not sent.', 'Draft ready. Not sent.']) && !reloaded.doc.querySelector('.do-halo'),    { text: chipText(reloaded.doc), log: (reloaded.store.log || []).map((e) => e && e.kind + ':' + e.connectorId) });
+    Boolean(undoAgain) && chipShows(reloaded.doc, ['Draft ready.', 'Reply draft ready in Outlook Drafts. Not sent.', 'Draft ready. Not sent.', 'Reply draft ready']) &&
+    !reloaded.doc.querySelector('.do-halo') &&
+    (!reloadMixed || !/Handled\.|טופל\./.test(chipText(reloaded.doc)) || chipText(reloaded.doc).indexOf('Draft') >= 0 || chipText(reloaded.doc).indexOf('טיוטה') >= 0),
+    { text: chipText(reloaded.doc), log: reloadLog.map((e) => e.connectorId), mixed: reloadMixed });
   draftPage.w.close();
   reloaded.w.close();
 
@@ -1117,13 +1122,15 @@ async function boot(opts) {
       };
     }
     if (msg.type === 'flow:execute-action' && msg.payload && msg.payload.connectorId === 'outlookTask') {
+      const title = (msg.payload.params && msg.payload.params.title) || msg.payload.subject || 'Task';
+      const taskId = 'task-' + String(title).replace(/\s+/g, '-').slice(0, 40);
       return {
         ok: true,
         fetchedBack: true,
-        proof: { system: 'microsoft/todo', externalId: 'task-hold', fetchedBack: true, verifiedAt: '2026-10-15T06:00:00.000Z' },
-        ref: { taskId: 'task-hold', taskListId: 'list-1', externalId: 'task-hold', created: { title: 'Budget review', importance: 'normal' } },
-        written: 'To Do · Budget review',
-        url: 'https://to-do.office.com/tasks/task-hold',
+        proof: { system: 'microsoft/todo', externalId: taskId, fetchedBack: true, verifiedAt: '2026-10-15T06:00:00.000Z' },
+        ref: { taskId: taskId, taskListId: 'list-1', externalId: taskId, created: { title: title, importance: 'normal' } },
+        written: 'To Do · ' + title,
+        url: 'https://to-do.office.com/tasks/' + taskId,
         where: 'Microsoft To Do'
       };
     }

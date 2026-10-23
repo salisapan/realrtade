@@ -507,7 +507,7 @@ const FlowDisplay = (() => {
   const ATTACH_UNREAD_EN = 'Could not read the attachments from Outlook';
   const NOTE_SELF_SHORT_HE = 'ממך אליך';
   const NOTE_SELF_SHORT_EN = 'From you to you';
-  const NOTE_SELF_TASK_HE = 'ממך אליך — הוצעה משימה.';
+  const NOTE_SELF_TASK_HE = 'ממך אליך — הוצעה משימה';
   const NOTE_SELF_TASK_EN = 'From you to you — a task was suggested.';
   const ATTACH_LOADING_HE = 'עד שייטענו את הקבצים המצורפים';
   const ATTACH_LOADING_EN = 'Until the attachments finish loading';

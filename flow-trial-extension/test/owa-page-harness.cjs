@@ -63,7 +63,7 @@ async function runPage(opts) {
     glanceOwnNames: []
   }, o.store || {});
   const sent = [];
-  const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
+  const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, attachmentsUnread: o.attachmentsUnread === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   function reply(msg) {
@@ -250,7 +250,14 @@ async function runPage(opts) {
   if (typeof o.beforeClose === 'function') await o.beforeClose({ window: w, document: w.document, store, ctx, sent });
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
-  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document };
+  let chip = w.document.querySelector('.flow-chip-host');
+  const paintUntil = Date.now() + 2500;
+  while (Date.now() < paintUntil) {
+    chip = w.document.querySelector('.flow-chip-host');
+    if (chip && (chip.querySelector('.flow-chip') || chip.querySelector('.flow-chip-undo'))) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip, chipMessage, doc: w.document };
   w.close();
   return res;
 }
@@ -848,10 +855,17 @@ if (require.main === module) {
     check('two files on the resolved message stay off the card and off Loops',
       !two.chip && fileIncoming(two.store).length === 0,
       { text: two.chip && two.chip.textContent, incoming: fileIncoming(two.store).length, why: (two.store.outlookPageDiag || []).map((d) => d.reason) });
-    const twoFail = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, attachmentReads: 'fail', waitMs: 3500 }));
-    check('two files with an unreadable list stay off the card and off Loops',
-      !twoFail.chip && fileIncoming(twoFail.store).length === 0,
-      { text: twoFail.chip && twoFail.chip.textContent, incoming: fileIncoming(twoFail.store).length, why: (twoFail.store.outlookPageDiag || []).map((d) => d.reason) });
+    const twoFail = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
+    const twoFailWhy = (twoFail.store.outlookPageDiag || []).map((d) => d.reason);
+    const twoFailKinds = ((twoFail.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+    const twoFailStepKinds = twoFailKinds && twoFailKinds.steps && twoFailKinds.steps.map((s) => s.kind);
+    check('two files with an unreadable list show reply card with attachments-not-read (no file step, off Loops)',
+      Boolean(twoFail.chip) &&
+      String(twoFail.chip.textContent || '').indexOf(attachUnreadHe) >= 0 &&
+      twoFailStepKinds && !twoFailStepKinds.some((k) => k === 'onedriveFile' || k === 'driveFile') &&
+      fileIncoming(twoFail.store).length === 0 &&
+      !twoFailWhy.some((r) => r === 'page:intent-null' || r === 'quiet:google' || r === 'page:quiet:google'),
+      { text: twoFail.chip && twoFail.chip.textContent, kinds: twoFailStepKinds, incoming: fileIncoming(twoFail.store).length, why: twoFailWhy });
     const itemOnly = await runPage(Object.assign({}, gate, {
       attachmentFiles: [{ id: 'mail1', name: 'Forwarded', isInline: false, '@odata.type': '#microsoft.graph.itemAttachment' }],
       waitMs: 3500

@@ -41,6 +41,9 @@ check('signed-save-suggest triggers recordSuggestNote',
   /signed-save-suggest/.test(outlookSrc) && /recordSuggestNote/.test(outlookSrc));
 check('buildCtx keeps task steps with reply draft (H1)',
   /taskSteps/.test(outlookSrc) && /draftSteps\.concat\(taskSteps\)/.test(outlookSrc));
+check('F3 path REST and office read use idSpellings + ImmutableId fallback',
+  /function idSpellings/.test(outlookSrc) && /idSpellings\(read\.messageId\)/.test(outlookSrc) &&
+  /prefers = \[null, GRAPH_IMMUTABLE\]/.test(outlookSrc));
 check('note-to-self does not return before decideFromText',
   !/pane\.noteToSelf = true[\s\S]{0,40}return;/.test(outlookSrc));
 check('paintMissingScope mentions OneDrive Files.ReadWrite',
@@ -131,6 +134,49 @@ async function runBehavioral() {
     gateAttachments: true, attachmentFiles: [file], hasAttachments: true, waitMs: 4500
   };
 
+  const selfTask = 'תזכיר לי לשלוח את החוזה ביום ראשון.';
+  const selfToSelf = await runPage({
+    htmlPatch: selfHtmlPatch(selfTask),
+    mailBody: selfTask,
+    graphFrom: { name: 'Sali', address: HME },
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-self-task',
+    waitMs: 4500,
+    store: Object.assign({}, cleanStore, { glanceOwnNames: ['Sali'] })
+  });
+  const selfChipText = selfToSelf.chip ? String(selfToSelf.chip.textContent || '') : '';
+  const selfHint = selfToSelf.chip && selfToSelf.chip.querySelector('.flow-chip-note-hint');
+  const selfHintText = selfHint ? String(selfHint.textContent || '') : '';
+  const selfKinds = ((selfToSelf.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const selfStepKinds = selfKinds && selfKinds.steps && selfKinds.steps.map((s) => s.kind);
+  const selfHasTask = selfStepKinds && selfStepKinds.some((k) => k === 'outlookTask' || k === 'googleTask');
+  check('(D) note-to-self with task row: full task-suggested line',
+    Boolean(selfToSelf.chip) && selfHasTask &&
+    (selfHintText.indexOf('הוצעה') >= 0 || selfChipText.indexOf('הוצעה') >= 0),
+    { hint: selfHintText.slice(0, 200), text: selfChipText.slice(0, 200), kinds: selfStepKinds, note: D.noteToSelfLine('he', { taskSuggested: true }) });
+
+  const selfNoteOnly = await runPage({
+    htmlPatch: selfHtmlPatch('תודה על העדכון — אעקוב מכאן.'),
+    mailBody: 'תודה על העדכון — אעקוב מכאן.',
+    graphFrom: { name: 'Sali', address: HME },
+    urlId: GATE_CONV + '-D2', listedConversationId: GATE_CONV + '-D2', messageId: 'M-self-note-only',
+    waitMs: 4500,
+    store: {
+      outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: HME }, ownAddresses: [HME] },
+      glanceTodoConsent: { mode: 'always', scope: 'Tasks.ReadWrite', revoked: false, at: 1 }
+    }
+  });
+  const noteOnlyHint = selfNoteOnly.chip && selfNoteOnly.chip.querySelector('.flow-chip-note-hint');
+  const noteOnlyText = noteOnlyHint ? String(noteOnlyHint.textContent || '') : '';
+  const noteOnlyKinds = ((selfNoteOnly.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const noteOnlyStepKinds = noteOnlyKinds && noteOnlyKinds.steps && noteOnlyKinds.steps.map((s) => s.kind);
+  const noteOnlyHasTask = noteOnlyStepKinds && noteOnlyStepKinds.some((k) => k === 'outlookTask' || k === 'googleTask');
+  const noteOnlyChipText = selfNoteOnly.chip ? String(selfNoteOnly.chip.textContent || '') : '';
+  check('(D) note-to-self without task row: judged WITH short line only',
+    Boolean(selfNoteOnly.chip) && !noteOnlyHasTask &&
+    (noteOnlyText.indexOf('ממך אליך') >= 0 || noteOnlyChipText.indexOf('ממך אליך') >= 0) &&
+    noteOnlyText.indexOf('הוצעה') < 0 && noteOnlyChipText.indexOf('הוצעה') < 0,
+    { hint: noteOnlyText, text: noteOnlyChipText.slice(0, 200), kinds: noteOnlyStepKinds, copy: D.noteToSelfLine('he', { taskSuggested: false }) });
+
   const contract = 'Please sign the contract and return the appendix by Friday.';
   const twoFiles = [file, Object.assign({}, file, { id: 'att2', name: 'appendix.pdf' })];
   const attachDom = (h) => gateHtml(contract)(h)
@@ -195,6 +241,50 @@ async function runBehavioral() {
     mixUndos.some((m) => m.connectorId === 'outlookTask'),
     mixUndos.map((m) => m.connectorId));
 
+  const h1Done = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-reload',
+    waitMs: 4500, clickDoIt: true,
+    store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [HME] } }
+  });
+  const h1Reload = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-reload',
+    waitMs: 4500,
+    store: JSON.parse(JSON.stringify(h1Done.store))
+  });
+  const reloadText = h1Reload.chip ? String(h1Reload.chip.textContent || '') : '';
+  const reloadWritten = (h1Reload.store.log || []).filter((e) => e && e.kind === 'written' && !e.undone);
+  check('H1 reload: one receipt shows draft + To Do (not Handled-only To Do)',
+    Boolean(h1Reload.chip) &&
+    /Draft ready|Reply draft ready/.test(reloadText) &&
+    reloadWritten.some((e) => e.connectorId === 'outlookDraft') &&
+    reloadWritten.some((e) => e.connectorId === 'outlookTask'),
+    { text: reloadText.slice(0, 240), written: reloadWritten.map((e) => e.connectorId) });
+  const h1UndoReload = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-reload',
+    waitMs: 4500, clickUndo: true, undoCount: 2,
+    store: JSON.parse(JSON.stringify(h1Done.store))
+  });
+  const h1UndoCalls = h1UndoReload.sent.filter((m) => m.type === 'flow:undo-action');
+  const h1SecondDraft = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-reload',
+    waitMs: 4500, clickDoIt: true,
+    store: JSON.parse(JSON.stringify(h1UndoReload.store))
+  });
+  const h1DraftWrites = h1SecondDraft.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft');
+  check('H1 reload Undo removes draft and To Do; a fresh Do It creates only one draft',
+    h1UndoCalls.some((m) => m.connectorId === 'outlookDraft') &&
+    h1UndoCalls.some((m) => m.connectorId === 'outlookTask') &&
+    h1DraftWrites.length === 1,
+    { undos: h1UndoCalls.map((m) => m.connectorId), drafts: h1DraftWrites.length });
+
   const bBody = 'Please sign the contract and return the appendix by Friday.';
   const bDom = (h) => gateHtml(bBody)(h)
     .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="a.pdf" data-size="1024"></div><div data-name="appendix.pdf" data-size="2048"></div');
@@ -229,45 +319,6 @@ async function runBehavioral() {
     unkStepKinds.some((k) => k === 'outlookDraft' || k === 'gmailDraft') &&
     unkStepKinds.some((k) => k === 'outlookTask' || k === 'googleTask'),
     { kinds: unkStepKinds, why: (unknownAttach.store.outlookPageDiag || []).map((d) => d.reason) });
-
-  const selfTask = 'תזכיר לי לשלוח את החוזה ביום ראשון.';
-  const selfToSelf = await runPage({
-    htmlPatch: selfHtmlPatch(selfTask),
-    mailBody: selfTask,
-    graphFrom: { name: 'Sali', address: HME },
-    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-self-task',
-    waitMs: 4500,
-    store: Object.assign({}, cleanStore, { glanceOwnNames: ['Sali'] })
-  });
-  const selfChipText = selfToSelf.chip ? String(selfToSelf.chip.textContent || '') : '';
-  const selfHint = selfToSelf.chip && selfToSelf.chip.querySelector('.flow-chip-note-hint');
-  const selfHintText = selfHint ? String(selfHint.textContent || '') : '';
-  const selfKinds = ((selfToSelf.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
-  const selfStepKinds = selfKinds && selfKinds.steps && selfKinds.steps.map((s) => s.kind);
-  const selfHasTask = selfStepKinds && selfStepKinds.some((k) => k === 'outlookTask' || k === 'googleTask');
-  check('(D) note-to-self with task row: full task-suggested line',
-    Boolean(selfToSelf.chip) && selfHasTask &&
-    (selfHintText.indexOf('הוצעה') >= 0 || D.noteToSelfLine('he', { taskSuggested: true }).indexOf('הוצעה') >= 0),
-    { hint: selfHintText.slice(0, 200), kinds: selfStepKinds, note: D.noteToSelfLine('he', { taskSuggested: true }) });
-
-  const selfNoteOnly = await runPage({
-    htmlPatch: selfHtmlPatch('תודה על העדכון — אעקוב מכאן.'),
-    mailBody: 'תודה על העדכון — אעקוב מכאן.',
-    graphFrom: { name: 'Sali', address: HME },
-    urlId: GATE_CONV + '-D2', listedConversationId: GATE_CONV + '-D2', messageId: 'M-self-note-only',
-    waitMs: 4500,
-    store: {
-      outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: HME }, ownAddresses: [HME] },
-      glanceTodoConsent: { mode: 'always', scope: 'Tasks.ReadWrite', revoked: false, at: 1 }
-    }
-  });
-  const noteOnlyHint = selfNoteOnly.chip && selfNoteOnly.chip.querySelector('.flow-chip-note-hint');
-  const noteOnlyText = noteOnlyHint ? String(noteOnlyHint.textContent || '') : '';
-  check('(D) note-to-self without task row: short line only',
-    !selfNoteOnly.chip && noteOnlyText.indexOf('הוצעה') < 0 &&
-    D.noteToSelfLine('he', { taskSuggested: false }).indexOf('ממך אליך') >= 0 &&
-    D.noteToSelfLine('he', { taskSuggested: false }).indexOf('הוצעה') < 0,
-    { hint: noteOnlyText, copy: D.noteToSelfLine('he', { taskSuggested: false }) });
 
   const lateSigned = 'Attached is the signed NDA. Please save it to OneDrive.';
   const lateChips = await runPage(Object.assign({}, gateBase, {
