@@ -387,8 +387,7 @@ function listsRoute() {
   const reloadLog = (reloaded.store.log || []).filter((e) => e && e.kind === 'written' && !e.undone);
   const reloadMixed = reloadLog.some((e) => e.connectorId === 'outlookDraft') && reloadLog.some((e) => e.connectorId === 'outlookTask');
   const reloadChip = chipText(reloaded.doc);
-  console.log('H1 parity bite: live-gate-0956-corpus.cjs:389-395 [mixed reload receipt] | before: draft-only chip text | after: draft+To Do in same receipt | CTO parity e456 item1');
-  console.log('H1 parity bite: live-gate-0956-corpus.cjs:1124-1135 [outlookTask mock] | before: fixed Budget review title | after: title/taskId from params | CTO parity e456 item1');
+  console.log('H1 parity bite: live-gate-0956-corpus.cjs:392-396 [mixed reload receipt] | before: Handled-only escape | after: draft+To Do required in same receipt | CTO parity e456 item1');
   check('a reload restores done and Undo from the receipt with draft and To Do in one receipt',
     Boolean(undoAgain) && chipShows(reloaded.doc, ['Draft ready.', 'Reply draft ready in Outlook Drafts. Not sent.', 'Draft ready. Not sent.', 'Reply draft ready']) &&
     !reloaded.doc.querySelector('.do-halo') &&
@@ -424,7 +423,40 @@ function listsRoute() {
     !h1Mixed.doc.querySelector('.flow-chip-undo') &&
     !/Reply draft ready/.test(sameSubj),
     { text: sameSubj });
+  const heldStore = JSON.parse(JSON.stringify(h1Mixed.store));
   h1Mixed.w.close();
+  const sameSubjHeld = await boot({
+    id: 'MSG-SAME-SUBJ-AS-HELD',
+    subject: 'Gate A – contract update',
+    body: 'Please send the October invoice by Friday.\nThanks',
+    store: heldStore
+  });
+  await waitCard(sameSubjHeld);
+  const heldSubjLeak = chipText(sameSubjHeld.doc);
+  check('N1: other mail with same subject as held draft shows Do It not draft receipt',
+    (sameSubjHeld.doc.querySelector('.do-halo') || sameSubjHeld.doc.querySelector('button.flow-chip')) &&
+    !sameSubjHeld.doc.querySelector('.flow-chip-undo') &&
+    !/Reply draft ready|Draft ready|טיוטה מוכנה/.test(heldSubjLeak),
+    { text: heldSubjLeak });
+  const subjectOnlySrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8').replace(
+    'return want.some((w) => have.some((h) => sameExchangeId(w, h)));',
+    'const subj = String((pane && pane.subject) || "").trim(); const rowSubj = String(row.subject || "").trim(); if (subj && rowSubj && subj === rowSubj) return true; return want.some((w) => have.some((h) => sameExchangeId(w, h)));'
+  );
+  const subjectMut = await boot({
+    id: 'MSG-SUBJ-MUT-LG',
+    subject: 'Gate A – contract update',
+    body: 'האם תוכל לעדכן אותי לגבי החוזה עד יום ראשון?',
+    store: heldStore,
+    contentOutlookSrc: subjectOnlySrc
+  });
+  await waitCard(subjectMut);
+  await sleep(500);
+  const mutText = chipText(subjectMut.doc);
+  check('N1 bite live-gate: subject-only draft match leaks held draft (mutation must fail)',
+    /Reply draft ready|Draft ready|טיוטה מוכנה/.test(mutText),
+    { text: mutText.slice(0, 200), undo: Boolean(subjectMut.doc.querySelector('.flow-chip-undo')) });
+  sameSubjHeld.w.close();
+  subjectMut.w.close();
 
   console.log('\n--- Hold It on a meeting mail changes the card ---\n');
   const meetPage = await boot({
@@ -1201,8 +1233,11 @@ async function boot(opts) {
     i18n: { getUILanguage: () => 'en' }
   };
   const ctx = dom.getInternalVMContext();
+  const outlookOverride = o.contentOutlookSrc || null;
   for (const f of files) {
-    new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx);
+    let src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    if (outlookOverride && f === 'src/content-outlook.js') src = outlookOverride;
+    new vm.Script(src, { filename: f }).runInContext(ctx);
   }
   const heading = w.document.querySelector('#ReadingPaneContainerId [role="heading"] span');
   if (heading) heading.textContent = o.subject;

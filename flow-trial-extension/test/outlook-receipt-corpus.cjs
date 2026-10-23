@@ -1,47 +1,18 @@
 
-// Active Outlook draft receipts must survive an older undone for the same messageId.
+// Active Outlook draft receipts — uses production storage.js (not a mirror).
 // Run: node test/outlook-receipt-corpus.cjs
-// Mirrors getActiveOutlookReceiptsFrom in src/storage.js (kept in sync by this corpus).
-function getActiveOutlookReceiptsFrom(state, opts) {
-  const bareSlot = opts && opts.bareSlotKey === true;
-  const log = (state && state.log) || [];
-  const undoTsByMsg = Object.create(null);
-  const undoByRef = Object.create(null);
-  for (const e of log) {
-    if (!e || e.kind !== 'undone' || !e.messageId) continue;
-    const ts = e.ts || 0;
-    if (undoTsByMsg[e.messageId] == null || ts >= undoTsByMsg[e.messageId]) undoTsByMsg[e.messageId] = ts;
-    if (e.ref) undoByRef[e.messageId + '|' + e.ref] = ts;
-  }
-  const bestBySlot = Object.create(null);
-  const seen = new Set();
-  const out = [];
-  function receiptSlotKey(entry) {
-    if (!entry || !entry.messageId) return '';
-    if (bareSlot) return entry.messageId;
-    const slot = entry.connectorId === 'outlookDraft' ? 'draft' : 'other';
-    return entry.messageId + '|' + slot;
-  }
-  const panelReceipt = (e) => e && e.kind === 'written' && e.connectorId === 'outlookDraft' && e.messageId && !e.undone && e.outlookReceipt !== false && !e.outlookSent;
-  for (const e of log) {
-    if (!panelReceipt(e)) continue;
-    const wts = e.ts || 0;
-    if (e.ref && undoByRef[e.messageId + '|' + e.ref] != null && undoByRef[e.messageId + '|' + e.ref] >= wts) continue;
-    if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) continue;
-    const slot = receiptSlotKey(e);
-    if (!slot) continue;
-    if (bareSlot) {
-      if (seen.has(slot)) continue;
-      seen.add(slot);
-      out.push(e);
-      continue;
-    }
-    const prev = bestBySlot[slot];
-    if (!prev || wts >= (prev.ts || 0)) bestBySlot[slot] = e;
-  }
-  if (!bareSlot) return Object.keys(bestBySlot).map((k) => bestBySlot[k]);
-  return out;
-}
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = path.join(__dirname, '..');
+
+const engine = { module: undefined, console, FlowDisplay: null };
+vm.createContext(engine);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'core/display-copy.js'), 'utf8'), engine, { filename: 'display-copy.js' });
+global.FlowDisplay = engine.FlowDisplay;
+const { FlowStorage } = require('../src/storage.js');
+const getActiveOutlookReceiptsFrom = FlowStorage.getActiveOutlookReceiptsFrom;
+
 let failures = 0;
 function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
@@ -60,9 +31,11 @@ check('undone after draft hides receipt', r2.length === 0, r2);
 const d1 = { kind: 'written', messageId: 'mix', connectorId: 'outlookDraft', ref: 'd1', ts: 100, outlookReceipt: true };
 const d2same = { kind: 'written', messageId: 'mix', connectorId: 'outlookDraft', ref: 'd2', ts: 200, outlookReceipt: true };
 const withSlot = getActiveOutlookReceiptsFrom({ log: [d1, d2same] });
-const bareKey = getActiveOutlookReceiptsFrom({ log: [d1, d2same] }, { bareSlotKey: true });
 check('receiptSlotKey draft|other keeps newest draft when two draft rows share messageId', withSlot.length === 1 && withSlot[0].ref === 'd2', withSlot);
-check('bare messageId slot key hides a second draft on the same message (mutation must fail)', bareKey.length === 1 && bareKey[0].ref === 'd1', bareKey);
+
+const provedTodo = { kind: 'written', messageId: 'm1', connectorId: 'outlookTask', ref: 't1', ts: 100, fetchedBack: true, proof: { fetchedBack: true } };
+const todoOnce = getActiveOutlookReceiptsFrom({ log: [provedTodo] });
+check('one proved To Do receipt is not duplicated by glanceProofs pass', todoOnce.length === 1 && todoOnce[0].ref === 't1', todoOnce);
 
 const { FlowOutlookStateMigrate: M } = require('../core/outlook-state-migrate.js');
 const merged = M.mergeHandledUndone([

@@ -110,6 +110,14 @@ async function runPage(opts) {
             return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
           }
         }
+        if (o.convFilterGraphIdOnly && /conversationId/.test(decoded)) {
+          const m = /conversationId eq '([^']+)'/.exec(decoded);
+          const wanted = m && m[1];
+          const accept = String(o.convFilterAcceptId || o.attachmentGraphMessageId || graphMsg.id || '');
+          if (!wanted || !accept || wanted !== accept) {
+            return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+          }
+        }
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
         return { ok: true, status: 200, body: JSON.stringify({ value }) };
@@ -217,8 +225,13 @@ async function runPage(opts) {
     vm.runInContext('globalThis.__glanceOwaHarness = ' + JSON.stringify(o.harnessFlags), ctx);
   }
   const throws = [];
+  const outlookOverride = o.contentOutlookSrc || null;
   for (const f of files) {
-    try { new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx); }
+    try {
+      let src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+      if (outlookOverride && f === 'src/content-outlook.js') src = outlookOverride;
+      new vm.Script(src, { filename: f }).runInContext(ctx);
+    }
     catch (e) { throws.push(f + ': ' + e.message.split('\n')[0]); }
   }
   // OWA never stops changing the page: an ad slot, presence, "x min ago".
@@ -867,21 +880,37 @@ if (require.main === module) {
       String(unread.chip.textContent || '').indexOf(attachUnreadHe) >= 0 &&
       !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google' || r === 'page:intent-null'),
       { text: unread.chip && unread.chip.textContent, why: unreadWhy });
-    const m2b = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, harnessFlags: { disableUnreadReprobe: true, disableUnreadHandler: true }, waitMs: 3500 }));
-    const m2bWhy = (m2b.store.outlookPageDiag || []).map((d) => d.reason);
-    check('row 31 bite m2b: unread re-probe off and handler off → not a judged reply+task card',
-      !m2b.chip || m2bWhy.some((r) => r === 'outlook:attachments-not-read' || r === 'page:intent-null'),
-      { text: m2b.chip && m2b.chip.textContent, why: m2bWhy });
-    const handlerOn = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, harnessFlags: { disableUnreadReprobe: true }, waitMs: 3500 }));
-    const handlerOff = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, harnessFlags: { disableUnreadReprobe: true, disableUnreadHandler: true }, waitMs: 3500 }));
-    const onKinds = ((handlerOn.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
-    const offKinds = ((handlerOff.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
-    const onSteps = onKinds && onKinds.steps && onKinds.steps.map((s) => s.kind);
-    const offSteps = offKinds && offKinds.steps && offKinds.steps.map((s) => s.kind);
-    check('row 31 bite: :4840 unread handler alone names reply+task when re-probe fails',
-      Boolean(handlerOn.chip) && onSteps && onSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft') && onSteps.some((k) => k === 'outlookTask' || k === 'googleTask') &&
-      (!handlerOff.chip || !offSteps || !offSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft')),
-      { on: onSteps, off: offSteps, offWhy: (handlerOff.store.outlookPageDiag || []).map((d) => d.reason) });
+    const outlookPath = path.join(ROOT, 'src/content-outlook.js');
+    function patchOutlook(mutator) {
+      return mutator(fs.readFileSync(outlookPath, 'utf8'));
+    }
+    function reprobeDisabledSrc(src) {
+      return src.replace(
+        'if (attachmentsUnread && !owaHarnessFlag(\'disableUnreadReprobe\')) {',
+        'if (attachmentsUnread && false) {'
+      );
+    }
+    function unreadHandlerRemovedSrc(src) {
+      return src.replace(
+        /\} else if \(decided && decided\.attachmentsUnread\) \{[\s\S]*?\} else if \(decided && decided\.reason === 'page:attachment-count-unread' && !decided\.intent\) \{/,
+        '} else if (decided && decided.reason === \'page:attachment-count-unread\' && !decided.intent) {'
+      );
+    }
+    const unreadGate = Object.assign({}, gate, {
+      htmlPatch: (h) => gateHtml(BODY)(h).replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="pilot.pdf" data-size="1024"></div'),
+      mailBody: BODY,
+      attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500
+    });
+    const reprobeOff = await runPage(Object.assign({}, unreadGate, {
+      harnessFlags: { forceAttachmentUnreadNone: true, disableUnreadReprobe: true }
+    }));
+    const reprobeOffKinds = ((reprobeOff.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+    const reprobeOffSteps = reprobeOffKinds && reprobeOffKinds.steps && reprobeOffKinds.steps.map((s) => s.kind);
+    check('row 31 bite: unread handler names reply+task when decideFromText re-probe is removed',
+      Boolean(reprobeOff.chip) && reprobeOffSteps &&
+      reprobeOffSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft') &&
+      reprobeOffSteps.some((k) => k === 'outlookTask' || k === 'googleTask'),
+      { text: reprobeOff.chip && reprobeOff.chip.textContent, kinds: reprobeOffSteps, why: (reprobeOff.store.outlookPageDiag || []).map((d) => d.reason) });
     function fileIncoming(store) {
       return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {
         return ((e && e.process && e.process.steps) || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));

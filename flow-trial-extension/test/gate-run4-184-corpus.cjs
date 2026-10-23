@@ -119,6 +119,31 @@ async function runBehavioral() {
     return;
   }
   const { runPage, ME: HME } = harness;
+  const outlookPath = path.join(ROOT, 'src/content-outlook.js');
+  function patchOutlook(mutator) {
+    return mutator(fs.readFileSync(outlookPath, 'utf8'));
+  }
+  function reprobeDisabledSrc(src) {
+    return src.replace(
+      'if (attachmentsUnread && !owaHarnessFlag(\'disableUnreadReprobe\')) {',
+      'if (attachmentsUnread && false) {'
+    );
+  }
+  function unreadHandlerRemovedSrc(src) {
+    return src.replace(
+      /\} else if \(decided && decided\.attachmentsUnread\) \{[\s\S]*?\} else if \(decided && decided\.reason === 'page:attachment-count-unread' && !decided\.intent\) \{/,
+      '} else if (decided && decided.reason === \'page:attachment-count-unread\' && !decided.intent) {'
+    );
+  }
+  function mutateFnSpellsRawOnly(src, fnName) {
+    const needle = 'async function ' + fnName;
+    const start = src.indexOf(needle);
+    if (start < 0) return src;
+    const nextFn = src.indexOf('\n  async function ', start + needle.length);
+    const end = nextFn > start ? nextFn : src.length;
+    const chunk = src.slice(start, end).replace(/const spells = owaHarnessIdSpells\((\w+)\);/g, (_, v) => 'const spells = [String(' + v + ' || "")];');
+    return src.slice(0, start) + chunk + src.slice(end);
+  }
   const attachUnreadHe = D.attachmentsNotReadLine('he');
   const GATE_CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX/C+aXV';
   const file = { id: 'att1', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
@@ -233,28 +258,44 @@ async function runBehavioral() {
     outlookMessageIdSpellings(F3_RAW_MSG).some((s) => f3AttachStubAccepts(s, F3_GRAPH_MSG)),
     { spells: outlookMessageIdSpellings(F3_RAW_MSG).map((s) => s.slice(0, 36)) });
   const f3Signed = 'Attached is the signed NDA. Please save it to OneDrive.';
-  const f3Page = await runPage(Object.assign({}, gateBase, {
-    htmlPatch: gateHtml(f3Signed), mailBody: f3Signed,
+  const f3Dom = (h) => gateHtml(f3Signed)(h).replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-0935-signed-NDA.pdf" data-size="1024"></div');
+  const f3Thread = [{ id: F3_GRAPH_MSG, conversationId: F3_GRAPH_MSG, subject: 'Gate Run 4', isDraft: false, hasAttachments: true,
+    from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+    receivedDateTime: new Date().toISOString(), body: { contentType: 'text', content: f3Signed } }];
+  const f3PathOpts = {
+    htmlPatch: f3Dom, mailBody: f3Signed,
     urlId: F3_URL, listedConversationId: F3_URL,
     messageId: F3_RAW_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
     pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_RAW_MSG,
-    attachmentsGraphIdOnly: true,
-    waitMs: 4500
-  }));
+    gateAttachments: true, attachmentsGraphIdOnly: true, waitMs: 4500
+  };
+  const f3Page = await runPage(Object.assign({}, gateBase, f3PathOpts));
+  const f3ConvOpts = {
+    htmlPatch: f3Dom, mailBody: f3Signed,
+    urlId: F3_RAW_MSG, listedConversationId: F3_RAW_MSG,
+    messageId: F3_GRAPH_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
+    threadMessages: f3Thread, pathRestMisses: 99,
+    convFilterGraphIdOnly: true, convFilterAcceptId: F3_GRAPH_MSG,
+    gateAttachments: true, attachmentsGraphIdOnly: true, waitMs: 4500
+  };
   const f3Kinds = ((f3Page.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
   const f3StepKinds = f3Kinds && f3Kinds.steps && f3Kinds.steps.map((s) => s.kind);
   check('F3 behavioral: attachments GET via idSpellings shows file card when stub accepts only Graph message id',
     Boolean(f3Page.chip) && /OneDrive|Do It/.test(String(f3Page.chip.textContent || '')) &&
     f3StepKinds && f3StepKinds.indexOf('onedriveFile') >= 0,
     { text: f3Page.chip && f3Page.chip.textContent, kinds: f3StepKinds });
-  const f3BaseOpts = {
-    htmlPatch: gateHtml(f3Signed), mailBody: f3Signed,
-    urlId: F3_URL, listedConversationId: F3_URL,
-    messageId: F3_RAW_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
-    pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_RAW_MSG,
-    attachmentsGraphIdOnly: true, waitMs: 4500
-  };
-  const f3AttachMut = await runPage(Object.assign({}, gateBase, f3BaseOpts, { harnessFlags: { idSpellingsRawOnly: true } }));
+  const f3ConvMut = await runPage(Object.assign({}, gateBase, f3ConvOpts, {
+    contentOutlookSrc: patchOutlook((src) => mutateFnSpellsRawOnly(src, 'messageIdForConversation'))
+  }));
+  const f3ConvKinds = ((f3ConvMut.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const f3ConvStepKinds = f3ConvKinds && f3ConvKinds.steps && f3ConvKinds.steps.map((s) => s.kind);
+  check('F3 mutation messageIdForConversation raw-only: file card missing (idSpellings required)',
+    !(f3ConvMut.chip && /OneDrive|Do It/.test(String(f3ConvMut.chip.textContent || ''))) ||
+    !f3ConvStepKinds || f3ConvStepKinds.indexOf('onedriveFile') < 0,
+    { text: f3ConvMut.chip && f3ConvMut.chip.textContent, kinds: f3ConvStepKinds });
+  const f3AttachMut = await runPage(Object.assign({}, gateBase, f3PathOpts, {
+    contentOutlookSrc: patchOutlook((src) => mutateFnSpellsRawOnly(src, 'attachmentListFor'))
+  }));
   const f3AttachKinds = ((f3AttachMut.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
   const f3AttachStepKinds = f3AttachKinds && f3AttachKinds.steps && f3AttachKinds.steps.map((s) => s.kind);
   check('F3 mutation attachmentListFor raw-only: file card missing (idSpellings required)',
@@ -379,7 +420,7 @@ async function runBehavioral() {
     reloadWritten.some((e) => e.connectorId === 'outlookDraft') &&
     reloadWritten.some((e) => e.connectorId === 'outlookTask'),
     { text: reloadText.slice(0, 240), written: reloadWritten.map((e) => e.connectorId) });
-  console.log('H1 parity bite: gate-run4-184-corpus.cjs:320-328 [H1 reload receipt text] | before: To Do only in store log | after: draft+To Do in DOM receipt | CTO parity e456 item1');
+  console.log('H1 parity bite: gate-run4-184-corpus.cjs:375-381 [H1 reload receipt text] | before: Handled-only / log-only To Do | after: draft+To Do in DOM receipt (incl. טיוטה) | CTO parity e456 item1');
   const heldDraftStore = JSON.parse(JSON.stringify(h1Done.store));
   const otherInvoice = await runPage({
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
@@ -407,6 +448,58 @@ async function runBehavioral() {
     !sameSubjOtherId.chip.querySelector('.flow-chip-undo') &&
     !/Reply draft ready/.test(sameSubjText),
     { text: sameSubjText.slice(0, 200) });
+  const heldSubj = 'Gate Run 4';
+  const sameSubjAsHeld = await runPage({
+    htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
+    mailBody: 'Please send the October invoice by Friday.',
+    urlId: GATE_CONV + '-HELD-SUBJ', listedConversationId: GATE_CONV + '-HELD-SUBJ', messageId: 'MSG-SAME-SUBJ-AS-HELD',
+    listedSubject: heldSubj, waitMs: 4500,
+    store: heldDraftStore
+  });
+  const sameSubjHeldText = sameSubjAsHeld.chip ? String(sameSubjAsHeld.chip.textContent || '') : '';
+  check('N1: other mail with same subject as held draft (different ids) shows Do It not draft receipt',
+    sameSubjAsHeld.chip && (sameSubjAsHeld.chip.querySelector('.do-halo') || sameSubjAsHeld.chip.querySelector('button.flow-chip')) &&
+    !sameSubjAsHeld.chip.querySelector('.flow-chip-undo') &&
+    !/Reply draft ready|Draft ready|טיוטה מוכנה/.test(sameSubjHeldText),
+    { text: sameSubjHeldText.slice(0, 200) });
+  const subjectOnlySrc = patchOutlook((src) => src.replace(
+    'return want.some((w) => have.some((h) => sameExchangeId(w, h)));',
+    'const subj = String((pane && pane.subject) || "").trim(); const rowSubj = String(row.subject || "").trim(); if (subj && rowSubj && subj === rowSubj) return true; return want.some((w) => have.some((h) => sameExchangeId(w, h)));'
+  ));
+  const subjectLeak = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV + '-HELD-SUBJ', listedConversationId: GATE_CONV + '-HELD-SUBJ', messageId: 'MSG-SUBJ-MUT',
+    listedSubject: heldSubj, waitMs: 4500,
+    store: heldDraftStore,
+    contentOutlookSrc: subjectOnlySrc
+  });
+  const subjectLeakText = subjectLeak.chip ? String(subjectLeak.chip.textContent || '') : '';
+  check('N1 bite: subject-only draftMatchesPane leaks receipt onto same-subject mail (mutation must fail)',
+    /Reply draft ready|Draft ready|טיוטה מוכנה/.test(subjectLeakText) && subjectLeak.chip && subjectLeak.chip.querySelector('.flow-chip-undo'),
+    { text: subjectLeakText.slice(0, 200) });
+  const pilotBody = 'Hi Sali,\n\nCould you review the attached pilot proposal and confirm by Wednesday whether we can start next week?\n\nThanks,\nFlow team';
+  const attachUnreadGate = Object.assign({}, gateBase, {
+    htmlPatch: (h) => gateHtml(pilotBody)(h).replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="pilot.pdf" data-size="1024"></div'),
+    mailBody: pilotBody,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-row31',
+    attachmentReads: 'fail', attachmentsUnread: true, waitMs: 4500
+  });
+  const row31HandlerOn = await runPage(Object.assign({}, attachUnreadGate, {
+    harnessFlags: { forceAttachmentUnreadNone: true, disableUnreadReprobe: true }
+  }));
+  const row31HandlerOff = await runPage(Object.assign({}, attachUnreadGate, {
+    harnessFlags: { forceAttachmentUnreadNone: true, disableUnreadReprobe: true },
+    contentOutlookSrc: patchOutlook(unreadHandlerRemovedSrc)
+  }));
+  const row31OnProc = (row31HandlerOn.store.log || []).find((e) => e && e.kind === 'shown');
+  const row31OffProc = (row31HandlerOff.store.log || []).find((e) => e && e.kind === 'shown');
+  const row31OnSteps = row31OnProc && row31OnProc.process && row31OnProc.process.steps ? row31OnProc.process.steps.map((s) => s.kind) : [];
+  const row31OffSteps = row31OffProc && row31OffProc.process && row31OffProc.process.steps ? row31OffProc.process.steps.map((s) => s.kind) : [];
+  check('row 31 bite: removing :4840 unread handler drops reply+task when re-probe is off',
+    row31OnSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft') && row31OnSteps.some((k) => k === 'outlookTask' || k === 'googleTask') &&
+    (!row31OffSteps.some((k) => k === 'outlookTask' || k === 'googleTask') || !row31OffSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft')),
+    { on: row31OnSteps, off: row31OffSteps, offWhy: (row31HandlerOff.store.outlookPageDiag || []).map((d) => d.reason) });
   const h1UndoReload = await runPage({
     htmlPatch: (h) => gateHtml(h1Body)(h),
     mailBody: h1Body,

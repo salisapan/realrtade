@@ -833,6 +833,9 @@
         attachmentsUnread = true;
       }
     }
+    if (r && r.show && attachmentsUnread && owaHarnessFlag('forceAttachmentUnreadNone')) {
+      return { none: true, attachmentsUnread: true, reason: 'intent-null' };
+    }
     if (r && r.show) {
       let proc = r.process;
       if (attachmentsUnread && proc && proc.id === 'file-it') {
@@ -847,31 +850,9 @@
       }
       return out;
     }
-    if (attachmentsUnread && !(typeof globalThis !== 'undefined' && globalThis.__glanceOwaHarness && globalThis.__glanceOwaHarness.disableUnreadReprobe)) {
-      const probe = FlowIncomingJudge.judge({
-        text: own, subject: pane.subject || '',
-        sender: { name: pane.senderName, email: pane.senderEmail },
-        now: new Date(), threadUrl: location.href,
-        hasThreadAttachment: true,
-        attachmentCount: 1,
-        surface: 'outlook',
-        to: pane.to || null,
-        cc: pane.cc || null,
-        ownAddresses: ownAddresses || null,
-        userName: pane.userName || null,
-        ownNames: pane.ownNames || null,
-        namesPending: pane.namesPending === true,
-        onBehalfOf: pane.onBehalfOf || null,
-        forwarded: pane.onBehalf === true,
-        inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
-      });
-      if (probe && probe.show && probe.process) {
-        const dropped = processDropFileSteps(probe.process);
-        if (dropped) {
-          pane.attachmentsUnread = true;
-          return { intent: probe.intent, process: dropped, attachmentsUnread: true };
-        }
-      }
+    if (attachmentsUnread && !owaHarnessFlag('disableUnreadReprobe')) {
+      const reprobe = judgeAttachmentUnreadReply(pane, own, ownAddresses, selfAddressed);
+      if (reprobe) return reprobe;
     }
     return { none: true, reason: (r && r.reason) || 'intent-null', attachmentsUnread: attachmentsUnread || undefined };
   }
@@ -1086,10 +1067,44 @@
     return out;
   }
 
+  // Test-only: harness may set globalThis.__glanceOwaHarness before scripts load; product code never writes it.
+  function owaHarnessFlag(name) {
+    try {
+      const h = typeof globalThis !== 'undefined' ? globalThis.__glanceOwaHarness : null;
+      return h && h[name];
+    } catch (e) { return undefined; }
+  }
+
   function owaHarnessIdSpells(id) {
-    const h = typeof globalThis !== 'undefined' && globalThis.__glanceOwaHarness;
-    if (h && h.idSpellingsRawOnly) return [String(id || '')];
+    if (owaHarnessFlag('idSpellingsRawOnly')) return [String(id || '')];
     return idSpellings(id);
+  }
+
+  function judgeAttachmentUnreadReply(pane, own, ownAddresses, selfAddressed) {
+    if (typeof FlowIncomingJudge === 'undefined') return null;
+    const from = String(pane.senderEmail || '').toLowerCase();
+    const probe = FlowIncomingJudge.judge({
+      text: own, subject: pane.subject || '',
+      sender: { name: pane.senderName, email: pane.senderEmail },
+      now: new Date(), threadUrl: location.href,
+      hasThreadAttachment: true,
+      attachmentCount: 1,
+      surface: 'outlook',
+      to: pane.to || null,
+      cc: pane.cc || null,
+      ownAddresses: ownAddresses || null,
+      userName: pane.userName || null,
+      ownNames: pane.ownNames || null,
+      namesPending: pane.namesPending === true,
+      onBehalfOf: pane.onBehalfOf || null,
+      forwarded: pane.onBehalf === true,
+      inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
+    });
+    if (!probe || !probe.show || !probe.process) return null;
+    const dropped = processDropFileSteps(probe.process);
+    if (!dropped) return null;
+    pane.attachmentsUnread = true;
+    return { intent: probe.intent, process: dropped, attachmentsUnread: true };
   }
 
   // The /inbox/id/<restId> segment is the Graph message id (EWS alphabet in the URL,
@@ -4840,15 +4855,14 @@
             if (decided && (decided.reason === 'page:attachment-count-unread' || decided.attachmentsUnread) && decided.intent && decided.process) {
               decided = { intent: decided.intent, process: decided.process, attachmentsUnread: true };
             } else if (decided && decided.attachmentsUnread) {
-              const skipUnreadHandler = typeof globalThis !== 'undefined' && globalThis.__glanceOwaHarness && globalThis.__glanceOwaHarness.disableUnreadHandler;
-              if (skipUnreadHandler) {
-                dropStuckCard(pane);
-                await pageReason('outlook:attachments-not-read', pane);
-                return;
-              }
-              const retry = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
-              if (retry && !retry.none && retry.intent && retry.process) {
-                decided = Object.assign({}, retry, { attachmentsUnread: true });
+              const ownForJudge = selfAddressed ? ownAll : own;
+              const prepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
+                ? FlowIncomingJudge.prepareForJudge(pane.text || '')
+                : (pane.text || '');
+              const ownText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
+              const handler = judgeAttachmentUnreadReply(pane, ownText, ownForJudge, selfAddressed);
+              if (handler && handler.intent && handler.process) {
+                decided = handler;
               } else {
                 dropStuckCard(pane);
                 await pageReason('outlook:attachments-not-read', pane);

@@ -1556,6 +1556,10 @@ const FlowStorage = (() => {
       if (!prev || wts >= (prev.ts || 0)) bestBySlot[slot] = e;
     }
     const out = Object.keys(bestBySlot).map((k) => bestBySlot[k]);
+    for (let i = 0; i < out.length; i++) {
+      const slot = receiptSlotKey(out[i]);
+      if (slot) seen.add(slot);
+    }
     const P = proofApi();
     const store = state && state.glanceProofs;
     if (P && typeof P.proofForIds === 'function' && store && store.records) {
