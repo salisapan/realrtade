@@ -109,6 +109,83 @@ const FlowConnectEcosystem = (() => {
     return microsoftScopes().filter((s) => s !== 'offline_access');
   }
 
+  const MS_CONSUMER_HOSTS = {
+    'outlook.com': true,
+    'hotmail.com': true,
+    'live.com': true,
+    'msn.com': true
+  };
+
+  const PLANNER_GROUP_SCOPE = 'Group.Read.All';
+
+  function primaryMicrosoftEmail(account) {
+    const fields = [account && account.userPrincipalName, account && account.mail, account && account.address];
+    for (let i = 0; i < fields.length; i++) {
+      const raw = String(fields[i] || '').trim().toLowerCase();
+      if (!raw || raw.indexOf('@') < 0) continue;
+      return raw;
+    }
+    return '';
+  }
+
+  function isPersonalMicrosoftAccount(account) {
+    if (account && account.microsoftAccountKind === 'personal') return true;
+    if (account && account.microsoftAccountKind === 'work') return false;
+    const email = primaryMicrosoftEmail(account);
+    if (!email) return false;
+    if (email.indexOf('#ext#') >= 0) return false;
+    const host = email.slice(email.lastIndexOf('@') + 1);
+    return Boolean(MS_CONSUMER_HOSTS[host]);
+  }
+
+  function hasPlannerGroupScope(grantedScopes) {
+    return hasScopes(grantedScopes, [PLANNER_GROUP_SCOPE]);
+  }
+
+  // C1 consent helper for M8 Planner (card wiring is another agent). Never requests on personal accounts.
+  function plannerAccess(account, grantedScopes) {
+    if (isPersonalMicrosoftAccount(account)) return 'personal';
+    if (hasPlannerGroupScope(grantedScopes)) return 'granted';
+    return 'needs-consent';
+  }
+
+  function plannerShowsPlannerCard(access) {
+    return access === 'granted' || access === 'needs-consent';
+  }
+
+  function plannerShouldRequestGroupConsent(access) {
+    return access === 'needs-consent';
+  }
+
+  const PLANNER_ADMIN_CONSENT_RE = /AADSTS65001|AADSTS90094|admin_consent|admin consent required/i;
+
+  function plannerConsentOutcome(authResult) {
+    const r = authResult || {};
+    if (r.ok === true) return 'granted';
+    const blob = [r.error, r.description, r.aadsts, r.reason].filter(Boolean).join(' ');
+    if (PLANNER_ADMIN_CONSENT_RE.test(blob)) return 'admin-required';
+    return 'denied';
+  }
+
+  // Host uses this after consent: personal → To Do silently; admin/denied → To Do with explanation (display-copy).
+  function plannerExecutionRoute(access, consentOutcome) {
+    const accessState = access || 'needs-consent';
+    const outcome = consentOutcome || null;
+    if (accessState === 'personal') {
+      return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: false };
+    }
+    if (accessState === 'granted' || outcome === 'granted') {
+      return { destination: 'planner', requestGroupConsent: false, showPlannerCard: true, explainTodoFallback: false };
+    }
+    if (accessState === 'needs-consent' && !outcome) {
+      return { destination: 'planner', requestGroupConsent: true, showPlannerCard: true, explainTodoFallback: false };
+    }
+    if (outcome === 'admin-required' || outcome === 'denied') {
+      return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: true };
+    }
+    return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: false };
+  }
+
   // Exactly one permission step per ecosystem id.
   function stepsFor(ecoId) {
     const id = normalizeEco(ecoId);
@@ -255,7 +332,13 @@ const FlowConnectEcosystem = (() => {
     disconnectTargets: disconnectTargets,
     microsoftRequiredScopes: microsoftRequiredScopes,
     hasScopes: hasScopes,
-    scopeNames: scopeNames
+    scopeNames: scopeNames,
+    plannerAccess: plannerAccess,
+    plannerShowsPlannerCard: plannerShowsPlannerCard,
+    plannerShouldRequestGroupConsent: plannerShouldRequestGroupConsent,
+    plannerConsentOutcome: plannerConsentOutcome,
+    plannerExecutionRoute: plannerExecutionRoute,
+    isPersonalMicrosoftAccount: isPersonalMicrosoftAccount
   };
 })();
 

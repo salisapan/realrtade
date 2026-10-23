@@ -9,6 +9,7 @@ const { FlowConnectEcosystem: E } = require('../core/connect-ecosystem.js');
 const { FlowOutlookAuth: A } = require('../core/outlook-auth.js');
 const { FlowOutlookConfig: C } = require('../core/outlook-config.js');
 const { FlowProfileHook: PH } = require('../core/profile-hook.js');
+const { FlowDisplay: D } = require('../core/display-copy.js');
 
 let n = 0;
 let failures = 0;
@@ -46,6 +47,53 @@ await ok('microsoft base consent never includes Group.*; planner optional is Gro
   assert.ok(!MS_EXPECTED.some((s) => /^Group\./i.test(s)));
   assert.deepStrictEqual(E.microsoftOptionalScopes.planner, ['Group.Read.All']);
   assert.ok(MS_EXPECTED.indexOf('Tasks.ReadWrite') >= 0);
+});
+
+await ok('plannerAccess personal Microsoft account: no card, silent To Do, never request Group.Read.All', () => {
+  const account = { address: 'you@outlook.com', mail: 'you@outlook.com', userPrincipalName: 'you@outlook.com' };
+  const access = E.plannerAccess(account, MS_EXPECTED);
+  assert.strictEqual(access, 'personal');
+  assert.strictEqual(E.plannerShowsPlannerCard(access), false);
+  assert.strictEqual(E.plannerShouldRequestGroupConsent(access), false);
+  const route = E.plannerExecutionRoute(access, null);
+  assert.strictEqual(route.destination, 'todo');
+  assert.strictEqual(route.requestGroupConsent, false);
+  assert.strictEqual(route.explainTodoFallback, false);
+});
+
+await ok('plannerAccess work account without Group.Read.All: needs-consent with EN+HE why copy', () => {
+  const account = { address: 'you@contoso.com', mail: 'you@contoso.com', userPrincipalName: 'you@contoso.com' };
+  const access = E.plannerAccess(account, MS_EXPECTED);
+  assert.strictEqual(access, 'needs-consent');
+  assert.strictEqual(E.plannerShowsPlannerCard(access), true);
+  assert.strictEqual(E.plannerShouldRequestGroupConsent(access), true);
+  const route = E.plannerExecutionRoute(access, null);
+  assert.strictEqual(route.requestGroupConsent, true);
+  const en = D.chrome('en').plannerGroupConsentWhy;
+  const he = D.chrome('he').plannerGroupConsentWhy;
+  assert.ok(en && en.length > 20);
+  assert.ok(he && he.length > 20);
+  assert.ok(/Planner/i.test(en));
+  assert.ok(/Planner/.test(he));
+});
+
+await ok('plannerConsentOutcome admin or denied falls back to To Do with explanation, not a dead end', () => {
+  const account = { address: 'you@contoso.com', userPrincipalName: 'you@contoso.com' };
+  const access = E.plannerAccess(account, MS_EXPECTED);
+  const admin = E.plannerConsentOutcome({ ok: false, aadsts: 'AADSTS65001', error: 'invalid_grant' });
+  const denied = E.plannerConsentOutcome({ ok: false, error: 'access_denied', reason: 'permission-denied' });
+  assert.strictEqual(admin, 'admin-required');
+  assert.strictEqual(denied, 'denied');
+  const routeAdmin = E.plannerExecutionRoute(access, admin);
+  const routeDenied = E.plannerExecutionRoute(access, denied);
+  assert.strictEqual(routeAdmin.destination, 'todo');
+  assert.strictEqual(routeDenied.destination, 'todo');
+  assert.strictEqual(routeAdmin.explainTodoFallback, true);
+  assert.strictEqual(routeDenied.explainTodoFallback, true);
+  assert.ok(D.chrome('en').plannerTodoFallbackAdmin);
+  assert.ok(D.chrome('he').plannerTodoFallbackAdmin);
+  assert.ok(D.chrome('en').plannerTodoFallbackDenied);
+  assert.ok(D.chrome('he').plannerTodoFallbackDenied);
 });
 
 await ok('stepsFor meta is exactly one host permission step with 15 origins', () => {
