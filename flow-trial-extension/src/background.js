@@ -2311,8 +2311,32 @@ async function chatAssetData(file) {
   } catch (e) { return { ok: false, reason: 'read-failed' }; }
 }
 
-async function chatTaskTarget() {
+// A proposed meeting becomes a hold on the person's own calendar: Google Calendar through the lane when the account is on
+// record with the Calendar scope, else Outlook Calendar when its token can write. Nothing is invited.
+async function chatCalendarTarget() {
+  let account = '';
+  try { account = globalThis.FlowGoogleLaneAccount ? await globalThis.FlowGoogleLaneAccount.read() : ''; } catch (e) { account = ''; }
+  if (account && await getGoogleTasksAuth()) {
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const list = (bag.googleGrantedScopes && bag.googleGrantedScopes.version) || [];
+      const C = globalThis.FlowGoogleConfig;
+      if (!C || C.hasScope(list, C.SCOPE_CALENDAR) !== false) return { ok: true, connectorId: 'googleHold' };
+    } catch (e) { /* fall through to Outlook */ }
+  }
+  try {
+    const session = await outlookSession({});
+    const Cal = globalThis.FlowOutlookCalendar;
+    if (session && session.ok && session.token && Cal && Cal.hasWriteScope(Cal.scopesFromToken ? Cal.scopesFromToken(session.token) : session.token.grantedScopes)) {
+      return { ok: true, connectorId: 'outlookCalendar' };
+    }
+  } catch (e) { /* not connected */ }
+  return { ok: false, reason: 'not-connected' };
+}
+
+async function chatTaskTarget(msg) {
   if (!(await glanceSwitchOn('CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
+  if (msg && msg.kind === 'calendar') return chatCalendarTarget();
   // Google writes through the lane, which needs the connected account on record (a chat page has no mailbox to name it).
   let account = '';
   try { account = globalThis.FlowGoogleLaneAccount ? await globalThis.FlowGoogleLaneAccount.read() : ''; } catch (e) { account = ''; }
@@ -6833,7 +6857,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'flow:chat-task-target') {
-    return reply(sendResponse, chatTaskTarget());
+    return reply(sendResponse, chatTaskTarget(msg));
   }
 
   if (msg.type === 'flow:event-link-plan') {

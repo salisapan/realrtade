@@ -194,6 +194,44 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('Microsoft: Undo goes through flow:undo-action', w.calls.some((c) => c.type === 'flow:undo-action' && c.connectorId === 'outlookTask'));
   }
 
+  // 5c. A proposed meeting is a hold on the person's own calendar, never an invitation.
+  {
+    const MEET = 'Could we meet Thursday at 3pm to go over the pilot?';
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input(MEET, { channel: 'messenger' }));
+    check('a proposed meeting shows the card with one calendar step', r.shown && w.injected[0] && w.injected[0].ctx.process.steps.length === 1 && w.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+    const asked = w.calls.find((c) => c.type === 'flow:chat-task-target');
+    check('the worker is asked for a calendar target', asked && asked.kind === 'calendar', asked);
+    const it = w.injected[0];
+    await it.handlers.onDoIt(it.host, {}, it.ctx);
+    const exec = w.calls.find((c) => c.type === 'flow:google-write');
+    check('Google: the hold goes through the Gmail card lane (googleHold) with day and clock', !!exec && exec.connectorId === 'googleHold' && exec.input.hour === 15 && exec.input.minute === 0 && /^\d{4}-\d{2}-\d{2}$/.test(exec.input.dateIso), exec && exec.input);
+    check('the hold note names the chat, not the message', exec && /Open in Messenger: https:\/\/www\.messenger\.com\/t\/12345/.test(exec.input.quote) && exec.input.quote.indexOf('pilot') < 0 && !('attendees' in exec.input), exec && exec.input);
+    check('the hold is Handled only with the read-back', w.logRows.length === 1 && w.logRows[0].fetchedBack === true);
+    await w.receipts.find((x) => x.receipt).receipt.onUndo();
+    check('Undo of a hold goes through flow:google-undo googleHold', w.calls.some((c) => c.type === 'flow:google-undo' && c.connectorId === 'googleHold'));
+    const m = world({ target: { ok: true, connectorId: 'outlookCalendar' }, exec: { ok: true, ref: { eventId: 'E1', externalId: 'E1' }, fetchedBack: true, written: 'Calendar · hold' } });
+    await m.Card.offer(input(MEET, { channel: 'whatsapp' }));
+    const mi = m.injected[0];
+    await mi.handlers.onDoIt(mi.host, {}, mi.ctx);
+    const mx = m.calls.find((c) => c.type === 'flow:execute-action');
+    check('Microsoft: the hold is an Outlook meeting write with no invitee field', !!mx && mx.payload.connectorId === 'outlookCalendar' && mx.payload.params.meeting === true && mx.payload.params.hour === 15 && mx.payload.threadUrl === 'https://www.messenger.com/t/12345', mx && mx.payload);
+    const none = world({ target: { ok: false, reason: 'not-connected' } });
+    check('no calendar connected: no card', !(await none.Card.offer(input(MEET))).shown);
+  }
+
+  // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
+  for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input(text, { channel: 'whatsapp' }));
+    check('meeting ask offers a hold: ' + text, r.shown && w.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+  }
+  for (const text of ['היה נעים להיפגש, תודה על הפגישה', 'נפגשנו אתמול ב-15:00 והכל היה מצוין', 'Nice to meet you, thanks for the call at 3pm yesterday', 'Can we talk tomorrow at 10:00?']) {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input(text, { channel: 'whatsapp' }));
+    check('no hold for: ' + text, !r.shown && w.injected.length === 0, r);
+  }
+
   // 6. sync: another newest message, or the person's own, retires the card.
   {
     const w = world();

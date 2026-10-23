@@ -95,3 +95,36 @@ test('CHAT_TASK_CARD on: a line that is not a task shows nothing', async ({ glan
   await expect(page.locator(CARD)).toHaveCount(0);
   expect(taskCalls()).toHaveLength(0);
 });
+
+// A proposed meeting in the chat becomes a hold on the person's own Google Calendar, through the same lane as the Gmail card.
+const MEET = 'Could we meet Thursday at 3pm to go over the pilot?';
+const events = () => Object.values(server.events());
+
+test('CHAT_TASK_CARD on: a proposed meeting shows the card, Do It makes one hold with nobody invited, Undo removes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, MEET);
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  const ev = events()[0];
+  expect(String(ev.start.dateTime)).toMatch(/T15:00:00/);
+  expect(ev.attendees || []).toHaveLength(0);
+  expect(String(ev.description || '')).toContain('https://www.messenger.com/t/100012345678');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.reload();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});
+
+test('CHAT_TASK_CARD on: Undo of a hold refuses after the person edited the event', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, MEET);
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = Object.keys(server.events())[0];
+  server.editEvent(id, { description: 'Agenda: pricing' });
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect(page.locator(CARD)).toContainText(/changed|left it|edited/i, { timeout: 15000 });
+  expect(server.events()[id]).toBeTruthy();
+});

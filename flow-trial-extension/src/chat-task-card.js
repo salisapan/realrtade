@@ -65,6 +65,15 @@ const FlowChatTaskCard = (() => {
     return ((process && process.steps) || []).find((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'task')) || null;
   }
 
+  // A proposed meeting ("Could we meet Thursday at 3pm?") is the calendar step the judge plans with one day and one
+  // clock. It becomes a hold on the person's own calendar: nobody is invited, nothing is sent.
+  function calendarStepOf(process) {
+    const s = ((process && process.steps) || []).find((x) => x && x.kind === 'calendar');
+    const p = s && s.params;
+    if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.dateIso || '')) || !Number.isInteger(p.hour) || !Number.isInteger(p.minute)) return null;
+    return s;
+  }
+
   // The card's pictures live inside the extension and a chat site cannot open them (the manifest is not changed for it),
   // so every picture that points there is swapped, once, for a data: URL the worker reads from its own four files.
   const pictureCache = {};
@@ -126,13 +135,13 @@ const FlowChatTaskCard = (() => {
       if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed' || u.reason === 'unverified' || u.reason === 'verify-timeout')) {
         return { ok: false, reason: u.reason, written: u.written || u.error };
       }
-      if (!(u && u.ok)) return { ok: false, written: (u && (u.written || u.error)) || 'Could not remove the task.' };
+      if (!(u && u.ok)) return { ok: false, written: (u && (u.written || u.error)) || 'Could not remove it.' };
       try {
-        await FlowStorage.appendLog({ kind: 'undone', label: 'Task removed.', app: 'chat', connectorId: connectorId, chatKey: chatKey });
+        await FlowStorage.appendLog({ kind: 'undone', label: 'Removed.', app: 'chat', connectorId: connectorId, chatKey: chatKey });
       } catch (e) { /* the page still shows the undo */ }
       try { host.remove(); } catch (e) { /* gone already */ }
       dismissed.delete(chatKey);
-      return { ok: true, written: (u && u.written) || 'Task removed.', reopen: true };
+      return { ok: true, written: (u && u.written) || 'Removed.', reopen: true };
     };
   }
 
@@ -140,9 +149,9 @@ const FlowChatTaskCard = (() => {
     if (typeof FlowChipHost === 'undefined' || typeof FlowChipHost.showDraftReceipt !== 'function') return;
     FlowChipHost.showDraftReceipt(host, {
       status: row.receiptStatus || 'Handled.',
-      written: row.label || 'Task added.',
+      written: row.label || 'Done.',
       url: row.url || null,
-      linkLabel: 'Open task',
+      linkLabel: (connectorId === 'googleHold' || connectorId === 'outlookCalendar') ? 'Open event' : 'Open task',
       onUndo: undoHandler(host, chatKey, connectorId, row.ref)
     });
   }
@@ -164,8 +173,23 @@ const FlowChatTaskCard = (() => {
     };
   }
 
+  // A Google hold goes through the same lane the Gmail card writes through (flow:google-write, googleHold): the event is
+  // read back by id and Undo refuses an event the person changed. Nobody is invited; the note names the chat only.
+  function googleHoldWrite(ctx, t, params) {
+    const note = [(ctx.sender && ctx.sender.name) ? ctx.sender.name : '', (OPEN_LABELS[t.channel] || 'Open chat') + ': ' + threadUrl()].filter(Boolean).join(' · ');
+    return {
+      type: 'flow:google-write',
+      connectorId: 'googleHold',
+      input: { title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', quote: note, dateIso: params.dateIso, hour: params.hour, minute: params.minute, params: { dateIso: params.dateIso, hour: params.hour, minute: params.minute, title: params.title || '', quote: note } },
+      tabAccount: '',
+      lang: t.he ? 'he' : 'en'
+    };
+  }
+
   function undoMessage(connectorId, ref) {
-    return connectorId === 'googleTask'
+    return connectorId === 'googleHold'
+      ? { type: 'flow:google-undo', connectorId: 'googleHold', ref: ref, tabAccount: '' }
+      : connectorId === 'googleTask'
       ? { type: 'flow:google-undo', connectorId: 'googleLaneTask', ref: ref, tabAccount: '' }
       : { type: 'flow:undo-action', connectorId: connectorId, ref: ref, created: ref && ref.created };
   }
@@ -175,14 +199,16 @@ const FlowChatTaskCard = (() => {
     if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     const step = t.step;
     const params = step.params || {};
-    const r = t.connectorId === 'googleTask' ? await send(googleLaneWrite(ctx, t, params)) : await send({
+    const r = t.connectorId === 'googleHold' ? await send(googleHoldWrite(ctx, t, params)) : t.connectorId === 'googleTask' ? await send(googleLaneWrite(ctx, t, params)) : await send({
       type: 'flow:execute-action',
       payload: {
         connectorId: t.connectorId,
         threadUrl: threadUrl(),
         threadLabel: OPEN_LABELS[t.channel] || 'Open chat',
         label: params.title || (ctx.intent && ctx.intent.label) || 'Task',
-        params: { dateIso: params.dateIso || null, amount: params.amount || null, what: params.what || null, fileTerm: params.fileTerm || null },
+        params: t.connectorId === 'outlookCalendar'
+          ? { meeting: true, title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', dateIso: params.dateIso, hour: params.hour, minute: params.minute }
+          : { dateIso: params.dateIso || null, amount: params.amount || null, what: params.what || null, fileTerm: params.fileTerm || null },
         facts: (ctx.intent && ctx.intent.facts) || null,
         entities: (ctx.intent && ctx.intent.entities) || (params.what ? { what: params.what } : null),
         senderName: (ctx.sender && ctx.sender.name) || null,
@@ -252,12 +278,14 @@ const FlowChatTaskCard = (() => {
       judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
     } catch (e) { judged = null; }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
-    const step = taskStepOf(judged.process);
+    const taskStep = taskStepOf(judged.process);
+    const calStep = taskStep ? null : calendarStepOf(judged.process);
+    const step = taskStep || calStep;
     if (!step) return { shown: false, reason: 'no-task-step' };
 
-    const target = await send({ type: 'flow:chat-task-target' });
+    const target = await send({ type: 'flow:chat-task-target', kind: calStep ? 'calendar' : 'task' });
     if (!target || !target.connectorId) return { shown: false, reason: (target && target.reason) || 'not-connected' };
-    const kind = target.connectorId === 'outlookTask' ? 'outlookTask' : 'googleTask';
+    const kind = target.connectorId === 'outlookTask' ? 'outlookTask' : (target.connectorId === 'googleHold' || target.connectorId === 'outlookCalendar') ? 'calendar' : 'googleTask';
     const liveStep = Object.assign({}, step, { kind: kind });
     const he = uiLangOf(i.text) === 'he';
     const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, steps: [liveStep] });
@@ -309,7 +337,7 @@ const FlowChatTaskCard = (() => {
     } catch (e) { /* the page keeps working */ }
   }
 
-  return { SWITCH, CHAIN, offer, afterDraft, sync, taskStepOf, chatKeyOf };
+  return { SWITCH, CHAIN, offer, afterDraft, sync, taskStepOf, calendarStepOf, chatKeyOf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatTaskCard };

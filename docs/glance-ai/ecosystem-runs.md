@@ -303,3 +303,8 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Code:** `core/workspace-file.js` (kind `form`), `src/content-gmail.js` (card label and closed line). The lane, verify and Undo wiring already carry the connector.
 - **Tests:** `test/google-form-corpus.cjs` (all pass: recognition both languages, create, read-back, withdraw on a different title, 403, Undo untouched, Undo edited, already deleted); workspace-file, gmail-new-file, docs-consistency, identity-copy, surface-parity, gmail-outlook-parity, system-notice green. No real-browser e2e for the form yet (the fake Google server has no Forms endpoint).
 - **Open:** the two manifest lines above (owner «מאשר»); until then the write answers not-connected. Live Gate not run.
+## 2026-10-23 Ecosystems builder B (thirty-third run) — chat meeting hold
+
+- **Capability shipped (switch off):** a meeting proposed in a WhatsApp, Messenger or Instagram chat (English and Hebrew) now shows the Do It card; Do It makes one hold on the person's own Google Calendar (the Gmail lane) or Outlook Calendar, read back by id, Undo refuses an event the person changed, nobody is invited, nothing is sent. The shared judge also gained the Hebrew «אפשר/נוכל/בא לך להיפגש» forms (Gmail and Outlook benefit).
+- **Tests:** `test/chat-task-card-corpus.cjs` (meeting lines EN+HE, quiet negatives, both providers), `e2e/chat-task-card.spec.js` (hold, reload receipt, Undo, edited-event refusal on the real chat lane), all 181 corpora, add-on bundle rebuilt.
+- **Open:** live Gate on the three chat sites; Outlook hold has corpus coverage only, no browser spec.
