@@ -96,6 +96,7 @@ import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClos
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
+import '../core/google-contacts.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
 import '../core/user-context-writer.js';
@@ -1542,9 +1543,18 @@ function launchGoogleWebAuthFlow(details) {
   });
 }
 
-function googleManifestScopes() {
+async function googleManifestScopes() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
-  return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+  const base = googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+  const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+  const flags = bag.glanceSwitches || {};
+  const G = globalThis.FlowGoogleContacts;
+  if (G && typeof G.oauthScopesForSwitch === 'function') {
+    G.oauthScopesForSwitch(flags).forEach((scope) => {
+      if (scope && base.indexOf(scope) < 0) base.push(scope);
+    });
+  }
+  return base;
 }
 
 async function readGoogleWebAuth() {
@@ -1589,10 +1599,11 @@ async function runGoogleWebAuth(interactive) {
   if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
   const state = randomOAuthState();
   const hint = await googleLoginHint();
+  const scopes = await googleManifestScopes();
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
-    scopes: googleManifestScopes(),
+    scopes,
     state,
     prompt: interactive ? 'select_account' : 'none',
     loginHint: hint
@@ -1719,9 +1730,10 @@ async function readGoogleGrantedScopes() {
 }
 
 async function writeGoogleGrantedScopes(status, source) {
+  const scopes = await googleManifestScopes();
   await chrome.storage.local.set({
     [GOOGLE_GRANTED_SCOPES_KEY]: {
-      version: scopeVersion(googleManifestScopes()),
+      version: scopeVersion(scopes),
       status: status,
       source: source || null,
       at: Date.now()
@@ -1795,7 +1807,8 @@ async function recordGoogleConsent(token, source) {
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
-  if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
+  const requiredScopes = await googleManifestScopes();
+  if (googleScopeAction(granted, requiredScopes, wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
   try {
@@ -6991,7 +7004,8 @@ async function connectorStatus() {
     try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   }
   const grantedRec = reconnectBag[GOOGLE_GRANTED_SCOPES_KEY] || null;
-  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(googleManifestScopes()));
+  const manifestScopes = await googleManifestScopes();
+  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(manifestScopes));
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
     detail: GLANCE_TASK_LIST_TITLE + ' list',

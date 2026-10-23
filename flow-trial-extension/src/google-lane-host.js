@@ -16,6 +16,8 @@ import '../core/event-call-link.js';
 import '../core/google-closes.js';
 import '../core/style-profile.js';
 import '../core/full-document-close.js';
+// FlowGoogleContacts: resolve a name in Google Contacts (G8), switch GOOGLE_CONTACTS, off.
+import '../core/google-contacts.js';
 import '../core/google-tasks.js';
 import '../core/google-task-close.js';
 import '../core/google-drive.js';
@@ -943,6 +945,26 @@ function onLaneMessage(msg, sender, sendResponse) {
       if (!R || typeof R.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(R.SWITCH))) return { action: 'off', reason: 'switch-off' };
       return R.plan({ flags: { [R.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000), todayIso: new Date().toISOString().slice(0, 10) });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-contacts-plan') {
+    const G = globalThis.FlowGoogleContacts;
+    Promise.resolve((async () => {
+      if (!G || typeof G.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(G.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      const bag = await chrome.storage.local.get(['googleGrantedScopes', 'glanceUserContext']);
+      const grantedRec = bag.googleGrantedScopes;
+      const grantedScopes = grantedRec && typeof grantedRec.version === 'string'
+        ? grantedRec.version.split('\n').filter(Boolean)
+        : null;
+      const profile = bag.glanceUserContext && typeof bag.glanceUserContext === 'object' ? bag.glanceUserContext : {};
+      const text = String(msg.text || '').slice(0, 4000);
+      const choiceIndex = typeof msg.choiceIndex === 'number' ? msg.choiceIndex : undefined;
+      return G.plan(
+        { flags: { [G.SWITCH]: true }, text: text, choiceIndex: choiceIndex },
+        { http: laneHttp, grantedScopes: grantedScopes, profile: profile, flags: { [G.SWITCH]: true } }
+      );
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }

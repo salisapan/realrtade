@@ -18,6 +18,8 @@ const FlowGoogleConfig = (() => {
   const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
   const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar.events';
   const SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';
+  const SCOPE_CONTACTS_READONLY = 'https://www.googleapis.com/auth/contacts.readonly';
+  const SCOPE_CONTACTS_OTHER_READONLY = 'https://www.googleapis.com/auth/contacts.other.readonly';
   const SCOPES = [
     SCOPE_OPENID,
     SCOPE_EMAIL,
@@ -44,7 +46,9 @@ const FlowGoogleConfig = (() => {
     if (/gmail/i.test(s) || /mail\.google/i.test(s) || /Mail\.Send/i.test(s)) return 'gmail-scope';
     if (/drive\.readonly/i.test(s) || /\/auth\/drive$/i.test(s)) return 'drive-wide';
     if (/\/auth\/documents/i.test(s) || /\/auth\/spreadsheets/i.test(s)) return 'docs-scope';
-    if (SCOPES.indexOf(s) < 0) return 'not-allowed';
+    if (SCOPES.indexOf(s) < 0
+      && s !== SCOPE_CONTACTS_READONLY
+      && s !== SCOPE_CONTACTS_OTHER_READONLY) return 'not-allowed';
     return '';
   }
 
@@ -128,6 +132,8 @@ const FlowGoogleConfig = (() => {
     SCOPE_DRIVE_FILE: SCOPE_DRIVE_FILE,
     SCOPE_CALENDAR: SCOPE_CALENDAR,
     SCOPE_TASKS: SCOPE_TASKS,
+    SCOPE_CONTACTS_READONLY: SCOPE_CONTACTS_READONLY,
+    SCOPE_CONTACTS_OTHER_READONLY: SCOPE_CONTACTS_OTHER_READONLY,
     scopeList: scopeList,
     refusalReason: refusalReason,
     refused: refused,
