@@ -343,3 +343,5 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/chat-task-card-corpus.cjs` (call words reach both providers, title, 5 quiet lines), chat browser spec, all corpora.
 - **Open:** live Gate; browser spec for the Teams link in Outlook chat (corpus only).
 
+
+## 2026-10-23 Ecosystems run A (37th): idle. The Google rows left wait on others, not on code: Forms (scope + host, owner «מאשר»), Contacts and Sheets row (scopes, owner), invite reply (choice card, Grok bot, card-requests-2026-10-20.md C5), Keep (no API).
