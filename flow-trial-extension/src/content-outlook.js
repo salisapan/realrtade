@@ -827,21 +827,57 @@
         listId = found && found.id;
       }
       if (listId) {
-        const rows = await attachmentListFor(listId);
+        let rows = await attachmentListFor(listId);
+        if (!Array.isArray(rows) && (pane.pathId || pane.conversationId)) {
+          const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+          const alt = found && found.id;
+          if (alt && String(alt) !== String(listId)) rows = await attachmentListFor(alt);
+        }
         if (!Array.isArray(rows)) attachmentsUnread = true;
       } else {
         attachmentsUnread = true;
       }
     }
-    if (r && r.show && attachmentsUnread && owaHarnessFlag('forceAttachmentUnreadNone')) {
-      return { none: true, attachmentsUnread: true, reason: 'intent-null' };
+    function unreadAttachmentReprobe() {
+      if (typeof FlowIncomingJudge === 'undefined') return null;
+      const probe = FlowIncomingJudge.judge({
+        text: own, subject: pane.subject || '',
+        sender: { name: pane.senderName, email: pane.senderEmail },
+        now: new Date(), threadUrl: location.href,
+        hasThreadAttachment: true,
+        attachmentCount: 1,
+        surface: 'outlook',
+        to: pane.to || null,
+        cc: pane.cc || null,
+        ownAddresses: ownAddresses || null,
+        userName: pane.userName || null,
+        ownNames: pane.ownNames || null,
+        namesPending: pane.namesPending === true,
+        onBehalfOf: pane.onBehalfOf || null,
+        forwarded: pane.onBehalf === true,
+        inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
+      });
+      if (!probe || !probe.show || !probe.process) return null;
+      const dropped = processDropFileSteps(probe.process);
+      if (!dropped) return null;
+      pane.attachmentsUnread = true;
+      return { intent: probe.intent, process: dropped, attachmentsUnread: true };
     }
     if (r && r.show) {
       let proc = r.process;
+      let fileDroppedForUnread = false;
       if (attachmentsUnread && proc && proc.id === 'file-it') {
         const dropped = processDropFileSteps(proc);
         if (!dropped) return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
+        fileDroppedForUnread = true;
         proc = dropped;
+      }
+      if (fileDroppedForUnread && attachmentsUnread) {
+        if (!owaHarnessFlag('disableUnreadReprobe')) {
+          const reprobe = unreadAttachmentReprobe();
+          if (reprobe) return reprobe;
+        }
+        return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
       }
       const out = { intent: r.intent, process: proc };
       if (attachmentsUnread) {
@@ -851,7 +887,7 @@
       return out;
     }
     if (attachmentsUnread && !owaHarnessFlag('disableUnreadReprobe')) {
-      const reprobe = judgeAttachmentUnreadReply(pane, own, ownAddresses, selfAddressed);
+      const reprobe = unreadAttachmentReprobe();
       if (reprobe) return reprobe;
     }
     return { none: true, reason: (r && r.reason) || 'intent-null', attachmentsUnread: attachmentsUnread || undefined };
@@ -1078,33 +1114,6 @@
   function owaHarnessIdSpells(id) {
     if (owaHarnessFlag('idSpellingsRawOnly')) return [String(id || '')];
     return idSpellings(id);
-  }
-
-  function judgeAttachmentUnreadReply(pane, own, ownAddresses, selfAddressed) {
-    if (typeof FlowIncomingJudge === 'undefined') return null;
-    const from = String(pane.senderEmail || '').toLowerCase();
-    const probe = FlowIncomingJudge.judge({
-      text: own, subject: pane.subject || '',
-      sender: { name: pane.senderName, email: pane.senderEmail },
-      now: new Date(), threadUrl: location.href,
-      hasThreadAttachment: true,
-      attachmentCount: 1,
-      surface: 'outlook',
-      to: pane.to || null,
-      cc: pane.cc || null,
-      ownAddresses: ownAddresses || null,
-      userName: pane.userName || null,
-      ownNames: pane.ownNames || null,
-      namesPending: pane.namesPending === true,
-      onBehalfOf: pane.onBehalfOf || null,
-      forwarded: pane.onBehalf === true,
-      inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
-    });
-    if (!probe || !probe.show || !probe.process) return null;
-    const dropped = processDropFileSteps(probe.process);
-    if (!dropped) return null;
-    pane.attachmentsUnread = true;
-    return { intent: probe.intent, process: dropped, attachmentsUnread: true };
   }
 
   // The /inbox/id/<restId> segment is the Graph message id (EWS alphabet in the URL,
@@ -4761,11 +4770,13 @@
             let msgId = pane.itemId || null;
             let msgImmutable = false;
             msgIdHow = msgId ? 'url' : null;
-            if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && (pane.pathId || pane.conversationId)) {
+            const pathKey = String(pane.pathId || pane.conversationId || '');
+            const urlOnlyId = msgId && pathKey && (String(msgId) === pathKey || FlowOwaParse.canonId(msgId) === FlowOwaParse.canonId(pathKey));
+            if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && (pane.pathId || pane.conversationId) && (!msgId || urlOnlyId)) {
               const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
               if (found && found.unread) msgIdHow = 'sender-mismatch';
               else if (found && found.id) { msgId = found.id; msgIdHow = found.how; msgImmutable = found.immutable === true; }
-              else msgIdHow = 'none';
+              else if (!msgId) msgIdHow = 'none';
             }
             if (chain && chain.move === 'needs-you') {
               const shown = await showHoldingChain(pane, chain, msgId);
@@ -4855,19 +4866,9 @@
             if (decided && (decided.reason === 'page:attachment-count-unread' || decided.attachmentsUnread) && decided.intent && decided.process) {
               decided = { intent: decided.intent, process: decided.process, attachmentsUnread: true };
             } else if (decided && decided.attachmentsUnread) {
-              const ownForJudge = selfAddressed ? ownAll : own;
-              const prepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
-                ? FlowIncomingJudge.prepareForJudge(pane.text || '')
-                : (pane.text || '');
-              const ownText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
-              const handler = judgeAttachmentUnreadReply(pane, ownText, ownForJudge, selfAddressed);
-              if (handler && handler.intent && handler.process) {
-                decided = handler;
-              } else {
-                dropStuckCard(pane);
-                await pageReason('outlook:attachments-not-read', pane);
-                return;
-              }
+              dropStuckCard(pane);
+              await pageReason('outlook:attachments-not-read', pane);
+              return;
             } else if (decided && decided.reason === 'page:attachment-count-unread' && !decided.intent) {
               const retry = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
               if (retry && !retry.none && retry.intent && retry.process) {

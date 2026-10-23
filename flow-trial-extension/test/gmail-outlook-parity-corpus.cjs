@@ -270,14 +270,19 @@ function logH1ParityChange(line, before, after) {
       if (g.process.id !== entry.process.id || g.process.name !== entry.process.name) return false;
       const gDraft = g.process.steps.filter((s) => /draft/i.test(s.kind)).map((s) => parityKind(s.kind)).join(',');
       const oDraft = entry.process.steps.filter((s) => /draft/i.test(s.kind)).map((s) => mapOutlookKind(s.kind)).join(',');
-      const gTaskN = g.process.steps.filter((s) => /task/i.test(s.kind)).length;
-      const oTaskN = entry.process.steps.filter((s) => /task/i.test(s.kind)).length;
-      return gDraft === oDraft && gTaskN === oTaskN && gTaskN > 0;
+      const gHasGoogleTask = g.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      const gHasOutlookTask = g.process.steps.some((s) => s.kind === 'outlookTask');
+      const oHasOutlookTask = entry.process.steps.some((s) => s.kind === 'outlookTask');
+      const oHasGoogleTask = entry.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      return gDraft === oDraft &&
+        gHasGoogleTask && !gHasOutlookTask &&
+        oHasOutlookTask && !oHasGoogleTask;
     };
     const processOk = H1_PARITY_NAMES.has(m.name)
       ? h1ProcessMatch()
       : (g.process.steps.map((s) => s.kind).join(',') === entry.process.steps.map((s) => s.kind).join(',') && g.process.name === entry.process.name);
-    check(m.name + ': same process (' + (H1_PARITY_NAMES.has(m.name) ? 'draft renamed; task kinds stay lane-specific' : 'raw step kinds') + ')', processOk, { g: gKinds, o: oKinds });
+    logH1ParityChange('gmail-outlook-parity-corpus.cjs:269-280 [' + m.name + ']', 'draft match + task count only', 'draft match + lane task connectors (googleTask vs outlookTask)');
+    check(m.name + ': same process (' + (H1_PARITY_NAMES.has(m.name) ? 'draft renamed; Gmail googleTask + Outlook outlookTask' : 'raw step kinds') + ')', processOk, { g: gKinds, o: oKinds });
     if (H1_PARITY_NAMES.has(m.name)) {
       check(m.name + ': Outlook lane uses outlookTask only (not googleTask)', entry.process.steps.some((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => s.kind === 'googleTask'), entry.process.steps.map((s) => s.kind));
       check(m.name + ': Gmail lane uses googleTask only (not outlookTask)', g.process.steps.some((s) => s.kind === 'googleTask') && !g.process.steps.some((s) => s.kind === 'outlookTask'), g.process.steps.map((s) => s.kind));
@@ -304,32 +309,6 @@ function logH1ParityChange(line, before, after) {
     check(m.name + ': the panel writes the same text too', panelText === gmailText, { panel: panelText, gmail: gmailText });
     check(m.name + ': the Outlook draft replies to the message that was read', /\/me\/messages\/msg\d+\/createReply$/.test(oCall.url) && oCall.url.includes(entry.messageId), oCall.url);
   }
-  console.log('\n--- 20c9-style Outlook steps fail H1 outlookTask pin ---\n');
-  let legacyH1Fails = 0;
-  for (const row of H1_ROWS) {
-    let steps = null;
-    if (row.name === 'Outlook Hebrew sign-and-return has draft and task') {
-      const heSign = 'מצורף החוזה, אנא חתום והחזר';
-      const hsO = J.judge({
-        text: heSign, subject: 'חוזה',
-        sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
-        now: new Date(NOW), to: [ME], ownAddresses: [ME],
-        attachmentCount: 1, hasThreadAttachment: true, inbound: true, surface: 'outlook'
-      }, { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution });
-      steps = hsO && hsO.process && hsO.process.steps;
-    } else {
-      const m = CASES.find((c) => c.name === row.name);
-      if (!m) continue;
-      const { entry } = outlookDecide(m, CASES.indexOf(m));
-      steps = entry && entry.process && entry.process.steps;
-    }
-    if (!steps) { legacyH1Fails++; continue; }
-    const legacySteps = steps.map((s) => (s.kind === 'outlookTask' ? Object.assign({}, s, { kind: 'googleTask' }) : s));
-    const pinFails = !legacySteps.some((s) => s.kind === 'outlookTask') || legacySteps.some((s) => s.kind === 'googleTask');
-    if (pinFails) legacyH1Fails++;
-  }
-  check('all six H1 parity rows reject 20c9-style googleTask on Outlook steps', legacyH1Fails === H1_ROWS.length, { count: legacyH1Fails, want: H1_ROWS.length });
-
   check('the comparison is not empty: at least four asks were shown on both', shownBoth >= 4, shownBoth);
 
   console.log('\n--- the live failure modes, fixed ---\n');

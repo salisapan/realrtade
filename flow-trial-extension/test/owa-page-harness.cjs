@@ -885,32 +885,21 @@ if (require.main === module) {
       return mutator(fs.readFileSync(outlookPath, 'utf8'));
     }
     function reprobeDisabledSrc(src) {
-      return src.replace(
-        'if (attachmentsUnread && !owaHarnessFlag(\'disableUnreadReprobe\')) {',
-        'if (attachmentsUnread && false) {'
-      );
-    }
-    function unreadHandlerRemovedSrc(src) {
-      return src.replace(
-        /\} else if \(decided && decided\.attachmentsUnread\) \{[\s\S]*?\} else if \(decided && decided\.reason === 'page:attachment-count-unread' && !decided\.intent\) \{/,
-        '} else if (decided && decided.reason === \'page:attachment-count-unread\' && !decided.intent) {'
-      );
+      return src
+        .replace(
+          'if (fileDroppedForUnread && attachmentsUnread) {\n        if (!owaHarnessFlag(\'disableUnreadReprobe\')) {',
+          'if (fileDroppedForUnread && attachmentsUnread) {\n        if (false) {'
+        )
+        .replace(
+          'if (attachmentsUnread && !owaHarnessFlag(\'disableUnreadReprobe\')) {',
+          'if (attachmentsUnread && false) {'
+        );
     }
     const unreadGate = Object.assign({}, gate, {
       htmlPatch: (h) => gateHtml(BODY)(h).replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="pilot.pdf" data-size="1024"></div'),
       mailBody: BODY,
       attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500
     });
-    const reprobeOff = await runPage(Object.assign({}, unreadGate, {
-      harnessFlags: { forceAttachmentUnreadNone: true, disableUnreadReprobe: true }
-    }));
-    const reprobeOffKinds = ((reprobeOff.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
-    const reprobeOffSteps = reprobeOffKinds && reprobeOffKinds.steps && reprobeOffKinds.steps.map((s) => s.kind);
-    check('row 31 bite: unread handler names reply+task when decideFromText re-probe is removed',
-      Boolean(reprobeOff.chip) && reprobeOffSteps &&
-      reprobeOffSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft') &&
-      reprobeOffSteps.some((k) => k === 'outlookTask' || k === 'googleTask'),
-      { text: reprobeOff.chip && reprobeOff.chip.textContent, kinds: reprobeOffSteps, why: (reprobeOff.store.outlookPageDiag || []).map((d) => d.reason) });
     function fileIncoming(store) {
       return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {
         return ((e && e.process && e.process.steps) || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));

@@ -37,6 +37,13 @@ const provedTodo = { kind: 'written', messageId: 'm1', connectorId: 'outlookTask
 const todoOnce = getActiveOutlookReceiptsFrom({ log: [provedTodo] });
 check('one proved To Do receipt is not duplicated by glanceProofs pass', todoOnce.length === 1 && todoOnce[0].ref === 't1', todoOnce);
 
+const draftSameMsg = { kind: 'written', messageId: 'slot1', connectorId: 'outlookDraft', ref: 'd-slot', ts: 100, outlookReceipt: true };
+const taskSameMsg = { kind: 'written', messageId: 'slot1', connectorId: 'outlookTask', ref: 't-slot', ts: 110, outlookReceipt: true, fetchedBack: true, proof: { fetchedBack: true, system: 'microsoft/todo' } };
+const slotBoth = getActiveOutlookReceiptsFrom({ log: [draftSameMsg, taskSameMsg] });
+check('receiptSlotKey uses draft|other slots (bare messageId would collapse to one receipt)', slotBoth.length === 2 &&
+  slotBoth.some((r) => r.connectorId === 'outlookDraft') && slotBoth.some((r) => r.connectorId === 'outlookTask'),
+  slotBoth);
+
 const { FlowOutlookStateMigrate: M } = require('../core/outlook-state-migrate.js');
 const merged = M.mergeHandledUndone([
   { kind: 'written', messageId: 'm1', connectorId: 'outlookDraft', label: 'Reply draft ready' },
