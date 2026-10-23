@@ -228,10 +228,30 @@ const FlowRecurringReminder = (() => {
     return Number.isFinite(x) && Number.isFinite(y) && x === y;
   }
 
+  // The Google lane hands its writers an http function (req -> { status, ok, json }); the module
+  // itself speaks calendar(method, path, body). Either is accepted.
+  const CAL_API = 'https://www.googleapis.com/calendar/v3';
+  function ioOf(arg) {
+    if (typeof arg !== 'function') return arg || {};
+    return {
+      calendar: (method, path, body) => arg({
+        method: method,
+        url: CAL_API + path,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' }
+      })
+    };
+  }
+
+  // The lane's writer signature: (input, http, clock).
+  function write(input, http) {
+    return create(input, http);
+  }
+
   // Do It. The host passes the plan's title, rule and first start as the person saw them.
   async function create(input, io) {
     input = input || {};
-    io = io || {};
+    io = ioOf(io);
     if (!enabled(input.flags)) return miss('switch-off');
     if (typeof io.calendar !== 'function') return miss('no-host');
     if (!calendarMod || typeof calendarMod.eventBody !== 'function') return miss('no-calendar-module');
@@ -286,7 +306,7 @@ const FlowRecurringReminder = (() => {
 
   // Undo: delete the whole series, only while it is still what Glance made.
   async function undo(ref, io) {
-    io = io || {};
+    io = ioOf(io);
     if (!ref || !ref.eventId || ref.createdByGlance !== true) return { ok: false, reason: 'not-ours' };
     if (typeof io.calendar !== 'function') return { ok: false, reason: 'no-host' };
     const got = await io.calendar('GET', eventPath(ref.eventId));
@@ -371,7 +391,7 @@ const FlowRecurringReminder = (() => {
     return { ok: false, reason: 'series-failed', removed: removed, ref: removed ? null : ref, proof: null, written: '' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, HOLD_SWITCH, enabled, recognize, plan, create, undo, contentHash, seriesFor, withRecurrence, confirmSeries };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM, CONNECTOR, HOLD_SWITCH, enabled, recognize, plan, create, write, undo, contentHash, seriesFor, withRecurrence, confirmSeries };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowRecurringReminder };

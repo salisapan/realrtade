@@ -315,3 +315,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** `git log` and `card-requests-*.md` checked at the start: nothing new from the Grok bot; the card reuses the canonical one, no new request.
 - **Tests:** corpus (own-promise lines EN+HE, quiet negatives, switch separation) and 3 new browser specs on the real chat lane.
 - **Open:** live Gate; Outlook hold browser spec.
+
+## 2026-10-23 Ecosystems run A (35th): the repeating reminder on the Gmail card
+
+- **Capability:** a mail that states a repeating commitment ("Please send the sales report every Monday at 9:00", «תשלח את דוח המכירות כל יום שני ב-9:00») now gets a Do It card that adds one repeating event to the calendar, no guest, with a popup at the start. Handled only when the event is read back by id with the same title, first start and rule; Undo deletes the series only while it is unchanged. A standing reminder does not mark the ask closed. A meeting that repeats stays the Hold It card. Behind `glanceSwitches.RECURRING_REMINDER` (off).
+- **Code:** `core/recurring-reminder.js` (lane http adapter, `write`), `src/google-lane.js`, `src/google-lane-host.js` (plan message, write input, verify URL), `src/content-gmail.js` (`showRecurringChip`, payload, connector map). No manifest change.
+- **Tests:** `test/recurring-reminder-wiring-corpus.cjs` (all pass); recurring-reminder, recurring-hold, workspace-file, gmail-new-file, gmail-event-link, meet-wiring, event-call-link, google-form, docs-consistency, identity-copy, surface-parity, gmail-outlook-parity, system-notice green. No real-browser e2e yet.
+- **Open:** live Gate (owner); Outlook has no equivalent card for this yet.

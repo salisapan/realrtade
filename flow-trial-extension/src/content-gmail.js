@@ -2160,6 +2160,7 @@ function glanceUiCopy(kind) {
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (inboundMail && usingGoogle && await showRecurringChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
@@ -3157,6 +3158,48 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  // A repeating commitment ("please send the sales report every Monday at 9:00") as one repeating reminder on the
+  // calendar, no guest (switch RECURRING_REMINDER, off). The worker owns the switch; the page only shows what it offers.
+  async function showRecurringChip(message, c) {
+    // A meeting that repeats is the Hold It card's (RECURRING_HOLD), not a second reminder.
+    if (c.intent && c.intent.type === 'event') return false;
+    let plan = null;
+    try {
+      plan = await sendRuntime({ type: 'flow:google-recurring-plan', text: c.text });
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.title || !plan.rrule || !plan.when) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'recurring-reminder',
+      name: plan.title,
+      closingLine: plan.line,
+      closedLine: he ? 'נקבעה תזכורת חוזרת ביומן.' : 'Repeating reminder added to your calendar.',
+      steps: [{
+        id: 'series',
+        kind: 'calendarRecurring',
+        label: 'Calendar',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create the repeating event and read it back (no guests)',
+        dependsOn: null,
+        params: { title: plan.title, rrule: plan.rrule, when: plan.when, destinationText: 'Calendar · ' + plan.title }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.line, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   async function showNewFileChip(message, c) {
     let plan = null;
     try {
@@ -3562,6 +3605,14 @@ function glanceUiCopy(kind) {
       });
     }
 
+    // A repeating reminder (switch RECURRING_REMINDER, off): the title, the one rule and the first start travel.
+    if (action.kind === 'calendarRecurring') {
+      const rp = action.params || {};
+      if (!rp.title || !rp.rrule || !rp.when) return null;
+      const zone = await glanceUserTimeZone();
+      return Object.assign(base, { params: { title: rp.title, rrule: rp.rrule, when: rp.when, timeZone: zone || '' } });
+    }
+
     // A Meet link on an event already on the calendar (switch EVENT_CALL_LINK, off): only the event's id and title travel.
     if (action.kind === 'calendarCallLink') {
       const ev = action.params && action.params.event;
@@ -3754,6 +3805,7 @@ function glanceUiCopy(kind) {
     driveSheet: 'googleSheetAppend',
     driveNewFile: 'googleNewFile',
     calendarCallLink: 'googleEventCallLink',
+    calendarRecurring: 'googleRecurringReminder',
     gmailDraft: 'gmailCompose'
   };
 
@@ -4360,6 +4412,7 @@ function glanceUiCopy(kind) {
     googleTask: 'set a reminder',
     driveNewFile: 'created the file',
     calendarCallLink: 'added a call link',
+    calendarRecurring: 'set a repeating reminder',
     driveDoc: 'wrote the doc',
     driveSheet: 'wrote the sheet',
     driveFile: 'saved the file'

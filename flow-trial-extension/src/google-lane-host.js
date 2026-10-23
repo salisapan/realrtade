@@ -661,6 +661,17 @@ async function prepareWrite(connectorId, input, cred) {
       expectAccount: cred && cred.email ? cred.email : ''
     };
   }
+  if (connectorId === 'googleRecurringReminder') {
+    const R = globalThis.FlowRecurringReminder;
+    return {
+      flags: R ? { [R.SWITCH]: await laneSwitchOn(R.SWITCH) } : {},
+      title: params.title || i.title || '',
+      rrule: params.rrule || i.rrule || '',
+      when: params.when || i.when || null,
+      timeZone: params.timeZone || i.timeZone || '',
+      now: new Date().toISOString()
+    };
+  }
   if (connectorId === 'googleEventCallLink') {
     const E = globalThis.FlowEventCallLink;
     return {
@@ -829,7 +840,7 @@ async function fetchAttachment(msg) {
 function verifyUrlFor(connectorId, ref) {
   const r = ref || {};
   const enc = encodeURIComponent;
-  if (connectorId === 'googleHold' || connectorId === 'googleEventCallLink') {
+  if (connectorId === 'googleHold' || connectorId === 'googleEventCallLink' || connectorId === 'googleRecurringReminder') {
     const id = r.eventId || r.externalId;
     return id ? 'https://www.googleapis.com/calendar/v3/calendars/' + enc(r.calendarId || 'primary') + '/events/' + enc(id) : '';
   }
@@ -900,6 +911,16 @@ function onLaneMessage(msg, sender, sendResponse) {
       const listed = await laneHttp({ method: 'GET', url: url });
       if (!listed || !listed.ok || !listed.json || !Array.isArray(listed.json.items)) return { action: 'silence', reason: 'not-searched' };
       return E.plan({ flags: { [E.SWITCH]: true }, text: text, events: listed.json.items, now: from });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-recurring-plan') {
+    // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
+    const R = globalThis.FlowRecurringReminder;
+    Promise.resolve((async () => {
+      if (!R || typeof R.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(R.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return R.plan({ flags: { [R.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000), todayIso: new Date().toISOString().slice(0, 10) });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
