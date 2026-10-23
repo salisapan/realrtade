@@ -4,8 +4,11 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const crypto = require('crypto');
 const { FlowConnectEcosystem: E } = require('../core/connect-ecosystem.js');
 const { FlowOutlookAuth: A } = require('../core/outlook-auth.js');
+const { FlowOutlookConfig: C } = require('../core/outlook-config.js');
+const { FlowProfileHook: PH } = require('../core/profile-hook.js');
 
 let n = 0;
 let failures = 0;
@@ -20,19 +23,8 @@ async function ok(name, fn) {
   }
 }
 
-const MS_EXPECTED = [
-  'offline_access',
-  'User.Read',
-  'Mail.ReadWrite',
-  'Calendars.ReadWrite',
-  'Tasks.ReadWrite',
-  'Files.ReadWrite',
-  'Contacts.Read',
-  'Chat.Read',
-  'Notes.ReadWrite',
-  'MailboxSettings.Read',
-  'People.Read'
-];
+// CTO 23/10: C1 base one-consent set for M1–M8 (Group.Read.All is optional, not here).
+const MS_EXPECTED = E.microsoftScopes();
 
 (async () => {
 await ok('stepsFor google is exactly one incremental step', () => {
@@ -42,12 +34,18 @@ await ok('stepsFor google is exactly one incremental step', () => {
   assert.strictEqual(r.steps[0].includeGrantedScopes, true);
 });
 
-await ok('stepsFor microsoft is exactly one Graph step with 11 ecosystem scopes', () => {
+await ok('stepsFor microsoft is exactly one Graph step with 12 ecosystem scopes', () => {
   const r = E.stepsFor('microsoft');
   assert.strictEqual(r.steps.length, 1);
   assert.strictEqual(r.steps[0].type, 'microsoft-ecosystem');
   assert.deepStrictEqual(r.steps[0].scopes, MS_EXPECTED);
-  assert.strictEqual(r.steps[0].scopes.length, 11);
+  assert.strictEqual(r.steps[0].scopes.length, 12);
+});
+
+await ok('microsoft base consent never includes Group.*; planner optional is Group.Read.All only', () => {
+  assert.ok(!MS_EXPECTED.some((s) => /^Group\./i.test(s)));
+  assert.deepStrictEqual(E.microsoftOptionalScopes.planner, ['Group.Read.All']);
+  assert.ok(MS_EXPECTED.indexOf('Tasks.ReadWrite') >= 0);
 });
 
 await ok('stepsFor meta is exactly one host permission step with 15 origins', () => {
@@ -168,6 +166,180 @@ await ok('flow:connect ecosystem path is behind CONNECT_ECOSYSTEM switch', () =>
   assert.ok(/connectEcosystemConnector/.test(bg));
   const block = bg.slice(bg.indexOf("if (msg.type === 'flow:connect')"), bg.indexOf("if (msg.type === 'flow:disconnect')"));
   assert.ok(/glanceSwitchOn\('CONNECT_ECOSYSTEM'\)/.test(block));
+});
+
+await ok('meta-consent fallback ORIGINS match FlowConnectEcosystem.META_ORIGINS', () => {
+  const sandbox = { globalThis: {} };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../lane-chat/meta-consent.js'), 'utf8'), sandbox);
+  const fallback = sandbox.globalThis.FlowMetaConsent.ORIGINS;
+  assert.strictEqual(JSON.stringify(fallback), JSON.stringify(E.META_ORIGINS));
+  assert.strictEqual(fallback.length, 15);
+});
+
+await ok('profileHook onConnect/onDisconnect are callable no-ops', () => {
+  assert.strictEqual(typeof PH.onConnect, 'function');
+  assert.strictEqual(typeof PH.onDisconnect, 'function');
+  PH.onConnect('microsoft', { address: 'a@b.com' });
+  PH.onDisconnect('meta');
+});
+
+function outlookConnectWorld(over) {
+  globalThis.FlowConnectEcosystem = E;
+  const CFG = Object.assign({}, C, { CLIENT_ID: '11111111-2222-3333-4444-555555555555' });
+  const ME = 'me@contoso.com';
+  const w = Object.assign({ store: {}, signInScopes: [], signInCalls: 0 }, over || {});
+  w.storage = {
+    get: async () => Object.assign({}, w.store),
+    set: async (patch) => { Object.assign(w.store, patch); },
+    getWatches: async () => [],
+    getIdentityGraph: async () => ({ parties: {} }),
+    observeIdentity: async () => ({ pid: 'p1' }),
+    updateWatch: async () => null,
+    upsertWatch: async (x) => x,
+    recordOutcomeLabel: async () => true
+  };
+  w.fetch = async (url) => {
+    if (String(url).includes('/me?')) return { ok: true, status: 200, json: async () => ({ mail: ME, displayName: 'Me', userPrincipalName: ME }) };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const { FlowOutlook: O } = require('../src/outlook.js');
+  const authWrap = {
+    signIn: async (deps, cfg, redirect, opts) => {
+      w.signInCalls += 1;
+      w.signInScopes = (opts && opts.scopes) ? opts.scopes.slice() : [];
+      return A.signIn(deps, cfg, redirect, opts);
+    },
+    session: A.session,
+    ensureFresh: A.ensureFresh
+  };
+  const inst = O.create({
+    storage: w.storage,
+    cfg: CFG,
+    auth: authWrap,
+    plan: require('../core/outlook-sync.js').FlowOutlookSync.plan,
+    fetch: w.fetch,
+    redirectUri: () => 'https://abc.chromiumapp.org/',
+    launch: async (url) => 'https://abc.chromiumapp.org/?code=CODE&state=' + new URL(url).searchParams.get('state'),
+    launchSilent: async () => '',
+    actions: null,
+    permissions: { request: async () => true, contains: async () => true, remove: async () => true },
+    send: async () => ({ ok: true }),
+    random: (n) => crypto.randomBytes(n),
+    sha256: async (b) => crypto.createHash('sha256').update(Buffer.from(b)).digest(),
+    now: () => Date.now(),
+    planDeps: {},
+    identity: { empty: () => ({ parties: {} }) },
+    followUp: {}
+  });
+  return { w, inst };
+}
+
+function sortScopes(list) {
+  return list.slice().sort();
+}
+
+await ok('ecosystem FlowOutlook.connect intersects scopes on reconnect #1', async () => {
+  const { w, inst } = outlookConnectWorld({
+    store: { outlookAuth: { ecosystem: true, requestedScopes: MS_EXPECTED, token: { accessToken: 'old' }, account: { address: 'me@contoso.com' } } }
+  });
+  const junk = MS_EXPECTED.concat(['Mail.Read', 'Mail.Send', 'https://graph.microsoft.com/Mail.Send']);
+  await inst.connect({ scopes: junk });
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED));
+  assert.ok(!w.signInScopes.some((s) => /Mail\.Send/i.test(s) || s === 'Mail.Read'));
+});
+
+await ok('ecosystem FlowOutlook.connect intersects scopes on reconnect #2', async () => {
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: MS_EXPECTED,
+        token: { accessToken: 'old' },
+        account: { address: 'me@contoso.com' }
+      }
+    }
+  });
+  await inst.connect({ scopes: MS_EXPECTED.concat(['Mail.Read', 'https://graph.microsoft.com/Mail.Send']) });
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED));
+});
+
+await ok('ecosystem checkbox scopesFor path ends subset of base ecosystem scopes', async () => {
+  const ids = (C.CONNECT_SERVICES || []).map((s) => s.id);
+  const scopes = C.scopesFor(ids);
+  const { w, inst } = outlookConnectWorld({
+    store: { outlookAuth: { ecosystem: true, requestedScopes: MS_EXPECTED, token: { accessToken: 'old' }, account: { address: 'me@contoso.com' } } }
+  });
+  await inst.connect({ scopes: scopes });
+  const allowed = new Set(MS_EXPECTED);
+  const expectedIntersect = scopes.filter((s) => allowed.has(s));
+  assert.ok(w.signInScopes.every((s) => allowed.has(s)));
+  assert.ok(!w.signInScopes.some((s) => /^Group\./i.test(s)));
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(expectedIntersect));
+});
+
+await ok('legacy non-ecosystem FlowOutlook.connect keeps Mail.Read from cfg.SCOPES', async () => {
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: false,
+        requestedScopes: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
+        token: { accessToken: 'old' },
+        account: { address: 'me@contoso.com' }
+      }
+    }
+  });
+  await inst.connect({ scopes: ['offline_access', 'User.Read'] });
+  assert.ok(w.signInScopes.indexOf('Mail.Read') >= 0);
+  assert.ok(w.signInScopes.indexOf('Mail.ReadWrite') >= 0);
+});
+
+await ok('disconnectEcosystem microsoft calls disableSurface(outlook) and clears surfaces', async () => {
+  const disableCalls = [];
+  const { sandbox, stored } = loadDisconnectHandlers();
+  stored.outlookAuth = { token: { accessToken: 'x' }, ecosystem: true };
+  stored.surfaces = { outlook: { enabled: true, at: 1 } };
+  const out = await sandbox.__sw.disconnectEcosystemConnector('microsoft', {
+    disableSurface: async (id) => {
+      disableCalls.push(id);
+      stored.surfaces = { outlook: { enabled: false, at: Date.now() } };
+      return { ok: true };
+    }
+  });
+  assert.strictEqual(out.ok, true);
+  assert.deepStrictEqual(disableCalls, ['outlook']);
+  assert.strictEqual(stored.outlookAuth, undefined);
+  assert.strictEqual(stored.surfaces.outlook.enabled, false);
+});
+
+async function routeFlowDisconnect(msg, sw, deps) {
+  if (msg.type !== 'flow:disconnect') return { ok: false, reason: 'not-disconnect' };
+  const id = msg.connectorId;
+  if (id === 'microsoft' || id === 'meta') {
+    return sw.disconnectEcosystemConnector(id, deps);
+  }
+  return { ok: false, reason: 'other-connector' };
+}
+
+await ok('flow:disconnect routes microsoft to ecosystem disconnect', async () => {
+  const disableCalls = [];
+  const { sandbox, stored } = loadDisconnectHandlers();
+  stored.outlookAuth = { token: { accessToken: 'x' } };
+  const out = await routeFlowDisconnect({ type: 'flow:disconnect', connectorId: 'microsoft' }, sandbox.__sw, {
+    disableSurface: async (id) => { disableCalls.push(id); return { ok: true }; },
+    disconnectConnector: async () => ({ ok: false })
+  });
+  assert.strictEqual(out.ok, true);
+  assert.deepStrictEqual(disableCalls, ['outlook']);
+  assert.strictEqual(stored.outlookAuth, undefined);
+});
+
+await ok('flow:disconnect routes meta to ecosystem permission clear', async () => {
+  const { sandbox, removed } = loadDisconnectHandlers();
+  const out = await routeFlowDisconnect({ type: 'flow:disconnect', connectorId: 'meta' }, sandbox.__sw, {});
+  assert.strictEqual(out.ok, true);
+  assert.ok(removed.some((r) => r.origins && r.origins.length === 15));
 });
 
 console.log('\n' + n + ' passed, ' + failures + ' failed');

@@ -53,6 +53,7 @@ import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConf
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import '../core/connect-ecosystem.js'; // classic: sets globalThis.FlowConnectEcosystem (C1)
+import '../core/profile-hook.js'; // classic: sets globalThis.FlowProfileHook (C1 learn-signal hook)
 import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)

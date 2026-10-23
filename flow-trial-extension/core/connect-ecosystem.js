@@ -14,8 +14,14 @@ const FlowConnectEcosystem = (() => {
     'Chat.Read',
     'Notes.ReadWrite',
     'MailboxSettings.Read',
-    'People.Read'
+    'People.Read',
+    'OnlineMeetings.ReadWrite'
   ];
+
+  // Work-account-only incremental scopes (not in one-consent). Planner plan pick (M8) may request Group.Read.All later.
+  const MICROSOFT_OPTIONAL_SCOPES = {
+    planner: ['Group.Read.All']
+  };
 
   // Same list as lane-chat/meta-consent.js FlowMetaConsent.ORIGINS (lane restoreLaneChats).
   const META_ORIGINS = [
@@ -236,6 +242,8 @@ const FlowConnectEcosystem = (() => {
   return {
     ECOSYSTEMS: ECOSYSTEMS,
     MICROSOFT_SCOPES: microsoftScopes(),
+    microsoftScopes: microsoftScopes,
+    microsoftOptionalScopes: MICROSOFT_OPTIONAL_SCOPES,
     META_ORIGINS: META_ORIGINS.slice(),
     PKCE_REFRESH_INTERFACE: PKCE_REFRESH_INTERFACE,
     catalog: catalog,

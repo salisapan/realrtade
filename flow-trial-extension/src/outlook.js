@@ -328,7 +328,16 @@ const FlowOutlook = (() => {
       const chosen = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
       // Ecosystem connect stores the catalogue scopes only (no cfg.SCOPES Mail.Read drift).
       const catalogOnly = Boolean(prev && prev.ecosystem);
-      const scopeSources = catalogOnly ? (chosen || []) : (chosen || []).concat(cfg.SCOPES || []);
+      let scopeSources;
+      if (catalogOnly) {
+        const E = typeof globalThis !== 'undefined' ? globalThis.FlowConnectEcosystem : null;
+        const allow = (E && typeof E.microsoftScopes === 'function') ? E.microsoftScopes() : ((E && E.MICROSOFT_SCOPES) ? E.MICROSOFT_SCOPES.slice() : []);
+        const allowSet = new Set(allow);
+        scopeSources = (chosen || []).filter((s) => allowSet.has(s));
+        if (!scopeSources.length && allow.length) scopeSources = allow.slice();
+      } else {
+        scopeSources = (chosen || []).concat(cfg.SCOPES || []);
+      }
       const scopes = [];
       scopeSources.forEach((s) => {
         if (!s || /Mail\.Send/i.test(s) || /\.Send$/i.test(s)) return;

@@ -32,6 +32,10 @@ async function connectMetaEcosystem() {
     } catch (e) { resolve(false); }
   });
   if (!granted) return { ok: false, reason: 'permission-denied' };
+  const hook = globalThis.FlowProfileHook;
+  if (hook && typeof hook.onConnect === 'function') {
+    try { hook.onConnect('meta', null); } catch (e) { /* profile store not wired */ }
+  }
   return { ok: true, partial: false };
 }
 
@@ -92,6 +96,10 @@ async function connectMicrosoftEcosystem(launchInteractive, deps) {
   if (typeof deps.enableSurface === 'function') {
     try { await deps.enableSurface('outlook'); } catch (e) { /* panel may enable */ }
   }
+  const hook = globalThis.FlowProfileHook;
+  if (hook && typeof hook.onConnect === 'function') {
+    try { hook.onConnect('microsoft', account); } catch (e) { /* profile store not wired */ }
+  }
   return { ok: true, partial: partial };
 }
 
@@ -102,6 +110,10 @@ async function disconnectMicrosoftEcosystem(deps) {
   } catch (e) { /* token cleared */ }
   if (deps && typeof deps.disableSurface === 'function') {
     try { await deps.disableSurface('outlook'); } catch (e) { /* ignore */ }
+  }
+  const hook = globalThis.FlowProfileHook;
+  if (hook && typeof hook.onDisconnect === 'function') {
+    try { hook.onDisconnect('microsoft'); } catch (e) { /* profile store not wired */ }
   }
   return { ok: true };
 }
@@ -114,8 +126,15 @@ async function disconnectMetaEcosystem() {
     : ((eco() && eco().META_ORIGINS) || []);
   if (!origins.length) return { ok: false };
   return new Promise((resolve) => {
-    try { chrome.permissions.remove({ origins: origins }, (ok) => resolve({ ok: ok !== false })); }
-    catch (e) { resolve({ ok: false }); }
+    try {
+      chrome.permissions.remove({ origins: origins }, (ok) => {
+        const hook = globalThis.FlowProfileHook;
+        if (hook && typeof hook.onDisconnect === 'function') {
+          try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+        }
+        resolve({ ok: ok !== false });
+      });
+    } catch (e) { resolve({ ok: false }); }
   });
 }
 
