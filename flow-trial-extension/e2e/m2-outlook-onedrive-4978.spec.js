@@ -1,7 +1,8 @@
 // M2: ONEDRIVE_FIND on the Outlook close map (F2). Graph stubbed; real-shape OWA fixture for one case.
+// pre-C1 registry: modules injected by test (not production launch.js) — see m2-outlook-pre-c1-registry-4978.js.
 const fs = require('fs');
 const path = require('path');
-const { test, expect } = require('./support/harness');
+const { test, expect } = require('./m2-outlook-onedrive-4978.harness');
 const S = require('./support/sentences');
 const { outlookHtml, outlookUrl } = require('./support/fixtures');
 
@@ -67,7 +68,7 @@ test('ONEDRIVE_FIND on: Do It attaches with Graph read-back (standard fixture)',
   });
   await expect(page.locator(PANE + ' .flow-chip-host[data-glance-chain="onedrive-find"]')).toBeVisible({ timeout: 30000 });
   const findCard = page.locator(PANE + ' .flow-chip-host[data-glance-chain="onedrive-find"]');
-  await findCard.locator('button.flow-chip').click();
+  await findCard.getByRole('button', { name: 'Do It' }).click();
   await expect.poll(async () => {
     const calls = await glance.apiCalls();
     return calls.some((c) => c.method === 'POST' && /\/attachments$/.test(c.url));

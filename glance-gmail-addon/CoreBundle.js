@@ -4605,6 +4605,7 @@ const FlowFileAttach = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowFileAttach };
+else if (typeof globalThis !== 'undefined') globalThis.FlowFileAttach = FlowFileAttach;
 
 // ----- flow-trial-extension/core/intent.js -----
 // The decision layer: takes one email's text and classifies it into exactly
