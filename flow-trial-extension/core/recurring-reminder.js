@@ -31,8 +31,10 @@ const FlowRecurringReminder = (() => {
   }
   const extract = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
   const attach = sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
-  const proofs = sibling(typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null, './proof-of-close.js', 'FlowProofOfClose');
-  const calendarMod = sibling(typeof FlowGoogleCalendar !== 'undefined' ? FlowGoogleCalendar : null, './google-calendar.js', 'FlowGoogleCalendar');
+  // Resolved at the call: in the service worker this file loads before proof-of-close.js.
+  const proofModule = () => sibling(typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null, './proof-of-close.js', 'FlowProofOfClose');
+  // Resolved at the call: in the service worker this file loads before google-calendar.js.
+  const calendarModule = () => sibling(typeof FlowGoogleCalendar !== 'undefined' ? FlowGoogleCalendar : null, './google-calendar.js', 'FlowGoogleCalendar');
 
   const SWITCH = 'RECURRING_REMINDER';
   const SWITCH_DEFAULT = false;
@@ -254,6 +256,7 @@ const FlowRecurringReminder = (() => {
     io = ioOf(io);
     if (!enabled(input.flags)) return miss('switch-off');
     if (typeof io.calendar !== 'function') return miss('no-host');
+    const calendarMod = calendarModule();
     if (!calendarMod || typeof calendarMod.eventBody !== 'function') return miss('no-calendar-module');
     const rrule = String(input.rrule || '');
     if (!/^RRULE:FREQ=(?:DAILY|WEEKLY;BYDAY=(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:MO|TU|WE|TH|FR))*|MONTHLY;BYMONTHDAY=(?:[1-9]|1\d|2[0-8]))$/.test(rrule)) return miss('unclear');
@@ -286,6 +289,7 @@ const FlowRecurringReminder = (() => {
     const verifiedAt = typeof input.now === 'string' ? input.now : new Date().toISOString();
     const url = ev.htmlLink && String(ev.htmlLink).slice(0, 8) === 'https://' ? ev.htmlLink : null;
     const finalRef = Object.assign({}, ref, { contentHash: contentHash(ev) });
+    const proofs = proofModule();
     const proof = proofs ? proofs.buildProof({ system: SYSTEM, externalId: id, url: url || '', fetchedBack: true, verifiedAt: verifiedAt }) : null;
     if (!proof) return miss(PENDING, { ref: finalRef });
     const start = String(ev.start.dateTime);

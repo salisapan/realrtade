@@ -28,6 +28,7 @@ for (const [text, name] of POS) {
 const NEG = [
   ['Can you create a feedback form?', 'no-name'],
   ['Could you create a form that asks about dietary needs, called Lunch RSVP?', 'asks-content'],
+  ['Could you create a survey which collects feedback, called Pulse?', 'asks-content'],
   ['Please create a Typeform for the launch', null],
   ['Please create a Microsoft Forms survey called Pulse', null],
   ['Maybe we could create a survey called Pulse at some point', 'hedge'],
@@ -41,6 +42,7 @@ for (const [text, why] of NEG) {
   const r = W.recognize(text);
   check('quiet: ' + text.slice(0, 48), r.kind !== 'clear' && (why === null || r.reason === why), r);
 }
+check('the word Ask in a subject does not silence a request', W.recognize('Ask. Can you create a feedback form for the Q4 launch?').kind === 'clear');
 check('existing Doc ask still reads as a Doc', W.recognize('Please create a doc called Q4 launch plan').fileKind === 'doc');
 const he = W.plan({ flags: flags, text: 'תוכל לפתוח טופס הרשמה בשם יום פתוח אביב' });
 check('the Hebrew plan names a form and does not send', he.action === 'offer' && /טופס/.test(he.line) && /לא שולח/.test(he.steps[1].label), he);

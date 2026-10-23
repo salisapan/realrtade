@@ -663,12 +663,18 @@ async function prepareWrite(connectorId, input, cred) {
   }
   if (connectorId === 'googleRecurringReminder') {
     const R = globalThis.FlowRecurringReminder;
+    let zone = String(params.timeZone || i.timeZone || '').trim();
+    if (!zone) zone = await storedTimeZone();
+    if (!zone) {
+      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
+    }
     return {
       flags: R ? { [R.SWITCH]: await laneSwitchOn(R.SWITCH) } : {},
       title: params.title || i.title || '',
       rrule: params.rrule || i.rrule || '',
       when: params.when || i.when || null,
-      timeZone: params.timeZone || i.timeZone || '',
+      timeZone: zone,
+      expectAccount: cred && cred.email ? cred.email : '',
       now: new Date().toISOString()
     };
   }

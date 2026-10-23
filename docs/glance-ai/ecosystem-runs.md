@@ -329,3 +329,9 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** `git log` and `card-requests-*.md` checked first; nothing new from Grok; canonical card reused.
 - **Tests:** `test/meeting-confirm-corpus.cjs` (10 agreed lines, 14 quiet lines, three time zones), chat corpus, 2 new browser specs on the real chat lane (21 specs pass with the lane specs).
 - **Open:** live Gate; Outlook hold browser spec.
+
+## 2026-10-23 Ecosystems run A (36th): real-browser proof of the form and the reminder
+
+- **Capability:** none new for the user; this run proves the two built last (Google Form, repeating reminder) in the unpacked extension against the local Google server, and fixes what that found: with the switch on, the repeating reminder could never reach Handled in the service worker (its calendar and ProofOfClose modules were read at load, before they were loaded), and a mail whose subject was the word "Ask" was silenced for a form request. Both are fixed; both features now complete end to end (Do It, write, read-back, Undo, Undo refused after an edit).
+- **Tests:** `e2e/gmail-form-and-reminder.spec.js` 6/6; gmail-new-file, meet-and-series and gmail-event-link e2e 16/16; recurring-reminder, recurring-hold, workspace-file, google-form, gmail-new-file, docs-consistency, identity-copy, surface-parity, system-notice corpora green. The fake Google server gained a Forms stand-in.
+- **Open:** live Gates (owner); manifest scope and host for Forms («מאשר»).
