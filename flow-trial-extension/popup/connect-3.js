@@ -246,8 +246,9 @@ const ConnectEcosystemUI = (function () {
         body = '<button type="button" class="c3-doit busy" aria-busy="true" disabled>' + spinHtml() +
           '<span class="label">' + c.busy + '</span></button>';
       } else {
+        const errHtml = err ? ('<p class="c3-err" role="alert">' + err.replace(/</g, '&lt;') + '</p>') : '';
         body = '<button type="button" class="c3-doit" data-connect-eco="' + eco.id + '"' + (anyBusy ? ' disabled' : '') + '>' +
-          '<span class="marks">' + marksHtml(eco.marks) + '</span><span class="label">' + c.cta + '</span></button>';
+          '<span class="marks">' + marksHtml(eco.marks) + '</span><span class="label">' + c.cta + '</span></button>' + errHtml;
       }
       const sub = busy ? c.hint : toolsLine(ecoToolsList(eco.id, lang));
       const stateName = done ? (partial ? 'partial' : 'done') : (busy ? 'busy' : 'idle');

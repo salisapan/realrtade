@@ -13,6 +13,10 @@ globalThis.FlowOutlookAuth = A;
 globalThis.FlowOutlookCalendar = Cal;
 const { FlowProfileHook: PH } = require('../core/profile-hook.js');
 const { FlowDisplay: D } = require('../core/display-copy.js');
+const { execFileSync } = require('child_process');
+
+let JSDOM;
+try { ({ JSDOM } = require('jsdom')); } catch (e) { JSDOM = null; }
 
 let n = 0;
 let failures = 0;
@@ -25,6 +29,259 @@ async function ok(name, fn) {
     failures++;
     console.log('FAIL', name, e && e.message ? e.message : e);
   }
+}
+
+const GRAPH_HOST_ORIGINS = [
+  'https://graph.microsoft.com/*',
+  'https://login.microsoftonline.com/*',
+  'https://outlook.live.com/*',
+  'https://outlook.office.com/*',
+  'https://outlook.office365.com/*'
+];
+
+function makeChromePermissions(over) {
+  const deniedOrigins = new Set((over && over.deniedOrigins) || []);
+  const allowedOrigins = (over && over.allowedOrigins) || GRAPH_HOST_ORIGINS.slice();
+  const allowedSet = new Set(allowedOrigins);
+  const originOk = (o) => !deniedOrigins.has(o) && (allowedSet.has(o) || allowedSet.has('*'));
+  return {
+    request: async (spec) => {
+      const origins = (spec && spec.origins) || [];
+      if (!origins.length) return true;
+      return origins.every(originOk);
+    },
+    contains: async (spec) => {
+      const origins = (spec && spec.origins) || [];
+      if (!origins.length) return false;
+      return origins.every(originOk);
+    },
+    remove: async () => true
+  };
+}
+
+function connect3Paint(opts) {
+  if (!JSDOM) throw new Error('jsdom is required for connect-3 behavioral rows');
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+    url: 'chrome-extension://glance/popup.html',
+    runScripts: 'outside-only'
+  });
+  const win = dom.window;
+  const ctx = {
+    document: win.document,
+    window: win,
+    matchMedia: (q) => (win.matchMedia ? win.matchMedia(q) : { matches: false, media: q, addListener() {}, removeListener() {} }),
+    chrome: { storage: { local: { get: async () => ({ glanceSwitches: {} }) } } },
+    FlowConnectEcosystem: E,
+    Connect3Brands: { check: '✓' },
+    console,
+    setTimeout: (fn, ms) => win.setTimeout(fn, ms),
+    clearTimeout: win.clearTimeout.bind(win)
+  };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '../popup/connect-3.js'), 'utf8') + '\nthis.__Connect3 = ConnectEcosystemUI;',
+    ctx
+  );
+  const host = win.document.createElement('div');
+  win.document.body.appendChild(host);
+  ctx.__Connect3.paint(host, opts || {});
+  return { host, win, UI: ctx.__Connect3 };
+}
+
+async function flushDom(win) {
+  await new Promise((r) => win.setTimeout(r, 0));
+  await new Promise((r) => win.setTimeout(r, 0));
+}
+
+function loadBackgroundOutlookSync(over) {
+  const stored = {
+    outlookAuth: {
+      token: {
+        accessToken: 'tok',
+        expiresAt: Date.now() + 3600000,
+        grantedScopes: ['User.Read', 'Mail.ReadWrite']
+      },
+      account: { address: 'me@example.com' },
+      profile: { displayName: 'Profile Name', mail: 'me@example.com', userPrincipalName: 'me@example.com' },
+      requestedScopes: E.microsoftConsentScopes()
+    }
+  };
+  const syncCalls = [];
+  const owaTabs = (over && over.owaTabs) || [];
+  const profileDisplay = 'Profile Name';
+  const chrome = {
+    storage: {
+      local: {
+        async get(k) {
+          if (k == null) return Object.assign({}, stored);
+          if (typeof k === 'string') return { [k]: stored[k] };
+          if (Array.isArray(k)) {
+            const bag = {};
+            k.forEach((key) => { bag[key] = stored[key]; });
+            return bag;
+          }
+          return Object.assign({}, stored);
+        },
+        async set(patch) { Object.assign(stored, patch); },
+        async remove(keys) { (keys || []).forEach((key) => { delete stored[key]; }); }
+      }
+    },
+    permissions: makeChromePermissions(over && over.permissions),
+    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' },
+    tabs: {
+      query: async () => owaTabs,
+      sendMessage: async () => {}
+    },
+    runtime: {
+      id: 'ext',
+      sendMessage: async () => ({}),
+      onStartup: { addListener() {} },
+      onInstalled: { addListener() {} },
+      onMessage: { addListener() {} },
+      onConnect: { addListener() {} },
+      getManifest: () => ({ version: '0.9.56' })
+    },
+    alarms: { create: () => {}, onAlarm: { addListener() {} }, get: (n, cb) => cb(null) },
+    contextMenus: { removeAll(cb) { if (cb) cb(); }, create(o, cb) { if (cb) cb(); }, onClicked: { addListener() {} } },
+    windows: { create: () => {}, onRemoved: { addListener() {} } },
+    notifications: { create: () => {}, onClicked: { addListener() {} }, onClosed: { addListener() {} } }
+  };
+  const sandbox = {
+    console,
+    chrome,
+    crypto: require('crypto').webcrypto,
+    fetch: async () => ({ ok: false }),
+    FlowConnectEcosystem: E,
+    FlowProfileHook: PH,
+    __syncCalls: syncCalls,
+    __profileDisplay: profileDisplay,
+    FlowExtract: {},
+    FlowIntent: {},
+    FlowFactReply: {},
+    FlowActions: {},
+    FlowIdentity: { empty: () => ({ parties: {} }) },
+    FlowFollowUp: {}
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../lane-chat/meta-consent.js'), 'utf8'), sandbox);
+  vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  if (over && over.noFlowOutlook) {
+    vm.runInContext('outlookEcosystemRunner = null; globalThis.FlowOutlook = null;', sandbox);
+  } else {
+    vm.runInContext(`
+      outlookEcosystemRunner = null;
+      globalThis.FlowOutlook = {
+        create: function () {
+          return {
+            sync: async function (opts) {
+              __syncCalls.push(opts);
+              await chrome.storage.local.set({ glanceOwnNames: [__profileDisplay] });
+              return { ok: true };
+            }
+          };
+        }
+      };
+    `, sandbox);
+  }
+  return { sandbox, stored, syncCalls };
+}
+
+function loadModuleAtRev(rev, relPath, exportName) {
+  const repoRoot = path.join(__dirname, '..', '..');
+  const src = execFileSync('git', ['show', `${rev}:${relPath}`], { cwd: repoRoot, encoding: 'utf8' });
+  const sandbox = { module: { exports: {} }, exports: {}, console, globalThis: {} };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox, { filename: relPath });
+  const Eold = sandbox.module.exports.FlowConnectEcosystem || sandbox.FlowConnectEcosystem;
+  if (exportName === 'FlowConnectEcosystem' && Eold) {
+    if (typeof Eold.microsoftConsentScopes !== 'function' && typeof Eold.microsoftScopes === 'function') {
+      Eold.microsoftConsentScopes = Eold.microsoftScopes.bind(Eold);
+    }
+    return Eold;
+  }
+  return sandbox[exportName] || sandbox.module.exports;
+}
+
+function runF488BiteRows() {
+  const rev = 'f488c95ff26b74fa68cf5fe67b7cbf995d90d885';
+  const repoRoot = path.join(__dirname, '..', '..');
+  let Eold;
+  try {
+    Eold = loadModuleAtRev(rev, 'flow-trial-extension/core/connect-ecosystem.js', 'FlowConnectEcosystem');
+  } catch (e) {
+    console.log('BITE f488c95: could not load core', e.message);
+    return;
+  }
+  if (!Eold) {
+    console.log('BITE f488c95: FlowConnectEcosystem missing at f488c95');
+    return;
+  }
+  if (typeof Eold.microsoftConsentScopes !== 'function' && typeof Eold.microsoftScopes === 'function') {
+    Eold.microsoftConsentScopes = Eold.microsoftScopes.bind(Eold);
+  }
+  const MSold = Eold.microsoftConsentScopes();
+  const bites = [
+    {
+      name: 'openid in microsoft consent scopes',
+      run() {
+        assert.ok(MSold.indexOf('openid') >= 0);
+      }
+    },
+    {
+      name: 'Chat.Read not in base consent',
+      run() {
+        assert.ok(MSold.indexOf('Chat.Read') < 0);
+      }
+    },
+    {
+      name: 'MSA gmail UPN without idToken is personal',
+      run() {
+        const profile = { mail: 'salisapan1@gmail.com', userPrincipalName: 'salisapan1@gmail.com' };
+        assert.strictEqual(Eold.resolveMicrosoftAccountKind(null, profile), 'personal');
+      }
+    },
+    {
+      name: 'GUID /me id without tid is unknown',
+      run() {
+        const profile = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', userPrincipalName: 'u@c.com' };
+        assert.strictEqual(Eold.resolveMicrosoftAccountKind(null, profile), 'unknown');
+      }
+    },
+    {
+      name: 'optional teamsChat bucket on f488',
+      run() {
+        assert.ok(Eold.microsoftOptionalScopes && Eold.microsoftOptionalScopes.teamsChat);
+        assert.ok(Eold.microsoftOptionalScopes.teamsMeeting === undefined);
+      }
+    },
+    {
+      name: 'background outlookEcosystemSync graph path',
+      run() {
+        const bg = execFileSync('git', ['show', `${rev}:flow-trial-extension/src/background.js`], { cwd: repoRoot, encoding: 'utf8' });
+        assert.ok(/async function outlookEcosystemSync/.test(bg));
+        assert.ok(/outlookEcosystemRunner\.sync/.test(bg));
+      }
+    },
+    {
+      name: 'connect-3 reconnectNeeded copy key',
+      run() {
+        const ui = execFileSync('git', ['show', `${rev}:flow-trial-extension/popup/connect-3.js`], { cwd: repoRoot, encoding: 'utf8' });
+        assert.ok(/reconnectNeeded/.test(ui));
+      }
+    }
+  ];
+  console.log('\n--- bite rows on f488c95 (expect FAIL) ---');
+  bites.forEach((b) => {
+    try {
+      b.run();
+      console.log('BITE PASS (unexpected)', b.name);
+    } catch (e) {
+      console.log('BITE FAIL', b.name, '-', e.message || e);
+    }
+  });
 }
 
 // CTO 23/10: C1 base one-consent set for M1–M8 (Group.Read.All and Chat.Read are optional, not here).
@@ -328,7 +585,7 @@ function outlookConnectWorld(over) {
     launch: async (url) => 'https://abc.chromiumapp.org/?code=CODE&state=' + new URL(url).searchParams.get('state'),
     launchSilent: async () => '',
     actions: null,
-    permissions: { request: async () => true, contains: async () => true, remove: async () => true },
+    permissions: (over && over.permissions) ? over.permissions : makeChromePermissions(over && over.perms),
     send: async () => ({ ok: true }),
     random: (n) => crypto.randomBytes(n),
     sha256: async (b) => crypto.createHash('sha256').update(Buffer.from(b)).digest(),
@@ -369,6 +626,15 @@ await ok('ecosystem FlowOutlook.connect intersects scopes on reconnect #2', asyn
   assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED));
 });
 
+await ok('outlook connect fails when Graph host permission is denied (permissions stub bites)', async () => {
+  const { inst } = outlookConnectWorld({
+    permissions: makeChromePermissions({ deniedOrigins: ['https://graph.microsoft.com/*'] })
+  });
+  const r = await inst.connect({ scopes: MS_EXPECTED });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.error, 'permission');
+});
+
 await ok('ecosystem checkbox scopesFor path ends subset of base ecosystem scopes', async () => {
   const ids = (C.CONNECT_SERVICES || []).map((s) => s.id);
   const scopes = C.scopesFor(ids);
@@ -383,6 +649,39 @@ await ok('ecosystem checkbox scopesFor path ends subset of base ecosystem scopes
   assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, 'Chat.Read is optional teamsChat only');
   assert.ok(w.signInScopes.indexOf('Mail.Read') < 0, 'legacy Mail.Read must not leak into ecosystem reconnect');
   assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(expectedIntersect));
+});
+
+await ok('personal microsoft stays connected when teamsChat optional is denied and Chat.Read is stripped on reconnect', async () => {
+  const personal = {
+    microsoftAccountKind: 'personal',
+    address: 'salisapan1@gmail.com',
+    mail: 'salisapan1@gmail.com',
+    userPrincipalName: 'salisapan1@gmail.com'
+  };
+  assert.strictEqual(E.optionalScopesForAccount(personal).teamsChat, undefined);
+  const granted = MS_EXPECTED.filter((s) => s !== 'offline_access' && s !== 'openid' && s !== 'profile');
+  const auth = {
+    token: { accessToken: 't', expiresAt: Date.now() + 1e6, grantedScopes: granted },
+    requestedScopes: MS_EXPECTED,
+    account: personal,
+    profile: personal
+  };
+  const snap = E.statusSnapshot({ outlookAuth: auth, outlookSync: {}, now: Date.now() }).microsoft;
+  assert.strictEqual(snap.connected, true);
+  assert.strictEqual(snap.needsReconnect, false);
+  const allSvcIds = (C.CONNECT_SERVICES || []).map((s) => s.id);
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: MS_EXPECTED,
+        token: { accessToken: 'old' },
+        account: personal
+      }
+    }
+  });
+  await inst.connect({ scopes: C.scopesFor(allSvcIds) });
+  assert.ok(w.signInScopes.indexOf('Chat.Read') < 0);
 });
 
 await ok('legacy non-ecosystem FlowOutlook.connect keeps Mail.Read from cfg.SCOPES', async () => {
@@ -535,15 +834,60 @@ await ok('meta-consent disconnect calls FlowProfileHook.onDisconnect', async () 
   assert.ok(removed.length >= 1);
 });
 
-await ok('connect-3 partial row paints Reconnect and Disconnect actions', () => {
-  const ui = fs.readFileSync(path.join(__dirname, '../popup/connect-3.js'), 'utf8');
-  assert.ok(ui.indexOf('data-reconnect-eco') >= 0);
-  assert.ok(ui.indexOf('data-disconnect-eco') >= 0);
-  assert.ok(ui.indexOf("type: 'flow:connect'") >= 0);
-  assert.ok(ui.indexOf("type: 'flow:disconnect'") >= 0);
-  assert.ok(ui.indexOf('reconnectNeeded') >= 0);
-  assert.ok(ui.indexOf('c3-err') >= 0);
-  assert.ok(/showActions/.test(ui));
+await ok('connect-3 paint: connected microsoft row shows Disconnect', () => {
+  const state = { outlookAuth: { token: { accessToken: 't' }, account: { address: 'you@contoso.com' } } };
+  const status = { microsoft: { connected: true, partial: false, needsReconnect: false } };
+  const { host } = connect3Paint({ lang: 'en', status, state, send: async () => ({ ok: true }) });
+  assert.ok(host.querySelector('[data-disconnect-eco="microsoft"]'));
+});
+
+await ok('connect-3 paint: needsReconnect label is Reconnect needed / צריך להתחבר מחדש', () => {
+  const state = { outlookAuth: { token: { accessToken: 't' }, account: { address: 'you@contoso.com' } } };
+  const status = { microsoft: { connected: false, partial: true, needsReconnect: true } };
+  const en = connect3Paint({ lang: 'en', status, state, send: async () => ({ ok: true }) });
+  assert.ok(en.host.textContent.includes('Reconnect needed'));
+  assert.ok(!en.host.textContent.includes('Partly connected'));
+  const he = connect3Paint({ lang: 'he', status, state, send: async () => ({ ok: true }) });
+  assert.ok(he.host.textContent.includes('צריך להתחבר מחדש'));
+});
+
+await ok('connect-3 paint: expired partial row shows Expired / פג תוקף', () => {
+  const state = { outlookAuth: { token: { accessToken: 't' }, account: { address: 'you@contoso.com' } } };
+  const status = { microsoft: { connected: false, partial: true, needsReconnect: false, detail: 'expired' } };
+  const en = connect3Paint({ lang: 'en', status, state, send: async () => ({ ok: true }) });
+  assert.ok(en.host.textContent.includes('Expired'));
+  const he = connect3Paint({ lang: 'he', status, state, send: async () => ({ ok: true }) });
+  assert.ok(he.host.textContent.includes('פג תוקף'));
+});
+
+await ok('connect-3 paint: Reconnect click sends flow:connect', async () => {
+  const sends = [];
+  const state = { outlookAuth: { token: { accessToken: 't' }, account: { address: 'you@contoso.com' } } };
+  const status = { microsoft: { connected: false, partial: true, needsReconnect: true } };
+  const { host, win } = connect3Paint({
+    lang: 'en', status, state,
+    send: async (m) => { sends.push(m); return { ok: true }; }
+  });
+  host.querySelector('[data-reconnect-eco="microsoft"]').click();
+  await flushDom(win);
+  assert.strictEqual(sends.length, 1);
+  assert.strictEqual(sends[0].type, 'flow:connect');
+  assert.strictEqual(sends[0].connectorId, 'microsoft');
+});
+
+await ok('connect-3 paint: failed connect shows reason inside the row', async () => {
+  const state = {};
+  const status = {};
+  const { host, win } = connect3Paint({
+    lang: 'en', status, state,
+    send: async () => ({ ok: false, reason: 'x' })
+  });
+  host.querySelector('[data-connect-eco="microsoft"]').click();
+  await new Promise((r) => win.setTimeout(r, 50));
+  const err = host.querySelector('[data-connect-eco="microsoft"]')?.parentElement?.querySelector('.c3-err')
+    || host.querySelector('.c3-err');
+  assert.ok(err);
+  assert.strictEqual(err.textContent.trim(), 'x');
 });
 
 await ok('personal microsoft with base scopes is connected without reconnect loop', () => {
@@ -569,12 +913,31 @@ await ok('disconnectConnector googleTasks calls FlowProfileHook.onDisconnect', (
   assert.ok(/onDisconnect\('google'\)/.test(block));
 });
 
-await ok('background syncOutlook runs Graph sync when OWA is closed', () => {
-  const bg = fs.readFileSync(path.join(__dirname, '../src/background.js'), 'utf8');
-  assert.ok(/async function outlookEcosystemSync/.test(bg));
-  assert.ok(/mode: 'graph'/.test(bg));
-  assert.ok(/outlookEcosystemRunner\.sync/.test(bg));
-  assert.ok(/syncOutlook: \(syncOpts\) => outlookEcosystemSync/.test(bg));
+await ok('outlookEcosystemSync OWA closed runs graph runner sync and remembers profile names', async () => {
+  const { sandbox, syncCalls, stored } = loadBackgroundOutlookSync({ owaTabs: [] });
+  const fn = vm.runInContext('outlookEcosystemSync', sandbox);
+  const r = await fn({ force: true });
+  assert.strictEqual(r.mode, 'graph');
+  assert.strictEqual(syncCalls.length, 1);
+  assert.strictEqual(syncCalls[0].force, true);
+  assert.strictEqual(stored.glanceOwnNames && stored.glanceOwnNames[0], 'Profile Name');
+});
+
+await ok('outlookEcosystemSync OWA open rescans only (no graph runner sync)', async () => {
+  const { sandbox, syncCalls } = loadBackgroundOutlookSync({ owaTabs: [{ id: 9, url: 'https://outlook.live.com/mail/' }] });
+  const fn = vm.runInContext('outlookEcosystemSync', sandbox);
+  const r = await fn({ force: true });
+  assert.strictEqual(r.mode, 'rescan');
+  assert.strictEqual(syncCalls.length, 0);
+});
+
+await ok('outlookEcosystemSync without FlowOutlook is not-configured (wiring dependency)', async () => {
+  const { sandbox } = loadBackgroundOutlookSync({ noFlowOutlook: true, owaTabs: [] });
+  const fn = vm.runInContext('outlookEcosystemSync', sandbox);
+  const r = await fn({ force: true });
+  assert.strictEqual(r.mode, 'graph');
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.error, 'not-configured');
 });
 
 function loadMicrosoftEcosystemConnect(over) {
@@ -666,5 +1029,6 @@ await ok('personal microsoft one-consent succeeds without OnlineMeetings.ReadWri
 });
 
 console.log('\n' + n + ' passed, ' + failures + ' failed');
+runF488BiteRows();
 if (failures) process.exit(1);
 })();
