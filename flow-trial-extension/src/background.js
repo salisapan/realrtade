@@ -631,7 +631,7 @@ const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
 function laneChatScripts(lane) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
   const out = [];
-  for (const f of base.concat(lane.js, ['core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-invitation-notice.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
+  for (const f of base.concat(lane.js, ['core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-invitation-notice.js', 'core/chat-self-note.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
   return out;
 }
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];

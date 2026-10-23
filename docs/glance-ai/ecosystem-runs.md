@@ -412,3 +412,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-invitation-notice-corpus.cjs` (8 invitations EN+HE, 16 quiet lines), the silence corpus (315 checks), chat card corpus, all corpora, chat browser spec.
 - **Open:** live Gate.
 
+## 2026-10-23 Ecosystems builder B (forty-fifth run) — reminders to self in chats
+
+- **Capability shipped (switch `CHAT_PROMISE_CARD`, off):** a person who types «תזכיר לי מחר לשלם חשבון חשמל», «לעצמי: לחדש דרכון עד יום חמישי», "Remind me tomorrow to pay the electricity bill" or "Note to self: renew the passport by Thursday" in WhatsApp, Messenger or Instagram (the self-chat habit) now gets the Do It card; Do It writes one task titled with the thing, due that day, with no name of the other person, read back by id, Undo refuses an edited task. An inbound "remind me", a question, a hedge, a refusal, no thing or no day stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-self-note-corpus.cjs` (8 notes EN+HE, 13 quiet lines), chat card corpus (switch separation, write, inbound not read), the silence corpus now covers eight readers, all corpora, chat browser spec.
+- **Open:** live Gate. The page cannot tell a self-chat from a chat with another person, so the cue words, not the thread, decide.
+

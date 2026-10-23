@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -383,6 +383,28 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     }
   }
 
+  // 5p. A reminder the person writes to themselves ("Remind me tomorrow to pay the bill") is a task titled with the thing, on the own switch.
+  {
+    const mine = (text) => input(text, { fromMe: true, own: true, sender: { name: 'Dana' } });
+    const off = world({ switchOn: true, switchOwn: false });
+    check('self note: CHAT_PROMISE_CARD off shows nothing', !(await off.Card.offer(mine('Remind me tomorrow to pay the electricity bill'))).shown);
+    for (const [text, titleRe] of [['Remind me tomorrow to pay the electricity bill', /^Pay the electricity bill$/], ['תזכיר לי מחר לשלם חשבון חשמל', /^לשלם חשבון חשמל$/]]) {
+      const w = world({ switchOn: false, switchOwn: true });
+      const r = await w.Card.offer(mine(text));
+      check('self note offers one task: ' + text, r.shown && w.injected[0].ctx.process.steps.length === 1, r);
+      if (!w.injected[0]) continue;
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+      const ge = w.calls.find((c) => c.type === 'flow:google-write');
+      check('the task is the thing itself, due that day, with no name of the other person: ' + text, !!ge && titleRe.test(ge.input.title) && /^\d{4}-\d{2}-\d{2}$/.test(ge.input.dueIso) && ge.input.notes.indexOf('Dana') < 0, ge && ge.input);
+    }
+    for (const quiet of ['Remind me to pay the bill', 'Maybe remind me tomorrow to pay the bill']) {
+      const q = world({ switchOn: false, switchOwn: true });
+      check('no self note card for: ' + quiet, !(await q.Card.offer(mine(quiet))).shown);
+    }
+    const inbound = world({ switchOn: true, switchOwn: true });
+    check('an inbound "remind me" is not read as a self note', !(await inbound.Card.offer(input('Remind me tomorrow to pay the electricity bill', { channel: 'whatsapp' }))).shown && inbound.injected.length === 0);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -437,7 +459,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-invitation-notice\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {

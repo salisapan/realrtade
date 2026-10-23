@@ -287,10 +287,20 @@ const FlowChatTaskCard = (() => {
     let callProposal = false;
     let appt = null;
     let inv = null;
+    let selfNote = null;
+    try { selfNote = (own && typeof FlowChatSelfNote !== 'undefined') ? FlowChatSelfNote.recognize(i.text, i.now) : null; } catch (e) { selfNote = null; }
     try { inv = (!own && typeof FlowChatInvitationNotice !== 'undefined') ? FlowChatInvitationNotice.recognize(i.text, i.now) : null; } catch (e) { inv = null; }
     try { appt = (!own && typeof FlowChatAppointmentNotice !== 'undefined') ? FlowChatAppointmentNotice.recognize(i.text, i.now) : null; } catch (e) { appt = null; }
     try { confirmed = typeof FlowMeetingConfirm !== 'undefined' ? FlowMeetingConfirm.recognize(i.text, i.now) : null; } catch (e) { confirmed = null; }
-    if (!(appt && appt.kind === 'appointment') && !(inv && inv.kind === 'invitation') && confirmed && confirmed.kind === 'confirmed') {
+    if (selfNote && selfNote.kind === 'note') {
+      // "Remind me tomorrow to pay the bill" / «תזכיר לי מחר לשלם חשבון חשמל» typed by the person (core/chat-self-note.js): a task
+      // titled with the thing itself, due that day. Not worded as a promise to the other person in the chat.
+      judged = {
+        show: true,
+        intent: { type: 'commitment', label: selfNote.what, entities: { dateIso: selfNote.dateIso, what: selfNote.what } },
+        process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + selfNote.what, params: { title: selfNote.what, dateIso: selfNote.dateIso, what: selfNote.what }, dependsOn: null }] }
+      };
+    } else if (!(appt && appt.kind === 'appointment') && !(inv && inv.kind === 'invitation') && confirmed && confirmed.kind === 'confirmed') {
       judged = {
         show: true,
         intent: { type: 'event', label: 'Meeting ' + confirmed.when, entities: { dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute } },
@@ -433,7 +443,7 @@ const FlowChatTaskCard = (() => {
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
       liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
     }
-    if (own) {
+    if (own && !(selfNote && selfNote.kind === 'note')) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").
       let base = '';
       try { base = (typeof FlowCommitmentTitle !== 'undefined' && FlowCommitmentTitle.titleFromBody(String(i.text || ''))) || ''; } catch (e) { base = ''; }
@@ -441,14 +451,14 @@ const FlowChatTaskCard = (() => {
       const title = ((base || (he ? 'הבטחה' : 'Promise')) + (who ? ' · ' + who : '')).slice(0, 120);
       liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: title }) });
     }
-    const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, name: own ? (he ? 'ההבטחה שלך' : 'Your promise') : judged.process.name, steps: [liveStep] });
+    const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, name: own ? (selfNote && selfNote.kind === 'note' ? (he ? 'תזכורת' : 'Reminder') : (he ? 'ההבטחה שלך' : 'Your promise')) : judged.process.name, steps: [liveStep] });
     const ctx = {
       app: i.channel || 'chat',
       doLabel: 'Do It',
       messageId: chatKey,
       intent: judged.intent,
       process: process,
-      sender: i.sender || {},
+      sender: (selfNote && selfNote.kind === 'note') ? {} : (i.sender || {}),
       bodyText: String(i.text || '').slice(0, 2000),
       subject: '',
       uiLang: he ? 'he' : 'en',

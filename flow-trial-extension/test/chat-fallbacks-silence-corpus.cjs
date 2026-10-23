@@ -1,4 +1,4 @@
-// The chat fallback readers (reminder, deadline, callback, payment, appointment, pickup, invitation) must stay silent on
+// The chat fallback readers (reminder, deadline, callback, payment, appointment, pickup, invitation, self note) must stay silent on
 // ordinary chat. These lines are everyday messages that contain a day, a clock, a number or a request word but are none of
 // the seven things. Written after the rules, not tuned to them. Run: node test/chat-fallbacks-silence-corpus.cjs
 const R = {
@@ -8,7 +8,8 @@ const R = {
   payment: require('../core/chat-payment-ask.js').FlowChatPaymentAsk,
   appointment: require('../core/chat-appointment-notice.js').FlowChatAppointmentNotice,
   pickup: require('../core/chat-pickup-notice.js').FlowChatPickupNotice,
-  invitation: require('../core/chat-invitation-notice.js').FlowChatInvitationNotice
+  invitation: require('../core/chat-invitation-notice.js').FlowChatInvitationNotice,
+  selfNote: require('../core/chat-self-note.js').FlowChatSelfNote
 };
 const NOW = new Date(2026, 9, 23, 10, 0, 0);
 let failures = 0;
