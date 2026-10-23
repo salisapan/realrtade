@@ -675,7 +675,10 @@ const FlowDisplay = (() => {
       amountOpen: 'A confirmed amount is still open',
       lmOn: 'The model built into this browser also reads wording nothing else recognises, for {langs} (it passed a precision check on this device). It only suggests; you decide.',
       lmOff: 'The model built into this browser did not pass the precision check on this device, so it stays off.',
-      lmAnd: ' and ', langEn: 'English', langHe: 'Hebrew'
+      lmAnd: ' and ', langEn: 'English', langHe: 'Hebrew',
+      plannerGroupConsentWhy: 'Planner needs read access to your work groups so Glance can list your plans. This is separate from your main Microsoft sign-in and is only asked when you use Planner.',
+      plannerTodoFallbackAdmin: 'Your organization has to approve Planner access. Glance added this to Microsoft To Do instead.',
+      plannerTodoFallbackDenied: 'Planner access wasn’t granted. Glance added this to Microsoft To Do instead.'
     },
     he: {
       brand: 'Glance', intentLabel: 'כוונה שזוהתה', will: 'Glance יבצע', prepared: 'מוכן · שום דבר לא נשלח', done: 'בוצע',
@@ -827,7 +830,10 @@ const FlowDisplay = (() => {
       amountOpen: 'סכום שסוכם עדיין פתוח',
       lmOn: 'המודל שבדפדפן הזה גם קורא ניסוח ששום דבר אחר לא מזהה, עבור {langs} (הוא עבר בדיקת דיוק במכשיר הזה). הוא רק מציע; אתה מחליט.',
       lmOff: 'המודל שבדפדפן הזה לא עבר את בדיקת הדיוק במכשיר הזה, אז הוא נשאר כבוי.',
-      lmAnd: ' ו-', langEn: 'אנגלית', langHe: 'עברית'
+      lmAnd: ' ו-', langEn: 'אנגלית', langHe: 'עברית',
+      plannerGroupConsentWhy: 'ל-Planner צריך גישת קריאה לקבוצות העבודה שלך כדי ש-Glance יוכל להציג את התוכניות. זה נפרד מההתחברות הראשית ל-Microsoft ונשאל רק כשמשתמשים ב-Planner.',
+      plannerTodoFallbackAdmin: 'הארגון שלך צריך לאשר גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
+      plannerTodoFallbackDenied: 'לא ניתנה גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.'
     }
   };
 
