@@ -884,17 +884,6 @@ if (require.main === module) {
     function patchOutlook(mutator) {
       return mutator(fs.readFileSync(outlookPath, 'utf8'));
     }
-    function reprobeDisabledSrc(src) {
-      return src
-        .replace(
-          'if (fileDroppedForUnread && attachmentsUnread) {\n        if (!owaHarnessFlag(\'disableUnreadReprobe\')) {',
-          'if (fileDroppedForUnread && attachmentsUnread) {\n        if (false) {'
-        )
-        .replace(
-          'if (attachmentsUnread && !owaHarnessFlag(\'disableUnreadReprobe\')) {',
-          'if (attachmentsUnread && false) {'
-        );
-    }
     const unreadGate = Object.assign({}, gate, {
       htmlPatch: (h) => gateHtml(BODY)(h).replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="pilot.pdf" data-size="1024"></div'),
       mailBody: BODY,
