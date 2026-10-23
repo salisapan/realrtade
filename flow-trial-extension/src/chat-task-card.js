@@ -311,6 +311,19 @@ const FlowChatTaskCard = (() => {
           callProposal = true;
         }
       }
+      // "Don't forget to bring the form on Monday" has no request verb or question, so the judge leaves it quiet;
+      // core/chat-reminder.js reads the reminder (one thing, one day) and the same task card offers it.
+      if ((!judged || !judged.show) && !own && typeof FlowChatReminder !== 'undefined') {
+        let rem = null;
+        try { rem = FlowChatReminder.recognize(i.text, i.now); } catch (e) { rem = null; }
+        if (rem && rem.kind === 'reminder') {
+          judged = {
+            show: true,
+            intent: { type: 'request', label: rem.what, entities: { dateIso: rem.dateIso, what: rem.what } },
+            process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + rem.what, params: { title: rem.what, dateIso: rem.dateIso, what: rem.what }, dependsOn: null }] }
+          };
+        }
+      }
     }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
     const taskStep = taskStepOf(judged.process);

@@ -345,3 +345,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 
 
 ## 2026-10-23 Ecosystems run A (37th): idle. The Google rows left wait on others, not on code: Forms (scope + host, owner «מאשר»), Contacts and Sheets row (scopes, owner), invite reply (choice card, Grok bot, card-requests-2026-10-20.md C5), Keep (no API).
+
+## 2026-10-23 Ecosystems builder B (thirty-seventh run) — reminders asked in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** a friend or colleague who writes «אל תשכח להביא את הטופס החתום ביום שני» or "Don't forget to bring the signed form on Monday" in WhatsApp, Messenger or Instagram now gets the Do It card; Do It writes one task with that thing, due that day, noting the chat only, read back by id, Undo refuses an edited task. The shared judge missed these (no request verb); questions, look-backs, hedges, no day, past days and the person's own messages stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-reminder-corpus.cjs` (8 reminders EN+HE, 13 quiet lines), chat card corpus (EN+HE card, write, quiet lines), all corpora.
+- **Open:** live Gate; no browser spec for this path yet (it shares the task write the 11 chat specs already prove).
+
