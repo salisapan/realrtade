@@ -353,3 +353,5 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-reminder-corpus.cjs` (8 reminders EN+HE, 13 quiet lines), chat card corpus (EN+HE card, write, quiet lines), all corpora.
 - **Open:** live Gate; no browser spec for this path yet (it shares the task write the 11 chat specs already prove).
 
+
+## 2026-10-23 Ecosystems run A (38th): idle. Same waits as the 37th; no «מאשר» yet.
