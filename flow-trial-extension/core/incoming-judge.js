@@ -113,6 +113,15 @@ const FlowIncomingJudge = (() => {
       if (notice) return { show: true, intent: noticeIntent(intentApi, notice), process: forSurface(noticeProcess(notice, i.threadUrl), i.surface || 'gmail') };
     }
 
+    // A booking the person is told about ("Your appointment is confirmed for Sunday at 10:00") becomes a hold on their own
+    // calendar, and a pickup with a last day ("Your order is ready for pickup until Friday") a task due that day. The same
+    // readers the chat card uses (core/chat-appointment-notice.js, core/chat-pickup-notice.js). Off unless the host passes
+    // bookingNoticeOn (glanceSwitches.BOOKING_NOTICE). Nobody is invited and nothing is sent.
+    if (i.bookingNoticeOn === true && i.senderIsUser !== true && i.inbound !== false) {
+      const booking = bookingNotice(i, prepareForJudge(i.text));
+      if (booking) return { show: true, intent: booking.intent, process: forSurface(booking.process, i.surface || 'gmail') };
+    }
+
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
@@ -249,6 +258,35 @@ const FlowIncomingJudge = (() => {
     const process = actionsApi.planFor(intent, planCtx);
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
+  }
+
+  function bookingNotice(i, body) {
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const apptApi = sibling(typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, './chat-appointment-notice.js', 'FlowChatAppointmentNotice');
+    const pickApi = sibling(typeof FlowChatPickupNotice !== 'undefined' ? FlowChatPickupNotice : null, './chat-pickup-notice.js', 'FlowChatPickupNotice');
+    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+    const tail = who ? ' · ' + who : '';
+    const appt = apptApi && typeof apptApi.recognize === 'function' ? apptApi.recognize(body, now0) : null;
+    if (appt && appt.kind === 'appointment') {
+      const he = appt.lang === 'he';
+      const title = ((he ? 'תור' : 'Appointment') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
+        process: { id: 'hold-it', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const pick = pickApi && typeof pickApi.recognize === 'function' ? pickApi.recognize(body, now0) : null;
+    if (pick && pick.kind === 'pickup') {
+      const he = pick.lang === 'he';
+      const title = ((he ? 'לאסוף הזמנה' : 'Pick up the order') + tail).slice(0, 120);
+      return {
+        intent: { type: 'request', label: title, confidence: 0.9, bookingNotice: 'pickup', personalClose: 'booking-notice', entities: { what: title, deadline: pick.dateIso }, facts: { date: { iso: pick.dateIso } } },
+        process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pick.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    return null;
   }
 
   function noticeIntent(intentApi, notice) {

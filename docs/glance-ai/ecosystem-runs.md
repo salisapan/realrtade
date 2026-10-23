@@ -419,3 +419,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-self-note-corpus.cjs` (8 notes EN+HE, 13 quiet lines), chat card corpus (switch separation, write, inbound not read), the silence corpus now covers eight readers, all corpora, chat browser spec.
 - **Open:** live Gate. The page cannot tell a self-chat from a chat with another person, so the cue words, not the thread, decide.
 
+## 2026-10-23 Ecosystems builder B (forty-sixth run) — Outlook booking confirmations and pickup notices
+
+- **Capability shipped (switch `glanceSwitches.BOOKING_NOTICE`, off):** an Outlook mail that says "Your appointment is confirmed for Sunday at 10:00" / «התור שלך נקבע ליום ראשון בשעה 10:00» now shows the existing Hold It card (event "Appointment · sender", nobody invited, read back by id, Undo deletes), and a mail that says "Your order is ready for pickup until Friday" / «ההזמנה שלך מוכנה לאיסוף עד יום חמישי» the existing To Do card (task "Pick up the order · sender" due that day). Until now these mails showed nothing (the mail judge saw no ask). First time the chat readers serve a mail surface: the one-algorithm rule holds, the readers live in `core/` and the judge calls them.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** new `test/booking-notice-corpus.cjs` (4 appointments, 2 pickups, switch off, own mail, not inbound, 8 quiet lines, wiring), new real-browser `e2e/outlook-booking-notice.spec.js` (3 specs: off shows nothing, hold with Undo, pickup task with Undo), all corpora, add-on bundle rebuilt.
+- **Open:** live Gate; Gmail not wired (own classify path); manifest `js` list gained two core files (content-script list only; the owner may want to see it).
+
