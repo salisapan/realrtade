@@ -204,16 +204,19 @@ function logH1ParityChange(line, before, after) {
 }
 
 (async () => {
-  logH1ParityChange(
-    'gmail-outlook-parity-corpus.cjs:244-246',
-    'same process (only the draft connector renamed); Outlook oKinds map outlookDraft→gmailDraft only',
-    'same process (draft and task connectors renamed); outlookDraft→gmailDraft and outlookTask→googleTask'
-  );
-  logH1ParityChange(
-    'gmail-outlook-parity-corpus.cjs:505',
-    'Outlook Hebrew sign-and-return expects googleTask step',
-    'Outlook Hebrew sign-and-return expects outlookTask step'
-  );
+  const H1_ROWS = [
+    { line: '262-265', name: 'a plain reply-requested ask from a named person' },
+    { line: '262-265', name: 'an approval ask with an amount' },
+    { line: '262-265', name: 'a confirm-by ask about pricing' },
+    { line: '262-265', name: 'a get-back-to-me ask with a deadline' },
+    { line: '262-265', name: 'an ask about who attends a dated kickoff (event + reply)' },
+    { line: '524', name: 'Outlook Hebrew sign-and-return has draft and task' }
+  ];
+  const H1_BEFORE = 'gmailDraft,googleTask vs outlookDraft,googleTask (task step not renamed on Outlook)';
+  const H1_AFTER = 'gmailDraft,googleTask vs outlookDraft,outlookTask (draft + task connectors renamed only)';
+  H1_ROWS.forEach((row) => {
+    logH1ParityChange('gmail-outlook-parity-corpus.cjs:' + row.line + ' [' + row.name + ']', H1_BEFORE, H1_AFTER);
+  });
   console.log('\n--- the same email, two adapters, one decision and one draft ---\n');
   let shownBoth = 0;
   for (let i = 0; i < CASES.length; i++) {
