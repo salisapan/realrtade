@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -220,6 +220,32 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('no calendar connected: no card', !(await none.Card.offer(input(MEET))).shown);
   }
 
+  // 5g. A call asked for in the chat travels to the worker as words, so Meet (Google) or Teams (Outlook) can add the link
+  // behind their own switches; the card itself adds nothing and invites nobody.
+  {
+    for (const text of ['Can we do a Teams call Thursday at 3pm?', 'אפשר שיחת וידאו ביום חמישי ב-15:00?']) {
+      const g = world({ target: { ok: true, connectorId: 'googleHold' } });
+      await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      if (!g.injected[0]) { check('call proposal offers the hold: ' + text, false, 'reason'); continue; }
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('Google hold carries the call words for Meet: ' + text, !!ge && ge.input.params.callText === text && !('attendees' in ge.input), ge && ge.input);
+      const o = world({ target: { ok: true, connectorId: 'outlookCalendar' }, exec: { ok: true, ref: { eventId: 'E2', externalId: 'E2' }, fetchedBack: true, written: 'Calendar · hold · Teams' } });
+      await o.Card.offer(input(text, { channel: 'whatsapp' }));
+      await o.injected[0].handlers.onDoIt(o.injected[0].host, {}, o.injected[0].ctx);
+      const ox = o.calls.find((c) => c.type === 'flow:execute-action');
+      check('Outlook hold carries the call words for Teams: ' + text, !!ox && ox.payload.params.meeting === true && ox.payload.params.callText === text, ox && ox.payload.params);
+    }
+    const t1 = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await t1.Card.offer(input('Can we do a Teams call Thursday at 3pm?', { channel: 'whatsapp' }));
+    check('a call proposal is titled as a call, not with the message', /^Call(?: · .+)?$/.test(t1.injected[0].ctx.process.steps[0].params.title), t1.injected[0].ctx.process.steps[0].params);
+    for (const quiet of ['Can we do a Zoom call Thursday at 3pm?', 'Maybe a video call sometime Thursday at 3pm?', 'No need for a Teams call Thursday at 3pm', 'Can we do a video call Thursday at 3pm or Friday at 4pm?', 'אפשר שיחת וידאו מתישהו ביום חמישי ב-15:00?']) {
+      const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+      const qr = await q.Card.offer(input(quiet, { channel: 'whatsapp' }));
+      check('no call hold for: ' + quiet, !qr.shown && q.injected.length === 0, qr);
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -274,7 +300,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {

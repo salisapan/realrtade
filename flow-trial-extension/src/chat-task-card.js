@@ -177,12 +177,16 @@ const FlowChatTaskCard = (() => {
 
   // A Google hold goes through the same lane the Gmail card writes through (flow:google-write, googleHold): the event is
   // read back by id and Undo refuses an event the person changed. Nobody is invited; the note names the chat only.
+  // The words of the proposal, so a video call asked for in the chat gets its Meet or Teams link (each behind its own
+  // switch in the worker) and a stated repeat gets its series. Only the worker reads it; it is never written anywhere.
+  function callTextOf(ctx) { return String((ctx && ctx.bodyText) || '').slice(0, 1500); }
+
   function googleHoldWrite(ctx, t, params) {
     const note = [(ctx.sender && ctx.sender.name) ? ctx.sender.name : '', (OPEN_LABELS[t.channel] || 'Open chat') + ': ' + threadUrl()].filter(Boolean).join(' · ');
     return {
       type: 'flow:google-write',
       connectorId: 'googleHold',
-      input: { title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', quote: note, dateIso: params.dateIso, hour: params.hour, minute: params.minute, params: { dateIso: params.dateIso, hour: params.hour, minute: params.minute, title: params.title || '', quote: note } },
+      input: { title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', quote: note, dateIso: params.dateIso, hour: params.hour, minute: params.minute, params: { dateIso: params.dateIso, hour: params.hour, minute: params.minute, title: params.title || '', quote: note, callText: callTextOf(ctx) } },
       tabAccount: '',
       lang: t.he ? 'he' : 'en'
     };
@@ -209,7 +213,7 @@ const FlowChatTaskCard = (() => {
         threadLabel: OPEN_LABELS[t.channel] || 'Open chat',
         label: params.title || (ctx.intent && ctx.intent.label) || 'Task',
         params: t.connectorId === 'outlookCalendar'
-          ? { meeting: true, title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', dateIso: params.dateIso, hour: params.hour, minute: params.minute }
+          ? { meeting: true, title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', dateIso: params.dateIso, hour: params.hour, minute: params.minute, callText: callTextOf(ctx) }
           : { dateIso: params.dateIso || null, amount: params.amount || null, what: params.what || null, fileTerm: params.fileTerm || null },
         facts: (ctx.intent && ctx.intent.facts) || null,
         entities: (ctx.intent && ctx.intent.entities) || (params.what ? { what: params.what } : null),
@@ -280,6 +284,7 @@ const FlowChatTaskCard = (() => {
     let judged = null;
     // An agreed meeting ("מעולה, נתראה ביום חמישי ב-15:00") is not a proposal the judge sees; core/meeting-confirm.js reads it.
     let confirmed = null;
+    let callProposal = false;
     try { confirmed = typeof FlowMeetingConfirm !== 'undefined' ? FlowMeetingConfirm.recognize(i.text, i.now) : null; } catch (e) { confirmed = null; }
     if (confirmed && confirmed.kind === 'confirmed') {
       judged = {
@@ -291,6 +296,21 @@ const FlowChatTaskCard = (() => {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
       } catch (e) { judged = null; }
+      // "Can we do a Teams call Thursday at 3pm?" is a call proposal the shared judge leaves to core/teams-meeting.js:
+      // one day, one clock, no other tool named. It becomes the same hold, titled as a call; the Meet or Teams link is the
+      // worker's, behind its own switch.
+      if ((!judged || !judged.show) && !own && typeof FlowTeamsMeeting !== 'undefined') {
+        let call = null;
+        try { call = FlowTeamsMeeting.recognize(i.text, i.now); } catch (e) { call = null; }
+        if (call && call.kind === 'clear') {
+          judged = {
+            show: true,
+            intent: { type: 'event', label: 'Call', entities: { dateIso: call.dateIso, hour: call.hour, minute: call.minute } },
+            process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: Call', params: { title: '', dateIso: call.dateIso, hour: call.hour, minute: call.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
+          };
+          callProposal = true;
+        }
+      }
     }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
     const taskStep = taskStepOf(judged.process);
@@ -312,7 +332,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((he ? 'פגישה' : 'Meeting') + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
     }
     if (own) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").

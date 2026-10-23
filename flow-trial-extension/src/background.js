@@ -631,7 +631,7 @@ const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
 function laneChatScripts(lane) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
   const out = [];
-  for (const f of base.concat(lane.js, ['core/meeting-confirm.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
+  for (const f of base.concat(lane.js, ['core/meeting-confirm.js', 'core/teams-meeting.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
   return out;
 }
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
