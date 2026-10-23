@@ -3276,71 +3276,6 @@
     return host;
   }
 
-  function fileAskGuardText(pane) {
-    const prepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
-      ? FlowIncomingJudge.prepareForJudge(pane.text || '')
-      : (pane.text || '');
-    return (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
-  }
-
-  function attachmentsPendingForFileAsk(pane, decided, mailbox) {
-    if (decided && (decided.reason === 'page:attachment-count-unread' || decided.reason === 'outlook:attachments-unread')) return true;
-    const closes = typeof FlowGoogleCloses !== 'undefined' ? FlowGoogleCloses : null;
-    const askText = fileAskGuardText(pane || {});
-    if (!closes || typeof closes.attachmentCountForJudge !== 'function' || !closes.attachmentCountForJudge(askText)) return false;
-    if (mailbox && mailbox.hasAttachments !== true) return false;
-    const localAttachN = ((pane && pane.attachments) || []).filter((a) => {
-      if (!a || a.isInline === true) return false;
-      return !/itemAttachment/i.test(String(a['@odata.type'] || ''));
-    }).length;
-    return localAttachN === 0;
-  }
-
-  function evaluateFileAskTaskGuard(pane, process, decided, st, mailbox) {
-    if (typeof FlowOutlookFileAskGuard === 'undefined' || typeof FlowOutlookFileAskGuard.evaluate !== 'function') return null;
-    return FlowOutlookFileAskGuard.evaluate({
-      text: fileAskGuardText(pane || {}),
-      process: process,
-      pageReason: decided && decided.reason,
-      scopes: calendarScopes(st),
-      attachmentsPending: attachmentsPendingForFileAsk(pane, decided, mailbox)
-    });
-  }
-
-  async function blockTaskFallbackForFileAsk(pane, process, decided, st, mailbox, token) {
-    const guard = evaluateFileAskTaskGuard(pane, process, decided, st, mailbox);
-    if (!guard || guard.allowTaskCard) return false;
-    dropStuckCard(pane);
-    const lang = pageUiLang();
-    const line = (guard.line && (lang === 'he' ? guard.line.he : guard.line.en)) || whyNotText(guard.pageReason);
-    const mount = mountPoint();
-    if (mount && !mount.querySelector('.flow-chip-host')) {
-      paintIfCurrent(token, function () {
-        let row = mount.querySelector('.flow-why-not');
-        if (!row) {
-          row = document.createElement('p');
-          row.className = 'flow-why-not';
-          if (mount.firstChild) mount.insertBefore(row, mount.firstChild);
-          else mount.appendChild(row);
-        }
-        row.textContent = line;
-        row.setAttribute('data-glance-why', guard.pageReason || guard.guard);
-        row.setAttribute('data-glance-file-ask-guard', guard.guard);
-        row.setAttribute('data-glance-task-fallback-blocked', guard.taskFallbackBlocked || '');
-        return row;
-      });
-    }
-    lastOutcome = guard.retry ? 'wait' : 'reason';
-    lastLoggedReason = guard.pageReason || guard.guard;
-    dbg('decision', { shown: false, reason: guard.pageReason, guard: guard.guard, taskFallbackBlocked: guard.taskFallbackBlocked });
-    await pageReason(guard.pageReason || guard.guard, pane, {
-      taskFallbackBlocked: guard.taskFallbackBlocked,
-      fileAskGuard: guard.guard
-    });
-    if (guard.retry) schedule();
-    return true;
-  }
-
   function taskOnlyProcess(process) {
     const steps = (process && process.steps) || [];
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
@@ -4497,10 +4432,6 @@
     if (!receiptOnly) {
       pane.userName = userNameOf(st);
       decided = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
-      if (decided && !decided.none && taskOnlyProcess(decided.process)) {
-        const mailboxHint = entry ? { hasAttachments: entry.hasAttachments } : null;
-        if (await blockTaskFallbackForFileAsk(pane, decided.process, decided, st, mailboxHint, token)) return;
-      }
       if (decided && decided.reason === 'third-party') {
         dropStuckCard(pane);
         await pageReason('page:third-party', pane);
@@ -4789,18 +4720,14 @@
       await pageReason('page:hold-without-clock', pane);
       return;
     }
-    if (taskOnlyProcess(ctx.process)) {
-      const mailboxHint = entry ? { hasAttachments: entry.hasAttachments } : null;
-      if (await blockTaskFallbackForFileAsk(pane, ctx.process, decided, st, mailboxHint, token)) return;
-      if (todoAsk(st)) {
-        const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
-        if (!asked) { await pageReason('page:inject-failed', pane); return; }
-        const askedIds = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
-        if (askedIds.length) asked.setAttribute('data-glance-message', askedIds.join('|'));
-        lastOutcome = 'card';
-        await clearReason(pane, 'tasks-not-granted');
-        return;
-      }
+    if (taskOnlyProcess(ctx.process) && todoAsk(st)) {
+      const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
+      if (!asked) { await pageReason('page:inject-failed', pane); return; }
+      const askedIds = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+      if (askedIds.length) asked.setAttribute('data-glance-message', askedIds.join('|'));
+      lastOutcome = 'card';
+      await clearReason(pane, 'tasks-not-granted');
+      return;
     }
 
     const host = paintIfCurrent(token, function () {
@@ -5859,18 +5786,15 @@
     try { loopSt = await FlowStorage.get(); } catch (e) { loopSt = null; }
     const dateWaiting = ctx.process.needsDateChoice === true && Array.isArray(ctx.process.dateChoices) && ctx.process.dateChoices.length >= 2;
     if ((ctx.process.id === 'hold' || ctx.glanceChain === 'calendar-hold') && !meetingClock(ctx) && !dateWaiting) return false;
-    if (taskOnlyProcess(ctx.process)) {
-      if (await blockTaskFallbackForFileAsk(pane, ctx.process, { intent: loop.intent, process: loop.process }, loopSt, null, token)) return true;
-      if (todoAsk(loopSt)) {
-        const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
-        if (!asked) return false;
-        const askedIds = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
-        if (askedIds.length) asked.setAttribute('data-glance-message', askedIds.join('|'));
-        lastOutcome = 'card';
-        lastKey = ctx.messageId + '|' + ((ctx.intent && ctx.intent.label) || '');
-        await clearReason(pane, 'tasks-not-granted');
-        return true;
-      }
+    if (taskOnlyProcess(ctx.process) && todoAsk(loopSt)) {
+      const asked = paintIfCurrent(token, function () { return paintTodoScopeCard(mount, ctx); });
+      if (!asked) return false;
+      const askedIds = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+      if (askedIds.length) asked.setAttribute('data-glance-message', askedIds.join('|'));
+      lastOutcome = 'card';
+      lastKey = ctx.messageId + '|' + ((ctx.intent && ctx.intent.label) || '');
+      await clearReason(pane, 'tasks-not-granted');
+      return true;
     }
     const host = paintIfCurrent(token, function () {
       const painted = injectCard(mount, ctx, {
