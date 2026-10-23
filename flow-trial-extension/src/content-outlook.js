@@ -746,6 +746,7 @@
       return !/itemAttachment/i.test(String(a['@odata.type'] || ''));
     }).length;
     const countGate = needsSave || (signedForJudge && localAttachN >= 2);
+    let attachmentsUnread = false;
     if (countGate) {
       let id = pane.itemId || null;
       if (!id) {
@@ -753,17 +754,16 @@
         if (found && found.unread) return { none: true, reason: found.reason };
         id = found && found.id;
       }
-      const rows = id ? await graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,isInline', 'save-count') : null;
-      if (!Array.isArray(rows)) {
-        const flag = mailbox && mailbox.hasAttachments;
-        if (flag === false) attachmentCount = 0;
-        else return { none: true, reason: 'page:attachment-count-unread' };
-      } else {
-        attachmentCount = rows.filter((a) => {
-          if (!a || a.isInline === true) return false;
-          return !/itemAttachment/i.test(String(a['@odata.type'] || ''));
-        }).length;
+      const ev = typeof FlowOutlookAttachmentEvidence !== 'undefined' ? FlowOutlookAttachmentEvidence : null;
+      const rows = id ? await attachmentListFor(id) : null;
+      const merged = ev && typeof ev.mergeCount === 'function'
+        ? ev.mergeCount(rows, pane, mailbox)
+        : { count: Array.isArray(rows) ? rows.length : null, unread: !Array.isArray(rows), source: 'graph' };
+      if (merged.count == null) {
+        return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
       }
+      attachmentCount = merged.count;
+      attachmentsUnread = Boolean(merged.unread);
     }
     if (signedForJudge && localAttachN >= 1 && !needsSave) attachmentCount = localAttachN;
     const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
@@ -801,9 +801,14 @@
     }
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
     if (r && r.show && r.process && r.process.id === 'file-it' && signedForJudge && localAttachN === 1 && !needsSave) {
-      return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process };
+      return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process, attachmentsUnread: attachmentsUnread };
     }
-    return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
+    if (r && r.show) {
+      const out = { intent: r.intent, process: r.process };
+      if (attachmentsUnread) out.attachmentsUnread = true;
+      return out;
+    }
+    return { none: true, reason: (r && r.reason) || 'intent-null', attachmentsUnread: attachmentsUnread || undefined };
   }
 
   function userNameOf(st) {
@@ -1148,12 +1153,14 @@
     // share-link step, and dropping the file would turn that Do It into a reply draft.
     const hasOnedrive = (process.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
     const draftSteps = (process.steps || []).filter((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft');
+    const taskSteps = (process.steps || []).filter((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     if (draftSteps.length && !hasOnedrive) {
-      process = Object.assign({}, process, {
-        steps: draftSteps.map((s) => s.kind === 'gmailDraft'
-          ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
-          : s)
-      });
+      const kept = draftSteps.concat(taskSteps).map((s) => s.kind === 'gmailDraft'
+        ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
+        : (s.kind === 'googleTask' || s.kind === 'googleTasks')
+          ? Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' })
+          : s);
+      process = Object.assign({}, process, { steps: kept });
     }
     const sender = entry.sender || (entry.base && entry.base.counterpart) || {
       name: pane && pane.senderName,
@@ -1221,6 +1228,8 @@
       attachment: pickedAttach || (savePick.mode === 'choice' ? null : (paneFiles[0] || null)),
       attachmentPickMode: savePick.mode,
       saveAttachmentName: pickedAttach && (pickedAttach.name || pickedAttach.filename) || null,
+      attachmentsUnread: Boolean(entry.attachmentsUnread || (pane && pane.attachmentsUnread)),
+      noteToSelf: Boolean(pane && pane.noteToSelf),
       __epoch: paneEpoch(pane)
     };
   }
@@ -3364,8 +3373,18 @@
     const steps = ctx.process.steps || [];
     const taskOnly = steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const hold = ctx.process.id === 'hold' || (ctx.intent && ctx.intent.personalClose === 'calendar-hold');
+    const needsOnedrive = steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'attachmentSave'));
     if (hold && calendarAsk(st)) paintCalendarConsent(host, ctx);
     if (taskOnly && todoAsk(st)) paintTodoConsent(host, ctx);
+    if (needsOnedrive && typeof FlowOnedriveFile !== 'undefined' && typeof FlowOnedriveFile.hasWriteScope === 'function') {
+      const ok = FlowOnedriveFile.hasWriteScope(calendarScopes(st));
+      if (ok === false) {
+        const line = (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine)
+          ? FlowReceipt.missingScopeLine('Files.ReadWrite', 'OneDrive')
+          : 'Reconnect OneDrive (Files.ReadWrite).';
+        paintHint(host, line);
+      }
+    }
   }
 
   async function onCalendarConsent(host, ctx, choice) {
@@ -4424,11 +4443,7 @@
       forwarded: pane.onBehalf === true
     });
     const selfMail = !receiptOnly && !selfAddressed && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
-    if (selfMail) {
-      dropStuckCard(pane);
-      await pageReason('note-to-self', pane);
-      return;
-    }
+    if (selfMail) pane.noteToSelf = true;
     if (!receiptOnly) {
       pane.userName = userNameOf(st);
       decided = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
@@ -4532,20 +4547,38 @@
           if (decided && decided.reason === 'signed-save-suggest') {
             dropStuckCard(pane);
             await clearReason(pane);
+            suggestNote = pane;
+            await recordSuggestNote();
             return;
           }
           const keepFile = typeof FlowOutlookSync !== 'undefined' && typeof FlowOutlookSync.keepMailboxFileCard === 'function'
             && FlowOutlookSync.keepMailboxFileCard(decided, entry);
           if (!keepFile) {
-            dropStuckCard(pane);
-            const named = (decided && decided.reason) || 'intent-null';
-            const quiet = /:/.test(String(named)) ? String(named) : ('page:' + named);
-            await pageReason(quiet, pane);
-            return;
+            if (decided && (decided.reason === 'page:attachment-count-unread' || decided.attachmentsUnread) && decided.intent && decided.process) {
+              decided = { intent: decided.intent, process: decided.process, attachmentsUnread: true };
+            } else if (decided && decided.reason === 'page:attachment-count-unread' && !decided.intent) {
+              const retry = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
+              if (retry && !retry.none && retry.intent && retry.process) {
+                decided = Object.assign({}, retry, { attachmentsUnread: true });
+              } else {
+                dropStuckCard(pane);
+                await pageReason('outlook:attachments-not-read', pane);
+                return;
+              }
+            } else {
+              dropStuckCard(pane);
+              const named = (decided && decided.reason) || 'intent-null';
+              const quiet = named === 'page:attachment-count-unread' || named === 'attachment-count-unread'
+                ? 'outlook:attachments-not-read'
+                : (/:/.test(String(named)) ? String(named) : ('page:' + named));
+              await pageReason(quiet, pane);
+              return;
+            }
+          } else if (decided && decided.none) {
+            decided = { intent: entry.intent, process: entry.process };
           }
-          decided = { intent: entry.intent, process: entry.process };
         }
-      if (!entry || (entry.process && decided.process && entry.process.id !== decided.process.id)) {
+      if (!entry || (entry.process && decided && decided.process && entry.process.id !== decided.process.id)) {
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
         let msgId = pane.itemId || null;
         if (!msgId && (pane.pathId || pane.conversationId)) {
@@ -4568,7 +4601,8 @@
           text: pane.text,
           sender: { name: pane.senderName, email: pane.senderEmail },
           intent: decided.intent,
-          process: decided.process
+          process: decided.process,
+          attachmentsUnread: Boolean(decided.attachmentsUnread)
         };
       } else {
         entry = Object.assign({}, entry, { intent: decided.intent, process: decided.process });
@@ -4736,6 +4770,12 @@
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
       if (painted) paintMissingScope(painted, ctx, st);
+      if (painted && ctx.attachmentsUnread && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+        paintHint(painted, FlowOutlookAttachmentEvidence.attachUnreadBanner(pageUiLang()));
+      }
+      if (painted && ctx.noteToSelf && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+        paintHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang()));
+      }
       return painted;
     });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
@@ -5058,7 +5098,15 @@
     const select = 'id,subject,from,sender,toRecipients,ccRecipients,receivedDateTime,conversationId';
     let rows = [];
     if (item) {
-      const one = await graphJson('/me/messages/' + encodeURIComponent(item) + '?$select=' + encodeURIComponent(select), 'pane-hydrate', null);
+      let one = null;
+      const spells = idSpellings(item);
+      const prefers = [null, GRAPH_IMMUTABLE];
+      for (let p = 0; p < prefers.length && !one; p++) {
+        for (let s = 0; s < spells.length; s++) {
+          const got = await graphJson('/me/messages/' + encodeURIComponent(spells[s]) + '?$select=' + encodeURIComponent(select), 'pane-hydrate', prefers[p]);
+          if (got && got.id && !Array.isArray(got.value)) { one = got; break; }
+        }
+      }
       if (one && one.id) rows = [one];
     } else {
       const filter = "conversationId eq '" + odataQuote(conv) + "'";

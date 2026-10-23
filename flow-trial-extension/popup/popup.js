@@ -1778,7 +1778,10 @@
         const pill = document.getElementById('statusPill');
         if (pill) pill.textContent = microsoftFaceLabel('missing');
       }
-      if (link === 'valid' && idN > 0) row.appendChild(el('div', 'wait-note', (who ? ('מחובר כ-' + who + '. ') : '') + idN + ' זהויות. ' + (st.lastAt ? 'נבדק.' : 'עדיין לא נבדק.')));
+      if (link === 'valid' && idN > 0) {
+        const addrs = (st.ownAddresses && st.ownAddresses.length) ? st.ownAddresses.join(', ') : who;
+        row.appendChild(el('div', 'wait-note', (addrs ? ('מחובר כ-' + addrs + '. ') : '') + idN + ' זהויות. ' + (st.lastAt ? 'נבדק.' : 'עדיין לא נבדק.')));
+      }
       if (st.fromAliasHint) row.appendChild(el('div', 'wait-note', st.fromAliasHint));
     }
     if (st.error) {

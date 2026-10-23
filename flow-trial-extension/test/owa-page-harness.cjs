@@ -805,9 +805,9 @@ async function runPage(opts) {
       { text: refused.chip && refused.chip.textContent, why: refusedWhy });
     const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
     const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
-    check('an unreadable attachment count is logged and is not a silent zero',
-      !unread.chip && (unreadWhy.indexOf('page:attachment-count-unread') >= 0 || unreadWhy.indexOf('outlook:attachments-unread') >= 0) &&
-      !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
+    check('an unreadable attachment count shows a card or attachments-not-read (never intent-null silence)',
+      (Boolean(unread.chip) || unreadWhy.indexOf('outlook:attachments-not-read') >= 0 || unreadWhy.indexOf('page:attachment-count-unread') >= 0) &&
+      !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google' || r === 'page:intent-null'),
       { text: unread.chip && unread.chip.textContent, why: unreadWhy });
     function fileIncoming(store) {
       return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {

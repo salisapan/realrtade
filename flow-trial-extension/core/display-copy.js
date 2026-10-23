@@ -453,6 +453,8 @@ const FlowDisplay = (() => {
     'not-connected': 'לא מחובר',
     'no-token': 'לא מחובר',
     'intent-null': 'לא זוהתה בקשה',
+    'attachments-not-read': 'לא הצלחתי לקרוא את הקבצים המצורפים',
+    'attachment-count-unread': 'לא הצלחתי לקרוא את הקבצים המצורפים',
     'too-short': 'לא זוהתה בקשה',
     'tasks-not-granted': 'אין הרשאת To Do',
     'third-party': 'משתמש חיצוני',
