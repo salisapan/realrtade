@@ -324,6 +324,19 @@ const FlowChatTaskCard = (() => {
           };
         }
       }
+      // "Need the report by Wednesday" / «תחתום על החוזה עד יום שישי»: a deadline asked without a question or a polite verb
+      // (core/chat-deadline-ask.js); the same task card offers it.
+      if ((!judged || !judged.show) && !own && typeof FlowChatDeadlineAsk !== 'undefined') {
+        let ask = null;
+        try { ask = FlowChatDeadlineAsk.recognize(i.text, i.now); } catch (e) { ask = null; }
+        if (ask && ask.kind === 'ask') {
+          judged = {
+            show: true,
+            intent: { type: 'request', label: ask.what, entities: { dateIso: ask.dateIso, what: ask.what } },
+            process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + ask.what, params: { title: ask.what, dateIso: ask.dateIso, what: ask.what }, dependsOn: null }] }
+          };
+        }
+      }
     }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
     const taskStep = taskStepOf(judged.process);

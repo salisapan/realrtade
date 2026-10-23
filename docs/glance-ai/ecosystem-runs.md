@@ -355,3 +355,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 
 
 ## 2026-10-23 Ecosystems run A (38th): idle. Same waits as the 37th; no «מאשר» yet.
+
+## 2026-10-23 Ecosystems builder B (thirty-eighth run) — deadlines asked in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** «תחתום על החוזה עד יום שישי», «אני צריך את המצגת עד מחר» or "Need the report by Wednesday" in WhatsApp, Messenger or Instagram now gets the Do It card; Do It writes one task with the thing, due that day, read back by id, Undo refuses an edited task. The shared judge missed these (no question or polite verb); questions, hedges, own promises, a third person, no day, past days stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-deadline-ask-corpus.cjs` (9 asks EN+HE, 15 quiet lines), chat card corpus, all corpora, chat browser spec.
+- **Open:** live Gate; "pay the deposit this week" (no named day) stays quiet by design.
+

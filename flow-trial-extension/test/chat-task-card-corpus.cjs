@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -265,6 +265,23 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check("the person's own reminder to someone is not offered here", !(await own.Card.offer(input("Don't forget to bring the signed form on Monday", { channel: 'whatsapp', fromMe: true, own: true }))).shown);
   }
 
+  // 5i. A deadline asked without a question ("Need the report by Wednesday") is a task the shared judge leaves quiet.
+  {
+    for (const [text, titleRe] of [['Need the signed contract by Wednesday', /contract/i], ['תחתום על החוזה עד יום שישי', /החוזה/]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleTask' } });
+      const r = await g.Card.offer(input(text, { channel: 'messenger' }));
+      check('deadline ask offers one task step: ' + text, r.shown && g.injected[0].ctx.process.steps.length === 1 && g.injected[0].ctx.process.steps[0].kind === 'googleTask', r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the task is the thing, due that day: ' + text, !!ge && titleRe.test(ge.input.title) && /^\d{4}-\d{2}-\d{2}$/.test(ge.input.dueIso) && /Open in Messenger/.test(ge.input.notes), ge && ge.input);
+    }
+    for (const quiet of ['Need the report', 'Maybe sign the lease by Monday', 'I need the report by 2025-01-02']) {
+      const q = world({ target: { ok: true, connectorId: 'googleTask' } });
+      check('no deadline card for: ' + quiet, !(await q.Card.offer(input(quiet, { channel: 'messenger' }))).shown && q.injected.length === 0);
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -319,7 +336,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {
