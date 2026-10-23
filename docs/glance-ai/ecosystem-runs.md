@@ -322,3 +322,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Code:** `core/recurring-reminder.js` (lane http adapter, `write`), `src/google-lane.js`, `src/google-lane-host.js` (plan message, write input, verify URL), `src/content-gmail.js` (`showRecurringChip`, payload, connector map). No manifest change.
 - **Tests:** `test/recurring-reminder-wiring-corpus.cjs` (all pass); recurring-reminder, recurring-hold, workspace-file, gmail-new-file, gmail-event-link, meet-wiring, event-call-link, google-form, docs-consistency, identity-copy, surface-parity, gmail-outlook-parity, system-notice green. No real-browser e2e yet.
 - **Open:** live Gate (owner); Outlook has no equivalent card for this yet.
+
+## 2026-10-23 Ecosystems builder B (thirty-fifth run) — agreed meetings in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** when someone agrees a meeting in a chat («מעולה, נתראה ביום חמישי ב-15:00», "Sounds good, see you Thursday at 3pm", «סגור, מחר ב-10:00») Glance offers the hold on the person's own calendar, titled "Meeting · Dana" / «פגישה · דנה» (proposals get the same tidy title). Questions, cancels, look-backs and past times stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked first; nothing new from Grok; canonical card reused.
+- **Tests:** `test/meeting-confirm-corpus.cjs` (10 agreed lines, 14 quiet lines, three time zones), chat corpus, 2 new browser specs on the real chat lane (21 specs pass with the lane specs).
+- **Open:** live Gate; Outlook hold browser spec.

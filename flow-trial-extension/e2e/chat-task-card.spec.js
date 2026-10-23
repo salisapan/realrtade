@@ -166,3 +166,26 @@ test('CHAT_PROMISE_CARD on: a vague promise and a promise from them (not me) sho
   await expect(again.locator(CARD)).toHaveCount(0);
   expect(taskCalls()).toHaveLength(0);
 });
+
+// An agreed meeting («מעולה, נתראה ביום חמישי ב-15:00») is not a proposal; core/meeting-confirm.js reads it and the card holds it.
+test('CHAT_TASK_CARD on: an agreed Hebrew meeting shows the card, Do It holds it titled with the person, Undo removes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'מעולה, נתראה ביום חמישי ב-15:00');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  const ev = events()[0];
+  expect(ev.summary).toBe('פגישה · Dana');
+  expect(String(ev.start.dateTime)).toMatch(/T15:00:00/);
+  expect(ev.attendees || []).toHaveLength(0);
+  expect(String(ev.description || '')).not.toContain('נתראה');
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});
+
+test('CHAT_TASK_CARD on: a cancelled or looking-back meeting message shows no card', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'מצטער, לא אוכל ביום חמישי ב-15:00');
+  await page.waitForTimeout(4000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+  expect(events()).toHaveLength(0);
+});

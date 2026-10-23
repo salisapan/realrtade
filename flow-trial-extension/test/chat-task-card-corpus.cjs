@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -259,6 +259,22 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const inboundOff = world({ switchOn: false, switchOwn: true });
     check('CHAT_PROMISE_CARD does not turn on the inbound card', !(await inboundOff.Card.offer(input(ASKS[0][0]))).shown);
   }
+
+  // 5f. An agreed meeting is a hold too, titled "Meeting · Dana", never with the whole message.
+  for (const [text, he] of [['מעולה, נתראה ביום חמישי ב-15:00', true], ['Sounds good, see you Thursday at 3pm', false], ['סגור, מחר ב-10:00 אצלך', true]]) {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input(text, { channel: 'whatsapp', sender: { name: 'Dana' } }));
+    check('agreed meeting offers a hold: ' + text, r.shown && w.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+    const it = w.injected[0];
+    await it.handlers.onDoIt(it.host, {}, it.ctx);
+    const exec = w.calls.find((c) => c.type === 'flow:google-write');
+    check('the hold is titled with the person, not the message: ' + text, !!exec && exec.input.title === (he ? 'פגישה · Dana' : 'Meeting · Dana') && Number.isInteger(exec.input.hour), exec && exec.input);
+  }
+  for (const text of ['Sorry, I can\'t make Thursday at 3pm', 'תודה על הפגישה אתמול ב-15:00', 'Sounds good, see you Thursday']) {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
+  }
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {
