@@ -616,3 +616,4 @@ const FlowFileAttach = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowFileAttach };
+else if (typeof globalThis !== 'undefined') globalThis.FlowFileAttach = FlowFileAttach;

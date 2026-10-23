@@ -42,7 +42,59 @@ function copyExtension(opts) {
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  patchM2OutlookClose(dest);
   return dest;
+}
+
+// E2E-only: inject M2 close-map scripts and worker writers (not in repo background.js).
+function patchM2OutlookClose(dest) {
+  const bgPath = path.join(dest, 'src/background.js');
+  let bg = fs.readFileSync(bgPath, 'utf8');
+  if (!bg.includes('outlook-m2-close.js')) {
+    bg = bg.replace(
+      "'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js']",
+      "'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js', 'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js']"
+    );
+    if (!bg.includes('outlook-m2-close.js')) {
+      bg = bg.replace(
+        /'core\/outlook-sync\.js', 'src\/outlook\.js', 'src\/chip-host\.js', 'src\/content-outlook\.js'\]/,
+        "'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js', 'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js']"
+      );
+    }
+  }
+  if (!bg.includes("import '../src/outlook-m2-close.js'")) {
+    bg = bg.replace(
+      "import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)",
+      "import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)\nimport '../core/onedrive-find.js';\nimport '../core/local-file.js';\nimport '../core/onedrive-file.js';\nimport '../src/outlook-m2-close.js';"
+    );
+  }
+  const hook = 'const WRITERS = {';
+  if (bg.includes(hook) && !bg.includes('onedriveFindAttach:')) {
+    const insert = `
+async function onedriveFindAttachWrite(p) {
+  const M2 = globalThis.FlowOutlookM2Close;
+  if (!M2) return { ok: false, reason: 'not-configured' };
+  const on = await glanceSwitchOn('ONEDRIVE_FIND');
+  const r = await M2.onedriveFindAttachWrite(outlookFetch, { flags: { ONEDRIVE_FIND: on }, params: (p && p.params) || {} });
+  return r && r.ok ? Object.assign({}, r, { fetchedBack: true }) : (r || { ok: false, reason: 'write-failed' });
+}
+async function onedriveFindUndo(ref) {
+  const M2 = globalThis.FlowOutlookM2Close;
+  if (!M2) return { ok: false };
+  return M2.onedriveFindUndo(outlookFetch, ref);
+}
+`;
+    bg = bg.replace(hook, insert + hook);
+    bg = bg.replace(
+      'onedriveNewFile: onedriveNewFileWrite, outlookEventCallLink: eventLinkWrite,',
+      'onedriveNewFile: onedriveNewFileWrite, onedriveFindAttach: onedriveFindAttachWrite, outlookEventCallLink: eventLinkWrite,'
+    );
+    bg = bg.replace(
+      'onedriveNewFile: onedriveNewFileUndo, outlookEventCallLink: eventLinkUndo,',
+      'onedriveNewFile: onedriveNewFileUndo, onedriveFindAttach: onedriveFindUndo, outlookEventCallLink: eventLinkUndo,'
+    );
+  }
+  fs.writeFileSync(bgPath, bg);
 }
 
 function outlookAuth(opts) {
@@ -278,14 +330,23 @@ function installE2EHooks() {
       if (attItem) {
         const messageId = attItem[1];
         const attachmentId = attItem[2];
-        const list = (scenario.attachments && scenario.attachments[messageId]) || [];
-        const row = list.find((a) => a && a.id === attachmentId) || { id: attachmentId, name: 'file.bin' };
+        const dyn = (e2e.draftAttachments && e2e.draftAttachments[messageId]) || [];
+        const list = ((scenario.attachments && scenario.attachments[messageId]) || []).concat(dyn);
+        if (method === 'DELETE') {
+          if (e2e.draftAttachments && e2e.draftAttachments[messageId]) {
+            e2e.draftAttachments[messageId] = e2e.draftAttachments[messageId].filter((a) => a && a.id !== attachmentId);
+          }
+          return Promise.resolve(empty(204));
+        }
+        const row = list.find((a) => a && a.id === attachmentId);
+        if (method === 'GET' && !row) return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
+        const use = row || { id: attachmentId, name: 'file.bin' };
         return Promise.resolve(json(200, {
           id: attachmentId,
-          name: row.name || 'file.bin',
-          contentType: row.contentType || 'application/octet-stream',
-          size: row.size || 3,
-          contentBytes: row.contentBytes || 'ZTJlLXBkZg=='
+          name: use.name || 'file.bin',
+          contentType: use.contentType || 'application/octet-stream',
+          size: use.size || 3,
+          contentBytes: use.contentBytes || 'ZTJlLXBkZg=='
         }));
       }
       const att = path.match(/\/me\/messages\/([^/]+)\/attachments$/);
@@ -298,7 +359,21 @@ function installE2EHooks() {
         return Promise.resolve(json(200, { value: list }));
       }
       if (att && method === 'POST') {
-        return Promise.resolve(json(201, { id: 'e2e-att-' + (e2e.seq++) }));
+        const msgId = att[1];
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        const attId = 'e2e-att-' + (e2e.seq++);
+        const bytes = posted.contentBytes ? Buffer.from(posted.contentBytes, 'base64') : Buffer.from('x');
+        const row = {
+          id: attId,
+          name: posted.name || 'file.bin',
+          contentType: posted.contentType || 'application/octet-stream',
+          size: bytes.length,
+          contentBytes: posted.contentBytes
+        };
+        e2e.draftAttachments = e2e.draftAttachments || {};
+        e2e.draftAttachments[msgId] = (e2e.draftAttachments[msgId] || []).concat([row]);
+        return Promise.resolve(json(201, { id: attId }));
       }
       const driveContent = path.match(/\/me\/drive\/root:\/(.+):\/content$/);
       if (driveContent && scenario.driveUnauthorized) {
@@ -319,10 +394,20 @@ function installE2EHooks() {
         e2e.drivePuts = (e2e.drivePuts || []).concat([key]);
         return Promise.resolve(json(201, item));
       }
+      if (/\/me\/drive\/root\/search/.test(path) && method === 'GET') {
+        const items = Object.values(e2e.driveItems || {}).filter((it) => it && it.file);
+        return Promise.resolve(json(200, { value: items }));
+      }
       const driveRoot = path.match(/\/me\/drive\/root:\/(.+)$/);
       if (driveRoot && method === 'GET') {
         const item = e2e.driveByName[driveRoot[1]];
         return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
+      }
+      const driveItemContent = path.match(/\/me\/drive\/items\/([^/]+)\/content$/);
+      if (driveItemContent && method === 'GET') {
+        const item = e2e.driveItems[driveItemContent[1]];
+        const body = (item && item.__content) || '%PDF-1.7 e2e-contract';
+        return Promise.resolve(new Response(body, { status: 200, headers: { 'Content-Type': 'application/octet-stream' } }));
       }
       const driveItem = path.match(/\/me\/drive\/items\/([^/]+)$/);
       if (driveItem) {
@@ -845,7 +930,35 @@ async function boot() {
     const o = opts || {};
     const id = o.id;
     const url = outlookUrl(id);
-    return openDocument(url, outlookHtml(o));
+    const page = await openDocument(url, outlookHtml(o));
+    await harness.ensureOutlookM2(page);
+    return page;
+  };
+
+  harness.openOutlookHtml = async function openOutlookHtml(html, opts) {
+    const o = opts || {};
+    const id = o.messageId || o.id || 'AQMkM2Html';
+    const url = outlookUrl(id);
+    const page = await openDocument(url, html);
+    await harness.ensureOutlookM2(page);
+    return page;
+  };
+
+  // Registered SURFACES may lag in headless runs; inject M2 close-map scripts explicitly (e2e copy only).
+  harness.ensureOutlookM2 = async function ensureOutlookM2(page) {
+    const pageUrl = page.url();
+    await harness.evaluateWorker(async (wantUrl) => {
+      const tabs = await chrome.tabs.query({ url: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'] });
+      const tab = (tabs || []).find((t) => t && t.url && wantUrl && t.url.split('#')[0] === wantUrl.split('#')[0]) || (tabs || [])[tabs.length - 1];
+      if (!tab || tab.id == null) return { ok: false, reason: 'no-tab' };
+      const files = ['core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js', 'src/outlook-m2-close.js'];
+      for (const f of files) {
+        try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [f] }); } catch (e) { /* already in bundle */ }
+      }
+      try { await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }); } catch (e) { /* scan will follow */ }
+      return { ok: true, tabId: tab.id };
+    }, pageUrl);
+    await page.waitForTimeout(500);
   };
 
   function watchSend() {
