@@ -373,3 +373,5 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-callback-ask-corpus.cjs` (8 asks EN+HE, 15 quiet lines), chat card corpus, all corpora, chat browser spec.
 - **Open:** live Gate; found but left alone: the shared judge shows a card for an inbound "I'll call you tomorrow" (the sender's promise), which is not an ask of the person.
 
+
+## 2026-10-23 Ecosystems run A (40th): idle. Same waits as the 37th; no «מאשר» yet.
