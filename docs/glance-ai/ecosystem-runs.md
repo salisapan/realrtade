@@ -390,3 +390,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** chat card corpus (two promise lines, vague promise), all corpora, chat browser spec.
 - **Open:** live Gate; the task is a follow-up, so Handled still needs the person to act on it (tracking is not completion).
 
+## 2026-10-23 Ecosystems builder B (forty-second run) — appointments confirmed in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** a clinic, salon, restaurant or person who confirms a booking in WhatsApp, Messenger or Instagram («התור שלך נקבע ליום ראשון בשעה 10:00», "Your appointment is confirmed for Sunday at 10:00") now gets the Do It card; Do It puts "Appointment · name" / «תור · שם» on the person's own Google or Outlook calendar, read back by id, Undo refuses an edited event, nobody is invited. Cancellations, offers of slots, questions, look-backs and a missing day or clock stay quiet. Before this, such a confirmation was mis-titled "Meeting" when the agreed-meeting reader caught the word "confirmed".
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-appointment-notice-corpus.cjs` (8 notices EN+HE, 16 quiet lines), chat card corpus, all corpora, chat browser spec.
+- **Open:** live Gate. Next buildable: a pickup deadline («ההזמנה מוכנה לאיסוף עד יום חמישי») as a task.
+

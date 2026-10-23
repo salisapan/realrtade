@@ -285,13 +285,24 @@ const FlowChatTaskCard = (() => {
     // An agreed meeting ("מעולה, נתראה ביום חמישי ב-15:00") is not a proposal the judge sees; core/meeting-confirm.js reads it.
     let confirmed = null;
     let callProposal = false;
+    let appt = null;
+    try { appt = (!own && typeof FlowChatAppointmentNotice !== 'undefined') ? FlowChatAppointmentNotice.recognize(i.text, i.now) : null; } catch (e) { appt = null; }
     try { confirmed = typeof FlowMeetingConfirm !== 'undefined' ? FlowMeetingConfirm.recognize(i.text, i.now) : null; } catch (e) { confirmed = null; }
-    if (confirmed && confirmed.kind === 'confirmed') {
+    if (!(appt && appt.kind === 'appointment') && confirmed && confirmed.kind === 'confirmed') {
       judged = {
         show: true,
         intent: { type: 'event', label: 'Meeting ' + confirmed.when, entities: { dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute } },
         process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: Meeting ' + confirmed.when, params: { title: '', dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
       };
+    } else if (appt && appt.kind === 'appointment') {
+      // "Your appointment is confirmed for Sunday at 10:00" / «התור שלך נקבע ליום ראשון בשעה 10:00» (core/chat-appointment-notice.js):
+      // a booking someone confirmed to the person becomes a hold titled "Appointment · name". Nobody is invited.
+      judged = {
+        show: true,
+        intent: { type: 'event', label: 'Appointment', entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute } },
+        process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: Appointment', params: { title: '', dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
+      };
+      callProposal = 'appointment';
     } else {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
@@ -402,7 +413,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
     }
     if (own) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").

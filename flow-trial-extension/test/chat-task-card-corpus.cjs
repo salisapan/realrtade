@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -332,6 +332,23 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a promise with no nameable thing keeps the generic log title', !vr.shown || !/^Waiting on/.test(vague.injected[0].ctx.process.steps[0].params.title), vr);
   }
 
+  // 5m. An appointment confirmed to the person is a hold titled "Appointment · name"; nobody is invited, nothing is sent.
+  {
+    for (const [text, titleRe] of [['Your appointment is confirmed for Sunday at 10:00', /^Appointment · Dana$/], ['התור שלך נקבע ליום ראשון בשעה 10:00', /^תור · Dana$/]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleHold' } });
+      const r = await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      check('appointment offers one calendar step: ' + text, r.shown && g.injected[0].ctx.process.steps.length === 1 && g.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the hold is the appointment at 10:00, no guest, note names the chat only: ' + text, !!ge && ge.connectorId === 'googleHold' && titleRe.test(ge.input.title) && ge.input.hour === 10 && !('attendees' in ge.input) && ge.input.quote.indexOf('confirmed') < 0, ge && ge.input);
+    }
+    for (const quiet of ['Your appointment is confirmed for Sunday', 'Your appointment has been cancelled, it was Sunday at 10:00', 'Available slots: Sunday at 10:00 or Monday at 11:00. Click to choose']) {
+      const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+      check('no appointment card for: ' + quiet, !(await q.Card.offer(input(quiet, { channel: 'whatsapp' }))).shown && q.injected.length === 0);
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -386,7 +403,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {
