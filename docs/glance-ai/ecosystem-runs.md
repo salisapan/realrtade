@@ -308,3 +308,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Capability shipped (switch off):** a meeting proposed in a WhatsApp, Messenger or Instagram chat (English and Hebrew) now shows the Do It card; Do It makes one hold on the person's own Google Calendar (the Gmail lane) or Outlook Calendar, read back by id, Undo refuses an event the person changed, nobody is invited, nothing is sent. The shared judge also gained the Hebrew «אפשר/נוכל/בא לך להיפגש» forms (Gmail and Outlook benefit).
 - **Tests:** `test/chat-task-card-corpus.cjs` (meeting lines EN+HE, quiet negatives, both providers), `e2e/chat-task-card.spec.js` (hold, reload receipt, Undo, edited-event refusal on the real chat lane), all 181 corpora, add-on bundle rebuilt.
 - **Open:** live Gate on the three chat sites; Outlook hold has corpus coverage only, no browser spec.
+
+## 2026-10-23 Ecosystems builder B (thirty-fourth run) — own-promise card in chats
+
+- **Capability shipped (switch `CHAT_PROMISE_CARD`, off):** Glance now catches what the person promised in a chat. A dated promise typed in a one-to-one WhatsApp, Messenger or Instagram chat (EN and HE) shows the Do It card; Do It writes one task due that day, titled with the promise and who it was made to, read back by id, Undo refuses an edited task. Vague promises, groups and forwarded messages stay quiet; nothing is sent.
+- **Grok sync:** `git log` and `card-requests-*.md` checked at the start: nothing new from the Grok bot; the card reuses the canonical one, no new request.
+- **Tests:** corpus (own-promise lines EN+HE, quiet negatives, switch separation) and 3 new browser specs on the real chat lane.
+- **Open:** live Gate; Outlook hold browser spec.

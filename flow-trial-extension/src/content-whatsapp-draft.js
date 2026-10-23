@@ -58,7 +58,17 @@
     const last = list[list.length - 1];
     if (!last) return;
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
-    if (!parsed || parsed.fromMe) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
+    if (parsed && parsed.fromMe) {
+      // The person's own newest message: a dated promise in it is offered as a task (CHAT_PROMISE_CARD, off).
+      const mine = textOf(last);
+      const mineKey = (last.getAttribute('data-id') || '') + '\n' + mine;
+      if (typeof FlowChatTaskCard !== 'undefined') {
+        FlowChatTaskCard.sync(mineKey);
+        if (mine && !quoted(last)) FlowChatTaskCard.offer({ text: mine, channel: 'whatsapp', oneToOne: true, group: false, fromMe: true, own: true, quoted: false, sender: { name: P.partyFromChat(title(main), list.map((n) => n.getAttribute('data-id'))).name }, key: mineKey, now: Date.now() }).catch(() => {});
+      }
+      return;
+    }
+    if (!parsed) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
     if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);

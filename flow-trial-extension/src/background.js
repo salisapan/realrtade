@@ -2335,7 +2335,7 @@ async function chatCalendarTarget() {
 }
 
 async function chatTaskTarget(msg) {
-  if (!(await glanceSwitchOn('CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
+  if (!(await glanceSwitchOn(msg && msg.own === true ? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
   if (msg && msg.kind === 'calendar') return chatCalendarTarget();
   // Google writes through the lane, which needs the connected account on record (a chat page has no mailbox to name it).
   let account = '';

@@ -14,11 +14,11 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
-  const o = Object.assign({ switchOn: true, target: { ok: true, connectorId: 'googleTask' }, exec: null, undo: null, log: [] }, opts || {});
+  const o = Object.assign({ switchOn: true, switchOwn: false, target: { ok: true, connectorId: 'googleTask' }, exec: null, undo: null, log: [] }, opts || {});
   const calls = [];
   const injected = [];
   const receipts = [];
@@ -56,7 +56,7 @@ function world(opts) {
           Promise.resolve().then(() => cb(r));
         }
       },
-      storage: { local: { async get() { return { glanceSwitches: o.switchOn ? { CHAT_TASK_CARD: true } : {} }; } } }
+      storage: { local: { async get() { return { glanceSwitches: Object.assign({}, o.switchOn ? { CHAT_TASK_CARD: true } : {}, o.switchOwn ? { CHAT_PROMISE_CARD: true } : {}) }; } } }
     },
     FlowStorage: {
       async get() { return { log: logRows.slice().reverse() }; },
@@ -232,6 +232,34 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('no hold for: ' + text, !r.shown && w.injected.length === 0, r);
   }
 
+  // 5e. The person's own dated promise in the chat is its own switch (CHAT_PROMISE_CARD, off) and its own card.
+  {
+    const mine = (text, extra) => input(text, Object.assign({ fromMe: true, own: true, sender: { name: 'Dana' } }, extra || {}));
+    const off = world({ switchOn: true, switchOwn: false });
+    check('own promise: CHAT_PROMISE_CARD off shows nothing even with CHAT_TASK_CARD on', !(await off.Card.offer(mine('I will send you the proposal by Thursday'))).shown && off.calls.length === 0);
+    for (const text of ['I will send you the proposal by Thursday', 'אשלח לך את ההצעה עד יום חמישי', 'אני אעביר לך את החשבונית מחר', "I'll send the contract on Sunday"]) {
+      const w = world({ switchOn: false, switchOwn: true });
+      const r = await w.Card.offer(mine(text));
+      check('own promise offers one task: ' + text, r.shown && w.injected[0].ctx.process.steps.length === 1 && /^\d{4}-/.test(w.injected[0].ctx.process.steps[0].params.dateIso), r);
+      const it = w.injected[0];
+      check('the promise task is titled with the promise and the person: ' + text, /· Dana$/.test(it.ctx.process.steps[0].params.title), it.ctx.process.steps[0].params);
+      await it.handlers.onDoIt(it.host, {}, it.ctx);
+      const exec = w.calls.find((c) => c.type === 'flow:google-write');
+      check('the promise task is written through the lane, due that day, noting who it was promised to: ' + text, !!exec && /^To: Dana$/m.test(exec.input.notes) && /^\d{4}-\d{2}-\d{2}$/.test(exec.input.dueIso) && exec.input.title.indexOf('Dana') > 0, exec && exec.input);
+      const ask = w.calls.find((c) => c.type === 'flow:chat-task-target');
+      check('the worker is told it is an own-promise offer', ask && ask.own === true, ask);
+    }
+    for (const text of ['I will think about it', 'I will try to send it sometime', "Sure, I'll be there", 'נדבר בהמשך', 'Thanks, got it!', 'Could you book the hall for next Monday?']) {
+      const w = world({ switchOn: false, switchOwn: true });
+      const r = await w.Card.offer(mine(text));
+      check('own message stays quiet: ' + text, !r.shown && w.injected.length === 0, r);
+    }
+    const g = world({ switchOwn: true });
+    check('own promise in a group stays out', !(await g.Card.offer(mine('I will send you the proposal by Thursday', { group: true }))).shown);
+    const inboundOff = world({ switchOn: false, switchOwn: true });
+    check('CHAT_PROMISE_CARD does not turn on the inbound card', !(await inboundOff.Card.offer(input(ASKS[0][0]))).shown);
+  }
+
   // 6. sync: another newest message, or the person's own, retires the card.
   {
     const w = world();
@@ -251,7 +279,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
   // 8. Production wiring: every chat lane loads the judge, the card, the chip host and the css.
   const bg = fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8');
   check('chat lanes load the shared judge base, chip host and the card', /function laneChatScripts/.test(bg) && /'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(bg) && /LANE_CHAT_CSS = \['design\/step-states-v1\/scoped\.css', 'src\/chip\.css'\]/.test(bg) && /js: laneChatScripts\(lane\),\s*css: LANE_CHAT_CSS/.test(bg));
-  check('the worker answers flow:chat-task-target behind the switch', /flow:chat-task-target/.test(bg) && /glanceSwitchOn\('CHAT_TASK_CARD'\)/.test(bg));
+  check('the worker answers flow:chat-task-target behind the switch', /flow:chat-task-target/.test(bg) && /glanceSwitchOn\(msg && msg\.own === true \? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'\)/.test(bg));
   for (const f of ['content-whatsapp-draft.js', 'content-messenger.js', 'content-instagram.js']) {
     check(f + ' hands the message to the card', /FlowChatTaskCard\.afterDraft\(/.test(fs.readFileSync(path.join(ROOT, 'src', f), 'utf8')));
   }

@@ -9,9 +9,9 @@ const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 
 const ASK = 'Can you review the draft by Wednesday?';
-const HTML = (text) => '<!doctype html><html><body><div role="main"><header><h2 data-glance-title>Dana</h2><a href="/100012345678/" role="link">Dana</a>' +
+const HTML = (text, who) => '<!doctype html><html><body><div role="main"><header><h2 data-glance-title>Dana</h2><a href="/100012345678/" role="link">Dana</a>' +
   '<a aria-label="Conversation information" href="https://www.messenger.com/t/100012345678">Conversation information</a></header>' +
-  '<div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + text + '</span></div>' +
+  '<div role="row" data-author="' + (who || 'them') + '" data-message-id="m1"><span dir="auto">' + text + '</span></div>' +
   '<div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div>' +
   '<button type="button" aria-label="Send"></button></div></body></html>';
 
@@ -44,10 +44,10 @@ async function registerRealLane(glance) {
   expect(ok).toBe(true);
 }
 
-async function open(glance, switches, text) {
+async function open(glance, switches, text, who) {
   await registerRealLane(glance);
   await glance.seedGmail(Object.assign({ googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' } }, switches ? { glanceSwitches: switches } : {}));
-  return glance.openMessenger(HTML(text || ASK));
+  return glance.openMessenger(HTML(text || ASK, who));
 }
 const CARD = '#glance-chat-task .flow-chip-host';
 const tasks = () => Object.values(server.tasks());
@@ -127,4 +127,42 @@ test('CHAT_TASK_CARD on: Undo of a hold refuses after the person edited the even
   await page.locator(CARD + ' button.flow-chip-undo').click();
   await expect(page.locator(CARD)).toContainText(/changed|left it|edited/i, { timeout: 15000 });
   expect(server.events()[id]).toBeTruthy();
+});
+
+// The person's own dated promise in the chat becomes a task, behind its own switch CHAT_PROMISE_CARD.
+const PROMISE = 'אשלח לך את ההצעה עד יום חמישי';
+
+test('CHAT_PROMISE_CARD off: the person\'s own promise shows nothing, even with CHAT_TASK_CARD on', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, PROMISE, 'me');
+  await page.waitForTimeout(5000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+  expect(taskCalls()).toHaveLength(0);
+});
+
+test('CHAT_PROMISE_CARD on: the own promise shows the card, Do It writes one task due that day, read back, Undo removes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_PROMISE_CARD: true }, PROMISE, 'me');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].title).toContain('Dana');
+  expect(String(tasks()[0].due || '')).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(tasks()[0].notes).toContain('To: Dana');
+  expect(tasks()[0].notes).toContain('Open in Messenger');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.reload();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(() => tasks().length).toBe(0);
+});
+
+test('CHAT_PROMISE_CARD on: a vague promise and a promise from them (not me) show no promise card', async ({ glance }) => {
+  const page = await open(glance, { CHAT_PROMISE_CARD: true }, 'I will think about it', 'me');
+  await page.waitForTimeout(4000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+  const again = await open(glance, { CHAT_PROMISE_CARD: true }, ASK, 'them');
+  await again.waitForTimeout(4000);
+  await expect(again.locator(CARD)).toHaveCount(0);
+  expect(taskCalls()).toHaveLength(0);
 });

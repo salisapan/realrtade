@@ -14,6 +14,8 @@
 // Page text stays on the device; the worker writes the task.
 const FlowChatTaskCard = (() => {
   const SWITCH = 'CHAT_TASK_CARD';
+  // The person's own dated promise in a chat ("אשלח לך את ההצעה עד יום חמישי") has its own switch, off by default.
+  const SWITCH_OWN = 'CHAT_PROMISE_CARD';
   const CHAIN = 'chat-task';
   const OPEN_LABELS = { whatsapp: 'Open in WhatsApp', messenger: 'Open in Messenger', instagram: 'Open in Instagram' };
   const dismissed = new Set();
@@ -37,11 +39,11 @@ const FlowChatTaskCard = (() => {
     });
   }
 
-  async function switchOn() {
+  async function switchOn(name) {
     try {
       if (!runtimeAlive() || !chrome.storage || !chrome.storage.local) return false;
       const bag = await chrome.storage.local.get({ glanceSwitches: {} });
-      return !!(bag.glanceSwitches && bag.glanceSwitches[SWITCH] === true);
+      return !!(bag.glanceSwitches && bag.glanceSwitches[name || SWITCH] === true);
     } catch (e) { return false; }
   }
 
@@ -162,7 +164,7 @@ const FlowChatTaskCard = (() => {
     const facts = (ctx.intent && ctx.intent.facts) || {};
     const iso = [params.dateIso, facts.date && facts.date.iso].find((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) || null;
     const lines = [];
-    if (ctx.sender && ctx.sender.name) lines.push('From: ' + ctx.sender.name);
+    if (ctx.sender && ctx.sender.name) lines.push((t.own ? 'To: ' : 'From: ') + ctx.sender.name);
     lines.push((OPEN_LABELS[t.channel] || 'Open chat') + ': ' + threadUrl());
     return {
       type: 'flow:google-write',
@@ -248,11 +250,13 @@ const FlowChatTaskCard = (() => {
 
   // input: { text, channel, oneToOne, group, fromMe, quoted, sender, key, now }
   // Resolves { shown, reason }.
+  // Own message: the same card, for a dated promise the person typed in the chat. Never sends, never touches the box.
   async function offer(input) {
     const i = input || {};
-    if (i.fromMe || i.group || i.oneToOne === false || i.quoted) return { shown: false, reason: 'not-an-inbound-one-to-one' };
+    const own = i.fromMe === true && i.own === true;
+    if ((i.fromMe && !own) || i.group || i.oneToOne === false || i.quoted) return { shown: false, reason: 'not-an-inbound-one-to-one' };
     if (typeof FlowChipHost === 'undefined' || typeof FlowStorage === 'undefined') return { shown: false, reason: 'missing' };
-    if (!(await switchOn())) return { shown: false, reason: 'switch-off' };
+    if (!(await switchOn(own ? SWITCH_OWN : SWITCH))) return { shown: false, reason: 'switch-off' };
     const chatKey = chatKeyOf(i);
     if (dismissed.has(chatKey)) return { shown: false, reason: 'dismissed' };
     const mount = mountNode();
@@ -279,16 +283,30 @@ const FlowChatTaskCard = (() => {
     } catch (e) { judged = null; }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
     const taskStep = taskStepOf(judged.process);
-    const calStep = taskStep ? null : calendarStepOf(judged.process);
+    // Own message: only a promise with one day on it ("I'll send it Thursday") is offered; a vague "I'll think about it" is not.
+    if (own) {
+      const typ = judged.intent && judged.intent.type;
+      const day = taskStep && taskStep.params && taskStep.params.dateIso;
+      if (!(typ === 'decision' || typ === 'commitment') || !/^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))) return { shown: false, reason: 'no-dated-promise' };
+    }
+    const calStep = taskStep || own ? null : calendarStepOf(judged.process);
     const step = taskStep || calStep;
     if (!step) return { shown: false, reason: 'no-task-step' };
 
-    const target = await send({ type: 'flow:chat-task-target', kind: calStep ? 'calendar' : 'task' });
+    const target = await send({ type: 'flow:chat-task-target', kind: calStep ? 'calendar' : 'task', own: own });
     if (!target || !target.connectorId) return { shown: false, reason: (target && target.reason) || 'not-connected' };
     const kind = target.connectorId === 'outlookTask' ? 'outlookTask' : (target.connectorId === 'googleHold' || target.connectorId === 'outlookCalendar') ? 'calendar' : 'googleTask';
-    const liveStep = Object.assign({}, step, { kind: kind });
     const he = uiLangOf(i.text) === 'he';
-    const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, steps: [liveStep] });
+    let liveStep = Object.assign({}, step, { kind: kind });
+    if (own) {
+      // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").
+      let base = '';
+      try { base = (typeof FlowCommitmentTitle !== 'undefined' && FlowCommitmentTitle.titleFromBody(String(i.text || ''))) || ''; } catch (e) { base = ''; }
+      const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+      const title = ((base || (he ? 'הבטחה' : 'Promise')) + (who ? ' · ' + who : '')).slice(0, 120);
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: title }) });
+    }
+    const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, name: own ? (he ? 'ההבטחה שלך' : 'Your promise') : judged.process.name, steps: [liveStep] });
     const ctx = {
       app: i.channel || 'chat',
       doLabel: 'Do It',
@@ -300,7 +318,7 @@ const FlowChatTaskCard = (() => {
       subject: '',
       uiLang: he ? 'he' : 'en',
       glanceChain: CHAIN,
-      chatTask: { connectorId: target.connectorId, channel: i.channel || 'chat', step: liveStep, chatKey: chatKey, he: he }
+      chatTask: { connectorId: target.connectorId, channel: i.channel || 'chat', step: liveStep, chatKey: chatKey, he: he, own: own }
     };
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();

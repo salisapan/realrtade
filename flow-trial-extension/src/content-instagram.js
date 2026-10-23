@@ -81,10 +81,18 @@
     const last = list[list.length - 1];
     if (!last) return;
     const who = author(last);
-    if (who !== 'them') { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
     const text = textOf(last);
     const id = last.getAttribute('data-message-id') || text.slice(0, 80);
     const key = id + '\n' + text;
+    if (who === 'me') {
+      // The person's own newest message: a dated promise in it is offered as a task (CHAT_PROMISE_CARD, off).
+      if (typeof FlowChatTaskCard !== 'undefined') {
+        FlowChatTaskCard.sync(key);
+        if (text && !forwarded(last)) FlowChatTaskCard.offer({ text: text, channel: 'instagram', oneToOne: true, group: false, fromMe: true, own: true, quoted: false, sender: { name: party.name }, key: key, now: Date.now() }).catch(() => {});
+      }
+      return;
+    }
+    if (who !== 'them') { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
     if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
