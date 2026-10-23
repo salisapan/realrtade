@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -282,6 +282,23 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     }
   }
 
+  // 5j. "Please call me back tomorrow" is a task to call the sender, due that day; the call itself stays the person's.
+  {
+    for (const [text, titleRe] of [['Please call me back tomorrow', /^Call back · /], ['תתקשר אליי מחר', /^להתקשר · /]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleTask' } });
+      const r = await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      check('callback ask offers one task step: ' + text, r.shown && g.injected[0].ctx.process.steps.length === 1, r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the task is the call with the sender, due that day: ' + text, !!ge && titleRe.test(ge.input.title) && /^\d{4}-\d{2}-\d{2}$/.test(ge.input.dueIso) && ge.input.notes.indexOf(text) < 0, ge && ge.input);
+    }
+    for (const quiet of ['Call me', "Don't call me tomorrow", 'Maybe call me Thursday']) {
+      const q = world({ target: { ok: true, connectorId: 'googleTask' } });
+      check('no callback card for: ' + quiet, !(await q.Card.offer(input(quiet, { channel: 'whatsapp' }))).shown && q.injected.length === 0);
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -336,7 +353,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {

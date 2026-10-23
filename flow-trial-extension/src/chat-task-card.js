@@ -337,6 +337,21 @@ const FlowChatTaskCard = (() => {
           };
         }
       }
+      // "Please call me back tomorrow" / «תתקשר אליי מחר» (core/chat-callback-ask.js): a task to call the sender, due that day.
+      // The call itself is the person's; Glance only keeps the promise to make it.
+      if ((!judged || !judged.show) && !own && typeof FlowChatCallbackAsk !== 'undefined') {
+        let cb = null;
+        try { cb = FlowChatCallbackAsk.recognize(i.text, i.now); } catch (e) { cb = null; }
+        if (cb && cb.kind === 'ask') {
+          const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+          const title = ((cb.lang === 'he' ? 'להתקשר' : 'Call back') + (who ? ' · ' + who : '')).slice(0, 120);
+          judged = {
+            show: true,
+            intent: { type: 'request', label: title, entities: { dateIso: cb.dateIso, what: title } },
+            process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title: title, dateIso: cb.dateIso, what: title }, dependsOn: null }] }
+          };
+        }
+      }
     }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
     const taskStep = taskStepOf(judged.process);

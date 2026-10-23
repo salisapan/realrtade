@@ -183,3 +183,4 @@ One line per decision: `date · decision · who · where it is written in docs/`
 - 2026-10-23: chat call proposals (WhatsApp, Messenger, Instagram) offer the hold titled Call · name, and the hold carries the proposal's words so Teams or Meet links follow their own switches (CHAT_TASK_CARD, TEAMS_MEETING, MEET_LINK, all off); Gate: not run.
 - 2026-10-23: chat reminders ("Don't forget to … on Monday", «אל תשכח … ביום שני») offered as one task by the chat card (core/chat-reminder.js, CHAT_TASK_CARD, off); Gate: not run.
 - 2026-10-23: chat deadlines asked without a question ("Need the report by Wednesday", «תחתום על החוזה עד יום שישי») offered as one task by the chat card (core/chat-deadline-ask.js, CHAT_TASK_CARD, off); Gate: not run.
+- 2026-10-23: chat call-me-back asks ("Please call me back tomorrow", «תתקשר אליי מחר») offered as one task Call back · name by the chat card (core/chat-callback-ask.js, CHAT_TASK_CARD, off); Gate: not run.
