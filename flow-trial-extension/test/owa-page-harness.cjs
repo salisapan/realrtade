@@ -62,6 +62,10 @@ async function runPage(opts) {
     outlookSync: { stateVersion: 3 },
     glanceOwnNames: []
   }, o.store || {});
+  if (o.uiLang && !Object.prototype.hasOwnProperty.call(store, 'glanceUiLanguage')) {
+    const u = String(o.uiLang).toLowerCase();
+    store.glanceUiLanguage = (u === 'he' || u.startsWith('he-') || u === 'iw' || u.startsWith('iw-')) ? 'he' : 'en';
+  }
   const sent = [];
   const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, attachmentsUnread: o.attachmentsUnread === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
@@ -162,13 +166,15 @@ async function runPage(opts) {
         if (o.outlookTaskWriteFail) {
           return { ok: false, reason: 'todo-write-failed', written: '', error: 'graph-down' };
         }
+        const title = (p.params && p.params.title) || p.subject || 'Task';
+        const taskId = 'T-' + String(title).replace(/\s+/g, '-').slice(0, 40);
         return {
           ok: true,
-          ref: { taskListId: 'L', taskId: 'T-mix-1', created: { title: 'Task' } },
-          proof: { fetchedBack: true, system: 'microsoft/todo', externalId: 'T-mix-1', verifiedAt: new Date().toISOString() },
+          ref: { taskListId: 'L', taskId, created: { title } },
+          proof: { fetchedBack: true, system: 'microsoft/todo', externalId: taskId, verifiedAt: new Date().toISOString() },
           written: 'To Do task logged',
           where: 'To Do',
-          url: 'https://to-do.office.com/tasks/id/T-mix-1'
+          url: 'https://to-do.office.com/tasks/id/' + taskId
         };
       }
       if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', fetchedBack: true, where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
@@ -176,7 +182,10 @@ async function runPage(opts) {
     }
     if (msg.type === 'flow:undo-action') {
       if (msg.connectorId === 'outlookCalendar') return { ok: true, written: 'Calendar event removed.' };
-      if (msg.connectorId === 'outlookTask') return { ok: true, fetchedBack: true, written: 'To Do task removed.' };
+      if (msg.connectorId === 'outlookTask') {
+        if (o.outlookTaskUndoFail) return { ok: false, written: 'Still there — the To Do task was not removed.' };
+        return { ok: true, fetchedBack: true, written: 'To Do task removed.' };
+      }
       return { ok: true, written: 'Reply draft removed. Not sent.' };
     }
     if (msg.type === 'flow:search-drive') {
@@ -201,9 +210,12 @@ async function runPage(opts) {
       },
       onChanged: { addListener() {} }, sync: { get: (k, cb) => cb({}) }
     },
-    i18n: { getUILanguage: () => 'he' }
+    i18n: { getUILanguage: () => (o.uiLang || 'he') }
   };
   const ctx = dom.getInternalVMContext();
+  if (o.harnessFlags) {
+    vm.runInContext('globalThis.__glanceOwaHarness = ' + JSON.stringify(o.harnessFlags), ctx);
+  }
   const throws = [];
   for (const f of files) {
     try { new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx); }
@@ -855,6 +867,21 @@ if (require.main === module) {
       String(unread.chip.textContent || '').indexOf(attachUnreadHe) >= 0 &&
       !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google' || r === 'page:intent-null'),
       { text: unread.chip && unread.chip.textContent, why: unreadWhy });
+    const m2b = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, harnessFlags: { disableUnreadReprobe: true, disableUnreadHandler: true }, waitMs: 3500 }));
+    const m2bWhy = (m2b.store.outlookPageDiag || []).map((d) => d.reason);
+    check('row 31 bite m2b: unread re-probe off and handler off → not a judged reply+task card',
+      !m2b.chip || m2bWhy.some((r) => r === 'outlook:attachments-not-read' || r === 'page:intent-null'),
+      { text: m2b.chip && m2b.chip.textContent, why: m2bWhy });
+    const handlerOn = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, harnessFlags: { disableUnreadReprobe: true }, waitMs: 3500 }));
+    const handlerOff = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, harnessFlags: { disableUnreadReprobe: true, disableUnreadHandler: true }, waitMs: 3500 }));
+    const onKinds = ((handlerOn.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+    const offKinds = ((handlerOff.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+    const onSteps = onKinds && onKinds.steps && onKinds.steps.map((s) => s.kind);
+    const offSteps = offKinds && offKinds.steps && offKinds.steps.map((s) => s.kind);
+    check('row 31 bite: :4840 unread handler alone names reply+task when re-probe fails',
+      Boolean(handlerOn.chip) && onSteps && onSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft') && onSteps.some((k) => k === 'outlookTask' || k === 'googleTask') &&
+      (!handlerOff.chip || !offSteps || !offSteps.some((k) => k === 'outlookDraft' || k === 'gmailDraft')),
+      { on: onSteps, off: offSteps, offWhy: (handlerOff.store.outlookPageDiag || []).map((d) => d.reason) });
     function fileIncoming(store) {
       return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {
         return ((e && e.process && e.process.steps) || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));

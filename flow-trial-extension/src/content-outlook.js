@@ -847,7 +847,7 @@
       }
       return out;
     }
-    if (attachmentsUnread) {
+    if (attachmentsUnread && !(typeof globalThis !== 'undefined' && globalThis.__glanceOwaHarness && globalThis.__glanceOwaHarness.disableUnreadReprobe)) {
       const probe = FlowIncomingJudge.judge({
         text: own, subject: pane.subject || '',
         sender: { name: pane.senderName, email: pane.senderEmail },
@@ -1086,6 +1086,12 @@
     return out;
   }
 
+  function owaHarnessIdSpells(id) {
+    const h = typeof globalThis !== 'undefined' && globalThis.__glanceOwaHarness;
+    if (h && h.idSpellingsRawOnly) return [String(id || '')];
+    return idSpellings(id);
+  }
+
   // The /inbox/id/<restId> segment is the Graph message id (EWS alphabet in the URL,
   // REST alphabet on Graph). GET /me/messages/{id} with both spellings. A conversation
   // id that is not a message returns no row, and the conversation fallbacks still run.
@@ -1117,7 +1123,7 @@
     if (!want) return null;
     try {
       const known = await loadUserAddresses();
-      const spells = idSpellings(raw);
+      const spells = owaHarnessIdSpells(raw);
       const prefers = [null, GRAPH_IMMUTABLE];
       for (let p = 0; p < prefers.length; p++) {
         for (let i = 0; i < spells.length; i++) {
@@ -2304,38 +2310,56 @@
   }
 
   function paneIdList(pane) {
-    return [pane && pane.itemId, pane && pane.pathId, pane && pane.conversationId].filter(Boolean).map(String);
+    const raw = [pane && pane.messageId, pane && pane.itemId, pane && pane.pathId, pane && pane.conversationId];
+    try {
+      const href = typeof location !== 'undefined' ? String(location.href || '') : '';
+      const m = /\/id\/([^?/#]+)/.exec(href);
+      if (m) raw.push(decodeURIComponent(m[1]));
+    } catch (e) { /* href unreadable */ }
+    const out = [];
+    raw.filter(Boolean).forEach((id) => {
+      const spells = typeof idSpellings === 'function' ? idSpellings(id) : [String(id)];
+      spells.forEach((s) => {
+        if (!s) return;
+        out.push(String(s));
+        if (typeof FlowOwaParse !== 'undefined') {
+          const c = FlowOwaParse.canonId(s);
+          if (c) out.push(c);
+        }
+      });
+    });
+    return out;
+  }
+
+  function draftRowIdList(row) {
+    const raw = [row.messageId, row.outlookIncomingId, row.itemId, row.pathId, row.threadId, row.outlookConversationId];
+    const out = [];
+    raw.filter(Boolean).forEach((id) => {
+      const spells = typeof idSpellings === 'function' ? idSpellings(id) : [String(id)];
+      spells.forEach((s) => {
+        if (!s) return;
+        out.push(String(s));
+        if (typeof FlowOwaParse !== 'undefined') {
+          const c = FlowOwaParse.canonId(s);
+          if (c) out.push(c);
+        }
+      });
+    });
+    return out;
   }
 
   function draftMatchesPane(row, pane) {
     if (!row || row.connectorId !== 'outlookDraft') return false;
     const want = paneIdList(pane);
-    const ids = [row.messageId, row.outlookIncomingId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
-    if (want.some((id) => idListed(id, ids))) return true;
-    const subj = String((pane && pane.subject) || '').trim();
-    const rowSubj = String(row.subject || '').trim();
-    if (subj && rowSubj && subj === rowSubj) return true;
-    try {
-      const href = typeof location !== 'undefined' ? String(location.href || '') : '';
-      const m = /\/id\/([^?/#]+)/.exec(href);
-      if (m && row.messageId) {
-        const pathId = decodeURIComponent(m[1]);
-        if (pathId === row.messageId || (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId(pathId) === FlowOwaParse.canonId(row.messageId))) return true;
-      }
-    } catch (e) { /* the open mail is still the match */ }
-    return false;
+    const have = draftRowIdList(row);
+    if (!want.length || !have.length) return false;
+    return want.some((w) => have.some((h) => sameExchangeId(w, h)));
   }
 
   function activeOutlookDraftRowInLog(log, pane) {
     const activeDrafts = (log || []).filter((e) => e && e.kind === 'written' && !e.undone && e.connectorId === 'outlookDraft');
     const matched = activeDrafts.filter((e) => draftMatchesPane(e, pane));
     if (matched.length) return matched[matched.length - 1];
-    const paneIds = paneIdList(pane);
-    for (let i = activeDrafts.length - 1; i >= 0; i--) {
-      const e = activeDrafts[i];
-      if (paneIds.some((id) => String(e.messageId) === String(id))) return e;
-    }
-    if (activeDrafts.length === 1) return activeDrafts[0];
     return null;
   }
 
@@ -2366,21 +2390,7 @@
   async function keepActiveDraftReceipt(pane) {
     if (!pane || typeof FlowStorage.getActiveOutlookReceipts !== 'function') return false;
     const receipts = await FlowStorage.getActiveOutlookReceipts();
-    let draft = (receipts || []).filter((r) => draftMatchesPane(r, pane)).pop();
-    if (!draft && typeof FlowStorage.get === 'function') {
-      let bag = null;
-      try { bag = await FlowStorage.get(); } catch (e) { bag = null; }
-      const log = (bag && bag.log) || [];
-      for (let i = log.length - 1; i >= 0; i--) {
-        const e = log[i];
-        if (!e || e.kind !== 'written' || e.undone || e.connectorId !== 'outlookDraft') continue;
-        if (draftMatchesPane(e, pane)) { draft = e; break; }
-      }
-      if (!draft) {
-        const drafts = log.filter((e) => e && e.kind === 'written' && !e.undone && e.connectorId === 'outlookDraft');
-        if (drafts.length === 1) draft = drafts[0];
-      }
-    }
+    const draft = (receipts || []).filter((r) => draftMatchesPane(r, pane)).pop();
     if (!draft) return false;
     if (pane) pane.__epoch = mailEpoch;
     const token = captureMailToken();
@@ -2637,11 +2647,7 @@
     let bag = null;
     try { bag = await FlowStorage.get(); } catch (e) { return null; }
     const log = (bag && bag.log) || [];
-    let draftRow = pane ? activeOutlookDraftRowInLog(log, pane) : null;
-    if (!draftRow && item && item.messageId) {
-      const drafts = log.filter((e) => e && e.kind === 'written' && !e.undone && e.connectorId === 'outlookDraft' && String(e.messageId) === String(item.messageId));
-      if (drafts.length === 1) draftRow = drafts[0];
-    }
+    const draftRow = pane ? activeOutlookDraftRowInLog(log, pane) : null;
     if (draftRow) return null;
     return FlowStillOpen.activeProofFor(log, item);
   }
@@ -4627,19 +4633,6 @@
       glanceError('calendar receipt', e);
     }
 
-    // The mail and Loops read the same still-open list. An older undone row
-    // stays one Do It here, matched by id or by the promise key, and the
-    // stored Undone line does not take the card's place.
-    try {
-      const loop = await openLoopForPane(pane);
-      if (loop && await showOpenLoopCard(pane, loop)) {
-        dbg('decision', { shown: true, reason: 'page:still-open', subject: pane.subject });
-        return;
-      }
-    } catch (e) {
-      glanceError('still open', e);
-    }
-
     // A new empty Word or Excel file asked for by name (switch ONEDRIVE_NEW_FILE, off): the worker decides.
     try {
       const closed = await settleCloseChains(pane, st);
@@ -4822,6 +4815,15 @@
           return;
         }
         if (!decided || decided.none) {
+          try {
+            const loop = await openLoopForPane(pane);
+            if (loop && await showOpenLoopCard(pane, loop)) {
+              dbg('decision', { shown: true, reason: 'page:still-open', subject: pane.subject });
+              return;
+            }
+          } catch (e) {
+            glanceError('still open', e);
+          }
           if (decided && decided.reason === 'signed-save-suggest') {
             dropStuckCard(pane);
             await clearReason(pane);
@@ -4838,6 +4840,12 @@
             if (decided && (decided.reason === 'page:attachment-count-unread' || decided.attachmentsUnread) && decided.intent && decided.process) {
               decided = { intent: decided.intent, process: decided.process, attachmentsUnread: true };
             } else if (decided && decided.attachmentsUnread) {
+              const skipUnreadHandler = typeof globalThis !== 'undefined' && globalThis.__glanceOwaHarness && globalThis.__glanceOwaHarness.disableUnreadHandler;
+              if (skipUnreadHandler) {
+                dropStuckCard(pane);
+                await pageReason('outlook:attachments-not-read', pane);
+                return;
+              }
               const retry = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
               if (retry && !retry.none && retry.intent && retry.process) {
                 decided = Object.assign({}, retry, { attachmentsUnread: true });
@@ -5436,7 +5444,7 @@
 
   async function attachmentListFor(id) {
     if (!id) return null;
-    const spells = idSpellings(id);
+    const spells = owaHarnessIdSpells(id);
     const prefers = [null, GRAPH_IMMUTABLE];
     const paths = [
       '/attachments?$select=id,name,contentType,size,isInline,contentId',

@@ -1535,7 +1535,7 @@ const FlowStorage = (() => {
       if (undoTsByMsg[e.messageId] == null || ts >= undoTsByMsg[e.messageId]) undoTsByMsg[e.messageId] = ts;
       if (e.ref) undoByRef[e.messageId + '|' + e.ref] = ts;
     }
-    const out = [];
+    const bestBySlot = Object.create(null);
     const seen = new Set();
     function receiptSlotKey(entry) {
       if (!entry || !entry.messageId) return '';
@@ -1551,10 +1551,11 @@ const FlowStorage = (() => {
       if (e.ref && undoByRef[e.messageId + '|' + e.ref] != null && undoByRef[e.messageId + '|' + e.ref] >= wts) continue;
       if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) continue;
       const slot = receiptSlotKey(e);
-      if (!slot || seen.has(slot)) continue;
-      seen.add(slot);
-      out.push(e);
+      if (!slot) continue;
+      const prev = bestBySlot[slot];
+      if (!prev || wts >= (prev.ts || 0)) bestBySlot[slot] = e;
     }
+    const out = Object.keys(bestBySlot).map((k) => bestBySlot[k]);
     const P = proofApi();
     const store = state && state.glanceProofs;
     if (P && typeof P.proofForIds === 'function' && store && store.records) {

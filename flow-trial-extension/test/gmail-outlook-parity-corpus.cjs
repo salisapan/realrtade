@@ -261,14 +261,23 @@ function logH1ParityChange(line, before, after) {
     shownBoth++;
     check(m.name + ': same type and label', g.intent.type === entry.intent.type && g.intent.label === entry.intent.label, { g: [g.intent.type, g.intent.label], o: [entry.intent.type, entry.intent.label] });
     const parityKind = H1_PARITY_NAMES.has(m.name)
-      ? (k) => (k === 'outlookDraft' ? 'gmailDraft' : k === 'outlookTask' || k === 'googleTasks' ? 'googleTask' : k)
+      ? (k) => (k === 'outlookDraft' ? 'gmailDraft' : k)
       : (k) => k;
-    const gKinds = g.process.steps.map((s) => parityKind(s.kind)).join(',');
-    const oKinds = entry.process.steps.map((s) => parityKind(s.kind)).join(',');
+    const normLane = (kind) => {
+      if (kind === 'gmailDraft' || kind === 'outlookDraft') return 'draft';
+      if (kind === 'googleTask' || kind === 'outlookTask' || kind === 'googleTasks') return 'task';
+      return kind;
+    };
+    const gKinds = g.process.steps.map((s) => normLane(parityKind(s.kind))).join(',');
+    const oKinds = entry.process.steps.map((s) => normLane(s.kind)).join(',');
     const processOk = H1_PARITY_NAMES.has(m.name)
       ? (gKinds === oKinds && g.process.name === entry.process.name)
       : (g.process.steps.map((s) => s.kind).join(',') === entry.process.steps.map((s) => s.kind).join(',') && g.process.name === entry.process.name);
-    check(m.name + ': same process (' + (H1_PARITY_NAMES.has(m.name) ? 'draft and task connectors renamed' : 'raw step kinds') + ')', processOk, { g: gKinds, o: entry.process.steps.map((s) => s.kind) });
+    check(m.name + ': same process (' + (H1_PARITY_NAMES.has(m.name) ? 'draft connector renamed; task kinds pinned per lane' : 'raw step kinds') + ')', processOk, { g: gKinds, o: entry.process.steps.map((s) => s.kind) });
+    if (H1_PARITY_NAMES.has(m.name)) {
+      check(m.name + ': Outlook lane uses outlookTask only (not googleTask)', entry.process.steps.some((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => s.kind === 'googleTask'), entry.process.steps.map((s) => s.kind));
+      check(m.name + ': Gmail lane uses googleTask only (not outlookTask)', g.process.steps.some((s) => s.kind === 'googleTask') && !g.process.steps.some((s) => s.kind === 'outlookTask'), g.process.steps.map((s) => s.kind));
+    }
 
     const gp = gmailPayload(g.process, m);
     if (!gp) { check(m.name + ': (no draft step on either side)', !entry.process.steps.some((s) => s.kind === 'outlookDraft')); continue; }
@@ -291,6 +300,14 @@ function logH1ParityChange(line, before, after) {
     check(m.name + ': the panel writes the same text too', panelText === gmailText, { panel: panelText, gmail: gmailText });
     check(m.name + ': the Outlook draft replies to the message that was read', /\/me\/messages\/msg\d+\/createReply$/.test(oCall.url) && oCall.url.includes(entry.messageId), oCall.url);
   }
+  console.log('\n--- 20c9-style Outlook steps fail H1 outlookTask pin ---\n');
+  const legacyOutlookSteps = [{ kind: 'outlookDraft' }, { kind: 'googleTask' }];
+  const legacyPinFails = !legacyOutlookSteps.some((s) => s.kind === 'outlookTask') || legacyOutlookSteps.some((s) => s.kind === 'googleTask');
+  check('20c9 product step list (googleTask on Outlook) fails the outlookTask pin', legacyPinFails, legacyOutlookSteps.map((s) => s.kind));
+  let legacyH1Fails = 0;
+  H1_ROWS.forEach(() => { if (legacyPinFails) legacyH1Fails++; });
+  check('all six H1 parity rows reject 20c9-style googleTask on Outlook', legacyH1Fails === H1_ROWS.length, { count: legacyH1Fails, want: H1_ROWS.length });
+
   check('the comparison is not empty: at least four asks were shown on both', shownBoth >= 4, shownBoth);
 
   console.log('\n--- the live failure modes, fixed ---\n');

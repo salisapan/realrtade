@@ -236,8 +236,8 @@ async function runBehavioral() {
   const f3Page = await runPage(Object.assign({}, gateBase, {
     htmlPatch: gateHtml(f3Signed), mailBody: f3Signed,
     urlId: F3_URL, listedConversationId: F3_URL,
-    messageId: F3_GRAPH_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
-    pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_GRAPH_MSG,
+    messageId: F3_RAW_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
+    pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_RAW_MSG,
     attachmentsGraphIdOnly: true,
     waitMs: 4500
   }));
@@ -247,6 +247,33 @@ async function runBehavioral() {
     Boolean(f3Page.chip) && /OneDrive|Do It/.test(String(f3Page.chip.textContent || '')) &&
     f3StepKinds && f3StepKinds.indexOf('onedriveFile') >= 0,
     { text: f3Page.chip && f3Page.chip.textContent, kinds: f3StepKinds });
+  const f3BaseOpts = {
+    htmlPatch: gateHtml(f3Signed), mailBody: f3Signed,
+    urlId: F3_URL, listedConversationId: F3_URL,
+    messageId: F3_RAW_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
+    pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_RAW_MSG,
+    attachmentsGraphIdOnly: true, waitMs: 4500
+  };
+  const f3AttachMut = await runPage(Object.assign({}, gateBase, f3BaseOpts, { harnessFlags: { idSpellingsRawOnly: true } }));
+  const f3AttachKinds = ((f3AttachMut.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const f3AttachStepKinds = f3AttachKinds && f3AttachKinds.steps && f3AttachKinds.steps.map((s) => s.kind);
+  check('F3 mutation attachmentListFor raw-only: file card missing (idSpellings required)',
+    !(f3AttachMut.chip && /OneDrive|Do It/.test(String(f3AttachMut.chip.textContent || ''))) ||
+    !f3AttachStepKinds || f3AttachStepKinds.indexOf('onedriveFile') < 0,
+    { text: f3AttachMut.chip && f3AttachMut.chip.textContent, kinds: f3AttachStepKinds });
+  check('keepActiveDraftReceipt uses getActiveOutlookReceipts only (no raw log scan)',
+    /getActiveOutlookReceipts\(\)/.test(outlookSrc) &&
+    !/keepActiveDraftReceipt[\s\S]{0,400}\(bag && bag\.log\)/.test(outlookSrc));
+  const { FlowStorage } = require('../src/storage.js');
+  const getActiveOutlookReceiptsFrom = FlowStorage.getActiveOutlookReceiptsFrom;
+  const pinLog = [
+    { kind: 'written', messageId: 'mix', connectorId: 'outlookDraft', ref: 'd1', ts: 100, outlookReceipt: true },
+    { kind: 'written', messageId: 'mix', connectorId: 'outlookDraft', ref: 'd2', ts: 200, outlookReceipt: true }
+  ];
+  const slotPin = getActiveOutlookReceiptsFrom({ log: pinLog });
+  check('storage receiptSlotKey keeps newest draft per message (slot key pinned in storage.js)',
+    slotPin.length === 1 && slotPin[0].ref === 'd2',
+    { slot: slotPin });
 
   const signed = 'Attached is the signed NDA. Please save it to OneDrive.';
   const one = await runPage(Object.assign({}, gateBase, {
@@ -300,6 +327,33 @@ async function runBehavioral() {
     (mixFailChip.indexOf(todoWarnHe) >= 0 || mixFailWritten.indexOf(todoWarnHe) >= 0 ||
       /To Do task wasn't created/i.test(mixFailChip) || /To Do task wasn't created/i.test(mixFailWritten)),
     { acts: mixFailActs.map((m) => m.payload && m.payload.connectorId), text: mixFailChip.slice(0, 280) });
+  const todoWarnEn = D.outlookTodoFailedAfterDraftLine('en');
+  const mixedTodoFailEn = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-todo-fail-en',
+    waitMs: 4500, clickDoIt: true, outlookTaskWriteFail: true, uiLang: 'en-US',
+    store: { glanceUiLanguage: 'en', outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [HME] } }
+  });
+  const enChip = mixedTodoFailEn.chip ? String(mixedTodoFailEn.chip.textContent || '') : '';
+  check('(A2-EN) To Do fail after draft shows EN warning on EN UI page',
+    /To Do task wasn't created/i.test(enChip) && /draft is ready/i.test(enChip),
+    { text: enChip.slice(0, 280), expected: todoWarnEn });
+  const mixedTodoUndoFail = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-todo-undo-fail',
+    waitMs: 4500, clickDoIt: true, clickUndo: true,
+    outlookTaskUndoFail: true,
+    store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [HME] } }
+  });
+  const undoFailText = mixedTodoUndoFail.chip ? String(mixedTodoUndoFail.chip.textContent || '') : '';
+  const undoFailDraftCalls = mixedTodoUndoFail.sent.filter((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookDraft');
+  check('(A2-undo) failed task Undo leaves draft receipt and does not call draft Undo',
+    mixedTodoUndoFail.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookTask') &&
+    undoFailDraftCalls.length === 0 &&
+    (/Reply draft ready|Draft ready|טיוטה/.test(undoFailText) || mixedTodoUndoFail.chip.querySelector('.flow-chip-undo')),
+    { text: undoFailText.slice(0, 280), undos: mixedTodoUndoFail.sent.filter((m) => m.type === 'flow:undo-action').map((m) => m.connectorId) });
 
   const h1Done = await runPage({
     htmlPatch: (h) => gateHtml(h1Body)(h),
@@ -317,12 +371,42 @@ async function runBehavioral() {
   });
   const reloadText = h1Reload.chip ? String(h1Reload.chip.textContent || '') : '';
   const reloadWritten = (h1Reload.store.log || []).filter((e) => e && e.kind === 'written' && !e.undone);
-  check('H1 reload: one receipt shows draft + To Do (not Handled-only To Do)',
+  const todoInReceipt = /To Do|משימה|Reply requested|הוצעה/.test(reloadText);
+  check('H1 reload: one receipt shows draft + To Do in receipt text (not Handled-only To Do)',
     Boolean(h1Reload.chip) &&
-    /Draft ready|Reply draft ready/.test(reloadText) &&
+    /Draft ready|Reply draft ready|טיוטה/.test(reloadText) &&
+    todoInReceipt &&
     reloadWritten.some((e) => e.connectorId === 'outlookDraft') &&
     reloadWritten.some((e) => e.connectorId === 'outlookTask'),
     { text: reloadText.slice(0, 240), written: reloadWritten.map((e) => e.connectorId) });
+  console.log('H1 parity bite: gate-run4-184-corpus.cjs:320-328 [H1 reload receipt text] | before: To Do only in store log | after: draft+To Do in DOM receipt | CTO parity e456 item1');
+  const heldDraftStore = JSON.parse(JSON.stringify(h1Done.store));
+  const otherInvoice = await runPage({
+    htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
+    mailBody: 'Please send the October invoice by Friday.',
+    urlId: GATE_CONV + '-OTHER', listedConversationId: GATE_CONV + '-OTHER', messageId: 'MSG-OTHER-INVOICE',
+    listedSubject: 'Invoice for October', waitMs: 4500,
+    store: heldDraftStore
+  });
+  const otherText = otherInvoice.chip ? String(otherInvoice.chip.textContent || '') : '';
+  const otherHasDo = otherInvoice.chip && (otherInvoice.chip.querySelector('.do-halo') || otherInvoice.chip.querySelector('button.flow-chip'));
+  check('N1: held draft on another mail does not show that draft receipt or Undo',
+    otherHasDo && !otherInvoice.chip.querySelector('.flow-chip-undo') &&
+    !/Reply draft ready|Draft ready/.test(otherText),
+    { text: otherText.slice(0, 200), why: (otherInvoice.store.outlookPageDiag || []).map((d) => d.reason) });
+  const sameSubjOtherId = await runPage({
+    htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h).replace('Invoice for October', 'Invoice for October'),
+    mailBody: 'Please send the October invoice by Friday.',
+    urlId: GATE_CONV + '-OTHER2', listedConversationId: GATE_CONV + '-OTHER2', messageId: 'MSG-OTHER-INVOICE-2',
+    listedSubject: 'Invoice for October', waitMs: 4500,
+    store: heldDraftStore
+  });
+  const sameSubjText = sameSubjOtherId.chip ? String(sameSubjOtherId.chip.textContent || '') : '';
+  check('N1: same subject different ids still shows Do It (not held draft receipt)',
+    sameSubjOtherId.chip && (sameSubjOtherId.chip.querySelector('.do-halo') || sameSubjOtherId.chip.querySelector('button.flow-chip')) &&
+    !sameSubjOtherId.chip.querySelector('.flow-chip-undo') &&
+    !/Reply draft ready/.test(sameSubjText),
+    { text: sameSubjText.slice(0, 200) });
   const h1UndoReload = await runPage({
     htmlPatch: (h) => gateHtml(h1Body)(h),
     mailBody: h1Body,

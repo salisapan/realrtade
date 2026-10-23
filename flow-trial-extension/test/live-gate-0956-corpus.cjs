@@ -386,13 +386,45 @@ function listsRoute() {
   const undoAgain = await waitFor(reloaded.doc, '.flow-chip-undo', 4000);
   const reloadLog = (reloaded.store.log || []).filter((e) => e && e.kind === 'written' && !e.undone);
   const reloadMixed = reloadLog.some((e) => e.connectorId === 'outlookDraft') && reloadLog.some((e) => e.connectorId === 'outlookTask');
-  check('a reload restores done and Undo from the receipt',
+  const reloadChip = chipText(reloaded.doc);
+  console.log('H1 parity bite: live-gate-0956-corpus.cjs:389-395 [mixed reload receipt] | before: draft-only chip text | after: draft+To Do in same receipt | CTO parity e456 item1');
+  console.log('H1 parity bite: live-gate-0956-corpus.cjs:1124-1135 [outlookTask mock] | before: fixed Budget review title | after: title/taskId from params | CTO parity e456 item1');
+  check('a reload restores done and Undo from the receipt with draft and To Do in one receipt',
     Boolean(undoAgain) && chipShows(reloaded.doc, ['Draft ready.', 'Reply draft ready in Outlook Drafts. Not sent.', 'Draft ready. Not sent.', 'Reply draft ready']) &&
     !reloaded.doc.querySelector('.do-halo') &&
-    (!reloadMixed || !/Handled\.|טופל\./.test(chipText(reloaded.doc)) || chipText(reloaded.doc).indexOf('Draft') >= 0 || chipText(reloaded.doc).indexOf('טיוטה') >= 0),
-    { text: chipText(reloaded.doc), log: reloadLog.map((e) => e.connectorId), mixed: reloadMixed });
+    (!reloadMixed || (reloadChip.indexOf('To Do') >= 0 || reloadChip.indexOf('Reply requested') >= 0 || reloadChip.indexOf('משימה') >= 0)),
+    { text: reloadChip, log: reloadLog.map((e) => e.connectorId), mixed: reloadMixed });
   draftPage.w.close();
   reloaded.w.close();
+
+  console.log('\n--- N1 held draft must not leak onto another mail ---\n');
+  const h1Mixed = await boot({
+    id: 'MSG-H1-MIX',
+    subject: 'Gate A – contract update',
+    body: 'האם תוכל לעדכן אותי לגבי החוזה עד יום ראשון?',
+    store: mailOnlyStore()
+  });
+  const h1Host = await waitCard(h1Mixed);
+  const h1Go = h1Host && (h1Host.querySelector('.do-halo') || h1Host.querySelector('button.flow-chip'));
+  if (h1Go) h1Go.click();
+  await waitFor(h1Mixed.doc, '.flow-chip-undo', 4000);
+  showSpaMail(h1Mixed, 'MSG-OTHER-INVOICE', 'Invoice for October', 'Please send the October invoice by Friday.\nThanks');
+  await sleep(400);
+  const leaked = chipText(h1Mixed.doc);
+  check('N1: opening another mail does not show the held draft receipt or Undo',
+    (h1Mixed.doc.querySelector('.do-halo') || h1Mixed.doc.querySelector('button.flow-chip')) &&
+    !h1Mixed.doc.querySelector('.flow-chip-undo') &&
+    !/Reply draft ready|Draft ready/.test(leaked),
+    { text: leaked });
+  showSpaMail(h1Mixed, 'MSG-OTHER-INVOICE-2', 'Invoice for October', 'Please confirm the October invoice total.\nThanks');
+  await sleep(400);
+  const sameSubj = chipText(h1Mixed.doc);
+  check('N1: same subject with a different id still shows Do It (not the held draft)',
+    (h1Mixed.doc.querySelector('.do-halo') || h1Mixed.doc.querySelector('button.flow-chip')) &&
+    !h1Mixed.doc.querySelector('.flow-chip-undo') &&
+    !/Reply draft ready/.test(sameSubj),
+    { text: sameSubj });
+  h1Mixed.w.close();
 
   console.log('\n--- Hold It on a meeting mail changes the card ---\n');
   const meetPage = await boot({
