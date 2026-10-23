@@ -375,3 +375,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 
 
 ## 2026-10-23 Ecosystems run A (40th): idle. Same waits as the 37th; no «מאשר» yet.
+
+## 2026-10-23 Ecosystems builder B (fortieth run) — payment asks in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** a chat message that asks the person to pay with an amount and a day («תעביר לי 500 שקל עד יום ראשון», "Please transfer 500 NIS to my account by Sunday") now gets the Do It card; Do It writes one task "Pay 500 NIS · name" due that day, read back by id, Undo refuses an edited task. Glance pays nothing. Own promises, payments already made, hedges, refusals, two amounts, no amount, no day stay quiet. This is the first user's money case («אף שקל לא נופל בין הכיסאות»).
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/chat-payment-ask-corpus.cjs` (8 asks EN+HE, 17 quiet lines), chat card corpus, all corpora, chat browser spec.
+- **Open:** live Gate; the shared judge still shows a task for an inbound "I'll transfer … by Sunday" (the sender's promise), not touched.
+

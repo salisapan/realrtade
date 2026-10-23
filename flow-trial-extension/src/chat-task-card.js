@@ -311,6 +311,21 @@ const FlowChatTaskCard = (() => {
           callProposal = true;
         }
       }
+      // "Please transfer 500 NIS to my account by Sunday" / «תעביר לי 500 שקל עד יום ראשון» (core/chat-payment-ask.js): a task
+      // to pay, with the amount and the day. Glance never pays and never touches a bank.
+      if ((!judged || !judged.show) && !own && typeof FlowChatPaymentAsk !== 'undefined') {
+        let pay = null;
+        try { pay = FlowChatPaymentAsk.recognize(i.text, i.now); } catch (e) { pay = null; }
+        if (pay && pay.kind === 'ask') {
+          const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+          const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+          judged = {
+            show: true,
+            intent: { type: 'request', label: title, entities: { dateIso: pay.dateIso, what: title } },
+            process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title: title, dateIso: pay.dateIso, what: title }, dependsOn: null }] }
+          };
+        }
+      }
       // "Don't forget to bring the form on Monday" has no request verb or question, so the judge leaves it quiet;
       // core/chat-reminder.js reads the reminder (one thing, one day) and the same task card offers it.
       if ((!judged || !judged.show) && !own && typeof FlowChatReminder !== 'undefined') {
