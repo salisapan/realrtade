@@ -383,3 +383,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-payment-ask-corpus.cjs` (8 asks EN+HE, 17 quiet lines), chat card corpus, all corpora, chat browser spec.
 - **Open:** live Gate; the shared judge still shows a task for an inbound "I'll transfer … by Sunday" (the sender's promise), not touched.
 
+## 2026-10-23 Ecosystems builder B (forty-first run) — what the sender promised, in chats
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** when someone promises the person something in WhatsApp, Messenger or Instagram («אשלח לך את החוזה ביום ראשון», "I'll send you the contract on Sunday"), the Do It card now logs "Waiting on Dana: Send the contract on Sunday" / «מחכים ל-Dana: לשלוח את החוזה ביום ראשון», due that day. Before, the card read "Log commitment for Oct 25", with no thing and no name, and looked like the person's own to-do (the issue noted in runs 39 and 40). A promise with no nameable thing keeps the generic title.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** chat card corpus (two promise lines, vague promise), all corpora, chat browser spec.
+- **Open:** live Gate; the task is a follow-up, so Handled still needs the person to act on it (tracking is not completion).
+

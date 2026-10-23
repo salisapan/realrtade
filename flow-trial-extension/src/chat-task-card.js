@@ -369,7 +369,21 @@ const FlowChatTaskCard = (() => {
       }
     }
     if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
-    const taskStep = taskStepOf(judged.process);
+    let taskStep = taskStepOf(judged.process);
+    // Something the sender promised the person ("I'll send you the contract on Sunday") is logged to follow up on, not to do:
+    // the judge's "Log commitment for Oct 25" becomes "Waiting on Dana: send the contract on Sunday", due that day.
+    if (!own && taskStep && taskStep.params && /^Log commitment/.test(String(taskStep.params.title || ''))) {
+      let base = '';
+      try { base = (typeof FlowCommitmentTitle !== 'undefined' && FlowCommitmentTitle.titleFromBody(String(i.text || ''))) || ''; } catch (e) { base = ''; }
+      const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+      if (base && who) {
+        const he = uiLangOf(i.text) === 'he';
+        const lead = he ? 'מחכים ל' + (/[\u0590-\u05FF]/.test(who) ? '' : '-') + who : 'Waiting on ' + who;
+        const retitled = Object.assign({}, taskStep, { params: Object.assign({}, taskStep.params, { title: (lead + ': ' + base).slice(0, 120) }) });
+        judged = Object.assign({}, judged, { process: Object.assign({}, judged.process, { steps: judged.process.steps.map((x) => (x === taskStep ? retitled : x)) }) });
+        taskStep = retitled;
+      }
+    }
     // Own message: only a promise with one day on it ("I'll send it Thursday") is offered; a vague "I'll think about it" is not.
     if (own) {
       const typ = judged.intent && judged.intent.type;

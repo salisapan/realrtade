@@ -185,3 +185,4 @@ One line per decision: `date · decision · who · where it is written in docs/`
 - 2026-10-23: chat deadlines asked without a question ("Need the report by Wednesday", «תחתום על החוזה עד יום שישי») offered as one task by the chat card (core/chat-deadline-ask.js, CHAT_TASK_CARD, off); Gate: not run.
 - 2026-10-23: chat call-me-back asks ("Please call me back tomorrow", «תתקשר אליי מחר») offered as one task Call back · name by the chat card (core/chat-callback-ask.js, CHAT_TASK_CARD, off); Gate: not run.
 - 2026-10-23: chat payment asks ("Please transfer 500 NIS by Sunday", «תעביר לי 500 שקל עד יום ראשון») offered as one task Pay 500 NIS · name by the chat card (core/chat-payment-ask.js, CHAT_TASK_CARD, off); nothing is paid; Gate: not run.
+- 2026-10-23: chat promises made to the person are logged as "Waiting on <name>: <thing>" due the promised day instead of "Log commitment for <date>" (src/chat-task-card.js, CHAT_TASK_CARD, off); Gate: not run.

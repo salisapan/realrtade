@@ -316,6 +316,22 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     }
   }
 
+  // 5l. What the sender promised the person is logged to follow up on ("Waiting on Dana: ..."), not worded as the person's own to-do.
+  {
+    for (const [text, titleRe] of [["I'll send you the contract on Sunday", /^Waiting on Dana: Send the contract on Sunday$/], ['אשלח לך את החוזה ביום ראשון', /^מחכים ל-Dana: לשלוח את החוזה ביום ראשון$/]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleTask' } });
+      const r = await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      check('sender promise is offered: ' + text, r.shown, r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the task waits on the sender, due the promised day: ' + text, !!ge && titleRe.test(ge.input.title) && /^\d{4}-\d{2}-\d{2}$/.test(ge.input.dueIso), ge && ge.input);
+    }
+    const vague = world({ target: { ok: true, connectorId: 'googleTask' } });
+    const vr = await vague.Card.offer(input("I'll call you tomorrow", { channel: 'whatsapp' }));
+    check('a promise with no nameable thing keeps the generic log title', !vr.shown || !/^Waiting on/.test(vague.injected[0].ctx.process.steps[0].params.title), vr);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
