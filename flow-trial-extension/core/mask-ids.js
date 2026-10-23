@@ -9,7 +9,7 @@
 //
 // Tokens: [ID_1], [ID_2]... Same value, same token. The map stays in the caller; only maskedText goes anywhere.
 const FlowMaskIds = (() => {
-  const LABEL = '(?:national\\s+id|id\\s*(?:number|no\\.?|#)?|passport(?:\\s+(?:number|no\\.?))?|policy(?:\\s+(?:number|no\\.?|#))?|case(?:\\s+(?:number|no\\.?|#))?|claim(?:\\s+(?:number|no\\.?|#))?|account(?:\\s+(?:number|no\\.?|#))?|acct\\.?|iban|ssn|tax\\s+id|vat\\s+(?:number|no\\.?)|ת\\.?ז\\.?|ת["\u05F4\u05F3\']ז|תעודת\\s+זהות|(?:מספר|מס[\'\u05F3.]?)\\s+(?:זהות|פוליסה|תיק|חשבון|דרכון|כרטיס)|חשבון\\s+(?:בנק\\s+)?(?:מספר|מס[\'\u05F3.]?)|פוליסה|חשבון)';
+  const LABEL = '(?:national\\s+id|id\\s*(?:number|no\\.?|#)?|passport(?:\\s+(?:number|no\\.?))?|policy(?:\\s+(?:number|no\\.?|#))?|case(?:\\s+(?:number|no\\.?|#))?|claim(?:\\s+(?:number|no\\.?|#))?|account(?:\\s+(?:number|no\\.?|#))?|acct\\.?|iban|ssn|tax\\s+id|vat\\s+(?:number|no\\.?)|ת\\.?ז\\.?|ת["\u05F4\u05F3\']ז|תעודת\\s+זהות|(?:מספר|מס[\'\u05F3.]?)\\s+(?:זהות|פוליסה|תיק|חשבון|דרכון|כרטיס)|חשבון\\s+(?:בנק\\s+)?(?:מספר|מס[\'\u05F3.]?)|פוליסה|דרכון|חשבון)';
   // After the label: optional punctuation, then a code of at least 5 characters that contains a digit (letters, digits, dashes, slashes).
   const LABELLED = new RegExp('(?<![A-Za-z0-9])(' + LABEL + ')(\\s*[:#.\\-]?\\s*)(?=[A-Za-z0-9\\-\\/]*\\d)([A-Za-z0-9][A-Za-z0-9\\-\\/]{4,29})', 'gi');
   // An IBAN: two letters, two digits, then 11 to 30 alphanumerics, optionally spaced in groups of four.
@@ -29,6 +29,10 @@ const FlowMaskIds = (() => {
   const DOT_DATE = /(?<![\d.])\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2})(?![\d.])/g;
   const HE_MONTHS = '(?:ינואר|פברואר|מרץ|מרס|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)';
   const HE_DATE = new RegExp('(?<!\\d)\\d{1,2}\\s?(?:ב|ל)?' + HE_MONTHS + '(?:\\s?,?\\s?\\d{4})?(?![א-ת])', 'g');
+
+  //   An address the shield's e-mail pattern cannot see (red team 2026-10-23): spaces or a no-break space around the @ ("dana @ acme.com"),
+  //   a full-width ＠, or written out ("dana at acme dot com", "dana [at] acme [dot] com"). The tail must end in a 2-6 letter domain label.
+  const LOOSE_EMAIL = /[A-Za-z0-9._%+-]+(?:[\s ]*(?:@|＠|\(at\)|\[at\])[\s ]*[A-Za-z0-9-]+(?:(?:\.|\s?\(dot\)\s?|\s?\[dot\]\s?)[A-Za-z0-9-]+)*(?:\.|\s?\(dot\)\s?|\s?\[dot\]\s?)[A-Za-z]{2,6}|\s+at\s+[A-Za-z0-9-]+(?:\s+dot\s+[A-Za-z0-9-]+)*\s+dot\s+[A-Za-z]{2,6})(?![A-Za-z0-9])/gi;
 
   function luhn(digits) {
     let sum = 0, alt = false;
@@ -60,6 +64,7 @@ const FlowMaskIds = (() => {
     };
     let out = String(text == null ? '' : text);
     out = out.replace(IBAN, (m) => tokenFor(m));
+    out = out.replace(LOOSE_EMAIL, (m) => tokenFor(m, 'EMAIL_X'));
     out = out.replace(CARD, (m) => (isCard(m) ? tokenFor(m, 'CARD') : m));
     out = out.replace(IL_PHONE, (m) => tokenFor(m, 'IL_PHONE'));
     out = out.replace(LABELLED, (m, label, sep, code) => label + sep + tokenFor(code));
@@ -83,7 +88,7 @@ const FlowMaskIds = (() => {
     return out;
   }
 
-  return { mask, maskAll, unmask, isCard, IL_PHONE, CARD };
+  return { mask, maskAll, unmask, isCard, IL_PHONE, CARD, LOOSE_EMAIL };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowMaskIds };
