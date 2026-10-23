@@ -28,6 +28,19 @@ const FlowExecRouter = (() => {
   const MONTH_LEAK = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\b/i;
   const LEAK_PATTERNS = [EMAIL_LEAK, PHONE_LEAK, MONEY_LEAK, ISO_LEAK, MONTH_LEAK];
   const MAX_PROMPT_CHARS = 12000;
+  // Red team 2026-10-16: Israeli identifiers that LEAK_PATTERNS above does not see (a local-form phone, a payment card, a labelled ID number).
+  // Kept apart from LEAK_PATTERNS so the copies the service worker and the server pin stay equal; checked only on what is about to leave.
+  const IL_PHONE_LEAK = /(?<![\d+])(?:(?:972|00972)[-.\s]?(?:5\d|[23489]|7\d)[-.\s]?\d{3}[-.\s]?\d{4}|0(?:5\d|7\d)[-.\s]?\d{3}[-.\s]?\d{4}|0[23489][-.\s]\d{3}[-.\s]?\d{4})(?!\d)/;
+  const CARD_LEAK = /(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/g;
+  const IL_ID_LEAK = /(?:ת["״׳']ז|ת\.ז\.?|תעודת\s+זהות|(?:מספר|מס['׳.]?)\s+זהות)\s*[:#.\-]?\s*\d{5,9}(?!\d)/;
+  // An address with spaces or a full-width sign around the @ (red team 2026-10-23); the written-out form is masked, not refused.
+  const LOOSE_EMAIL_LEAK = /[A-Za-z0-9._%+-]+[\s\u00A0]*(?:@|＠)[\s\u00A0]*[A-Za-z0-9-]+(?:[\s\u00A0]*\.[\s\u00A0]*[A-Za-z0-9-]+)*[\s\u00A0]*\.[\s\u00A0]*[A-Za-z]{2,6}(?![A-Za-z0-9])/;
+  function luhnOk(d) { let sum = 0, alt = false; for (let i = d.length - 1; i >= 0; i--) { let x = d.charCodeAt(i) - 48; if (alt) { x *= 2; if (x > 9) x -= 9; } sum += x; alt = !alt; } return sum % 10 === 0; }
+  function idLeaks(text) {
+    const t = String(text == null ? '' : text);
+    if (IL_PHONE_LEAK.test(t) || IL_ID_LEAK.test(t) || LOOSE_EMAIL_LEAK.test(t)) return true;
+    return (t.match(CARD_LEAK) || []).some((m) => { const d = m.replace(/\D/g, ''); return d.length >= 13 && d.length <= 19 && luhnOk(d); });
+  }
   const TOKEN = /\[[A-Z][A-Z_]*_[A-Z0-9]+\]/g;
 
   function withTimeout(promise, ms, label) {
@@ -110,7 +123,7 @@ const FlowExecRouter = (() => {
     try { m = masker.maskAll(prompt, shield); } catch (e) { return { ok: false, reason: 'mask-failed' }; }
     const text = m && m.maskedText;
     if (typeof text !== 'string' || !m.tokenMap || typeof m.tokenMap !== 'object') return { ok: false, reason: 'mask-failed' };
-    if (leaks(text)) return { ok: false, reason: 'pii-blocked' };
+    if (leaks(text) || idLeaks(text)) return { ok: false, reason: 'pii-blocked' };
     for (const raw of Object.values(m.tokenMap)) if (String(raw).length >= 4 && text.indexOf(String(raw)) >= 0) return { ok: false, reason: 'mask-failed' };
     for (const span of sensitiveSpans(prompt)) if (text.indexOf(span) >= 0) return { ok: false, reason: 'mask-failed' };
     return { ok: true, text, tokenMap: m.tokenMap, counts: m.counts };
@@ -178,7 +191,7 @@ const FlowExecRouter = (() => {
     }
   }
 
-  return { MIN_CONFIDENCE, MAX_PROMPT_CHARS, LEAK_PATTERNS, maskForServer, route, confidence, agreement, canonical, leaks, sensitiveSpans };
+  return { MIN_CONFIDENCE, MAX_PROMPT_CHARS, LEAK_PATTERNS, maskForServer, route, confidence, agreement, canonical, leaks, idLeaks, sensitiveSpans };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecRouter };
