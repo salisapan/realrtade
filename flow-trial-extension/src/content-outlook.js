@@ -1521,7 +1521,9 @@
         ? FlowProofOfClose.allowsHandled({ ok: !!(tr && tr.ok), proof: tr && tr.proof })
         : false;
       if (!taskProved && (!tr || !tr.ok)) {
-        taskWritten = String((tr && (tr.written || tr.error || tr.reason)) || "To Do didn't save. The draft is ready.");
+        taskWritten = (typeof FlowDisplay !== 'undefined' && FlowDisplay.outlookTodoFailedAfterDraftLine
+          ? FlowDisplay.outlookTodoFailedAfterDraftLine(pageUiLang())
+          : String((tr && (tr.written || tr.error || tr.reason)) || "To Do task wasn't created. The draft is ready."));
       } else if (taskProved || (tr && tr.ref && tr.written === "Created, couldn't verify")) {
         taskRef = tr.ref;
         taskCreated = (tr.ref && tr.ref.created) || null;

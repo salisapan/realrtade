@@ -120,6 +120,13 @@ async function runPage(opts) {
           return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
         }
         if (o.attachmentReads === 'fail') return { ok: false, status: 0, error: 'network' };
+        const graphOnly = o.attachmentsGraphIdOnly ? String(o.attachmentGraphMessageId || graphMsg.id) : '';
+        if (graphOnly) {
+          if (asked === graphOnly) {
+            return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
+          }
+          return { ok: false, status: 404, body: '{}' };
+        }
         if (asked === graphMsg.id) {
           return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
         }
@@ -152,6 +159,9 @@ async function runPage(opts) {
         return { ok: true, ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar', url: 'https://outlook.live.com/calendar/item/ev-hold-1', written: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00' };
       }
       if (p.connectorId === 'outlookTask') {
+        if (o.outlookTaskWriteFail) {
+          return { ok: false, reason: 'todo-write-failed', written: '', error: 'graph-down' };
+        }
         return {
           ok: true,
           ref: { taskListId: 'L', taskId: 'T-mix-1', created: { title: 'Task' } },

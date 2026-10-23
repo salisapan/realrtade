@@ -513,6 +513,8 @@ const FlowDisplay = (() => {
   const ATTACH_LOADING_EN = 'Until the attachments finish loading';
   const MISSING_SCOPE_HE = '{scope} לא כלול בכניסה. בהגדרות, סמן {service}.';
   const MISSING_SCOPE_EN = '{scope} is not included in your sign-in. In Settings, check {service}.';
+  const TODO_AFTER_DRAFT_FAIL_HE = 'משימת To Do לא נוצרה. הטיוטה מוכנה.';
+  const TODO_AFTER_DRAFT_FAIL_EN = "To Do task wasn't created. The draft is ready.";
 
   function attachmentsNotReadLine(lang) {
     const which = uiLangFrom({ setting: lang });
@@ -524,6 +526,11 @@ const FlowDisplay = (() => {
     const withTask = opts && (opts.taskSuggested === true || opts.withTask === true);
     if (withTask) return which === 'he' ? NOTE_SELF_TASK_HE : NOTE_SELF_TASK_EN;
     return which === 'he' ? NOTE_SELF_SHORT_HE : NOTE_SELF_SHORT_EN;
+  }
+
+  function outlookTodoFailedAfterDraftLine(lang) {
+    const which = uiLangFrom({ setting: lang });
+    return which === 'he' ? TODO_AFTER_DRAFT_FAIL_HE : TODO_AFTER_DRAFT_FAIL_EN;
   }
 
   function attachmentsLoadingLine(lang) {
@@ -1255,6 +1262,7 @@ const FlowDisplay = (() => {
     dropAlreadyHandledDiag: dropAlreadyHandledDiag,
     whyNotShownLine: whyNotShownLine,
     attachmentsNotReadLine: attachmentsNotReadLine,
+    outlookTodoFailedAfterDraftLine: outlookTodoFailedAfterDraftLine,
     noteToSelfLine: noteToSelfLine,
     attachmentsLoadingLine: attachmentsLoadingLine,
     missingScopeLine: missingScopeLine,

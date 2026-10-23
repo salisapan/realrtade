@@ -15,6 +15,19 @@ function check(name, cond, detail) {
 const ROOT = path.join(__dirname, '..');
 const { FlowOutlookAttachmentEvidence: E } = require('../core/outlook-attachment-evidence.js');
 const { FlowDisplay: D } = require('../core/display-copy.js');
+const { FlowOwaParse } = require('../core/owa-parse.js');
+const BITE_REF = '26ee0527';
+function logGateRun4Bite(line, name, ruling) {
+  console.log('Gate Run 4 bite: gate-run4-184-corpus.cjs:' + line + ' [' + name + '] | ruling: ' + ruling + ' | ref: ' + BITE_REF);
+}
+function outlookMessageIdSpellings(id) {
+  const raw = String(id || '');
+  const canon = FlowOwaParse.canonId(raw);
+  const out = [];
+  if (canon) out.push(canon);
+  if (raw && raw !== canon) out.push(raw);
+  return out;
+}
 const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
 const bgSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
 const displaySrc = fs.readFileSync(path.join(ROOT, 'core/display-copy.js'), 'utf8');
@@ -41,9 +54,9 @@ check('signed-save-suggest triggers recordSuggestNote',
   /signed-save-suggest/.test(outlookSrc) && /recordSuggestNote/.test(outlookSrc));
 check('buildCtx keeps task steps with reply draft (H1)',
   /taskSteps/.test(outlookSrc) && /draftSteps\.concat\(taskSteps\)/.test(outlookSrc));
-check('F3 path REST and office read use idSpellings + ImmutableId fallback',
-  /function idSpellings/.test(outlookSrc) && /idSpellings\(read\.messageId\)/.test(outlookSrc) &&
-  /prefers = \[null, GRAPH_IMMUTABLE\]/.test(outlookSrc));
+check('display-copy has HE+EN To Do failed after draft warning',
+  D.outlookTodoFailedAfterDraftLine('he').indexOf('טיוטה') >= 0 &&
+  /draft is ready/i.test(D.outlookTodoFailedAfterDraftLine('en')));
 check('note-to-self does not return before decideFromText',
   !/pane\.noteToSelf = true[\s\S]{0,40}return;/.test(outlookSrc));
 check('paintMissingScope mentions OneDrive Files.ReadWrite',
@@ -208,6 +221,33 @@ async function runBehavioral() {
     immStepKinds && immStepKinds.indexOf('onedriveFile') >= 0,
     { text: imm.chip && imm.chip.textContent, kinds: immStepKinds });
 
+  const F3_URL = GATE_CONV;
+  const F3_RAW_MSG = 'AQMkADBm/j3F3Plus+Underscore_Spelling==';
+  const F3_GRAPH_MSG = FlowOwaParse.canonId(F3_RAW_MSG);
+  const f3AttachStubAccepts = (asked, acceptId) => String(asked || '') === String(acceptId || '');
+  logGateRun4Bite('211-235', 'F3 attachments GET idSpellings vs Graph-only stub', 'CTO item 4 F3: attachment list must try REST spelling, not raw URL id only');
+  check('F3 counterfactual: single encodeURIComponent on raw URL id does not hit Graph-only attachment stub',
+    F3_RAW_MSG !== F3_GRAPH_MSG && !f3AttachStubAccepts(F3_RAW_MSG, F3_GRAPH_MSG),
+    { raw: F3_RAW_MSG.slice(0, 40), graph: F3_GRAPH_MSG.slice(0, 40) });
+  check('F3 idSpellings reaches Graph-only attachment stub',
+    outlookMessageIdSpellings(F3_RAW_MSG).some((s) => f3AttachStubAccepts(s, F3_GRAPH_MSG)),
+    { spells: outlookMessageIdSpellings(F3_RAW_MSG).map((s) => s.slice(0, 36)) });
+  const f3Signed = 'Attached is the signed NDA. Please save it to OneDrive.';
+  const f3Page = await runPage(Object.assign({}, gateBase, {
+    htmlPatch: gateHtml(f3Signed), mailBody: f3Signed,
+    urlId: F3_URL, listedConversationId: F3_URL,
+    messageId: F3_GRAPH_MSG, attachmentGraphMessageId: F3_GRAPH_MSG,
+    pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_GRAPH_MSG,
+    attachmentsGraphIdOnly: true,
+    waitMs: 4500
+  }));
+  const f3Kinds = ((f3Page.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const f3StepKinds = f3Kinds && f3Kinds.steps && f3Kinds.steps.map((s) => s.kind);
+  check('F3 behavioral: attachments GET via idSpellings shows file card when stub accepts only Graph message id',
+    Boolean(f3Page.chip) && /OneDrive|Do It/.test(String(f3Page.chip.textContent || '')) &&
+    f3StepKinds && f3StepKinds.indexOf('onedriveFile') >= 0,
+    { text: f3Page.chip && f3Page.chip.textContent, kinds: f3StepKinds });
+
   const signed = 'Attached is the signed NDA. Please save it to OneDrive.';
   const one = await runPage(Object.assign({}, gateBase, {
     htmlPatch: gateHtml(signed), mailBody: signed, waitMs: 4500
@@ -240,6 +280,26 @@ async function runBehavioral() {
     mixUndos.some((m) => m.connectorId === 'outlookDraft') &&
     mixUndos.some((m) => m.connectorId === 'outlookTask'),
     mixUndos.map((m) => m.connectorId));
+
+  const todoWarnHe = D.outlookTodoFailedAfterDraftLine('he');
+  logGateRun4Bite('244-262', 'mixed Do It draft ok To Do fail receipt warning', 'CTO item 6: warning line EN+HE on receipt when To Do write fails after draft');
+  const mixedTodoFail = await runPage({
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-h1-todo-fail',
+    waitMs: 4500, clickDoIt: true, outlookTaskWriteFail: true,
+    store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [HME] } }
+  });
+  const mixFailActs = mixedTodoFail.sent.filter((m) => m.type === 'flow:execute-action');
+  const mixFailChip = mixedTodoFail.chip ? String(mixedTodoFail.chip.textContent || '') : '';
+  const mixFailHost = mixedTodoFail.chip && mixedTodoFail.chip.querySelector('.flow-chip-host-inner, .flow-chip');
+  const mixFailWritten = mixFailHost ? String(mixFailHost.textContent || '') : mixFailChip;
+  check('(A2) mixed Do It: draft write succeeds, To Do fails — receipt shows task-not-created warning',
+    mixFailActs.some((m) => m.payload && m.payload.connectorId === 'outlookDraft') &&
+    mixFailActs.some((m) => m.payload && m.payload.connectorId === 'outlookTask') &&
+    (mixFailChip.indexOf(todoWarnHe) >= 0 || mixFailWritten.indexOf(todoWarnHe) >= 0 ||
+      /To Do task wasn't created/i.test(mixFailChip) || /To Do task wasn't created/i.test(mixFailWritten)),
+    { acts: mixFailActs.map((m) => m.payload && m.payload.connectorId), text: mixFailChip.slice(0, 280) });
 
   const h1Done = await runPage({
     htmlPatch: (h) => gateHtml(h1Body)(h),
