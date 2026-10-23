@@ -74,7 +74,7 @@ One consent turns on Messenger, Facebook messages, Business Suite, Instagram and
 
 ## Run discipline (read before every ecosystems run; owner asked to cut waste, 2026-10-21)
 
-- **Idle is allowed and cheap.** If no gap is both unblocked (no Grok card, no owner scope, no live Gate needed) and of user value, end the run with one line in `ecosystem-runs.md` and touch nothing else. Do not invent work.
+- **Never idle (owner, 2026-10-23: «אתה עובד אצלי ואתה צריך ליצור יכולות חדשות»).** Every run ships one new user-facing capability. When a row looks blocked, pick the next buildable idea on the same surfaces (a new intent kind, a new close for a chat or mail the judge already sees, a missing Hebrew form, an Outlook browser spec for a built close) and write the blocker to `docs/open-tasks.md`. A run with no new capability is a failed run; do not report it as idle. **Grok sync:** at the start of every run, `git fetch` and read `git log` and `docs/glance-ai/card-requests-*.md` for what the Grok bot pushed (designs, answers to requests); build against it, and write any card the existing canonical one cannot show as a new request line there, so the Grok bot picks it up from git.
 - **A and B do not share rows.** A takes Google, B takes Microsoft and Meta. If your side is empty, you are idle; do not take the other side's row.
 - **Tests:** run the corpora for what you touched plus `docs-consistency` and `identity-copy` on every run; run the whole corpus sweep and the full headless e2e once, on the last run you make in a day, not on every run.
 - **No result-recording commits.** A commit whose only content is "the suite passed" is waste. Put the numbers in the run report line of the commit that changed code.
