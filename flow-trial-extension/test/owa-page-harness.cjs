@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { FlowOwaParse } = require('../core/owa-parse.js');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }
 catch (e) {
@@ -94,7 +95,17 @@ async function runPage(opts) {
       if (/\/me\/messages\?/.test(u)) {
         // Live Graph often answers the conversationId filter with an empty page (or refuses it).
         // The inbox list above is the fallback the open page must use.
-        if (o.convFilterEmpty && /conversationId/.test(decodeURIComponent(u))) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        const decoded = decodeURIComponent(u);
+        if (o.convFilterEmpty && /conversationId/.test(decoded)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        if (o.convFilterCanonOnly && /conversationId/.test(decoded)) {
+          const m = /conversationId eq '([^']+)'/.exec(decoded);
+          const wanted = m && m[1];
+          const rawConv = String(o.urlId || o.listedConversationId || '');
+          const canon = FlowOwaParse.canonId(rawConv);
+          if (wanted && rawConv && canon && wanted === rawConv && wanted !== canon) {
+            return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+          }
+        }
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
         return { ok: true, status: 200, body: JSON.stringify({ value }) };
@@ -140,11 +151,22 @@ async function runPage(opts) {
       if (p.connectorId === 'outlookCalendar') {
         return { ok: true, ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar', url: 'https://outlook.live.com/calendar/item/ev-hold-1', written: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00' };
       }
-      if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
-      return { ok: true, ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
+      if (p.connectorId === 'outlookTask') {
+        return {
+          ok: true,
+          ref: { taskListId: 'L', taskId: 'T-mix-1', created: { title: 'Task' } },
+          proof: { fetchedBack: true, system: 'microsoft/todo', externalId: 'T-mix-1', verifiedAt: new Date().toISOString() },
+          written: 'To Do task logged',
+          where: 'To Do',
+          url: 'https://to-do.office.com/tasks/id/T-mix-1'
+        };
+      }
+      if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', fetchedBack: true, where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
+      return { ok: true, ref: 'draft-1', fetchedBack: true, where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts', written: 'Reply draft ready in Outlook Drafts. Not sent.' };
     }
     if (msg.type === 'flow:undo-action') {
       if (msg.connectorId === 'outlookCalendar') return { ok: true, written: 'Calendar event removed.' };
+      if (msg.connectorId === 'outlookTask') return { ok: true, fetchedBack: true, written: 'To Do task removed.' };
       return { ok: true, written: 'Reply draft removed. Not sent.' };
     }
     if (msg.type === 'flow:search-drive') {
@@ -212,9 +234,10 @@ async function runPage(opts) {
     if (o.clickUndo) {
       const undo = w.document.querySelector('.flow-chip-undo');
       if (undo) undo.click();
-      const untilUndo = Date.now() + 2000;
-      while (Date.now() < untilUndo && !sent.some((m) => m.type === 'flow:undo-action')) await new Promise((r) => setTimeout(r, 40));
-      await new Promise((r) => setTimeout(r, 150));
+      const wantUndos = typeof o.undoCount === 'number' ? o.undoCount : 1;
+      const untilUndo = Date.now() + 3000;
+      while (Date.now() < untilUndo && sent.filter((m) => m.type === 'flow:undo-action').length < wantUndos) await new Promise((r) => setTimeout(r, 40));
+      await new Promise((r) => setTimeout(r, 200));
     }
   } else if (o.clickUndo) {
     const undo = w.document.querySelector('.flow-chip-undo');
@@ -232,6 +255,9 @@ async function runPage(opts) {
   return res;
 }
 
+module.exports = { runPage, ME, CONV, registeredFiles };
+
+if (require.main === module) {
 (async () => {
   console.log('\n--- the registered file list ---\n');
   const files = registeredFiles();
@@ -805,8 +831,11 @@ async function runPage(opts) {
       { text: refused.chip && refused.chip.textContent, why: refusedWhy });
     const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
     const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
-    check('an unreadable attachment count shows a card or attachments-not-read (never intent-null silence)',
-      (Boolean(unread.chip) || unreadWhy.indexOf('outlook:attachments-not-read') >= 0 || unreadWhy.indexOf('page:attachment-count-unread') >= 0) &&
+    // CTO silent-degradation ruling 23/10: owa-page-harness.cjs ~808 — before: chip OR reason; after: chip AND attachments-not-read copy AND not page:intent-null.
+    const attachUnreadHe = 'לא הצלחתי לקרוא את הקבצים המצורפים';
+    check('an unreadable attachment count shows a card with attachments-not-read (never intent-null silence)',
+      Boolean(unread.chip) &&
+      String(unread.chip.textContent || '').indexOf(attachUnreadHe) >= 0 &&
       !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google' || r === 'page:intent-null'),
       { text: unread.chip && unread.chip.textContent, why: unreadWhy });
     function fileIncoming(store) {
@@ -972,3 +1001,4 @@ async function runPage(opts) {
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();
+}

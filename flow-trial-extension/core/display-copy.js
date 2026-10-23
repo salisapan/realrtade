@@ -462,18 +462,82 @@ const FlowDisplay = (() => {
     'outlook-calendar-write-not-granted': 'צריך הרשאה ליומן',
     'suggest:no-consent': 'יש קובץ מצורף. צריך הרשאת OneDrive כדי לשמור אותו',
     'suggest:attachments-unread': 'לא הצלחתי לקרוא את הקבצים המצורפים',
+    'suggest:unresolved': 'לא הצלחתי לקרוא את הקבצים המצורפים',
+    'suggest:graph-400': 'לא הצלחתי לקרוא את הקבצים המצורפים',
+    'suggest:graph-0': 'לא הצלחתי לקרוא את הקבצים המצורפים',
     'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
     'names-pending': 'ממתין לשם'
   };
 
-  function whyNotShownLine(reason) {
+  const WHY_EN = {
+    'context-dead': 'The extension updated',
+    'not-connected': 'Not connected',
+    'no-token': 'Not connected',
+    'intent-null': 'No request recognised',
+    'attachments-not-read': 'Could not read the attachments from Outlook',
+    'attachment-count-unread': 'Could not read the attachments from Outlook',
+    'too-short': 'No request recognised',
+    'tasks-not-granted': 'To Do permission is missing',
+    'third-party': 'External user',
+    'calendar-write-not-granted': 'Calendar permission is needed',
+    'outlook-calendar-write-not-granted': 'Calendar permission is needed',
+    'suggest:no-consent': 'There is an attachment. OneDrive permission is needed to save it',
+    'suggest:attachments-unread': 'Could not read the attachments from Outlook',
+    'suggest:unresolved': 'Could not read the attachments from Outlook',
+    'suggest:graph-400': 'Could not read the attachments from Outlook',
+    'suggest:graph-0': 'Could not read the attachments from Outlook',
+    'suggest:too-large': 'The attachment is too large to save',
+    'scan-skipped': 'Still reading the mail',
+    'names-pending': 'Waiting for your name'
+  };
+
+  function whyNotShownLine(reason, lang) {
     let r = String(reason || '');
     r = r.replace(/^(?:page:|quiet:|outlook:)/, '');
-    if (WHY_HE[r]) return WHY_HE[r];
+    const which = arguments.length >= 2 ? uiLangFrom({ setting: lang }) : 'he';
+    const table = which === 'he' ? WHY_HE : WHY_EN;
+    if (table[r]) return table[r];
     const bare = r.replace(/^outlook-/, '');
-    if (WHY_HE[bare]) return WHY_HE[bare];
-    return WHY_HE['intent-null'];
+    if (table[bare]) return table[bare];
+    return table['intent-null'];
+  }
+
+  const ATTACH_UNREAD_HE = 'לא הצלחתי לקרוא את הקבצים המצורפים';
+  const ATTACH_UNREAD_EN = 'Could not read the attachments from Outlook';
+  const NOTE_SELF_SHORT_HE = 'ממך אליך';
+  const NOTE_SELF_SHORT_EN = 'From you to you';
+  const NOTE_SELF_TASK_HE = 'ממך אליך — הוצעה משימה.';
+  const NOTE_SELF_TASK_EN = 'From you to you — a task was suggested.';
+  const ATTACH_LOADING_HE = 'עד שייטענו את הקבצים המצורפים';
+  const ATTACH_LOADING_EN = 'Until the attachments finish loading';
+  const MISSING_SCOPE_HE = '{scope} לא כלול בכניסה. בהגדרות, סמן {service}.';
+  const MISSING_SCOPE_EN = '{scope} is not included in your sign-in. In Settings, check {service}.';
+
+  function attachmentsNotReadLine(lang) {
+    const which = uiLangFrom({ setting: lang });
+    return which === 'he' ? ATTACH_UNREAD_HE : ATTACH_UNREAD_EN;
+  }
+
+  function noteToSelfLine(lang, opts) {
+    const which = uiLangFrom({ setting: lang });
+    const withTask = opts && (opts.taskSuggested === true || opts.withTask === true);
+    if (withTask) return which === 'he' ? NOTE_SELF_TASK_HE : NOTE_SELF_TASK_EN;
+    return which === 'he' ? NOTE_SELF_SHORT_HE : NOTE_SELF_SHORT_EN;
+  }
+
+  function attachmentsLoadingLine(lang) {
+    const which = uiLangFrom({ setting: lang });
+    return which === 'he' ? ATTACH_LOADING_HE : ATTACH_LOADING_EN;
+  }
+
+  function missingScopeLine(scope, service, lang) {
+    const name = String(scope || '').trim();
+    const box = String(service || '').trim();
+    if (!name || !box) return '';
+    const which = arguments.length >= 3 ? uiLangFrom({ setting: lang }) : 'he';
+    const tpl = which === 'he' ? MISSING_SCOPE_HE : MISSING_SCOPE_EN;
+    return tpl.replace('{scope}', name).replace('{service}', box);
   }
 
   // Card dates are Hebrew. A deadline is "עד 23 באוק׳". A hold prints the
@@ -1190,6 +1254,10 @@ const FlowDisplay = (() => {
     dropOutlookLoopRow: dropOutlookLoopRow,
     dropAlreadyHandledDiag: dropAlreadyHandledDiag,
     whyNotShownLine: whyNotShownLine,
+    attachmentsNotReadLine: attachmentsNotReadLine,
+    noteToSelfLine: noteToSelfLine,
+    attachmentsLoadingLine: attachmentsLoadingLine,
+    missingScopeLine: missingScopeLine,
     whyNotShownRows: whyNotShownRows,
     hebrewDay: hebrewDay,
     localeDay: localeDay,

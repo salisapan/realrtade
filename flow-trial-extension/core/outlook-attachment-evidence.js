@@ -34,18 +34,32 @@ const FlowOutlookAttachmentEvidence = (() => {
     return Object.assign({ rows: null }, fb);
   }
 
-  const BANNER_EN = 'Attachments could not be read from Outlook; steps may be limited until they load.';
-  const BANNER_HE = 'לא הצלחתי לקרוא את הקבצים המצורפים; ייתכן שהשלבים יהיו מוגבלים עד שהם ייטענו.';
-
   function attachUnreadBanner(lang) {
-    return (lang === 'he' || lang === 'iw') ? BANNER_HE : BANNER_EN;
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.attachmentsNotReadLine === 'function') {
+      return FlowDisplay.attachmentsNotReadLine(lang);
+    }
+    const he = lang === 'he' || lang === 'iw';
+    return he
+      ? 'לא הצלחתי לקרוא את הקבצים המצורפים'
+      : 'Could not read the attachments from Outlook';
   }
 
-  const NOTE_SELF_EN = 'From you to you — a task was suggested.';
-  const NOTE_SELF_HE = 'ממך אליך — הוצעה משימה.';
+  function noteToSelfLine(lang, opts) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.noteToSelfLine === 'function') {
+      return FlowDisplay.noteToSelfLine(lang, opts);
+    }
+    const he = lang === 'he' || lang === 'iw';
+    const withTask = opts && (opts.taskSuggested === true || opts.withTask === true);
+    if (withTask) return he ? 'ממך אליך — הוצעה משימה.' : 'From you to you — a task was suggested.';
+    return he ? 'ממך אליך' : 'From you to you';
+  }
 
-  function noteToSelfLine(lang) {
-    return (lang === 'he' || lang === 'iw') ? NOTE_SELF_HE : NOTE_SELF_EN;
+  function attachmentsLoadingLine(lang) {
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.attachmentsLoadingLine === 'function') {
+      return FlowDisplay.attachmentsLoadingLine(lang);
+    }
+    const he = lang === 'he' || lang === 'iw';
+    return he ? 'עד שייטענו את הקבצים המצורפים' : 'Until the attachments finish loading';
   }
 
   return {
@@ -55,6 +69,7 @@ const FlowOutlookAttachmentEvidence = (() => {
     mergeCount,
     attachUnreadBanner,
     noteToSelfLine,
+    attachmentsLoadingLine,
     REASON_ATTACH_UNREAD: 'outlook:attachments-not-read',
     REASON_ATTACH_COUNT_UNREAD: 'page:attachment-count-unread'
   };

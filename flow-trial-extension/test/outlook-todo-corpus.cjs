@@ -146,7 +146,7 @@ console.log('\n--- judge: task-only is To Do, a draft stays a draft, a calendar 
     sender: { name: 'Dana', email: 'dana@acme.com' }
   }, Object.assign({ intent, actions: { planFor: () => ({ id: 'reply-track', name: 'Reply', steps: [{ kind: 'gmailDraft', id: 'draft', params: {} }, { kind: 'googleTask', id: 'task', params: {} }] }) } }, quiet));
   check('a process with a draft stays a draft and does not become the only step',
-    mixed.show === true && mixed.process.steps.some((s) => s.kind === 'outlookDraft') && mixed.process.steps.some((s) => s.kind === 'googleTask'),
+    mixed.show === true && mixed.process.steps.some((s) => s.kind === 'outlookDraft') && mixed.process.steps.some((s) => s.kind === 'outlookTask'),
     mixed.process && mixed.process.steps);
   const cal = J.judge({
     text: 'Can we meet tomorrow at 10:00 to go over the rollout plan?',

@@ -760,10 +760,12 @@
         ? ev.mergeCount(rows, pane, mailbox)
         : { count: Array.isArray(rows) ? rows.length : null, unread: !Array.isArray(rows), source: 'graph' };
       if (merged.count == null) {
-        return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
+        attachmentsUnread = true;
+        attachmentCount = 0;
+      } else {
+        attachmentCount = merged.count;
+        attachmentsUnread = Boolean(merged.unread);
       }
-      attachmentCount = merged.count;
-      attachmentsUnread = Boolean(merged.unread);
     }
     if (signedForJudge && localAttachN >= 1 && !needsSave) attachmentCount = localAttachN;
     const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
@@ -801,11 +803,28 @@
     }
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
     if (r && r.show && r.process && r.process.id === 'file-it' && signedForJudge && localAttachN === 1 && !needsSave) {
+      pane.attachmentsLoading = localAttachN < 1;
       return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process, attachmentsUnread: attachmentsUnread };
+    }
+    if (r && r.show && localAttachN >= 1 && !attachmentsUnread) {
+      let listId = pane.itemId || null;
+      if (!listId) {
+        const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+        listId = found && found.id;
+      }
+      if (listId) {
+        const rows = await attachmentListFor(listId);
+        if (!Array.isArray(rows)) attachmentsUnread = true;
+      } else {
+        attachmentsUnread = true;
+      }
     }
     if (r && r.show) {
       const out = { intent: r.intent, process: r.process };
-      if (attachmentsUnread) out.attachmentsUnread = true;
+      if (attachmentsUnread) {
+        out.attachmentsUnread = true;
+        pane.attachmentsUnread = true;
+      }
       return out;
     }
     return { none: true, reason: (r && r.reason) || 'intent-null', attachmentsUnread: attachmentsUnread || undefined };
@@ -1229,7 +1248,16 @@
       attachmentPickMode: savePick.mode,
       saveAttachmentName: pickedAttach && (pickedAttach.name || pickedAttach.filename) || null,
       attachmentsUnread: Boolean(entry.attachmentsUnread || (pane && pane.attachmentsUnread)),
-      noteToSelf: Boolean(pane && pane.noteToSelf),
+      noteToSelf: Boolean(pane && pane.noteToSelf) || (function () {
+        const from = String((sender && sender.email) || (pane && pane.senderEmail) || '').toLowerCase();
+        const own = (pane && pane.ownAddresses) || [];
+        const to = (pane && pane.to) || [];
+        if (!from || !own.length) return false;
+        const isOwn = own.some((a) => String(a || '').toLowerCase() === from);
+        if (!isOwn) return false;
+        return to.some((a) => String(a || '').toLowerCase() === from);
+      })(),
+      attachmentsLoading: Boolean(pane && pane.attachmentsLoading),
       __epoch: paneEpoch(pane)
     };
   }
@@ -1278,7 +1306,7 @@
     const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
     const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const earlyDraft = earlySteps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
-    if (earlyTask && !earlyDraft) {
+    if (earlyTask) {
       let stNow = null;
       try { stNow = await FlowStorage.get(); } catch (e) { stNow = null; }
       if (todoAsk(stNow)) {
@@ -1423,23 +1451,89 @@
       subject: ctx.subject,
       text: ctx.bodyText
     });
+    let taskRef = null;
+    let taskCreated = null;
+    let taskWritten = '';
+    if (taskStep && !unverified) {
+      const params = (taskStep && taskStep.params) || {};
+      const tr = await send({
+        type: 'flow:execute-action',
+        payload: {
+          connectorId: 'outlookTask',
+          params: params,
+          label: artifactTitleFor(ctx, (ctx.intent && ctx.intent.label) || params.title || 'Task'),
+          senderName: ctx.sender && ctx.sender.name,
+          senderEmail: ctx.sender && ctx.sender.email,
+          subject: ctx.subject || '',
+          text: ctx.bodyText || '',
+          threadUrl: ctx.threadUrl || null,
+          facts: (ctx.intent && ctx.intent.facts) || null,
+          entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
+        }
+      });
+      const taskProved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+        ? FlowProofOfClose.allowsHandled({ ok: !!(tr && tr.ok), proof: tr && tr.proof })
+        : false;
+      if (taskProved || (tr && tr.ref && tr.written === "Created, couldn't verify")) {
+        taskRef = tr.ref;
+        taskCreated = (tr.ref && tr.ref.created) || null;
+        taskWritten = tr.written || pageChrome().handled;
+        const taskTitle = actionTitle({
+          connectorId: 'outlookTask', process: ctx.process, intent: ctx.intent, text: ctx.bodyText,
+          writtenLine: taskWritten, subject: ctx.subject, params: params
+        });
+        const taskFields = (taskProved && tr.proof && FlowProofOfClose.receiptLogFields)
+          ? FlowProofOfClose.receiptLogFields(tr.proof, { writtenLine: taskWritten, processName: faceTitle(ctx), status: pageChrome().handled, created: taskCreated })
+          : null;
+        await FlowStorage.appendLog(Object.assign({
+          kind: 'written',
+          label: taskTitle,
+          actionTitle: taskTitle,
+          messageId: ctx.messageId,
+          itemId: ctx.itemId || null,
+          pathId: ctx.pathId || null,
+          threadId: ctx.threadId || ctx.conversationId || null,
+          outlookConversationId: ctx.conversationId || null,
+          outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
+          app: 'outlook',
+          connectorId: 'outlookTask',
+          ref: taskRef,
+          created: taskCreated,
+          where: tr.where || null,
+          url: tr.url || null,
+          fetchedBack: taskProved ? true : false,
+          intent: ctx.intent,
+          process: ctx.process,
+          sender: ctx.sender,
+          subject: ctx.subject,
+          text: ctx.bodyText
+        }, taskFields || {}));
+      }
+    }
+    const receiptWritten = taskWritten ? (written + '\n' + taskWritten) : written;
     if (!unverified && ctx.messageId) {
       await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
       await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
     }
     paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
       status: draftUnverifiedStatus(written),
-      written: written,
+      written: receiptWritten,
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
         const undoToken = captureMailToken();
+        if (taskRef) {
+          await send({ type: 'flow:undo-action', connectorId: 'outlookTask', ref: taskRef, created: taskCreated });
+          if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+            await FlowStorage.markMicrosoftTodoUndone(ctx.messageId, taskRef, ctx.threadId || ctx.conversationId);
+          }
+        }
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created, outlookImmutableId: ctx.outlookImmutableId === true });
         if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
         if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
         }
         if (u && u.ok) {
-          await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: ctx.messageId, draftOnly: true });
+          await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: ctx.messageId, draftOnly: !taskRef });
         }
         // Undo reopens the owed ask: drop the settled receipt and let scan
         // re-inject Do It (same eligibility as the popup Still Open list).
@@ -3227,6 +3321,12 @@
     host.appendChild(FlowChipHost.el('span', 'flow-chip-undo-hint flow-chip-undo-failed', text));
   }
 
+  function paintNoteHint(host, text) {
+    if (paintDepth <= 0 || !host || !text) return;
+    if (host.querySelector('.flow-chip-note-hint')) return;
+    host.appendChild(FlowChipHost.el('span', 'flow-chip-note-hint flow-chip-undo-hint', text));
+  }
+
   function paintCalendarFailure(host, chip, result) {
     if (paintDepth <= 0) return '';
     const why = calendarReasonLine(result);
@@ -3371,17 +3471,21 @@
   function paintMissingScope(host, ctx, st) {
     if (!host || !ctx || !ctx.process) return;
     const steps = ctx.process.steps || [];
-    const taskOnly = steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    const hasTask = steps.some((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const hold = ctx.process.id === 'hold' || (ctx.intent && ctx.intent.personalClose === 'calendar-hold');
     const needsOnedrive = steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'attachmentSave'));
     if (hold && calendarAsk(st)) paintCalendarConsent(host, ctx);
-    if (taskOnly && todoAsk(st)) paintTodoConsent(host, ctx);
+    if (hasTask && todoAsk(st)) paintTodoConsent(host, ctx);
     if (needsOnedrive && typeof FlowOnedriveFile !== 'undefined' && typeof FlowOnedriveFile.hasWriteScope === 'function') {
       const ok = FlowOnedriveFile.hasWriteScope(calendarScopes(st));
       if (ok === false) {
-        const line = (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine)
-          ? FlowReceipt.missingScopeLine('Files.ReadWrite', 'OneDrive')
-          : 'Reconnect OneDrive (Files.ReadWrite).';
+        const lang = pageUiLang();
+        const svc = (lang === 'he' || lang === 'iw') ? 'וואן־דרייב' : 'OneDrive';
+        const line = (typeof FlowDisplay !== 'undefined' && FlowDisplay.missingScopeLine)
+          ? FlowDisplay.missingScopeLine('Files.ReadWrite', svc, lang)
+          : ((typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine)
+            ? FlowReceipt.missingScopeLine('Files.ReadWrite', svc)
+            : 'Reconnect OneDrive (Files.ReadWrite).');
         paintHint(host, line);
       }
     }
@@ -4443,7 +4547,7 @@
       forwarded: pane.onBehalf === true
     });
     const selfMail = !receiptOnly && !selfAddressed && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
-    if (selfMail) pane.noteToSelf = true;
+    if (selfMail || selfAddressed) pane.noteToSelf = true;
     if (!receiptOnly) {
       pane.userName = userNameOf(st);
       decided = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
@@ -4547,7 +4651,10 @@
           if (decided && decided.reason === 'signed-save-suggest') {
             dropStuckCard(pane);
             await clearReason(pane);
+            pane.__signedSaveJudge = { intent: decided.intent, process: decided.process };
+            pane.attachmentsLoading = !((pane.attachments || []).filter((a) => a && !a.isInline).length);
             suggestNote = pane;
+            if (pane.attachmentsLoading) armAttachChipRescan(pane);
             await recordSuggestNote();
             return;
           }
@@ -4605,7 +4712,11 @@
           attachmentsUnread: Boolean(decided.attachmentsUnread)
         };
       } else {
-        entry = Object.assign({}, entry, { intent: decided.intent, process: decided.process });
+        entry = Object.assign({}, entry, {
+          intent: decided.intent,
+          process: decided.process,
+          attachmentsUnread: Boolean(decided.attachmentsUnread || entry.attachmentsUnread)
+        });
       }
     } else {
       dbg('judged', { show: true, type: entry.intent && entry.intent.type, label: entry.intent && entry.intent.label, from: 'mailbox check' });
@@ -4666,6 +4777,7 @@
       return;
     }
 
+    pane.ownAddresses = ownAll;
     const ctx = buildCtx(entry, pane, decided);
     if (!ctx || !ctx.messageId) { await pageReason('page:no-process', pane); return; }
     const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
@@ -4769,13 +4881,23 @@
         onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
-      if (painted) paintMissingScope(painted, ctx, st);
+      const hasTaskRow = (ctx.process && ctx.process.steps || []).some((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
       if (painted && ctx.attachmentsUnread && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
         paintHint(painted, FlowOutlookAttachmentEvidence.attachUnreadBanner(pageUiLang()));
       }
-      if (painted && ctx.noteToSelf && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
-        paintHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang()));
+      if (painted && ctx.attachmentsLoading && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+        paintHint(painted, FlowOutlookAttachmentEvidence.attachmentsLoadingLine(pageUiLang()));
+        armAttachChipRescan(pane);
       }
+      if (painted && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+        const acct = st && st.outlookAuth && st.outlookAuth.account && st.outlookAuth.account.address;
+        const from = ctx.sender && ctx.sender.email ? String(ctx.sender.email).toLowerCase() : '';
+        const noteSelf = ctx.noteToSelf || (from && acct && from === String(acct).toLowerCase());
+        if (noteSelf) {
+          paintNoteHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: hasTaskRow }));
+        }
+      }
+      if (painted) paintMissingScope(painted, ctx, st);
       return painted;
     });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
@@ -4862,6 +4984,8 @@
   }
   let paneWatch = null;
   let paneObs = null;
+  let attachChipObs = null;
+  let attachChipWatchKey = '';
   function readingPaneSignal() {
     let href = '';
     let conv = '';
@@ -4911,6 +5035,90 @@
     const cls = node.classList;
     if (cls && (cls.contains('flow-chip-host') || cls.contains('flow-chip-consent') || cls.contains('flow-skip-host') || cls.contains('flow-why-not'))) return true;
     return Boolean(node.closest && node.closest('.flow-chip-host, .flow-chip-consent, .flow-why-not'));
+  }
+
+  // OWA paints attachment chips after the body. One rescan when they appear.
+  function armAttachChipRescan(pane) {
+    if (!pane || typeof MutationObserver === 'undefined') return;
+    const key = String(mailEpoch) + '|' + String(pane.conversationId || '') + '|' + String(pane.itemId || '');
+    if (attachChipWatchKey === key) return;
+    attachChipWatchKey = key;
+    if (attachChipObs) {
+      try { attachChipObs.disconnect(); } catch (e) { /* sealed */ }
+      attachChipObs = null;
+    }
+    let tried = false;
+    const root = document.querySelector('#ReadingPaneContainerId')
+      || document.querySelector('[data-testid="ReadingPane"]')
+      || document.body;
+    attachChipObs = new MutationObserver(() => {
+      if (tried) return;
+      let count = 0;
+      try {
+        const fresh = FlowOwaParse.readPane(document, location.href, {});
+        if (fresh && typeof FlowOutlookAttachmentEvidence !== 'undefined' && typeof FlowOutlookAttachmentEvidence.localAttachmentCount === 'function') {
+          count = FlowOutlookAttachmentEvidence.localAttachmentCount(fresh);
+          if (count >= 1 && fresh.attachments) pane.attachments = fresh.attachments;
+        }
+      } catch (e) { count = 0; }
+      if (count >= 1) {
+        tried = true;
+        try { attachChipObs.disconnect(); } catch (e2) { /* */ }
+        attachChipObs = null;
+        pane.attachmentsLoading = false;
+        lastSig = '';
+        schedule();
+      }
+    });
+    try { attachChipObs.observe(root, { childList: true, subtree: true }); } catch (e) { attachChipObs = null; }
+  }
+
+  async function paintJudgedCardWithAttachmentsUnread(pane, judged) {
+    if (!pane || !judged || !judged.intent || !judged.process) return false;
+    const token = pane.__mailToken;
+    let msgId = pane.itemId || null;
+    let bag = {};
+    try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
+    const own = await ownWithAliases(ownAddressesOf(bag));
+    if (!msgId && (pane.pathId || pane.conversationId)) {
+      const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+      msgId = found && found.id;
+    }
+    if (!msgId) msgId = pane.conversationId || pane.pathId || '';
+    const entry = {
+      messageId: msgId,
+      outlookIncomingId: msgId,
+      subject: pane.subject,
+      text: pane.text,
+      sender: { name: pane.senderName, email: pane.senderEmail },
+      intent: judged.intent,
+      process: judged.process,
+      attachmentsUnread: true
+    };
+    const ctx = buildCtx(entry, pane, judged);
+    if (!ctx || !ctx.messageId) return false;
+    const mount = mountPoint();
+    if (!mount) return false;
+    const host = paintIfCurrent(token, function () {
+      const painted = injectCard(mount, ctx, {
+        onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
+        onDismiss: (h, c) => { onDismiss(h, c); }
+      });
+      if (painted) {
+        paintMissingScope(painted, ctx, bag);
+        if (typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+          paintHint(painted, FlowOutlookAttachmentEvidence.attachUnreadBanner(pageUiLang()));
+        }
+      }
+      return painted;
+    });
+    if (host) {
+      const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+      if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
+      lastOutcome = 'card';
+      await clearReason(pane);
+    }
+    return Boolean(host);
   }
 
   // A replacement of the open message, including the same words, is a mail
@@ -5109,9 +5317,16 @@
       }
       if (one && one.id) rows = [one];
     } else {
-      const filter = "conversationId eq '" + odataQuote(conv) + "'";
-      const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate', null);
-      rows = body && Array.isArray(body.value) ? body.value : [];
+      const canonConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
+        ? FlowOwaParse.canonId(conv) : '';
+      const spells = [];
+      if (canonConv) spells.push(canonConv);
+      if (conv && spells.indexOf(conv) < 0) spells.push(conv);
+      for (let si = 0; si < spells.length && !rows.length; si++) {
+        const filter = "conversationId eq '" + odataQuote(spells[si]) + "'";
+        const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate', null);
+        rows = body && Array.isArray(body.value) ? body.value : [];
+      }
     }
     let hydrateHow = item ? 'item' : (rows.length ? 'conversation' : 'none');
     let subjectFallback = false;
@@ -5220,7 +5435,11 @@
     const conv = String((pane && pane.conversationId) || '').trim();
     let filter = '';
     if (from && subject) filter = "from/emailAddress/address eq '" + odataQuote(from) + "' and " + subjectFilter(subject);
-    else if (conv) filter = "conversationId eq '" + odataQuote(conv) + "'";
+    else if (conv) {
+      const canonConv = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function')
+        ? FlowOwaParse.canonId(conv) : '';
+      filter = "conversationId eq '" + odataQuote(canonConv || conv) + "'";
+    }
     else if (subject) filter = subjectFilter(subject);
     else return { error: 'missing' };
     const select = 'id,conversationId,receivedDateTime,from,subject,internetMessageId';
@@ -5639,6 +5858,8 @@
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
       await appendSuggestLog({ messageId: messageId, reason: stageReason, detail: (read && read.detail) || '', surface: 'outlook' });
+      const judged = pane.__signedSaveJudge;
+      if (/^suggest:(?:unresolved|graph-|attachments-unread)/.test(stageReason) && judged && await paintJudgedCardWithAttachmentsUnread(pane, judged)) return;
       if (!pageAlreadyDecided(pane) || genericTextQuiet(pane)) {
         await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
       }
