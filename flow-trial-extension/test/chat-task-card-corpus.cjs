@@ -451,6 +451,22 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('after the hold was undone the same time is offered again', afterUndo.shown, afterUndo);
   }
 
+  // 5t. The same task is not made twice either: a payment ask repeated in the same chat while the first task stands is not offered again.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleTask' } });
+    await w.Card.offer(input('Please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-1' }));
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    check('the first payment ask makes one task', w.logRows.length === 1 && !!w.logRows[0].heldKey, w.logRows[0]);
+    const shownBefore = w.injected.length;
+    const again = await w.Card.offer(input('Hi again, please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-2' }));
+    check('the same payment in the same chat is not offered again', !again.shown && again.reason === 'already-on-task-list' && w.injected.length === shownBefore, again);
+    const other = await w.Card.offer(input('Please transfer 900 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-3' }));
+    check('another amount is a different task and is offered', other.shown, other);
+    await w.receipts.find((x) => x.receipt).receipt.onUndo();
+    const afterUndo = await w.Card.offer(input('Hi again, please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-4' }));
+    check('after the task was undone the same payment is offered again', afterUndo.shown, afterUndo);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

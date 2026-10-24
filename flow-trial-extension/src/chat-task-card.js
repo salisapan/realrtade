@@ -152,6 +152,30 @@ const FlowChatTaskCard = (() => {
     return null;
   }
 
+  // The same task must not be made twice either: a bill and then its reminder in the same chat would add a second Pay task. The key is
+  // the due day and the title the person would see; a task this card wrote for it in this thread, and not undone since, is the answer.
+  function taskKeyOf(step) {
+    const p = step && step.params;
+    const title = p ? String(p.title || '').toLowerCase().replace(/\s+/g, ' ').trim() : '';
+    return p && /^\d{4}-\d{2}-\d{2}$/.test(String(p.dateIso || '')) && title ? 'task ' + p.dateIso + ' ' + title : '';
+  }
+
+  async function findHeldTask(chatKey, step) {
+    const key = taskKeyOf(step);
+    if (!key || typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return null;
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    const thread = String(chatKey).split('|').slice(0, 3).join('|');
+    const undone = {};
+    for (const e of log) {
+      if (!e) continue;
+      if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
+      if (e.kind !== 'written' || !e.ref || undone[e.chatKey] || e.heldKey !== key) continue;
+      if (String(e.chatKey || '').split('|').slice(0, 3).join('|') === thread) return e;
+    }
+    return null;
+  }
+
   function undoHandler(host, chatKey, connectorId, ref) {
     return async function () {
       const u = await send(undoMessage(connectorId, ref));
@@ -269,7 +293,8 @@ const FlowChatTaskCard = (() => {
       intent: ctx.intent,
       process: ctx.process,
       chatKey: t.chatKey,
-      messageId: t.chatKey
+      messageId: t.chatKey,
+      heldKey: t.connectorId === 'googleHold' || t.connectorId === 'outlookCalendar' ? undefined : taskKeyOf(t.step) || undefined
     };
     try { await FlowStorage.appendLog(row); } catch (e) { /* the receipt still shows */ }
     showReceipt(host, row, t.chatKey, t.connectorId);
@@ -478,6 +503,7 @@ const FlowChatTaskCard = (() => {
       const title = ((base || (he ? 'הבטחה' : 'Promise')) + (who ? ' · ' + who : '')).slice(0, 120);
       liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: title }) });
     }
+    if (kind !== 'calendar' && (await findHeldTask(chatKey, liveStep))) return { shown: false, reason: 'already-on-task-list' };
     const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, name: own ? (selfNote && selfNote.kind === 'note' ? (he ? 'תזכורת' : 'Reminder') : (he ? 'ההבטחה שלך' : 'Your promise')) : judged.process.name, steps: [liveStep] });
     const ctx = {
       app: i.channel || 'chat',

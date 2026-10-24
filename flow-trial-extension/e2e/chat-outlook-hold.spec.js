@@ -89,3 +89,15 @@ test('a reminder asked in a chat is one Microsoft To Do task titled with the thi
   await page.locator(CARD + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await todo(glance)).length).toBe(0);
 });
+
+test('the same reminder repeated in the same chat while its task stands is not offered a second To Do task', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, "Don't forget to bring the signed form on Monday");
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await todo(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML("Hi again, don't forget to bring the signed form on Monday"));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});
