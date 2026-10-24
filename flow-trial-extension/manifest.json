@@ -47,6 +47,7 @@
         "core/system-notice.js",
         "core/chat-appointment-notice.js",
         "core/chat-pickup-notice.js",
+        "core/chat-invitation-notice.js",
         "core/incoming-judge.js",
         "core/execution-memory.js",
         "core/close-memory.js",

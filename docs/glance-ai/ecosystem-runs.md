@@ -426,3 +426,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/booking-notice-corpus.cjs` (4 appointments, 2 pickups, switch off, own mail, not inbound, 8 quiet lines, wiring), new real-browser `e2e/outlook-booking-notice.spec.js` (3 specs: off shows nothing, hold with Undo, pickup task with Undo), all corpora, add-on bundle rebuilt.
 - **Open:** live Gate; Gmail not wired (own classify path); manifest `js` list gained two core files (content-script list only; the owner may want to see it).
 
+## 2026-10-24 Ecosystems builder B (forty-seventh run) — Outlook invitations
+
+- **Capability shipped (switch `glanceSwitches.BOOKING_NOTICE`, off):** an Outlook mail that invites the person to an event with a day and a clock («מוזמן לאירוע ההשקה שלנו ביום חמישי בשעה 19:00», "You're invited to our product launch on Thursday at 19:00") now shows the existing Hold It card; Do It adds "Invitation · sender" to the calendar, nobody invited, read back by id, Undo deletes. Promotions, webinars, thank-yous and mail without a clock stay quiet. Third notice kind on the same switch after bookings and pickups.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** `test/booking-notice-corpus.cjs` extended (3 invitations, 3 more quiet lines, manifest wiring), `e2e/outlook-booking-notice.spec.js` now 4 specs in a real browser, all corpora, add-on bundle rebuilt.
+- **Open:** live Gate; Gmail not wired.
+

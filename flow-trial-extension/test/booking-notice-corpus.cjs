@@ -12,7 +12,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'incoming-judge.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js', 'incoming-judge.js'];
 const box = { module: undefined, console };
 vm.createContext(box);
 for (const f of CORE) vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), box, { filename: f });
@@ -31,6 +31,16 @@ for (const [text, day, h, m] of APPT) {
   const st = r.show && r.process.steps[0];
   check('appointment mail offers one calendar hold: ' + text.slice(0, 50), r.show && r.process.steps.length === 1 && st.kind === 'calendar' && st.params.dateIso === day && st.params.hour === h && st.params.minute === m && st.params.meeting === true && /^(Appointment|תור) · Studio Nofar$/.test(st.params.title), r);
 }
+const INVITE = [
+  ["You're invited to our product launch on Thursday at 19:00", '2026-10-29', 19, 0],
+  ['Join us for the opening on Sunday at 6:30pm', '2026-10-25', 18, 30],
+  ['מוזמן לאירוע ההשקה שלנו ביום חמישי בשעה 19:00', '2026-10-29', 19, 0]
+];
+for (const [text, day, h, m] of INVITE) {
+  const r = judge(text);
+  const st = r.show && r.process.steps[0];
+  check('invitation mail offers one calendar hold: ' + text.slice(0, 50), r.show && r.process.steps.length === 1 && st.kind === 'calendar' && st.params.dateIso === day && st.params.hour === h && st.params.minute === m && /^(Invitation|הזמנה) · Studio Nofar$/.test(st.params.title), r);
+}
 const PICK = [
   ['Hi, your order is ready for pickup until Friday', '2026-10-30'],
   ['ההזמנה שלך מוכנה לאיסוף עד יום חמישי', '2026-10-29']
@@ -43,7 +53,7 @@ for (const [text, day] of PICK) {
 check('the same pickup on Gmail keeps the Google task step', judge(PICK[0][0], { surface: 'gmail' }).process.steps[0].kind === 'googleTask');
 
 // Off: nothing changes. Not for the person's own mail either.
-for (const [text] of APPT.concat(PICK)) {
+for (const [text] of APPT.concat(PICK, INVITE)) {
   const off = judge(text, { bookingNoticeOn: false });
   check('switch off: no booking card: ' + text.slice(0, 40), !(off.show && off.intent && off.intent.bookingNotice), off && off.reason);
 }
@@ -52,6 +62,7 @@ check('a mail that is not inbound is never a booking notice', !(judge(APPT[0][0]
 
 // Quiet: cancellations, offers, deliveries, no clock, no deadline.
 const QUIET = [
+  'Join our webinar on Thursday at 19:00, register now', 'Thank you for the invitation to the party on Saturday at 8pm', "You're invited to the launch on Thursday",
   'Your appointment has been cancelled, it was Sunday at 10:00', 'Available slots: Sunday at 10:00 or Monday at 11:00. Click to choose',
   'Your appointment is confirmed for Sunday', 'Your package will arrive on Monday', 'Your order is ready for pickup',
   'Your order was picked up yesterday', 'התור שלך בוטל, היה ביום ראשון ב-10:00', 'החבילה שלך תגיע ביום שני'
@@ -61,7 +72,7 @@ for (const text of QUIET) check('no booking card for: ' + text.slice(0, 50), !(j
 // Wiring.
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 const js = manifest.content_scripts[0].js;
-check('manifest loads both readers before the judge', ['core/chat-appointment-notice.js', 'core/chat-pickup-notice.js'].every((f) => js.indexOf(f) > -1 && js.indexOf(f) < js.indexOf('core/incoming-judge.js')));
+check('manifest loads both readers before the judge', ['core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-invitation-notice.js'].every((f) => js.indexOf(f) > -1 && js.indexOf(f) < js.indexOf('core/incoming-judge.js')));
 const ol = fs.readFileSync(path.join(ROOT, 'src', 'content-outlook.js'), 'utf8');
 check('Outlook reads glanceSwitches.BOOKING_NOTICE and passes bookingNoticeOn', /BOOKING_NOTICE === true/.test(ol) && /bookingNoticeOn: bookingNoticeSwitch === true/.test(ol));
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll booking-notice checks passed');

@@ -114,7 +114,7 @@ const FlowIncomingJudge = (() => {
     }
 
     // A booking the person is told about ("Your appointment is confirmed for Sunday at 10:00") becomes a hold on their own
-    // calendar, and a pickup with a last day ("Your order is ready for pickup until Friday") a task due that day. The same
+    // calendar, an invitation to an event the same, and a pickup with a last day ("Your order is ready for pickup until Friday") a task due that day. The same
     // readers the chat card uses (core/chat-appointment-notice.js, core/chat-pickup-notice.js). Off unless the host passes
     // bookingNoticeOn (glanceSwitches.BOOKING_NOTICE). Nobody is invited and nothing is sent.
     if (i.bookingNoticeOn === true && i.senderIsUser !== true && i.inbound !== false) {
@@ -274,6 +274,17 @@ const FlowIncomingJudge = (() => {
         intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
         process: { id: 'hold-it', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
           steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');
+    const inv = invApi && typeof invApi.recognize === 'function' ? invApi.recognize(body, now0) : null;
+    if (inv && inv.kind === 'invitation') {
+      const he = inv.lang === 'he';
+      const title = ((he ? 'הזמנה' : 'Invitation') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'invitation', personalClose: 'booking-notice', entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
+        process: { id: 'hold-it', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
     const pick = pickApi && typeof pickApi.recognize === 'function' ? pickApi.recognize(body, now0) : null;

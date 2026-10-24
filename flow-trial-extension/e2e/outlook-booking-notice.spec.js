@@ -7,6 +7,7 @@ const S = require('./support/sentences');
 
 const PANE = '#ReadingPaneContainerId';
 const APPT = 'Hi, your appointment is confirmed for tomorrow at 14:00. See you then.';
+const INVITE = "Hi, you're invited to our product launch on tomorrow at 19:00. We'd love to see you.";
 const PICKUP = 'Hi, your order is ready for pickup until tomorrow.';
 
 let n = 0;
@@ -48,4 +49,17 @@ test('BOOKING_NOTICE on: a pickup with a last day is one To Do task, read back, 
   expect(JSON.stringify(list[0])).toMatch(/Pick up the order/);
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
+
+test('BOOKING_NOTICE on: an invitation to an event is one calendar hold titled Invitation, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, INVITE, true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Invitation/);
+  expect(list[0].attendees || []).toEqual([]);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
