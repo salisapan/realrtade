@@ -483,3 +483,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/day-words-corpus.cjs` (9 clock rewrites, 3 left alone, 6 readers reading the part of the day, 1 ambiguous hour that must stay unresolved), meeting-confirm and chat corpora, all corpora, browser specs.
 - **Open:** live Gate. No manifest change this run.
 
+## 2026-10-24 Ecosystems builder B (fifty-fifth run) — the Outlook hold from a chat now completes
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, `TEAMS_MEETING`, off):** for a person who has only Microsoft connected, a meeting or a Teams call proposed in WhatsApp, Messenger or Instagram showed the Do It card and created the Outlook event, but the card never turned to Handled and gave no Undo. The chat card accepted a write only if `ref.taskId` or `ref.externalId` was set, and the Outlook meeting write answers with `ref.eventId`. Found by writing the real-browser spec the previous runs listed as open ("Outlook hold has corpus coverage only"): the corpus stub had used `externalId`, so it passed. Fixed. Now the whole path works in a real browser: one hold, no guest, read back by id, Handled, Undo deletes it; with `TEAMS_MEETING` on a Teams call proposal carries a Teams join link, with it off a plain hold.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `e2e/chat-outlook-hold.spec.js` (3 specs: hold with Undo, Teams link on, plain hold off), the chat card corpus gained the `eventId`-only case (and the case without read-back that must stay unhandled), all corpora, chat/Outlook/Gmail browser specs.
+- **Open:** live Gate. An Outlook task from a chat (`outlookTask`) uses To Do's ref and was already covered by its corpus; a browser spec for it is not written.
+

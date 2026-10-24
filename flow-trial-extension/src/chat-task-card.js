@@ -227,7 +227,7 @@ const FlowChatTaskCard = (() => {
     const ref = r && r.ref;
     // Google answers with proof.fetchedBack, Microsoft To Do with fetchedBack; either must say true, nothing else is Handled.
     const proved = !!(r && (r.fetchedBack === true || (r.proof && r.proof.fetchedBack === true)));
-    const ok = !!(r && r.ok && ref && (ref.taskId || ref.externalId) && proved);
+    const ok = !!(r && r.ok && ref && (ref.taskId || ref.externalId || ref.eventId) && proved);
     if (!ok) {
       if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-error', t.he ? 'לא הצלחתי לסיים, נסה שוב' : "Couldn't finish, try again");
       return;

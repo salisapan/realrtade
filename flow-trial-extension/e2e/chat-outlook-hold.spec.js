@@ -1,0 +1,64 @@
+// The chat card on a Microsoft-only person: a meeting or a Teams call proposed in a one-to-one Messenger chat becomes one hold on
+// the person's Outlook Calendar (the Graph stand-in), nobody invited, read back by id, with a Teams link only when the owner's
+// TEAMS_MEETING switch is on, and Undo deletes it. Closes the "Outlook hold has corpus coverage only" item.
+const { test, expect } = require('./support/harness');
+
+const HTML = (text) => '<!doctype html><html><body><div role="main"><header><h2 data-glance-title>Dana</h2><a href="/100012345678/" role="link">Dana</a>' +
+  '<a aria-label="Conversation information" href="https://www.messenger.com/t/100012345678">Conversation information</a></header>' +
+  '<div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + text + '</span></div>' +
+  '<div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div>' +
+  '<button type="button" aria-label="Send"></button></div></body></html>';
+
+async function registerRealLane(glance) {
+  const ok = await glance.evaluateWorker(async () => {
+    const lane = globalThis.__glanceLaneChatDefs.find((l) => l.id === 'glance-lane-messenger');
+    const id = 'glance-lane-messenger-e2e';
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* first run */ }
+    await chrome.scripting.registerContentScripts([{ id: id, matches: ['https://www.messenger.com/*', 'https://messenger.com/*'], js: globalThis.__glanceLaneChatScripts(lane), css: ['design/step-states-v1/scoped.css', 'src/chip.css'], runAt: 'document_idle' }]);
+    return true;
+  });
+  expect(ok).toBe(true);
+}
+async function open(glance, switches, text) {
+  await registerRealLane(glance);
+  await glance.seedOutlook(Object.assign({}, switches ? { glanceSwitches: switches } : {}), { calendar: true });
+  return glance.openMessenger(HTML(text));
+}
+const CARD = '#glance-chat-task .flow-chip-host';
+const events = (glance) => glance.evaluateWorker(() => Object.values(globalThis.__glanceE2e.outlookEvents));
+
+test('a meeting proposed in a chat is one Outlook hold with no guest, read back; Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'Could we meet Thursday at 3pm to go over the pilot?');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].attendees || []).toEqual([]);
+  expect(JSON.stringify(list[0])).not.toContain('go over the pilot');
+  expect(list[0].isOnlineMeeting).toBeFalsy();
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+test('TEAMS_MEETING on: a Teams call proposed in a chat is one Outlook hold with a Teams link, read back', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true, TEAMS_MEETING: true }, 'Can we do a Teams call Thursday at 3pm?');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].isOnlineMeeting).toBe(true);
+  expect(list[0].attendees || []).toEqual([]);
+  expect(String(list[0].subject)).toMatch(/^Call/);
+});
+
+test('TEAMS_MEETING off: the same Teams call proposal is one plain hold, no link', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'Can we do a Teams call Thursday at 3pm?');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].isOnlineMeeting).toBeFalsy();
+});

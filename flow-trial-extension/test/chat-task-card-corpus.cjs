@@ -405,6 +405,18 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('an inbound "remind me" is not read as a self note', !(await inbound.Card.offer(input('Remind me tomorrow to pay the electricity bill', { channel: 'whatsapp' }))).shown && inbound.injected.length === 0);
   }
 
+  // 5q. The Outlook meeting write answers with ref.eventId (no externalId): that is still a proved write, so the card must reach Handled.
+  {
+    const m = world({ target: { ok: true, connectorId: 'outlookCalendar' }, exec: { ok: true, fetchedBack: true, written: 'Calendar · Meeting · Thu 15:00', ref: { eventId: 'AAMk-1', created: { subject: 'Meeting' }, contentHash: 'h1' } } });
+    await m.Card.offer(input('Could we meet Thursday at 3pm?', { channel: 'whatsapp' }));
+    await m.injected[0].handlers.onDoIt(m.injected[0].host, {}, m.injected[0].ctx);
+    check('an Outlook hold whose ref carries only eventId is Handled with the read-back', m.logRows.length === 1 && m.logRows[0].fetchedBack === true && m.logRows[0].ref.eventId === 'AAMk-1', m.logRows);
+    const bad = world({ target: { ok: true, connectorId: 'outlookCalendar' }, exec: { ok: true, written: 'Calendar', ref: { eventId: 'AAMk-2' } } });
+    await bad.Card.offer(input('Could we meet Thursday at 3pm?', { channel: 'whatsapp' }));
+    await bad.injected[0].handlers.onDoIt(bad.injected[0].host, {}, bad.injected[0].ctx);
+    check('without the read-back it is still not Handled', bad.logRows.length === 0);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
