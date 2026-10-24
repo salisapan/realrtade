@@ -497,3 +497,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `e2e/chat-outlook-hold.spec.js` now 5 specs (hold with Undo, Teams link on, plain hold, To Do task, To Do reminder; the task spec asserts the message is not in the body), the chat card corpus asserts the payload carries no message words, all corpora, chat/Outlook/Gmail browser specs.
 - **Open:** live Gate. Own-promise and note-to-self cards on Microsoft are covered by the same write but have no browser spec of their own.
 
+## 2026-10-24 Ecosystems builder B (fifty-seventh run) — "at 8.30 pm" was read as 8:00
+
+- **Capability shipped (all existing switches, off):** a probe of the clock forms people really type found a wrong-hour error in the shared date reader: "at 8.30 pm" (dotted clock) came back as 08:00, so a chat or a mail that says "see you at 8.30 pm" would have been offered as a hold at the wrong hour. `core/day-words.js` now writes the clock out first: dotted clocks ("at 8.30 pm", «ב-20.00», «בשעה 8.15»), «ב-8 וחצי» and «ב-8 ורבע» (also with a part of the day: «ב-8 וחצי בערב»), "half past 8", "quarter past 5", "quarter to 9". Chat, Outlook and Gmail readers and the agreed-meeting reader benefit. Prices and decimals are left alone ("12.50 NIS"). Dotted dates still win where they are valid dates («ב-5.11»).
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/day-words-corpus.cjs` (9 more rewrites, 2 more left alone, 5 readers reading the written clock, the "8.30 pm" regression), all corpora, browser specs.
+- **Also fixed at the source:** `core/extract.js` `parseTime` now reads a dotted clock that carries am or pm ("at 8.30 pm") as that clock, so the Gmail and Outlook meeting-proposal cards no longer offer 08:00 for 20:30; "at 12.50 NIS" and a bare "at 8.30" are untouched; every corpus stays green.
+- **Open:** live Gate.
+

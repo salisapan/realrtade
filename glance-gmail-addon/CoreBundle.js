@@ -695,6 +695,14 @@ const FlowExtract = (() => {
   function parseTime(text) {
     let m;
 
+    // "at 8.30 pm": a dotted clock that carries am or pm is that clock, not 8:00 with ".30 pm" left over.
+    m = text.match(/\bat\s+(\d{1,2})\.([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
+    if (m) {
+      const clock0 = resolveClock(+m[1], +m[2], m[3].toLowerCase().replace(/\./g, ''));
+      if (!clock0) return null;
+      return { raw: m[0], hour: clock0.hour, minute: clock0.minute };
+    }
+
     m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|(?:in the|this) (?:morning|afternoon|evening)|at night)?\b/i);
     if (m) {
       const marker = (m[3] || '').toLowerCase().replace(/\./g, '').replace(/^this /, 'in the ');

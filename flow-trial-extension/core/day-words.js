@@ -30,6 +30,14 @@ const FlowDayWords = (() => {
       if (probe.getMonth() !== mn - 1 || probe.getDate() !== dn) return m;
       return pre + mark + iso(probe);
     });
+    // Clocks written the other ways: «ב-8 וחצי», «ב-8 ורבע», "half past 8", "quarter to 9", and a dotted clock («ב-20.00»,
+    // "at 8.30 pm"). The date reader would take "at 8.30 pm" for 8:00, a wrong hour, so these are made explicit first.
+    s = s.replace(/(^|[^\u0590-\u05FF\d])(ב-?|בשעה\s+)(\d{1,2})\s*ו-?(חצי|רבע)(?![\u0590-\u05FF])/g, (m, pre, lead, h, w) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? pre + lead + h + ':' + (w === 'חצי' ? '30' : '15') : m);
+    s = s.replace(/\bhalf\s+past\s+(\d{1,2})\b/gi, (m, h) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? h + ':30' : m);
+    s = s.replace(/\bquarter\s+past\s+(\d{1,2})\b/gi, (m, h) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? h + ':15' : m);
+    s = s.replace(/\bquarter\s+(?:to|of)\s+(\d{1,2})\b/gi, (m, h) => { const n = parseInt(h, 10); return (n >= 1 && n <= 12) ? ((n === 1 ? 12 : n - 1) + ':45') : m; });
+    s = s.replace(/(\d{1,2})\.([0-5]\d)(\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z]))/gi, (m, h, mi, mer) => parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12 ? h + ':' + mi + mer : m);
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)([01]?\d|2[0-3])\.([0-5]\d)(?![\d.])/gi, (m, lead, h, mi) => lead + h + ':' + mi);
     // A clock with a part of the day: «ב-7 בערב» to "at 7:00 pm", «ב-12 בצהריים» to "at 12:00 pm", "at noon" to "at 12:00 pm". The
     // date reader leaves a bare 12 or 00 unresolved on purpose, and takes a written am or pm.
     s = s.replace(/(ב-?|בשעה\s+)(\d{1,2})(?::([0-5]\d))?\s+(בבוקר|בצהריים|בצהרים|אחה["״]צ|אחר\s+הצהריים|אחרי\s+הצהריים|בערב|בלילה)/g, (m, lead, h, min, part) => {
