@@ -832,10 +832,8 @@
       }
       if (listId) {
         let rows = await attachmentListFor(listId);
-        if (!Array.isArray(rows) && (pane.pathId || pane.conversationId)) {
-          const found = paneUrlOnlyMessageTarget(pane)
-            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)
-            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+        if (!Array.isArray(rows) && paneUrlOnlyMessageTarget(pane) && (pane.pathId || pane.conversationId)) {
+          const found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);
           const alt = found && found.id;
           if (alt && String(alt) !== String(listId)) rows = await attachmentListFor(alt);
         }
@@ -987,32 +985,19 @@
     return true;
   }
 
-  function openPaneConversationRow(pane, m) {
-    if (!pane || !m) return false;
-    const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
-    const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || '');
-    const wantConv = canon(pane.conversationId || pane.pathId);
-    const gotConv = canon(m.conversationId);
-    return Boolean(wantConv && gotConv && wantConv === gotConv);
-  }
-
   async function exactOpenMessageInList(list, pane, openSender) {
     if (!pane) return null;
     const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
     const hits = [];
-    const convSender = [];
     for (let i = 0; i < (list || []).length; i++) {
       const m = list[i];
       const from = fromAddress(m);
       if (behalfSplit(m.from, m.sender)) continue;
       if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;
-      if (openPaneConversationRow(pane, m)) convSender.push(m);
       if (!openPaneExactGraphRow(pane, m)) continue;
       hits.push(m);
     }
     if (hits.length === 1) return hits[0];
-    if (hits.length > 1) return null;
-    if (convSender.length === 1) return convSender[0];
     return null;
   }
 

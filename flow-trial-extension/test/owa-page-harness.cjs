@@ -134,7 +134,7 @@ async function runPage(opts) {
         if (o.attachmentReads === 'fail') return { ok: false, status: 0, error: 'network' };
         const graphOnly = o.attachmentsGraphIdOnly ? String(o.attachmentGraphMessageId || graphMsg.id) : '';
         if (graphOnly) {
-          if (asked === graphOnly) {
+          if (asked === graphOnly || canon(asked) === canon(graphOnly)) {
             return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
           }
           return { ok: false, status: 404, body: '{}' };
@@ -270,8 +270,15 @@ async function runPage(opts) {
       const undo = w.document.querySelector('.flow-chip-undo');
       if (undo) undo.click();
       const wantUndos = typeof o.undoCount === 'number' ? o.undoCount : 1;
-      const untilUndo = Date.now() + 3000;
-      while (Date.now() < untilUndo && sent.filter((m) => m.type === 'flow:undo-action').length < wantUndos) await new Promise((r) => setTimeout(r, 40));
+      const untilUndo = Date.now() + 5000;
+      const needBoth = wantUndos >= 2;
+      while (Date.now() < untilUndo) {
+        const undos = sent.filter((m) => m.type === 'flow:undo-action');
+        if (undos.length >= wantUndos) {
+          if (!needBoth || (undos.some((m) => m.connectorId === 'outlookDraft') && undos.some((m) => m.connectorId === 'outlookTask'))) break;
+        }
+        await new Promise((r) => setTimeout(r, 40));
+      }
       await new Promise((r) => setTimeout(r, 200));
     }
   } else if (o.clickUndo) {
