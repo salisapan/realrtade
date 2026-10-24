@@ -13,7 +13,14 @@ const YES = [
   ['תעביר לי 500 שקל עד יום ראשון', '2026-10-25', '500', 'NIS'],
   ['תשלם 300 ש"ח עד מחר', '2026-10-24', '300', 'NIS'],
   ['אפשר שתעביר 1,500 ₪ ביום חמישי?', '2026-10-29', '1500', 'NIS'],
-  ['אתה חייב לי 200 ש"ח, תעביר ביום שני', '2026-10-26', '200', 'NIS']
+  ['אתה חייב לי 200 ש"ח, תעביר ביום שני', '2026-10-26', '200', 'NIS'],
+  ['תעביר לי חמש מאות שקל עד יום ראשון', '2026-10-25', '500', 'NIS'],
+  ['תשלם אלפיים ש"ח עד מחר', '2026-10-24', '2000', 'NIS'],
+  ['תעביר שלוש מאות וחמישים שקל עד יום ראשון', '2026-10-25', '350', 'NIS'],
+  ['תעביר שלושת אלפים ש״ח עד יום ראשון', '2026-10-25', '3000', 'NIS'],
+  ['Please transfer five hundred shekels by Sunday', '2026-10-25', '500', 'NIS'],
+  ['Please pay two thousand five hundred NIS by Sunday', '2026-10-25', '2500', 'NIS'],
+  ['Please pay a hundred dollars by Sunday', '2026-10-25', '100', 'USD']
 ];
 for (const [text, day, amount, cur] of YES) { const r = A.recognize(text, NOW); check('payment ask: ' + text, r.kind === 'ask' && r.dateIso === day && r.amount === amount && r.currency === cur, r); }
 const NO = [
@@ -31,6 +38,10 @@ const NO = [
   ['אני אעביר 500 שקל עד יום ראשון', 'own promise'],
   ['העברתי לך 500 שקל אתמול', 'look back'],
   ['תעביר 500 שקל', 'no day'],
+  ['תעביר חמישה אנשים עד יום ראשון', 'a number of people, not money'],
+  ['Please pay five people by Sunday', 'a number of people, not money'],
+  ['תעביר לי 500 שקל או חמש מאות שקל עד יום ראשון', 'two amounts'],
+  ['חמש מאות שקל זה יקר, תעביר לי את זה עד יום ראשון', 'no pay-aimed ask'],
   ['תעביר לי את הכסף עד יום ראשון', 'no amount'],
   ['', 'empty'],
   ['x'.repeat(300), 'long']

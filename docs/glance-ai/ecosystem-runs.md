@@ -469,3 +469,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/day-words-corpus.cjs` (14 rewrites, 9 left alone, 15 readers finding their day, 6 decimals that must not become days), the silence corpus gained 6 everyday lines with abbreviations and dates, all corpora, 25 real-browser specs (Outlook, Gmail, chat) including a new Hebrew «בעוד יומיים» task on Outlook, add-on bundle rebuilt.
 - **Open:** live Gate; `core/day-words.js` joined the shared content-script `js` list in `manifest.json` (no permission, host or scope change). Hebrew number words as amounts («חמש מאות שקל») are still not read.
 
+## 2026-10-24 Ecosystems builder B (fifty-third run) — amounts written in words
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `PAYMENT_ASK`, off):** people write money in words as often as in digits, in Hebrew especially («תעביר לי חמש מאות שקל», «אלפיים ש"ח»). The payment reader only took digits, so those asks got no card. It now reads «חמש מאות שקל», «שלוש מאות וחמישים שקל», «אלף ומאתיים שקל», «שני אלף», «שלושת אלפים ש״ח», "five hundred shekels", "two thousand five hundred NIS" and "a hundred dollars" (rewritten to digits and the same currency word first), in chat, Outlook and Gmail. A number of people or things («חמישה אנשים») is not money; two amounts stay quiet. Closes the "Hebrew number words as amounts" item left open in run 52.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` (7 asks in words, 4 more quiet lines), `test/payment-ask-mail-corpus.cjs` (2 in words), the silence corpus (4 more everyday lines with amounts in words), all corpora, chat/Outlook/Gmail browser specs (25).
+- **Open:** live Gate; amounts such as «מאה וחמישים אלף» (over a thousand with a trailing hundreds part) and decimals in words are not read, by design.
+

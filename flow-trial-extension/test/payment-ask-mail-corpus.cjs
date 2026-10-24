@@ -24,7 +24,9 @@ const YES = [
   ['Hi Sali, please transfer 500 NIS to my account by Sunday. Thanks!', '2026-10-25', /^Pay 500 NIS · Dana Levi$/],
   ['Can you pay the 1,200 ₪ invoice before Thursday?', '2026-10-29', /^Pay 1200 NIS · Dana Levi$/],
   ['שלום, תעביר לי 500 שקל עד יום ראשון', '2026-10-25', /^לשלם 500 NIS · Dana Levi$/],
-  ['אפשר שתעביר 1,500 ₪ ביום חמישי?', '2026-10-29', /^לשלם 1500 NIS · Dana Levi$/]
+  ['אפשר שתעביר 1,500 ₪ ביום חמישי?', '2026-10-29', /^לשלם 1500 NIS · Dana Levi$/],
+  ['שלום, תעביר לי חמש מאות שקל עד יום ראשון', '2026-10-25', /^לשלם 500 NIS · Dana Levi$/],
+  ['Hi Sali, please transfer five hundred shekels to my account by Sunday', '2026-10-25', /^Pay 500 NIS · Dana Levi$/]
 ];
 for (const [text, day, titleRe] of YES) {
   const r = judge(text);

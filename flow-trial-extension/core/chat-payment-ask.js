@@ -47,9 +47,63 @@ const FlowChatPaymentAsk = (() => {
     return { iso: iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + (idx - at.getDay() + 7) % 7)) };
   }
 
+  // An amount written in words ("חמש מאות שקל", "אלפיים ש"ח", "five hundred shekels") is rewritten to digits and the same currency
+  // word, so one amount reader serves both. Only a run of number words directly before a currency word is touched.
+  const HE_UNITS = { 'אחד': 1, 'אחת': 1, 'שני': 2, 'שתי': 2, 'שניים': 2, 'שתיים': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4, 'חמש': 5, 'חמישה': 5, 'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9, 'עשר': 10, 'עשרה': 10, 'שלושת': 3, 'ארבעת': 4, 'חמשת': 5, 'ששת': 6, 'שבעת': 7, 'שמונת': 8, 'תשעת': 9, 'עשרת': 10 };
+  const HE_TENS = { 'עשרים': 20, 'שלושים': 30, 'ארבעים': 40, 'חמישים': 50, 'שישים': 60, 'שבעים': 70, 'שמונים': 80, 'תשעים': 90 };
+  const HE_WORD = '(?:אחד|אחת|שני|שתי|שניים|שתיים|שלוש|שלושה|שלושת|ארבע|ארבעה|ארבעת|חמש|חמישה|חמשת|שש|שישה|ששת|שבע|שבעה|שבעת|שמונה|שמונת|תשע|תשעה|תשעת|עשר|עשרה|עשרת|עשרים|שלושים|ארבעים|חמישים|שישים|שבעים|שמונים|תשעים|מאה|מאתיים|מאות|אלף|אלפיים|אלפים)';
+  const EN_UNITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, a: 1 };
+  const EN_TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  const EN_WORD = '(?:a|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)';
+  const CUR_WORD = '(?:שקל(?:ים)?|ש"ח|ש״ח|שח|דולר(?:ים)?|אירו|יורו|nis|ils|usd|eur|gbp|shekels?|dollars?|euros?|bucks)';
+
+  function heWordsValue(words) {
+    let total = 0; let cur = 0;
+    for (const raw of words) {
+      const w = raw.replace(/^ו/, '');
+      if (HE_UNITS[w] != null) cur += HE_UNITS[w];
+      else if (HE_TENS[w] != null) cur += HE_TENS[w];
+      else if (w === 'מאה') cur += 100;
+      else if (w === 'מאתיים') cur += 200;
+      else if (w === 'מאות') cur = (cur || 1) * 100;
+      else if (w === 'אלף') { total += (cur || 1) * 1000; cur = 0; }
+      else if (w === 'אלפיים') { total += 2000; cur = 0; }
+      else if (w === 'אלפים') { total += (cur || 1) * 1000; cur = 0; }
+      else return 0;
+    }
+    return total + cur;
+  }
+  function enWordsValue(words) {
+    let total = 0; let cur = 0;
+    for (const raw of words) {
+      const w = raw.toLowerCase();
+      if (EN_UNITS[w] != null) cur += EN_UNITS[w];
+      else if (EN_TENS[w] != null) cur += EN_TENS[w];
+      else if (w === 'hundred') cur = (cur || 1) * 100;
+      else if (w === 'thousand') { total += (cur || 1) * 1000; cur = 0; }
+      else return 0;
+    }
+    return total + cur;
+  }
+  function amountWords(text) {
+    let s = String(text || '');
+    s = s.replace(new RegExp('((?:^|[\\s(,])(?:ו)?' + HE_WORD + '(?:\\s+(?:ו)?' + HE_WORD + ')*)\\s+(' + CUR_WORD + ')', 'g'), (m, run, cur) => {
+      const lead = /^[\s(,]/.test(run) ? run.charAt(0) : '';
+      const words = run.replace(/^[\s(,]/, '').split(/\s+/);
+      const n = heWordsValue(words);
+      return n > 0 ? lead + n + ' ' + cur : m;
+    });
+    s = s.replace(new RegExp('\\b(' + EN_WORD + '(?:[\\s-]+(?:and\\s+)?' + EN_WORD + ')*)\\s+(' + CUR_WORD + ')', 'gi'), (m, run, cur) => {
+      const words = run.split(/[\s-]+/).filter((w) => !/^and$/i.test(w));
+      const n = enWordsValue(words);
+      return n > 0 ? n + ' ' + cur : m;
+    });
+    return s;
+  }
+
   function currencyOf(m) {
     const t = m[0];
-    if (/₪|nis|ils|שקל|ש"ח|ש״ח|שח/i.test(t)) return 'NIS';
+    if (/₪|nis|ils|shekel|שקל|ש"ח|ש״ח|שח/i.test(t)) return 'NIS';
     if (/\$|usd|dollar|דולר|bucks/i.test(t)) return 'USD';
     if (/€|eur|euro|אירו|יורו/i.test(t)) return 'EUR';
     if (/£|gbp/i.test(t)) return 'GBP';
@@ -58,7 +112,7 @@ const FlowChatPaymentAsk = (() => {
 
   // { kind: 'ask', dateIso, amount, currency, lang } or { kind: 'none', reason }.
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim();
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };
