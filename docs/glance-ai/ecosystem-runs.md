@@ -527,3 +527,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/chat-appointment-notice-corpus.cjs` (8 more notices, 5 more quiet lines), all corpora, `outlook-teams-and-series` 17/17, `engine` 10/10, booking/chat browser specs.
 - **Open:** live Gate; `gate-0956-live.spec.js` and `google-lane-http.spec.js` also build `d/m` text but with a weekday, so they are stable.
 
+## 2026-10-24 Ecosystems builder B (sixty-first run) — flights, trains and rides become a hold
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `BOOKING_NOTICE`, off):** an airline, a rail company or a ride service that tells the person "Your flight LY001 departs Sunday at 06:30", "Your train leaves tomorrow at 08:15", «הטיסה שלך ממריאה ביום ראשון ב-06:30» or «הרכבת שלך יוצאת מחר ב-08:15» now gets the existing Hold It card in WhatsApp, Messenger, Instagram, Outlook and Gmail: one event titled "Trip · sender" / «נסיעה · שולח», read back by id, Undo deletes it, nobody invited. Cancelled, delayed or changed trips, promotions, questions, someone else's flight and a missing day or clock stay quiet. Found on the way: the date reader left "06:30" unresolved (6:30 am or pm?), which is right for a bare "6:30" and wrong for a leading zero; `core/day-words.js` now writes a leading-zero clock out as 24-hour am.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** new `test/chat-travel-notice-corpus.cjs` (10 notices EN+HE, 16 quiet lines), chat card corpus (trip hold, quiet lines), booking-notice corpus (2 mails, 2 quiet), the silence corpus (4 more everyday lines), all corpora, chat/Outlook/Gmail browser specs.
+- **Open:** live Gate; `core/chat-travel-notice.js` joined the shared content-script `js` list in `manifest.json` (no permission, host or scope change). A flight with a time zone ("06:30 local") is read as the written clock.
+

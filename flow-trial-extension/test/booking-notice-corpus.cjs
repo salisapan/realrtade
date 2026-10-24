@@ -12,7 +12,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'day-words.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js', 'incoming-judge.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'day-words.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-invitation-notice.js', 'incoming-judge.js'];
 const box = { module: undefined, console };
 vm.createContext(box);
 for (const f of CORE) vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), box, { filename: f });
@@ -30,6 +30,15 @@ for (const [text, day, h, m] of APPT) {
   const r = judge(text);
   const st = r.show && r.process.steps[0];
   check('appointment mail offers one calendar hold: ' + text.slice(0, 50), r.show && r.process.steps.length === 1 && st.kind === 'calendar' && st.params.dateIso === day && st.params.hour === h && st.params.minute === m && st.params.meeting === true && /^(Appointment|תור) · Studio Nofar$/.test(st.params.title), r);
+}
+const TRIP = [
+  ['Your flight LY001 departs Sunday at 06:30. Please arrive at the airport two hours before.', '2026-10-25', 6, 30],
+  ['הטיסה שלך ממריאה ביום ראשון ב-06:30, נא להגיע לשדה שעתיים לפני', '2026-10-25', 6, 30]
+];
+for (const [text, day, h, m] of TRIP) {
+  const r = judge(text);
+  const st = r.show && r.process.steps[0];
+  check('trip mail offers one calendar hold: ' + text.slice(0, 50), r.show && st.kind === 'calendar' && st.params.dateIso === day && st.params.hour === h && st.params.minute === m && /^(Trip|נסיעה) · Studio Nofar$/.test(st.params.title), r);
 }
 const INVITE = [
   ["You're invited to our product launch on Thursday at 19:00", '2026-10-29', 19, 0],
@@ -53,7 +62,7 @@ for (const [text, day] of PICK) {
 check('the same pickup on Gmail keeps the Google task step', judge(PICK[0][0], { surface: 'gmail' }).process.steps[0].kind === 'googleTask');
 
 // Off: nothing changes. Not for the person's own mail either.
-for (const [text] of APPT.concat(PICK, INVITE)) {
+for (const [text] of APPT.concat(PICK, INVITE, TRIP)) {
   const off = judge(text, { bookingNoticeOn: false });
   check('switch off: no booking card: ' + text.slice(0, 40), !(off.show && off.intent && off.intent.bookingNotice), off && off.reason);
 }
@@ -62,6 +71,7 @@ check('a mail that is not inbound is never a booking notice', !(judge(APPT[0][0]
 
 // Quiet: cancellations, offers, deliveries, no clock, no deadline.
 const QUIET = [
+  'Your flight was cancelled, it departed Sunday at 06:30', 'Flight deals departing Sunday at 06:30 - book now',
   'Join our webinar on Thursday at 19:00, register now', 'Thank you for the invitation to the party on Saturday at 8pm', "You're invited to the launch on Thursday",
   'Your appointment has been cancelled, it was Sunday at 10:00', 'Available slots: Sunday at 10:00 or Monday at 11:00. Click to choose',
   'Your appointment is confirmed for Sunday', 'Your package will arrive on Monday', 'Your order is ready for pickup',

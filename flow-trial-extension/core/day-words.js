@@ -38,6 +38,10 @@ const FlowDayWords = (() => {
     s = s.replace(/\bquarter\s+(?:to|of)\s+(\d{1,2})\b/gi, (m, h) => { const n = parseInt(h, 10); return (n >= 1 && n <= 12) ? ((n === 1 ? 12 : n - 1) + ':45') : m; });
     s = s.replace(/(\d{1,2})\.([0-5]\d)(\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z]))/gi, (m, h, mi, mer) => parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12 ? h + ':' + mi + mer : m);
     s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)([01]?\d|2[0-3])\.([0-5]\d)(?![\d.])/gi, (m, lead, h, mi) => lead + h + ':' + mi);
+    // A clock written with a leading zero is a 24-hour clock ("06:30", «ב-06:30», "at 06:30"): the date reader leaves a bare 6:30
+    // unresolved, which is right for "6:30" and wrong for "06:30" on a boarding pass. Written out with am, it is 6:30 am.
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])0([1-9]):([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, h, mi) => 'at ' + h + ':' + mi + ' am');
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])00:([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, mi) => 'at 12:' + mi + ' am');
     // A clock with a part of the day: «ב-7 בערב» to "at 7:00 pm", «ב-12 בצהריים» to "at 12:00 pm", "at noon" to "at 12:00 pm". The
     // date reader leaves a bare 12 or 00 unresolved on purpose, and takes a written am or pm.
     s = s.replace(/(ב-?|בשעה\s+)(\d{1,2})(?::([0-5]\d))?\s+(בבוקר|בצהריים|בצהרים|אחה["״]צ|אחר\s+הצהריים|אחרי\s+הצהריים|בערב|בלילה)/g, (m, lead, h, min, part) => {

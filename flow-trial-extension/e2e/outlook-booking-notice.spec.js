@@ -130,3 +130,17 @@ test('TASK_ASK on, Hebrew with a relative span: «אל תשכח להביא את 
   expect(JSON.stringify(list[0])).toContain(iso);
   expect(JSON.stringify(list[0])).toContain('הטופס החתום');
 });
+
+test('BOOKING_NOTICE on: a flight told in a mail is one calendar hold titled Trip, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi Sali, your flight LY001 to Paris departs tomorrow at 06:30. Please arrive at the airport two hours before.', true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Trip/);
+  expect(list[0].attendees || []).toEqual([]);
+  expect(JSON.stringify(list[0].start)).toContain('06:30');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});

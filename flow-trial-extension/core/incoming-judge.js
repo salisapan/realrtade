@@ -369,6 +369,17 @@ const FlowIncomingJudge = (() => {
           steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
+    const tripApi = sibling(typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, './chat-travel-notice.js', 'FlowChatTravelNotice');
+    const trip = firstHit(tripApi, body, now0, 'trip');
+    if (trip) {
+      const he = trip.lang === 'he';
+      const title = ((he ? 'נסיעה' : 'Trip') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'trip', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute }, facts: { date: { iso: trip.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
     const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');
     const inv = firstHit(invApi, body, now0, 'invitation');
     if (inv) {

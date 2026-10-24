@@ -140,6 +140,10 @@ const FlowDayWords = (() => {
     s = s.replace(/\bquarter\s+(?:to|of)\s+(\d{1,2})\b/gi, (m, h) => { const n = parseInt(h, 10); return (n >= 1 && n <= 12) ? ((n === 1 ? 12 : n - 1) + ':45') : m; });
     s = s.replace(/(\d{1,2})\.([0-5]\d)(\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z]))/gi, (m, h, mi, mer) => parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12 ? h + ':' + mi + mer : m);
     s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)([01]?\d|2[0-3])\.([0-5]\d)(?![\d.])/gi, (m, lead, h, mi) => lead + h + ':' + mi);
+    // A clock written with a leading zero is a 24-hour clock ("06:30", «ב-06:30», "at 06:30"): the date reader leaves a bare 6:30
+    // unresolved, which is right for "6:30" and wrong for "06:30" on a boarding pass. Written out with am, it is 6:30 am.
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])0([1-9]):([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, h, mi) => 'at ' + h + ':' + mi + ' am');
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])00:([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, mi) => 'at 12:' + mi + ' am');
     // A clock with a part of the day: «ב-7 בערב» to "at 7:00 pm", «ב-12 בצהריים» to "at 12:00 pm", "at noon" to "at 12:00 pm". The
     // date reader leaves a bare 12 or 00 unresolved on purpose, and takes a written am or pm.
     s = s.replace(/(ב-?|בשעה\s+)(\d{1,2})(?::([0-5]\d))?\s+(בבוקר|בצהריים|בצהרים|אחה["״]צ|אחר\s+הצהריים|אחרי\s+הצהריים|בערב|בלילה)/g, (m, lead, h, min, part) => {
@@ -9717,6 +9721,17 @@ const FlowIncomingJudge = (() => {
         intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
         process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
           steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const tripApi = sibling(typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, './chat-travel-notice.js', 'FlowChatTravelNotice');
+    const trip = firstHit(tripApi, body, now0, 'trip');
+    if (trip) {
+      const he = trip.lang === 'he';
+      const title = ((he ? 'נסיעה' : 'Trip') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'trip', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute }, facts: { date: { iso: trip.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
     const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');

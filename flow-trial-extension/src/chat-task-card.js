@@ -289,6 +289,8 @@ const FlowChatTaskCard = (() => {
     let callProposal = false;
     let appt = null;
     let inv = null;
+    let trip = null;
+    try { trip = (!own && typeof FlowChatTravelNotice !== 'undefined') ? FlowChatTravelNotice.recognize(i.text, i.now) : null; } catch (e) { trip = null; }
     let selfNote = null;
     try { selfNote = (own && typeof FlowChatSelfNote !== 'undefined') ? FlowChatSelfNote.recognize(i.text, i.now) : null; } catch (e) { selfNote = null; }
     try { inv = (!own && typeof FlowChatInvitationNotice !== 'undefined') ? FlowChatInvitationNotice.recognize(i.text, i.now) : null; } catch (e) { inv = null; }
@@ -302,22 +304,22 @@ const FlowChatTaskCard = (() => {
         intent: { type: 'commitment', label: selfNote.what, entities: { dateIso: selfNote.dateIso, what: selfNote.what } },
         process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + selfNote.what, params: { title: selfNote.what, dateIso: selfNote.dateIso, what: selfNote.what }, dependsOn: null }] }
       };
-    } else if (!(appt && appt.kind === 'appointment') && !(inv && inv.kind === 'invitation') && confirmed && confirmed.kind === 'confirmed') {
+    } else if (!(appt && appt.kind === 'appointment') && !(inv && inv.kind === 'invitation') && !(trip && trip.kind === 'trip') && confirmed && confirmed.kind === 'confirmed') {
       judged = {
         show: true,
         intent: { type: 'event', label: 'Meeting ' + confirmed.when, entities: { dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute } },
         process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: Meeting ' + confirmed.when, params: { title: '', dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
       };
-    } else if ((appt && appt.kind === 'appointment') || (inv && inv.kind === 'invitation')) {
-      const held = (appt && appt.kind === 'appointment') ? appt : inv;
+    } else if ((appt && appt.kind === 'appointment') || (inv && inv.kind === 'invitation') || (trip && trip.kind === 'trip')) {
+      const held = (appt && appt.kind === 'appointment') ? appt : (inv && inv.kind === 'invitation') ? inv : trip;
       // "Your appointment is confirmed for Sunday at 10:00" / «התור שלך נקבע ליום ראשון בשעה 10:00» (core/chat-appointment-notice.js):
       // a booking someone confirmed to the person becomes a hold titled "Appointment · name". Nobody is invited.
       judged = {
         show: true,
-        intent: { type: 'event', label: held === inv ? 'Invitation' : 'Appointment', entities: { dateIso: held.dateIso, hour: held.hour, minute: held.minute } },
-        process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + (held === inv ? 'Invitation' : 'Appointment'), params: { title: '', dateIso: held.dateIso, hour: held.hour, minute: held.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
+        intent: { type: 'event', label: held === trip ? 'Trip' : held === inv ? 'Invitation' : 'Appointment', entities: { dateIso: held.dateIso, hour: held.hour, minute: held.minute } },
+        process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + (held === trip ? 'Trip' : held === inv ? 'Invitation' : 'Appointment'), params: { title: '', dateIso: held.dateIso, hour: held.hour, minute: held.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
       };
-      callProposal = held === inv ? 'invitation' : 'appointment';
+      callProposal = held === trip ? 'trip' : held === inv ? 'invitation' : 'appointment';
     } else {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
@@ -443,7 +445,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
     }
     if (own && !(selfNote && selfNote.kind === 'note')) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").
