@@ -1068,6 +1068,29 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
   check('request-dismissal history does not suppress a dated commitment', notSuppressed.type === FlowIntent.TYPES.DECISION_TO_LOG, notSuppressed.type);
 }
 
+// Owner, 2026-10-24: a request to approve with a deadline is a task (the decision stays the person's, the deadline is kept,
+// no reply draft). The same ask with no date stays the reader's own and quiet.
+console.log('\n--- approve with a deadline is a task ---\n');
+{
+  const approveAsks = [
+    ['HE please-approve proposal', 'בבקשה תאשר את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE na-approve proposal', 'נא לאשר את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE can-you-approve proposal', 'תוכל לאשר את ההצעה על סך 3,900 שקל עד יום שני?'],
+    ['HE please-approve feminine', 'בבקשה תאשרי את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE formal ana-approve', 'אנא אשר את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE can-you-approve budget by tomorrow', 'תוכל לאשר לי את התקציב עד מחר?']
+  ];
+  for (const [name, text] of approveAsks) {
+    const r = FlowIntent.classify(text, { now: NOW });
+    check('approve with a deadline is a request: ' + name, Boolean(r && r.type === 'request'), r && { type: r.type, quiet: r.quiet });
+    check('approve with a deadline offers no reply draft: ' + name, Boolean(r && r.noReplyDraft === true), r && { noReplyDraft: r.noReplyDraft });
+  }
+  for (const text of ['נא לאשר את ההצעה', 'האם אתה מסכים להצעה?']) {
+    const r = FlowIntent.classify(text, { now: NOW });
+    check('approve with no date stays quiet: ' + text, !r || !r.type, r && { type: r.type });
+  }
+}
+
 // Google-loop silence. Probed against classify() — the path the chip uses.
 // These cleared a hard gate while the score sat under 50 (or, for a settled
 // payment, just over it) and would have shown a Do It. The three Trusted
@@ -1081,11 +1104,6 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['soft if possible + invoice', 'If possible, could you send the invoice?'],
     ['soft optional follow up', 'Optional: please follow up with Dana about the invoice if you want.'],
     ['soft Hebrew maybe + invoice', 'אולי תוכל לשלוח את החשבונית?'],
-    ['HE reader-decision please-approve proposal', 'בבקשה תאשר את ההצעה על סך 3,900 שקל עד יום שני.'],
-    ['HE reader-decision na-approve proposal', 'נא לאשר את ההצעה על סך 3,900 שקל עד יום שני.'],
-    ['HE reader-decision can-you-approve proposal', 'תוכל לאשר את ההצעה על סך 3,900 שקל עד יום שני?'],
-    ['HE reader-decision please-approve feminine', 'בבקשה תאשרי את ההצעה על סך 3,900 שקל עד יום שני.'],
-    ['HE reader-decision formal ana-approve', 'אנא אשר את ההצעה על סך 3,900 שקל עד יום שני.'],
     ['EN reader-decision please-accept proposal', 'Please accept the $18,000 proposal by Monday and route it to the legal team for the paperwork this week.'],
     ['soft HE if-you-can send invoice', 'במידה ותוכל, תשלח לי את החשבונית עד יום שישי.'],
     ['soft HE assuming send invoice', 'בהנחה שתספיק, תשלח לי את החשבונית עד יום שישי.'],

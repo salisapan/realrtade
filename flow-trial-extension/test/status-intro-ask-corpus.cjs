@@ -42,6 +42,7 @@ const SHOW = [
   "אשמח שתפגיש אותי עם מי שאחראי אצלכם על הדיגיטל",
   "תעדכני אותי כשהתשלום יצא עד סוף היום",
   "Can you approve the budget by Wednesday?",
+  "תוכל לאשר לי את ההצעה עד מחר?",
   "יש קישור לזום ?",
   "Do you have the invoice?",
   "Can you send the deck?",
