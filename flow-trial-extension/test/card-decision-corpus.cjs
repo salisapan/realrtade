@@ -566,13 +566,9 @@ function panel(store) {
     check('F1 bite: pathId-before-itemId mutation wrongly matches the URL message entry (must fail on control product)',
       matchedBite && matchedBite.how === 'message id' && String(matchedBite.entry.messageId) === MSG_WRONG,
       { how: matchedBite && matchedBite.how, id: matchedBite && matchedBite.entry && matchedBite.entry.messageId });
-    const owaNoOp = pathIdFirstPaneIdSrc(owaSrc.replace(
-      'const paneId = canonId(pane.itemId || pane.messageId || pane.pathId);',
-      'const paneId = canonId(pane.itemId || pane.messageId || pane.pathId);'
-    ));
     const noopCtx = vm.createContext({ module: { exports: {} }, exports: {} });
     noopCtx.exports = noopCtx.module.exports;
-    vm.runInContext(owaNoOp + '\nmodule.exports = { FlowOwaParse };', noopCtx);
+    vm.runInContext(owaSrc + '\nmodule.exports = { FlowOwaParse };', noopCtx);
     const matchedNoOp = noopCtx.module.exports.FlowOwaParse.matchEntryHow(paneOpen, [wrongEntry]);
     check('F1 bite: identity owa-parse patch does not satisfy pathId-first bite',
       !matchedNoOp || matchedNoOp.how !== 'message id' || String(matchedNoOp.entry.messageId) !== MSG_WRONG,
