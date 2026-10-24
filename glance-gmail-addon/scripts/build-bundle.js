@@ -15,6 +15,7 @@ const out = path.join(__dirname, '..', 'CoreBundle.js');
 
 const files = [
   'domains.js',
+  'day-words.js',
   'extract.js',
   'judgment.js',
   'google-closes.js',

@@ -23,7 +23,7 @@ const REW = [
   ['בעוד יומיים', '2026-10-25'], ['בעוד שלושה ימים', '2026-10-26'], ['בעוד 5 ימים', '2026-10-28'], ['בעוד שבוע', '2026-10-30'],
   ['ב-7 בערב', 'at 7:00 pm'], ['ב־4 אחה"צ', 'at 4:00 pm'], ['בשעה 8:30 בערב', 'at 8:30 pm'], ['ב-12 בצהריים', 'at 12:00 pm'], ['ב-9 בבוקר', 'at 9:00 am'], ['ב-12 בלילה', 'at 12:00 am'], ['ב-11 בלילה', 'at 11:00 pm'], ['at noon', 'at 12:00 pm'], ['at midnight', 'at 12:00 am'],
   ['at 8.30 pm', 'at 8:30 pm'], ['ב-20.00', 'ב-20:00'], ['בשעה 8.15', 'בשעה 8:15'], ['ב-8 וחצי', 'ב-8:30'], ['ב־8 ורבע', 'ב-8:15'], ['at half past 8', 'at 8:30'], ['at quarter past 5', 'at 5:15'], ['at quarter to 9', 'at 8:45'], ['ב-8 וחצי בערב', 'at 8:30 pm'],
-  ['end of the week', '2026-10-23'], ['by EOW', 'by 2026-10-23'], ['end of the month', '2026-10-31'], ['סוף החודש', '2026-10-31'], ['by the 30th', 'by 2026-10-30'], ['before the 5th', 'before 2026-11-05'], ['עד ה-30', 'עד 2026-10-30'], ['עד ה־5 לחודש', 'עד 2026-11-05'], ['ב-15 לחודש', 'ב-2026-11-15'], ['the 5th of November', 'November 5'],
+  ['end of the week', '2026-10-23'], ['by EOW', 'by 2026-10-23'], ['עד סוף השבוע', 'עד 2026-10-29'], ['end of the month', '2026-10-31'], ['סוף החודש', '2026-10-31'], ['by the 30th', 'by 2026-10-30'], ['before the 5th', 'before 2026-11-05'], ['עד ה-30', 'עד 2026-10-30'], ['עד ה־5 לחודש', 'עד 2026-11-05'], ['ב-15 לחודש', 'ב-2026-11-15'], ['the 5th of November', 'November 5'],
   ['in 3 days', '2026-10-26'], ['in two days', '2026-10-25'], ['in a week', '2026-10-30']
 ];
 for (const [from, to] of REW) check('rewrites ' + from, D.normalize(from, NOW) === to, D.normalize(from, NOW));
@@ -49,7 +49,7 @@ const YES = [
   ['pick', 'ההזמנה שלך מוכנה לאיסוף עד יום ה׳', '2026-10-29'],
   ['note', 'לעצמי: לחדש דרכון עד 29.10', '2026-10-29'],
   ['dl', 'Need the report by the end of the month', '2026-10-31'],
-  ['dl', 'תחתום על החוזה עד סוף השבוע', '2026-10-23'],
+  ['dl', 'תחתום על החוזה עד סוף השבוע', '2026-10-29'],
   ['dl', 'תחתום על החוזה עד ה-30', '2026-10-30'],
   ['pay', 'Please pay 500 NIS by the 5th of November', '2026-11-05'],
   ['pick', 'ההזמנה שלך מוכנה לאיסוף עד סוף החודש', '2026-10-31']
@@ -70,6 +70,8 @@ const CLOCKS2 = [
 for (const [k, t, h, m] of CLOCKS2) { const r = M[k].recognize(t, NOW); check(k + ' reads the written clock: ' + t, r.hour === h && r.minute === m, r); }
 const XT = require('../core/extract.js').FlowExtract;
 check('the shared extractor itself reads "at 8.30 pm" as 20:30, not 8:00', (() => { const c = XT.parseTime('at 8.30 pm'); return c && c.hour === 20 && c.minute === 30; })());
+check('the shared extractor takes everyday Hebrew day forms itself (parseDate)', [['נתראה ביום ה׳', '2026-10-29'], ['עד 28.10', '2026-10-28'], ['עד סוף החודש', '2026-10-31'], ['בעוד יומיים', '2026-10-25'], ['עד ה-30', '2026-10-30']].every(([t, d]) => { const r = XT.parseDate(t, NOW); return r && r.iso === d; }));
+check('the shared extractor takes the written clocks itself (parseTime)', [['ב-8 וחצי בערב', 20, 30], ['ב־12 בצהריים', 12, 0], ['ב-20.00', 20, 0], ['at half past 8 in the evening', 20, 30]].every(([t, h, m]) => { const c = XT.parseTime(t); return c && c.hour === h && c.minute === m; }));
 check('"at 12.50 NIS" is still not a clock', XT.parseTime('at 12.50 NIS') === null);
 check('"at 8.30 pm" is no longer read as 8:00', M.appt.recognize('Your appointment is confirmed for Sunday at 8.30 pm', NOW).minute === 30);
 check('an unresolved 8 in the "noon window" stays unresolved', M.appt.recognize('התור שלך נקבע מחר ב-8 בצהריים', NOW).kind === 'none');

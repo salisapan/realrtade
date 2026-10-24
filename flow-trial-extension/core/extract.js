@@ -346,7 +346,17 @@ const FlowExtract = (() => {
 
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
+  // Forms people really write that the readers below do not take (Hebrew weekday abbreviations, dotted dates, «ב-8 בערב»,
+  // "half past 8", "by the 30th", «בעוד יומיים») are made explicit first by core/day-words.js, when it is loaded.
+  function dayWordsFirst(text, now) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
+      return D ? D.normalize(text, now) : text;
+    } catch (e) { return text; }
+  }
+
   function parseDate(text, now) {
+    text = dayWordsFirst(text, now);
     now = now || new Date();
     let m;
 
@@ -591,6 +601,7 @@ const FlowExtract = (() => {
   }
 
   function parseTime(text) {
+    text = dayWordsFirst(text);
     let m;
 
     // "at 8.30 pm": a dotted clock that carries am or pm is that clock, not 8:00 with ".30 pm" left over.

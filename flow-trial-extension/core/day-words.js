@@ -55,7 +55,9 @@ const FlowDayWords = (() => {
     s = s.replace(/\bat\s+midnight\b/gi, 'at 12:00 am');
     s = s.replace(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, (m, d, mo) => mo + ' ' + d);
     // End of the week (Friday) and of the month, and a day of the month by itself: "by the 30th", «עד ה-30», «עד 30 לחודש».
-    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b|סוף\s+השבוע(?![\u0590-\u05FF])/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
+    // English: Friday. Hebrew «סוף השבוע» follows the product's Israeli work week, as core/follow-up.js does: Thursday.
+    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
+    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - at.getDay() + 7) % 7));
     s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => iso(new Date(at.getFullYear(), at.getMonth() + 1, 0)));
     const dayOfMonth = (dn) => {
       if (dn < 1 || dn > 31) return null;
