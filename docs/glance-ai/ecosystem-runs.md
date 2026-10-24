@@ -584,3 +584,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** deadline reader corpus (3 more asks), reminder reader corpus (2 more quiet lines), chat card corpus (nudged repeat quiet, look back quiet), a real-browser Outlook spec (fails on the previous readers), all corpora.
 - **Open:** live Gate; the call-back reader does not take a leading nudge ("Reminder: call me back" is taken by the reminder reader, which gives a fine task); the bare "Reminder: <event>" (e.g. "Reminder: team lunch on Monday") still makes a reminder task by design.
 
+## 2026-10-24 Ecosystems builder B (sixty-ninth run) — a moved appointment is offered at its new time
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `BOOKING_NOTICE`, off):** businesses move appointments by message ("Your appointment has been moved to Monday at 11:00", «התור שלך הועבר ליום שני בשעה 11:00», «נדחה ליום שלישי ב-09:00»). The appointment reader treated "moved", "rescheduled" and «נדחה» as cancellations, so the new time was never offered, and without "see you" the line had no confirming frame. `core/chat-appointment-notice.js` now reads the booking at the new day and clock (the old day before "to" is dropped; "moved from Sunday at 10:00 to Monday at 11:00" works); cancellations, "unfortunately … instead" and lines about a meeting or a package stay quiet. The same reader serves WhatsApp, Messenger, Instagram, Outlook and Gmail mail. Nothing is sent; nobody is invited.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** appointment reader corpus (4 more bookings, 5 more quiet lines), chat card corpus (confirmation, then the move is offered; Hebrew; cancelled quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
+- **Open:** live Gate; the old event stays on the calendar until the person removes it (replacing it would be an edit of an event Glance made earlier: a design for the owner, not built); the pickup and trip readers do not read a moved time yet.
+

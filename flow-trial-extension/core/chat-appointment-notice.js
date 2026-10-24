@@ -13,6 +13,10 @@ const FlowChatAppointmentNotice = (() => {
   // Looking back, cancelling, moving, asking, or a thing that is not an appointment of the person's.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|nice)|cancel(?:l?ed|l?ation)?|postpone[d]?|resched\w*|unfortunately|unable|can'?t|cannot|sorry|instead|maybe|might|if\s+you|would\s+you\s+like|available\s+slots?|choose|select|pick\s+a|book\s+now|book\s+(?:your|an?)\b|\bslots?\b|click|tap)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|היה\s+(?:נעים|כיף|מצוין)|בוטל|בוטלה|ביטול|לבטל|נדחה|נדחתה|לדחות|לצערנו|מצטערים|מצטער|אולי|במקום|לחץ|בחר|בחרי|לקביעת)/;
+  // A booking that was moved ("has been moved to Monday at 11:00", «התור שלך הועבר ליום שני בשעה 11:00») is the same booking at the new
+  // day and clock: the words up to the verb stay (they carry the noun), the old day and clock before "to" are dropped.
+  const MOVE_EN = /\s+(?:(?:has|have)\s+been\s+|was\s+|is\s+now\s+|got\s+)?(?:moved|rescheduled|changed|postponed|pushed(?:\s+back)?|shifted)(?:\s+over)?(?:\s+from\s+.+?)?\s+(?:to|for)\s+/i;
+  const MOVE_HE = /\s+(?:הועבר|הועברה|נדחה|נדחתה|שונה|שונתה|הוזז|הוזזה)\s+(?=ל|אל\s)/;
   const QUESTION = /[?؟]/;
   const MAX_AHEAD_DAYS = 90;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -62,8 +66,15 @@ const FlowChatAppointmentNotice = (() => {
   }
 
   // { kind: 'appointment', dateIso, hour, minute, lang } or { kind: 'none', reason }.
+  function movedTo(raw) {
+    let m = raw.match(MOVE_EN);
+    if (m) return raw.slice(0, m.index) + ' is on ' + raw.slice(m.index + m[0].length);
+    m = raw.match(MOVE_HE);
+    return m ? raw.slice(0, m.index) + ' נקבע ' + raw.slice(m.index + m[0].length) : raw;
+  }
+
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = movedTo(String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim());
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 260) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

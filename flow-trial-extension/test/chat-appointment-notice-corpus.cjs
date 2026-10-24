@@ -5,6 +5,10 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['Your appointment has been moved to Monday at 11:00', '2026-10-26', 11, 0],
+  ['Your appointment was rescheduled from Sunday at 10:00 to Tuesday at 9am', '2026-10-27', 9, 0],
+  ['התור שלך הועבר ליום שני בשעה 11:00', '2026-10-26', 11, 0],
+  ['התור שלך נדחה ליום שלישי ב-09:00', '2026-10-27', 9, 0],
   ['Your appointment is confirmed for Sunday at 10:00', '2026-10-25', 10, 0],
   ['Reminder: your table is booked Thursday at 8pm', '2026-10-29', 20, 0],
   ['Hi, your haircut appointment is scheduled for tomorrow at 14:30', '2026-10-24', 14, 30],
@@ -24,6 +28,11 @@ const YES = [
 ];
 for (const [text, day, h, m] of YES) { const r = A.recognize(text, NOW); check('appointment: ' + text, r.kind === 'appointment' && r.dateIso === day && r.hour === h && r.minute === m, r); }
 const NO = [
+  ['Unfortunately your appointment has been moved to Monday at 11:00 instead', 'sorry / instead'],
+  ['Your appointment on Sunday at 10:00 was cancelled', 'cancelled'],
+  ['Your appointment was moved, sorry for the change', 'no new day'],
+  ['The meeting was moved to Monday at 11:00', 'not a possessive booking'],
+  ['Your package was moved to the depot on Monday at 11:00', 'not an appointment'],
   ['Your appointment is confirmed for Sunday', 'no clock'],
   ['Your appointment is confirmed at 10:00', 'no day'],
   ['Your appointment has been cancelled, it was Sunday at 10:00', 'cancelled'],

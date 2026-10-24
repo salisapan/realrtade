@@ -479,6 +479,20 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a Reminder look back offers nothing', !(await q.Card.offer(input('Reminder: the form was due Monday', { channel: 'whatsapp' }))).shown);
   }
 
+  // 5v. A booking that was moved is the same booking at a new day and clock: the new time is offered as its own hold.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await w.Card.offer(input('Your appointment is confirmed for Sunday at 10:00', { channel: 'whatsapp', key: 'mv-1' }));
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    const moved = await w.Card.offer(input('Your appointment has been moved to Monday at 11:00', { channel: 'whatsapp', key: 'mv-2' }));
+    const st = moved.shown && w.injected[w.injected.length - 1].ctx.process.steps[0].params;
+    check('the moved appointment is offered at the new day and clock', !!st && st.dateIso === '2026-10-26' && st.hour === 11 && st.minute === 0, st || moved);
+    const he = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('Hebrew moved appointment is offered', (await he.Card.offer(input('התור שלך הועבר ליום שני בשעה 11:00', { channel: 'whatsapp' }))).shown);
+    const c = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a cancelled appointment offers nothing', !(await c.Card.offer(input('Your appointment on Sunday at 10:00 was cancelled', { channel: 'whatsapp' }))).shown);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
