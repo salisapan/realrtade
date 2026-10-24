@@ -21,7 +21,9 @@ Most closes built since 2026-10-20 ship behind an off switch (shared rule: a rou
 | `ONEDRIVE_NEW_FILE` | An empty Word or Excel file from a request |
 | `PLANNER_TASK` | A task in a named Planner plan |
 
-**Turn them on for your own test browser (your decision, not an agent's).** Open `chrome://extensions`, turn on Developer mode, click "service worker" under Glance, and paste this in the console. Then reload the Gmail, Outlook or WhatsApp tab.
+**Easiest way (built 2026-10-24).** Open the Glance popup, the setup tab, the block called "מעבדה" (Labs): one row per switch, each marked "לא נבדק חי", and "הפעל הכל" / "כבה הכל". It writes only `glanceSwitches`. Real-browser spec: `e2e/labs-panel.spec.js`. The console way below does the same.
+
+**Turn them on from the console instead (your decision, not an agent's).** Open `chrome://extensions`, turn on Developer mode, click "service worker" under Glance, and paste this in the console. Then reload the Gmail, Outlook or WhatsApp tab.
 
 ```js
 chrome.storage.local.get({ glanceSwitches: {} }).then((b) => chrome.storage.local.set({
@@ -45,4 +47,4 @@ To turn one off, set it to `false` the same way. Some need a connection or a sco
 5. WhatsApp Web (after the opt-in), a contact writes "תשלח לי את הדוח עד חמישי": a Do It card, then Handled.
 6. Anything that looks wrong: say which, and the switch name from the table.
 
-**Not fixed by this page.** A one-click panel for these switches in the extension itself does not exist; it is the first item of builder A's backlog (a plain list of checkboxes in the existing popup style, off by default, with a note that each one is not live-tested).
+**New switches.** A switch an agent adds must be added to `core/labs-switches.js` in the same commit; `test/labs-switches-corpus.cjs` fails when the code reads a switch the panel does not list.

@@ -236,6 +236,7 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderLabs().catch(() => {});
   renderMetaChats().catch(() => {});
   try {
     if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
@@ -2256,6 +2257,43 @@
       if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
     } catch (e) { on = false; }
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
+  }
+
+  // The off switches, one row each, in the rows the popup already uses. It reads and writes one storage object and nothing else.
+  async function renderLabs() {
+    const host = document.getElementById('labs-list');
+    if (!host || typeof FlowLabsSwitches === 'undefined') return;
+    let bag = {};
+    try { bag = ((await chrome.storage.local.get({ glanceSwitches: {} })).glanceSwitches) || {}; } catch (e) { bag = {}; }
+    host.replaceChildren();
+    const setAll = el('div', 'wait-acts');
+    const onAll = el('button', 'ghost sm', 'הפעל הכל');
+    const offAll = el('button', 'ghost sm', 'כבה הכל');
+    onAll.type = 'button'; offAll.type = 'button';
+    onAll.addEventListener('click', async () => { await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.all(bag, true) }); await renderLabs(); });
+    offAll.addEventListener('click', async () => { await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.all(bag, false) }); await renderLabs(); });
+    setAll.appendChild(onAll); setAll.appendChild(offAll);
+    host.appendChild(setAll);
+    FlowLabsSwitches.LIST.forEach((r) => {
+      const on = FlowLabsSwitches.isOn(bag, r.id);
+      const row = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', r.who));
+      top.appendChild(el('span', 'wait-state' + (on ? ' ok' : ''), on ? 'פעיל' : 'כבוי'));
+      row.appendChild(top);
+      row.appendChild(el('div', 'wait-note', r.note + ' · לא נבדק חי'));
+      const acts = el('div', 'wait-acts');
+      const btn = el('button', 'ghost sm', on ? 'כבה' : 'הפעל');
+      btn.type = 'button';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        await renderLabs();
+      });
+      acts.appendChild(btn);
+      row.appendChild(acts);
+      host.appendChild(row);
+    });
   }
 
   async function renderSurfaces() {
