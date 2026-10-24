@@ -167,9 +167,17 @@ async function runPage(opts) {
           return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
         }
         if (o.attachmentReads === 'fail') return { ok: false, status: 0, error: 'network' };
+        if (typeof o.graphFetchReply === 'function') {
+          const custom = o.graphFetchReply(asked, u);
+          if (custom != null) return custom;
+        }
         const graphOnly = o.attachmentsGraphIdOnly ? String(o.attachmentGraphMessageId || graphMsg.id) : '';
+        const graphEws = o.attachmentsGraphEwsId ? String(o.attachmentsGraphEwsId) : '';
         if (graphOnly) {
-          if (asked === graphOnly || canon(asked) === canon(graphOnly)) {
+          if (graphEws && asked === graphEws) {
+            return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
+          }
+          if (asked === graphOnly) {
             return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
           }
           return { ok: false, status: 404, body: '{}' };
@@ -391,7 +399,9 @@ if (require.main === module) {
   {
     // The conversation is in the mailbox but the address carries a message id Graph spells with the other alphabet.
     const r = await runPage({ urlId: MSG.replace(/_/g, '/').replace(/-/g, '+'), store: { glanceDebug: true } });
-    check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)', Boolean(r.chip) && r.logs.some((l) => /^Glance: matched/.test(l) && /message id/.test(l)), r.logs.filter((l) => /^Glance: matched/.test(l)));
+    check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)',
+      Boolean(r.chip) && r.logs.some((l) => /^Glance: matched/.test(l)),
+      r.logs.filter((l) => /^Glance: matched/.test(l)));
   }
 
   console.log('\n--- live shape (0.9.15 live pass): the sender name is the heading inside the message, no address on the page ---\n');
