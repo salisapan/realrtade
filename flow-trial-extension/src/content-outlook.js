@@ -4416,6 +4416,8 @@
   // Each one is the same shape on the canonical Do It card and its step list: the page asks the worker for a
   // plan (the worker owns the switch and the logic), shows the card on an offer, Do It writes through the
   // worker with a read-back by id, the receipt survives a reload, Undo leaves anything the person edited.
+  //   - onedrive-find: attach one file from the person's OneDrive (ONEDRIVE_FIND, off)
+  //   - local-file-close: save one local file to OneDrive (LOCAL_FILE_CLOSE, off)
   //   - new-file:   an empty Word or Excel file from a request (ONEDRIVE_NEW_FILE)
   //   - event-link: a Teams link on an event already on the calendar (OUTLOOK_EVENT_CALL_LINK)
   // Both are quiet unless their switch is on and the scope they use is granted.
@@ -4429,6 +4431,50 @@
 
   function openFileLabel() {
     return pageUiLang() === 'he' ? 'פתיחת הקובץ' : 'Open file';
+  }
+
+  function m2CloseReady() {
+    return typeof FlowOutlookM2Close !== 'undefined' ? FlowOutlookM2Close : null;
+  }
+
+  async function prepareOutlookDraftForM2(ctx) {
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookDraft',
+        messageId: ctx.messageId,
+        outlookIncomingId: ctx.messageId || ctx.outlookIncomingId,
+        itemId: ctx.itemId,
+        subject: ctx.subject,
+        text: ctx.bodyText,
+        bodyText: ctx.bodyText,
+        sender: ctx.sender,
+        intent: ctx.intent
+      }
+    });
+    if (!r || !r.ok || !r.ref) return { error: r || { reason: 'draft-failed' } };
+    const draftId = typeof r.ref === 'string' ? r.ref : (r.ref.draftId || r.ref.id || '');
+    if (!draftId) return { error: { reason: 'no-draft' } };
+    return { draftId: draftId };
+  }
+
+  async function m2CloudHits(pane, st, text) {
+    const M2 = m2CloseReady();
+    const Find = typeof FlowOnedriveFind !== 'undefined' ? FlowOnedriveFind : null;
+    if (!M2 || !Find) return null;
+    const scopes = M2.scopesFromSt(st);
+    if (Find.hasReadScope(scopes) === false) return null;
+    const graphGet = M2.graphFromPageSend(send);
+    const rec = Find.recognize({
+      flags: { ONEDRIVE_FIND: true },
+      surface: 'outlook',
+      text: text,
+      threadAttachments: Array.isArray(pane && pane.attachments) ? pane.attachments : [],
+      scopes: scopes
+    });
+    if (rec.action !== 'search') return [];
+    const files = await M2.searchDrive(graphGet, rec.paths);
+    return Array.isArray(files) ? files.map((f) => ({ id: f.id, name: f.name })) : [];
   }
 
   function closeReasonLine(map, result) {
@@ -4591,9 +4637,20 @@
       try {
         const cc = (ctx && ctx.closeChain) || {};
         if (ignoreStaleClick(host)) return;
+        let params = cc.params || {};
+        if (typeof cfg.prepareExecute === 'function') {
+          const prep = await cfg.prepareExecute(ctx, params);
+          if (prep && prep.error) {
+            paintIfCurrent(token, function () {
+              if (chip) FlowChipHost.setChipState(chip, 'flow-chip-error', closeReasonLine(cfg.reasons(), prep.error));
+            });
+            return;
+          }
+          if (prep && prep.params) params = prep.params;
+        }
         const r = await send({
           type: 'flow:execute-action',
-          payload: { connectorId: cfg.connectorId, params: cc.params || {}, messageId: ctx.messageId }
+          payload: { connectorId: cfg.connectorId, params: params, messageId: ctx.messageId }
         });
         if (!r || !r.ok || !r.ref || !r.ref[cfg.refKey] || r.fetchedBack !== true) {
           paintIfCurrent(token, function () {
@@ -4654,21 +4711,112 @@
       }
     }
 
-    // Quiet unless the scope is granted and the worker's plan says offer. A receipt already written stays the card.
+    // Quiet unless the scope is granted and the plan says offer (worker message or in-page planFn).
     async function settle(pane, st) {
       const messageId = (pane && (pane.itemId || pane.conversationId || pane.pathId)) || '';
       const row = await findWritten(pane);
       if (row) return mountReceipt(pane, row, row.messageId || messageId);
+      if (cfg.switchName) {
+        let sw = (st && st.glanceSwitches) || {};
+        if (sw[cfg.switchName] !== true) {
+          try {
+            const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+            sw = (bag && bag.glanceSwitches) || {};
+          } catch (e) { sw = {}; }
+          if (sw[cfg.switchName] !== true) return false;
+        }
+      }
       if (!cfg.scopeOk(st)) return false;
       const text = ((pane && pane.subject) ? pane.subject + '. ' : '') + holdTextOf(pane);
       if (!String(text).trim()) return false;
-      const plan = await send({ type: cfg.planMessage, text: text });
+      let plan = null;
+      if (typeof cfg.planFn === 'function') {
+        plan = await cfg.planFn(pane, st, text);
+      } else {
+        plan = await send({ type: cfg.planMessage, text: text });
+      }
       if (!plan || plan.action !== 'offer' || !cfg.planOk(plan)) return false;
       return showCard(pane, plan, messageId);
     }
 
     return { settle: settle, chain: CHAIN };
   }
+
+  const onedriveFindChain = makeCloseChain({
+    chain: 'onedrive-find',
+    connectorId: 'onedriveFindAttach',
+    switchName: 'ONEDRIVE_FIND',
+    refKey: 'attachmentId',
+    stepKind: 'onedrive',
+    name: 'OneDrive file',
+    undone: 'Attachment removed from the draft.',
+    undoFailed: 'Could not remove the attachment.',
+    writtenDefault: 'File attached from OneDrive to the reply draft.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'files.read') || scopeOf(st, 'files.readwrite'),
+    planFn: async (pane, st, text) => {
+      const M2 = m2CloseReady();
+      if (!M2) return { action: 'silence', reason: 'not-configured' };
+      return M2.planOnedriveFind({
+        flags: { ONEDRIVE_FIND: true },
+        surface: 'outlook',
+        text: text,
+        threadAttachments: Array.isArray(pane && pane.attachments) ? pane.attachments : [],
+        scopes: M2.scopesFromSt(st),
+        graphGet: M2.graphFromPageSend(send)
+      });
+    },
+    planOk: (plan) => Boolean(plan.file && plan.file.id),
+    cardLabel: (plan) => (plan.file && plan.file.name) || 'OneDrive file',
+    paramsOf: (plan) => ({ file: plan.file }),
+    prepareExecute: async (ctx, params) => {
+      const prep = await prepareOutlookDraftForM2(ctx);
+      if (prep.error) return prep;
+      return { params: { file: params.file, draftId: prep.draftId } };
+    },
+    reasons: () => ({
+      'files-scope-missing': pageUiLang() === 'he' ? 'צריך הרשאה ל-OneDrive' : 'OneDrive needs to be allowed first',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook',
+      'connector-not-live': pageUiLang() === 'he' ? 'החיבור עדיין לא רשום — C1' : 'Worker connector not registered yet (C1)',
+      'draft-failed': pageUiLang() === 'he' ? 'לא הצלחתי לפתוח טיוטה' : 'Could not open a reply draft',
+      'attach-failed': pageUiLang() === 'he' ? 'לא הצלחתי לצרף הקובץ' : 'Could not attach that file'
+    })
+  });
+
+  const localFileCloseChain = makeCloseChain({
+    chain: 'local-file-close',
+    connectorId: 'localFileToOnedrive',
+    switchName: 'LOCAL_FILE_CLOSE',
+    refKey: 'itemId',
+    stepKind: 'onedrive',
+    name: 'Local file',
+    undone: 'File removed from OneDrive.',
+    undoFailed: 'Could not remove the file.',
+    writtenDefault: 'File saved to OneDrive from this computer.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'files.readwrite'),
+    planFn: async (pane, st, text) => {
+      const M2 = m2CloseReady();
+      if (!M2) return { action: 'silence', reason: 'not-configured' };
+      const cloudHits = await m2CloudHits(pane, st, text);
+      return M2.planLocalFile({
+        flags: { LOCAL_FILE_CLOSE: true },
+        text: text,
+        cloudHits: cloudHits,
+        listing: M2.listingFromSt(st),
+        scopes: M2.scopesFromSt(st)
+      });
+    },
+    planOk: (plan) => Boolean(plan.file && plan.file.path),
+    cardLabel: (plan) => (plan.file && plan.file.name) || 'Local file',
+    paramsOf: (plan) => ({ file: plan.file }),
+    reasons: () => ({
+      'files-readwrite-missing': pageUiLang() === 'he' ? 'צריך הרשאת כתיבה ל-OneDrive' : 'OneDrive write permission is needed',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook',
+      'connector-not-live': pageUiLang() === 'he' ? 'החיבור עדיין לא רשום — C1' : 'Worker connector not registered yet (C1)',
+      'local-unreadable': pageUiLang() === 'he' ? 'לא הצלחתי לקרוא את הקובץ מהמחשב' : 'Could not read the file on this computer'
+    })
+  });
 
   const newFileChain = makeCloseChain({
     chain: 'new-file',
@@ -4716,6 +4864,8 @@
   });
 
   async function settleCloseChains(pane, st) {
+    if (await onedriveFindChain.settle(pane, st)) return onedriveFindChain.chain;
+    if (await localFileCloseChain.settle(pane, st)) return localFileCloseChain.chain;
     if (await newFileChain.settle(pane, st)) return newFileChain.chain;
     if (await eventLinkChain.settle(pane, st)) return eventLinkChain.chain;
     return '';
