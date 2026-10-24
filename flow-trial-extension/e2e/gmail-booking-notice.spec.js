@@ -92,3 +92,19 @@ test('TASK_ASK on: a reminder asked without a question is one Google Task, Undo 
   await page.locator(MAIN + ' button.flow-chip-undo').click();
   await expect.poll(() => tasks().length).toBe(0);
 });
+
+test('BOOKING_NOTICE on: the reminder mail of an appointment already on the calendar is not offered a second event', async ({ glance }) => {
+  let page = await open(glance, { BOOKING_NOTICE: true }, APPT);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  // Another thread from the same sender, a later mail that says the same thing.
+  n += 1;
+  const reminder = { messageId: 'm-bk-' + n, threadId: 't-bk-' + n, subject: 'Reminder: your booking', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: 'Hi, a reminder: your appointment is confirmed for tomorrow at 14:00. See you then.', detailsTable: { to: ['me@x.com'] } };
+  page = await glance.openGmail(reminder);
+  await page.waitForTimeout(3000);
+  await expect(page.locator(MAIN + ' button.flow-chip')).toHaveCount(0);
+  expect(events()).toHaveLength(1);
+});

@@ -156,3 +156,35 @@ test('PAYMENT_ASK on: a bill that states what is due is one To Do task Pay 1200 
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await todo(glance)).length).toBe(0);
 });
+
+const REMINDER = 'Hi Sali, a reminder: your appointment is confirmed for tomorrow at 14:00. See you then.';
+const mailOf = (body, id) => ({ id: id, subject: 'Your booking', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: body });
+
+test('BOOKING_NOTICE on: the reminder mail of an appointment already on the calendar is not offered a second hold', async ({ glance }) => {
+  await glance.seedOutlook({ glanceSwitches: { BOOKING_NOTICE: true } }, { calendar: true });
+  let page = await glance.openOutlook(mailOf(APPT, 'AQMk-held-1'));
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+  // Another thread from the same sender, a later mail that says the same thing.
+  page = await glance.openOutlook(mailOf(REMINDER, 'AQMk-held-2'));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .chip-hold')).toHaveCount(0);
+  expect(await events(glance)).toHaveLength(1);
+});
+
+test('BOOKING_NOTICE on: after Undo of the first hold, the reminder mail of that appointment is offered again', async ({ glance }) => {
+  await glance.seedOutlook({ glanceSwitches: { BOOKING_NOTICE: true } }, { calendar: true });
+  let page = await glance.openOutlook(mailOf(APPT, 'AQMk-held-1'));
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+  page = await glance.openOutlook(mailOf(REMINDER, 'AQMk-held-2'));
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+});

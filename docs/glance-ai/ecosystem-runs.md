@@ -548,3 +548,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** chat card corpus (first hold, reminder not offered, another time offered, same time offered again after Undo), all corpora, chat/Outlook/Gmail browser specs.
 - **Open:** live Gate; the mail cards (Outlook, Gmail) do not dedupe a confirmation mail and its reminder mail yet.
 
+## 2026-10-24 Ecosystems builder B (sixty-fourth run) — a reminder mail no longer adds a second event
+
+- **Capability shipped (switch `BOOKING_NOTICE`, off):** a business sends the confirmation and then a reminder, as two threads. Outlook and Gmail mail cards offered a second Do It for the reminder and the person ended with two identical events. Now `core/held-hold.js` looks in the activity log: a hold written for the same sender at the same day and clock and not undone since means the reminder is not offered; after Undo it is offered again. The open mail's own receipt is never treated as its own duplicate. Nothing is sent, nothing is overwritten.
+- **Also:** `test/live-gate-0956-corpus.cjs` waits for the refusal to reach the store before copying it (was failing about 1 run in 3).
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** `test/held-hold-corpus.cjs`, two Outlook browser specs (reminder quiet; after Undo offered again), one Gmail browser spec, all corpora. The first Outlook version keyed on the conversation id and a browser run showed it never matched (confirmation and reminder are separate threads), so it keys on the sender.
+- **Open:** live Gate; the chat card still keys on the chat, the mail cards on the sender: a second appointment from the same sender at the same day and clock is treated as the same one (a deliberate trade, owner can veto).
+

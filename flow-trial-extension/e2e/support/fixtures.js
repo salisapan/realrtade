@@ -163,7 +163,7 @@ function outlookHtml(opts) {
   // A conversation id in the address counts only when the open mail's header
   // shows that same id. The fixture header carries it, the way a confirmed
   // reading pane does.
-  const convId = o.id && /^A[AQ]Qk/i.test(String(o.id)) ? String(o.id) : '';
+  const convId = o.convId ? String(o.convId) : (o.id && /^A[AQ]Qk/i.test(String(o.id)) ? String(o.id) : '');
   const convAttr = convId ? (' data-convid="' + esc(convId) + '"') : '';
   const clock = o.live && o.receivedLabel
     ? ('<div class="date">' + esc(o.receivedLabel) + '</div>')

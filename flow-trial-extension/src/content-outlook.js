@@ -820,6 +820,13 @@
       }
     }
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
+    if (r && r.show && r.intent && r.intent.bookingNotice && r.process && r.process.id === 'hold' && pane.senderEmail && typeof FlowHeldHold !== 'undefined') {
+      // A reminder for an appointment this sender's confirmation already put on the calendar (and was not undone) is not offered twice.
+      try {
+        const bag = await FlowStorage.get();
+        if (FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.holdAt(r.intent.entities), [pane.itemId, pane.pathId, pane.conversationId])) return { none: true, reason: 'already-on-calendar' };
+      } catch (e) { /* the log is unreadable: offer as before */ }
+    }
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
   }
 
