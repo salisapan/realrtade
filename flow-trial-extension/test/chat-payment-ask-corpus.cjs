@@ -20,7 +20,12 @@ const YES = [
   ['תעביר שלושת אלפים ש״ח עד יום ראשון', '2026-10-25', '3000', 'NIS'],
   ['Please transfer five hundred shekels by Sunday', '2026-10-25', '500', 'NIS'],
   ['Please pay two thousand five hundred NIS by Sunday', '2026-10-25', '2500', 'NIS'],
-  ['Please pay a hundred dollars by Sunday', '2026-10-25', '100', 'USD']
+  ['Please pay a hundred dollars by Sunday', '2026-10-25', '100', 'USD'],
+  ['Your invoice of 1,200 NIS is due on Oct 30', '2026-10-30', '1200', 'NIS'],
+  ['Your electricity bill for 340 NIS is due by Nov 3', '2026-11-03', '340', 'NIS'],
+  ['Reminder: payment due Oct 29 - amount due: 89.90 NIS', '2026-10-29', '89.90', 'NIS'],
+  ['החשבונית שלך על סך 1,200 ₪ לתשלום עד 5 בנובמבר', '2026-11-05', '1200', 'NIS'],
+  ['שכר הדירה שלך 4,000 ₪ לתשלום עד 1 בנובמבר', '2026-11-01', '4000', 'NIS']
 ];
 for (const [text, day, amount, cur] of YES) { const r = A.recognize(text, NOW); check('payment ask: ' + text, r.kind === 'ask' && r.dateIso === day && r.amount === amount && r.currency === cur, r); }
 const NO = [
@@ -38,6 +43,14 @@ const NO = [
   ['אני אעביר 500 שקל עד יום ראשון', 'own promise'],
   ['העברתי לך 500 שקל אתמול', 'look back'],
   ['תעביר 500 שקל', 'no day'],
+  ['Thank you for your payment of 1,200 NIS on Oct 30', 'a receipt'],
+  ['Your invoice of 1,200 NIS was paid on Oct 30', 'already paid'],
+  ['Your card will be charged 49 NIS on Oct 30 (autopay)', 'happens by itself'],
+  ['Your invoice of 1,200 NIS is attached', 'no due day'],
+  ['The invoice of 1,200 NIS is due on Oct 30', 'not the person\'s own bill'],
+  ['Your invoice of 1,200 NIS or 1,300 NIS is due on Oct 30', 'two amounts'],
+  ['Your invoice of 1,200 NIS was due on Oct 1', 'past'],
+  ['תודה על התשלום בסך 1,200 ₪ ביום 30 באוקטובר', 'thanks'],
   ['תעביר חמישה אנשים עד יום ראשון', 'a number of people, not money'],
   ['Please pay five people by Sunday', 'a number of people, not money'],
   ['תעביר לי 500 שקל או חמש מאות שקל עד יום ראשון', 'two amounts'],

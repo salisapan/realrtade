@@ -534,3 +534,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/chat-travel-notice-corpus.cjs` (10 notices EN+HE, 16 quiet lines), chat card corpus (trip hold, quiet lines), booking-notice corpus (2 mails, 2 quiet), the silence corpus (4 more everyday lines), all corpora, chat/Outlook/Gmail browser specs.
 - **Open:** live Gate; `core/chat-travel-notice.js` joined the shared content-script `js` list in `manifest.json` (no permission, host or scope change). A flight with a time zone ("06:30 local") is read as the written clock.
 
+## 2026-10-24 Ecosystems builder B (sixty-second run) — bills that state what is due
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `PAYMENT_ASK`, off):** the first user pays suppliers, rent and arnona, and most of it arrives as a bill, not as a request ("Your invoice of 1,200 NIS is due on Nov 5", «החשבונית שלך על סך 1,200 ₪ לתשלום עד 5 בנובמבר»). The payment reader only took a request with a pay verb. It now also takes the person's own bill with an amount and a due day, and the card writes one task "Pay 1200 NIS · sender" / «לשלם 1200 NIS · שולח» due that day, in chat, Outlook and Gmail. Receipts, "thank you for your payment", already paid, autopay and direct debit, an invoice that is only attached, someone else's invoice, two amounts and a due date already past stay quiet. Nothing is paid and no bank is touched.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` (5 bills, 8 quiet lines), `test/payment-ask-mail-corpus.cjs` (2 bills, 3 quiet mails), the silence corpus (3 more everyday lines), a real-browser Outlook spec (bill, Handled, Undo), all corpora, chat/Outlook/Gmail browser specs.
+- **Open:** live Gate; an overdue bill with a past due date stays quiet by design (no due day to put the task on); owner decision whether an overdue bill should become a task due today.
+

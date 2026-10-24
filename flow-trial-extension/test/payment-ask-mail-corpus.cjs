@@ -25,6 +25,8 @@ const YES = [
   ['Can you pay the 1,200 ₪ invoice before Thursday?', '2026-10-29', /^Pay 1200 NIS · Dana Levi$/],
   ['שלום, תעביר לי 500 שקל עד יום ראשון', '2026-10-25', /^לשלם 500 NIS · Dana Levi$/],
   ['אפשר שתעביר 1,500 ₪ ביום חמישי?', '2026-10-29', /^לשלם 1500 NIS · Dana Levi$/],
+  ['Hi Sali, your invoice of 1,200 NIS is due on Oct 30. Thank you!', '2026-10-30', /^Pay 1200 NIS · Dana Levi$/],
+  ['שלום, החשבונית שלך על סך 1,200 ₪ לתשלום עד 30 באוקטובר', '2026-10-30', /^לשלם 1200 NIS · Dana Levi$/],
   ['שלום, תעביר לי חמש מאות שקל עד יום ראשון', '2026-10-25', /^לשלם 500 NIS · Dana Levi$/],
   ['Hi Sali, please transfer five hundred shekels to my account by Sunday', '2026-10-25', /^Pay 500 NIS · Dana Levi$/]
 ];
@@ -38,6 +40,7 @@ for (const [text] of YES) check('switch off: no payment card: ' + text.slice(0, 
 check("the person's own mail is never a payment ask", !(judge(YES[0][0], { senderIsUser: true }).intent || {}).paymentAsk);
 check('a mail that is not inbound is never a payment ask', !(judge(YES[0][0], { inbound: false }).intent || {}).paymentAsk);
 const QUIET = [
+  'Thank you for your payment of 1,200 NIS on Oct 30', 'Your card will be charged 49 NIS on Oct 30 (autopay)', 'Your invoice of 1,200 NIS is attached',
   'Please transfer the money by Sunday', 'Please transfer 500 NIS', "I'll transfer 500 NIS by Sunday", 'I already paid 500 NIS on Sunday',
   'Maybe pay 500 NIS by Sunday', "Don't pay 500 NIS before Sunday", 'The price is 500 NIS by Sunday', 'Please pay 500 NIS or 600 NIS by Sunday',
   'העברתי לך 500 שקל אתמול', 'תעביר לי את הכסף עד יום ראשון'

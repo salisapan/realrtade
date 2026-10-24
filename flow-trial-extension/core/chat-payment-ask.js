@@ -10,8 +10,8 @@ const FlowChatPaymentAsk = (() => {
   const ASK_EN = /^(?:(?:hey|hi|hello)[\s,]+\S+[\s,]+)?(?:please\s+|pls\s+|kindly\s+)?(?:can|could|would|will)?\s*(?:you\s+)?(?:please\s+)?(?:transfer|pay|send|wire|settle|bit|paybox)\b|^(?:please\s+)(?:transfer|pay|send|wire|settle)\b|\byou\s+(?:owe|need\s+to\s+pay|still\s+owe)\b|\b(?:need|want)\s+you\s+to\s+(?:transfer|pay|send)\b/i;
   const ASK_HE = /^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:בבקשה\s+)?(?:אפשר\s+ש)?(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע|תסגור|תסגרי)|אתה\s+חייב|את\s+חייבת|אתם\s+חייבים|אני\s+צריך\s+שתעביר|צריך\s+שתשלם/;
   const AMOUNT = /(?:(?:[$€£₪])\s?(\d[\d,]*(?:\.\d{1,2})?))|(?:(\d[\d,]*(?:\.\d{1,2})?)\s?(?:nis|ils|usd|eur|gbp|dollars?|euros?|shekels?|bucks|₪|\$|€|£|שקל(?:ים)?|שקלים|ש"ח|ש״ח|שח|דולר(?:ים)?|אירו|יורו))/i;
-  const NO_EN = /\b(?:don'?t|do\s+not|no\s+need|never\s*mind|already|paid|sent|yesterday|last\s+(?:week|night)|maybe|might|if\s+you\s+(?:want|can|like)|cancel(?:l?ed)?|refund|i'?ll|i\s+will|i\s+can|i\s+sent|i\s+paid|(?:he|she|they)\s+(?:will|should|can))\b/i;
-  const NO_HE = /(?:אל\s+תעביר|אל\s+תשלם|אין\s+צורך|לא\s+צריך|כבר\s|שילמתי|העברתי|אתמול|שבוע שעבר|אולי|אם\s+(?:בא|תוכל|אפשר)|לבטל|בוטל|החזר|אני\s+(?:אעביר|אשלם|אשלח))/;
+  const NO_EN = /\b(?:receipt|refunded|thank(?:s|\s+you)\s+for\s+(?:your\s+)?payment|has\s+been\s+paid|was\s+paid|autopay|auto-?pay|will\s+be\s+charged|direct\s+debit|don'?t|do\s+not|no\s+need|never\s*mind|already|paid|sent|yesterday|last\s+(?:week|night)|maybe|might|if\s+you\s+(?:want|can|like)|cancel(?:l?ed)?|refund|i'?ll|i\s+will|i\s+can|i\s+sent|i\s+paid|(?:he|she|they)\s+(?:will|should|can))\b/i;
+  const NO_HE = /(?:קבלה|שולם|שולמה|תודה\s+על\s+התשלום|הוראת\s+קבע|יחויב|תחויב|אל\s+תעביר|אל\s+תשלם|אין\s+צורך|לא\s+צריך|כבר\s|שילמתי|העברתי|אתמול|שבוע שעבר|אולי|אם\s+(?:בא|תוכל|אפשר)|לבטל|בוטל|החזר|אני\s+(?:אעביר|אשלם|אשלח))/;
   const MAX_AHEAD_DAYS = 60;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -111,13 +111,20 @@ const FlowChatPaymentAsk = (() => {
   }
 
   // { kind: 'ask', dateIso, amount, currency, lang } or { kind: 'none', reason }.
+  // A bill that states what is due ("Your invoice of 1,200 NIS is due on Nov 5", «החשבונית שלך על סך 1,200 ₪ לתשלום עד 5.11»): no
+  // request verb, but the same one amount and one day. Only the person's own bill (your / שלך), never a receipt or a charge that
+  // happens by itself.
+  const BILL_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:invoice|bill|statement|subscription|rent|instal+ment|balance|tax|premium|fee|fine|ticket)\b[^.?!]{0,80}\b(?:is|are)?\s*(?:due|payable|overdue|outstanding)\b|\bpayment\s+(?:is\s+)?due\b|\bamount\s+due\b/i;
+  const BILL_HE = /(?:החשבונית|החשבון|החיוב|המנוי|התשלום|שכר\s+הדירה|הארנונה|החוב|הקנס|הפרמיה|הדוח)\s+(?:שלך|שלכם|שלכן)[^.?!]{0,80}(?:לתשלום|פירעון|בפיגור|ממתין|ממתינה)|מועד\s+(?:הפירעון|התשלום)|לתשלום\s+עד/;
+
   function recognize(text, now) {
     const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim();
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };
-    if (!(VERB_EN.test(raw) || VERB_HE.test(raw))) return { kind: 'none', reason: 'no-pay-verb' };
-    if (!(ASK_EN.test(raw) || ASK_HE.test(raw))) return { kind: 'none', reason: 'not-aimed-at-you' };
+    const billed = BILL_EN.test(raw) || BILL_HE.test(raw);
+    if (!billed && !(VERB_EN.test(raw) || VERB_HE.test(raw))) return { kind: 'none', reason: 'no-pay-verb' };
+    if (!billed && !(ASK_EN.test(raw) || ASK_HE.test(raw))) return { kind: 'none', reason: 'not-aimed-at-you' };
     const all = raw.match(new RegExp(AMOUNT.source, 'gi')) || [];
     if (all.length !== 1) return { kind: 'none', reason: all.length ? 'several-amounts' : 'no-amount' };
     const m = raw.match(AMOUNT);
@@ -133,7 +140,7 @@ const FlowChatPaymentAsk = (() => {
     const today = new Date(at.getFullYear(), at.getMonth(), at.getDate());
     const ahead = Math.round((new Date(d.iso + 'T00:00:00') - today) / 86400000);
     if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
-    return { kind: 'ask', dateIso: d.iso, amount: amount, currency: currency, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    return { kind: 'ask', billed: billed, dateIso: d.iso, amount: amount, currency: currency, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
   return { recognize: recognize };
