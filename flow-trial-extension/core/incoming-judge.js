@@ -119,6 +119,7 @@ const FlowIncomingJudge = (() => {
       calibration: i.calibration || null,
       calibrationByType: i.calibrationByType || null,
       attachmentCount: i.attachmentCount || 0,
+      surface: i.surface || null,
       now,
       to: i.to || i.toRecipients || null,
       cc: i.cc || i.ccRecipients || null,
@@ -231,7 +232,7 @@ const FlowIncomingJudge = (() => {
     // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
     const asked = intent.googleClose;
     if (!selfSentTask && (i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
-      return { show: false, reason: 'onedrive-target-on-gmail', intent };
+      if (!intent.inboundOnedriveTask) return { show: false, reason: 'onedrive-target-on-gmail', intent };
     }
     // The judge has already said offer. planFor may change the kind:
     // a Meeting only with a noun, an explicit date, and a clock; a

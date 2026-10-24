@@ -659,6 +659,7 @@ const FlowIntent = (() => {
   // quiet when the reader is Sali. Nothing here is a setting.
   const NAME_SCRIPT = [
     ['sali', 'סאלי'],
+    ['sali', 'סלי'],
     ['noa', 'נועה'],
     ['dana', 'דנה'],
     ['maya', 'מאיה'],
@@ -1518,6 +1519,48 @@ const FlowIntent = (() => {
       if (/\b(?:postpon(?:e|ed|ing)|cancel(?:led|ed|ing)?|called off|won'?t happen|will not happen|isn'?t happening)\b/i.test(blob)) return 'negative';
       return '';
     }
+    function inboundActionRequiredPartyOk() {
+      if (thirdPartyQuote(text)) return false;
+      if (/["«][^"\n]{0,200}פעולה\s+נדרשת\s+מצד/i.test(text)) return false;
+      if (/(?:^|[^\u0590-\u05FF])(?:שלחתי|העברתי|רק\s+לעדכון)\s+[^.\n]{0,80}:\s*["«]?[^"\n]*פעולה\s+נדרשת\s+מצד/i.test(text)) return false;
+      if (/פעולה\s+נדרשת\s+מצדך:/i.test(text)) return true;
+      const after = text.split(/פעולה\s+נדרשת\s+מצד:\s*/i)[1];
+      if (!after) return false;
+      const lines = String(after).split('\n').map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) return false;
+      let head = stripInlineHeThanks(lines[0]).replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+      if (lines.length > 1 && !/חתימה|לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן/i.test(head)) return false;
+      const dash = head.match(/^(.+?)\s*[—–-]\s+(.+)$/);
+      if (dash) {
+        const who = dash[1].trim();
+        if (who && !/^חתימה/i.test(who) && !nameIsReader(who, ctx)) return false;
+        head = dash[2].trim();
+      }
+      if (/^[\u0590-\u05FF][\u0590-\u05FF'’\s.-]{0,50}$/.test(head) && !/חתימה|לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן/i.test(head)) return false;
+      return /^חתימה\s+על\s+/i.test(head) || /^(?:לחתום|לאשר|לשלוח|להעביר|לבדוק|לעדכן)/i.test(head);
+    }
+    function rescueInboundActionRequired() {
+      if (addressedToSelf(ctx)) return null;
+      if (!/פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) return null;
+      if (!inboundActionRequiredPartyOk()) return null;
+      const subject = ctx && ctx.subject;
+      let titled = '';
+      const actionLine = text.match(/פעולה\s+נדרשת\s+מצד(?:ך)?:\s*([^\n]+)/i);
+      if (actionLine) {
+        const action = stripInlineHeThanks(String(actionLine[1] || '')).replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+        if (/^חתימה\s+על\s+/i.test(action)) titled = clipTitle('לחתום על ' + action.replace(/^חתימה\s+על\s+/i, ''));
+      }
+      const decided = selfDecisionTitle(text, facts);
+      if (!titled) titled = decided || selfAskTitle(text, subject, ctx);
+      if (!decided && !usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+      if (!usableSelfTitle(titled)) return null;
+      const made = finish(TYPES.REQUEST, 'high', { what: titled });
+      if (!made || !made.type) return null;
+      made.label = titled;
+      made.selfTask = true;
+      made.noReplyDraft = true;
+      return made;
+    }
     function rescueSelfSent(code) {
       if (code === 'calibrated') return null;
       if (!addressedToSelf(ctx)) return null;
@@ -1638,6 +1681,11 @@ const FlowIntent = (() => {
     if (mailIsOwn(ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
+    }
+    if (!addressedToSelf(ctx) && /פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) {
+      if (!inboundActionRequiredPartyOk()) return stayQuiet('hedge');
+      const inboundAction = rescueInboundActionRequired();
+      if (inboundAction) return inboundAction;
     }
     if (greetingUnconfirmed(text, ctx)) return stayQuiet('hedge', { noRescue: true });
     if (mailIsOwn(ctx) || vocativeIsOther(text, ctx) || ccOnlyWithoutGreeting(text, ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
@@ -1810,13 +1858,27 @@ const FlowIntent = (() => {
           entities.hour = clock.hour;
           entities.minute = clock.minute;
         }
-        return finish(
+        const closed = finish(
           hold ? TYPES.SCHEDULED_EVENT : TYPES.DECISION_TO_LOG,
           'high',
           entities,
           g.personalClose,
           g
         );
+        const senderAddr = String(ctx.senderEmail || '').trim().toLowerCase();
+        const ownList = addressList(ctx.ownAddresses || ctx.own);
+        const inboundFromOther = ctx.inbound === true || ctx.direction === 'inbound' ||
+          (ownList.length && senderAddr && ownList.indexOf(senderAddr) < 0);
+        if (closed && g.personalClose === 'drive-file' && g.target === 'onedrive' && g.lang === 'he' &&
+            inboundFromOther && !addressedToSelf(ctx) && !mailIsOwn(ctx) && /מצורף/.test(text) && Number(ctx.attachmentCount) >= 1) {
+          let titled = selfAskTitle(text, ctx && ctx.subject, ctx);
+          if (titled) titled = String(titled).replace(/\s+בבקשה\s*$/u, '').trim();
+          if (!usableSelfTitle(titled)) titled = 'לשמור את המצורף בוואן דרייב';
+          closed.label = titled;
+          closed.inboundOnedriveTask = true;
+          closed.noReplyDraft = true;
+        }
+        return closed;
       }
     }
 
@@ -2119,6 +2181,8 @@ const FlowIntent = (() => {
         if (via) return via;
       }
       if (quietHint) return stayQuiet(quietHint);
+      const inboundAction = rescueInboundActionRequired();
+      if (inboundAction) return inboundAction;
       const rescued = rescueSelfSent('intent-null');
       if (rescued) return rescued;
       return { type: null, signals, facts };
@@ -2802,7 +2866,7 @@ const FlowIntent = (() => {
     [/לעדכן|תעדכ(?:ן|נ(?:י|ו)?)(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להשלים|יש להשלים/, 'להשלים'],
     [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק'],
-    [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
+    [/לשמור|תשמר(?:י|ו)?(?![\u0590-\u05FF])|תשמור(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
     [/(?<=^|[^\u0590-\u05FF])שלח(?:י|ו)?(?![\u0590-\u05FF])/, 'לשלוח'],
     [/(?<=^|[^\u0590-\u05FF])לקבל(?![\u0590-\u05FF])/, 'לקבל'],
     [/(?<=^|[^\u0590-\u05FF])לצרף(?![\u0590-\u05FF])/, 'לצרף'],
@@ -2996,12 +3060,19 @@ const FlowIntent = (() => {
   // with Initech at $4,850" is Decision: Initech, $4,850. Six words at most.
   const DECISION_NAME = '([A-Z][\\w&.\\-]*(?:[ \\t]+(?!(?:is|are|was|will|as|at|for|to|and|our|the)\\b)[A-Z][\\w&.\\-]*){0,2})';
   // A greeting or a sign-off ends the sentence. The name never runs into it.
-  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:תודה(?:\s+רבה)?|בתודה|בברכה|ברכה|יום\s+(?:טוב|נעים)|המשך\s+יום|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
+  const SIGNOFF_TAIL = /(?:^|[\s,.!;:\-])(?:בתודה|בברכה|יום\s+(?:טוב|נעים)|שבוע\s+(?:טוב|נעים)|thanks|thank\s+you|many\s+thanks|regards|kind\s+regards|cheers|sincerely|cordially|best(?:\s+regards)?[ \t]*[,.!]?[ \t]*$)(?![\u0590-\u05FFA-Za-z]).*$/i;
+  function stripInlineHeThanks(line) {
+    return String(line || '').replace(/\sתודה(?:\s+רבה)?\s*$/g, function (match, offset, whole) {
+      const before = whole.slice(0, offset).replace(/[ \t]+$/g, '');
+      if (/מכתב$/i.test(before)) return match;
+      return '';
+    });
+  }
   function selfDecisionTitle(raw, facts) {
     const money = facts && facts.moneyText ? ', ' + String(facts.moneyText).trim() : '';
     const lines = String(raw || '').replace(/\u00A0/g, ' ').split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
-      const t = lines[i].replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
+      const t = stripInlineHeThanks(lines[i]).replace(SIGNOFF_TAIL, '').replace(/[ \t]+/g, ' ').trim();
       if (!t) continue;
       let m = t.match(new RegExp('(?:^|[.!]\\s*)(?:[Ff]inal[ \\t]+)?[Dd]ecision(?:[ \\t]+[Mm]ade)?[ \\t]*[:\\-–][ \\t]*' + DECISION_NAME));
       if (!m) m = t.match(new RegExp('\\b(?:[Ww]e(?:\'|’)re|[Ww]e are|[Ii](?:\'|’)m|[Ii] am)[ \\t]+going[ \\t]+with[ \\t]+' + DECISION_NAME));
@@ -3089,7 +3160,8 @@ const FlowIntent = (() => {
       /^נקבע\s+/,
       /^קבעתי לנו\s+/,
       /^בהמשך לשיחתנו,?\s*/,
-      /^פעולה נדרשת מצדך:\s*/
+      /^פעולה נדרשת מצדך:\s*/,
+      /^פעולה נדרשת מצד:\s*/
     ];
     for (let guard = 0; guard < 6; guard++) {
       let next = clause;
