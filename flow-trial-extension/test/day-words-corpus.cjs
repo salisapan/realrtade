@@ -21,10 +21,11 @@ const REW = [
   ['ביום ה׳ בשעה 10:00', 'ביום חמישי בשעה 10:00'], ['ליום א׳', 'ליום ראשון'], ["ביום ו' ב-20:00", 'ביום שישי ב-20:00'],
   ['ב־10:00', 'ב-10:00'], ['עד 28.10', 'עד 2026-10-28'], ['ב-5.11 בשעה 19:30', 'ב-2026-11-05 בשעה 19:30'], ['by 28.10', 'by 2026-10-28'], ['עד 1.3', 'עד 2027-03-01'], ['on 15.10.27', 'on 2027-10-15'],
   ['בעוד יומיים', '2026-10-25'], ['בעוד שלושה ימים', '2026-10-26'], ['בעוד 5 ימים', '2026-10-28'], ['בעוד שבוע', '2026-10-30'],
+  ['ב-7 בערב', 'at 7:00 pm'], ['ב־4 אחה"צ', 'at 4:00 pm'], ['בשעה 8:30 בערב', 'at 8:30 pm'], ['ב-12 בצהריים', 'at 12:00 pm'], ['ב-9 בבוקר', 'at 9:00 am'], ['ב-12 בלילה', 'at 12:00 am'], ['ב-11 בלילה', 'at 11:00 pm'], ['at noon', 'at 12:00 pm'], ['at midnight', 'at 12:00 am'],
   ['in 3 days', '2026-10-26'], ['in two days', '2026-10-25'], ['in a week', '2026-10-30']
 ];
 for (const [from, to] of REW) check('rewrites ' + from, D.normalize(from, NOW) === to, D.normalize(from, NOW));
-const KEEP = ['12.50 ש"ח', 'גרסה 2.10 של התוכנה', 'המחיר 3.5 דולר', 'version 2.10.1', 'עד 45.13', 'עד 31.2', 'בעוד כמה ימים', 'in several days', ''];
+const KEEP = ['ב-8 בצהריים', 'ב-13 בערב', 'בשעה 7','12.50 ש"ח', 'גרסה 2.10 של התוכנה', 'המחיר 3.5 דולר', 'version 2.10.1', 'עד 45.13', 'עד 31.2', 'בעוד כמה ימים', 'in several days', ''];
 for (const t of KEEP) check('leaves alone: ' + t, D.normalize(t, NOW) === t, D.normalize(t, NOW));
 check('no throw on junk', (() => { try { D.normalize(null, null); D.normalize(undefined, 'x'); return true; } catch (e) { return false; } })());
 
@@ -50,6 +51,12 @@ for (const [k, t, day] of YES) {
   const r = M[k].recognize(t, NOW);
   check(k + ' finds its day: ' + t, r.dateIso === day, r);
 }
+const CLOCKS = [
+  ['appt', 'התור שלך נקבע ליום ראשון ב-4 אחה"צ', 16], ['appt', 'התור שלך נקבע מחר ב־12 בצהריים', 12], ['appt', 'התור שלך נקבע מחר ב-11 בלילה', 23],
+  ['appt', 'התור שלך נקבע מחר ב-12 בלילה', 0], ['appt', 'Your appointment is confirmed for Sunday at noon', 12], ['inv', 'מוזמן לחתונה ביום חמישי ב-7 בערב', 19]
+];
+for (const [k, t, h] of CLOCKS) { const r = M[k].recognize(t, NOW); check(k + ' reads the part of the day: ' + t, r.hour === h, r); }
+check('an unresolved 8 in the "noon window" stays unresolved', M.appt.recognize('התור שלך נקבע מחר ב-8 בצהריים', NOW).kind === 'none');
 // A price, a version or a decimal must not become a day.
 const NO = [
   ['pay', 'Please pay 12.50 NIS'], ['pay', 'תעביר לי 12.50 ש"ח'], ['dl', 'Sign the document version 2.10'], ['rem', 'Remember to update to version 2.10'],

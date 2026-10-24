@@ -476,3 +476,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/chat-payment-ask-corpus.cjs` (7 asks in words, 4 more quiet lines), `test/payment-ask-mail-corpus.cjs` (2 in words), the silence corpus (4 more everyday lines with amounts in words), all corpora, chat/Outlook/Gmail browser specs (25).
 - **Open:** live Gate; amounts such as «מאה וחמישים אלף» (over a thousand with a trailing hundreds part) and decimals in words are not read, by design.
 
+## 2026-10-24 Ecosystems builder B (fifty-fourth run) — «ב-7 בערב» and "at noon"
+
+- **Capability shipped (all existing switches, off):** the next everyday Hebrew time form the date reader missed: a clock with a part of the day. «התור שלך נקבע ליום ראשון ב-4 אחה"צ», «מוזמן לחתונה ביום חמישי ב-7 בערב», «סגור, נתראה ב-3 אחר הצהריים», «ב־12 בצהריים», «ב-11 בלילה», "at noon", "at midnight" had no clock, so no card (the reader took only «בשעה 8 בערב»). `core/day-words.js` now rewrites them to a written am or pm, which also fixes the case where the reader refuses a bare 12 or 00 on purpose (noon and midnight are unambiguous once written that way). Chat, Outlook, Gmail and the agreed-meeting reader benefit. An hour that is still ambiguous («ב-8 בצהריים») stays unresolved on purpose.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/day-words-corpus.cjs` (9 clock rewrites, 3 left alone, 6 readers reading the part of the day, 1 ambiguous hour that must stay unresolved), meeting-confirm and chat corpora, all corpora, browser specs.
+- **Open:** live Gate. No manifest change this run.
+

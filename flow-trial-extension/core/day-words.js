@@ -2,6 +2,7 @@
 // for its one day: Hebrew weekday abbreviations («יום א׳» to «יום ראשון»), the Hebrew hyphen (maqaf) in «ב־10:00», dotted dates
 // after a day marker («עד 28.10» to «עד 28/10», "by 28.10"), and relative spans («בעוד יומיים», «בעוד שלושה ימים», «בעוד שבוע»,
 // "in 3 days", "in two days", "in a week") to an ISO date. It only rewrites; it never decides anything. Portable: no
+// A clock with a part of the day («ב-7 בערב», «ב-4 אחה"צ», "at noon") becomes "at 7:00 pm".
 // chrome.*, no DOM, no network.
 const FlowDayWords = (() => {
   const ABBR = { 'א': 'ראשון', 'ב': 'שני', 'ג': 'שלישי', 'ד': 'רביעי', 'ה': 'חמישי', 'ו': 'שישי', 'ש': 'שבת' };
@@ -29,6 +30,21 @@ const FlowDayWords = (() => {
       if (probe.getMonth() !== mn - 1 || probe.getDate() !== dn) return m;
       return pre + mark + iso(probe);
     });
+    // A clock with a part of the day: «ב-7 בערב» to "at 7:00 pm", «ב-12 בצהריים» to "at 12:00 pm", "at noon" to "at 12:00 pm". The
+    // date reader leaves a bare 12 or 00 unresolved on purpose, and takes a written am or pm.
+    s = s.replace(/(ב-?|בשעה\s+)(\d{1,2})(?::([0-5]\d))?\s+(בבוקר|בצהריים|בצהרים|אחה["״]צ|אחר\s+הצהריים|אחרי\s+הצהריים|בערב|בלילה)/g, (m, lead, h, min, part) => {
+      const hh = parseInt(h, 10);
+      if (hh < 1 || hh > 12) return m;
+      let mer = '';
+      if (part === 'בבוקר') mer = hh === 12 ? '' : 'am';
+      else if (/^בצהר/.test(part)) mer = (hh === 12 || hh <= 5) ? 'pm' : '';
+      else if (part === 'בלילה') mer = hh === 12 || hh <= 5 ? 'am' : 'pm';
+      else mer = 'pm';
+      if (!mer) return m;
+      return 'at ' + hh + ':' + (min || '00') + ' ' + mer;
+    });
+    s = s.replace(/\bat\s+noon\b/gi, 'at 12:00 pm');
+    s = s.replace(/\bat\s+midnight\b/gi, 'at 12:00 am');
     // Relative spans to an ISO date.
     s = s.replace(/בעוד\s+(יומיים|(?:שלושה|שלוש|ארבעה|ארבע|חמישה|חמש|שישה|שש|שבעה|שבע|\d{1,2})\s+ימים)/g, (m, span) => {
       const n = HE_NUM[span] || HE_NUM[span.split(/\s+/)[0]] || parseInt(span, 10);
