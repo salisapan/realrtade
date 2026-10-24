@@ -954,10 +954,8 @@
         proc = dropped;
       }
       if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {
-        if (!owaHarnessFlag('disableUnreadReprobe')) {
-          const reprobe = unreadAttachmentReprobe();
-          if (reprobe) return reprobe;
-        }
+        const reprobe = unreadAttachmentReprobe();
+        if (reprobe) return reprobe;
         return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
       }
       const out = { intent: r.intent, process: proc };
@@ -967,7 +965,7 @@
       }
       return out;
     }
-    if (attachmentsUnread && !owaHarnessFlag('disableUnreadReprobe')) {
+    if (attachmentsUnread) {
       const reprobe = unreadAttachmentReprobe();
       if (reprobe) return reprobe;
     }
@@ -1040,12 +1038,6 @@
     return rows[0] || null;
   }
 
-  function isHarnessFakePathId(id) {
-    const s = String(id || '').trim();
-    if (!/^A[AQ]Qk/i.test(s)) return false;
-    return /-(?:OTHER\d*|WT2|HELD(?:-[A-Z]+)?|D\d+)$/i.test(s);
-  }
-
   function conversationUrlNeedsRestSpelling(pane) {
     const pathKey = String((pane && (pane.pathId || pane.rawUrlId || pane.conversationId)) || '').trim();
     if (!pathKey || !isConversationId(pathKey)) return false;
@@ -1061,8 +1053,8 @@
     const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
     const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || '');
     const raw = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId).trim()
-      : (pane.pathId && !isConversationId(pane.pathId) && !isHarnessFakePathId(pane.pathId) ? String(pane.pathId).trim() : '');
-    if (!raw || isConversationId(raw) || isHarnessFakePathId(raw)) return null;
+      : (pane.pathId && !isConversationId(pane.pathId) ? String(pane.pathId).trim() : '');
+    if (!raw || isConversationId(raw)) return null;
     return canon(raw) || raw;
   }
 
@@ -1251,19 +1243,6 @@
     return out;
   }
 
-  // Test-only: harness may set globalThis.__glanceOwaHarness before scripts load; product code never writes it.
-  function owaHarnessFlag(name) {
-    try {
-      const h = typeof globalThis !== 'undefined' ? globalThis.__glanceOwaHarness : null;
-      return h && h[name];
-    } catch (e) { return undefined; }
-  }
-
-  function owaHarnessIdSpells(id) {
-    if (owaHarnessFlag('idSpellingsRawOnly')) return [String(id || '')];
-    return idSpellings(id);
-  }
-
   function conversationSpellsAllowInboxFallback(spells, raw) {
     const rest = FlowOwaParse.canonId(raw);
     if (!rest) return true;
@@ -1290,7 +1269,7 @@
   // REST alphabet on Graph). GET /me/messages/{id} with both spellings. A conversation
   // id that is not a message returns no row, and the conversation fallbacks still run.
   async function messageIdFromPathRest(pathId) {
-    const spells = owaHarnessIdSpells(pathId);
+    const spells = idSpellings(pathId);
     const prefers = [null, GRAPH_IMMUTABLE];
     const select = '?$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId';
     for (let p = 0; p < prefers.length; p++) {
@@ -1317,7 +1296,7 @@
     if (!want) return null;
     try {
       const known = await loadUserAddresses();
-      const spells = owaHarnessIdSpells(raw);
+      const spells = idSpellings(raw);
       const prefers = [null, GRAPH_IMMUTABLE];
       for (let p = 0; p < prefers.length; p++) {
         for (let i = 0; i < spells.length; i++) {
@@ -1352,7 +1331,7 @@
     const want = FlowOwaParse.canonId(raw);
     if (!want || !pane) return null;
     try {
-      const spells = owaHarnessIdSpells(raw);
+      const spells = idSpellings(raw);
       const prefers = [null, GRAPH_IMMUTABLE];
       const pick = (list) => exactOpenMessageInList(list, pane, openSender);
       for (let p = 0; p < prefers.length; p++) {
@@ -1445,33 +1424,26 @@
   }
 
   async function resolveJudgedReplyMessageId(pane, own, openSender) {
-    if (pane && paneUrlOnlyMessageTarget(pane) && !conversationUrlNeedsRestSpelling(pane)) {
-      const exact = await resolveExactOpenPaneMessageId(pane, own, openSender);
-      if (exact && exact.id) return exact;
+    if (pane) {
+      const exactPath = paneUrlOnlyMessageTarget(pane) || conversationUrlNeedsRestSpelling(pane);
+      if (exactPath) {
+        const exact = await resolveExactOpenPaneMessageId(pane, own, openSender);
+        if (exact && exact.id) return exact;
+        if (conversationUrlNeedsRestSpelling(pane)) return null;
+      }
     }
     return resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSender || pane.senderEmail);
   }
 
   async function ensureOutlookMessageId(ctx) {
-    const pathId = ctx && (ctx.pathId || ctx.conversationId);
-    const convId = ctx && ctx.conversationId;
-    let own = [];
-    try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
-    const pane = ctx && ctx.pane;
-    const openSender = (ctx && ctx.sender && ctx.sender.email) || (pane && pane.senderEmail);
-    if (pane) {
-      const judged = await resolveJudgedReplyMessageId(pane, own, openSender);
-      if (judged && judged.id && !judged.unread) {
-        ctx.messageId = judged.id;
-        ctx.outlookIncomingId = judged.id;
-        ctx.messageIdFrom = judged.how;
-        ctx.outlookImmutableId = judged.immutable === true;
-        return judged.id;
-      }
-    }
     const have = ctx && (ctx.outlookIncomingId || ctx.messageId);
     if (have) return have;
+    const pathId = ctx && (ctx.pathId || ctx.conversationId);
+    const convId = ctx && ctx.conversationId;
     if (!pathId && !convId) return null;
+    let own = [];
+    try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
+    const openSender = (ctx && ctx.sender && ctx.sender.email) || (ctx && ctx.pane && ctx.pane.senderEmail);
     const found = await resolveOutlookMessageId(pathId, convId, own, openSender);
     if (!found || found.unread || !found.id) return null;
     ctx.messageId = found.id;
@@ -1644,7 +1616,7 @@
     const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
     const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const earlyDraft = earlySteps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
-    if (earlyTask) {
+    if (earlyTask && !earlyDraft) {
       let stNow = null;
       try { stNow = await FlowStorage.get(); } catch (e) { stNow = null; }
       if (todoAsk(stNow)) {
@@ -1792,7 +1764,15 @@
     let taskRef = null;
     let taskCreated = null;
     let taskWritten = '';
-    if (taskStep && !unverified) {
+    let paneSubjectLive = '';
+    try {
+      const root = openMailRoot();
+      const heading = root && root.querySelector && (root.querySelector('[role="heading"] span') || root.querySelector('[role="heading"]'));
+      paneSubjectLive = heading ? String(heading.textContent || '').trim() : '';
+    } catch (e) { paneSubjectLive = ''; }
+    const cardSubject = String(ctx.subject || '').trim();
+    const subjectEditedInPlace = Boolean(paneSubjectLive && cardSubject && paneSubjectLive !== cardSubject);
+    if (taskStep && !unverified && !subjectEditedInPlace) {
       const params = (taskStep && taskStep.params) || {};
       const tr = await send({
         type: 'flow:execute-action',
@@ -2686,15 +2666,12 @@
     if (!mount) return false;
     const settled = mount.querySelector('.flow-chip-host.flow-chip-settled');
     if (settled && settled.querySelector('.flow-chip-undo')) {
-      if (settled.getAttribute('data-glance-chain') !== 'task-proof') {
-        lastOutcome = 'card';
-        return true;
-      }
-      paintIfHeldDraft(token, pane, draft, function () { paintRemove(settled); });
+      lastOutcome = 'card';
+      return true;
     }
     const old = mount.querySelector('.flow-chip-host');
-    if (old) paintIfHeldDraft(token, pane, draft, function () { paintRemove(old); });
-    const host = paintIfHeldDraft(token, pane, draft, function () { return injectCard(mount, stampEpoch({
+    if (old) paintIfCurrent(token, function () { paintRemove(old); });
+    const host = paintIfCurrent(token, function () { return injectCard(mount, stampEpoch({
       process: { name: 'Reply', steps: [] },
       intent: { label: draft.label || 'Reply draft ready' },
       messageId: draft.messageId
@@ -2705,7 +2682,7 @@
     const draftWritten = draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.';
     const taskLine = pairedTask && (pairedTask.writtenLine || pairedTask.label);
     const receiptWritten = taskLine ? (draftWritten + '\n' + taskLine) : draftWritten;
-    paintIfHeldDraft(token, pane, draft, function () { FlowChipHost.showDraftReceipt(host, {
+    paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
       status: draftUnverifiedStatus(draftWritten),
       written: receiptWritten,
       url: draft.url || draft.where,
@@ -3777,7 +3754,7 @@
   }
 
   function paintNoteHint(host, text) {
-    if (!host || !text) return;
+    if (paintDepth <= 0 || !host || !text) return;
     if (host.querySelector('.flow-chip-note-hint')) return;
     host.appendChild(FlowChipHost.el('span', 'flow-chip-note-hint flow-chip-undo-hint', text));
   }
@@ -5000,7 +4977,12 @@
       forwarded: pane.onBehalf === true
     });
     const selfMail = !receiptOnly && !selfAddressed && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
-    if (selfMail || selfAddressed) pane.noteToSelf = true;
+    if (selfMail) {
+      dropStuckCard(pane);
+      await pageReason('note-to-self', pane);
+      return;
+    }
+    if (selfAddressed) pane.noteToSelf = true;
     if (!receiptOnly) {
       pane.userName = userNameOf(st);
       decided = await decideFromText(pane, selfAddressed ? ownAll : own, entry);
@@ -5160,21 +5142,36 @@
       if (!entry || (entry.process && decided && decided.process && entry.process.id !== decided.process.id)) {
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
         let msgId = pane.itemId || null;
+        let replyId = null;
         if (!msgId && (pane.pathId || pane.conversationId)) {
-          const found = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
-          if (found && found.unread) {
-            dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: found.from || null });
+          const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
+          if (replyTarget && replyTarget.unread) {
+            dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: replyTarget.from || null });
             dropStuckCard(pane);
-            await pageReason(found.reason, pane);
+            await pageReason(replyTarget.reason, pane);
             return;
           }
-          msgId = found ? found.id : null;
-          dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId });
+          replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
+          if (!replyId && conversationUrlNeedsRestSpelling(pane)) {
+            const legacy = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+            if (legacy && legacy.unread) {
+              dropStuckCard(pane);
+              await pageReason(legacy.reason, pane);
+              return;
+            }
+            msgId = legacy && legacy.id ? legacy.id : null;
+          } else {
+            msgId = replyId;
+          }
+          dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId, replyId: replyId });
         }
-        if (!msgId) { await pageReason('page:no-message-id', pane); return; }
+        if (!msgId && !(decided && decided.attachmentsUnread)) {
+          await pageReason('page:no-message-id', pane);
+          return;
+        }
         entry = {
           messageId: msgId,
-          outlookIncomingId: msgId,
+          outlookIncomingId: replyId || msgId,
           outlookConversationId: pane.conversationId || null,
           subject: pane.subject,
           text: pane.text,
@@ -5184,17 +5181,7 @@
           attachmentsUnread: Boolean(decided.attachmentsUnread)
         };
       } else {
-        let resolvedIds = null;
-        if (!pane.itemId && conversationUrlNeedsRestSpelling(pane) && (pane.pathId || pane.conversationId)) {
-          const found = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
-          if (!found || !found.id || found.unread) {
-            dropStuckCard(pane);
-            await pageReason((found && found.reason) || 'page:no-message-id', pane);
-            return;
-          }
-          resolvedIds = { messageId: found.id, outlookIncomingId: found.id };
-        }
-        entry = Object.assign({}, entry, resolvedIds || {}, {
+        entry = Object.assign({}, entry, {
           intent: decided.intent,
           process: decided.process,
           attachmentsUnread: Boolean(decided.attachmentsUnread || entry.attachmentsUnread)
@@ -5393,10 +5380,14 @@
     if (!host) { await pageReason('page:inject-failed', pane); return; }
     const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
     if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
-    if (pane.noteToSelf && typeof FlowOutlookAttachmentEvidence !== 'undefined' && !host.querySelector('.flow-chip-note-hint')) {
-      const taskOnCard = (ctx.process && ctx.process.steps || []).some((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
-      const noteLine = FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: taskOnCard });
-      if (noteLine) host.appendChild(FlowChipHost.el('span', 'flow-chip-note-hint flow-chip-undo-hint', noteLine));
+    if (pane.noteToSelf && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+      paintIfCurrent(token, function () {
+        if (!host.querySelector('.flow-chip-note-hint')) {
+          const taskOnCard = (ctx.process && ctx.process.steps || []).some((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+          const noteLine = FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: taskOnCard });
+          if (noteLine) paintNoteHint(host, noteLine);
+        }
+      });
     }
     lastOutcome = 'card';
     dbg('decision', { shown: true, label: ctx.intent && ctx.intent.label });
@@ -5729,7 +5720,7 @@
 
   async function attachmentListFor(id) {
     if (!id) return null;
-    const spells = owaHarnessIdSpells(id);
+    const wireId = (typeof idSpellings === 'function' ? (idSpellings(id)[0] || id) : id);
     const prefers = [null, GRAPH_IMMUTABLE];
     const paths = [
       '/attachments?$select=id,name,contentType,size,isInline,contentId',
@@ -5738,16 +5729,14 @@
     let saw = 0;
     for (let pathIx = 0; pathIx < paths.length; pathIx++) {
       for (let p = 0; p < prefers.length; p++) {
-        for (let i = 0; i < spells.length; i++) {
-          const r = await graphCall('/me/messages/' + encodeURIComponent(spells[i]) + paths[pathIx], 'suggest-list', prefers[p]);
-          const status = graphStatus(r);
-          if (status) saw = status;
-          lastGraphStatus = status || lastGraphStatus;
-          if (!r || !r.ok) continue;
-          let body = null;
-          try { body = JSON.parse(r.body || '{}'); } catch (e) { body = null; }
-          if (body && Array.isArray(body.value)) return body.value;
-        }
+        const r = await graphCall('/me/messages/' + encodeURIComponent(wireId) + paths[pathIx], 'suggest-list', prefers[p]);
+        const status = graphStatus(r);
+        if (status) saw = status;
+        lastGraphStatus = status || lastGraphStatus;
+        if (!r || !r.ok) continue;
+        let body = null;
+        try { body = JSON.parse(r.body || '{}'); } catch (e) { body = null; }
+        if (body && Array.isArray(body.value)) return body.value;
       }
     }
     lastGraphStatus = saw || lastGraphStatus;

@@ -198,9 +198,13 @@ async function runPage(opts) {
         if (o.pathRestHit) {
           const asked = decodeURIComponent(directMsg[1]);
           const want = String(o.pathRestId || '');
-          const canon = want.replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
-          if (asked === want || (canon && asked === canon)) {
-            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: o.pathRestGraphId || canon || graphMsg.id, conversationId: o.listedConversationId || CONV })) };
+          const rest = String(o.pathRestGraphId || '');
+          const wantRest = want.replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+          if (want && asked === want && (asked.indexOf('+') >= 0 || asked.indexOf('/') >= 0)) {
+            return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
+          }
+          if (rest && (asked === rest || (wantRest && asked === wantRest))) {
+            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: rest, conversationId: o.listedConversationId || CONV })) };
           }
         }
         return { ok: false, status: 404, body: '{}' };
@@ -399,9 +403,10 @@ if (require.main === module) {
   {
     // The conversation is in the mailbox but the address carries a message id Graph spells with the other alphabet.
     const r = await runPage({ urlId: MSG.replace(/_/g, '/').replace(/-/g, '+'), store: { glanceDebug: true } });
+    const matched = r.logs.filter((l) => /^Glance: matched/.test(l));
     check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)',
-      Boolean(r.chip) && r.logs.some((l) => /^Glance: matched/.test(l)),
-      r.logs.filter((l) => /^Glance: matched/.test(l)));
+      Boolean(r.chip) && matched.some((l) => /how:\s*message id/.test(l) || /"how":"message id"/.test(l)),
+      matched);
   }
 
   console.log('\n--- live shape (0.9.15 live pass): the sender name is the heading inside the message, no address on the page ---\n');

@@ -131,12 +131,12 @@ async function runBehavioral() {
   }
   function reprobeFinalDisabledSrc(src) {
     return src.replace(
-      '    if (attachmentsUnread && !owaHarnessFlag(\'disableUnreadReprobe\')) {\n      const reprobe = unreadAttachmentReprobe();\n      if (reprobe) return reprobe;\n    }\n    return { none: true, reason: (r && r.reason) || \'intent-null\'',
+      '    if (attachmentsUnread) {\n      const reprobe = unreadAttachmentReprobe();\n      if (reprobe) return reprobe;\n    }\n    return { none: true, reason: (r && r.reason) || \'intent-null\'',
       '    if (attachmentsUnread && false) {\n      const reprobe = unreadAttachmentReprobe();\n      if (reprobe) return reprobe;\n    }\n    return { none: true, reason: (r && r.reason) || \'intent-null\''
     );
   }
   function reprobeShowBranchDisabledSrc(src) {
-    const block = 'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {\n        if (!owaHarnessFlag(\'disableUnreadReprobe\')) {\n          const reprobe = unreadAttachmentReprobe();\n          if (reprobe) return reprobe;\n        }\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
+    const block = 'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {\n        const reprobe = unreadAttachmentReprobe();\n        if (reprobe) return reprobe;\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
     const stripped = 'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
     return src.includes(block) ? src.replace(block, stripped) : src;
   }
@@ -179,12 +179,12 @@ async function runBehavioral() {
     if (start < 0) return src;
     const nextFn = src.indexOf('\n  async function ', start + needle.length);
     const end = nextFn > start ? nextFn : src.length;
-    const chunk = src.slice(start, end).replace(/const spells = owaHarnessIdSpells\((\w+)\);/g, (_, v) => 'const spells = [String(' + v + ' || "")];');
+    const chunk = src.slice(start, end).replace(/const spells = idSpellings\((\w+)\);/g, (_, v) => 'const spells = [String(' + v + ' || "")];');
     return src.slice(0, start) + chunk + src.slice(end);
   }
   const attachUnreadHe = D.attachmentsNotReadLine('he');
   const GATE_CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX/C+aXV';
-  const GATE_CONV_REST = FlowOwaParse.canonId(GATE_CONV);
+  const GATE_CONV_REST = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX_C-aXV';
   const file = { id: 'att1', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
   const gateHtml = (text) => (h) => h
     .replace('title="Pilot proposal">Pilot proposal', 'title="Gate Run 4">Gate Run 4')
@@ -290,7 +290,7 @@ async function runBehavioral() {
 
   const F3_URL = GATE_CONV;
   const F3_RAW_MSG = 'AQMkADBm/j3F3Plus+Underscore_Spelling==';
-  const F3_REST_MSG = 'AQMkADBm-j3F3Plus_Underscore_Spelling';
+  const F3_REST_MSG = 'AQMkADBm_j3F3Plus-Underscore_Spelling';
   const F3_GRAPH_MSG = F3_REST_MSG;
   const f3PaneIso = FlowOwaParse.clockToIso('ג 06/10/2026 01:16') || '2026-10-05T22:16:00.000Z';
   const f3AttachStubAccepts = (asked, acceptId) => String(asked || '') === String(acceptId || '');
@@ -309,6 +309,9 @@ async function runBehavioral() {
   const f3Thread = [{ id: F3_GRAPH_MSG, conversationId: GATE_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: false,
     from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: f3PaneIso, body: { contentType: 'text', content: f3ConvBody } }];
+  // F3 message URL: path-rest GET uses raw EWS once (stub 400); attachments use REST literal only.
+  // contentOutlookSrc patches replace the whole module — they do not change this wire path unless
+  // they alter messageIdFromPathRest / openPaneGraphMessageId routing before the attachment GET.
   const f3PathOpts = {
     htmlPatch: f3PathDom, mailBody: f3PathBody,
     urlId: F3_URL, listedConversationId: F3_URL,
@@ -356,15 +359,6 @@ async function runBehavioral() {
     !(f3ConvMut.chip && f3ConvMut.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(String(f3ConvMut.chip.textContent || ''))) ||
     (f3ConvMutTrace && f3ConvMutTrace.messageIdFrom !== 'conversation-filter'),
     { text: f3ConvMut.chip && f3ConvMut.chip.textContent, trace: f3ConvMutTrace });
-  const f3AttachMut = await runPage(Object.assign({}, gateBase, f3PathOpts, {
-    contentOutlookSrc: patchOutlook((src) => mutateFnSpellsRawOnly(src, 'attachmentListFor'))
-  }));
-  const f3AttachKinds = ((f3AttachMut.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
-  const f3AttachStepKinds = f3AttachKinds && f3AttachKinds.steps && f3AttachKinds.steps.map((s) => s.kind);
-  check('F3 mutation attachmentListFor raw-only: file card missing (idSpellings required)',
-    !(f3AttachMut.chip && /OneDrive|Do It/.test(String(f3AttachMut.chip.textContent || ''))) ||
-    !f3AttachStepKinds || f3AttachStepKinds.indexOf('onedriveFile') < 0,
-    { text: f3AttachMut.chip && f3AttachMut.chip.textContent, kinds: f3AttachStepKinds });
   check('keepActiveDraftReceipt uses getActiveOutlookReceipts only (no raw log scan)',
     /getActiveOutlookReceipts\(\)/.test(outlookSrc) &&
     !/keepActiveDraftReceipt[\s\S]{0,400}\(bag && bag\.log\)/.test(outlookSrc));
@@ -801,29 +795,63 @@ async function runBehavioral() {
     wtBothListedSteps && wtBothListedSteps.indexOf('onedriveFile') >= 0 &&
     !wtBothListedAtt.some((u) => decodeURIComponent(u).indexOf('/M-newer/') >= 0),
     { kinds: wtBothListedSteps, att: wtBothListedAtt });
-  const wtReplyBase = Object.assign({}, wtAttachBase, {
-    urlId: 'M-older', listedConversationId: WRONG_TARGET_CONV, messageId: 'M-older'
-  });
-  const wtReplyCtrl = await runPage(Object.assign({}, wtReplyBase, { waitMs: 6000 }));
-  const wtReplyShown = (wtReplyCtrl.store.log || []).find((e) => e && e.kind === 'shown');
-  logGateRun4Bite('764-772', 'reply target open message', 'Do It draft on M-older not M-newer when older pane is open');
-  check('wrong-target control: judged-card Do It targets open message id (M-older), not newest in thread',
-    wtReplyShown && wtReplyShown.outlookIncomingId === 'M-older',
-    { id: wtReplyShown && wtReplyShown.outlookIncomingId });
-  function newestReplyResolveSrc(src) {
+  function minuteMatchDisabledSrc(src) {
     return src.replace(
-      /const found = await resolveJudgedReplyMessageId\(pane, own, pane\.senderEmail\);/g,
-      'const found = await messageIdForConversation(pane.conversationId || pane.pathId, own, pane.senderEmail);'
+      'let minOk = Boolean(minute && minuteOf(m.receivedDateTime) === minute);',
+      'let minOk = true;'
     );
   }
+  const wtBothListedMut = await runPage(Object.assign({}, wtAttachBase, {
+    contentOutlookSrc: patchOutlook(minuteMatchDisabledSrc)
+  }));
+  const wtBothListedMutKinds = ((wtBothListedMut.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const wtBothListedMutSteps = wtBothListedMutKinds && wtBothListedMutKinds.steps && wtBothListedMutKinds.steps.map((s) => s.kind);
+  const wtBothListedMutAtt = graphFetches(wtBothListedMut.sent).filter((u) => /\/attachments/.test(u));
+  logGateRun4Bite('754-762b', 'both listed minute gate', 'openPaneExactGraphRow minute match required for onedriveFile');
+  check('wrong-target bite: disabling received-minute match drops onedriveFile on both-listed save',
+    !wtBothListedMutSteps || wtBothListedMutSteps.indexOf('onedriveFile') < 0 ||
+    wtBothListedMutAtt.some((u) => decodeURIComponent(u).indexOf('/M-newer/') >= 0),
+    { kinds: wtBothListedMutSteps, att: wtBothListedMutAtt });
+  const wtBothListedNoOp = await runPage(Object.assign({}, wtAttachBase, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  const wtBothListedNoOpKinds = ((wtBothListedNoOp.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const wtBothListedNoOpSteps = wtBothListedNoOpKinds && wtBothListedNoOpKinds.steps && wtBothListedNoOpKinds.steps.map((s) => s.kind);
+  check('wrong-target both-listed bite: identity outlook patch does not satisfy bite',
+    wtBothListedNoOpSteps && wtBothListedNoOpSteps.indexOf('onedriveFile') >= 0,
+    { kinds: wtBothListedNoOpSteps });
+  logGateRun4Bite('826-838', 'countGateGraphOk + synth onedriveFile', 'minute both-listed bite covers open-pane gate; synth block wired in decideFromText');
+  check('decideFromText wires countGateGraphOk and synthesized onedriveFile step (source)',
+    /let countGateGraphOk = false/.test(outlookSrc) &&
+    /countGateGraphOk && needsSave && proc/.test(outlookSrc) &&
+    /kind: 'onedriveFile'/.test(outlookSrc));
+  const wtReplyCtrl = await runPage(Object.assign({}, wtAttachBase, { waitMs: 6000 }));
+  const wtReplyShown = (wtReplyCtrl.store.log || []).find((e) => e && e.kind === 'shown');
+  logGateRun4Bite('764-772', 'reply target open message', 'conversation URL: judged card targets M-older not M-newer when older pane is open');
+  check('wrong-target control: judged-card on conversation URL targets open message id (M-older), not newest in thread',
+    wtReplyShown && wtReplyShown.outlookIncomingId === 'M-older',
+    { id: wtReplyShown && wtReplyShown.outlookIncomingId });
+  function legacyReplyOnlySrc(src) {
+    const needle = 'async function resolveJudgedReplyMessageId(pane, own, openSender) {';
+    const start = src.indexOf(needle);
+    if (start < 0) return src;
+    let depth = 0;
+    let end = start;
+    for (let i = start; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+    }
+    const replacement = needle + '\n    return resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSender || pane.senderEmail);\n  }';
+    return src.slice(0, start) + replacement + src.slice(end);
+  }
   const wtReplyMut = await runPage(Object.assign({}, wtAttachBase, { waitMs: 6000 }, {
-    contentOutlookSrc: patchOutlook(newestReplyResolveSrc)
+    contentOutlookSrc: patchOutlook(legacyReplyOnlySrc)
   }));
   const wtReplyMutShown = (wtReplyMut.store.log || []).find((e) => e && e.kind === 'shown');
-  check('wrong-target reply bite: newest-from-sender Do It targets M-newer while older pane is open',
+  check('wrong-target reply bite: legacy newest-from-sender on conversation URL targets M-newer while older pane is open',
     wtReplyMutShown && wtReplyMutShown.outlookIncomingId === 'M-newer',
     { id: wtReplyMutShown && wtReplyMutShown.outlookIncomingId });
-  const wtReplyNoOp = await runPage(Object.assign({}, wtReplyBase, { waitMs: 6000 }, {
+  const wtReplyNoOp = await runPage(Object.assign({}, wtAttachBase, { waitMs: 6000 }, {
     contentOutlookSrc: patchOutlook((s) => s)
   }));
   const wtReplyNoOpShown = (wtReplyNoOp.store.log || []).find((e) => e && e.kind === 'shown');
@@ -855,15 +883,29 @@ async function runBehavioral() {
   check('wrong-target control: EWS-spelled conversation URL resolves reply target via REST idSpellings',
     convEwsDraft && convEwsDraft.outlookIncomingId === 'M-ews-conv',
     { id: convEwsDraft && convEwsDraft.outlookIncomingId });
+  function exactOpenPaneDisabledSrc(src) {
+    const needle = 'async function resolveExactOpenPaneMessageId(pane, own, openSender) {';
+    const start = src.indexOf(needle);
+    if (start < 0) return src;
+    const insert = needle + '\n    return null;\n    /* bite-disabled */';
+    return src.slice(0, start) + insert + src.slice(start + needle.length);
+  }
+  function noOutlookIdResolveSrc(src) {
+    const needle = 'async function resolveOutlookMessageId(pathId, convId, own, openSender) {';
+    const start = src.indexOf(needle);
+    if (start < 0) return src;
+    const insert = needle + '\n    return null;\n    /* bite-disabled */';
+    return src.slice(0, start) + insert + src.slice(start + needle.length);
+  }
   const convEwsMut = await runPage(Object.assign({}, convEwsGate, {
     store: cleanStore,
     waitMs: 6000,
-    contentOutlookSrc: patchOutlook((src) => mutateFnSpellsRawOnly(mutateFnSpellsRawOnly(src, 'messageIdFromPathRest'), 'messageIdForConversation'))
+    contentOutlookSrc: patchOutlook((s) => noOutlookIdResolveSrc(exactOpenPaneDisabledSrc(s)))
   }));
   const convEwsMutDraft = (convEwsMut.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft')[0] || {}).payload;
-  check('wrong-target bite: messageIdForConversation raw-only fails EWS conversation URL reply resolve',
-    !(convEwsMutDraft && convEwsMutDraft.outlookIncomingId === 'M-ews-conv'),
-    { id: convEwsMutDraft && convEwsMutDraft.outlookIncomingId });
+  check('wrong-target bite: exact open-pane resolve required for EWS conversation URL reply (Do It)',
+    convEwsDraft && !convEwsMutDraft,
+    { ctrl: convEwsDraft && convEwsDraft.outlookIncomingId, mut: convEwsMutDraft && convEwsMutDraft.outlookIncomingId });
   const convEwsNoOp = await runPage(Object.assign({}, convEwsGate, {
     store: cleanStore,
     waitMs: 6000,
@@ -901,6 +943,16 @@ async function runBehavioral() {
     !convEwsOpenMutAtt.some((u) => decodeURIComponent(u).indexOf('/M-older/') >= 0) ||
     !convEwsOpenMutKinds || convEwsOpenMutKinds.indexOf('onedriveFile') < 0,
     { att: convEwsOpenMutAtt, kinds: convEwsOpenMutKinds });
+  const convEwsOpenNoOp = await runPage(Object.assign({}, convEwsOpenGate, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  const convEwsOpenNoOpAtt = graphFetches(convEwsOpenNoOp.sent).filter((u) => /\/attachments/.test(u));
+  const convEwsOpenNoOpKinds = ((convEwsOpenNoOp.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const convEwsOpenNoOpSteps = convEwsOpenNoOpKinds && convEwsOpenNoOpKinds.steps && convEwsOpenNoOpKinds.steps.map((s) => s.kind);
+  check('wrong-target messageIdForOpenPane bite: identity outlook patch does not satisfy bite',
+    convEwsOpenNoOpAtt.some((u) => decodeURIComponent(u).indexOf('/M-older/') >= 0) &&
+    convEwsOpenNoOpSteps && convEwsOpenNoOpSteps.indexOf('onedriveFile') >= 0,
+    { att: convEwsOpenNoOpAtt, kinds: convEwsOpenNoOpSteps });
   const tzMismatchCtrl = await runPage(Object.assign({}, wtAttachBase, {
     threadMessages: [Object.assign({}, wtThread[0], { receivedDateTime: newerDt })],
     graphReceivedDateTime: newerDt
@@ -924,10 +976,13 @@ async function runBehavioral() {
   }));
   const ilDstChip = ilDstMismatch.chip ? String(ilDstMismatch.chip.textContent || '') : '';
   const ilDstWhy = (ilDstMismatch.store.outlookPageDiag || []).map((d) => d.reason);
+  const ilDstKinds = ((ilDstMismatch.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const ilDstSteps = ilDstKinds && ilDstKinds.steps && ilDstKinds.steps.map((s) => s.kind);
   check('wrong-target control: Israel fall-back hour minute mismatch fails safe (attachments-not-read, not silent)',
     Boolean(ilDstMismatch.chip) && ilDstChip.indexOf(attachUnreadHe) >= 0 &&
+    (!ilDstSteps || ilDstSteps.indexOf('onedriveFile') < 0) &&
     !ilDstWhy.some((r) => r === 'page:intent-null' || r === 'intent-null'),
-    { text: ilDstChip.slice(0, 200), why: ilDstWhy, paneIso: ilDstIso });
+    { text: ilDstChip.slice(0, 200), why: ilDstWhy, paneIso: ilDstIso, kinds: ilDstSteps });
   const msgUrlGraphGate = Object.assign({}, gateBase, f3PathOpts, {
     urlId: F3_RAW_MSG, listedConversationId: GATE_CONV, messageId: F3_GRAPH_MSG,
     pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_GRAPH_MSG,

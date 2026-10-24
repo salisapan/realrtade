@@ -36,18 +36,12 @@ const FlowOwaParse = (() => {
     return { itemId: conv ? null : id, conversationId: conv ? id : null, kind: conv ? 'conversation' : 'message', raw: id };
   }
 
-  // Graph REST message/conversation id for compare and /me/messages/{id} paths.
-  // EWS / OWA URL ids use + and /; REST ids use _ and - (convertToRestId / ImmutableId).
-  // https://learn.microsoft.com/en-us/graph/outlook-immutable-id
+  // One spelling for an Exchange id, whatever alphabet and padding it arrived in.
   function canonId(id) {
     if (!id) return '';
     let s = String(id);
     try { s = decodeURIComponent(s); } catch (e) { /* already decoded */ }
-    s = s.replace(/^ol:/, '').trim();
-    if (s.indexOf('/') >= 0 || s.indexOf('+') >= 0) {
-      s = s.replace(/\+/g, '_').replace(/\//g, '-');
-    }
-    return s.replace(/=+$/, '');
+    return s.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
   }
 
   // Bidi marks and NBSP sit in front of Hebrew "אל:" and are not \s, so a
