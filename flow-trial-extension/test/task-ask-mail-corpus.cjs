@@ -12,7 +12,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'incoming-judge.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'day-words.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'incoming-judge.js'];
 const box = { module: undefined, console };
 vm.createContext(box);
 for (const f of CORE) vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), box, { filename: f });

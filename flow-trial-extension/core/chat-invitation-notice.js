@@ -6,7 +6,7 @@
 // approves, and accepting or declining stays theirs. Portable: no chrome.*, no DOM, no network.
 const FlowChatInvitationNotice = (() => {
   const FRAME_EN = /\b(?:you(?:'re|\s+are)\s+(?:cordially\s+)?invited|(?:we|i)\s*(?:'d|\s+would)?\s*(?:love|like)\s+(?:to\s+invite|you\s+to\s+(?:join|come))|(?:we|i)(?:'re|\s+am|\s+are)?\s*inviting\s+you|invit(?:e|ing)\s+you\s+to|join\s+(?:us|me)\s+(?:for|at|on)|come\s+(?:celebrate|join)\s+(?:with\s+)?(?:us|me)|save\s+the\s+date|hope\s+you\s+can\s+(?:join|come))\b/i;
-  const FRAME_HE = /(?:מוזמן(?:ת|ים|ות)?\s+(?:ל|ל-)|מזמינ(?:ה|ים|ות)?\s+(?:אותך|אתכם|אתכן|אותכם)|מזמין\s+אותך|הזמנה\s+ל|נשמח\s+(?:לראות|שתצטרפו|שתבואו|שתגיע|שתצטרף)|הצטרפו\s+אלינו|בואו\s+לחגוג|שמרו\s+את\s+התאריך)/;
+  const FRAME_HE = /(?:מוזמ[נן](?:ת|ים|ות)?\s+(?:ל|ל-)|מזמינ(?:ה|ים|ות)?\s+(?:אותך|אתכם|אתכן|אותכם)|מזמין\s+אותך|הזמנה\s+ל|נשמח\s+(?:לראות|שתצטרפו|שתבואו|שתגיע|שתצטרף)|הצטרפו\s+אלינו|בואו\s+לחגוג|שמרו\s+את\s+התאריך)/;
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|amazing|nice)|thank(?:s|\s+you)\s+for|cancel(?:l?ed)?|postpone[d]?|resched\w*|unfortunately|sorry|maybe|might|webinar|sale|discount|offer|subscribe|unsubscribe|click\s+here|register\s+now|rsvp\s+by)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|היה\s+(?:נהדר|כיף|מדהים)|תודה\s+על|בוטל|בוטלה|נדחה|לצערנו|מצטער|מצטערים|אולי|וובינר|מבצע|הנחה|הרשמה|לחץ\s+כאן|הירשמו)/;
   const QUESTION = /[?؟]/;
@@ -18,6 +18,14 @@ const FlowChatInvitationNotice = (() => {
     if (typeof FlowExtract !== 'undefined') return FlowExtract;
     try { return typeof require !== 'undefined' ? require('./extract.js').FlowExtract : null; } catch (e) { return null; }
   }
+  // Hebrew weekday abbreviations, the maqaf, dotted dates and "in N days" are rewritten into forms the date reader takes.
+  function dayWords(text, now) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
+      return D ? D.normalize(text, now) : text;
+    } catch (e) { return text; }
+  }
+
   function pad(n) { return String(n).padStart(2, '0'); }
   function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 
@@ -51,7 +59,7 @@ const FlowChatInvitationNotice = (() => {
 
   // { kind: 'invitation', dateIso, hour, minute, lang } or { kind: 'none', reason }.
   function recognize(text, now) {
-    const raw = String(text || '').replace(/\s+/g, ' ').trim();
+    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 280) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

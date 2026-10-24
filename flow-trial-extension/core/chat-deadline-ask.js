@@ -22,6 +22,14 @@ const FlowChatDeadlineAsk = (() => {
     if (typeof FlowExtract !== 'undefined') return FlowExtract;
     try { return typeof require !== 'undefined' ? require('./extract.js').FlowExtract : null; } catch (e) { return null; }
   }
+  // Hebrew weekday abbreviations, the maqaf, dotted dates and "in N days" are rewritten into forms the date reader takes.
+  function dayWords(text, now) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
+      return D ? D.normalize(text, now) : text;
+    } catch (e) { return text; }
+  }
+
   function pad(n) { return String(n).padStart(2, '0'); }
   function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 
@@ -51,7 +59,7 @@ const FlowChatDeadlineAsk = (() => {
 
   // { kind: 'ask', dateIso, what } or { kind: 'none', reason }.
   function recognize(text, now) {
-    const raw = String(text || '').replace(/\s+/g, ' ').trim();
+    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

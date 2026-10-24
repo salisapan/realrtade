@@ -117,3 +117,16 @@ test('TASK_ASK on but the person is only on Cc: no card', async ({ glance }) => 
   await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(0);
 });
+
+test('TASK_ASK on, Hebrew with a relative span: «אל תשכח להביא את הטופס החתום בעוד יומיים» is one To Do task due in two days', async ({ glance }) => {
+  const page = await open(glance, { TASK_ASK: true }, 'שלום סלי, אל תשכח להביא את הטופס החתום בעוד יומיים. תודה!', false);
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  const due = new Date(Date.now() + 2 * 24 * 3600 * 1000);
+  const iso = due.getFullYear() + '-' + String(due.getMonth() + 1).padStart(2, '0') + '-' + String(due.getDate()).padStart(2, '0');
+  expect(JSON.stringify(list[0])).toContain(iso);
+  expect(JSON.stringify(list[0])).toContain('הטופס החתום');
+});

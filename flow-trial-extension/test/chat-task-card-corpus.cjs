@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -459,7 +459,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {
