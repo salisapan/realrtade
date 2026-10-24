@@ -117,8 +117,12 @@ const FlowChatPaymentAsk = (() => {
   const BILL_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:invoice|bill|statement|subscription|rent|instal+ment|balance|tax|premium|fee|fine|ticket)\b[^.?!]{0,80}\b(?:is|are)?\s*(?:due|payable|overdue|outstanding)\b|\bpayment\s+(?:is\s+)?due\b|\bamount\s+due\b/i;
   const BILL_HE = /(?:החשבונית|החשבון|החיוב|המנוי|התשלום|שכר\s+הדירה|הארנונה|החוב|הקנס|הפרמיה|הדוח)\s+(?:שלך|שלכם|שלכן)[^.?!]{0,80}(?:לתשלום|פירעון|בפיגור|ממתין|ממתינה)|מועד\s+(?:הפירעון|התשלום)|לתשלום\s+עד/;
 
+  // A nudge in front of the same ask ("Reminder: please transfer…", «תזכורת: תעביר…») is the same ask, not another sentence.
+  const NUDGE_EN = /^(?:(?:a\s+)?(?:gentle|friendly|quick|polite)\s+)?(?:reminder|nudge|ping|follow(?:ing)?[\s-]*up)\s*[:,\-–—]\s*/i;
+  const NUDGE_HE = /^(?:תזכורת(?:\s+(?:ידידותית|קטנה))?|שוב)\s*[:,\-–—]\s*/;
+
   function recognize(text, now) {
-    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim();
+    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim().replace(NUDGE_EN, '').replace(NUDGE_HE, '');
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };

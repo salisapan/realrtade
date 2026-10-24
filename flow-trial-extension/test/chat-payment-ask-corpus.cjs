@@ -10,6 +10,9 @@ const YES = [
   ['Can you pay the 1,200 ₪ invoice before Thursday?', '2026-10-29', '1200', 'NIS'],
   ['Could you send $250 tomorrow?', '2026-10-24', '250', 'USD'],
   ['Please wire 80 EUR by Monday', '2026-10-26', '80', 'EUR'],
+  ['Reminder: please transfer 500 NIS to my account by Sunday', '2026-10-25', '500', 'NIS'],
+  ['Gentle reminder, please wire 80 EUR by Monday', '2026-10-26', '80', 'EUR'],
+  ['תזכורת: תעביר לי 500 שקל עד יום ראשון', '2026-10-25', '500', 'NIS'],
   ['תעביר לי 500 שקל עד יום ראשון', '2026-10-25', '500', 'NIS'],
   ['תשלם 300 ש"ח עד מחר', '2026-10-24', '300', 'NIS'],
   ['אפשר שתעביר 1,500 ₪ ביום חמישי?', '2026-10-29', '1500', 'NIS'],
@@ -29,6 +32,9 @@ const YES = [
 ];
 for (const [text, day, amount, cur] of YES) { const r = A.recognize(text, NOW); check('payment ask: ' + text, r.kind === 'ask' && r.dateIso === day && r.amount === amount && r.currency === cur, r); }
 const NO = [
+  'Reminder: the group is paying 500 NIS on Sunday',
+  'A reminder that rent was paid on Sunday, 500 NIS',
+  'Reminder: payment of 500 NIS went out on Sunday',
   ['Please transfer the money by Sunday', 'no amount'],
   ['Please transfer 500 NIS', 'no day'],
   ['Please transfer 500 NIS or 600 NIS by Sunday', 'two amounts'],

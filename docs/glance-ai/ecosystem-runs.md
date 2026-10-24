@@ -570,3 +570,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** chat card corpus (first task, repeat quiet, other amount offered, offered again after Undo), a real-browser Outlook spec (fails on the previous card, passes now), all corpora.
 - **Open:** live Gate; a repeat worded as "Reminder: …" reaches a different reader than the bill wording and gets a different title, so it is still offered (recognition detail, not a data risk); the hold and task guards are separate code, to be merged if a third kind appears.
 
+## 2026-10-24 Ecosystems builder B (sixty-seventh run) — a "Reminder:" repeat of a payment ask is the same ask
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `PAYMENT_ASK`, off):** the sixty-sixth run left a gap: "Reminder: please transfer 500 NIS to my account by Sunday" was read as not aimed at the person, so the chat card gave a different task, or none, instead of seeing the repeat. `core/chat-payment-ask.js` now takes a leading nudge ("Reminder:", "Gentle reminder,", "Friendly reminder:", «תזכורת:», «שוב:») as part of the same ask. A Reminder line about someone else or a payment already made stays quiet. With the guard the person ends with one Pay task, not two.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` (3 more asks, 3 more quiet lines), the chat card corpus on the real "Reminder:" wording, a real-browser Outlook spec (bill, then "Reminder:" quiet; fails on the previous reader), all corpora.
+- **Open:** live Gate; the reminder, deadline and call-back readers do not take a leading nudge yet.
+

@@ -458,12 +458,12 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
     check('the first payment ask makes one task', w.logRows.length === 1 && !!w.logRows[0].heldKey, w.logRows[0]);
     const shownBefore = w.injected.length;
-    const again = await w.Card.offer(input('Hi again, please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-2' }));
+    const again = await w.Card.offer(input('Reminder: please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-2' }));
     check('the same payment in the same chat is not offered again', !again.shown && again.reason === 'already-on-task-list' && w.injected.length === shownBefore, again);
     const other = await w.Card.offer(input('Please transfer 900 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-3' }));
     check('another amount is a different task and is offered', other.shown, other);
     await w.receipts.find((x) => x.receipt).receipt.onUndo();
-    const afterUndo = await w.Card.offer(input('Hi again, please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-4' }));
+    const afterUndo = await w.Card.offer(input('Reminder: please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-4' }));
     check('after the task was undone the same payment is offered again', afterUndo.shown, afterUndo);
   }
 

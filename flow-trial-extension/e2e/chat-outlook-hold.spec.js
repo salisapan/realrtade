@@ -101,3 +101,18 @@ test('the same reminder repeated in the same chat while its task stands is not o
   await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(1);
 });
+
+test('a payment asked in a chat is one To Do task, and "Reminder: …" repeating it is not offered a second one', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Please transfer 500 NIS to my account by Sunday');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const first = await todo(glance);
+  expect(first).toHaveLength(1);
+  expect(JSON.stringify(first[0])).toMatch(/Pay 500 NIS/);
+  expect(JSON.stringify(first[0])).not.toContain('my account');
+  page = await glance.openMessenger(HTML('Reminder: please transfer 500 NIS to my account by Sunday'));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});
