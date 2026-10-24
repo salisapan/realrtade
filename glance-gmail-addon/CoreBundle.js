@@ -1815,7 +1815,7 @@ const FlowGoogleCloses = (() => {
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
   const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
+  const SAVE_HE = /(?:תשמור|תשמר(?:י|ו)?|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב|את\s+המצורף\s+בוואן\s*דרייב)/i;
   // A refusal of that save is silence. The negation has to govern the verb
   // in the same clause, so a different "no need to" does not hide a real save.
   // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
@@ -6127,6 +6127,21 @@ const FlowIntent = (() => {
       if (/\b(?:postpon(?:e|ed|ing)|cancel(?:led|ed|ing)?|called off|won'?t happen|will not happen|isn'?t happening)\b/i.test(blob)) return 'negative';
       return '';
     }
+    function rescueInboundActionRequired() {
+      if (addressedToSelf(ctx)) return null;
+      if (!/פעולה\s+נדרשת\s+מצד(?:ך)?:/i.test(text)) return null;
+      const subject = ctx && ctx.subject;
+      const decided = selfDecisionTitle(text, facts);
+      let titled = decided || selfAskTitle(text, subject, ctx);
+      if (!decided && !usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+      if (!decided && !usableSelfTitle(titled)) return null;
+      const made = finish(TYPES.REQUEST, 'high', { what: titled });
+      if (!made || !made.type) return null;
+      made.label = titled;
+      made.selfTask = true;
+      made.noReplyDraft = true;
+      return made;
+    }
     function rescueSelfSent(code) {
       if (code === 'calibrated') return null;
       if (!addressedToSelf(ctx)) return null;
@@ -6153,6 +6168,8 @@ const FlowIntent = (() => {
       // a past recap, a negation, a conditional). Any other self-sent
       // note is still the task, including one this path had filed as quiet.
       if (!(extra && extra.noRescue)) {
+        const inboundAction = rescueInboundActionRequired();
+        if (inboundAction) return inboundAction;
         const rescued = rescueSelfSent(code);
         if (rescued) return rescued;
       }
@@ -6401,6 +6418,26 @@ const FlowIntent = (() => {
       }
       if (google && google.close) {
         const g = google.close;
+        // Gmail cannot write OneDrive. An inbound save-to-OneDrive ask is
+        // still a task with a verb-plus-object title, not silence.
+        // Hebrew save-to-OneDrive inbound (#179 item 5b): task card with a verb-plus-object
+        // title on Gmail and Outlook. English OneDrive closes stay on the google-close path.
+        if (g.copyAttachment && g.target === 'onedrive' && !addressedToSelf(ctx) &&
+            /(?:תשמר(?:י|ו)?|תשמור(?:י|ו)?|לשמור|שמור)\s+את\s+המצורף\s+בוואן\s*דרייב/i.test(text)) {
+          const subject = ctx && ctx.subject;
+          let titled = selfAskTitle(text, subject, ctx);
+          if (!usableSelfTitle(titled)) titled = selfRecoverTitle(text, subject, ctx);
+          if (usableSelfTitle(titled)) {
+            const label = String(titled).replace(/\s+בבקשה[.!]?\s*$/i, '').trim();
+            const tracked = finish(TYPES.REQUEST, 'high', { what: label });
+            if (tracked && tracked.type) {
+              tracked.label = label;
+              tracked.selfTask = true;
+              tracked.noReplyDraft = true;
+              return tracked;
+            }
+          }
+        }
         const hold = g.personalClose === 'file-on-hold';
         if (hold && suppressed(TYPES.SCHEDULED_EVENT)) {
           return stayQuiet('calibrated', { googleSilence: true });
@@ -6728,6 +6765,8 @@ const FlowIntent = (() => {
         if (via) return via;
       }
       if (quietHint) return stayQuiet(quietHint);
+      const inboundAction = rescueInboundActionRequired();
+      if (inboundAction) return inboundAction;
       const rescued = rescueSelfSent('intent-null');
       if (rescued) return rescued;
       return { type: null, signals, facts };
@@ -7411,7 +7450,8 @@ const FlowIntent = (() => {
     [/לעדכן|תעדכ(?:ן|נ(?:י|ו)?)(?![\u0590-\u05FF])/, 'לעדכן'],
     [/להשלים|יש להשלים/, 'להשלים'],
     [/לסרוק|תסרק(?:י|ו)?(?![\u0590-\u05FF])/, 'לסרוק'],
-    [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
+    [/לשמור|תשמור(?:י|ו)?(?![\u0590-\u05FF])|תשמר(?:י|ו)?(?![\u0590-\u05FF])|שמור(?![\u0590-\u05FF])/, 'לשמור'],
+    [/לחתום|תחתום(?:י|ו)?(?![\u0590-\u05FF])|חתימה\s+על/, 'לחתום'],
     [/(?<=^|[^\u0590-\u05FF])שלח(?:י|ו)?(?![\u0590-\u05FF])/, 'לשלוח'],
     [/(?<=^|[^\u0590-\u05FF])לקבל(?![\u0590-\u05FF])/, 'לקבל'],
     [/(?<=^|[^\u0590-\u05FF])לצרף(?![\u0590-\u05FF])/, 'לצרף'],
@@ -7525,6 +7565,13 @@ const FlowIntent = (() => {
       const obj = approve[1].replace(/\s+עד(?:\s|$).*$/, '').trim();
       if (obj) return 'לאשר את ' + obj;
     }
+    const signOn = t.match(/חתימה\s+על\s+(.+?)(?:\s*$|[.!?\n])/);
+    if (signOn) {
+      const obj = signOn[1].replace(/\s+/g, ' ').trim();
+      if (obj) return 'לחתום על ' + obj;
+    }
+    const saveOd = t.match(/(?:תשמר(?:י|ו)?|תשמור(?:י|ו)?|לשמור|שמור)\s+את\s+המצורף\s+בוואן\s*דרייב/i);
+    if (saveOd) return 'לשמור את המצורף בוואן דרייב';
     return '';
   }
   // A few slipped letters still name the same verb. This is not a new verb list.
@@ -7698,7 +7745,8 @@ const FlowIntent = (() => {
       /^נקבע\s+/,
       /^קבעתי לנו\s+/,
       /^בהמשך לשיחתנו,?\s*/,
-      /^פעולה נדרשת מצדך:\s*/
+      /^פעולה נדרשת מצדך:\s*/,
+      /^פעולה נדרשת מצד:\s*/
     ];
     for (let guard = 0; guard < 6; guard++) {
       let next = clause;
