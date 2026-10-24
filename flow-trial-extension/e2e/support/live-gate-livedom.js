@@ -56,6 +56,9 @@ function liveGmailPage(opts) {
   if (o.liveMutate === 'quietBody') {
     mutate += `var body=document.querySelector('.a3s');if(body)body.textContent='Thanks, got it.';`;
   }
+  if (o.messageId) {
+    main.html = main.html.replace(/data-legacy-message-id="[^"]+"/g, 'data-legacy-message-id="' + esc(o.messageId) + '"');
+  }
   if (o.liveMutate === 'selfPdfAttach') {
     const pdfName = o.attachName || 'חוזה-ברוש.pdf';
     const url = 'https://mail.google.com/e2e/att/board.pdf';
@@ -66,6 +69,14 @@ function liveGmailPage(opts) {
     } else {
       main.html = main.html + span;
     }
+  }
+  if (o.bodyText) {
+    const bodyJson = JSON.stringify(String(o.bodyText));
+    mutate += 'var body=document.querySelector(".a3s");if(body){body.textContent=' + bodyJson + ';}';
+  }
+  if (o.subjectText) {
+    const subJson = JSON.stringify(String(o.subjectText));
+    mutate += 'document.querySelectorAll("h2.hP").forEach(function(n){n.textContent=' + subJson + ';});';
   }
   if (o.liveMutate === 'signedContract184w') {
     const msgId = o.messageId || '1a15ed1d116b46f7';
