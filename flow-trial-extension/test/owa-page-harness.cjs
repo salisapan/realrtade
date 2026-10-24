@@ -199,12 +199,12 @@ async function runPage(opts) {
           const asked = decodeURIComponent(directMsg[1]);
           const want = String(o.pathRestId || '');
           const rest = String(o.pathRestGraphId || '');
-          const wantRest = want.replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
           if (want && asked === want && (asked.indexOf('+') >= 0 || asked.indexOf('/') >= 0)) {
             return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
           }
-          if (rest && (asked === rest || (wantRest && asked === wantRest))) {
-            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: rest, conversationId: o.listedConversationId || CONV })) };
+          if (rest && asked === rest) {
+            const graphId = String(o.pathRestResponseId || o.messageId || rest);
+            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: graphId, conversationId: o.listedConversationId || CONV })) };
           }
         }
         return { ok: false, status: 404, body: '{}' };

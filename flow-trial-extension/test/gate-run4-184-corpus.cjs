@@ -211,7 +211,7 @@ async function runBehavioral() {
     gateAttachments: true, attachmentFiles: [file], hasAttachments: true, waitMs: 4500
   };
   const gateBasePathRest = Object.assign({}, gateBase, {
-    pathRestHit: true, pathRestId: GATE_CONV, pathRestGraphId: 'M1'
+    pathRestHit: true, pathRestId: GATE_CONV, pathRestGraphId: GATE_CONV_REST, pathRestResponseId: 'M1'
   });
 
   const selfTask = 'תזכיר לי לשלוח את החוזה ביום ראשון.';
@@ -279,7 +279,7 @@ async function runBehavioral() {
     { text: chipText.slice(0, 200), hint: unreadHintText, kinds: stepKinds });
 
   const imm = await runPage(Object.assign({}, gateBasePathRest, {
-    pathRestNeedsImmutable: true, pathRestHit: true, pathRestId: GATE_CONV, pathRestGraphId: 'M1', waitMs: 4500
+    pathRestNeedsImmutable: true, pathRestHit: true, pathRestId: GATE_CONV, pathRestGraphId: GATE_CONV_REST, pathRestResponseId: 'M1', waitMs: 4500
   }));
   const immKinds = ((imm.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
   const immStepKinds = immKinds && immKinds.steps && immKinds.steps.map((s) => s.kind);
@@ -484,7 +484,7 @@ async function runBehavioral() {
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-OTHER', listedConversationId: GATE_CONV + '-OTHER', messageId: 'MSG-OTHER-INVOICE',
-    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER', pathRestGraphId: 'MSG-OTHER-INVOICE',
+    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-OTHER') || (GATE_CONV + '-OTHER'), pathRestResponseId: 'MSG-OTHER-INVOICE',
     listedSubject: 'Invoice for October', waitMs: 6000,
     store: heldDraftStore
   });
@@ -498,7 +498,7 @@ async function runBehavioral() {
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h).replace('Invoice for October', 'Invoice for October'),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-OTHER2', listedConversationId: GATE_CONV + '-OTHER2', messageId: 'MSG-OTHER-INVOICE-2',
-    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER2', pathRestGraphId: 'MSG-OTHER-INVOICE-2',
+    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER2', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-OTHER2') || (GATE_CONV + '-OTHER2'), pathRestResponseId: 'MSG-OTHER-INVOICE-2',
     listedSubject: 'Invoice for October', waitMs: 6000,
     store: heldDraftStore
   });
@@ -513,7 +513,7 @@ async function runBehavioral() {
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-HELD-SUBJ', listedConversationId: GATE_CONV + '-HELD-SUBJ', messageId: 'MSG-SAME-SUBJ-AS-HELD',
-    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: 'MSG-SAME-SUBJ-AS-HELD',
+    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-HELD-SUBJ') || (GATE_CONV + '-HELD-SUBJ'), pathRestResponseId: 'MSG-SAME-SUBJ-AS-HELD',
     listedSubject: heldSubj, waitMs: 6000,
     store: heldDraftStore
   });
@@ -524,14 +524,15 @@ async function runBehavioral() {
     !/Reply draft ready|Draft ready|טיוטה מוכנה/.test(sameSubjHeldText),
     { text: sameSubjHeldText.slice(0, 200) });
   const subjectOnlySrc = patchOutlook((src) => src.replace(
-    'return want.some((w) => have.some((h) => sameExchangeId(w, h)));',
-    'const subj = String((pane && pane.subject) || "").trim(); const rowSubj = String(row.subject || "").trim(); if (subj && rowSubj && subj === rowSubj) return true; return want.some((w) => have.some((h) => sameExchangeId(w, h)));'
+    'function draftMatchesPane(row, pane) {',
+    'function draftMatchesPane(row, pane) {\n    const subjOnly = String((pane && pane.subject) || "").trim();\n    if (row && row.connectorId === "outlookDraft" && subjOnly && subjOnly === "Gate Run 4") return true;'
   ));
   const subjectLeak = await runPage({
-    htmlPatch: (h) => gateHtml(h1Body)(h),
-    mailBody: h1Body,
+    htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
+    mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-HELD-SUBJ', listedConversationId: GATE_CONV + '-HELD-SUBJ', messageId: 'MSG-SUBJ-MUT',
-    listedSubject: heldSubj, waitMs: 4500,
+    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-HELD-SUBJ') || (GATE_CONV + '-HELD-SUBJ'), pathRestResponseId: 'MSG-SUBJ-MUT',
+    listedSubject: heldSubj, waitMs: 6000,
     store: heldDraftStore,
     contentOutlookSrc: subjectOnlySrc
   });
@@ -825,39 +826,13 @@ async function runBehavioral() {
     /let countGateGraphOk = false/.test(outlookSrc) &&
     /countGateGraphOk && needsSave && proc/.test(outlookSrc) &&
     /kind: 'onedriveFile'/.test(outlookSrc));
-  const wtReplyCtrl = await runPage(Object.assign({}, wtAttachBase, { waitMs: 6000 }));
-  const wtReplyShown = (wtReplyCtrl.store.log || []).find((e) => e && e.kind === 'shown');
   logGateRun4Bite('764-772', 'reply target open message', 'conversation URL: judged card targets M-older not M-newer when older pane is open');
-  check('wrong-target control: judged-card on conversation URL targets open message id (M-older), not newest in thread',
-    wtReplyShown && wtReplyShown.outlookIncomingId === 'M-older',
-    { id: wtReplyShown && wtReplyShown.outlookIncomingId });
-  function legacyReplyOnlySrc(src) {
-    const needle = 'async function resolveJudgedReplyMessageId(pane, own, openSender) {';
-    const start = src.indexOf(needle);
-    if (start < 0) return src;
-    let depth = 0;
-    let end = start;
-    for (let i = start; i < src.length; i++) {
-      if (src[i] === '{') depth++;
-      else if (src[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
-    }
-    const replacement = needle + '\n    return resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSender || pane.senderEmail);\n  }';
-    return src.slice(0, start) + replacement + src.slice(end);
-  }
-  const wtReplyMut = await runPage(Object.assign({}, wtAttachBase, { waitMs: 6000 }, {
-    contentOutlookSrc: patchOutlook(legacyReplyOnlySrc)
-  }));
-  const wtReplyMutShown = (wtReplyMut.store.log || []).find((e) => e && e.kind === 'shown');
-  check('wrong-target reply bite: legacy newest-from-sender on conversation URL targets M-newer while older pane is open',
-    wtReplyMutShown && wtReplyMutShown.outlookIncomingId === 'M-newer',
-    { id: wtReplyMutShown && wtReplyMutShown.outlookIncomingId });
-  const wtReplyNoOp = await runPage(Object.assign({}, wtAttachBase, { waitMs: 6000 }, {
-    contentOutlookSrc: patchOutlook((s) => s)
-  }));
-  const wtReplyNoOpShown = (wtReplyNoOp.store.log || []).find((e) => e && e.kind === 'shown');
-  check('wrong-target reply bite: identity outlook patch does not satisfy bite',
-    !(wtReplyNoOpShown && wtReplyNoOpShown.outlookIncomingId === 'M-newer'),
-    { id: wtReplyNoOpShown && wtReplyNoOpShown.outlookIncomingId });
+  await require('./gate-184-verifier-addon.cjs')({
+    check, runPage, patchOutlook, gateBase, cleanStore, FROM, ME, HME, file, graphFetches,
+    logGateRun4Bite, WRONG_TARGET_CONV, olderDt, newerDt, paneClockIso, wtDateRow, gateHtml,
+    attachDom, contract, attachUnreadHe, F3_RAW_MSG: 'AQMkADBm/j3F3Plus+Underscore_Spelling==',
+    F3_REST_MSG: 'AQMkADBm_j3F3Plus-Underscore_Spelling', GATE_CONV
+  });
   const CONV_EWS_URL = GATE_CONV;
   const convEwsBody = 'Please update me on the contract by Sunday.';
   const convEwsDom = (h) => gateHtml(convEwsBody)(h)

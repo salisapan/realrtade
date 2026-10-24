@@ -1045,6 +1045,15 @@
     return rest !== pathKey;
   }
 
+  function needsJudgedReplyTarget(proc) {
+    if (!proc) return false;
+    if (proc.id === 'file-it') return false;
+    const steps = proc.steps || [];
+    if (steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'))) return false;
+    if (proc.id === 'reply-track') return true;
+    return steps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
+  }
+
   // Open-pane identity for Graph rows: same conversation, same sender, and the same
   // internet message id or received minute. Never pick "newest from sender".
   // Message id from the open pane URL (not a conversation id). Graph REST spelling.
@@ -1764,15 +1773,7 @@
     let taskRef = null;
     let taskCreated = null;
     let taskWritten = '';
-    let paneSubjectLive = '';
-    try {
-      const root = openMailRoot();
-      const heading = root && root.querySelector && (root.querySelector('[role="heading"] span') || root.querySelector('[role="heading"]'));
-      paneSubjectLive = heading ? String(heading.textContent || '').trim() : '';
-    } catch (e) { paneSubjectLive = ''; }
-    const cardSubject = String(ctx.subject || '').trim();
-    const subjectEditedInPlace = Boolean(paneSubjectLive && cardSubject && paneSubjectLive !== cardSubject);
-    if (taskStep && !unverified && !subjectEditedInPlace) {
+    if (taskStep && !unverified) {
       const params = (taskStep && taskStep.params) || {};
       const tr = await send({
         type: 'flow:execute-action',
@@ -5144,6 +5145,9 @@
         let msgId = pane.itemId || null;
         let replyId = null;
         if (!msgId && (pane.pathId || pane.conversationId)) {
+          if (decided && decided.attachmentsUnread && !pane.itemId) {
+            dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: null, attachmentsUnread: true });
+          } else {
           const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
           if (replyTarget && replyTarget.unread) {
             dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: replyTarget.from || null });
@@ -5153,6 +5157,11 @@
           }
           replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
           if (!replyId && conversationUrlNeedsRestSpelling(pane)) {
+            if (needsJudgedReplyTarget(decided && decided.process) && !(decided && decided.attachmentsUnread)) {
+              dropStuckCard(pane);
+              await pageReason('page:no-message-id', pane);
+              return;
+            }
             const legacy = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
             if (legacy && legacy.unread) {
               dropStuckCard(pane);
@@ -5164,6 +5173,7 @@
             msgId = replyId;
           }
           dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId, replyId: replyId });
+          }
         }
         if (!msgId && !(decided && decided.attachmentsUnread)) {
           await pageReason('page:no-message-id', pane);
@@ -5181,6 +5191,28 @@
           attachmentsUnread: Boolean(decided.attachmentsUnread)
         };
       } else {
+        if (needsJudgedReplyTarget((decided && decided.process) || (entry && entry.process))
+          && conversationUrlNeedsRestSpelling(pane) && !pane.itemId && (pane.pathId || pane.conversationId)) {
+          const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
+          if (replyTarget && replyTarget.unread) {
+            dropStuckCard(pane);
+            await pageReason(replyTarget.reason, pane);
+            return;
+          }
+          const exactId = replyTarget && replyTarget.id ? replyTarget.id : null;
+          if (!exactId) {
+            if (needsJudgedReplyTarget((decided && decided.process) || (entry && entry.process))) {
+              dropStuckCard(pane);
+              await pageReason('page:no-message-id', pane);
+              return;
+            }
+          } else if (String(exactId) !== String(entry.messageId || '')) {
+            entry = Object.assign({}, entry, {
+              messageId: exactId,
+              outlookIncomingId: exactId
+            });
+          }
+        }
         entry = Object.assign({}, entry, {
           intent: decided.intent,
           process: decided.process,
@@ -5248,12 +5280,12 @@
 
     pane.ownAddresses = ownAll;
     const ctx = buildCtx(entry, pane, decided);
-    if (!ctx || !ctx.messageId) { await pageReason('page:no-process', pane); return; }
+    if (!ctx || (!ctx.messageId && !ctx.attachmentsUnread)) { await pageReason('page:no-process', pane); return; }
     const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
       ? await FlowStorage.getActiveOutlookReceipts() : [];
-    const hasReceipt = receipts.some((r) => r.messageId === ctx.messageId);
+    const hasReceipt = ctx.messageId && receipts.some((r) => r.messageId === ctx.messageId);
     const verifyMount = mountPoint();
-    if (!hasReceipt && typeof FlowStorage.verifyGateFrom === 'function') {
+    if (ctx.messageId && !hasReceipt && typeof FlowStorage.verifyGateFrom === 'function') {
       const gate = FlowStorage.verifyGateFrom(await FlowStorage.get(), ctx.messageId);
       if (gate === 'verifying') {
         if (!mailTokenLive(token)) return;
@@ -5293,7 +5325,7 @@
     }
     // Same still-open rule as the popup: draft-only undo (outlookReopen) is NOT
     // terminal, so Do It must be eligible again after Undo.
-    if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
+    if (ctx.messageId && await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
     if (await activeOutlookDraftForPane(pane)) {
       if (await keepActiveDraftReceipt(pane)) {
         dbg('decision', { shown: true, reason: 'page:draft-receipt', subject: pane.subject });
