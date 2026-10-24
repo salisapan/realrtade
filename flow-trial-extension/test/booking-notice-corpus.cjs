@@ -75,5 +75,7 @@ const js = manifest.content_scripts[0].js;
 check('manifest loads both readers before the judge', ['core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-invitation-notice.js'].every((f) => js.indexOf(f) > -1 && js.indexOf(f) < js.indexOf('core/incoming-judge.js')));
 const ol = fs.readFileSync(path.join(ROOT, 'src', 'content-outlook.js'), 'utf8');
 check('Outlook reads glanceSwitches.BOOKING_NOTICE and passes bookingNoticeOn', /BOOKING_NOTICE === true/.test(ol) && /bookingNoticeOn: bookingNoticeSwitch === true/.test(ol));
+const gm = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
+check('Gmail asks the same readers through the judge helpers behind both switches', /FlowIncomingJudge\.bookingNotice/.test(gm) && /FlowIncomingJudge\.paymentAsk/.test(gm) && /BOOKING_NOTICE === true/.test(gm) && /PAYMENT_ASK === true/.test(gm) && /intent\.plannedProcess/.test(gm));
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll booking-notice checks passed');
 process.exit(failures ? 1 : 0);

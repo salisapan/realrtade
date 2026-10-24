@@ -1,0 +1,77 @@
+// Booking notices, invitations, pickups and payment asks on the real Gmail card, behind the owner's off switches
+// BOOKING_NOTICE and PAYMENT_ASK in glanceSwitches, in the unpacked extension against the local Google lane server. Switch off: no
+// card. On: the existing Hold It card (one event, no guest) or the existing task card (one Google Task due that day),
+// read back by id; Undo deletes. Nothing is paid or sent.
+const { test, expect } = require('./support/harness');
+const { startGoogleLaneServer } = require('./support/google-lane-server');
+const S = require('./support/sentences');
+
+const APPT = 'Hi, your appointment is confirmed for tomorrow at 14:00. See you then.';
+const PICKUP = 'Hi, your order is ready for pickup until tomorrow.';
+const PAY = 'Hi Sali, please transfer 500 NIS to my account by tomorrow. Thanks!';
+const MAIN = 'div[role="main"]';
+let server;
+let n = 0;
+
+test.beforeAll(async () => { server = await startGoogleLaneServer(); });
+test.afterAll(async () => { if (server) await server.close(); });
+test.beforeEach(async ({ glance }) => {
+  server.reset();
+  server.setAccount('me@x.com');
+  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
+});
+
+async function open(glance, switches, body) {
+  await glance.seedGmail(switches ? { glanceSwitches: switches } : {});
+  n += 1;
+  return glance.openGmail({ messageId: 'm-bk-' + n, threadId: 't-bk-' + n, subject: 'Your booking', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: body });
+}
+const tasks = () => Object.values(server.tasks());
+const events = () => Object.values(server.events());
+
+test('switches off: a pickup and a payment request show no card', async ({ glance }) => {
+  for (const body of [PICKUP, PAY]) {
+    const page = await open(glance, null, body);
+    await page.waitForTimeout(2500);
+    await expect(page.locator(MAIN + ' button.flow-chip')).toHaveCount(0);
+  }
+  expect(events()).toHaveLength(0);
+  expect(tasks()).toHaveLength(0);
+});
+
+test('BOOKING_NOTICE on: a confirmed appointment is one calendar event, no guest, read back, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, APPT);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  expect(events()[0].summary).toMatch(/^Hold /);
+  expect(events()[0].attendees || []).toEqual([]);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});
+
+test('BOOKING_NOTICE on: a pickup with a last day is one Google Task, read back, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, PICKUP);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].title).toMatch(/Pick up the order/);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => tasks().length).toBe(0);
+});
+
+test('PAYMENT_ASK on: a payment request is one Google Task Pay 500 NIS, nothing is paid, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { PAYMENT_ASK: true }, PAY);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].title).toMatch(/Pay 500 NIS/);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => tasks().length).toBe(0);
+});

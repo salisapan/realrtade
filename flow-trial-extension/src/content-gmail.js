@@ -607,6 +607,9 @@ function glanceUiCopy(kind) {
       intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, ctx) : null;
     }
     if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
+    if (intent.plannedProcess && intent.plannedProcess.steps && intent.plannedProcess.steps.length) {
+      return { show: true, intent: intent, process: intent.plannedProcess };
+    }
     if (intent.systemNotice && intent.notice && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeProcess === 'function') {
       return { show: true, intent: intent, process: FlowIncomingJudge.noticeProcess(intent.notice, ctx.threadUrl) };
     }
@@ -1553,6 +1556,17 @@ function glanceUiCopy(kind) {
     if (noticeOn && typeof FlowSystemNotice !== 'undefined' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeIntent === 'function' && base && base.inbound !== false) {
       const notice = FlowSystemNotice.detect({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now });
       if (notice) return FlowIncomingJudge.noticeIntent(FlowIntent, notice);
+    }
+    // A booking, an invitation or a pickup told to the person, and a payment asked of them (core/chat-appointment-notice.js,
+    // chat-invitation-notice.js, chat-pickup-notice.js, chat-payment-ask.js): the same readers Outlook uses through the shared
+    // judge. Each is behind its own switch, glanceSwitches.BOOKING_NOTICE and PAYMENT_ASK, default off. Nothing is paid or sent.
+    if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.bookingNotice === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true) {
+      let bag = null;
+      try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { bag = null; }
+      const sw = (bag && bag.glanceSwitches) || {};
+      const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null };
+      const hit = (sw.PAYMENT_ASK === true ? FlowIncomingJudge.paymentAsk(judgeIn, prepared) : null) || (sw.BOOKING_NOTICE === true ? FlowIncomingJudge.bookingNotice(judgeIn, prepared) : null);
+      if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     let intent = FlowIntent.classify(prepared, ctx);
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {

@@ -9513,7 +9513,7 @@ const FlowIncomingJudge = (() => {
     const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
     const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
     return {
-      intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
+      intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
       process: { id: 'log-it', name: 'Log It', closingLine: pay.lang === 'he' ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: pay.lang === 'he' ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, paymentAsk: true,
         steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pay.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
     };
@@ -9530,8 +9530,8 @@ const FlowIncomingJudge = (() => {
       const he = appt.lang === 'he';
       const title = ((he ? 'תור' : 'Appointment') + tail).slice(0, 120);
       return {
-        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
-        process: { id: 'hold-it', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
           steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
@@ -9541,8 +9541,8 @@ const FlowIncomingJudge = (() => {
       const he = inv.lang === 'he';
       const title = ((he ? 'הזמנה' : 'Invitation') + tail).slice(0, 120);
       return {
-        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'invitation', personalClose: 'booking-notice', entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
-        process: { id: 'hold-it', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'invitation', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
           steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
@@ -9551,7 +9551,7 @@ const FlowIncomingJudge = (() => {
       const he = pick.lang === 'he';
       const title = ((he ? 'לאסוף הזמנה' : 'Pick up the order') + tail).slice(0, 120);
       return {
-        intent: { type: 'request', label: title, confidence: 0.9, bookingNotice: 'pickup', personalClose: 'booking-notice', entities: { what: title, deadline: pick.dateIso }, facts: { date: { iso: pick.dateIso } } },
+        intent: { type: 'request', label: title, confidence: 0.9, bookingNotice: 'pickup', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pick.dateIso }, facts: { date: { iso: pick.dateIso } } },
         process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
           steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pick.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
@@ -9648,7 +9648,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
   }
 
-  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
+  return { MIN_TEXT, bookingNotice, paymentAsk, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

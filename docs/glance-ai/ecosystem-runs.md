@@ -440,3 +440,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `test/payment-ask-mail-corpus.cjs` (4 asks, Gmail step, switch off, own mail, not inbound, 10 quiet lines, wiring), `e2e/outlook-booking-notice.spec.js` now 5 specs in a real browser (payment off then on, Undo), chat payment and silence corpora, all corpora, add-on bundle rebuilt.
 - **Open:** live Gate; Gmail not wired; the switch is separate from `BOOKING_NOTICE` on purpose (paying is a different trust decision from a calendar hold).
 
+## 2026-10-24 Ecosystems builder B (forty-ninth run) — Gmail gets booking notices and payment asks
+
+- **Capability shipped (switches `BOOKING_NOTICE`, `PAYMENT_ASK`, both off):** the Gmail card now does what Outlook learned in runs 46 to 48: a mail that confirms an appointment, invites to an event, says an order is ready for pickup until a day, or asks the person to pay an amount by a day gets the existing Hold It or task card (event, or Google Task "Pick up the order · sender" / "Pay 500 NIS · sender"), read back by id, Undo deletes, nobody invited, nothing paid. Same readers, same judge helpers (`FlowIncomingJudge.bookingNotice` / `paymentAsk`, exported), so the three surfaces agree.
+- **Found and fixed on the way:** the judge's intents carried no `signals` and the Gmail scan threw on `signals.score` (the first run of the browser spec showed it); they now carry a fixed score. Gmail titles its holds "Hold Sun 14:00" by its own convention, so the spec checks that, not "Appointment".
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `e2e/gmail-booking-notice.spec.js` (4 specs: off shows no card for a pickup or a payment ask, hold with Undo, pickup task with Undo, payment task with Undo) in a real browser against the local Google server, the Outlook spec (5/5), `test/booking-notice-corpus.cjs` extended with Gmail wiring, all corpora, add-on bundle rebuilt.
+- **Open:** live Gate; Gmail already showed a "Schedule It" card for an appointment confirmation with a clock (existing behaviour), so with `BOOKING_NOTICE` on the notice takes that card over; the owner can compare in the live Gate.
+
