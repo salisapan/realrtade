@@ -563,3 +563,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/held-hold-corpus.cjs` (7 more cases), an Outlook and a Gmail browser spec (both fail on the previous code and pass now), all corpora.
 - **Open:** live Gate; the chat card has its own guard for holds only, not yet for chat tasks.
 
+## 2026-10-24 Ecosystems builder B (sixty-sixth run) — a repeated chat ask no longer adds a second task
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** in WhatsApp, Messenger and Instagram a bill or a reminder is often repeated ("please transfer 500 NIS by Sunday", then "Hi again, please transfer…"). The chat card offered a second Do It and the person ended with two identical tasks. Now a task this card wrote in this chat for the same due day and title, not undone since, is not offered again (`already-on-task-list`); another amount or day is; after Undo it is. It mirrors the hold guard of the sixty-third run.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** chat card corpus (first task, repeat quiet, other amount offered, offered again after Undo), a real-browser Outlook spec (fails on the previous card, passes now), all corpora.
+- **Open:** live Gate; a repeat worded as "Reminder: …" reaches a different reader than the bill wording and gets a different title, so it is still offered (recognition detail, not a data risk); the hold and task guards are separate code, to be merged if a third kind appears.
+
