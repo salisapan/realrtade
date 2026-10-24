@@ -62,3 +62,30 @@ test('TEAMS_MEETING off: the same Teams call proposal is one plain hold, no link
   expect(list).toHaveLength(1);
   expect(list[0].isOnlineMeeting).toBeFalsy();
 });
+
+const todo = (glance) => glance.evaluateWorker(() => Object.values(globalThis.__glanceE2e.todoTasks));
+
+test('a task asked in a chat is one Microsoft To Do task naming the chat, read back, Handled, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'Can you review the draft by Wednesday?');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toContain('Open in Messenger');
+  expect(JSON.stringify(list[0])).not.toContain('review the draft by Wednesday?');
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
+
+test('a reminder asked in a chat is one Microsoft To Do task titled with the thing, Handled, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, "Don't forget to bring the signed form on Monday");
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toMatch(/signed form/i);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});

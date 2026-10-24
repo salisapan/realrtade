@@ -490,3 +490,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** new `e2e/chat-outlook-hold.spec.js` (3 specs: hold with Undo, Teams link on, plain hold off), the chat card corpus gained the `eventId`-only case (and the case without read-back that must stay unhandled), all corpora, chat/Outlook/Gmail browser specs.
 - **Open:** live Gate. An Outlook task from a chat (`outlookTask`) uses To Do's ref and was already covered by its corpus; a browser spec for it is not written.
 
+## 2026-10-24 Ecosystems builder B (fifty-sixth run) — the Microsoft To Do task from a chat, proved; the message text stays out of it
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** for a person who has only Microsoft connected, a task or a reminder asked in WhatsApp, Messenger or Instagram is one To Do task naming the chat, read back by id, Handled, with Undo that deletes it; now proved in a real browser (the open item from run 55). The spec found a privacy mismatch: the Microsoft write copied the whole chat message into the task body as `Quote: "…"` (the card sent `text`, `entities` and `params.what`), while the Google task note holds only the sender and the chat address, as the spec and the coverage page say. Fixed: nothing from the words of a chat message travels into a To Do task (the worker still gets the call words for a Teams link, only for a hold).
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** `e2e/chat-outlook-hold.spec.js` now 5 specs (hold with Undo, Teams link on, plain hold, To Do task, To Do reminder; the task spec asserts the message is not in the body), the chat card corpus asserts the payload carries no message words, all corpora, chat/Outlook/Gmail browser specs.
+- **Open:** live Gate. Own-promise and note-to-self cards on Microsoft are covered by the same write but have no browser spec of their own.
+

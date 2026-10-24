@@ -190,6 +190,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     await it.handlers.onDoIt(it.host, {}, it.ctx);
     const exec = w.calls.find((c) => c.type === 'flow:execute-action');
     check('Microsoft: Do It writes through flow:execute-action outlookTask', !!exec && exec.payload.connectorId === 'outlookTask' && exec.payload.threadLabel === 'Open in Instagram' && w.logRows.length === 1, exec);
+    check('Microsoft: the words of the chat message never travel into the task body (no text, no entities, no what)', !!exec && exec.payload.text === '' && exec.payload.bodyText === '' && exec.payload.entities === null && exec.payload.params.what === null && JSON.stringify(exec.payload).indexOf(ASKS[1][0]) < 0, exec && exec.payload);
     await w.receipts.find((x) => x.receipt).receipt.onUndo();
     check('Microsoft: Undo goes through flow:undo-action', w.calls.some((c) => c.type === 'flow:undo-action' && c.connectorId === 'outlookTask'));
   }

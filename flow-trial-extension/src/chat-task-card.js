@@ -214,14 +214,16 @@ const FlowChatTaskCard = (() => {
         label: params.title || (ctx.intent && ctx.intent.label) || 'Task',
         params: t.connectorId === 'outlookCalendar'
           ? { meeting: true, title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', dateIso: params.dateIso, hour: params.hour, minute: params.minute, callText: callTextOf(ctx) }
-          : { dateIso: params.dateIso || null, amount: params.amount || null, what: params.what || null, fileTerm: params.fileTerm || null },
+          : { dateIso: params.dateIso || null, amount: params.amount || null, what: null, fileTerm: params.fileTerm || null },
         facts: (ctx.intent && ctx.intent.facts) || null,
-        entities: (ctx.intent && ctx.intent.entities) || (params.what ? { what: params.what } : null),
+        entities: null,
         senderName: (ctx.sender && ctx.sender.name) || null,
         senderEmail: null,
         subject: '',
-        text: ctx.bodyText || '',
-        bodyText: ctx.bodyText || ''
+        // The words of the chat message never go into the task body: the note names the chat, as the Google task does. The
+        // worker reads callText (for a Teams link or a series), nothing else from the words.
+        text: '',
+        bodyText: ''
       }
     });
     const ref = r && r.ref;
