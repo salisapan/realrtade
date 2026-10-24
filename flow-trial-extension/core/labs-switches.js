@@ -10,16 +10,16 @@ const FlowLabsSwitches = (() => {
     { id: 'SYSTEM_NOTICE', who: 'התראת מערכת עם מועד', note: '"הפרויקט ייעצר", "הדומיין יפוג" הופכים למשימה' },
     { id: 'CHAT_TASK_CARD', who: 'צ\'אט: כרטיס עשה', note: 'וואטסאפ, מסנג\'ר ואינסטגרם: בקשה בצ\'אט מקבלת כרטיס' },
     { id: 'CHAT_PROMISE_CARD', who: 'צ\'אט: הבטחה אליך', note: 'הבטחה שקיבלת בצ\'אט נרשמת כ"ממתין ל..."' },
-    { id: 'MEET_LINK', who: 'קישור Meet לשיחה', note: 'שיחה שהוצעה מקבלת אירוע ביומן עם קישור Meet' },
-    { id: 'EVENT_CALL_LINK', who: 'קישור Meet לאירוע קיים', note: 'מוסיף קישור לאירוע שאתה מארגן' },
+    { id: 'MEET_LINK', who: 'קישור לשיחת וידאו של Google', note: 'שיחה שהוצעה מקבלת אירוע ביומן עם קישור לשיחת וידאו של Google' },
+    { id: 'EVENT_CALL_LINK', who: 'קישור לשיחת וידאו באירוע קיים', note: 'מוסיף קישור לאירוע שאתה מארגן' },
     { id: 'TEAMS_MEETING', who: 'קישור Teams לשיחה', note: 'שיחה שהוצעה ב-Outlook מקבלת אירוע עם קישור Teams' },
     { id: 'OUTLOOK_EVENT_CALL_LINK', who: 'קישור Teams לאירוע קיים', note: 'מוסיף קישור לאירוע קיים ב-Outlook' },
     { id: 'RECURRING_HOLD', who: 'פגישה חוזרת', note: 'חזרה שנאמרה במפורש הופכת לסדרה ביומן' },
     { id: 'RECURRING_REMINDER', who: 'תזכורת חוזרת', note: 'התחייבות חוזרת הופכת לתזכורת חוזרת' },
-    { id: 'RECURRING_TODO', who: 'משימה חוזרת', note: 'משימה ב-Microsoft To Do שחוזרת' },
-    { id: 'WORKSPACE_FILE', who: 'מסמך, גיליון או מצגת ב-Google', note: 'קובץ ריק בשם שביקשו, ב-Drive' },
-    { id: 'ONEDRIVE_NEW_FILE', who: 'קובץ Word או Excel', note: 'קובץ ריק בשם שביקשו, ב-OneDrive' },
-    { id: 'PLANNER_TASK', who: 'משימה ב-Planner', note: 'משימה בתוכנית ששמה בא במייל' }
+    { id: 'RECURRING_TODO', who: 'משימה חוזרת', note: 'משימה של Microsoft שחוזרת על עצמה' },
+    { id: 'WORKSPACE_FILE', who: 'מסמך, גיליון או מצגת של Google', note: 'קובץ ריק בשם שביקשו, ב-Drive' },
+    { id: 'ONEDRIVE_NEW_FILE', who: 'מסמך או גיליון של Microsoft', note: 'קובץ ריק בשם שביקשו, ב-OneDrive' },
+    { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' }
   ];
   const IDS = LIST.map((r) => r.id);
   function isOn(bag, id) { return Boolean(bag && bag[id] === true); }
