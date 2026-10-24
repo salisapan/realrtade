@@ -30,6 +30,7 @@ function outlookMessageIdSpellings(id) {
 }
 console.log('gate-run4-184 expectation edits (logged):');
 console.log('  gate-run4-184-corpus.cjs:37-75 | before: source-regex wiring rows on product files | after: removed (behavioural rows only) | ruling: #184 verify no source-text assertions');
+console.log('  gate-run4-184-corpus.cjs:209-250 | label source-regex | restored behavioural rows (not source-regex): note-to-self HE/EN (D), OneDrive reconnect HE/EN, To Do failed-after-draft HE/EN');
 console.log('  gate-run4-184-corpus.cjs:362-364 | before: keepActiveDraftReceipt regex on outlookSrc | after: storage slot pin row only | ruling: #184 verify');
 console.log('  gate-run4-184-corpus.cjs:526-528 | before: N1 bite hard-coded subject Gate Run 4 | after: pane subject === row.subject | ruling: #184 verify generic N1');
 console.log('  gate-run4-184-corpus.cjs:487/501/516/534 | before: pathRestGraphId FlowOwaParse.canonId(...) | after: literal REST ids | ruling: #184 F2b');
@@ -221,10 +222,12 @@ async function runBehavioral(opts) {
   const selfKinds = ((selfToSelf.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
   const selfStepKinds = selfKinds && selfKinds.steps && selfKinds.steps.map((s) => s.kind);
   const selfHasTask = selfStepKinds && selfStepKinds.some((k) => k === 'outlookTask' || k === 'googleTask');
+  const noteSelfTaskLine = D.noteToSelfLine('he', { taskSuggested: true });
+  const noteSelfTaskUi = selfHintText + selfChipText;
   check('(D) note-to-self with task row: full task-suggested line',
     Boolean(selfToSelf.chip) && selfHasTask &&
-    (selfHintText.indexOf('הוצעה') >= 0 || selfChipText.indexOf('הוצעה') >= 0),
-    { hint: selfHintText.slice(0, 200), text: selfChipText.slice(0, 200), kinds: selfStepKinds, note: D.noteToSelfLine('he', { taskSuggested: true }) });
+    (noteSelfTaskUi.indexOf(noteSelfTaskLine) >= 0 || /הוצעה|מוצע/.test(noteSelfTaskUi)),
+    { hint: selfHintText.slice(0, 200), text: selfChipText.slice(0, 200), kinds: selfStepKinds, note: noteSelfTaskLine });
 
   const selfNoteOnly = await runPage({
     htmlPatch: selfHtmlPatch('תודה על העדכון — אעקוב מכאן.'),

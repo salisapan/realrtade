@@ -100,6 +100,13 @@ async function runPage(opts) {
     const u = String(o.uiLang).toLowerCase();
     store.glanceUiLanguage = (u === 'he' || u.startsWith('he-') || u === 'iw' || u.startsWith('iw-')) ? 'he' : 'en';
   }
+  const harnessUiLang = store.glanceUiLanguage || (o.uiLang ? String(o.uiLang) : '');
+  if (harnessUiLang) {
+    try {
+      const hl = String(harnessUiLang).toLowerCase();
+      w.document.documentElement.lang = (hl === 'he' || hl.startsWith('he-') || hl === 'iw') ? 'he' : 'en';
+    } catch (e) { /* jsdom */ }
+  }
   const sent = [];
   const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, attachmentsUnread: o.attachmentsUnread === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
@@ -336,7 +343,15 @@ async function runPage(opts) {
     await new Promise((r) => setTimeout(r, 150));
   }
   clearInterval(ad);
-  if (typeof o.beforeClose === 'function') await o.beforeClose({ window: w, document: w.document, store, ctx, sent });
+  const replyTargetUnsureEl = w.document.querySelector('.flow-why-not[data-glance-why="page:reply-target-unsure"]');
+  let replyTargetUnsureLine = replyTargetUnsureEl ? String(replyTargetUnsureEl.textContent || '').trim() : '';
+  if (typeof o.beforeClose === 'function') {
+    await o.beforeClose({
+      window: w, document: w.document, store, ctx, sent,
+      replyTargetUnsureLine,
+      setReplyTargetUnsureLine: (t) => { replyTargetUnsureLine = String(t || '').trim(); }
+    });
+  }
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
   let chip = w.document.querySelector('.flow-chip-host');
@@ -346,7 +361,7 @@ async function runPage(opts) {
     if (chip && (chip.querySelector('.flow-chip') || chip.querySelector('.flow-chip-undo'))) break;
     await new Promise((r) => setTimeout(r, 50));
   }
-  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip, chipMessage, doc: w.document };
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip, chipMessage, doc: w.document, replyTargetUnsureLine };
   w.close();
   return res;
 }

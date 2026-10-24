@@ -1401,15 +1401,18 @@
     return null;
   }
 
+  function conversationPanePathKey(pane) {
+    const pathKey = String((pane && (pane.pathId || pane.rawUrlId || pane.conversationId)) || '').trim();
+    return pathKey && isConversationId(pathKey) ? pathKey : '';
+  }
+
   async function resolveJudgedReplyMessageId(pane, own, openSender) {
-    if (pane) {
-      const exactPath = paneUrlOnlyMessageTarget(pane) || conversationUrlNeedsRestSpelling(pane);
-      if (exactPath) {
-        const exact = await resolveExactOpenPaneMessageId(pane, own, openSender);
-        if (exact && exact.id) return exact;
-        if (conversationUrlNeedsRestSpelling(pane)) return null;
-      }
+    if (pane && paneUrlOnlyMessageTarget(pane)) {
+      const exact = await resolveExactOpenPaneMessageId(pane, own, openSender);
+      if (exact && exact.id) return exact;
+      if (conversationPanePathKey(pane)) return null;
     }
+    if (!pane) return null;
     return resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSender || pane.senderEmail);
   }
 
@@ -1426,6 +1429,10 @@
     if (pane && (pane.itemId || pane.pathId || pane.conversationId)) {
       found = await resolveJudgedReplyMessageId(pane, own, openSender);
     } else if (pathId || convId) {
+      const bareKey = String(pathId || convId || '').trim();
+      const draftStep = ctx && ctx.process && Array.isArray(ctx.process.steps) &&
+        ctx.process.steps.some((s) => s && s.kind === 'outlookDraft');
+      if (draftStep && bareKey && isConversationId(bareKey)) return null;
       found = await resolveOutlookMessageId(pathId || convId, convId, own, openSender);
     } else {
       return null;
@@ -1633,7 +1640,16 @@
       resolvedId = null;
     }
     if (!resolvedId) {
-      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message'); });
+      const pane = ctx && ctx.pane;
+      const convKey = String((ctx && (ctx.pathId || ctx.conversationId)) || '').trim();
+      const convPane = Boolean(pane && conversationPanePathKey(pane)) ||
+        (convKey && isConversationId(convKey));
+      if (convPane && pane) {
+        paintIfCurrent(token, function () { paintRemove(host); });
+        await pageReason('page:reply-target-unsure', pane);
+      } else {
+        paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message'); });
+      }
       return;
     }
     const fromList = Array.isArray(liveSteps);
@@ -2106,7 +2122,7 @@
   let paintDepth = 0;
   function whyNotText(reason) {
     if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function') {
-      return FlowDisplay.whyNotShownLine(reason);
+      return FlowDisplay.whyNotShownLine(reason, pageUiLang());
     }
     return 'לא זוהתה בקשה';
   }
@@ -3398,6 +3414,7 @@
     const ctx = {
       app: 'outlook',
       doLabel: 'Do It',
+      pane: pane || null,
       messageId: messageId || null,
       outlookIncomingId: messageId || null,
       pathId: (pane && (pane.pathId || pane.conversationId || pane.itemId)) || null,
@@ -5124,7 +5141,10 @@
           if (decided && decided.attachmentsUnread && !pane.itemId) {
             dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: null, attachmentsUnread: true });
           } else {
-            const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
+            const judged = needsJudgedReplyTarget(decided && decided.process);
+            const replyTarget = judged
+              ? await resolveJudgedReplyMessageId(pane, own, pane.senderEmail)
+              : await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail);
             if (replyTarget && replyTarget.unread) {
               dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: replyTarget.from || null });
               dropStuckCard(pane);
@@ -5132,26 +5152,16 @@
               return;
             }
             replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
-            if (!replyId && conversationUrlNeedsRestSpelling(pane)) {
-              if (needsJudgedReplyTarget(decided && decided.process)) {
-                dropStuckCard(pane);
-                await pageReason('page:reply-target-unsure', pane);
-                return;
-              }
-              const legacy = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
-              if (legacy && legacy.unread) {
-                dropStuckCard(pane);
-                await pageReason(legacy.reason, pane);
-                return;
-              }
-              msgId = legacy && legacy.id ? legacy.id : null;
-            } else {
-              msgId = replyId;
+            if (!replyId && conversationPanePathKey(pane) && needsJudgedReplyTarget(decided && decided.process)) {
+              dropStuckCard(pane);
+              await pageReason('page:reply-target-unsure', pane);
+              return;
             }
+            msgId = replyId;
             dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId, replyId: replyId, attachmentsUnread: Boolean(decided && decided.attachmentsUnread) });
           }
         }
-        if (!msgId && !(decided && decided.attachmentsUnread)) {
+        if (!msgId && !(decided && decided.attachmentsUnread) && needsJudgedReplyTarget(decided && decided.process)) {
           dropStuckCard(pane);
           await pageReason('page:reply-target-unsure', pane);
           return;
@@ -5169,7 +5179,7 @@
         };
       } else {
         if (needsJudgedReplyTarget((decided && decided.process) || (entry && entry.process))
-          && conversationUrlNeedsRestSpelling(pane) && !pane.itemId && (pane.pathId || pane.conversationId)) {
+          && conversationPanePathKey(pane) && !pane.itemId) {
           const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
           if (replyTarget && replyTarget.unread) {
             dropStuckCard(pane);
@@ -5178,12 +5188,11 @@
           }
           const exactId = replyTarget && replyTarget.id ? replyTarget.id : null;
           if (!exactId) {
-            if (needsJudgedReplyTarget((decided && decided.process) || (entry && entry.process))) {
-              dropStuckCard(pane);
-              await pageReason('page:reply-target-unsure', pane);
-              return;
-            }
-          } else if (String(exactId) !== String(entry.messageId || '')) {
+            dropStuckCard(pane);
+            await pageReason('page:reply-target-unsure', pane);
+            return;
+          }
+          if (String(exactId) !== String(entry.messageId || '')) {
             entry = Object.assign({}, entry, {
               messageId: exactId,
               outlookIncomingId: exactId
@@ -5612,10 +5621,11 @@
     try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
     const own = await ownWithAliases(ownAddressesOf(bag));
     if (!msgId && (pane.pathId || pane.conversationId)) {
-      const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
-      msgId = found && found.id;
+      const found = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
+      if (found && found.unread) return false;
+      msgId = found && found.id ? found.id : null;
     }
-    if (!msgId) msgId = pane.conversationId || pane.pathId || '';
+    if (!msgId) return false;
     const entry = {
       messageId: msgId,
       outlookIncomingId: msgId,
