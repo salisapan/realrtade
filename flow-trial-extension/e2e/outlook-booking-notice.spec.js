@@ -81,3 +81,12 @@ test('PAYMENT_ASK off: a payment request shows no card; on: one To Do task Pay 5
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await todo(glance)).length).toBe(0);
 });
+
+test('BOOKING_NOTICE on: a long, ordinary mail (greeting, directions, signature) still finds its one booking line', async ({ glance }) => {
+  const long = 'Hi Sali,\n\nHope you are well. Quick note from the studio: your appointment is confirmed for tomorrow at 14:00 at our Tel Aviv branch, please arrive ten minutes early and bring your ID card with you. If anything changes we will let you know.\n\nBest regards,\nStudio Nofar\nwww.nofar.example | 03-1234567 | Rothschild 1, Tel Aviv';
+  const page = await open(glance, { BOOKING_NOTICE: true }, long, true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+});

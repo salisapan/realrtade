@@ -69,6 +69,23 @@ const QUIET = [
 ];
 for (const text of QUIET) check('no booking card for: ' + text.slice(0, 50), !(judge(text).intent || {}).bookingNotice, judge(text).reason);
 
+// A real mail is long: greeting, the line that matters, directions, signature. The readers see sentences, not the whole body.
+const LONG = [
+  ['Hi Sali,\n\nHope you are well. Quick note from the studio: your appointment is confirmed for Sunday at 10:00 at our Tel Aviv branch, please arrive ten minutes early and bring your ID card with you. If anything changes we will let you know.\n\nBest regards,\nStudio Nofar\nwww.nofar.example | 03-1234567 | Rothschild 1, Tel Aviv', 'calendar', '2026-10-25'],
+  ['שלום סלי,\n\nמקווים שהכול טוב. רצינו לעדכן שהתור שלך נקבע ליום ראשון בשעה 10:00 בסניף תל אביב, נא להגיע עשר דקות לפני ולהביא תעודת זהות. אם יהיה שינוי נעדכן אותך.\n\nבברכה,\nסטודיו נופר\nwww.nofar.example | 03-1234567', 'calendar', '2026-10-25'],
+  ['Dear customer,\n\nThank you for shopping with us. Your order is ready for pickup until Friday at our store on Dizengoff 10, open Sunday to Thursday 9:00-18:00. Please bring the order number from your confirmation message.\n\nKind regards,\nThe Shop Team\nUnsubscribe anytime', 'googleTask', '2026-10-30']
+];
+for (const [text, kind, day] of LONG) {
+  const r = judge(text);
+  const st = r.show && r.process.steps[0];
+  check('a long mail still finds its one line: ' + text.slice(0, 40).replace(/\n/g, ' '), r.show && r.process.bookingNotice === true && st.params.dateIso === day && (kind === 'calendar' ? st.kind === 'calendar' : st.kind === 'outlookTask'), r);
+}
+const LONG_QUIET = [
+  'Hi,\n\nWe are sorry to tell you that your appointment has been cancelled. It was on Sunday at 10:00. You can book a new one on our site.\n\nRegards,\nStudio',
+  'Hello,\n\nHere is our weekly newsletter. This Sunday at 10:00 we open the new studio, join our webinar on Thursday at 19:00, register now. Thank you for reading and have a lovely week.\n\nUnsubscribe'
+];
+for (const text of LONG_QUIET) check('a long mail with no booking stays quiet: ' + text.slice(0, 40).replace(/\n/g, ' '), !(judge(text).intent || {}).bookingNotice, judge(text).reason);
+
 // Wiring.
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 const js = manifest.content_scripts[0].js;

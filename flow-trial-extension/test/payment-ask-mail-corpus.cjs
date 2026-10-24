@@ -41,6 +41,9 @@ const QUIET = [
   'העברתי לך 500 שקל אתמול', 'תעביר לי את הכסף עד יום ראשון'
 ];
 for (const text of QUIET) check('no payment card for: ' + text.slice(0, 50), !(judge(text).intent || {}).paymentAsk, judge(text).reason);
+const LONGPAY = 'Hi Sali,\n\nThanks again for the great work last month. Just a small admin note: please transfer 500 NIS to my account by Sunday so I can close the books, the details are the same as on the previous invoice.\n\nThank you!\nDana Levi\nFreelance designer | 054-1234567 | dana@example.com';
+{ const r = judge(LONGPAY); check('a long mail still finds its one payment line', r.show && r.process.paymentAsk === true && r.process.steps[0].params.dateIso === '2026-10-25' && /^Pay 500 NIS/.test(r.process.steps[0].params.title), r); }
+check('a long mail that only mentions money stays quiet', !(judge('Hi,\n\nThe workshop costs 500 NIS and takes place on Sunday. Seats are limited so please register early.\n\nBest,\nDana').intent || {}).paymentAsk);
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 const js = manifest.content_scripts[0].js;
 check('manifest loads the payment reader before the judge', js.indexOf('core/chat-payment-ask.js') > -1 && js.indexOf('core/chat-payment-ask.js') < js.indexOf('core/incoming-judge.js'));

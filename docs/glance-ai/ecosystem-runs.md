@@ -448,3 +448,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `e2e/gmail-booking-notice.spec.js` (4 specs: off shows no card for a pickup or a payment ask, hold with Undo, pickup task with Undo, payment task with Undo) in a real browser against the local Google server, the Outlook spec (5/5), `test/booking-notice-corpus.cjs` extended with Gmail wiring, all corpora, add-on bundle rebuilt.
 - **Open:** live Gate; Gmail already showed a "Schedule It" card for an appointment confirmation with a clock (existing behaviour), so with `BOOKING_NOTICE` on the notice takes that card over; the owner can compare in the live Gate.
 
+## 2026-10-24 Ecosystems builder B (fiftieth run) — booking and payment readers now work on real, long mail
+
+- **Capability shipped (switches `BOOKING_NOTICE`, `PAYMENT_ASK`, off):** the readers behind runs 46 to 49 were written for one-line messages and refused any text over 200 to 280 characters, so a real mail (greeting, the line that matters, directions, signature; the probe was 321 characters) was silently missed on Outlook and Gmail. The judge now asks each reader about one sentence, two neighbouring sentences and the lead clause before a comma or "so", and the first hit wins. A booking confirmation, an invitation, a pickup notice or a payment ask in an ordinary mail now gets the card; a cancellation, a newsletter that mentions a webinar, and a mail that only mentions money stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/booking-notice-corpus.cjs` (3 long mails EN+HE that must hit, 2 long mails that must stay quiet), `test/payment-ask-mail-corpus.cjs` (1 long ask, 1 long mention), `e2e/outlook-booking-notice.spec.js` (long mail in a real browser, 6 specs), the Gmail spec (4), all corpora, add-on bundle rebuilt.
+- **Open:** live Gate. The windows are applied only to these mail readers; the chat card still reads whole messages, which are short by nature.
+

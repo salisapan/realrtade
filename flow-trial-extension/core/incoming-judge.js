@@ -267,11 +267,38 @@ const FlowIncomingJudge = (() => {
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
+  // A real mail is longer than the one-line messages the readers were written for (greeting, a sentence, directions,
+  // a signature). Each reader is asked about one sentence, and about two neighbouring sentences, never the whole body, so a
+  // line that states a booking is found and the rest of the mail cannot add or take away from it.
+  function windowsOf(body) {
+    const text = String(body || '').replace(/\r/g, '');
+    const parts = text.split(/\n+|(?<=[.!?؟:;])\s+/).map((x) => x.trim()).filter((x) => x.length >= 8);
+    const out = [];
+    if (text.replace(/\s+/g, ' ').trim().length <= 200) out.push(text.replace(/\s+/g, ' ').trim());
+    for (let k = 0; k < parts.length && out.length < 60; k++) {
+      out.push(parts[k]);
+      const lead = parts[k].split(/,\s+|\s+(?:so|because|since|as|and then)\s+/)[0];
+      if (lead && lead.length >= 8 && lead.length < parts[k].length) out.push(lead);
+      if (k + 1 < parts.length) out.push(parts[k] + ' ' + parts[k + 1]);
+    }
+    return out;
+  }
+
+  function firstHit(api, body, now, kind) {
+    if (!api || typeof api.recognize !== 'function') return null;
+    const wins = windowsOf(body);
+    for (let k = 0; k < wins.length; k++) {
+      const r = api.recognize(wins[k], now);
+      if (r && r.kind === kind) return r;
+    }
+    return null;
+  }
+
   function paymentAsk(i, body) {
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const api = sibling(typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk : null, './chat-payment-ask.js', 'FlowChatPaymentAsk');
-    const pay = api && typeof api.recognize === 'function' ? api.recognize(body, now0) : null;
-    if (!pay || pay.kind !== 'ask') return null;
+    const pay = firstHit(api, body, now0, 'ask');
+    if (!pay) return null;
     const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
     const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
     return {
@@ -287,8 +314,8 @@ const FlowIncomingJudge = (() => {
     const pickApi = sibling(typeof FlowChatPickupNotice !== 'undefined' ? FlowChatPickupNotice : null, './chat-pickup-notice.js', 'FlowChatPickupNotice');
     const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
     const tail = who ? ' · ' + who : '';
-    const appt = apptApi && typeof apptApi.recognize === 'function' ? apptApi.recognize(body, now0) : null;
-    if (appt && appt.kind === 'appointment') {
+    const appt = firstHit(apptApi, body, now0, 'appointment');
+    if (appt) {
       const he = appt.lang === 'he';
       const title = ((he ? 'תור' : 'Appointment') + tail).slice(0, 120);
       return {
@@ -298,8 +325,8 @@ const FlowIncomingJudge = (() => {
       };
     }
     const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');
-    const inv = invApi && typeof invApi.recognize === 'function' ? invApi.recognize(body, now0) : null;
-    if (inv && inv.kind === 'invitation') {
+    const inv = firstHit(invApi, body, now0, 'invitation');
+    if (inv) {
       const he = inv.lang === 'he';
       const title = ((he ? 'הזמנה' : 'Invitation') + tail).slice(0, 120);
       return {
@@ -308,8 +335,8 @@ const FlowIncomingJudge = (() => {
           steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
-    const pick = pickApi && typeof pickApi.recognize === 'function' ? pickApi.recognize(body, now0) : null;
-    if (pick && pick.kind === 'pickup') {
+    const pick = firstHit(pickApi, body, now0, 'pickup');
+    if (pick) {
       const he = pick.lang === 'he';
       const title = ((he ? 'לאסוף הזמנה' : 'Pick up the order') + tail).slice(0, 120);
       return {
