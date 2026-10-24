@@ -513,8 +513,30 @@
 
   function renderConnectors() {
     const host = document.getElementById('connector-list');
+    const ecoHost = document.getElementById('connect-ecosystem-host');
+    const ecoBlock = document.getElementById('connectEcosystemBlock');
+    const legacyBlock = document.getElementById('legacyConnectorBlock');
     const gen = ++connectorPaintGen;
-    return outlookHostOpen().then((onOutlook) => {
+    const ecoPromise = (typeof ConnectEcosystemUI !== 'undefined' && ConnectEcosystemUI.switchOn)
+      ? ConnectEcosystemUI.switchOn()
+      : Promise.resolve(false);
+    return ecoPromise.then((ecoOn) => {
+      if (gen !== connectorPaintGen) return;
+      if (ecoBlock && legacyBlock) {
+        ecoBlock.hidden = !ecoOn;
+        legacyBlock.hidden = ecoOn;
+      }
+      if (ecoOn && ecoHost && typeof ConnectEcosystemUI !== 'undefined') {
+        ConnectEcosystemUI.paint(ecoHost, {
+          lang: uiLang(),
+          status: status,
+          state: state,
+          send: send,
+          refresh: refresh
+        });
+        return renderMetaChats();
+      }
+      return outlookHostOpen().then((onOutlook) => {
       if (gen !== connectorPaintGen || !host) return;
       const catalog = onOutlook
         ? [{ id: 'microsoft' }]
@@ -537,6 +559,7 @@
         if (full) host.appendChild(connectorCard(full));
       });
       if (onOutlook) return renderOutlookRefresh(host);
+      });
     }).then(() => {
       if (gen !== connectorPaintGen) return;
       return renderMetaChats();
