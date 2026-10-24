@@ -34,6 +34,9 @@ function copyExtension(opts) {
     // spec registers the chat scripts against a fixture on this host.
     'https://www.messenger.com/*',
     'https://messenger.com/*',
+    // This copy only. The repo manifest lists WhatsApp Web as an optional host;
+    // the scenario rehearsal registers the WhatsApp lane against a fixture here.
+    'https://web.whatsapp.com/*',
     // This copy only. The repo manifest already lists these as optional hosts.
     'https://business.facebook.com/latest/inbox',
     'https://business.facebook.com/latest/inbox/*',
@@ -557,6 +560,9 @@ async function boot() {
   const extDir = copyExtension();
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-profile-'));
   const context = await chromium.launchPersistentContext(userData, {
+    // Cloud sessions ship one Chromium whose build differs from this Playwright
+    // pin. GLANCE_CHROMIUM=/opt/pw-browsers/chromium uses it; CI leaves it unset.
+    executablePath: process.env.GLANCE_CHROMIUM || undefined,
     headless: false,
     viewport: { width: 1280, height: 800 },
     ignoreDefaultArgs: ['--disable-extensions'],
@@ -571,7 +577,7 @@ async function boot() {
   });
 
   const documents = new Map();
-  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com)\//, async (route) => {
+  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com)\//, async (route) => {
     const req = route.request();
     const bare = req.url().split('#')[0];
     if (req.resourceType() === 'document' && documents.has(bare)) {
@@ -704,7 +710,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }
@@ -761,6 +767,11 @@ async function boot() {
   harness.openMessenger = async function openMessenger(html) {
     await watchSend();
     return openDocument('https://www.messenger.com/t/100012345678', html);
+  };
+
+  harness.openWhatsApp = async function openWhatsApp(html) {
+    await watchSend();
+    return openDocument('https://web.whatsapp.com/', html);
   };
 
   harness.openFixture = async function openFixture(search) {
