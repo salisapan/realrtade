@@ -202,3 +202,4 @@ One line per decision: `date · decision · who · where it is written in docs/`
 - 2026-10-24: chat card fix: an Outlook calendar hold (ref.eventId) now reaches Handled with Undo; real-browser spec for the Outlook hold and the Teams link from a chat (CHAT_TASK_CARD, TEAMS_MEETING, off); Gate: not run.
 - 2026-10-24: chat card on Microsoft: the chat message's words no longer go into the To Do task body (no Quote line), matching the Google task; real-browser specs for the To Do task and reminder from a chat (CHAT_TASK_CARD, off); Gate: not run.
 - 2026-10-24: clocks written «ב-8 וחצי», "half past 8", «ב-20.00» and "at 8.30 pm" are made explicit before the readers look (core/day-words.js); "at 8.30 pm" had been read as 8:00; Gate: not run.
+- 2026-10-24: end of the week / month and a day of the month ("by the 30th", «עד ה-30», «עד סוף השבוע») are read by the chat and mail readers (core/day-words.js); Gate: not run.

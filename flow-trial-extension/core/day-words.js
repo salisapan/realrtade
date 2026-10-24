@@ -53,6 +53,21 @@ const FlowDayWords = (() => {
     });
     s = s.replace(/\bat\s+noon\b/gi, 'at 12:00 pm');
     s = s.replace(/\bat\s+midnight\b/gi, 'at 12:00 am');
+    s = s.replace(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, (m, d, mo) => mo + ' ' + d);
+    // End of the week (Friday) and of the month, and a day of the month by itself: "by the 30th", «עד ה-30», «עד 30 לחודש».
+    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b|סוף\s+השבוע(?![\u0590-\u05FF])/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
+    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => iso(new Date(at.getFullYear(), at.getMonth() + 1, 0)));
+    const dayOfMonth = (dn) => {
+      if (dn < 1 || dn > 31) return null;
+      for (let k = 0; k < 3; k++) {
+        const probe = new Date(at.getFullYear(), at.getMonth() + k, dn);
+        if (probe.getDate() === dn && probe >= new Date(at.getFullYear(), at.getMonth(), at.getDate())) return iso(probe);
+      }
+      return null;
+    };
+    s = s.replace(/\b(by|before|until|till|on)\s+the\s+(\d{1,2})(?:st|nd|rd|th)\b(?!\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/gi, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? mark + ' ' + v : m; });
+    s = s.replace(/(עד|לפני)\s+ה-?\s*(\d{1,2})(?:\s+לחודש)?(?![\d:./\u0590-\u05FF])/g, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? mark + ' ' + v : m; });
+    s = s.replace(/(עד|לפני|ב-?)\s*(\d{1,2})\s+לחודש(?![\u0590-\u05FF])/g, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? (/^ב-?$/.test(mark) ? 'ב-' : mark + ' ') + v : m; });
     // Relative spans to an ISO date.
     s = s.replace(/בעוד\s+(יומיים|(?:שלושה|שלוש|ארבעה|ארבע|חמישה|חמש|שישה|שש|שבעה|שבע|\d{1,2})\s+ימים)/g, (m, span) => {
       const n = HE_NUM[span] || HE_NUM[span.split(/\s+/)[0]] || parseInt(span, 10);

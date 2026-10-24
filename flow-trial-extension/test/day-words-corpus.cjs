@@ -23,10 +23,11 @@ const REW = [
   ['בעוד יומיים', '2026-10-25'], ['בעוד שלושה ימים', '2026-10-26'], ['בעוד 5 ימים', '2026-10-28'], ['בעוד שבוע', '2026-10-30'],
   ['ב-7 בערב', 'at 7:00 pm'], ['ב־4 אחה"צ', 'at 4:00 pm'], ['בשעה 8:30 בערב', 'at 8:30 pm'], ['ב-12 בצהריים', 'at 12:00 pm'], ['ב-9 בבוקר', 'at 9:00 am'], ['ב-12 בלילה', 'at 12:00 am'], ['ב-11 בלילה', 'at 11:00 pm'], ['at noon', 'at 12:00 pm'], ['at midnight', 'at 12:00 am'],
   ['at 8.30 pm', 'at 8:30 pm'], ['ב-20.00', 'ב-20:00'], ['בשעה 8.15', 'בשעה 8:15'], ['ב-8 וחצי', 'ב-8:30'], ['ב־8 ורבע', 'ב-8:15'], ['at half past 8', 'at 8:30'], ['at quarter past 5', 'at 5:15'], ['at quarter to 9', 'at 8:45'], ['ב-8 וחצי בערב', 'at 8:30 pm'],
+  ['end of the week', '2026-10-23'], ['by EOW', 'by 2026-10-23'], ['end of the month', '2026-10-31'], ['סוף החודש', '2026-10-31'], ['by the 30th', 'by 2026-10-30'], ['before the 5th', 'before 2026-11-05'], ['עד ה-30', 'עד 2026-10-30'], ['עד ה־5 לחודש', 'עד 2026-11-05'], ['ב-15 לחודש', 'ב-2026-11-15'], ['the 5th of November', 'November 5'],
   ['in 3 days', '2026-10-26'], ['in two days', '2026-10-25'], ['in a week', '2026-10-30']
 ];
 for (const [from, to] of REW) check('rewrites ' + from, D.normalize(from, NOW) === to, D.normalize(from, NOW));
-const KEEP = ['המחיר 12.50 ש"ח', 'it costs 8.30 dollars','ב-8 בצהריים', 'ב-13 בערב', 'בשעה 7','12.50 ש"ח', 'גרסה 2.10 של התוכנה', 'המחיר 3.5 דולר', 'version 2.10.1', 'עד 45.13', 'עד 31.2', 'בעוד כמה ימים', 'in several days', ''];
+const KEEP = ['by the 40th', 'עד ה-31.12', 'עד 10', 'the 5th was great','המחיר 12.50 ש"ח', 'it costs 8.30 dollars','ב-8 בצהריים', 'ב-13 בערב', 'בשעה 7','12.50 ש"ח', 'גרסה 2.10 של התוכנה', 'המחיר 3.5 דולר', 'version 2.10.1', 'עד 45.13', 'עד 31.2', 'בעוד כמה ימים', 'in several days', ''];
 for (const t of KEEP) check('leaves alone: ' + t, D.normalize(t, NOW) === t, D.normalize(t, NOW));
 check('no throw on junk', (() => { try { D.normalize(null, null); D.normalize(undefined, 'x'); return true; } catch (e) { return false; } })());
 
@@ -46,7 +47,12 @@ const YES = [
   ['rem', 'Remember to call the bank in 3 days', '2026-10-26'],
   ['cb', 'תתקשר אליי ביום ג׳', '2026-10-27'],
   ['pick', 'ההזמנה שלך מוכנה לאיסוף עד יום ה׳', '2026-10-29'],
-  ['note', 'לעצמי: לחדש דרכון עד 29.10', '2026-10-29']
+  ['note', 'לעצמי: לחדש דרכון עד 29.10', '2026-10-29'],
+  ['dl', 'Need the report by the end of the month', '2026-10-31'],
+  ['dl', 'תחתום על החוזה עד סוף השבוע', '2026-10-23'],
+  ['dl', 'תחתום על החוזה עד ה-30', '2026-10-30'],
+  ['pay', 'Please pay 500 NIS by the 5th of November', '2026-11-05'],
+  ['pick', 'ההזמנה שלך מוכנה לאיסוף עד סוף החודש', '2026-10-31']
 ];
 for (const [k, t, day] of YES) {
   const r = M[k].recognize(t, NOW);

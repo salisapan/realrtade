@@ -505,3 +505,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Also fixed at the source:** `core/extract.js` `parseTime` now reads a dotted clock that carries am or pm ("at 8.30 pm") as that clock, so the Gmail and Outlook meeting-proposal cards no longer offer 08:00 for 20:30; "at 12.50 NIS" and a bare "at 8.30" are untouched; every corpus stays green.
 - **Open:** live Gate.
 
+## 2026-10-24 Ecosystems builder B (fifty-eighth run) — "by the 30th", «עד סוף החודש»
+
+- **Capability shipped (all existing switches, off):** a probe of deadline wording found that the most common ways people set a deadline without a weekday had no day for the readers: "by end of the week", "by the end of the month", "by the 30th", «עד סוף השבוע», «עד סוף החודש», «עד ה-30», «עד 30 לחודש» and "the 5th of November". `core/day-words.js` now turns them into dates (end of the week is Friday, end of the month the last day, a day of the month the next such day), so a deadline ask, a reminder, a payment ask or a pickup notice written that way gets its card in chat, Outlook and Gmail. A day that does not exist ("the 40th") and a bare hour («עד 10») are not taken for dates.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/day-words-corpus.cjs` (10 more rewrites, 4 more left alone, 5 readers finding the new day forms), all corpora, browser specs.
+- **Open:** live Gate; "next week" / «בשבוע הבא» as a deadline stays unread on purpose (no single day).
+
