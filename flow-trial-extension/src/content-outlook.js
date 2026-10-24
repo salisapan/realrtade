@@ -741,6 +741,13 @@
     chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) paymentAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.PAYMENT_ASK === true); });
   } catch (e) { paymentAskSwitch = false; }
 
+  // glanceSwitches.TASK_ASK (off): a reminder or a deadline asked without a question, or a call-back request, becomes a To Do task due that day.
+  let taskAskSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { taskAskSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.TASK_ASK === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) taskAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.TASK_ASK === true); });
+  } catch (e) { taskAskSwitch = false; }
+
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
   async function decideFromText(pane, ownAddresses, mailbox) {
@@ -787,6 +794,7 @@
       systemNoticeOn: systemNoticeSwitch === true,
       bookingNoticeOn: bookingNoticeSwitch === true,
       paymentAskOn: paymentAskSwitch === true,
+      taskAskOn: taskAskSwitch === true,
       text: text, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
       now: new Date(), threadUrl: location.href,

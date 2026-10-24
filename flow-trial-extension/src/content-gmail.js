@@ -1564,8 +1564,8 @@ function glanceUiCopy(kind) {
       let bag = null;
       try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { bag = null; }
       const sw = (bag && bag.glanceSwitches) || {};
-      const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null };
-      const hit = (sw.PAYMENT_ASK === true ? FlowIncomingJudge.paymentAsk(judgeIn, prepared) : null) || (sw.BOOKING_NOTICE === true ? FlowIncomingJudge.bookingNotice(judgeIn, prepared) : null);
+      const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null };
+      const hit = (sw.PAYMENT_ASK === true ? FlowIncomingJudge.paymentAsk(judgeIn, prepared) : null) || (sw.BOOKING_NOTICE === true ? FlowIncomingJudge.bookingNotice(judgeIn, prepared) : null) || (sw.TASK_ASK === true ? FlowIncomingJudge.taskAsk(judgeIn, prepared) : null);
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     let intent = FlowIntent.classify(prepared, ctx);

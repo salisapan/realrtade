@@ -9360,6 +9360,15 @@ const FlowIncomingJudge = (() => {
       if (booking) return { show: true, intent: booking.intent, process: forSurface(booking.process, i.surface || 'gmail') };
     }
 
+    // A reminder or a deadline asked without a question ("Don't forget to bring the signed form on Monday", "I need the signed
+    // contract by Wednesday") and a request to call back on a day become a task due that day (core/chat-reminder.js,
+    // chat-deadline-ask.js, chat-callback-ask.js). Only for a mail addressed to the person (their address on To, not Cc-only).
+    // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
+    if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
+      const ask = taskAsk(i, prepareForJudge(i.text));
+      if (ask) return { show: true, intent: ask.intent, process: forSurface(ask.process, i.surface || 'gmail') };
+    }
+
     // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
     // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
     if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
@@ -9515,6 +9524,8 @@ const FlowIncomingJudge = (() => {
     if (text.replace(/\s+/g, ' ').trim().length <= 200) out.push(text.replace(/\s+/g, ' ').trim());
     for (let k = 0; k < parts.length && out.length < 60; k++) {
       out.push(parts[k]);
+      const bare = parts[k].replace(/^(?:hi|hello|hey|dear|good\s+(?:morning|afternoon|evening)|שלום|היי|הי|בוקר\s+טוב|ערב\s+טוב)(?:\s+[^\s,]+)?\s*,\s*/i, '');
+      if (bare.length >= 8 && bare.length < parts[k].length) out.push(bare);
       const lead = parts[k].split(/,\s+|\s+(?:so|because|since|as|and then)\s+/)[0];
       if (lead && lead.length >= 8 && lead.length < parts[k].length) out.push(lead);
       if (k + 1 < parts.length) out.push(parts[k] + ' ' + parts[k + 1]);
@@ -9530,6 +9541,40 @@ const FlowIncomingJudge = (() => {
       if (r && r.kind === kind) return r;
     }
     return null;
+  }
+
+  function addressedOnTo(i) {
+    const list = (v) => (Array.isArray(v) ? v : String(v || '').split(/[;,\s]+/)).map((x) => String(x || '').trim().toLowerCase()).filter((x) => x.indexOf('@') > 0);
+    const own = list(i.ownAddresses);
+    const to = list(i.to);
+    if (!own.length || !to.length || !to.some((a) => own.indexOf(a) !== -1)) return false;
+    const intentApi = typeof FlowIntent !== 'undefined' ? FlowIntent : null;
+    if (intentApi && typeof intentApi.copiedOnly === 'function' && intentApi.copiedOnly(i.text, i)) return false;
+    return true;
+  }
+
+  function taskAsk(i, body) {
+    if (!addressedOnTo(i)) return null;
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const remApi = sibling(typeof FlowChatReminder !== 'undefined' ? FlowChatReminder : null, './chat-reminder.js', 'FlowChatReminder');
+    const dlApi = sibling(typeof FlowChatDeadlineAsk !== 'undefined' ? FlowChatDeadlineAsk : null, './chat-deadline-ask.js', 'FlowChatDeadlineAsk');
+    const cbApi = sibling(typeof FlowChatCallbackAsk !== 'undefined' ? FlowChatCallbackAsk : null, './chat-callback-ask.js', 'FlowChatCallbackAsk');
+    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+    let title = '';
+    let dateIso = '';
+    let lang = 'en';
+    const rem = firstHit(remApi, body, now0, 'reminder');
+    if (rem) { title = rem.what; dateIso = rem.dateIso; lang = rem.lang; }
+    if (!title) { const dl = firstHit(dlApi, body, now0, 'ask'); if (dl) { title = dl.what; dateIso = dl.dateIso; lang = dl.lang; } }
+    if (!title) { const cb = firstHit(cbApi, body, now0, 'ask'); if (cb) { title = (cb.lang === 'he' ? 'להתקשר' : 'Call back') + (who ? ' · ' + who : ''); dateIso = cb.dateIso; lang = cb.lang; } }
+    if (!title) return null;
+    title = title.slice(0, 120);
+    const he = lang === 'he';
+    return {
+      intent: { type: 'request', label: title, confidence: 0.9, taskAsk: true, personalClose: 'task-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: dateIso }, facts: { date: { iso: dateIso } } },
+      process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, taskAsk: true,
+        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
   }
 
   function paymentAsk(i, body) {
@@ -9675,7 +9720,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

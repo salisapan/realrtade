@@ -24,7 +24,7 @@ test.beforeEach(async ({ glance }) => {
 async function open(glance, switches, body) {
   await glance.seedGmail(switches ? { glanceSwitches: switches } : {});
   n += 1;
-  return glance.openGmail({ messageId: 'm-bk-' + n, threadId: 't-bk-' + n, subject: 'Your booking', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: body });
+  return glance.openGmail({ messageId: 'm-bk-' + n, threadId: 't-bk-' + n, subject: 'Your booking', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: body, detailsTable: { to: ['me@x.com'], cc: [], expanded: true, hebrew: false } });
 }
 const tasks = () => Object.values(server.tasks());
 const events = () => Object.values(server.events());
@@ -72,6 +72,23 @@ test('PAYMENT_ASK on: a payment request is one Google Task Pay 500 NIS, nothing 
   await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(tasks()).toHaveLength(1);
   expect(tasks()[0].title).toMatch(/Pay 500 NIS/);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => tasks().length).toBe(0);
+});
+
+const REMIND = "Hi Sali, don't forget to bring the signed form tomorrow. Thanks!";
+
+test('TASK_ASK on: a reminder asked without a question is one Google Task, Undo deletes it; off: no card', async ({ glance }) => {
+  let page = await open(glance, null, REMIND);
+  await page.waitForTimeout(2500);
+  await expect(page.locator(MAIN + ' button.flow-chip')).toHaveCount(0);
+  page = await open(glance, { TASK_ASK: true }, REMIND);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].title).toMatch(/bring the signed form/i);
   await page.locator(MAIN + ' button.flow-chip-undo').click();
   await expect.poll(() => tasks().length).toBe(0);
 });

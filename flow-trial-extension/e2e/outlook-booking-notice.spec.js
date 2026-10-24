@@ -90,3 +90,30 @@ test('BOOKING_NOTICE on: a long, ordinary mail (greeting, directions, signature)
   await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(await events(glance)).toHaveLength(1);
 });
+
+const REMIND = 'Hi Sali, one small thing: do not forget to bring the signed form tomorrow. Thanks!';
+const REMIND2 = "Hi Sali, don't forget to bring the signed form tomorrow. Thanks!";
+
+test('TASK_ASK off: a reminder asked without a question shows no card; on: one To Do task Bring the signed form, Undo deletes it', async ({ glance }) => {
+  let page = await open(glance, null, REMIND2, false);
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
+  page = await open(glance, { TASK_ASK: true }, REMIND2, false);
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toMatch(/bring the signed form/i);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
+
+test('TASK_ASK on but the person is only on Cc: no card', async ({ glance }) => {
+  await glance.seedOutlook({ glanceSwitches: { TASK_ASK: true } }, {});
+  n += 1;
+  const page = await glance.openOutlook({ id: 'AQMk-booking-cc-' + n, subject: 'Quick one', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: REMIND2, to: ['someone.else@example.com'], cc: ['ai.local.flow@gmail.com'] });
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(0);
+});

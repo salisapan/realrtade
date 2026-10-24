@@ -455,3 +455,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/booking-notice-corpus.cjs` (3 long mails EN+HE that must hit, 2 long mails that must stay quiet), `test/payment-ask-mail-corpus.cjs` (1 long ask, 1 long mention), `e2e/outlook-booking-notice.spec.js` (long mail in a real browser, 6 specs), the Gmail spec (4), all corpora, add-on bundle rebuilt.
 - **Open:** live Gate. The windows are applied only to these mail readers; the chat card still reads whole messages, which are short by nature.
 
+## 2026-10-24 Ecosystems builder B (fifty-first run) — reminders, deadlines and call-backs in mail
+
+- **Capability shipped (switch `glanceSwitches.TASK_ASK`, off):** a mail that says "Don't forget to bring the signed form on Monday", "I need the signed contract by Wednesday", "Please sign the lease by Monday", "Please call me back tomorrow" («אל תשכח להביא את הטופס ביום שני», «תחתום על החוזה עד יום שישי», «תתקשר אליי מחר») now gets the existing task card on Outlook (To Do) and Gmail (Google Tasks): the task is the thing, or "Call back · sender", due that day, read back by id, Undo deletes. The shared judge saw none of these (no question, no polite verb). Stricter than chat on purpose: only when the person's address is on To and the mail is not Cc-only (`FlowIntent.copiedOnly`); no To list is quiet. Mail is read sentence by sentence; a greeting before the line is stripped.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/task-ask-mail-corpus.cjs` (7 asks EN+HE, Gmail step, switch off, Cc-only, no To, someone else, own mail, not inbound, a long mail, 13 quiet lines, wiring), real-browser specs on Outlook (off then on with Undo, Cc-only quiet) and Gmail (off then on with Undo), 13 browser specs in the two booking files, all corpora, add-on bundle rebuilt.
+- **Open:** live Gate; the manifest content-script `js` list gained three reader files (no permission, host or scope change).
+
