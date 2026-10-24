@@ -734,6 +734,13 @@
     chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) bookingNoticeSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.BOOKING_NOTICE === true); });
   } catch (e) { bookingNoticeSwitch = false; }
 
+  // glanceSwitches.PAYMENT_ASK (off): "Please transfer 500 NIS by Sunday" becomes a To Do task Pay 500 NIS due that day. Glance pays nothing.
+  let paymentAskSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { paymentAskSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.PAYMENT_ASK === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) paymentAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.PAYMENT_ASK === true); });
+  } catch (e) { paymentAskSwitch = false; }
+
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
   async function decideFromText(pane, ownAddresses, mailbox) {
@@ -779,6 +786,7 @@
     const judgeWith = (text) => FlowIncomingJudge.judge({
       systemNoticeOn: systemNoticeSwitch === true,
       bookingNoticeOn: bookingNoticeSwitch === true,
+      paymentAskOn: paymentAskSwitch === true,
       text: text, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
       now: new Date(), threadUrl: location.href,

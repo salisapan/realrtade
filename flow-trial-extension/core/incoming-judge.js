@@ -122,6 +122,13 @@ const FlowIncomingJudge = (() => {
       if (booking) return { show: true, intent: booking.intent, process: forSurface(booking.process, i.surface || 'gmail') };
     }
 
+    // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
+    // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
+    if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
+      const pay = paymentAsk(i, prepareForJudge(i.text));
+      if (pay) return { show: true, intent: pay.intent, process: forSurface(pay.process, i.surface || 'gmail') };
+    }
+
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
@@ -258,6 +265,20 @@ const FlowIncomingJudge = (() => {
     const process = actionsApi.planFor(intent, planCtx);
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
+  }
+
+  function paymentAsk(i, body) {
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const api = sibling(typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk : null, './chat-payment-ask.js', 'FlowChatPaymentAsk');
+    const pay = api && typeof api.recognize === 'function' ? api.recognize(body, now0) : null;
+    if (!pay || pay.kind !== 'ask') return null;
+    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+    return {
+      intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
+      process: { id: 'log-it', name: 'Log It', closingLine: pay.lang === 'he' ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: pay.lang === 'he' ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, paymentAsk: true,
+        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pay.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
   }
 
   function bookingNotice(i, body) {

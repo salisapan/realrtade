@@ -433,3 +433,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/booking-notice-corpus.cjs` extended (3 invitations, 3 more quiet lines, manifest wiring), `e2e/outlook-booking-notice.spec.js` now 4 specs in a real browser, all corpora, add-on bundle rebuilt.
 - **Open:** live Gate; Gmail not wired.
 
+## 2026-10-24 Ecosystems builder B (forty-eighth run) — Outlook payment asks
+
+- **Capability shipped (switch `glanceSwitches.PAYMENT_ASK`, off):** an Outlook mail that asks the person to pay with an amount and a day («שלום, תעביר לי 500 שקל עד יום ראשון», "Please transfer 500 NIS to my account by Sunday") now shows the existing To Do card; Do It writes "Pay 500 NIS · sender" / «לשלם 500 NIS · שולח» due that day, read back by id, Undo deletes. Glance pays nothing. Own promises, payments already made, hedges, refusals, two amounts, no amount, no day, and the person's own mail stay quiet. Hebrew greetings ahead of the pay verb («שלום, …») now count in the payment reader (chat too).
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** new `test/payment-ask-mail-corpus.cjs` (4 asks, Gmail step, switch off, own mail, not inbound, 10 quiet lines, wiring), `e2e/outlook-booking-notice.spec.js` now 5 specs in a real browser (payment off then on, Undo), chat payment and silence corpora, all corpora, add-on bundle rebuilt.
+- **Open:** live Gate; Gmail not wired; the switch is separate from `BOOKING_NOTICE` on purpose (paying is a different trust decision from a calendar hold).
+

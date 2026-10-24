@@ -63,3 +63,21 @@ test('BOOKING_NOTICE on: an invitation to an event is one calendar hold titled I
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
+
+const PAY = 'Hi Sali, please transfer 500 NIS to my account by tomorrow. Thanks!';
+
+test('PAYMENT_ASK off: a payment request shows no card; on: one To Do task Pay 500 NIS, read back, Undo deletes it, nothing is paid', async ({ glance }) => {
+  let page = await open(glance, null, PAY, false);
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(0);
+  page = await open(glance, { PAYMENT_ASK: true }, PAY, false);
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toMatch(/Pay 500 NIS/);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
