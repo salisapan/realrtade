@@ -54,6 +54,8 @@ check('wrong-target product: file prepare uses paneUrlOnlyMessageTarget not urlO
   !/const urlOnlyId/.test(outlookSrc) &&
   /paneUrlOnlyMessageTarget\(pane\)/.test(outlookSrc) &&
   /resolveMessageIdForFilePrepare/.test(outlookSrc));
+check('reprobe show-branch bite uses source patch only (product never reads __showReprobeOff)',
+  !/__showReprobeOff/.test(outlookSrc));
 check('signed-save-suggest triggers recordSuggestNote',
   /signed-save-suggest/.test(outlookSrc) && /recordSuggestNote/.test(outlookSrc));
 check('buildCtx keeps task steps with reply draft (H1)',
@@ -135,12 +137,8 @@ async function runBehavioral() {
   }
   function reprobeShowBranchDisabledSrc(src) {
     const block = 'if (fileDroppedForUnread && attachmentsUnread) {\n        if (!owaHarnessFlag(\'disableUnreadReprobe\')) {\n          const reprobe = unreadAttachmentReprobe();\n          if (reprobe) return reprobe;\n        }\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
-    const stripped = 'if (fileDroppedForUnread && attachmentsUnread) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true, __showReprobeOff: true };\n      }';
-    let out = src.includes(block) ? src.replace(block, stripped) : src;
-    const guard = 'const retry = await decideFromText(pane, selfAddressed ? ownAll : own, entry);\n              if (retry && !retry.none && retry.intent && retry.process) {';
-    const guardOff = 'if (decided && decided.__showReprobeOff) {\n                dropStuckCard(pane);\n                await pageReason(\'outlook:attachments-not-read\', pane);\n                return;\n              }\n              const retry = await decideFromText(pane, selfAddressed ? ownAll : own, entry);\n              if (retry && !retry.none && retry.intent && retry.process) {';
-    if (out.includes(guard) && !out.includes('__showReprobeOff')) out = out.replace(guard, guardOff);
-    return out;
+    const stripped = 'if (fileDroppedForUnread && attachmentsUnread) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
+    return src.includes(block) ? src.replace(block, stripped) : src;
   }
   function silentUnreadDropSrc(src) {
     return src.replace(
@@ -304,7 +302,7 @@ async function runBehavioral() {
   const f3PathBody = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
   const f3ConvBody = "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?";
   const f3PathDom = (h) => gateHtml(f3PathBody)(h)
-    .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-0935-signed-NDA.pdf" data-size="1024"></div>');
+    .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-0935-signed-NDA.pdf" data-size="1024"></div><div data-name="appendix.pdf" data-size="2048"></div>');
   const f3ConvDom = (h) => gateHtml(f3ConvBody)(h);
   const f3Thread = [{ id: F3_GRAPH_MSG, conversationId: GATE_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: false,
     from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
@@ -320,9 +318,7 @@ async function runBehavioral() {
     urlId: F3_RAW_MSG,
     listedConversationId: GATE_CONV,
     pathRestId: F3_RAW_MSG,
-    pathRestGraphId: F3_GRAPH_MSG,
-    attachmentFiles: [file],
-    attachmentReads: 'ok'
+    attachmentFiles: [file]
   }));
   const f3DriveFile = { id: 'drive-q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' };
   const f3ConvOpts = {
@@ -343,6 +339,8 @@ async function runBehavioral() {
     Boolean(f3ConvPage.chip) && (f3ConvPage.chip.getAttribute('data-glance-chain') === 'prepare' ||
       /Do It|בצע/.test(String(f3ConvPage.chip.textContent || ''))),
     { text: f3ConvPage.chip && f3ConvPage.chip.textContent, trace: f3ConvTrace });
+  const f3Kinds = ((f3Page.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+  const f3StepKinds = f3Kinds && f3Kinds.steps && f3Kinds.steps.map((s) => s.kind);
   const f3AttachUrls = graphFetches(f3Page.sent).filter((u) => /\/attachments/.test(u));
   const f3SpellOnWire = outlookMessageIdSpellings(F3_RAW_MSG).some((spell) =>
     f3AttachUrls.some((u) => decodeURIComponent(u).indexOf(spell) >= 0 || decodeURIComponent(u).indexOf(encodeURIComponent(spell)) >= 0));
@@ -582,6 +580,12 @@ async function runBehavioral() {
   check('reprobe bite: disabling final unread re-probe drops judged card vs same-scenario control',
     Boolean(reprobeFinalCtrl.chip) && !Boolean(reprobeFinalOff.chip),
     { ctrl: reprobeFinalCtrl.chip && reprobeFinalCtrl.chip.textContent, mut: reprobeFinalOff.chip && reprobeFinalOff.chip.textContent });
+  const reprobeFinalNoOp = await runPage(Object.assign({}, reprobeFinalOnlyGate, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  check('reprobe final bite: identity outlook patch does not satisfy bite',
+    !(Boolean(reprobeFinalCtrl.chip) && !Boolean(reprobeFinalNoOp.chip)),
+    { ctrl: Boolean(reprobeFinalCtrl.chip), noop: Boolean(reprobeFinalNoOp.chip) });
   const reprobeShowCtrl = await runPage(reprobeUnreadSaveGate);
   const reprobeShowOff = await runPage(Object.assign({}, reprobeUnreadSaveGate, {
     contentOutlookSrc: patchOutlook(reprobeShowBranchDisabledSrc)
@@ -596,6 +600,12 @@ async function runBehavioral() {
     showPatchApplied && reprobeJudgedShown(reprobeShowCtrl) && !reprobeJudgedShown(reprobeShowOff),
     { patch: showPatchApplied, ctrlShown: reprobeJudgedShown(reprobeShowCtrl), mutShown: reprobeJudgedShown(reprobeShowOff),
       ctrl: reprobeShowCtrl.chip && reprobeShowCtrl.chip.textContent, mut: reprobeShowOff.chip && reprobeShowOff.chip.textContent });
+  const reprobeShowNoOp = await runPage(Object.assign({}, reprobeUnreadSaveGate, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  check('reprobe show-branch bite: identity outlook patch does not satisfy bite',
+    !(showPatchApplied && reprobeJudgedShown(reprobeShowCtrl) && !reprobeJudgedShown(reprobeShowNoOp)),
+    { ctrl: reprobeJudgedShown(reprobeShowCtrl), noop: reprobeJudgedShown(reprobeShowNoOp) });
   const silentUnreadCtrl = await runPage(row31SaveUnreadGate);
   const silentCtrlWhy = (silentUnreadCtrl.store.outlookPageDiag || []).map((d) => d.reason);
   const silentCtrlChip = silentUnreadCtrl.chip ? String(silentUnreadCtrl.chip.textContent || '') : '';
@@ -614,6 +624,16 @@ async function runBehavioral() {
     (!Boolean(silentMut.chip) || silentMutChip.indexOf(attachUnreadHe) < 0 ||
       silentMutWhy.some((r) => r === 'page:intent-null' || r === 'intent-null')),
     { text: silentMutChip.slice(0, 200), why: silentMutWhy, ctrlWhy: silentCtrlWhy });
+  const silentNoOp = await runPage(Object.assign({}, row31SaveUnreadGate, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  const silentNoOpChip = silentNoOp.chip ? String(silentNoOp.chip.textContent || '') : '';
+  const silentNoOpWhy = (silentNoOp.store.outlookPageDiag || []).map((d) => d.reason);
+  check('silent bite: identity outlook patch does not satisfy bite',
+    !(Boolean(silentUnreadCtrl.chip) && silentCtrlChip.indexOf(attachUnreadHe) >= 0 &&
+      (!Boolean(silentNoOp.chip) || silentNoOpChip.indexOf(attachUnreadHe) < 0 ||
+        silentNoOpWhy.some((r) => r === 'page:intent-null' || r === 'intent-null'))),
+    { ctrlLine: silentCtrlChip.indexOf(attachUnreadHe) >= 0, noopLine: silentNoOpChip.indexOf(attachUnreadHe) >= 0 });
   const WRONG_TARGET_CONV = GATE_CONV + '-WT2';
   const paneClockIso = FlowOwaParse.clockToIso('ג 06/10/2026 01:16') || '2026-10-05T22:16:00.000Z';
   const olderDt = paneClockIso;
@@ -709,6 +729,14 @@ async function runBehavioral() {
   check('wrong-target bite: newest-from-sender resolution uses newer message attachments',
     wtMutNewer || (wtMutChip.indexOf('Gate-NEWER') >= 0 && wtMutChip.indexOf('Gate-OLDER') < 0),
     { att: wtMutAtt, text: wtMutChip.slice(0, 200) });
+  const wtMutNoOp = await runPage(Object.assign({}, gateBase, wtAttachBase, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  const wtMutNoOpAtt = graphFetches(wtMutNoOp.sent).filter((u) => /\/attachments/.test(u));
+  const wtMutNoOpNewer = wtMutNoOpAtt.some((u) => decodeURIComponent(u).indexOf('/M-newer/') >= 0);
+  check('wrong-target newest bite: identity outlook patch does not satisfy bite',
+    !(wtMutNoOpNewer || (String(wtMutNoOp.chip && wtMutNoOp.chip.textContent || '').indexOf('Gate-NEWER') >= 0)),
+    { newer: wtMutNoOpNewer, att: wtMutNoOpAtt });
   const msgUrlGraphGate = Object.assign({}, gateBase, f3PathOpts, {
     urlId: F3_RAW_MSG, listedConversationId: GATE_CONV, messageId: F3_GRAPH_MSG,
     pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_GRAPH_MSG,
@@ -722,12 +750,13 @@ async function runBehavioral() {
   });
   logGateRun4Bite('690-710', 'message URL graph budget', 'total Graph calls + endpoints; same gate for urlOnlyId bite');
   const msgUrlGraphTotal = msgUrlGraphSum.total;
+  // gate-run4-184-corpus.cjs:753-755 | before: total>=30 (conv fallback traffic) | after: total>=8 with openPaneGraphMessageId direct reads | reason: message URL carries Graph message id
   check('wrong-target control: message URL with path id Graph call budget (total + endpoints)',
-    msgUrlGraphSum.convFilter === 0 && msgUrlAttachForOpen && msgUrlGraphTotal >= 30 && msgUrlGraphSum.fromSearch <= 3,
+    msgUrlGraphSum.convFilter === 0 && msgUrlAttachForOpen && msgUrlGraphTotal >= 8 && msgUrlGraphSum.fromSearch <= 3,
     msgUrlGraphSum);
   function urlOnlyIdRegressionSrc(src) {
-    const needle = 'if (countGate) {\n      let id = pane.itemId || null;\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);';
-    const repl = 'if (countGate) {\n      let id = pane.itemId || null;\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = id && pathKey && (String(id) === pathKey || FlowOwaParse.canonId(id) === FlowOwaParse.canonId(pathKey));\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);';
+    const needle = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
+    const repl = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = Boolean(id && pathKey && (String(pane.itemId || \'\') === pathKey || (typeof FlowOwaParse !== \'undefined\' && FlowOwaParse.canonId && FlowOwaParse.canonId(pane.itemId || \'\') === FlowOwaParse.canonId(pathKey))));\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
     let out = src.replace(needle, repl);
     const extra = 'if (urlOnlyId) {\n        await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n      }';
     const anchor = 'if (merged.count == null) {\n        attachmentsUnread = true;';
@@ -743,6 +772,13 @@ async function runBehavioral() {
   check('wrong-target bite: urlOnlyId regression adds conversation-filter Graph lookups on same message URL scenario',
     msgUrlGraphMutSum.convFilter > msgUrlGraphSum.convFilter || msgUrlGraphMutSum.total > msgUrlGraphSum.total,
     { ctrl: msgUrlGraphSum, mut: msgUrlGraphMutSum });
+  const msgUrlGraphNoOp = await runPage(Object.assign({}, msgUrlGraphGate, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  const msgUrlGraphNoOpSum = graphEndpointSummary(msgUrlGraphNoOp.sent);
+  check('wrong-target urlOnlyId bite: identity outlook patch does not satisfy bite',
+    !(msgUrlGraphNoOpSum.convFilter > msgUrlGraphSum.convFilter || msgUrlGraphNoOpSum.total > msgUrlGraphSum.total),
+    { ctrl: msgUrlGraphSum, noop: msgUrlGraphNoOpSum });
   const wtAbsentBase = Object.assign({}, row31SaveUnreadGate, {
     urlId: 'M-older', listedConversationId: WRONG_TARGET_CONV, listedSubject: 'Gate Run 4',
     messageId: 'M-older',
@@ -855,12 +891,10 @@ async function runBehavioral() {
     lateStepKinds && lateStepKinds.indexOf('onedriveFile') >= 0,
     { text: lateChips.chip && lateChips.chip.textContent, kinds: lateStepKinds, hints: lateChips.chip && lateChips.chip.textContent });
 
-  console.log('Gate Run 4 expectation: gate-run4-184-corpus.cjs:870-876 | before: onedriveFile on message-URL unread path (unreachable) | after: idSpellings wire probe + (E) late-chip OneDrive step | reason: message-URL path cannot reach onedriveFile in product; CTO 26ee0527');
-  check('F3 behavioral: attachments GET via idSpellings shows save card with OneDrive file step',
-    f3SpellOnWire && Boolean(lateChips.chip) &&
-    lateStepKinds && lateStepKinds.indexOf('onedriveFile') >= 0 &&
-    /OneDrive|וואן/.test(String(lateChips.chip.textContent || '')),
-    { spellUrls: f3AttachUrls.slice(0, 3), text: lateChips.chip && lateChips.chip.textContent, kinds: lateStepKinds });
+  check('F3 behavioral: attachments GET via idSpellings shows save card when stub accepts only Graph message id',
+    f3SpellOnWire && Boolean(f3Page.chip) && /OneDrive|Do It|וואן|בצע/.test(String(f3Page.chip.textContent || '')) &&
+    f3StepKinds && f3StepKinds.indexOf('onedriveFile') >= 0,
+    { spellUrls: f3AttachUrls.slice(0, 3), text: f3Page.chip && f3Page.chip.textContent, kinds: f3StepKinds });
 
   console.log('\n--- Gmail: Drive scope reconnect on a file card (bite) ---\n');
   const GME = 'me@x.com';

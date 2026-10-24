@@ -762,7 +762,7 @@
     const countGate = needsSave || (signedForJudge && localAttachN >= 2);
     let attachmentsUnread = Boolean(mailbox && mailbox.attachmentsUnread);
     if (countGate) {
-      let id = pane.itemId || null;
+      let id = openPaneGraphMessageId(pane);
       if (!id) {
         const found = paneUrlOnlyMessageTarget(pane)
           ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)
@@ -823,7 +823,8 @@
       return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process, attachmentsUnread: attachmentsUnread };
     }
     if (r && r.show && localAttachN >= 1 && !attachmentsUnread) {
-      let listId = pane.itemId || null;
+      const openMsgId = openPaneGraphMessageId(pane);
+      let listId = openMsgId;
       if (!listId) {
         const found = paneUrlOnlyMessageTarget(pane)
           ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)
@@ -832,8 +833,10 @@
       }
       if (listId) {
         let rows = await attachmentListFor(listId);
-        if (!Array.isArray(rows) && paneUrlOnlyMessageTarget(pane) && (pane.pathId || pane.conversationId)) {
-          const found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);
+        if (!Array.isArray(rows) && !openMsgId && (pane.pathId || pane.conversationId)) {
+          const found = paneUrlOnlyMessageTarget(pane)
+            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)
+            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
           const alt = found && found.id;
           if (alt && String(alt) !== String(listId)) rows = await attachmentListFor(alt);
         }
@@ -965,6 +968,17 @@
 
   // Open-pane identity for Graph rows: same conversation, same sender, and the same
   // internet message id or received minute. Never pick "newest from sender".
+  // Message id from the open pane URL (not a conversation id). Graph REST spelling.
+  function openPaneGraphMessageId(pane) {
+    if (!pane) return null;
+    const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
+    const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || '');
+    const raw = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId).trim()
+      : (pane.pathId && !isConversationId(pane.pathId) ? String(pane.pathId).trim() : '');
+    if (!raw) return null;
+    return canon(raw) || raw;
+  }
+
   function openPaneExactGraphRow(pane, m) {
     if (!pane || !m) return false;
     const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
@@ -984,7 +998,6 @@
     if (!netOk && !minOk) return false;
     return true;
   }
-
   async function exactOpenMessageInList(list, pane, openSender) {
     if (!pane) return null;
     const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
