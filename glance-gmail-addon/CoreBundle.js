@@ -5535,6 +5535,8 @@ const FlowIntent = (() => {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
     if (/\b(?:please|kindly|do you)\s+(?:agree|accept)\b/i.test(raw)) return true;
+    // Approving is the same decision. With a deadline it becomes a task (see the readerDecisionAsk caller); without one it stays quiet.
+    if (/\b(?:can|could|would|will) you\s+(?:please\s+)?approve\b/i.test(raw) || /\b(?:please|kindly)\s+approve\b/i.test(raw)) return true;
     if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw) && !/\bconfirm\s+by\b/i.test(raw)) return true;
     if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
     if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
@@ -6520,6 +6522,21 @@ const FlowIntent = (() => {
     const familyBlocks = familiesBlockAsk && !inboundAsk;
     if (!quietHint && (askIsSoft || familyBlocks) && requestEvidence) quietHint = 'hedge';
     if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && readerDecisionAsk(text) && !replyAsk) {
+      // Owner, 2026-10-24: a request to approve or accept, with a deadline, is a task: the decision stays the person's, the
+      // deadline is not lost. No reply draft and no answer on their behalf. Without a date it stays the reader's own and quiet.
+      if (hasResolvedDate && !isPast) {
+        const approve = finish(TYPES.REQUEST, 'medium', {
+          who, amount,
+          what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+          when: humanWhen(facts.date, facts.time),
+          dateIso: facts.date && facts.date.iso
+        }, 'follow-up-ask');
+        if (approve && approve.type) {
+          approve.noReplyDraft = true;
+          approve.label = /[\u0590-\u05FF]/.test(text) ? 'אישור נדרש' : 'Approval requested';
+        }
+        return approve;
+      }
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';

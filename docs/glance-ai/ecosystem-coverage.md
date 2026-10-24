@@ -101,3 +101,9 @@ Run A has been idle for 40+ runs (every row left needs an owner scope or a Grok 
 5. **Recall.** 40 new lines per run from the kinds in `real-mail-misses-2026-10-21.md` (a link, an invoice, a document, a signature, an introduction, a status, an approval) plus invented lines the engine has not seen, Hebrew and English; honest measurement; never lower a precision gate.
 
 Every run ends with code pushed. The final reply is three Hebrew bullets: what a user can now do that he could not before, the tests, what is open.
+
+## Owner approvals, 2026-10-24 (these rows are no longer blocked)
+
+- **SharePoint (row 79a):** approved. Add the delegated scope `Sites.ReadWrite.All` in `core/outlook-config.js` only when its Connect box is ticked, behind an off switch, with the consent-screen row and the privacy and store wording drafted in the same commit. Save a file or add a list item, read back by id, Undo refuses after an edit. The Entra app registration and admin consent are the owner's step; write them as the exact request in `docs/open-tasks.md`.
+- **Google Forms (row 79b):** approved. Add `https://www.googleapis.com/auth/forms.body` to `manifest.json` oauth scopes behind an off switch, with the privacy and store wording in the same commit. Create a form from a named request, read back by id. Google's OAuth verification of the scope is the owner's step.
+- **Approval ask with a deadline (done):** "can you approve the budget by Wednesday" and «תוכל לאשר לי את ההצעה עד מחר?» now give a task titled `Approval requested` / `אישור נדרש`, no reply draft; the same ask with no date stays quiet.
