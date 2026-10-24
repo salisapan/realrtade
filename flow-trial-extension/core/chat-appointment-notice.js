@@ -6,12 +6,12 @@
 // the clock only; the chat card offers a calendar hold the person approves, nobody is invited. Portable: no chrome.*,
 // no DOM, no network.
 const FlowChatAppointmentNotice = (() => {
-  const NOUN_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:appointment|booking|reservation|table|visit|slot|session|consultation|check-?in|delivery\s+slot|class|lesson|fitting|test\s+drive)\b/i;
-  const NOUN_HE = /(?:התור|הזמנתך|ההזמנה|הפגישה|הביקור|השיעור|הסדנה|הטיפול|המשלוח)\s+(?:שלך|שלכם|שלכן)|(?:נקבע|נקבעה|אושר|אושרה|שוריין|שוריינה)\s+(?:לך\s+|לכם\s+)?(?:תור|שולחן|פגישה|טיפול|שיעור|ביקור)|(?:תור|שולחן|טיפול|שיעור)\s+(?:נקבע|נקבעה|אושר|אושרה|שוריין)/;
-  const FRAME_EN = /\b(?:is|has\s+been|was|are)\s+(?:now\s+)?(?:confirmed|booked|scheduled|set|reserved|on|for)\b|\bconfirm(?:ed|ing|ation)\b|\breminder\b|\bsee\s+you\b|\bwe(?:'re| are)\s+expecting\b/i;
-  const FRAME_HE = /(?:נקבע|נקבעה|אושר|אושרה|שוריין|שוריינה|תזכורת|מזכירים|מחכים\s+לך|נתראה|מאשרים|אישור)|ל?יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/;
+  const NOUN_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:appointment|booking|reservation|table|visit|slot|session|consultation|check-?in|delivery\s+slot|class|lesson|fitting|test\s+drive)\b|\byou\s+have\s+(?:an?\s+|your\s+)?(?:[a-z-]+\s+){0,2}(?:appointment|booking|reservation|table|visit|session|consultation|class|lesson)\b|\b(?:appointment|booking|reservation)\s+(?:reminder|confirmation|confirmed)\b|\b(?:table|appointment|booking|reservation)\s+(?:is\s+)?(?:confirmed|booked|reserved)\b/i;
+  const NOUN_HE = /(?:התור|הזמנתך|ההזמנה|הפגישה|הביקור|השיעור|הסדנה|הטיפול|המשלוח)\s+(?:שלך|שלכם|שלכן)|(?:נקבע|נקבעה|אושר|אושרה|שוריין|שוריינה)\s+(?:לך\s+|לכם\s+)?(?:תור|שולחן|פגישה|טיפול|שיעור|ביקור)|(?:תור|שולחן|טיפול|שיעור)\s+(?:נקבע|נקבעה|אושר|אושרה|שוריין)|יש\s+(?:לך|לכם|לכן)\s+(?:תור|פגישה|שיעור|טיפול|הזמנה|שולחן)|תזכורת\s+ל(?:תור|פגישה|שיעור|טיפול|הזמנה)|קבענו\s+(?:לך|לכם|לכן)\s+(?:תור|פגישה|שיעור|טיפול)|(?:שריינו|שרינו)\s+(?:לך|לכם|לכן)\s+(?:שולחן|מקום)|אישור\s+(?:הזמנה|תור|פגישה)/;
+  const FRAME_EN = /\b(?:is|has\s+been|was|are)\s+(?:now\s+)?(?:confirmed|booked|scheduled|set|reserved|on|for)\b|\bconfirm(?:ed|ing|ation)\b|\breminder\b|\bsee\s+you\b|\bwe(?:'re| are)\s+expecting\b|\byou\s+have\b|\bremind(?:er|ing)\b/i;
+  const FRAME_HE = /(?:נקבע|נקבעה|אושר|אושרה|שוריין|שוריינה|תזכורת|מזכירים|מחכים\s+לך|נתראה|מאשרים|אישור)|ל?יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)|יש\s+(?:לך|לכם|לכן)|קבענו|שריינו|שרינו|אישור/;
   // Looking back, cancelling, moving, asking, or a thing that is not an appointment of the person's.
-  const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|nice)|cancel(?:l?ed|l?ation)?|postpone[d]?|resched\w*|unfortunately|unable|can'?t|cannot|sorry|instead|maybe|might|if\s+you|would\s+you\s+like|available\s+slots?|choose|select|pick\s+a|book\s+now|click|tap)\b/i;
+  const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|nice)|cancel(?:l?ed|l?ation)?|postpone[d]?|resched\w*|unfortunately|unable|can'?t|cannot|sorry|instead|maybe|might|if\s+you|would\s+you\s+like|available\s+slots?|choose|select|pick\s+a|book\s+now|book\s+(?:your|an?)\b|\bslots?\b|click|tap)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|היה\s+(?:נעים|כיף|מצוין)|בוטל|בוטלה|ביטול|לבטל|נדחה|נדחתה|לדחות|לצערנו|מצטערים|מצטער|אולי|במקום|לחץ|בחר|בחרי|לקביעת)/;
   const QUESTION = /[?؟]/;
   const MAX_AHEAD_DAYS = 90;
