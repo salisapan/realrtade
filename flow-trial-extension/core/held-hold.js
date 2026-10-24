@@ -11,6 +11,16 @@
     return e.dateIso + ' ' + String(e.hour).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
   }
 
+  // What a notice would put on the person's calendar or task list: a hold is its day and clock, a task its due day and its title.
+  // Only the notices the judge raises itself (booking, payment, reminder) have a key; any other intent has none and is never held back.
+  function keyOf(intent) {
+    if (!intent || (intent.personalClose !== 'booking-notice' && intent.personalClose !== 'payment-ask' && intent.personalClose !== 'task-ask')) return '';
+    const e = intent.entities || {};
+    if (Number.isInteger(e.hour)) return holdAt(e);
+    const what = String(e.what || intent.label || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(e.deadline || '')) && what ? 'task ' + e.deadline + ' ' + what : '';
+  }
+
   // Who the mail came from. A business sends its confirmation and its reminder as two threads, so the thread cannot be the key.
   function senderOf(row) {
     return String((row && (row.holdSender || (row.sender && row.sender.email))) || '').trim().toLowerCase();
@@ -27,7 +37,7 @@
       if (!e) continue;
       if (e.kind === 'undone' && e.messageId) { undone[e.messageId] = true; continue; }
       if (e.kind !== 'written' || !e.ref) continue;
-      if ((e.holdAt || holdAt(e.intent && e.intent.entities)) !== at) continue;
+      if ((e.holdAt || keyOf(e.intent)) !== at) continue;
       if (e.messageId && undone[e.messageId]) continue;
       if (own.length && [e.messageId, e.itemId, e.pathId].some((x) => x && own.indexOf(String(x)) >= 0)) continue; // the open mail's own receipt is not a duplicate
       if (senderOf(e) !== from) continue;
@@ -36,7 +46,7 @@
     return null;
   }
 
-  const api = { holdAt, find };
+  const api = { holdAt, keyOf, find };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.FlowHeldHold = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

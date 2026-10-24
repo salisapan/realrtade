@@ -1545,10 +1545,10 @@ function glanceUiCopy(kind) {
   // check is one name lookup, not a picker and not a Drive browser.
   // A reminder for an appointment this sender's confirmation already put on the calendar (and was not undone) is not offered twice.
   async function holdAlreadyMade(senderEmail, intent, ownIds) {
-    if (typeof FlowHeldHold === 'undefined' || !senderEmail) return false;
+    if (typeof FlowHeldHold === 'undefined' || !senderEmail || !FlowHeldHold.keyOf(intent)) return false;
     try {
       const bag = await FlowStorage.get();
-      return !!FlowHeldHold.find((bag && bag.log) || [], senderEmail, FlowHeldHold.holdAt(intent.entities), ownIds);
+      return !!FlowHeldHold.find((bag && bag.log) || [], senderEmail, FlowHeldHold.keyOf(intent), ownIds);
     } catch (e) { return false; }
   }
 
@@ -1575,7 +1575,7 @@ function glanceUiCopy(kind) {
       const sw = (bag && bag.glanceSwitches) || {};
       const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null };
       const hit = (sw.PAYMENT_ASK === true ? FlowIncomingJudge.paymentAsk(judgeIn, prepared) : null) || (sw.BOOKING_NOTICE === true ? FlowIncomingJudge.bookingNotice(judgeIn, prepared) : null) || (sw.TASK_ASK === true ? FlowIncomingJudge.taskAsk(judgeIn, prepared) : null);
-      if (hit && hit.intent.bookingNotice && hit.process && hit.process.id === 'hold' && await holdAlreadyMade(ctx.senderEmail, hit.intent, [ctx.messageId])) return { type: null };
+      if (hit && await holdAlreadyMade(ctx.senderEmail, hit.intent, [ctx.messageId])) return { type: null };
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     let intent = FlowIntent.classify(prepared, ctx);
@@ -5262,7 +5262,7 @@ function glanceUiCopy(kind) {
         url: r.response.url,
         ref: r.response.ref,
         connectorId: r.action.kind,
-        holdAt: (ctx.intent && ctx.intent.bookingNotice && typeof FlowHeldHold !== 'undefined') ? FlowHeldHold.holdAt(ctx.intent.entities) || undefined : undefined,
+        holdAt: (typeof FlowHeldHold !== 'undefined') ? FlowHeldHold.keyOf(ctx.intent) || undefined : undefined,
         holdSender: (ctx.sender && ctx.sender.email) || undefined,
         app: SOURCE_APP
       }, proofFields))

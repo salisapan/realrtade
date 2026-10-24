@@ -188,3 +188,19 @@ test('BOOKING_NOTICE on: after Undo of the first hold, the reminder mail of that
   await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(await events(glance)).toHaveLength(1);
 });
+
+const BILL = 'Hi Sali, your invoice of 1,200 NIS is due by tomorrow. Thank you for working with us!';
+const BILL_REMINDER = 'Hi Sali, a reminder: your invoice of 1,200 NIS is due by tomorrow. Thank you!';
+
+test('PAYMENT_ASK on: the reminder of a bill already on the task list is not offered a second Pay task', async ({ glance }) => {
+  await glance.seedOutlook({ glanceSwitches: { PAYMENT_ASK: true } }, {});
+  let page = await glance.openOutlook(mailOf(BILL, 'AQMk-bill-1'));
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await todo(glance)).toHaveLength(1);
+  page = await glance.openOutlook(mailOf(BILL_REMINDER, 'AQMk-bill-2'));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});

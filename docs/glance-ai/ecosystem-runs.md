@@ -556,3 +556,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/held-hold-corpus.cjs`, two Outlook browser specs (reminder quiet; after Undo offered again), one Gmail browser spec, all corpora. The first Outlook version keyed on the conversation id and a browser run showed it never matched (confirmation and reminder are separate threads), so it keys on the sender.
 - **Open:** live Gate; the chat card still keys on the chat, the mail cards on the sender: a second appointment from the same sender at the same day and clock is treated as the same one (a deliberate trade, owner can veto).
 
+## 2026-10-24 Ecosystems builder B (sixty-fifth run) — a reminder for a bill no longer adds a second Pay task
+
+- **Capability shipped (switches `PAYMENT_ASK`, `TASK_ASK`, off):** the sixty-fourth run's guard now covers tasks. A supplier sends the invoice, then "a reminder: your invoice of 1,200 NIS is due tomorrow". Outlook and Gmail mail cards offered a second Pay task. Now a task the same sender's earlier mail already put on the list (same due day and same title, not undone) is not offered again; a different amount or day is. Only intents the judge raises itself (booking, payment, reminder) have a key, so an ordinary request is never held back. Nothing is paid or sent.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical cards reused.
+- **Tests:** `test/held-hold-corpus.cjs` (7 more cases), an Outlook and a Gmail browser spec (both fail on the previous code and pass now), all corpora.
+- **Open:** live Gate; the chat card has its own guard for holds only, not yet for chat tasks.
+

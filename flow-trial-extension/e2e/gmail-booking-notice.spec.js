@@ -108,3 +108,17 @@ test('BOOKING_NOTICE on: the reminder mail of an appointment already on the cale
   await expect(page.locator(MAIN + ' button.flow-chip')).toHaveCount(0);
   expect(events()).toHaveLength(1);
 });
+
+test('PAYMENT_ASK on: the reminder of a bill already on the task list is not offered a second Pay task', async ({ glance }) => {
+  let page = await open(glance, { PAYMENT_ASK: true }, 'Hi Sali, your invoice of 1,200 NIS is due by tomorrow. Thank you for working with us!');
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  n += 1;
+  page = await glance.openGmail({ messageId: 'm-bk-' + n, threadId: 't-bk-' + n, subject: 'Reminder: invoice', senderEmail: 'hello@nofar.example', senderName: 'Studio Nofar', body: 'Hi Sali, a reminder: your invoice of 1,200 NIS is due by tomorrow. Thank you!', detailsTable: { to: ['me@x.com'] } });
+  await page.waitForTimeout(3000);
+  await expect(page.locator(MAIN + ' button.flow-chip')).toHaveCount(0);
+  expect(tasks()).toHaveLength(1);
+});
