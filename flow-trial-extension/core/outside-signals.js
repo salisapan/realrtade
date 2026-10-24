@@ -72,6 +72,8 @@ const FlowOutsideSignals = (() => {
   }
 
   const sameAmount = (a, b) => Math.abs(a - b) <= Math.max(0.5, a * 0.005);
+  // An invoice loop opened "plus VAT" also matches the net figure (the client may pay either); no other loop has amountNet.
+  const loopAmountMatches = (w, v) => sameAmount(w.amount.value, v) || Boolean(w.amountNet && w.amountNet.value > 0 && sameAmount(w.amountNet.value, v));
   const sameCurrency = (a, b) => !a || !b || a === b;
 
   // Waiting payment loops the evidence could settle. Evidence never closes a payment loop
@@ -79,7 +81,7 @@ const FlowOutsideSignals = (() => {
   function matchPayment(watches, ev, now) {
     if (!ev || !ev.amount) return null;
     const cand = (watches || []).filter((w) => w && w.status === 'waiting' && w.kind === KINDS.PAYMENT && w.direction !== 'mine' && w.direction !== 'clock'
-      && w.amount && sameAmount(w.amount.value, ev.amount.value) && sameCurrency(w.amount.currency, ev.amount.currency)
+      && w.amount && loopAmountMatches(w, ev.amount.value) && sameCurrency(w.amount.currency, ev.amount.currency)
       && !(w.signalDismissed || []).includes('payment')
       && (typeof w.createdAt !== 'number' || (typeof now === 'number' ? now : Date.now()) >= w.createdAt));
     if (cand.length !== 1) return null;       // none, or two loops for the same amount: do not guess
@@ -172,7 +174,104 @@ const FlowOutsideSignals = (() => {
   function wantsCalendar(w) { return Boolean(w) && w.status === 'waiting' && isScheduleLoop(w) && Boolean(w.counterpart && w.counterpart.email) && !(w.signalDismissed || []).includes('calendar'); }
   function wantsDrive(w) { return Boolean(w) && w.status === 'waiting' && w.direction === 'mine' && /:(?:quote|proposal|contract|invoice|report|deck|design)$/.test(String(w.subtype || '')) && Boolean(w.counterpart && w.counterpart.email) && !(w.signalDismissed || []).includes('drive'); }
 
-  return { TRUSTED_DOMAINS, CALENDAR_LOOKBACK_MS, trustedSender, paymentEvidence, matchPayment, matchCalendar, matchDrive, proposal, dismissPatch, wantsCalendar, wantsDrive, isScheduleLoop };
+  // ---- the invoice you sent IS the open loop (CARRY.invoices in config/carry.public.js, off) ----------------
+  // A freelancer sends "מצורפת חשבונית 1044 על סך 3,850 ₪" and never writes "please pay". Today that opens nothing
+  // (core/follow-up.js wants an explicit payment ask), so the money is tracked by nobody. This reads the person's OWN
+  // outgoing message (the caller decides that) and returns a payment ask in the shape core/follow-up.js buildWatch() takes,
+  // or null. Precision first: it needs the word invoice, evidence the invoice is on this message (attached / a file named
+  // like an invoice), and exactly one figure to wait for. A receipt, "חשבונית מס קבלה" (already paid), a quote, a credit
+  // note, invoices sent to your accountant, a forwarded invoice, or "I'll send the invoice tomorrow" open nothing.
+  // The due day comes from the stated terms: שוטף+N (end of this month + N days), net N / within N days / תוך N ימים,
+  // an explicit due date, "upon receipt"; with no terms there is no deadline and the first look is in 14 days.
+  // The loop closes only as any payment loop does: their reply that it was paid, a bank or processor email for that
+  // amount (matchPayment above), or the same in another app (core/cross-channel.js, by amount). Nothing here closes.
+  const INVOICE_NOUN = /\b(?:invoice|inv[-#]?\s?\d{2,})\b|(?:חשבונית|חשבון עסקה|דרישת תשלום)/i;
+  const ON_THIS_MESSAGE = /\b(?:attached|attaching|enclosed|please find|here(?:'s| is)(?: the| my| our)? invoice|sending (?:you )?(?:over )?(?:the|my|our) invoice)\b|(?:מצורפ|מצ["״]ב|רצ["״]ב|מצרפ|צירפתי|שולח(?:ת)? (?:לך |לכם )?(?:את )?ה?(?:חשבונית|חשבון|דרישת)|הנה ה(?:חשבונית|חשבון))/i;
+  const ALREADY_PAID = /(?<!\b(?:upon|on) )\breceipt\b|\b(?:paid in full|has been paid|thank you for (?:your )?payment|payment (?:was )?received)\b|(?:^|[\s,.(:"'])קבלה(?=$|[\s,.)!?:"'])|חשבונית מס\s*[/\\-]?\s*קבלה|(?:^|\s)שולמה?(?=$|[\s,.!?])|התשלום התקבל|תודה על התשלום/i;
+  const NOT_OWED = /\b(?:quote|quotation|estimate|proposal|credit note|refund|draft invoice|pro[- ]?forma draft)\b|(?:הצעת מחיר|(?:^|\s)הצעה(?=$|[\s,.])|זיכוי|החזר כספי|טיוטת חשבונית)/i;
+  const NOT_YET = /\b(?:will send|i(?:'ll| will) (?:send|issue|invoice|bill)|(?:invoice|it) will follow|to follow)\b|(?:אשלח|אוציא|אנפיק|אעביר)(?: לך| לכם)? (?:את )?ה?(?:חשבונית|חשבון)|(?:החשבונית|החשבון) (?:תישלח|יישלח|יצא)/i;
+  const BOOKKEEPING = /\b(?:accountant|bookkeep\w*|for your records|vat (?:report|return)|tax return)\b|(?:רו["״]ח|רואה החשבון|רואת החשבון|הנהלת חשבונות|הנה["״]ח|לדיווח|דיווח מע["״]מ|לתיעוד|החשבוניות של החודש)/i;
+  const FORWARDED = /(?:^|\n)\s*(?:-{3,}\s*(?:forwarded message|הודעה שהועברה)|(?:fwd?|fw|הועבר)\s*:)/i;
+  const PLUS_VAT = /\+\s*מע["״]מ|לפני מע["״]מ|לא כולל מע["״]מ|\bplus vat\b|\b\+\s*vat\b|\bexcl(?:\.|uding)? vat\b/i;
+  const VAT_RATE = 0.18;   // Israel, from 2025-01-01
+  const INVOICE_FILE = /(?:invoice|inv[-_ ]?\d|חשבונית|חשבון)[^/\\]*\.pdf$/i;
+  function isoOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function dayAt(now) { const d = new Date(now); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function plusDays(d, n) { const x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+
+  // { kind:'eom'|'net'|'date'|'receipt'|null, days, dueIso }
+  function paymentTerms(text, now) {
+    const t = String(text || '');
+    const d0 = dayAt(now);
+    let m = /שוטף\s*\+\s*(\d{1,3})|\b(?:eom|end of month)\s*\+\s*(\d{1,3})\b/i.exec(t);
+    if (m) { const n = +(m[1] || m[2]); const eom = new Date(d0.getFullYear(), d0.getMonth() + 1, 0); return { kind: 'eom', days: n, dueIso: isoOf(plusDays(eom, n)) }; }
+    m = /\bnet[\s-]?(\d{1,3})\b|\b(?:due|payable)\s+(?:with)?in\s+(\d{1,3})\s+days\b|\bwithin\s+(\d{1,3})\s+days\b|(?:תוך|בתוך)\s*(\d{1,3})\s*(?:יום|ימים)/i.exec(t);
+    if (m) { const n = +(m[1] || m[2] || m[3] || m[4]); return { kind: 'net', days: n, dueIso: isoOf(plusDays(d0, n)) }; }
+    m = /\b(?:due|payable|to be paid)\s+(?:on|by|before)\s+(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?|[^.\n]{3,30})|(?:לתשלום עד|מועד (?:ה)?תשלום[:\s]+|יש לשלם עד)\s*(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?|[^.\n]{3,30})/i.exec(t);
+    if (m) {
+      const span = m[1] || m[2];
+      // Hebrew text writes day first (15/11, 15.11.26). English stays with the shared parser, which knows month names.
+      const dm = /[֐-׿]/.test(t) ? /(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/.exec(span) : null;
+      if (dm) {
+        const day = +dm[1], mon = +dm[2];
+        let year = dm[3] ? +dm[3] : d0.getFullYear();
+        if (year < 100) year += 2000;
+        let due = new Date(year, mon - 1, day);
+        if (!dm[3] && due < d0) due = new Date(year + 1, mon - 1, day);
+        if (mon >= 1 && mon <= 12 && day >= 1 && day <= 31 && due.getDate() === day && due >= d0) return { kind: 'date', days: null, dueIso: isoOf(due) };
+      } else if (extract && extract.parseDate) {
+        try { const pd = extract.parseDate(span, new Date(now)); if (pd && pd.iso && pd.iso >= isoOf(d0)) return { kind: 'date', days: null, dueIso: pd.iso }; } catch (e) { /* no date */ }
+      }
+    }
+    if (/\b(?:upon|on|due on) receipt\b|\bimmediate(?:ly)?\b|(?:מיידי|עם קבלת החשבונית)/i.test(t)) return { kind: 'receipt', days: 0, dueIso: isoOf(plusDays(d0, 7)) };
+    return { kind: null, days: null, dueIso: null };
+  }
+
+  // text: the person's own outgoing message. opts: { enabled (the switch), now, subject, attachmentNames: [..] }
+  function invoiceLoop(text, opts) {
+    const o = opts || {};
+    if (o.enabled !== true || !extract || !extract.parseMoney) return null;
+    const now = typeof o.now === 'number' ? o.now : Date.now();
+    const body = String(text || '').slice(0, 4000);
+    const subject = String(o.subject || '');
+    const both = subject + '\n' + body;
+    if (!INVOICE_NOUN.test(both)) return null;
+    if (FORWARDED.test(body) || /^\s*(?:fwd?|fw|הועבר)\s*:/i.test(subject)) return null;
+    if (ALREADY_PAID.test(both) || NOT_OWED.test(both) || NOT_YET.test(both) || BOOKKEEPING.test(both)) return null;
+    const files = (Array.isArray(o.attachmentNames) ? o.attachmentNames : []).map(String);
+    if (!(ON_THIS_MESSAGE.test(both) || files.some((f) => INVOICE_FILE.test(f)))) return null;
+    // Exactly one figure to wait for: the largest money figure, and no second, different total.
+    // Two invoices in one message ("an invoice for 3,000 and another for 1,500"): which one to wait for is a guess.
+    if ((both.match(/\binvoice\b|חשבונית/gi) || []).length > 1 && /\b(?:another|second|also)\b[^.]{0,30}\binvoice|(?:ו?בנוסף|ועוד)[^.]{0,20}חשבונית|חשבונית נוספת/i.test(both)) return null;
+    const moneyHits = [];
+    // Sentences, then clauses (", " never splits "3,850" because a thousands comma has no space after it).
+    body.split(/(?<=[.!?])\s+|\n+|,\s+|;\s*/).forEach((sentence) => { const mm = extract.parseMoney(sentence); if (mm && mm.value > 0) moneyHits.push({ m: mm, sentence }); });
+    if (!moneyHits.length) return null;
+    if (new Set(moneyHits.map((h) => Math.round(h.m.value * 100))).size > 1 && !moneyHits.some((h) => /\b(?:total|amount due|balance due)\b|(?:סה["״]כ|לתשלום)/i.test(h.sentence))) return null;
+    const totals = moneyHits.filter((h) => /\b(?:total|amount due|balance due|sum)\b|(?:סה["״]כ|לתשלום|על סך|בסך|סכום)/i.test(h.sentence));
+    const pool = totals.length ? totals : moneyHits;
+    const values = Array.from(new Set(pool.map((h) => Math.round(h.m.value * 100))));
+    if (values.length !== 1) return null;            // two different totals: do not guess which one is owed
+    const pick = pool[0];
+    const currency = pick.m.currency || null;
+    let amount = { value: pick.m.value, currency, raw: pick.m.raw };
+    let amountNet = null;
+    if ((PLUS_VAT.test(pick.sentence) || PLUS_VAT.test(body)) && !/כולל מע["״]מ|\bincl(?:\.|uding)? vat\b/i.test(body) && currency === 'ILS') {
+      amountNet = amount;
+      const gross = Math.round(pick.m.value * (1 + VAT_RATE) * 100) / 100;
+      amount = { value: gross, currency, raw: pick.m.raw + ' + מע"מ' };
+    }
+    const lang = /[֐-׿]/.test(body) ? 'he' : 'en';
+    const no = /(?:invoice|inv)\s*(?:no\.?|number|#)?\s*[#:]?\s*([A-Z]{0,4}-?\d{2,8})\b|חשבונית(?: מס)?(?: מספר| מס'| מס׳)?\s*[#:]?\s*(\d{2,8})/i.exec(both);
+    const invoiceNo = no ? (no[1] || no[2]) : null;
+    const terms = paymentTerms(both, now);
+    const d0 = dayAt(now);
+    const chaseIso = terms.dueIso ? isoOf(plusDays(new Date(terms.dueIso + 'T00:00:00'), 1)) : isoOf(plusDays(d0, 14));
+    const label = lang === 'he' ? 'תשלום על חשבונית' + (invoiceNo ? ' ' + invoiceNo : '') : 'Payment for invoice' + (invoiceNo ? ' ' + invoiceNo : '');
+    return { kind: KINDS.PAYMENT, what: label, amount, amountNet, deadlineIso: terms.dueIso, chaseIso, lang, subtype: 'invoice', invoiceNo, terms: { kind: terms.kind, days: terms.days }, direction: 'theirs', basis: 'invoice' };
+  }
+
+  return { invoiceLoop, paymentTerms, TRUSTED_DOMAINS, CALENDAR_LOOKBACK_MS, trustedSender, paymentEvidence, matchPayment, matchCalendar, matchDrive, proposal, dismissPatch, wantsCalendar, wantsDrive, isScheduleLoop };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutsideSignals };

@@ -57,14 +57,80 @@ const FlowGoogleCloses = (() => {
   const SHEET_HE = /(?:תרשום|רשום|לרשום)\s+בגיליון\s+חדש/;
   const SHEET_EXISTING = /\b(?:the|our|my)\s+(?:\w+\s+){0,3}(?:spreadsheet|sheet|tracker|workbook)\b|הגיליון\s+ה|בגיליון\s+ה/i;
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:google\s+)?drive\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב)/;
+  // Drive and OneDrive are the same one-file save. "our shared files" is not:
+  // this write lands in the person's own OneDrive, not a shared library.
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
+  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
+  // A refusal of that save is silence. The negation has to govern the verb
+  // in the same clause, so a different "no need to" does not hide a real save.
+  // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
+  // is not a refusal: forget sits where need would.
+  const SAVE_NO = /\b(?:(?:do not|don't|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)|no\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  // אין / לא / אל, then a need-word, then the save verb. The need-word is
+  // צריך or צורך with י or ו slipped or dropped (צרך, צרכי, צרךי). The
+  // letters are the shape, not a list of spellings.
+  function hebrewNeedRefusal(text) {
+    const raw = String(text || '');
+    const re = /(?:^|[^\u0590-\u05FF])(?:אין|לא|אל)\s+(צ[וריכך]{2,4})\s+ל?(?:שמור|שמרי|לשמור|תתייק|תשמור)/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const word = m[1];
+      if (word.length >= 3 && word.length <= 5 && word.indexOf('ר') >= 0) return true;
+    }
+    return false;
+  }
+
+  // Save-shaped only. The open Outlook page counts file attachments for
+  // this sentence and for no other, so the rest of show and silence stay put.
+  function needsOneAttachment(text) {
+    const t = String(text || '');
+    return SAVE_EN.test(t) || SAVE_HE.test(t);
+  }
+
+  function saveClauses(text) {
+    return String(text || '').split(/[.!?\n\r]+/);
+  }
+
+  function clauseSaves(clause) {
+    return SAVE_EN.test(clause) || SAVE_HE.test(clause);
+  }
+
+  // A later "don't save it" names the same save without saying Drive again.
+  const SAVE_BACK = /\b(?:it|this|that)\b|אותו|את\s+זה/;
+
+  // Quiet when a save clause is itself negated. A "no need" that does not
+  // govern save, in another clause, leaves a real save in place. A later
+  // "don't save" still refuses the whole mail, including when that later
+  // clause only says "it" / "this" / "that" / אותו / את זה.
+  function saveRefused(clause) {
+    return SAVE_NO.test(clause) || hebrewNeedRefusal(clause);
+  }
+  function refusesSave(text) {
+    const raw = String(text || '');
+    const clauses = saveClauses(raw);
+    if (clauses.some((clause) => clauseSaves(clause) && saveRefused(clause))) return true;
+    let seenSave = false;
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (seenSave && saveRefused(clause) && SAVE_BACK.test(clause)) return true;
+      if (clauseSaves(clause)) seenSave = true;
+    }
+    if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return saveRefused(raw);
+    return false;
+  }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
   const HEDGE = /\b(?:maybe|might|perhaps|possibly)\b|(?:^|\s)(?:אולי|ייתכן)/i;
-  const PLACE_EN = /\b(?:add|put|attach|include|place|note)\b(?:\s+\w+){0,4}\s+(?:the\s+)?([a-z][\w-]{2,24})\b(?:\s+\w+){0,10}\s+(?:on|to|into|in)\s+(?:the\s+)?(calendar|invite|event|hold|task|reminder)\b/i;
-  const PLACE_HE = /(?:תוסיף|תצרף|שים|תשים)\s+את\s+ה?([א-ת]{2,24})\s+[^\n]{0,40}(ליומן|בזימון|בתזכורת|במשימה)/;
-  const PLACE_STOP = /^(?:meeting|call|sync|this|that|these|those|file|files|doc|docs|document|documents|stuff|one|email|message|it|them|thing|things)$/i;
+  // "on my calendar" is the same target as "on the calendar". A named
+  // file may carry an extension ("glance-pricing-q4.pdf file"), so the
+  // term keeps dots. The word "file" after that name is not the term.
+  const PLACE_EN = /\b(?:add|put|attach|include|place|note)\b(?:\s+\w+){0,4}\s+(?:the\s+)?([a-z][\w.-]{2,80})\b(?:\s+\w+){0,10}\s+(?:on|to|onto|into|in)\s+(?:(?:the|my|our)\s+)?(calendar|invite|event|hold|task|reminder)\b/i;
+  // A Latin file name inside a Hebrew place sentence ("שים את
+  // glance-pricing-q4.pdf ביומן"). Tried before PLACE_HE so "קובץ" is
+  // not captured as the file. ביומן and ליומן are the same calendar.
+  const PLACE_HE_FILE = /(?:תוסיף|תצרף|שים|תשים)\s+את\s+(?:הקובץ\s+|קובץ\s+)?([A-Za-z][\w.-]{2,80})(?:\s+ה?קובץ)?\s+[^\n]{0,40}?(ליומן|ביומן|בזימון|בתזכורת|במשימה)/;
+  const PLACE_HE = /(?:תוסיף|תצרף|שים|תשים)\s+את\s+ה?([א-ת]{2,24})\s+[^\n]{0,40}(ליומן|ביומן|בזימון|בתזכורת|במשימה)/;
+  const PLACE_STOP = /^(?:meeting|call|sync|this|that|these|those|file|files|doc|docs|document|documents|stuff|one|email|message|it|them|thing|things|קובץ|קבצים|מסמך|מסמכים|הקובץ|המסמך)$/i;
   const SEND_ONLY = /\b(?:send|attach|forward|share)\b/i;
 
   function englishPluralTerm(term) {
@@ -232,6 +298,12 @@ const FlowGoogleCloses = (() => {
       };
     }
     if (close.copyAttachment) {
+      if (close.target === 'onedrive') {
+        return {
+          cardLine: 'Saving the attached file to OneDrive.',
+          cardLineHe: 'שומר את הקובץ המצורף ב-OneDrive.'
+        };
+      }
       return {
         cardLine: 'Saving the attached file to Drive.',
         cardLineHe: 'שומר את הקובץ המצורף בדרייב.'
@@ -250,7 +322,7 @@ const FlowGoogleCloses = (() => {
   }
 
   function placeTarget(which) {
-    if (which === 'calendar' || which === 'invite' || which === 'event' || which === 'hold' || which === 'ליומן' || which === 'בזימון') return 'calendar';
+    if (which === 'calendar' || which === 'invite' || which === 'event' || which === 'hold' || which === 'ליומן' || which === 'ביומן' || which === 'בזימון') return 'calendar';
     if (which === 'task' || which === 'reminder' || which === 'בתזכורת' || which === 'במשימה') return 'task';
     return null;
   }
@@ -276,13 +348,14 @@ const FlowGoogleCloses = (() => {
     if (!text.trim()) return null;
     if (COMMENT_EN.test(text) || COMMENT_HE.test(text)) return { silence: true };
     if (input.blocked) return null;
-    if (HEDGE.test(text) && (CREATE_EN.test(text) || CREATE_HE.test(text) || SHEET_EN.test(text) || SHEET_HE.test(text) || SAVE_EN.test(text) || SAVE_HE.test(text) || PLACE_EN.test(text) || PLACE_HE.test(text))) {
+    if (HEDGE.test(text) && (CREATE_EN.test(text) || CREATE_HE.test(text) || SHEET_EN.test(text) || SHEET_HE.test(text) || SAVE_EN.test(text) || SAVE_HE.test(text) || PLACE_EN.test(text) || PLACE_HE_FILE.test(text) || PLACE_HE.test(text))) {
       return { silence: true };
     }
 
     if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
-      if (input.attachmentCount !== 1) return { silence: true };
+      if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
+      const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {
         family: 'C',
         personalClose: 'drive-file',
@@ -290,6 +363,7 @@ const FlowGoogleCloses = (() => {
         kind: 'file',
         copyAttachment: true,
         destination: 'draft',
+        target: onedrive ? 'onedrive' : 'drive',
         fileTerm: null,
         slots: [],
         filled: {},
@@ -306,7 +380,7 @@ const FlowGoogleCloses = (() => {
       return { close: close };
     }
 
-    const place = text.match(PLACE_EN) || text.match(PLACE_HE);
+    const place = text.match(PLACE_EN) || text.match(PLACE_HE_FILE) || text.match(PLACE_HE);
     if (place) {
       if (bothDestinations(text)) return { silence: true };
       const term = cleanLine(place[1]);
@@ -473,8 +547,18 @@ const FlowGoogleCloses = (() => {
     return merged;
   }
 
+  // A Doc or Sheet built from a named template (Family I / create-missing).
+  // Family B places a file that already exists. It has no template and no
+  // body to fill. Treating it as a blank template aborts Do It before the
+  // calendar or task write.
+  function needsArtifactBody(close) {
+    if (!close || close.copyAttachment) return false;
+    if (close.personalClose === 'file-on-hold' || close.personalClose === 'file-on-task') return false;
+    return close.personalClose === 'create-missing' || close.kind === 'doc' || close.kind === 'sheet' || Boolean(close.templateName);
+  }
+
   function artifactBody(close, fills) {
-    if (!close || close.copyAttachment) return { blank: true };
+    if (!needsArtifactBody(close)) return { blank: true };
     if (!close.templateName) return { blank: true };
     const merged = mergedFills(close, fills);
     const missing = missingSlots(close.slots || [], merged);
@@ -526,6 +610,43 @@ const FlowGoogleCloses = (() => {
     return false;
   }
 
+  // Every address on the message is the account. That is a note to
+  // yourself, not a reply you just sent to someone else.
+  function noteToSelf(emails, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    if (!own) return false;
+    const list = [];
+    const raw = Array.isArray(emails) ? emails : [];
+    for (const item of raw) {
+      const email = String(item || '').trim().toLowerCase();
+      if (email) list.push(email);
+    }
+    if (!list.length) return false;
+    for (const email of list) {
+      if (email !== own) return false;
+    }
+    return true;
+  }
+
+  // Which message the reading pane should judge. emailLists[i] is the
+  // [email] values on that message, sender first. A newest note addressed
+  // only to yourself is the ask, even when an older message in the thread
+  // came from someone else. Otherwise the newest non-own message wins.
+  // A message you sent to someone else stays quiet. -1 means stay quiet.
+  function messageToJudge(emailLists, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    if (!own || !Array.isArray(emailLists) || !emailLists.length) return -1;
+    const newest = emailLists.length - 1;
+    if (noteToSelf(emailLists[newest], own)) return newest;
+    for (let i = newest; i >= 0; i--) {
+      const list = Array.isArray(emailLists[i]) ? emailLists[i] : [];
+      const sender = String(list[0] || '').trim().toLowerCase();
+      if (sender && sender === own) continue;
+      return i;
+    }
+    return -1;
+  }
+
   // Exactly one name match. Zero or two-plus is not a file we may use.
   function pickOneFile(files, term) {
     const hits = [];
@@ -540,13 +661,19 @@ const FlowGoogleCloses = (() => {
 
   return {
     consider: consider,
+    needsOneAttachment: needsOneAttachment,
+    refusesSave: refusesSave,
+    refusesSave: refusesSave,
     detailMode: detailMode,
     cardPlan: cardPlan,
     chatLine: chatLine,
     parseSlotReply: parseSlotReply,
     acceptTurn: acceptTurn,
+    needsArtifactBody: needsArtifactBody,
     artifactBody: artifactBody,
     pickOneFile: pickOneFile,
+    noteToSelf: noteToSelf,
+    messageToJudge: messageToJudge,
     MAX_CHAT_TURNS: MAX_CHAT_TURNS,
     FIELD_CAP: FIELD_CAP,
     ARTIFACTS: ARTIFACTS

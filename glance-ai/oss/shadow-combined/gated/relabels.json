@@ -1,0 +1,32 @@
+[
+ {
+  "id": "v2syn-2455",
+  "lang": "en",
+  "surface": "gmail",
+  "scenario": "drive_save",
+  "from": "SILENT",
+  "to": "file_save",
+  "own": "Hi all,\n\nPlease store the attached file in the Drive.\n\nThank you,\nDana",
+  "rule": "explicit-save-real-attachment",
+  "voc": "group",
+  "role": "to",
+  "n": 1,
+  "target": "drive",
+  "why": "explicit Drive-on-Gmail save ask, 1 declared attachment(s), not negated/hedged/marketing, addressed group/to; suggest-save.js -> suggest:show"
+ },
+ {
+  "id": "v2syn-2459",
+  "lang": "en",
+  "surface": "gmail",
+  "scenario": "drive_save",
+  "from": "SILENT",
+  "to": "file_save",
+  "own": "Hey,\n\nPlease store the attached file in the Drive.\n\nThanks!\nMichael",
+  "rule": "explicit-save-real-attachment",
+  "voc": "none",
+  "role": "to",
+  "n": 1,
+  "target": "drive",
+  "why": "explicit Drive-on-Gmail save ask, 1 declared attachment(s), not negated/hedged/marketing, addressed none/to; suggest-save.js -> suggest:show"
+ }
+]

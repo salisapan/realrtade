@@ -56,7 +56,7 @@ const FLOW_CONNECTORS = [
     // The rest still work (see WRITERS/UNDOERS in background.js) but aren't
     // part of onboarding until the core loop has proven itself.
     mvp: true,
-    note: 'One Google sign-in, covering Tasks, Calendar, Gmail drafts, and Drive files Glance itself creates — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; prepares (never sends) draft replies; and, when the close is a file, creates that Doc, Sheet, or Drive file from what the email already says. Undo removes it.'
+    note: 'One native Google sign-in, covering Tasks, Calendar, Gmail drafts, and Drive files Glance itself creates — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; prepares (never sends) draft replies; and, when the close is a file, creates that Doc, Sheet, or Drive file from what the email already says. Undo removes it.'
   },
   {
     id: 'notion',
@@ -109,7 +109,76 @@ const FLOW_CONNECTORS = [
       { key: 'board', label: 'Board ID', placeholder: '1234567890', type: 'text' }
     ]
   },
+  {
+    id: 'asana',
+    label: 'Asana',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one task to the Asana project you choose and reads it back before it counts as handled. Off in this build; needs an Asana app Client ID (docs/glance-ai/connectors/asana.md).',
+    fields: [
+      { key: 'project', label: 'Project URL or ID', placeholder: 'https://app.asana.com/0/…', type: 'text' }
+    ]
+  },
+  {
+    id: 'jira',
+    label: 'Jira',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one issue to the Jira project you choose and reads it back before it counts as handled. Off in this build; needs an Atlassian app Client ID (docs/glance-ai/connectors/jira.md).',
+    fields: [
+      { key: 'project', label: 'Project key or link', placeholder: 'OPS or https://….atlassian.net/…', type: 'text' }
+    ]
+  },
+  {
+    id: 'linear',
+    label: 'Linear',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one issue to the Linear team you choose and reads it back before it counts as handled. Off in this build; needs a Linear OAuth app Client ID (docs/glance-ai/connectors/linear.md).',
+    fields: [
+      { key: 'team', label: 'Team key or link', placeholder: 'ENG or https://linear.app/…/team/ENG', type: 'text' }
+    ]
+  },
+  {
+    id: 'docusign',
+    label: 'DocuSign',
+    kind: 'E-signature',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Reads the status of one envelope you already sent and counts the loop closed when it is completed. Never sends or changes an envelope. Off in this build; needs a DocuSign integration key (docs/glance-ai/connectors/docusign.md).'
+  },
+  {
+    id: 'dropbox',
+    label: 'Dropbox',
+    kind: 'File storage',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Saves one file you approve into a Glance folder in your Dropbox and reads it back before it counts as saved. Never overwrites. Off in this build; needs a Dropbox app key (docs/glance-ai/connectors/dropbox.md).'
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 
-if (typeof module !== 'undefined') module.exports = { FLOW_CONNECTORS };
+// One card per provider. googleTask and googleTasks are the same Google
+// consent. A second row with that id is the same card, dropped here.
+function providerIdOf(row) {
+  const raw = row && (row.providerId || row.id) || '';
+  if (raw === 'google' || raw === 'googleTask' || raw === 'googleTasks') return 'google';
+  return raw;
+}
+
+function connectionProviders(rows) {
+  const seen = Object.create(null);
+  const out = [];
+  (rows || []).forEach((row) => {
+    const id = providerIdOf(row);
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    out.push(row);
+  });
+  return out;
+}
+
+if (typeof module !== 'undefined') module.exports = { FLOW_CONNECTORS, connectionProviders, providerIdOf };

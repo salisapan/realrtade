@@ -57,7 +57,7 @@ const FlowCloseFamilies = (() => {
   const ASK_EN = /\b(?:please (?:send|forward|share|attach|email|resend|provide|enclose)|(?:can|could|would) you (?:please )?(?:send|forward|share|attach|email|resend|provide)|would you mind (?:sending|forwarding|sharing|emailing|attaching)|kindly (?:send|forward|share|attach|email|resend|provide)|(?:i|we) (?:still |also )?need (?:you to (?:send|forward|attach|share|email) )?(?:a copy of )?(?:the|your|our|a|an)|(?:can|could) i (?:please )?(?:get|have) (?:a copy of )?(?:the|your|a|an)|send me (?:the|your|a)|attach (?:the|your)|mind (?:sending|forwarding|emailing|sharing)|be able to (?:send|forward|share|attach|email|resend|provide)|if you could (?:please )?(?:send|forward|share|attach|email|resend|provide)|pass along (?:the|your|a|an))\b/i;
   // שלח / להעביר need a non-letter before them so אשלח and אעביר (a promise)
   // are not read as an ask to find a file.
-  const ASK_HE = /(?:אפשר\s+(?:לשלוח|לקבל|לצרף)|בבקשה\s+תשלח|תשלח(?:י|ו)?(?:\s+לי|\s+את)|תעביר(?:י|ו)?(?:\s+לי|\s+את)|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי|\s+את)|תצר(?:ף|פי|פו)|(?:^|[^\u0590-\u05FF])לצרף|(?:צריך|צריכה|צריכים)\s+את|אשמח\s+לקבל|אבקש\s+לקבל|נשמח\s+לקבל|נא\s+(?:לשלוח|לצרף)|מבקש(?:ת|ים)?\s+ל(?:שלוח|קבל|צרף)|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרף)|(?:^|[^\u0590-\u05FF])להעביר)/;
+  const ASK_HE = /(?:אפשר\s+(?:לשלוח|לקבל|לצרר?ף)|בבקשה\s+תשלח|תשלח(?:י|ו)?(?:\s+לי|\s+את)|תעביר(?:י|ו)?(?:\s+לי|\s+את)|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי|\s+את)|תצר(?:ף|פי|פו)|(?:^|[^\u0590-\u05FF])לצרר?ף|(?:צריך|צריכה|צריכים)\s+את|אשמח\s+לקבל|אבקש\s+לקבל|נשמח\s+לקבל|נא\s+(?:לשלוח|לצרר?ף)|מבקש(?:ת|ים)?\s+ל(?:שלוח|קבל|צרף)|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרר?ף)|(?:^|[^\u0590-\u05FF])להעביר)/;
 
   const CREATE_EN = /\b(?:create|draft|draw up|prepare|put together|spin up)\b/i;
   const CREATE_HE = /(?:תיצור|תכין|ליצור|להכין|לנסח|תנסח|תכתוב|לכתוב)/;
@@ -118,8 +118,8 @@ const FlowCloseFamilies = (() => {
   const PAST_HE = /(?:כבר|שלחתי|שילמתי|נשלחה אתמול|שול(?:מה|מו|ם)\s+אתמול)/;
   const RETRACT_EN = /^\s*(?:never mind|forget it|disregard|ignore that)[.!]?\s*$/i;
   const RETRACT_HE = /^\s*(?:עזוב|תשכח מזה|לא משנה)[.!]?\s*$/;
-  const NOISE_EN = /\b(?:unsubscribe|newsletter|hope this (?:email )?finds you well|book a demo|free trial|just bumping this|circling back|quick bump|for your information|no action needed|fyi)\b/i;
-  const NOISE_HE = /(?:לידיעתך|אין צורך בפעולה|ניוזלטר)/;
+  const NOISE_EN = /\b(?:unsubscribe|newsletter|you are receiving this|you(?:'|’)re receiving this|you received this email because|hope this (?:email )?finds you well|book a demo|free trial|just bumping this|circling back|quick bump|for your information|no action needed|fyi)\b/i;
+  const NOISE_HE = /(?:לידיעתך|אין צורך בפעולה|ניוזלטר|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום)/;
   const VENT_EN = /\b(?:so frustrated|ridiculous|just venting|this is a mess)\b/i;
 
   const TARGET_CAL = /\b(?:(?:on(?:to)?|to|in) the calendar|in the (?:calendar |event |invite )?description|calendar invite|calendar note)\b|בתיאור (?:האירוע|הפגישה)|[בל]יומן/i;
@@ -201,11 +201,37 @@ const FlowCloseFamilies = (() => {
     return true;
   }
 
+  // "don't forget to save" is the ask. "no need to reply" declines a draft.
+  // Neither phrase negates the work in the same mail.
+  function askPhraseIsNotTheNegation(raw) {
+    const t = String(raw || '');
+    if (/\bdon'?t\s+forget\b/i.test(t)) return true;
+    if (/\bno\s+ne+d\s+to\s+reply\b/i.test(t)) return true;
+    return false;
+  }
+  // "don't save" / "no need to save" is the file gate's own quiet.
+  // That reason stays quiet:google. It is not this hold.
+  function saveRefusal(raw) {
+    const t = String(raw || '');
+    if (/\bdon'?t\s+forget\b/i.test(t)) return false;
+    if (/\b(?:do not|don'?t|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)\b/i.test(t)) return true;
+    if (/\bno\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)\b/i.test(t)) return true;
+    if (/(?:אל\s*תשמור|לא\s+צריך\s+לשמור|אין\s+צורך\s+לשמור|לא\s+לשמור)/.test(t)) return true;
+    return false;
+  }
   function hedged(sentence) {
-    return HEDGE_EN.test(sentence) || HEDGE_HE.test(sentence);
+    // An English hedge, maybe, if you're free, and אולי win before a live ask.
+    // "אם אפשר, תשלח" is still the ask. אם אפשר is not this hedge.
+    const t = String(sentence || '');
+    if (HEDGE_EN.test(t)) return true;
+    if (/(?:^|[^\u0590-\u05FF])אולי/.test(t)) return true;
+    if (sentenceLiveAsk(t)) return false;
+    return HEDGE_HE.test(t);
   }
   function negated(sentence) {
-    return NEG_EN.test(sentence) || NEG_HE.test(sentence);
+    const t = String(sentence || '');
+    if (askPhraseIsNotTheNegation(t)) return false;
+    return NEG_EN.test(t) || NEG_HE.test(t);
   }
   function pastDone(sentence) {
     return PAST_EN.test(sentence) || PAST_HE.test(sentence);
@@ -269,17 +295,77 @@ const FlowCloseFamilies = (() => {
     }
     return found.length + he.length >= 2;
   }
+  function normHold(raw) {
+    return String(raw || '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u2060\u200E\u200F]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // A real ask that is still on. A hypothetical, an "if we approve", and
+  // "nothing has been decided" are not this, even when "could you" follows.
+  function sentenceLiveAsk(raw) {
+    const t = normHold(raw);
+    if (!t) return false;
+    if (/\bhypothetical/i.test(t) || /\bif\s+we\s+approv/i.test(t) || /באופן תיאורטי/.test(t)) return false;
+    if (/אם נאשר/.test(t) && !/אם אפשר/.test(t)) return false;
+    if (/\bnothing has been decided\b/i.test(t) && !/\bwe confirmed it\b/i.test(t)) return false;
+    if (/\b(?:do not|don'?t)\b/i.test(t) && !/\bwe confirmed it\b/i.test(t) && !/\bdon'?t\s+forget\b/i.test(t)) return false;
+    if (/\bno\s+ne+d\s+to\b/i.test(t) && !/\bno\s+ne+d\s+to\s+reply\b/i.test(t)) return false;
+    if (/\b(?:please|kindly)\b/i.test(t) && /\b(?:pay|send|wire|process|schedule|remit|reply|confirm)\b/i.test(t)) return true;
+    if (/\bif you can\b/i.test(t) && /\b(?:send|pay|attach|forward|share)\b/i.test(t)) return true;
+    if (/\bwe confirmed it\b/i.test(t) && /\bplease\s+pay\b/i.test(t)) return true;
+    if (/אם אפשר/.test(t) && /(?:תשלח|שלח|תעביר|העבר|לשלוח)/.test(t)) return true;
+    if (/נא\s+לשלם/.test(t)) return true;
+    if (/\b(?:can|could)\s+we\s+meet\b/i.test(t) || /\blet'?s\s+meet\b/i.test(t)) return true;
+    if (/אפשר\s+לקבוע\s+פגישה/.test(t) || /אפשר\s+לשלוח/.test(t)) return true;
+    if (/אשמח אם תוכל/.test(t)) return true;
+    if (/\b(?:can|could|would)\s+you\b/i.test(t) && /\b(?:send|pay|schedule|forward|attach|deliver|meet|confirm|review)\b/i.test(t)) return true;
+    if (/תוכל/.test(t) && /(?:לקבוע|לשלוח|להעביר|לשלם)/.test(t)) return true;
+    return false;
+  }
+  // Negated or still conditional. "No ned" and "utnil we confirm" are the
+  // same hold as the spelled words. A live ask in this sentence is not a hold.
+  function sentenceHeldBack(raw) {
+    const t = normHold(raw);
+    if (!t || sentenceLiveAsk(t)) return false;
+    // "We don't have a quote" names the missing file. It is not a hold.
+    if (notFound(t)) return false;
+    // These two are not a hold of the ask. A save refusal is the file gate.
+    if (askPhraseIsNotTheNegation(t) || saveRefusal(t)) return false;
+    if (/\b(?:do not|don'?t)\b/i.test(t)) return true;
+    if (/\bno\s+ne+d\s+to\b/i.test(t)) return true;
+    if (/\b(?:until|utnil)\s+we\s+confirm\b/i.test(t)) return true;
+    if (/\bif\s+we\s+approv/i.test(t)) return true;
+    if (/\bhypothetical/i.test(t)) return true;
+    if (/\bnothing has been decided\b/i.test(t)) return true;
+    if (/באופן תיאורטי/.test(t)) return true;
+    if (/אם נאשר/.test(t)) return true;
+    if (/אל\s*תשל/.test(t)) return true;
+    if (/אין צורך/.test(t)) return true;
+    if (/לא נדר(?:שת|ת)?\s+פעולה/.test(t)) return true;
+    if (/\b(?:possibly|tentatively)\b/i.test(t) && /\b(?:meet|confirm)\b/i.test(t)) return true;
+    return false;
+  }
+  // Quiet only when a hold is present and no sentence still asks.
+  function commitmentHeldBack(text) {
+    const parts = splitSentences(normHold(text));
+    if (!parts.length) return false;
+    let held = false;
+    for (let i = 0; i < parts.length; i++) {
+      if (sentenceLiveAsk(parts[i])) return false;
+      if (sentenceHeldBack(parts[i])) held = true;
+    }
+    return held;
+  }
   function skipSentence(sentence) {
     if (hedged(sentence) || pastDone(sentence) || statusQuestion(sentence)) return true;
+    if (sentenceHeldBack(sentence)) return true;
     // "We don't have a quote" names a missing asset. "Please don't send" does not.
     if (negated(sentence) && !notFound(sentence)) return true;
     return false;
   }
 
   // Hebrew clock words, longest first so "אחת עשרה" is not clipped to "אחת".
-  // A word with no day-part is the workday hour (שלוש → 15:00). A bare digit
-  // ("בשעה 3", "at 3") stays unresolved: that form is not a stated half of
-  // the day, and writing 03:00 was the wrong close.
+  // A word with no day-part is the workday hour (שלוש → 15:00, בשלוש → 15:00).
+  // Hebrew "בשעה 3" is that same hour with no minutes, so it is 15:00. English
+  // "at 3" stays unresolved.
   const HE_HOUR_WORDS = [
     ['אחת עשרה', 11], ['אחד עשרה', 11],
     ['שתיים עשרה', 12], ['שתים עשרה', 12],
@@ -297,9 +383,10 @@ const FlowCloseFamilies = (() => {
   }
   function hebrewWordClock(text) {
     const part = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    const m = String(text || '').match(new RegExp(
-      '(?:בשעה|בשעות)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
-    ));
+    const src = String(text || '');
+    const marked = '(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const bare = '(?:^|[^\\u0590-\\u05FF])ב(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])';
+    const m = src.match(new RegExp(marked)) || src.match(new RegExp(bare));
     if (!m) return null;
     const hour = HE_HOUR_WORDS.find((pair) => pair[0] === m[1]);
     if (!hour) return null;
@@ -337,7 +424,7 @@ const FlowCloseFamilies = (() => {
   function bareAmbiguousHour(text) {
     if (clockOf(text)) return false;
     if (/\bat\s+(?:1[0-2]|0?[1-7])(?::[0-5]\d)?\b/i.test(text)) return true;
-    if (/(?:בשעה|בשעות)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
     return false;
   }
   function shiftWeekday(now, target, mode) {
@@ -359,7 +446,7 @@ const FlowCloseFamilies = (() => {
     const letter = '([אבגדהו])';
     const tail = '(?:[\'׳\u05F3])?(?:\\s+הבא(?![\\u0590-\\u05FF]))?(?![\\u0590-\\u05FF])';
     const led = String(text || '').match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+' + letter + tail));
-    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+בשעה)'));
+    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+(?:בשעה|בעה))'));
     const m = led || clocked;
     if (!m) return null;
     const target = 'אבגדהו'.indexOf(m[1]);
@@ -472,12 +559,10 @@ const FlowCloseFamilies = (() => {
         date: date, time: time, fromDate: oldDate, fromTime: oldTime
       });
     }
-    if (date && time) {
-      return hit({
-        family: 'G', type: 'event', confidence: 'high', personalClose: 'calendar-hold',
-        what: sentence, requestWhat: sentence, date: date, time: time
-      });
-    }
+    // Postpone or reschedule that does not name two different clocks is
+    // not a new hold. A cancel that names one slot still falls through
+    // to the delete below.
+    if (date && time && move) return 'suppress';
     if (date && move) {
       return hit({
         family: 'G', type: 'decision', confidence: 'high', personalClose: 'dated-commitment',
@@ -563,11 +648,12 @@ const FlowCloseFamilies = (() => {
     if (!meet && !commit && !slot) return null;
     if (!date) return null;
     if (time) {
-      // A timed promise stays a decision. A meet, or a sentence that is
-      // only the slot, is the event. Both are one calendar hold.
+      // A sender's promise plus a clock is not a hold. A meet, or a
+      // sentence that is only the slot, is the event.
+      if (commit && !meet) return null;
       return hit({
         family: 'D',
-        type: (commit && !meet) ? 'decision' : 'event',
+        type: 'event',
         confidence: 'high',
         personalClose: 'calendar-hold',
         what: sentence,
@@ -576,8 +662,9 @@ const FlowCloseFamilies = (() => {
         time: time
       });
     }
-    // "at 3" / "בשעה 3" named an hour we will not invent. A commitment
+    // English "at 3" named an hour we will not invent. A commitment
     // still has its day. A meet does not become an all-day hold here.
+    // Hebrew "בשעה 3" is already a workday clock, so it is not this case.
     if (bareAmbiguousHour(sentence)) {
       if (!commit) return null;
       return hit({
@@ -599,6 +686,7 @@ const FlowCloseFamilies = (() => {
 
   function matchMoney(sentence, facts, now) {
     if (pastDone(sentence)) return null;
+    if (sentenceHeldBack(sentence)) return null;
     // "Has the fee been confirmed?" is a question, not an approval.
     if (/\?\s*$/.test(sentence)) return null;
     // "Nothing is confirmed yet" names the word in order to withdraw it.
@@ -732,7 +820,7 @@ const FlowCloseFamilies = (() => {
     if (MOVE_EN.test(text) || MOVE_HE.test(text) || CANCEL_EN.test(text) || CANCEL_HE.test(text)) return false;
     if (replacementCue(text)) return false;
     const clockRe = new RegExp(
-      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|בשעה\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
+      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|(?:בשעה|(?<![\\u0590-\\u05FF])בעה)\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
       'gi'
     );
     const clocks = [];
@@ -893,10 +981,23 @@ const FlowCloseFamilies = (() => {
   // completed act, or a status question. The bare handoff regex cannot
   // see "don't" or "maybe" in front of "could you", and a chip there is a
   // wrong close. A past day on the thing being asked for is not this.
+  function parkingPermitAsk(text) {
+    const t = String(text || '');
+    return /\bparking permits?\b/i.test(t) && /\b(?:please|can you|could you|would you|send|need|renew|attach|forward)\b/i.test(t);
+  }
+
   function askBlocked(text) {
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     text = stripQuotedAsks(text);
-    if (NOISE_EN.test(text) || NOISE_HE.test(text)) return true;
+    if (NOISE_HE.test(text)) return true;
+    if (NOISE_EN.test(text)) {
+      // "Everyone else, no action needed" stands other people down. It is
+      // not a whole-mail noise line when another sentence still asks.
+      const parts = splitSentences(text);
+      const kept = parts.filter((s) => !/^(?:everyone else|all others|everybody else|the rest(?: of you)?)[,:]?\s+no action (?:needed|required|necessary)\b/i.test(String(s || '').trim()));
+      if (kept.length === parts.length || NOISE_EN.test(kept.join('\n'))) return true;
+      text = kept.join('\n');
+    }
     const cue = /\b(?:can you|could you|would you|please|kindly|send|forward|chase|nudge)\b/i;
     let saw = false;
     let open = false;
@@ -946,7 +1047,7 @@ const FlowCloseFamilies = (() => {
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
+  return { assess, askBlocked, parkingPermitAsk, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE, commitmentHeldBack, sentenceHeldBack, sentenceLiveAsk };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

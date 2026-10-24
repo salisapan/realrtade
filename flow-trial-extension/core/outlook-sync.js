@@ -74,13 +74,31 @@ const FlowOutlookSync = (() => {
 
     const threads = {};
     const unreadable = {};
+    function fileCount(msg) {
+      if (!msg) return 0;
+      if (msg.attachmentsUnread) return null;
+      if (Array.isArray(msg.attachments)) {
+        return msg.attachments.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || ''))).length;
+      }
+      return msg.hasAttachments ? 1 : 0;
+    }
     Object.keys(byId).forEach((id) => {
-      const u = graphMail.toUtterance(byId[id], me);
+      const raw0 = byId[id];
+      const u = graphMail.toUtterance(raw0, me);
+      if (u && u.text.trim() && !u.thread && raw0 && raw0.id && !raw0.isDraft) u.thread = 'msg:' + raw0.id;
       if (!u || !u.thread || !u.text.trim()) {
         // A message with no readable text (an empty body, an attachment only): it still gets a line in Why not shown.
-        const raw = byId[id];
+        // A message with no conversation id is not dropped: the line uses the message id.
+        const raw = raw0;
+        if (raw && raw.isDraft) {
+          const conv = raw.conversationId;
+          if (conv) unreadable[conv] = unreadable[conv] || { conversationId: conv, messageId: id, subject: String(raw.subject || '').slice(0, 120) || '(no subject)', reason: 'no-text', direction: null };
+          return;
+        }
         const conv = raw && raw.conversationId;
-        if (conv) unreadable[conv] = unreadable[conv] || { conversationId: conv, subject: String(raw.subject || '').slice(0, 120), reason: 'no-text', direction: u ? u.direction : null };
+        const row = { conversationId: conv || null, messageId: id, subject: String((raw && raw.subject) || '').slice(0, 120) || '(no subject)', reason: 'no-text', direction: u ? u.direction : null };
+        if (conv) unreadable[conv] = unreadable[conv] || row;
+        else out.diagnostics.push(row);
         return;
       }
       (threads[u.thread] = threads[u.thread] || []).push(u);
@@ -101,9 +119,16 @@ const FlowOutlookSync = (() => {
         if (extra) Object.assign(row, extra);
         out.diagnostics.push(row);
       }
-      const cp = graphMail.counterpartOf(raws, me);
-      // Note to self (every party is me): produce nothing.
-      if (!cp) { out.stats.conversations++; note('note-to-self'); return; }
+      let cp = graphMail.counterpartOf(raws, me);
+      const selfMsg = byId[last.id] || lastRaw0;
+      const selfAddressed = graphMail.addressedToSelf && graphMail.addressedToSelf(selfMsg, meSet);
+      // Every party is the user, and the mail is not to the user: a note
+      // with no ask. A mail from the user to the user is incoming.
+      if (!cp && !selfAddressed) { out.stats.conversations++; note('note-to-self'); return; }
+      if (!cp && selfAddressed) {
+        const fa = selfMsg.from && selfMsg.from.emailAddress;
+        cp = channel.party({ channel: 'outlook', name: fa && fa.name, email: fa && fa.address });
+      }
       if (cp.email && !seenParty[cp.email]) { seenParty[cp.email] = true; out.parties.push(cp); }
       out.stats.conversations++;
       const id = watchId(conv);
@@ -145,20 +170,41 @@ const FlowOutlookSync = (() => {
 
       // ---- their message is the newest -------------------------------------------------------------------
       const party = last.from;
-      // Never classify a message whose sender is in ownAddresses.
-      if (meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) { note('own-sender', { counterpart: party.email || null }); return; }
+      // A sender in ownAddresses who wrote to someone else stays quiet.
+      // The same sender writing to their own address, or to an alias, is the ask.
+      if (!selfAddressed && meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) { note('own-sender', { counterpart: party.email || null }); return; }
 
       // The incoming-ask judgment comes first and is Gmail's own (core/incoming-judge.js): the message's own text, the
       // subject as context, the same silence bar, the same process. Gmail shows its chip on a new ask whatever loops exist
       // with that person elsewhere, so Outlook does too.
       const ikey = conv + '|' + last.id;
       const subject = String(lastRaw.subject || '');
-      const judged = judge ? judge.judge({
-        text: last.text, subject, sender: { name: party.name, email: party.email },
-        attachmentCount: lastRaw.hasAttachments ? 1 : 0,
-        calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
-        now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: Boolean(lastRaw.hasAttachments), surface: 'outlook'
-      }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' };
+      const counted = fileCount(lastRaw);
+      const askedText = judge && typeof judge.prepareForJudge === 'function' ? judge.prepareForJudge(last.text) : last.text;
+      // A 255-character bodyPreview is not the mail. A refusal after that cut
+      // would be lost, so a file or send card from the preview stays off.
+      let judged = (graphMail.truncatedPreviewOnly && graphMail.truncatedPreviewOnly(lastRaw))
+        ? { show: false, reason: 'outlook:body-preview-only', intent: null }
+        : counted == null
+        ? { show: false, reason: 'outlook:attachments-unread', intent: null }
+        : (judge ? judge.judge({
+          text: askedText, subject, sender: { name: party.name, email: party.email },
+          attachmentCount: counted,
+          calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
+          now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook',
+          to: lastRaw.toRecipients || null, cc: lastRaw.ccRecipients || null,
+          ownAddresses: meSet ? Array.from(meSet) : null, userName: deps.userName || null,
+          ownNames: deps.ownNames || null
+        }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' });
+      // A flag without the file list is not one file. The runner reads that
+      // list before plan. A failed read, or a flag that was never read, stays
+      // outlook:attachments-unread.
+      if (judged.show && !Array.isArray(lastRaw.attachments)) {
+        const steps = (judged.process && judged.process.steps) || [];
+        if (steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'))) {
+          judged = { show: false, reason: 'outlook:attachments-unread', intent: judged.intent };
+        }
+      }
       // Someone asking YOU for something: Gmail shows its Do It on that message whatever loops exist, so Outlook does too.
       // Their own promise or answer stays with the loop it belongs to (one item, not two).
       const isAsk = Boolean(judged.show && judged.intent && judged.intent.type === 'request');
@@ -265,7 +311,36 @@ const FlowOutlookSync = (() => {
     return out;
   }
 
-  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan };
+  // The open page could not count files (often a conversation id, no item id).
+  // Keep the mailbox card when that check already found one real file to save.
+  function keepMailboxFileCard(decided, entry) {
+    if (!decided || decided.none !== true || decided.reason !== 'page:attachment-count-unread') return false;
+    if (!entry || !entry.messageId) return false;
+    const steps = (entry.process && entry.process.steps) || [];
+    return steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
+  }
+
+  // A Drafts-folder message Glance already created for a loop is not a
+  // new silence line. A draft with no known conversation and no stored ref
+  // is the unexplained one.
+  function explainDrafts(drafts, ctx) {
+    const conversations = {};
+    const refs = {};
+    ((ctx && ctx.conversations) || []).forEach((id) => { if (id) conversations[String(id)] = 1; });
+    ((ctx && ctx.refs) || []).forEach((id) => { if (id) refs[String(id)] = 1; });
+    return (drafts || []).filter(Boolean).map((d) => {
+      const id = String((d && d.id) || '');
+      const conv = String((d && d.conversationId) || '');
+      const known = (id && refs[id]) || (conv && conversations[conv]);
+      return {
+        id: id,
+        conversationId: conv || null,
+        reason: known ? 'draft-for-loop' : 'draft-unexplained'
+      };
+    });
+  }
+
+  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan, keepMailboxFileCard, explainDrafts };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookSync };

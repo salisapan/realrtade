@@ -48,11 +48,11 @@ const FlowRequestTypes = (() => {
       en: ['join', 'attend', 'rsvp', 'register', 'sign up', 'come to'],
       he: ['להצטרף', 'תצטרף', 'להגיע', 'תגיע', 'תגיעו', 'להירשם', 'תירשם', 'אישור הגעה'] },
     { id: 'complete', days: 3, noun: 'a deliverable',
-      en: ['complete', 'fill out', 'fill in', 'finish', 'finali[sz]e', 'prepare', 'draft', 'write', 'create', 'build', 'fix', 'update the', 'deliver'],
+      en: ['complete', 'fill out', 'fill in', 'finish', 'renew', 'finali[sz]e', 'prepare', 'draft', 'write', 'create', 'build', 'fix', 'update the', 'deliver'],
       he: ['להשלים', 'תשלים', 'תשלימו', 'למלא', 'תמלא', 'תמלאו', 'לסיים', 'תסיים', 'להכין', 'תכין', 'תכינו', 'לכתוב', 'תכתוב', 'לתקן', 'תתקן'] },
     { id: 'send', days: 2, noun: 'a file',
       en: ['send', 'sending', 'sent', 'share', 'forward', 'provide', 'attach', 'upload', 'return', 'submit', 'resend', 'e-?mail me', 'give me', 'get me'],
-      he: ['לקבל', 'שלחת', 'שלחתם', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי'] },
+      he: ['לקבל', 'שלחת', 'שלחתם', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי', 'תשמור את (?:ה)?(?:קובץ|מסמך|מצורף)', 'לשמור את (?:ה)?(?:קובץ|מסמך|מצורף)'] },
     { id: 'reply', days: 2, noun: 'a reply',
       en: ['get my (?:email|message|text)', 'reply', 'respond', 'get back', 'revert', 'answer', 'response', 'update me', 'an update', 'let me know', 'follow up', 'be in touch', 'hear (?:back )?from you', 'hear your'],
       he: ['קיבלת', 'להשיב', 'תשיב', 'תשיבו', 'לענות', 'תענה', 'תענו', 'תחזור', 'תחזרו', 'תחזרי', 'לחזור אליי', 'לעדכן', 'תעדכן', 'תעדכנו', 'תודיע', 'תודיעו', 'תשובה', 'עדכון', 'סיוע', 'עזרתך', 'עזרה', 'בירור', 'לברר', 'הבהרה', 'להבהיר', 'לדעת', 'סטטוס', 'להודיע'] }
@@ -79,7 +79,8 @@ const FlowRequestTypes = (() => {
   // How a request is framed. A sentence with an ACTION but no FRAME is a
   // statement, not an ask.
   const FRAME_EN = /\b(?:could|can|would|will) you\b|\b(?:can|could|shall) we\b|\bplease\b|\bkindly\b|\b(?:i|we)(?:'d| would) (?:like|appreciate|love)\b|\b(?:i|we) (?:need|require|want|expect)\b|\bneed you to\b|\b(?:waiting|awaiting) (?:for|on)\b|\bany chance\b|\bwhen (?:can|could|will) you\b|\bdo you have\b|\bby when\b|\bwould you mind\b|\bit would help (?:if|to)\b|\bstill need\b|\bhave you (?:had a chance|been able)\b|\b(?:can|could|would|will) (?:u|ya)\b|\b(?:pls|plz|pleez)\b|\b(?:did|have|had) (?:you|u) (?:\w+ )?(?:sent|send|paid|pay|signed|sign|confirmed|confirm|got|get|received|receive|transferred|transfer|checked|check|seen|see)\b|\b(?:u|you) able to\b|\bwhat time (?:works|is good|suits)\b|\blet me know if (?:you|u)\b|\bneed (?:the )?[\w ]{1,30} by\b/i;
-  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח|^(?:(?:אחי|אחותי|חבר|חבר'ה|יקירי|היי|הי|שלום|נו|אז|ו)[,\s]+)*ת(?:שלח|שלחי|עביר|עבירי|חתום|חתמי|אשר|אשרי|בדוק|בדקי|עדכן|עדכני|חזור|חזרי|תן|תני|ביא|בואי|גיד|גידי|אשר)(?=[\s,.!?]|$)|(?:שלחת|שלחתם|העברת|חתמת|אישרת|שילמת|בדקת|קיבלת|ראית)(?:\s+כבר)?(?=[\s,.!?]|$)|מתי (?:ת(?:עביר|שלח|חתום|אשר|חזור|עדכן|שלם|בוא|גיע)|נוח|מתאים|אפשר|זה יהיה)|אפשר (?:ל|ש)\S+)/;
+  // "ניתן לפנות" is "one may contact", an availability line, not a request frame.
+  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן(?!\s+לפנות)|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח|^(?:(?:אחי|אחותי|חבר|חבר'ה|יקירי|היי|הי|שלום|נו|אז|ו)[,\s]+)*ת(?:שלח|שלחי|עביר|עבירי|חתום|חתמי|אשר|אשרי|בדוק|בדקי|עדכן|עדכני|חזור|חזרי|תן|תני|ביא|בואי|גיד|גידי|שמור|שמרי|שמרו|אשר)(?=[\s,.!?]|$)|(?:שלחת|שלחתם|העברת|חתמת|אישרת|שילמת|בדקת|קיבלת|ראית)(?:\s+כבר)?(?=[\s,.!?]|$)|מתי (?:ת(?:עביר|שלח|חתום|אשר|חזור|עדכן|שלם|בוא|גיע)|נוח|מתאים|אפשר|זה יהיה)|אפשר (?:ל|ש)\S+)/;
 
   // English entries are regex fragments joined into one word-bounded pattern.
   // Hebrew has no \b, so each Hebrew entry is its own pattern.
@@ -125,27 +126,34 @@ const FlowRequestTypes = (() => {
   }
 
   // ---- the mirror: what YOU promised -------------------------------------------
-  const COMMIT_EN = /^(?:will|sending|paying|transferring|signing)\b(?:\s+\w+){0,3}\s+(?:it|this|that|the|you|them|now|today|tonight|tomorrow|on|by|in)\b|\bill (?:send|pay|sign|check|call|do|transfer|confirm|get)\b|\b(?:i|we)(?:'ll| will| shall)\b|\b(?:i|we)(?:'m|'re| am| are) (?:going to|gonna)\b|\blet me (?:check|look|review|get|send|find|confirm|come back|revert|run|see|loop|work|pull|put|dig)\b/i;
+  const COMMIT_EN = /^(?:will|sending|paying|transferring|signing)\b(?:\s+\w+){0,3}\s+(?:it|this|that|the|you|them|now|today|tonight|tomorrow|on|by|in)\b|\bill (?:send|pay|sign|check|call|do|transfer|confirm|get)\b|\b(?:i|we)(?:'ll| will| shall)\b|\b(?:i|we)(?:'m|'re| am| are) (?:going to|gonna)\b|\blet me (?:check|look|review|get|send|find|confirm|come back|revert|run|see|loop|work|pull|put|dig)\b|\b(?:i|we) agreed to\b/i;
   const COMMIT_HE = /אני (?:מעביר|שולח|חותם|משלם|מאשר|בודק|מעדכן|חוזר)(?![א-ת])(?:\s+\S+){0,3}?\s+(?:היום|עכשיו|הערב|מחר|עוד מעט)|(?<![א-ת])ו?(?:אדאג|נדאג|אעשה|נעשה|אחתום|נחתום|אפנה|נפנה|אבצע|נבצע|אגיש|נגיש|אפעל|נפעל|אשלם|נשלם|אקבע|נקבע|אסדר|נסדר|אטפל|נטפל|אשלח|נשלח|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אכין|נכין|אעביר|נעביר|אתאם|נתאם|אחזיר|נחזיר|אשיב|נשיב|אאשר|נאשר|אספק|נספק|אכתוב|נכתוב|אסגור|נסגור|אסיים|נסיים|אתקן|נתקן)/;
   // Not a promise: conditional, hedged, or an invitation for THEM to act.
   const COMMIT_NOT = /\b(?:maybe|might|perhaps|probably|hopefully|try to|if you|unless|in case|when you|once you|let me know)\b|(?:אולי|בערך|בוא נ|בואו נ|בואי נ|אם תרצו|אם תרצה|ברגע שתשלח|תודיע לי)/i;
   const COMMIT_NOT_ACTION = /\b(?:thank|thanks|happy|glad|be there|see you|call you|talk to you|speak)\b/i;
 
   // One sentence -> { type, action, object } or null.
+  function commitmentParts(sentence) {
+    return String(sentence || '').split(/(?<=[.!?])\s+/).map((p) => p.trim()).filter(Boolean);
+  }
+  // A trailing "Thanks" is a sign-off. It must not erase a commitment in another sentence.
   function detectCommitmentSentence(sentence) {
     const s = String(sentence || '');
     if (COMMIT_NOT.test(s)) return null;
+    const parts = commitmentParts(s);
     if (hasHebrew(s)) {
-      if (!COMMIT_HE.test(s)) return null;
-      const action = findAction(s);
-      const object = findObject(s);
+      const hit = parts.find((p) => COMMIT_HE.test(p));
+      if (!hit) return null;
+      const action = findAction(hit);
+      const object = findObject(hit);
       const a = action ? action.id : 'reply';
       return { type: 'owe:' + a + (object ? ':' + object.id : ''), action: a, object: object ? object.id : null };
     }
-    if (!COMMIT_EN.test(s) || COMMIT_NOT_ACTION.test(s)) return null;
-    const action = findAction(s);
+    const hit = parts.find((p) => COMMIT_EN.test(p) && !COMMIT_NOT_ACTION.test(p));
+    if (!hit) return null;
+    const action = findAction(hit);
     if (!action) return null;
-    const object = findObject(s);
+    const object = findObject(hit);
     return { type: 'owe:' + action.id + (object ? ':' + object.id : ''), action: action.id, object: object ? object.id : null };
   }
 

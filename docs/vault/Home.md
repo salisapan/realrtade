@@ -1,14 +1,26 @@
 ---
 tags: [home]
-updated: 2026-10-05
+updated: 2026-10-16
 ---
 # Home — Glance / Flow context vault
 
 > **מה זה:** מטמון הקשר (context cache) בין צ׳אטים וסוכנים. קוראים כאן לפני שמתחילים זרם עבודה, כותבים כאן אחרי החלטה.
 > **מה זה לא:** מקור אמת. האמת של הקוד והמוצר נשארת ב־`CLAUDE.md` + `docs/` (המפה: [[README]]). כשיש סתירה — המסמכים מנצחים, וה־vault מתוקן.
 
+## Truth files (canonical, one source)
+The vault is a view over these. Facts live only there.
+- `CLAUDE.md` (repo root, one level above the vault, so open it from the repo or GitHub): standing rules, the locked identity, "Owner product locks"
+- [[README]]: the map of every doc and what to update together
+- [[open-tasks]]: open work, Gates, the Glance release order, holds
+- [[revenue-routines]]: money, Flow sales and outreach (§8), CoS routines (§9)
+- The topic docs that [[README]] §1 lists (for example [[product-identity]], [[true-close]], [[multi-platform]])
+
+## Read first
+- [[shared-rules]] — Shared rules & product locks (Sali). Product, Flow/Sales, and bot operations, each rule dated. A bot that saves a new rule or setting to shared memory adds it here via PR.
+- [[product-locks]] — the Glance locks in short form. The full wording is [[shared-rules]].
+
 ## Before you start a stream (2 minutes)
-1. Skim this page and [[decisions]] (newest at the top).
+1. Read [[product-locks]] and [[shared-rules]], then skim this page and [[decisions]] (newest at the top).
 2. Open the note for the stream you touch (below).
 3. Then the normal reading order: `CLAUDE.md` → [[README]] → [[open-tasks]] → the topic owner doc.
 
@@ -23,13 +35,9 @@ updated: 2026-10-05
 | Living toolbar icon | [[living-icon-handoff]] | [[product-identity]] (Visual identity) | this note |
 | Open work, blockers | [[open-loops-pointer]] | [[open-tasks]] | [[open-tasks]] |
 
-## Code graph (Graphify)
-- [[_GRAPHIFY_INDEX]] — community-level map of the codebase (auto-exported under `docs/graphify/`)
-- [[GRAPH_REPORT]] — architecture highlights from the last scan
-
 ## Process
 - [[when-to-write-to-vault]] — מתי כותבים ל־vault (and what goes to `docs/` in the same commit)
-- New session log: Daily note → `vault/sessions/YYYY-MM-DD.md` (template [[session]])
+- New session log: Daily note → `vault/sessions/YYYY-MM-DD.md` (template [[session]]). Latest: [[sessions/2026-10-08]] (standup 07:30, verbatim)
 - New decision: template [[decision]] → one line in [[decisions]] + the docs §2 files
 
 ## גשר Claude↔CoS

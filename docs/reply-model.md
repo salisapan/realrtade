@@ -57,3 +57,7 @@ so it can be added to the data. Never lower the 0.9 threshold to catch more.
 - A remote model for this: the question is short, frequent and private; it runs on the device (`docs/local-first-principle.md`). Still true: the second reading (`docs/ai-ladder.md`) is about recognising an ask or a promise in your own sentence, never about judging a reply.
 - A short reply nothing could place used to close a loop by default; since 2026-10-04 a reply of three words or fewer with no answer in it is held open instead (`docs/true-close.md`). The model is unchanged.
 - A bigger or fancier model: the data, not the architecture, was the limit (see how accuracy moved with the second and third data banks).
+
+## 6. Rules added from real mail (2026-10-08)
+
+These are rules, not a change to the reply model or its 0.9 threshold. A redirect ("this is not my job, contact X", "I retired", "please direct this to …") closes the loop as declined, not as done. A bare "לא" declines only when that is the whole sentence. A short suggestion to talk does not close the loop. "אעדר" and a recipient bounce ("message blocked", "recipient address rejected") are auto-replies, so the loop stays open. Found on the real-mail gold set (`docs/human-eval.md` §7, `docs/real-mail-eval/2026-10-08.md`). The model still never closes anything.

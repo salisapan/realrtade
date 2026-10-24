@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glance.local/schemas/training-record-m0.json",
+  "title": "Glance M0 Gold / TrainingRecord case",
+  "description": "One owner-labeled mail case for M0 gold and later TrainingRecord export. Consent defaults false; redacted body preferred over raw.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "subject",
+    "ownerLabel",
+    "expectedAction",
+    "wrongDoIt",
+    "labeledAt",
+    "labeledBy",
+    "consent"
+  ],
+  "anyOf": [
+    { "required": ["redactedBody"] },
+    { "required": ["bodyHash", "excerpt"] }
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable case id, e.g. gold-YYYYMMDD-001 or imported rm-001."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["gmail", "outlook"],
+      "description": "Mail surface the message was read from (test inbox)."
+    },
+    "subject": {
+      "type": "string",
+      "description": "Subject line; redact PII the same way as body."
+    },
+    "redactedBody": {
+      "type": "string",
+      "description": "Full body after privacyShield / mask-ids ([NAME], [ORG], [EMAIL], [PHONE], [DATE], [IMAGE]). Prefer this for labeling sessions."
+    },
+    "bodyHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "sha256 of canonical redacted body when full body is not stored."
+    },
+    "excerpt": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Short redacted excerpt sufficient to re-identify the judgment call."
+    },
+    "ownerLabel": {
+      "type": "string",
+      "enum": ["ASK", "SILENT"],
+      "description": "Owner judgment for M0: ASK = open loop / Do It card may be correct; SILENT = no card. PROMISE/HOLD/CLOSE from the older intent pipeline map into notes or expectedAction, not this enum."
+    },
+    "expectedAction": {
+      "type": ["string", "null"],
+      "description": "If ASK: name the true-close outcome (close fabric) or the single next step toward it (e.g. 'issue+verify invoice', 'pay after approval', 'obtain file from third party then attach'). Not a draft-helper end state — draft/file/calendar are intermediate. null when SILENT."
+    },
+    "wrongDoIt": {
+      "type": "boolean",
+      "description": "true if surfacing a Do It card on this message would be incorrect or harmful. Must be true whenever a Do It would violate silence-beats-wrong-Do-It."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text rationale, edge cases, HE/EN nuance, link to thread."
+    },
+    "labeledAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the owner (or CoS under owner direction) labeled."
+    },
+    "labeledBy": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who labeled: typically 'sali' or 'cos:<name>'."
+    },
+    "consent": {
+      "type": "boolean",
+      "description": "Explicit training consent for this record. Product default is off; gold labeling on the test inbox may set true only when Sali opts in for that batch."
+    },
+    "lang": {
+      "type": "string",
+      "enum": ["he", "en", "mixed"],
+      "description": "Optional language tag."
+    },
+    "importedFrom": {
+      "type": "string",
+      "description": "Optional provenance, e.g. real-mail-gold.json#rm-003."
+    },
+    "modelLabelPrior": {
+      "type": ["string", "null"],
+      "description": "Prior model-assigned label if imported; never treat as ownerLabel."
+    },
+    "ownerVerified": {
+      "type": "boolean",
+      "description": "True only when labeledBy is sali. The ingest refuses to set true for any other labeledBy."
+    },
+    "actionLabel": {
+      "type": ["string", "null"],
+      "description": "Canonical family|step the label accepts. The model's action on a take-model mark, the engine's action on a take-engine mark, or an explicit actionLabel when the close is neither. null when SILENT. expectedAction is the plain name of what that action closes."
+    }
+  }
+}

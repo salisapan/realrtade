@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+flow-trial-extension/e2e-report/
+flow-trial-extension/test-results/
+flow-trial-extension/playwright-report/
 dist
 dist-ssr
 *.local
@@ -24,6 +27,9 @@ __pycache__/
 flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip
 flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip.partial
 
+# Apps Script project id from clasp create. The example file is the template.
+glance-gmail-addon/.clasp.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -39,5 +45,34 @@ flow-trial-extension/core/dense-prior-data.js
 # Human-text eval set built from the owner's own sent mail (masked, local only, never committed)
 flow-trial-extension/test/fixtures/private/
 
-# Graphify local AST graph (large HTML/JSON/cache). Community notes for Obsidian live in docs/graphify/.
+# Glance model lab (glance-ai/): regenerated datasets, local envs, and large weights.
+# The checked-in int8 JSON and .glw files under glance-ai/model/artifacts and
+# glance-ai/model/shadow-pkg/weights are the shadow candidates (each inside the
+# on-device budget). They are not this ignore. ONNX, GGUF, LLM checkpoints, and
+# anything a generator writes into dataset/out* are.
+glance-ai/**/.venv/
+glance-ai/**/node_modules/
+glance-ai/**/*.gguf
+glance-ai/**/*.onnx
+glance-ai/**/*.safetensors
+glance-ai/**/*.pt
+glance-ai/**/*.bin
+glance-ai/model/dataset/out/
+glance-ai/model/dataset/out-*/
+glance-ai/model/train/features-v2/
+glance-ai/labeling/dry-run/work/
+glance-ai/labeling/dry-run/artifacts/
+glance-ai/model/train/*.npz
+glance-ai/oss/finetune/data/
+glance-ai/oss/finetune/tools/
+glance-ai/oss/finetune/gguf/
+glance-ai/oss/finetune/runs/
+glance-ai/oss/models/
+glance-ai/oss/.venv/
+glance-ai/model/suggest-save/out/
+glance-ai/model/strip/out/
+glance-ai/model/shadow-pkg/test/out/
+glance-ai/model/shadow-pkg/bench/out/
+
+# Graphify local AST graph (large HTML/JSON/cache). Rebuilt on demand; not committed.
 graphify-out/

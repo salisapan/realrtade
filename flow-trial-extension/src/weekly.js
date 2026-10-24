@@ -13,6 +13,19 @@
 // which could be a week away. Nothing idle is ever left on the page.
 
 const FlowWeekly = (() => {
+  let uiOverride = null;
+  function setUiLang(lang) { uiOverride = lang; }
+  function words() {
+    let ui = '';
+    try { if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') ui = chrome.i18n.getUILanguage() || ''; } catch (e) {}
+    let nav = '';
+    try { nav = (typeof navigator !== 'undefined' && navigator.language) || ''; } catch (e) {}
+    const lang = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.uiLangFrom === 'function')
+      ? FlowDisplay.uiLangFrom({ setting: uiOverride, uiLanguage: ui, navigatorLanguage: nav })
+      : 'en';
+    if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') return FlowDisplay.chrome(lang);
+    return { dismiss: 'Dismiss', seeOpen: 'See what’s open' };
+  }
   const HOST_ID = 'flow-weekly-host';
   let host = null;
 
@@ -57,14 +70,14 @@ const FlowWeekly = (() => {
 
     const actions = el('div', 'flow-weekly-actions');
     if (summary.open) {
-      const view = el('button', 'flow-weekly-link', 'See what’s open');
+      const view = el('button', 'flow-weekly-link', words().seeOpen || 'See what’s open');
       view.type = 'button';
       view.addEventListener('click', () => { hide(); if (opts.onOpenList) opts.onOpenList(); });
       actions.appendChild(view);
     }
     const dismiss = el('button', 'flow-weekly-x', '×');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.setAttribute('aria-label', words().dismiss);
     dismiss.addEventListener('click', () => { hide(); if (opts.onDismiss) opts.onDismiss(); });
     actions.appendChild(dismiss);
     host.appendChild(actions);
@@ -77,5 +90,5 @@ const FlowWeekly = (() => {
     host = null;
   }
 
-  return { showSummary, hide };
+  return { showSummary, hide, setUiLang };
 })();

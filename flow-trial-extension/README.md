@@ -6,8 +6,29 @@
 
 **Implementation status (code reality, this commit; not the product definition).** The entry surface is a Chrome extension that watches Gmail passively. It stays on what you are waiting on until the
 other side really answers, and when an email decides something it puts one `Do It` button next to it that writes the record for you (a Google Calendar event, a Google Task, a Gmail draft; Drive for
-files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. The judgment engine itself knows nothing about Gmail: it scores plain
+files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. Meta chats — Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web — turn on together from one consent on the options page. The popup links that page when the consent is missing. A draft is still not a send. A chat draft whose message timestamp is more than two minutes ahead of this device stays quiet (`whyNotShown: future`). Those two minutes are an intentional clock-skew margin, in `src/content-messenger.js`. The judgment engine itself knows nothing about Gmail: it scores plain
 text, so Gmail is the first surface, not the architecture's ceiling (see "What is still deliberately narrow" below).
+
+## Live Gate fixture (David)
+
+This page is for an unpacked copy of `flow-trial-extension` from the repo. It is not in the store zip, and a build whose manifest has `update_url` ignores the flag.
+
+1. Load the unpacked `flow-trial-extension` folder from this repo. Do not load the store zip, and do not load a build whose manifest has `update_url`.
+2. On `chrome://extensions`, copy the extension id.
+3. Open the service worker console and run `chrome.storage.local.set({ glanceDevFixture: true })`.
+4. Open `chrome-extension://<ID>/dev/messenger-fixture.html`. No manifest entry is required. The composer should show `דיזנגוף 99` and a maps link. The page has no Send button. The row is dated about an hour ago. The fake event is 8 October 2026 at דיזנגוף 99. Run it while that date is still in last week (through Saturday 17 October 2026).
+5. Each quiet case stays empty, shows one line `[Glance] whyNotShown: <reason>` on the page, and prints that same line in the page console. Nothing is sent.
+   - `?case=two` — two addresses, דיזנגוף 99 and אבן גבירול 30. Reason `conflict`. A draft that was already deleted wins instead: the stored row is `closed`, and the line is `closed`, not `conflict`. If nothing was deleted, the line stays `conflict` and the row is not closed.
+   - `?case=greeting` — the row says היי. Reason `no-ask`.
+   - `?case=group` — the header has a Group chip and the line Chat members. Reason `not-one-to-one`.
+   - `?case=self-last` — the last message is yours. Reason `from-me`.
+   - `?case=stale` — the row is older than 14 days. Reason `stale`.
+   - `?case=future` — the row is five minutes ahead. Reason `future`.
+6. Open `?reset=1` to clear the lane draft store. That removes the hash, state, and time rows under `glanceLaneDrafts` and leaves every other `chrome.storage.local` value in place. The page and the console both say `[Glance] lane store reset`.
+7. `chrome.storage.local.set({ glanceDevFixture: false })` turns the page off.
+8. A store or outlook zip does not contain this page. A manifest with `update_url` ignores `glanceDevFixture`.
+
+דנה ורותם with one profile link whose id is the thread id drafts. The ו before ר is part of the name (the same ו+י/ר surname check as דנה וייס and דנה ורד). The composer gets the draft. Glance does not send it.
 
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
 engine for organizations with sensitive or regulated data) — not a stripped
@@ -93,6 +114,8 @@ deletes anything that was already there.
 | **True close**: a short reply with no answer in it never closes a loop; a draft is not a delivery | `docs/true-close.md`, `docs/resolution-paths.md` |
 | Receipts and documents (contract, quote, proposal, signed copy) as a path to a real delivery | `docs/resolution-paths.md`, `docs/true-close.md` §4 |
 | Other apps (WhatsApp Web, Outlook through Graph + Outlook on the web Do It card, right-click capture), opt-in; Outlook drafts on Do It (never send) | Store listing + `src/content-outlook.js` |
+| **Client requests** for accountants and lawyers: what is missing from whom, reminders as drafts. Engine and ledger only, no surface yet (owner rejected a standalone page 2026-10-10); reading mail is **off**, `config/client-requests.public.js` | `docs/glance-ai/client-requests.md` |
+| **Carry until closed**: after the third unanswered nudge, one proposed next move (the app where they answer you, one colleague on the thread, or "Still need this?"). Engine only, never closes or sends; **off**, `config/carry.public.js` (`nextMove`; the real-user A/B `abLive`, counts only, also **off**) | `docs/glance-ai/proposals/2026-10-11-next-move.md` |
 | Hybrid on-device model + masked server for Do It proposals (**dormant**, `config/hybrid.public.js`) | `docs/hybrid-execution-architecture.md` |
 | Pro (Stripe, licence key, server-enforced paid features) | `docs/monetization.md`, `docs/revenue-routines.md` |
 | What is open, blocked or decided | `docs/open-tasks.md` |
@@ -181,38 +204,20 @@ Undo) and a one-time invitation to the Flow Pilot Program — Glance's own
 upsell path into the full Flow product, shown only after the loop has
 genuinely completed once, never speculatively.
 
-## Set up Google (Tasks, Calendar, Gmail Drafts, Drive) (needs the site owner)
+## Set up Google (Tasks, Calendar, Gmail Drafts, Drive Picker) (needs the site owner)
 
-Google is the default connector — Calendar, Gmail Drafts, Google Tasks, and
-Drive all share one OAuth grant. The primary path is
-`chrome.identity.getAuthToken` (Chrome's own account chooser, the
-Chrome-extension client in `manifest.json`). When that call fails because
-browser sign-in is off, or the identity API is unavailable and the user did
-not cancel, Glance uses `chrome.identity.launchWebAuthFlow` with the Web
-application client `WEB_OAUTH_CLIENT_ID` in `config/oauth.public.js`
-(implicit `response_type=token` to `https://<extension-id>.chromiumapp.org/`).
-There is still **no client secret and no Netlify exchange**. Drive
-find-and-attach uses whichever token that path returned (`drive.readonly` /
-`drive.file`). There is no Google Picker and no separate API key. The
-Picker widget loaded a hosted Google script and is not part of either zip.
-
-### Unpacked and Chrome Web Store are two extension IDs
-
-| | Load unpacked and the signup download zip | Chrome Web Store item |
-|---|---|---|
-| Extension ID | `dnjhplgmnkabbjogfpbhofjedlkehkai` | `lbihckfmoffgjjlnneoeaehbhoonfenh` |
-| Google OAuth client | `93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com` | `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com` |
-| Where it lives | `manifest.json` in git (`key` + `oauth2.client_id`) | Only inside the store zip |
-
-The store client is the Chrome-extension client in GCP project **Flow Extension** (`oceanic-spider-509610-c1`), registered against the store item ID. The unpacked client stays registered against the unpacked ID. Do not paste the store client into the repo manifest, and do not delete `key` there. Load unpacked and the signup download both use that file as-is.
-
-Build the store zip from the repo root:
-
-```
-bash flow-trial-extension/scripts/build-cws.sh
-```
-
-That writes `flow-trial-extension/dist/glance-cws.zip`. The script drops `key`, sets `oauth2.client_id` to the store client, and sets the manifest description to the store line (132 characters or fewer). It does not contain `picker/`. Upload that zip. Do not upload `flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip` — that is the signup download, and it keeps the unpacked manifest.
+Google is the default connector — Calendar, Gmail Drafts, and Google Tasks
+all share one OAuth grant. The primary path is `chrome.identity.getAuthToken`
+(Chrome's own account chooser, the Chrome-extension client in `manifest.json`).
+When that call fails because browser sign-in is off, or the identity API is
+unavailable and the user did not cancel, Glance uses
+`chrome.identity.launchWebAuthFlow` with the Web application client
+`WEB_OAUTH_CLIENT_ID` in `config/oauth.public.js` (implicit `response_type=token`
+to `https://<extension-id>.chromiumapp.org/`). That window opens only after
+an explicit Connect click. There is still **no client secret and no Netlify
+exchange**. The Drive picker needs one extra, unrelated credential: a plain API key (not OAuth)
+that authenticates Google's picker *widget*, separate from the OAuth token
+that authenticates *file access*.
 
 ### 1. Create or pick a Google Cloud project
 
@@ -222,7 +227,7 @@ below happens inside this one project.
 
 ### 2. Enable the APIs
 
-**APIs & Services → Library**, enable all four — a missing one fails at
+**APIs & Services → Library**, enable all five — a missing one fails at
 the first real API call with a 403 ("API not enabled"), not at OAuth time,
 which is the single most common way this gets half-configured:
 
@@ -230,6 +235,7 @@ which is the single most common way this gets half-configured:
 - Gmail API
 - Google Tasks API
 - Google Drive API
+- Google Picker API
 
 ### 3. Configure the OAuth consent screen
 
@@ -242,7 +248,7 @@ which is the single most common way this gets half-configured:
    here is required to start testing.
 3. Leave **Publishing status** as **Testing** for now — this is what lets
    you skip Google's verification review entirely while testing on real
-   accounts (see Test users, step 6).
+   accounts (see Test users, step 7).
 
 ### 4. Create the OAuth Client ID (type: Chrome Extension)
 
@@ -251,7 +257,7 @@ which is the single most common way this gets half-configured:
 1. Application type: **Chrome extension** (not "Web application" — that's
    the type the other four connectors below effectively use via their
    redirect-URL flow; Google's flow is a different, extension-native type).
-2. **Item ID / Application ID**: the unpacked ID —
+2. **Item ID / Application ID**: paste the extension's own ID —
    ```
    dnjhplgmnkabbjogfpbhofjedlkehkai
    ```
@@ -259,16 +265,13 @@ which is the single most common way this gets half-configured:
    URLs for HubSpot/Salesforce/Slack/Monday.com below, derived from the
    `key` pinned in `manifest.json`. It stays stable across reloads — don't
    regenerate that key without updating it everywhere it's registered,
-   here included. The store item is a different ID
-   (`lbihckfmoffgjjlnneoeaehbhoonfenh`); its client is already created
-   and is applied only by `build-cws.sh`.
-3. Both clients already exist (see the table above). There is no client
-   secret for this application type — Chrome itself is the OAuth client.
-4. Leave `manifest.json`'s `oauth2.client_id` on the unpacked client
-   `93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com`.
-   The store client
-   `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com`
-   belongs only in the store zip.
+   here included.
+3. Create it, then copy the generated **Client ID**
+   (`....apps.googleusercontent.com`). There is no client secret for this
+   application type — Chrome itself is the OAuth client, so there's nothing
+   to keep server-side.
+4. Paste that Client ID into `manifest.json`'s `oauth2.client_id`, replacing
+   the `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder.
 
 ### Web application client (launchWebAuthFlow fallback)
 
@@ -286,15 +289,33 @@ https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
 https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/
 ```
 
-`build-cws.sh` does not swap this id. It only swaps `manifest.json`'s
+The store build does not swap this id. It only swaps `manifest.json`'s
 `oauth2.client_id`, which is the Chrome-extension client `getAuthToken`
-uses. Unpacked and store builds both call `launchWebAuthFlow` with this
-same Web client.
+uses. Unpacked id `dnjhplgmnkabbjogfpbhofjedlkehkai` and store id
+`lbihckfmoffgjjlnneoeaehbhoonfenh` both call `launchWebAuthFlow` with this
+same Web client. Do not put this Web client id into `oauth2.client_id`.
 
-### 5. Confirm the scopes match
+### 5. Create the Picker API key
 
-`manifest.json`'s `oauth2.scopes` should already list all five (this ships
-in the repo — nothing to add here unless it's been edited):
+**APIs & Services → Credentials → Create Credentials → API key.**
+
+1. Create the key, then click **Edit** on it immediately (an unrestricted
+   key left as-is is a real, avoidable exposure).
+2. **Application restrictions → HTTP referrers (web sites)** → add:
+   ```
+   chrome-extension://dnjhplgmnkabbjogfpbhofjedlkehkai/*
+   ```
+3. **API restrictions → Restrict key** → select **Google Picker API** only
+   (it doesn't need Drive/Calendar/Gmail/Tasks API access — those calls all
+   go through the OAuth token from step 4, never this key).
+4. Paste the key into `picker/picker.js`'s `GOOGLE_PICKER_API_KEY` constant,
+   replacing the `YOUR_GOOGLE_PICKER_API_KEY` placeholder.
+
+### 6. Confirm the scopes match
+
+`manifest.json`'s `oauth2.scopes` should already list these (this ships
+in the repo — nothing to add here unless it's been edited). `openid` and
+`userinfo.profile` are on that same consent, so Connect stays one prompt:
 
 ```
 https://www.googleapis.com/auth/tasks
@@ -302,6 +323,8 @@ https://www.googleapis.com/auth/calendar.events
 https://www.googleapis.com/auth/gmail.compose
 https://www.googleapis.com/auth/drive.readonly
 https://www.googleapis.com/auth/drive.file
+openid
+https://www.googleapis.com/auth/userinfo.profile
 ```
 
 `drive.readonly` is read access across the whole Drive. When an open
@@ -341,7 +364,7 @@ Testing-mode use; that step only matters once you move toward verification
 for production (see Common pitfalls — `drive.readonly` sits in a stricter
 verification tier than the other scopes below).
 
-### 6. Add yourself as a test user
+### 7. Add yourself as a test user
 
 **OAuth consent screen → Audience/Test users → Add users** → add the exact
 Google account you'll sign into during manual testing. While the app is in
@@ -355,18 +378,18 @@ completed verification" blocking screen, not a partial failure.
   Drive after a successful sign-in almost always means step 2 was skipped
   for that specific API, not a scopes or Client ID problem.
 - **Wrong OAuth client type.** "Web application" and "Chrome extension" are
-  different Client ID formats. `chrome.identity.getAuthToken` only works
-  with the Chrome extension client from step 4. The sign-in fallback uses
-  the Web application client above, and only that client. Do not paste the
-  Web client into `oauth2.client_id`.
+  different Client ID formats; `chrome.identity.getAuthToken` only works
+  with the Chrome extension type from step 4.
 - **Forgetting the test user.** The single most common "it just won't sign
-  in" report while in Testing status — the fix is step 6, not the Client ID.
-- **Regenerating `manifest.json`'s `key`.** This changes the unpacked
-  extension ID, which silently invalidates the Item ID in step 4 and all
-  four `chromiumapp.org` redirect URLs below. Don't touch it once any of
-  these are registered. The Chrome Web Store zip omits `key` — see
-  `docs/chrome-web-store-submission.md`. That omission does not change the
-  listing's ID; regenerating the repo key does change the unpacked ID.
+  in" report while in Testing status — the fix is step 7, not the Client ID.
+- **Regenerating `manifest.json`'s `key`.** This changes the extension ID,
+  which silently invalidates the Item ID in step 4, the Picker key
+  restriction in step 5, and all four `chromiumapp.org` redirect URLs below.
+  Don't touch it once any of these are registered.
+- **Picker API key with no restrictions, or restricted to the wrong
+  referrer.** Either leaves it wide open or failing every request;
+  the exact pattern in step 5's referrer field matters (trailing `/*`
+  included).
 - **Production / many real users, later:** `gmail.compose`, `calendar.events`,
   and `tasks` are all Google "sensitive" scopes — fine for Testing and up to
   100 test users with zero review, but a real public launch beyond that
@@ -608,6 +631,7 @@ src/brief.js            Morning Brief UI: the page-level "N still open" indicato
 src/brief.css           brief indicator/panel/resurface styles, reusing the chip's own button states
 src/weekly.js           Weekly Closing Summary banner ("closed N this week / N still open")
 src/weekly.css          weekly summary banner styles
+core/proof-of-close.js  Handled only after a read-back (`fetchedBack`). Google Tasks in this slice. No network.
 src/receipt-copy.js     the receipt's status words ("Handled." / "Partly handled.") and the Undo label — pure, no DOM
 src/content-gmail.js    Gmail watcher, the chip, the sidebar wiring, and the receipt after a write
 src/background.js       credentials, the five write paths, undo, the glance-assist relay, and the extension-icon badge

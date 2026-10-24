@@ -62,6 +62,7 @@ function load(stored, opts) {
       if (!byId.has(id)) { const n = makeNode('div'); n.id = id; byId.set(id, n); }
       return byId.get(id);
     },
+    querySelector: () => null,
     querySelectorAll: () => [],
     createElement: (t) => makeNode(t),
     createTextNode: (t) => { const n = makeNode('#text'); n.textContent = String(t); return n; }
@@ -94,16 +95,36 @@ function load(stored, opts) {
         },
         set: (patch, cb) => { Object.assign(store, patch); if (cb) { cb(); return; } return Promise.resolve(); },
         remove: (k, cb) => { [].concat(k).forEach((x) => { delete store[x]; }); if (cb) { cb(); return; } return Promise.resolve(); }
+      },
+      onChanged: {
+        addListener(fn) { (opts.storageListeners = opts.storageListeners || []).push(fn); },
+        removeListener(fn) { opts.storageListeners = (opts.storageListeners || []).filter((f) => f !== fn); }
       }
     },
     identity: { getRedirectURL: () => 'https://testextensionidtestextensionid12.chromiumapp.org/' },
+    permissions: { contains: async () => false, request: async () => false, remove: async () => true },
+    tabs: {
+      query: async () => (opts.activeTabs || []),
+      sendMessage: async () => {}
+    },
     runtime: {
       sendMessage: (msg, cb) => {
+        (opts.messages = opts.messages || []).push(msg && msg.type);
         // popup.js's only two-way call is flow:connector-status; everything
         // else (flow:pending-count, flow:track) is fire-and-forget in the
         // real extension too, so an empty reply is a faithful stub.
         // flow:undo-action is the exception the Activity row waits on.
-        if (msg && msg.type === 'flow:undo-action') {
+        if (msg && msg.type === 'flow:execute-action') {
+          (opts.executes = opts.executes || []).push(msg.payload);
+          if (cb) cb(opts.executeReply || {
+            ok: true,
+            written: 'To Do',
+            ref: { externalId: 'TASK9', taskListId: 'DEF', taskId: 'TASK9' },
+            proof: { system: 'microsoft/todo', externalId: 'TASK9', fetchedBack: true, verifiedAt: '2026-10-08T07:00:00.000Z' }
+          });
+          return;
+        }
+        if (msg && (msg.type === 'flow:undo-action' || msg.type === 'flow:google-undo')) {
           if (cb) cb({ ok: opts.undoOk !== false });
           return;
         }
@@ -111,6 +132,10 @@ function load(stored, opts) {
         if (msg && msg.type === 'flow:hybrid-status') { if (cb) cb(opts.hybridStatus || { ok: true }); return; }
         if (msg && msg.type === 'flow:hybrid-consent') { (opts.hybridConsents = opts.hybridConsents || []).push(msg.patch); if (cb) cb({ ok: true }); return; }
         if (msg && msg.type === 'flow:follow-draft') { (opts.drafts = opts.drafts || []).push(msg.payload); if (cb) cb({ ok: true }); return; }
+        if (msg && msg.type === 'flow:build-stamp') {
+          if (cb) cb(opts.workerBuild == null ? { ok: true } : { ok: true, build: opts.workerBuild });
+          return;
+        }
         if (cb) cb(msg && msg.type === 'flow:connector-status' ? {} : { ok: true });
       }
     }
@@ -121,6 +146,7 @@ function load(stored, opts) {
   // just enough surface that the call doesn't throw ReferenceError.
   const sandbox = {
     module: undefined, console, document, chrome: chromeStub,
+    FlowBuild: opts.pageStamp ? { STAMP: opts.pageStamp } : undefined,
     crypto: { randomUUID: () => 'test-uuid' },
     navigator: { clipboard: { writeText: async () => {} } },
     Blob: class { constructor(parts, opts) { this.parts = parts; this.type = opts && opts.type; } },
@@ -128,7 +154,11 @@ function load(stored, opts) {
     // Both button-confirmation resets (referralCopy's "Copied", and this
     // session's referralExportRecipe's "Exported") use the real setTimeout —
     // Node's own is a faithful stand-in, not a stub that needs its own logic.
-    setTimeout, clearTimeout
+    setTimeout, clearTimeout,
+    fetch: async (url) => {
+      (opts.fetches = opts.fetches || []).push(String(url));
+      return { ok: false, status: 401, json: async () => ({}), text: async () => '' };
+    }
   };
   vm.createContext(sandbox);
   // Same file list, same order popup.html actually loads them in — core/
@@ -147,7 +177,9 @@ function load(stored, opts) {
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
     [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'local-lm.js'], [CORE, 'local-lm-audit.js'], [CORE, 'local-lm-server.js'], [CORE, 'hybrid-status.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
-    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
+    [CORE, 'proof-of-close.js'],
+    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'incoming-judge.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js'],
+    [CORE, 'display-copy.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -243,6 +275,54 @@ async function run() {
     const host = document.getElementById('open-list');
     check('no pending processes renders no rows', find(host, 'log-item').length === 0);
     check('the empty state is shown', document.getElementById('open-empty').hidden === false);
+  }
+
+  console.log('\n--- popup.js: a passed deadline is a Loops row named expired, with no Do It ---\n');
+  {
+    const proc = { id: 'reply-track', name: 'Reply & Track', steps: [{ id: 'draft' }] };
+    const stored = {
+      log: [{
+        ts: Date.now(),
+        kind: 'shown',
+        messageId: 'car-insurance',
+        threadId: 't-car',
+        process: proc,
+        sender: { name: 'Dana' },
+        subject: 'Car insurance certificate',
+        text: 'Please send the car insurance certificate by October 12.',
+        app: 'outlook',
+        threadUrl: 'https://outlook.office.com/mail/insurance',
+        intent: {
+          type: 'request',
+          label: 'Send the car insurance certificate',
+          confidence: 'high',
+          personalClose: 'follow-up-ask',
+          facts: { date: { iso: '2020-01-02' } },
+          entities: { what: 'the car insurance certificate', requestWhat: 'Please send the car insurance certificate by October 12.' }
+        }
+      }]
+    };
+    const { document } = (() => {
+      const l = load(stored);
+      vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), l.sandbox, { filename: 'popup.js' });
+      return l;
+    })();
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('open-list');
+    const rows = find(host, 'log-item');
+    const kinds = find(host, 'log-kind').map((n) => n.textContent);
+    const marked = rows.filter((n) => n.getAttribute('data-glance-status') === 'expired');
+    const mainCards = (host.children || []).filter((n) => String(n.className || '').split(/\s+/).includes('log-item'));
+    const expiredBox = (host.children || []).filter((n) => n.getAttribute && n.getAttribute('data-glance-section') === 'expired');
+    const box = expiredBox[0];
+    check('the car-insurance loop is kept once, inside a collapsed Expired section',
+      rows.length === 1 && marked.length === 1 && kinds.indexOf('expired') !== -1 && mainCards.length === 0 &&
+      box && String(box.tagName).toLowerCase() === 'details' && box.open !== true &&
+      (box.children || []).some((c) => String(c.tagName).toLowerCase() === 'summary' && c.textContent === 'Expired'),
+      { rows: rows.length, kinds, main: mainCards.length, tag: box && box.tagName, open: box && box.open });
+    check('an expired loop has no Do It', find(host, 'primary').length === 0, find(host, 'primary').length);
+    check('the main list is empty while the expired row stays collapsed', document.getElementById('open-empty').hidden === false);
   }
 
   console.log('\n--- popup.js: Dismiss closes the process for good, DOM-independent ---\n');
@@ -495,11 +575,7 @@ async function run() {
     const probe = load({});
     const Quiet = vm.runInContext('FlowQuietMetrics', probe.sandbox);
     const now = Date.now();
-    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), {
-      messageId: 'm1', ts: now, app: 'gmail', product: 'free',
-      proposed: 1, succeeded: 1, receiptFull: true, receiptStatus: 'Handled.',
-      kinds: ['googleTask']
-    });
+    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), { messageId: 'm1', ts: now });
     quietMetrics = Quiet.noteSilence(quietMetrics, { messageId: 's1', reason: 'family', ts: now });
     const { sandbox, document } = load({ quietMetrics: quietMetrics });
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
@@ -676,12 +752,12 @@ async function run() {
     const host = document.getElementById('surface-list');
     const states = find(host, 'wait-state').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
-    check('the Outlook row is there and is off until turned on', states.includes('Off') && !states.includes('Not set up yet'), states);
+    check('the Outlook row is there and is not connected until turned on', states.includes('לא מחובר') && !states.includes('Not set up yet'), states);
     // Since Mail.ReadWrite (2026-10-05) Outlook writes reply drafts on Do It, so "read-only" is no longer true: the row
     // says what it reads, that it never sends, and that nothing goes to Glance.
-    check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Never sends/.test(t) && /reply draft/.test(t) && /nothing is sent to Glance/.test(t)), notes);
+    check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /14/.test(t) && /לא שולח/.test(t) && /טיוטת תשובה/.test(t) && /לא נשלח ל-Glance/.test(t)), notes);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
+    check('and offers Connect once a client id is set', buttons.includes('התחבר'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
   }
 
@@ -719,9 +795,9 @@ async function run() {
     const whos = find(host, 'wait-who').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('the row is there, off by default', whos.includes('A model on your computer'));
-    check('it says it runs here, costs nothing, only proposes, and is switched on per language only after a test', notes.some((t) => /on this computer/.test(t) && /nothing leaves this computer/.test(t) && /you still tap/.test(t) && /per language only after it passes a precision test/.test(t)), notes);
-    check('Find models and Test and turn on are offered, Turn off is not (it is off)', buttons.includes('Find models') && buttons.includes('Test and turn on') && !buttons.includes('Turn off'), buttons);
+    check('the row is there, off by default', whos.includes('מודל על המחשב'));
+    check('it says it runs here, costs nothing, only proposes, and is switched on per language only after a test', notes.some((t) => /על המחשב הזה/.test(t) && /שום דבר לא יוצא מהמחשב/.test(t) && /אתה עדיין לוחץ/.test(t) && /מבחן דיוק/.test(t)), notes);
+    check('Find models and Test and turn on are offered, Turn off is not (it is off)', buttons.includes('מצא מודלים') && buttons.includes('בדוק והפעל') && !buttons.includes('כבה'), buttons);
   }
   {
     const status = { en: { ok: true, precision: 0.98, recall: 0.61 }, he: { ok: false, precision: 0.91, recall: 0.5 }, checkedAt: Date.now(), nextCheckAt: Date.now() + 1e9 };
@@ -731,12 +807,542 @@ async function run() {
     const host = document.getElementById('surface-list');
     const notes = find(host, 'wait-note').map((n) => n.textContent);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /English: on \(precision 0\.98, recall 0\.61\)/.test(t) && /Hebrew: off \(precision 0\.91, needs 0\.97\)/.test(t)), notes);
-    check('and offers Test again and Turn off', buttons.includes('Test again') && buttons.includes('Turn off'), buttons);
+    check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /אנגלית: פעיל \(דיוק 0\.98, כיסוי 0\.61\)/.test(t) && /עברית: כבוי \(דיוק 0\.91, צריך 0\.97\)/.test(t)), notes);
+    check('and offers Test again and Turn off', buttons.includes('בדוק שוב') && buttons.includes('כבה'), buttons);
   }
+
+  console.log('\n--- popup.js: a stale worker asks for Reload Glance ---\n');
+  {
+    const fresh = load({}, {});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), fresh.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('without a page stamp the reload line stays hidden', fresh.document.getElementById('reloadGlance').hidden === true);
+    const stale = load({}, { pageStamp: '0.9.40', workerBuild: '0.9.34' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), stale.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const staleLine = stale.document.getElementById('reloadGlance');
+    check('a worker still on the previous stamp shows Reload Glance', staleLine.hidden === false && staleLine.textContent === 'רענן את Glance', staleLine.textContent);
+    const quiet = load({}, { pageStamp: '0.9.40', workerBuild: '' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), quiet.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('a worker that does not answer the stamp shows Reload Glance', quiet.document.getElementById('reloadGlance').hidden === false && quiet.document.getElementById('reloadGlance').textContent === 'רענן את Glance');
+    const same = load({}, { pageStamp: '0.9.40', workerBuild: '0.9.40' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), same.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('matching stamps keep the reload line hidden', same.document.getElementById('reloadGlance').hidden === true);
+  }
+
+  console.log('\n--- popup.js: Outlook Do It with Google disconnected ---\n');
+  {
+    const iso = isoDaysFromNow(1);
+    const text = 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate';
+    const base = {
+      ts: Date.now(),
+      kind: 'shown',
+      app: 'outlook',
+      messageId: 'todo-mail',
+      threadId: 'ol:ctodo',
+      threadUrl: 'https://outlook.live.com/mail/0/inbox/id/AQQKtodo',
+      subject: 'Gate 0.9.35 To Do title',
+      text: text,
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      outlookIncomingId: 'todo-mail',
+      intent: {
+        type: 'decision',
+        label: 'Log commitment for Oct 9',
+        confidence: 'high',
+        personalClose: 'dated-commitment',
+        facts: { date: { iso: iso } },
+        entities: { what: 'renew the passport application' },
+        signals: { score: 80 }
+      }
+    };
+    const taskStored = {
+      log: [Object.assign({}, base, {
+        process: {
+          id: 'log-it',
+          name: 'Log It',
+          steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the passport application', dateIso: iso } }]
+        }
+      })]
+    };
+    const taskOpts = {};
+    const task = load(taskStored, taskOpts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), task.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const taskHost = task.document.getElementById('open-list');
+    const taskBtn = find(taskHost, 'primary')[0];
+    check('the commitment card is on the Open list', Boolean(taskBtn), find(taskHost, 'log-label').map((n) => n.textContent));
+    if (taskBtn) await Promise.all((taskBtn.listeners.click || []).map((fn) => Promise.resolve().then(fn)));
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const taskExec = (taskOpts.executes || [])[0] || {};
+    const taskWritten = (task.store().log || []).filter((e) => e && e.kind === 'written');
+    check('Do It writes Microsoft To Do, not a reply draft, with Google disconnected',
+      taskExec.connectorId === 'outlookTask'
+      && !(taskOpts.fetches || []).some((u) => /createReply/i.test(u))
+      && !(taskOpts.messages || []).includes('flow:follow-task')
+      && taskWritten.some((e) => e.fetchedBack === true && e.system === 'microsoft/todo' && e.connectorId === 'outlookTask')
+      && taskWritten.every((e) => !/Reply draft ready/.test(String(e.label || ''))),
+      { exec: taskExec.connectorId, fetches: taskOpts.fetches, messages: taskOpts.messages, written: taskWritten.map((e) => ({ label: e.label, system: e.system, fetchedBack: e.fetchedBack, connectorId: e.connectorId })) });
+
+    const fileOpts = {
+      executeReply: {
+        ok: true,
+        written: 'Saved on OneDrive.',
+        ref: { externalId: 'FILE9', driveId: 'me', itemId: 'FILE9' },
+        proof: { system: 'microsoft/onedrive', externalId: 'FILE9', fetchedBack: true, verifiedAt: '2026-10-08T07:00:00.000Z' }
+      }
+    };
+    const fileStored = {
+      log: [Object.assign({}, base, {
+        messageId: 'file-mail',
+        subject: 'Gate 0.9.37 OneDrive save',
+        intent: Object.assign({}, base.intent, { label: 'Save the file' }),
+        process: {
+          id: 'save-file',
+          name: 'Save the file',
+          closedLine: 'Saved on OneDrive.',
+          steps: [
+            { kind: 'onedriveFile', id: 'onedriveFile', params: { name: 'signed-NDA.pdf' } },
+            { kind: 'outlookDraft', id: 'outlookDraft', params: {} }
+          ]
+        }
+      })]
+    };
+    const file = load(fileStored, fileOpts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), file.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const fileBtn = find(file.document.getElementById('open-list'), 'primary')[0];
+    check('the file card is on the Open list', Boolean(fileBtn));
+    if (fileBtn) await Promise.all((fileBtn.listeners.click || []).map((fn) => Promise.resolve().then(fn)));
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const fileExec = (fileOpts.executes || [])[0] || {};
+    check('Do It on a file card writes OneDrive, not a reply draft',
+      fileExec.connectorId === 'onedriveFile' && !(fileOpts.fetches || []).some((u) => /createReply/i.test(u)),
+      { exec: fileExec.connectorId, fetches: fileOpts.fetches });
+
+    const draftOpts = {};
+    const draftStored = {
+      outlookAuth: { token: { accessToken: 'AT', grantedScopes: ['Mail.Read', 'Mail.ReadWrite'] }, account: { address: 'me@contoso.com' } },
+      log: [Object.assign({}, base, {
+        messageId: 'draft-mail',
+        subject: 'Please reply',
+        intent: Object.assign({}, base.intent, { label: 'Reply' }),
+        process: { id: 'reply', name: 'Reply', steps: [{ kind: 'outlookDraft', id: 'outlookDraft', params: {} }] }
+      })]
+    };
+    const draft = load(draftStored, draftOpts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), draft.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const draftBtn = find(draft.document.getElementById('open-list'), 'primary')[0];
+    check('the reply card is on the Open list', Boolean(draftBtn));
+    if (draftBtn) {
+      try { await Promise.all((draftBtn.listeners.click || []).map((fn) => Promise.resolve().then(fn))); }
+      catch (e) { /* a refused Graph call must not become a To Do write */ }
+    }
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const handledStored = {
+      log: [{
+        kind: 'written', app: 'outlook', messageId: 'handled-park', ts: Date.now(),
+        connectorId: 'outlookTask', fetchedBack: true, system: 'microsoft/todo',
+        label: 'Renew the parking permit by Oct 11',
+        actionTitle: 'Renew the parking permit by Oct 11'
+      }, Object.assign({}, base, {
+        messageId: 'still-park',
+        subject: 'Parking permit - please renew by Sunday',
+        text: 'Please renew the parking permit by Sunday.',
+        intent: Object.assign({}, base.intent, { label: 'Renew the parking permit by Oct 11', personalClose: 'follow-up-ask', type: 'request', noReplyDraft: true }),
+        process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit by Oct 11' } }] }
+      })]
+    };
+    const handled = load(handledStored, {});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), handled.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const heads = find(handled.document.getElementById('open-list'), 'loops-section').map((n) => n.getAttribute('data-glance-section'));
+    check('Loops shows Added for a Handled row and Suggested for the open Do It',
+      heads.indexOf('added') >= 0 && heads.indexOf('suggested') >= 0, heads);
+    const doIts = find(handled.document.getElementById('open-list'), 'primary');
+    check('that open parking row is one Do It', doIts.length === 1, doIts.length);
+
+    const headingIso = isoDaysFromNow(1);
+    const heading = load({
+      log: [
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'sug-mail', threadId: 'ol:sug',
+          subject: 'Please renew the parking permit by Sunday.',
+          text: 'Please renew the parking permit by Sunday.',
+          intent: datedIntent(headingIso),
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit' } }] }
+        },
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'add-mail', threadId: 'ol:add',
+          subject: 'Gate 0.9.35 To Do title',
+          text: 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate',
+          intent: {
+            type: 'decision',
+            label: 'Log commitment for Oct 9',
+            confidence: 'high',
+            personalClose: 'dated-commitment',
+            facts: { date: { iso: isoDaysFromNow(3) } },
+            entities: { what: 'renew the passport application' },
+            signals: { score: 80 }
+          },
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'added-task', added: true, params: { title: 'Call Noa' } }] }
+        }
+      ]
+    }, {});
+    heading.sandbox.FlowStepKit = {};
+    heading.sandbox.FlowStepList = {
+      rowsFor(process) {
+        const steps = (process && process.steps) || [];
+        if (steps.some((s) => s && s.added === true)) return [{ id: 'a', added: true }];
+        return [{ id: 's', suggested: true }];
+      },
+      liveStepsFrom() { return []; }
+    };
+    heading.sandbox.FlowStepListView = {
+      mount(host, rows) {
+        const added = (rows || []).some((r) => r && r.added);
+        const sec = heading.document.createElement('li');
+        sec.className = 'act-section';
+        sec.setAttribute('data-glance-section', added ? 'added' : 'suggested');
+        const label = heading.document.createElement('span');
+        label.className = 'acts-label';
+        label.textContent = added ? 'Added' : 'Suggested';
+        sec.appendChild(label);
+        host.appendChild(sec);
+        return {};
+      }
+    };
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), heading.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const headingList = heading.document.getElementById('open-list');
+    function sectionNodes(node, out) {
+      out = out || [];
+      if (node && node.getAttribute && node.getAttribute('data-glance-section')) out.push(node);
+      for (const c of (node && node.children) || []) sectionNodes(c, out);
+      return out;
+    }
+    const topHeads = (headingList.children || []).filter((n) => String(n.className || '').split(/\s+/).includes('loops-section'));
+    const topSuggested = topHeads.filter((n) => n.getAttribute('data-glance-section') === 'suggested');
+    const topAdded = topHeads.filter((n) => n.getAttribute('data-glance-section') === 'added');
+    const suggestedLabel = topSuggested[0] && (topSuggested[0].children || []).map((c) => c.textContent).join('');
+    const addedLabel = topAdded[0] && (topAdded[0].children || []).map((c) => c.textContent).join('');
+    const cards = find(headingList, 'log-item');
+    const repeated = [];
+    cards.forEach((card) => {
+      sectionNodes(card).forEach((n) => {
+        const section = n.getAttribute('data-glance-section');
+        if (section === 'suggested' || section === 'added') repeated.push(section);
+      });
+    });
+    check('Loops keeps one top-level Suggested heading and one top-level Added heading',
+      topSuggested.length === 1 && suggestedLabel === 'Suggested' && topAdded.length === 1 && addedLabel === 'Added',
+      { suggested: topSuggested.length, suggestedLabel, added: topAdded.length, addedLabel, cards: cards.length,
+        sections: sectionNodes(headingList).map((n) => n.getAttribute('data-glance-section') + ':' + String(n.className || '')) });
+    check('no Loops card repeats Suggested or Added', repeated.length === 0, repeated);
+
+    check('a reply ask still does not write Microsoft To Do',
+      !(draftOpts.executes || []).some((p) => p && (p.connectorId === 'outlookTask' || p.connectorId === 'onedriveFile')),
+      draftOpts.executes);
+  }
+
+  console.log('\n--- popup.js: expired rows do not replace Suggested or Added ---\n');
+  {
+    const mixed = load({
+      log: [
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'sug-mail', threadId: 'ol:sug',
+          subject: 'Please renew the parking permit by Sunday.',
+          text: 'Please renew the parking permit by Sunday.',
+          intent: datedIntent(isoDaysFromNow(2)),
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit' } }] }
+        },
+        {
+          ts: Date.now(), kind: 'shown', app: 'outlook', messageId: 'add-mail', threadId: 'ol:add',
+          subject: 'Gate 0.9.35 To Do title',
+          text: 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate',
+          intent: {
+            type: 'decision', label: 'Log commitment for Oct 9', confidence: 'high',
+            personalClose: 'dated-commitment',
+            facts: { date: { iso: isoDaysFromNow(3) } },
+            entities: { what: 'renew the passport application' },
+            signals: { score: 80 }
+          },
+          process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'added-task', added: true, params: { title: 'Call Noa' } }] }
+        },
+        {
+          ts: Date.now(), kind: 'shown', messageId: 'car-insurance', threadId: 't-car',
+          process: { id: 'reply-track', name: 'Reply & Track', steps: [{ id: 'draft' }] },
+          sender: { name: 'Dana' }, subject: 'Car insurance certificate',
+          text: 'Please send the car insurance certificate by October 12.',
+          app: 'outlook', threadUrl: 'https://outlook.office.com/mail/insurance',
+          intent: {
+            type: 'request', label: 'Send the car insurance certificate', confidence: 'high',
+            personalClose: 'follow-up-ask',
+            facts: { date: { iso: '2020-01-02' } },
+            entities: { what: 'the car insurance certificate' }
+          }
+        }
+      ]
+    }, {});
+    mixed.sandbox.FlowStepKit = {};
+    mixed.sandbox.FlowStepList = {
+      rowsFor(process) {
+        const steps = (process && process.steps) || [];
+        if (steps.some((s) => s && s.added === true)) return [{ id: 'a', added: true }];
+        return [{ id: 's', suggested: true }];
+      },
+      liveStepsFrom() { return []; }
+    };
+    mixed.sandbox.FlowStepListView = {
+      mount(host, rows) {
+        const added = (rows || []).some((r) => r && r.added);
+        const sec = mixed.document.createElement('li');
+        sec.className = 'act-section';
+        sec.setAttribute('data-glance-section', added ? 'added' : 'suggested');
+        const label = mixed.document.createElement('span');
+        label.className = 'acts-label';
+        label.textContent = added ? 'Added' : 'Suggested';
+        sec.appendChild(label);
+        host.appendChild(sec);
+        return {};
+      }
+    };
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), mixed.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const list = mixed.document.getElementById('open-list');
+    const heads = (list.children || []).filter((n) => String(n.className || '').split(/\s+/).includes('loops-section'));
+    const names = heads.map((n) => n.getAttribute('data-glance-section'));
+    const expired = heads.filter((n) => n.getAttribute('data-glance-section') === 'expired')[0];
+    const mainExpired = (list.children || []).filter((n) => n.getAttribute && n.getAttribute('data-glance-status') === 'expired');
+    check('Suggested and Added stay when an expired loop is also stored',
+      names.indexOf('suggested') >= 0 && names.indexOf('added') >= 0 && names.indexOf('suggested') < names.indexOf('added'),
+      names);
+    check('Expired is a collapsed section after Suggested and Added, not the main list',
+      names[names.length - 1] === 'expired' && expired && String(expired.tagName).toLowerCase() === 'details' &&
+      expired.open !== true && mainExpired.length === 0 &&
+      (expired.children || []).some((c) => c.getAttribute && c.getAttribute('data-glance-status') === 'expired'),
+      { names, open: expired && expired.open, main: mainExpired.length });
+  }
+
+  console.log('\n--- popup.js: Setup on an Outlook tab says Connect Microsoft ---\n');
+  {
+    const panel = load({}, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const list = panel.document.getElementById('connector-list');
+    const words = [];
+    (function walk(n) {
+      if (n && n.textContent) words.push(n.textContent);
+      (n.children || []).forEach(walk);
+    })(list);
+    const services = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-service')) services.push(n.getAttribute('data-glance-service'));
+      (n.children || []).forEach(walk);
+    })(list);
+    const ticked = {};
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-service')) ticked[n.getAttribute('data-glance-service')] = n.checked === true;
+      (n.children || []).forEach(walk);
+    })(list);
+    const scopeLines = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-scope-line')) scopeLines.push(n.textContent);
+      (n.children || []).forEach(walk);
+    })(list);
+    check('Outlook Setup says התחבר ל-Microsoft and offers שמירת זמן ביומן',
+      words.indexOf('התחבר ל-Microsoft') >= 0 && services.indexOf('calendar') >= 0 && words.indexOf('Connect Google') < 0 && words.indexOf('שמירת זמן ביומן') >= 0,
+      { words, services });
+    check('on a new connection the OneDrive box is ticked by default and To Do and Calendar are not',
+      ticked.onedrive === true && ticked.todo === false && ticked.calendar === false && ticked.mail === true, ticked);
+    check('each unchecked service names its scope and how to connect',
+      scopeLines.some((t) => t.indexOf('Tasks.ReadWrite') >= 0 && t.indexOf('To Do') >= 0) &&
+      scopeLines.some((t) => t.indexOf('Calendars.ReadWrite') >= 0 && t.indexOf('שמירת זמן ביומן') >= 0) &&
+      scopeLines.some((t) => t.indexOf('Files.ReadWrite') >= 0) &&
+      !scopeLines.some((t) => t.indexOf('Mail.Read') === 0),
+      scopeLines);
+  }
+
+  console.log('\n--- popup.js: the panel and Setup share one Microsoft state ---\n');
+  async function microsoftFace(store) {
+    const panel = load(store, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const pill = panel.document.getElementById('statusPill');
+    const list = panel.document.getElementById('connector-list');
+    const cards = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-connect') === 'microsoft') cards.push(n);
+      (n.children || []).forEach(walk);
+    })(list);
+    const card = cards[0] || null;
+    let connectedBadge = false;
+    (function walk(n) {
+      const classes = String((n && n.className) || '').split(/\s+/);
+      if (classes.indexOf('badge') >= 0 && classes.indexOf('on') >= 0) connectedBadge = true;
+      (n.children || []).forEach(walk);
+    })(card || { children: [] });
+    return {
+      pill: pill ? pill.textContent : '',
+      status: card ? card.getAttribute('data-glance-microsoft') : '',
+      connectedBadge: connectedBadge
+    };
+  }
+  const expiredFace = await microsoftFace({
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() - 1000, grantedScopes: ['Mail.ReadWrite'] } },
+    outlookSync: {}
+  });
+  check('an expired token is Reconnect in the panel and in Setup, never Connected',
+    expiredFace.pill === 'התחבר מחדש' && expiredFace.status === 'expired' && !expiredFace.connectedBadge,
+    expiredFace);
+  const scopeFace = await microsoftFace({
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } },
+    outlookSync: {}
+  });
+  check('a missing mail scope is Reconnect in the panel and in Setup, never Connected',
+    scopeFace.pill === 'התחבר מחדש' && scopeFace.status === 'missing-scope' && !scopeFace.connectedBadge,
+    scopeFace);
+
+  console.log('\n--- popup.js: header, panel, Setup row, and popup read one Microsoft state ---\n');
+  async function fourMicrosoft(store) {
+    const panel = load(store, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    function walk(n, hit) {
+      if (!n) return;
+      if (n.getAttribute && n.getAttribute('data-glance-connect') === 'microsoft' && n.getAttribute('data-glance-microsoft')) hit.card = n;
+      if (n.getAttribute && n.getAttribute('data-glance-surface') === 'outlook') hit.row = n;
+      (n.children || []).forEach((c) => walk(c, hit));
+    }
+    const hit = {};
+    walk(panel.document.getElementById('connector-list'), hit);
+    walk(panel.document.getElementById('surface-list'), hit);
+    function stateOf(node) { return node && node.getAttribute ? (node.getAttribute('data-glance-microsoft') || '') : ''; }
+    function textOf(node, cls) {
+      const found = [];
+      (function w(n) {
+        if (!n) return;
+        const classes = String(n.className || '').split(/\s+/);
+        if (classes.indexOf(cls) >= 0 && n.children && n.children.length === 0) found.push(n.textContent);
+        (n.children || []).forEach(w);
+      })(node);
+      return found[0] || '';
+    }
+    const pill = panel.document.getElementById('statusPill');
+    const block = panel.document.getElementById('outlookBlock');
+    return {
+      header: stateOf(pill),
+      panel: stateOf(hit.card),
+      row: stateOf(hit.row),
+      popup: stateOf(block),
+      headerText: pill ? pill.textContent : '',
+      panelText: textOf(hit.card, 'badge'),
+      rowText: textOf(hit.row, 'wait-state')
+    };
+  }
+  const faces = {
+    valid: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.ReadWrite'] }, account: { address: 'me@outlook.com' } }, outlookSync: {} },
+    expired: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() - 1000, grantedScopes: ['Mail.ReadWrite'] } }, outlookSync: {} },
+    'missing-scope': { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite'] } }, outlookSync: {} },
+    missing: { outlookAuth: null, outlookSync: {} }
+  };
+  const words = { valid: 'מחובר', expired: 'התחבר מחדש', 'missing-scope': 'התחבר מחדש', missing: 'לא מחובר' };
+  for (const key of Object.keys(faces)) {
+    const face = await fourMicrosoft(faces[key]);
+    check('header, panel, Setup row, and popup agree on ' + key,
+      face.header === key && face.panel === key && face.row === key && face.popup === key &&
+      face.headerText === words[key] && face.panelText === words[key] && face.rowText === words[key],
+      face);
+  }
+
+  console.log('\n--- popup.js: Why not shown uses the same Hebrew as the page ---\n');
+  const whyReasons = ['intent-null', 'tasks-not-granted', 'third-party', 'not-connected', 'context-dead', 'too-short', 'no-token', 'calendar-write-not-granted'];
+  const whyStore = {
+    outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.Read'] }, account: { address: 'me@outlook.com' } },
+    outlookSync: {},
+    glanceWhyCurrent: { reason: 'page:intent-null', subject: 'Mail 0', messageId: 'w0' },
+    outlookPageDiag: whyReasons.map((reason, i) => ({ id: 'w' + i, reason: 'page:' + reason, verdict: 'quiet', subject: 'Mail ' + i }))
+  };
+  const whyPanel = load(whyStore, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+  vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), whyPanel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+  const whyNodes = [];
+  (function walk(n) {
+    if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) whyNodes.push(n);
+    (n.children || []).forEach(walk);
+  })(whyPanel.document.getElementById('surface-list'));
+  const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const pageUsesShared = /function whyNotText\(reason\) \{[\s\S]*?FlowDisplay\.whyNotShownLine\(reason\)/.test(pageSrc);
+  const whyLog = [];
+  (function walkLog(n) {
+    if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) whyLog.push(n);
+    (n.children || []).forEach(walkLog);
+  })(whyPanel.document.getElementById('log-list'));
+  check('Setup shows one why line, for the current mail only', whyNodes.length === 1, whyNodes.map((n) => n.textContent));
+  check('Activity shows the same why line',
+    whyNodes.length === 1 && whyLog.length === 1 && whyLog[0].getAttribute('data-glance-why-line') === whyNodes[0].getAttribute('data-glance-why-line'),
+    whyLog.map((n) => n.textContent));
+  whyReasons.forEach((reason) => {
+    const expected = whyPanel.sandbox.FlowDisplay.whyNotShownLine(reason);
+    const expectedPage = whyPanel.sandbox.FlowDisplay.whyNotShownLine('page:' + reason);
+    const node = whyNodes.filter((n) => n.getAttribute('data-glance-why') === 'page:' + reason)[0];
+    const shown = reason === 'intent-null';
+    check('page and Setup say the same Hebrew for ' + reason,
+      pageUsesShared && expected === expectedPage && (shown ? (node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0) : !node),
+      { expected, page: expectedPage, text: node && node.textContent });
+  });
+
+  console.log('\n--- popup.js: a why line that arrives after open still paints ---\n');
+  const lateOpts = { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] };
+  const latePanel = load({
+    outlookAuth: whyStore.outlookAuth,
+    outlookSync: {},
+    glanceWhyCurrent: null
+  }, lateOpts);
+  vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), latePanel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+  function countWhy(root) {
+    const found = [];
+    (function walk(n) {
+      if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) found.push(n);
+      (n.children || []).forEach(walk);
+    })(root);
+    return found;
+  }
+  const before = countWhy(latePanel.document.getElementById('surface-list'));
+  check('open before the quiet write paints no why line', before.length === 0, before.map((n) => n.textContent));
+  const arrived = { reason: 'page:intent-null', subject: 'Stay quiet', messageId: 'b' };
+  latePanel.sandbox.chrome.storage.local.set({ glanceWhyCurrent: arrived });
+  (lateOpts.storageListeners || []).forEach((fn) => {
+    fn({ glanceWhyCurrent: { newValue: arrived } }, 'local');
+  });
+  for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
+  const after = countWhy(latePanel.document.getElementById('surface-list'));
+  const afterLog = countWhy(latePanel.document.getElementById('log-list'));
+  check('glanceWhyCurrent after open paints the why line',
+    after.length === 1 && after[0].getAttribute('data-glance-why-line') === 'לא זוהתה בקשה' && after[0].textContent.indexOf('לא זוהתה בקשה') === 0 && after[0].textContent.indexOf('Stay quiet') >= 0,
+    after.map((n) => n.textContent));
+  check('glanceWhyCurrent after open paints the why line on Activity',
+    afterLog.length === 1 && afterLog[0].textContent.indexOf('לא זוהתה בקשה') === 0 && afterLog[0].textContent.indexOf('Stay quiet') >= 0,
+    afterLog.map((n) => n.textContent));
+
+  const refreshPanel = load({ glanceOutlookRefresh: { '7': true } }, { activeTabs: [{ id: 7, url: 'https://outlook.live.com/mail/0/inbox' }] });
+  vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), refreshPanel.sandbox, { filename: 'popup.js' });
+  for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+  const refreshWords = [];
+  (function walk(n) {
+    if (n && n.textContent && n.children && n.children.length === 0) refreshWords.push(n.textContent);
+    (n.children || []).forEach(walk);
+  })(refreshPanel.document.getElementById('connector-list'));
+  check('a tab the dead script could not paint shows the same refresh line in the popup',
+    refreshWords.indexOf('Glance התעדכן — רענן את הדף כדי להתחבר מחדש') >= 0 && refreshWords.indexOf('רענן') >= 0,
+    refreshWords);
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }
 
-run();
+module.exports = { load };
+if (require.main === module) run();

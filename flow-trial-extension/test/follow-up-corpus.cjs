@@ -152,6 +152,16 @@ check('"passed it to accounting" on a payment is not paid', outcome('העברת�
 check('"much appreciated" is an acknowledgement', outcome('Much appreciated!', replyW) === 'ack');
 check('"thanks for sending" is an acknowledgement', outcome('Thanks for sending this over.', replyW) === 'ack');
 check('a refusal is still an answer (it closes the loop as declined, you know where you stand)', outcome('Unfortunately we decided not to go ahead with the vendor.', replyW) === 'declined');
+check('rm-101 not-my-job plus contact-them closes as declined, not as done', outcome('שלום, נושא זה אינו בטיפולי ולא בסמכותי. אנא פנה אל מנהל האגף למערכות מידע ב[ORG]. תודה, [NAME]', replyW) === 'declined');
+check('rm-102 retirement closes as declined, not as done', outcome('אתם לא מעודכנים😊. פרשתי לפני כחצי שנה. תוכלו למצוא את פרטי המחליפה שלי באתר [ORG] תחת הנהלה', replyW) === 'declined');
+check('rm-103 a suggestion to talk does not close the loop', outcome('[NAME] שלום, כדאי שנדבר על הנושא. בברכה [NAME]', replyW) === 'ack');
+check('rm-104 לא הבנתי is not a bare no', outcome('שלום, לא הבנתי אם מדובר על מערכת לניהול קריאות? יודעת לנהל מלאי וחלפים? תודה [NAME]', replyW) !== 'declined');
+check('rm-111 Hebrew absence is an auto-reply', outcome('שלום, לרגל חופשה אעדר מהמשרד עד ליום [DATE] למקרים דחופים יש לפנות ל[NAME] [EMAIL]', replyW) === 'auto');
+check('rm-113 Hebrew absence is an auto-reply', outcome('שלום, בתקופה הקרובה אעדר מ[ORG]. לסיוע ותמיכה ניתן לפנות במייל [EMAIL]', replyW) === 'auto');
+check('rm-114 a recipient bounce is not an answer', outcome('Message blocked. Your message to [EMAIL] has been blocked. The response from the remote server was: 550 5.4.1 Recipient address rejected: Access denied.', replyW) === 'auto');
+check('a bare לא still declines', outcome('לא', replyW) === 'declined');
+check('לא תודה still declines', outcome('לא תודה', replyW) === 'declined');
+check('please direct this to accounting declines', outcome('Please direct this to our accounting department.', replyW) === 'declined');
 console.log('  payment:');
 check('"payment sent" closes a payment loop as paid', outcome('Payment sent today, confirmation attached.', payW) === 'paid');
 check('"I paid yesterday" is paid', outcome('I paid yesterday, should reach you shortly.', payW) === 'paid');
@@ -244,6 +254,48 @@ console.log('\n--- a reminder ticked done in Google Tasks ---\n');
   check('on your own promise it is "kept"', F.closeFromTask(Object.assign({}, w, { direction: 'mine' }), NOW).closedAs === 'kept');
   check('only waiting loops with a reminder are asked about, and not again within ten minutes', F.taskRefsToCheck([w, { id: 'x', status: 'waiting' }, { id: 'y', status: 'resolved', taskRef: { taskId: 'Y' } }], NOW, {}).length === 1 && F.taskRefsToCheck([w], NOW, { t1: NOW - 60000 }).length === 0 && F.taskRefsToCheck([w], NOW, { t1: NOW - 11 * 60000 }).length === 1);
 }
+
+console.log('\n--- progress and preparation are not completion ---\n');
+const PROGRESS_OPEN = [
+  'I started on it; half done.', 'Found it in the shared folder, sending shortly.', 'Almost there, a couple more days.', 'All set on my side.',
+  "It's all drafted, I just need an approval.", 'Prepared the document, waiting for approval from Dana.', 'It is with the lawyer right now.',
+  'כמעט סיימתי', 'זה אצל עורך הדין כרגע', 'מוכן, רק צריך לקבל אישור', 'מצאתי, שולח עוד מעט', 'התחלתי'
+];
+PROGRESS_OPEN.forEach((t) => { const o = outcome(t, replyW); check('stays open (not closed): ' + t, o === 'promised' || o === 'ack' || o === 'yours', o); });
+check('progress is visible and minimal: it becomes "promised" with the day they named, or none', (() => { const r = cr('Drafted it, will send tomorrow.', replyW); return r.outcome === 'promised' && r.progress === true && r.promisedIso === '2026-10-02'; })(), cr('Drafted it, will send tomorrow.', replyW));
+check('"half done" is not delivery just because it contains "done"', outcome('Half done, will finish tomorrow.', replyW) === 'promised');
+const STILL_CLOSES = [
+  'Here is the signed lease, attached.', 'Found it, attached.', 'Done, sent it this morning.', 'Yes, I found it and the amount is $500.',
+  'מצורף ההסכם החתום', 'סיימתי', 'Approved. The figure is $12,400.'
+];
+STILL_CLOSES.forEach((t) => check('a real delivery or answer still closes: ' + t, outcome(t, replyW) === 'closed', outcome(t, replyW)));
+check('a payment claim "Transferred, confirmation attached." is a payment claim (the person is then asked once)', outcome('Transferred, confirmation attached.', payW) === 'paid');
+check('"Not transferred yet" is not', outcome('Not transferred yet', payW) !== 'paid');
+check('an unfinished payment still does not close it', outcome('Will pay once the invoice is corrected.', payW) !== 'paid');
+check('applyReply keeps a progress reply open and moves the next look, never closes', (() => { const r = cr('Found it in the shared folder, sending shortly.', replyW); const a = F.applyReply(replyW, r, NOW); return !a.close && a.rescheduled && a.patch.stage === 'promised' && !a.patch.status; })());
+
+console.log('\n--- deferred completion: the day they name, in the ways people say it ---\n');
+const dayOf = (t) => cr(t, replyW).promisedIso;
+check('a bare weekday: "I will send it Thursday" (today is Thursday: next week)', dayOf('I will send it Thursday') === '2026-10-08', dayOf('I will send it Thursday'));
+check('«אחזור אליך עד חמישי»', dayOf('אחזור אליך עד חמישי') === '2026-10-08', dayOf('אחזור אליך עד חמישי'));
+check('«אחזור אליך עד יום ה׳» (letter form)', dayOf('אחזור אליך עד יום ה׳') === '2026-10-08', dayOf('אחזור אליך עד יום ה׳'));
+check('«אשלח בשבוע הבא» is a week out', dayOf('אשלח בשבוע הבא') === '2026-10-08', dayOf('אשלח בשבוע הבא'));
+check('«אשלח עד סוף השבוע» on a Thursday is today', dayOf('אשלח עד סוף השבוע') === '2026-10-01', dayOf('אשלח עד סוף השבוע'));
+check('«אשלח עד 20/10» reads day/month with no year', dayOf('אשלח עד 20/10') === '2026-10-20', dayOf('אשלח עד 20/10'));
+check('"3/11" is read day/month (Israel), the next one that is not in the past', dayOf('Thanks, I will revert on 3/11') === '2026-11-03', dayOf('Thanks, I will revert on 3/11'));
+check('"by the end of the month"', dayOf('I will send it by the end of the month') === '2026-10-31', dayOf('I will send it by the end of the month'));
+check('a past day is never returned (31/12 passed is next year only if it already passed)', (dayOf('אשלח עד 15/09') || '2027-09-15') >= '2026-10-01');
+check('no day named stays without a day', dayOf('Will look into it later and revert.') === null);
+
+console.log('\n--- a reply that hands you a task is not a close (found on real mail, 2026-10-12; sentences here are invented) ---\n');
+const open_ = (t) => cr(t, replyW).outcome !== 'closed';
+check('«נא לצרף צילום של הרישיון» is the ball back with you', open_('קיבלנו את בקשתך. נא לצרף בהודעה חוזרת צילום של הרישיון ואז נטפל.'));
+check('«אנא הגש עד 26/7» is not a close', open_('המטלות פתוחות. אנא הגש את שתיהן עד 26/7. אם אתה זקוק לזמן נוסף עדכן אותי.'));
+check('«אין צורך (ואי אפשר) לאשר» is a no, not a close', open_('בשלב הזה אין צורך (ואי אפשר) לאשר מועד מיוחד. אודה לך אם תעדכן אותי בתאריכים.'));
+check('"please attach the ID photo and we will proceed" is not a close', open_('Please attach the ID photo and we will proceed.'));
+check('"it arrived, please check back in a few days" waits, never closes', cr('The package has arrived and is in transit. Please check back again in a few days.', replyW).outcome === 'ack');
+check('a real confirmation still closes («הפרופיל הוסר»)', cr('הבקשה טופלה. הפרופיל הוסר והמסמך נמחק.', replyW).outcome === 'closed');
+check('a plain yes with "please let me know if anything else" still closes', cr('Approved. Please let me know if you need anything else.', replyW).outcome === 'closed', cr('Approved. Please let me know if you need anything else.', replyW));
 
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

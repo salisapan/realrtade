@@ -1,8 +1,12 @@
 // Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the tokens fresh. Portable: no chrome.*, no DOM.
 // The browser pieces (the sign-in window, fetch, the clock, randomness, silent launch) are handed in, so this file is tested without a browser.
 //
-// What is asked of the person: Mail.Read, Mail.ReadWrite (drafts only, by code), User.Read and offline_access.
-// Never Mail.Send. The tokens are kept only in this browser's extension storage. Nothing here talks to Glance's servers.
+// What the default sign-in asks: Mail.Read, Mail.ReadWrite (drafts only, by code), User.Read
+// and offline_access. Tasks.ReadWrite is asked only when the To Do checkbox is checked
+// (one To Do task, read back, Undo deletes it). Files.ReadWrite is asked only when
+// the OneDrive checkbox is checked (one file, read back, Undo deletes or restores it).
+// Never Mail.Send.
+// The tokens are kept only in this browser's extension storage. Nothing here talks to Glance's servers.
 //
 // SPA refresh tokens last 24h and do not slide (Microsoft). silentReauth renews with prompt=none before that window
 // ends; only login_required / interaction_required / consent_required force a visible reconnect.
@@ -61,6 +65,30 @@ const FlowOutlookAuth = (() => {
   function codeBody(o) { return form({ client_id: o.clientId, grant_type: 'authorization_code', code: o.code, redirect_uri: o.redirectUri, code_verifier: o.verifier, scope: o.scopes.join(' ') }); }
   function refreshBody(o) { return form({ client_id: o.clientId, grant_type: 'refresh_token', refresh_token: o.refreshToken, scope: o.scopes.join(' ') }); }
 
+  // The scopes this sign-in will ask for. A passed list wins (the Connect screen).
+  // Otherwise the config default (mail). Mail.Send is dropped if it ever appears.
+  // A real token answer. "unknown", a missing scope, and a stale requested
+  // list are not a grant. The calendar module folds Graph URIs and scp.
+  function grantedFromResponse(resp, previous) {
+    const Cal = typeof FlowOutlookCalendar !== 'undefined' ? FlowOutlookCalendar : null;
+    if (Cal && typeof Cal.grantedScopesFromResponse === 'function') return Cal.grantedScopesFromResponse(resp, previous);
+    const raw = resp && resp.scope != null ? String(resp.scope).trim() : '';
+    if (raw && !/^unknown$/i.test(raw)) return raw.split(/[\s,;]+/).filter(Boolean);
+    return (previous && previous.grantedScopes) || null;
+  }
+
+  function scopeList(cfg, scopes) {
+    const base = Array.isArray(cfg && cfg.SCOPES) ? cfg.SCOPES : [];
+    const raw = Array.isArray(scopes) && scopes.length ? scopes : base;
+    const out = [];
+    raw.forEach((s) => {
+      const x = String(s || '');
+      if (!x || /Mail\.Send/i.test(x) || /\.Send$/i.test(x)) return;
+      if (out.indexOf(x) < 0) out.push(x);
+    });
+    return out.length ? out : base.slice();
+  }
+
   // The token endpoint's answer -> what is stored. A minute of margin so a token is never used in its last seconds.
   // rtIssuedAt is set when a CODE is redeemed (interactive or silent). A refresh_token grant keeps the previous rtIssuedAt
   // (SPA refresh tokens inherit the original 24h expiry).
@@ -73,7 +101,7 @@ const FlowOutlookAuth = (() => {
       refreshToken: resp.refresh_token ? String(resp.refresh_token) : (previous && previous.refreshToken) || null,
       expiresAt: t + Math.max(0, (Number(resp.expires_in) || 3600) - 60) * 1000,
       rtIssuedAt: rtIssuedAt,
-      grantedScopes: resp.scope ? String(resp.scope).split(/\s+/).filter(Boolean) : (previous && previous.grantedScopes) || null
+      grantedScopes: grantedFromResponse(resp, previous)
     };
   }
 
@@ -99,9 +127,10 @@ const FlowOutlookAuth = (() => {
   async function signIn(deps, cfg, redirectUri, opts) {
     if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured' };
     const o = opts || {};
+    const scopes = scopeList(cfg, o.scopes);
     const pk = await newPkce(deps);
     const url = authorizeUrl({
-      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: cfg.SCOPES,
+      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: scopes,
       challenge: pk.challenge, state: pk.state, prompt: o.prompt || 'select_account', loginHint: o.loginHint || null
     });
     let back;
@@ -109,7 +138,7 @@ const FlowOutlookAuth = (() => {
     if (!back) return { ok: false, error: 'cancelled' };
     const r = parseRedirect(back, pk.state);
     if (r.error) return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null };
-    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: cfg.SCOPES }));
+    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: scopes }));
     if (!t.ok) return { ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null };
     const tok = normalizeToken(t.data, deps.now(), null, true);
     return tok ? { ok: true, token: tok } : { ok: false, error: 'no-token' };
@@ -117,12 +146,13 @@ const FlowOutlookAuth = (() => {
 
   // Silent renewal: same authorize URL with prompt=none and login_hint. deps.launchSilent(url) -> redirect url | null.
   // Never opens a visible window. Returns { ok, token } or { ok:false, error, aadsts, needsInteraction }.
-  async function silentReauth(deps, cfg, redirectUri, loginHint) {
+  async function silentReauth(deps, cfg, redirectUri, loginHint, scopes) {
     if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured', needsInteraction: true };
     if (typeof deps.launchSilent !== 'function') return { ok: false, error: 'no-silent', needsInteraction: true };
+    const list = scopeList(cfg, scopes);
     const pk = await newPkce(deps);
     const url = authorizeUrl({
-      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: cfg.SCOPES,
+      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: list,
       challenge: pk.challenge, state: pk.state, prompt: 'none', loginHint: loginHint || null
     });
     // launchSilent resolves the redirect address, null, or { error } (Chrome's own message, e.g. "User interaction required.").
@@ -139,7 +169,7 @@ const FlowOutlookAuth = (() => {
       // failed attempt, retried later, never a reason to drop the connection.
       return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[r.error]) };
     }
-    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: cfg.SCOPES }));
+    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: list }));
     if (!t.ok) {
       return { ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[t.error]) };
     }
@@ -152,7 +182,7 @@ const FlowOutlookAuth = (() => {
     if (!token || !token.accessToken) return { ok: false, error: 'not-connected', reauth: true };
     if (token.expiresAt > deps.now()) return { ok: true, token, refreshed: false };
     if (!token.refreshToken) return { ok: false, error: 'expired', reauth: true };
-    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: cfg.SCOPES }));
+    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: scopeList(cfg, token.grantedScopes) }));
     if (!t.ok) {
       return {
         ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null,
@@ -194,6 +224,82 @@ const FlowOutlookAuth = (() => {
   function refreshTokenAlive(token, now) { return Boolean(token && token.refreshToken) && rtAgeOf(token, now) < RT_LIFETIME_MS - 60 * 1000; }
   function isTransient(error) { return !INTERACTION_ERRORS[error] && error !== 'not-connected' && error !== 'not-configured'; }
 
+  // The access token's scp claim, when this file is loaded without the calendar
+  // module (the panel). A Graph audience counts. Another audience does not.
+  function jwtPayload(accessToken) {
+    const parts = String(accessToken || '').split('.');
+    if (parts.length < 2 || !parts[1]) return null;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const clean = String(parts[1]).replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    if (!clean) return null;
+    let bits = '';
+    for (let i = 0; i < clean.length; i++) {
+      const v = chars.indexOf(clean.charAt(i));
+      if (v < 0) return null;
+      bits += v.toString(2).padStart(6, '0');
+    }
+    let text = '';
+    for (let i = 0; i + 8 <= bits.length; i += 8) text += String.fromCharCode(parseInt(bits.slice(i, i + 8), 2));
+    if (!text || text.charAt(0) !== '{') return null;
+    try { return JSON.parse(text); } catch (e) { return null; }
+  }
+
+  function scopeNames(raw) {
+    if (raw == null) return null;
+    const items = Array.isArray(raw) ? raw : [raw];
+    const out = [];
+    items.forEach((item) => {
+      String(item == null ? '' : item).split(/[\s,;]+/).forEach((part) => {
+        let s = String(part || '').trim();
+        if (!s || /^unknown$/i.test(s)) return;
+        if (/^https:\/\/graph\.microsoft\.com\//i.test(s)) s = s.replace(/^https:\/\/graph\.microsoft\.com\//i, '');
+        else if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return;
+        if (!s || s.indexOf('/') >= 0 || /^unknown$/i.test(s)) return;
+        if (out.indexOf(s) < 0) out.push(s);
+      });
+    });
+    return out.length ? out : null;
+  }
+
+  // What this stored token can do. The calendar module's reading wins when
+  // it is loaded. Otherwise the JWT scp wins over a stale grantedScopes list.
+  function tokenScopeNames(token) {
+    const Cal = typeof FlowOutlookCalendar !== 'undefined' ? FlowOutlookCalendar : null;
+    if (Cal && typeof Cal.scopesFromToken === 'function') return Cal.scopesFromToken(token);
+    if (!token || typeof token !== 'object') return null;
+    const payload = jwtPayload(token.accessToken);
+    if (payload && payload.scp != null) {
+      const scp = scopeNames(payload.scp);
+      if (scp && scp.length) return scp;
+    }
+    const granted = scopeNames(token.grantedScopes);
+    if (granted && granted.length) return granted;
+    return scopeNames(token.scope);
+  }
+
+  function hasMailScope(names) {
+    if (!names || !names.length) return false;
+    return names.some((s) => {
+      const name = String(s || '').toLowerCase();
+      return name === 'mail.read' || name === 'mail.readwrite';
+    });
+  }
+
+  // One reading of a stored Microsoft sign-in. The panel and Setup both use it.
+  // valid is the only state that may say connected. expired and missing-scope
+  // ask for a reconnect. missing has no token.
+  function microsoftConnection(auth, sync, now) {
+    const token = auth && auth.token;
+    if (!token || !token.accessToken) return 'missing';
+    const state = sync || {};
+    if (state.needsSignIn) return 'expired';
+    const exp = Number(token.expiresAt);
+    const clock = Number(now) || 0;
+    if (exp && clock && exp <= clock) return 'expired';
+    if (!hasMailScope(tokenScopeNames(token))) return 'missing-scope';
+    return 'valid';
+  }
+
   // One answer to "give me a usable access token", used by the panel, the Outlook page and the background worker alike.
   // deps: { fetch, now, random, sha256, launchSilent? }. auth: the stored outlookAuth record ({ token, account, ... }).
   // opts: { redirectUri, loginHint, force (the token was refused: refresh even if it looks fresh), lastSilentAt, allowSilent }.
@@ -204,6 +310,7 @@ const FlowOutlookAuth = (() => {
     if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured', needsSignIn: false, transient: false };
     if (!token || !token.accessToken) return { ok: false, error: 'not-connected', needsSignIn: true, transient: false };
     const now = deps.now();
+    const scopes = scopeList(cfg, o.scopes || (token && token.grantedScopes));
     const allowSilent = o.allowSilent !== false && typeof deps.launchSilent === 'function' && Boolean(o.redirectUri);
     const silentDue = !o.lastSilentAt || now - o.lastSilentAt >= SILENT_RETRY_MS;
     let silentTried = false;
@@ -211,7 +318,7 @@ const FlowOutlookAuth = (() => {
 
     async function silent() {
       silentTried = true;
-      const r = await silentReauth(deps, cfg, o.redirectUri, o.loginHint || null);
+      const r = await silentReauth(deps, cfg, o.redirectUri, o.loginHint || null, scopes);
       if (r.ok) return r.token;
       silentFail = r;
       return null;
@@ -229,7 +336,7 @@ const FlowOutlookAuth = (() => {
     // 3. Refresh inside the 24 hours.
     let refreshFail = null;
     if (refreshTokenAlive(token, now)) {
-      const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: cfg.SCOPES }));
+      const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: scopes }));
       if (t.ok) {
         const next = normalizeToken(t.data, now, token, false);
         if (next) return { ok: true, token: next, changed: true, how: 'refresh', silentTried };
@@ -260,9 +367,10 @@ const FlowOutlookAuth = (() => {
   }
 
   return {
-    b64url, newPkce, authorizeUrl, parseRedirect, codeBody, refreshBody, normalizeToken,
+    b64url, newPkce, authorizeUrl, parseRedirect, codeBody, refreshBody, normalizeToken, scopeList,
     explainError, errorSentence, signIn, ensureFresh, silentReauth,
-    session, rtAgeOf, refreshTokenAlive, RT_LIFETIME_MS, SILENT_AFTER_MS, ACCESS_MARGIN_MS, SILENT_RETRY_MS
+    session, rtAgeOf, refreshTokenAlive, RT_LIFETIME_MS, SILENT_AFTER_MS, ACCESS_MARGIN_MS, SILENT_RETRY_MS,
+    microsoftConnection
   };
 })();
 

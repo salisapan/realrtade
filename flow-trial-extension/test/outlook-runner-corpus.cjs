@@ -1,6 +1,7 @@
 // The Outlook runner against a fake Microsoft: read-only, bounded, honest about failure, and it never creates a loop without a tap.
 // Run: node test/outlook-runner-corpus.cjs
 const crypto = require('crypto');
+const { FlowNativeEdit } = require('../src/native-edit.js');
 const { FlowOutlook: O } = require('../src/outlook.js');
 const { FlowOutlookAuth: A } = require('../core/outlook-auth.js');
 const { FlowOutlookConfig: C } = require('../core/outlook-config.js');
@@ -49,8 +50,16 @@ function world(over) {
       w.drafts = w.drafts || {};
       const id = 'draft-' + Object.keys(w.drafts).length + 1;
       const body = init.body ? JSON.parse(init.body) : {};
-      w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
+      w.drafts[id] = { id, isDraft: true, changeKey: 'ck-created', lastModifiedDateTime: '2026-10-14T09:00:00.000Z', webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
       return { ok: true, status: 201, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
+    }
+    const listAtt = u.match(/\/me\/messages\/([^/?]+)\/attachments(?:\?|$)/i);
+    if (listAtt && (init.method || 'GET').toUpperCase() === 'GET') {
+      const id = decodeURIComponent(listAtt[1]);
+      if (w.attachmentFail && w.attachmentFail[id]) return { ok: false, status: 403, json: async () => ({}) };
+      const rows = w.attachmentLists && w.attachmentLists[id];
+      if (!rows) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ value: rows }) };
     }
     const attMatch = u.match(/\/me\/messages\/([^/?]+)\/attachments$/i);
     if (attMatch && (init.method || 'GET').toUpperCase() === 'POST') {
@@ -73,7 +82,10 @@ function world(over) {
       const method = (init.method || 'GET').toUpperCase();
       w.drafts = w.drafts || {};
       if (method === 'GET') {
-        if (w.drafts[id]) return { ok: true, status: 200, json: async () => ({ id, isDraft: w.drafts[id].isDraft !== false }) };
+        if (w.drafts[id]) {
+          const d = w.drafts[id];
+          return { ok: true, status: 200, json: async () => ({ id, isDraft: d.isDraft !== false, changeKey: d.changeKey || null, lastModifiedDateTime: d.lastModifiedDateTime || null, body: d.body || { content: '' } }) };
+        }
         return { ok: false, status: 404, json: async () => ({}) };
       }
       if (method === 'DELETE') {
@@ -279,6 +291,24 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('Do It createReply once on the incoming message id', draft.ok && draft.ref && draft.written.indexOf('Not sent') !== -1, draft);
     const posts = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
     check('exactly one createReply POST', posts.length === 1 && /\/messages\/a1\/createReply/.test(posts[0].url), posts.map((c) => c.url));
+    const reused = await o.createReplyDraft('a1', 'Thanks, will confirm.');
+    const postsReuse = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
+    check('a second Do It reuses the draft still in Drafts', reused.ok && reused.reused === true && reused.reason === 'draft-already' && reused.ref === draft.ref && postsReuse.length === 1, reused);
+
+    const page = world({ inbox: [ask], sent: [] });
+    const pageRunner = O.create(Object.assign({}, page.deps(), {
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent },
+      actions: FlowActions
+    }));
+    await pageRunner.connect();
+    page.drafts = { 'page-draft': { id: 'page-draft', isDraft: true, webLink: 'https://outlook.office.com/mail/draft/page-draft', body: { content: 'From the page.' }, attachments: {} } };
+    page.store.outlookSync = Object.assign({}, page.store.outlookSync, { glanceDraftByMessage: { a1: 'page-draft' } });
+    const postsBeforePage = page.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url)).length;
+    const fromPage = await pageRunner.createReplyDraft('a1', 'Thanks, will confirm.');
+    const postsAfterPage = page.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url)).length;
+    check('Loops Do It reuses the draft the page already stored for that mail',
+      fromPage.ok && fromPage.reused === true && fromPage.reason === 'draft-already' && fromPage.ref === 'page-draft' && postsAfterPage === postsBeforePage,
+      { fromPage, postsBeforePage, postsAfterPage });
     check('Mail.Send never in requested scopes', CFG.SCOPES.indexOf('Mail.Send') === -1);
     const forbidden = w.calls.filter((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(c.url) && c.method !== 'GET');
     check('no /send /reply /replyAll /forward /sendMail ever happens', forbidden.length === 0, forbidden);
@@ -314,6 +344,19 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const draftsBefore = Object.keys(w.drafts).length;
     const noId = await o.createReplyDraft('a1', 'Should not claim a file.', { file: file });
     check('no attachment id deletes the draft and does not claim attached', noId.ok === false && noId.reason === 'outlook-file-found-no-attach' && !(noId.written && /attach/i.test(noId.written)) && Object.keys(w.drafts).length === draftsBefore, noId);
+
+    const typed = await o.createReplyDraft('a-edited', 'Thanks, will confirm.');
+    w.drafts[typed.ref].changeKey = 'ck-user';
+    w.drafts[typed.ref].body = { content: 'I typed this myself.' };
+    const patchesBefore = w.calls.filter((c) => c.method === 'PATCH').length;
+    const leftAlone = await o.undoReplyDraft({ id: typed.ref, created: typed.created });
+    const patchesAfter = w.calls.filter((c) => c.method === 'PATCH').length;
+    check('a draft the person edited is left alone and is not rewritten',
+      leftAlone.ok === false && leftAlone.reason === 'user-edited' &&
+      leftAlone.written === FlowNativeEdit.userEditedLine() &&
+      w.drafts[typed.ref] && w.drafts[typed.ref].body.content === 'I typed this myself.' &&
+      patchesAfter === patchesBefore,
+      { leftAlone, patchesBefore, patchesAfter });
 
     // Silent reauth after 20h
     const w3 = world({ sent: [], inbox: [] });
@@ -376,7 +419,8 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
       token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW },
       account: { address: GMAIL_ME, userPrincipalName: GMAIL_ME },
       ownAddresses: [GMAIL_ME],
-      profile: { mail: '', userPrincipalName: GMAIL_ME, otherMails: [], proxyAddresses: [] }
+      // The stored profile carries the display name; without it the greeting Hi Sali is held as names-pending (0.9.56).
+      profile: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [], proxyAddresses: [] }
     };
     w2.store.outlookPending = {
       offers: [{ key: 'stale', base: { counterpart: { email: OUT }, threadId: 'ol:convB' }, ask: { what: 'signed vendor contract', direction: 'theirs' } }],
@@ -391,7 +435,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const pend2 = w2.store.outlookPending || {};
     check('upgrade wipe: stale self-offer gone after stateVersion bump', !(pend2.offers || []).some((x) => x.key === 'stale' || (x.base && x.base.counterpart && x.base.counterpart.email === OUT)), pend2);
     check('upgrade wipe: stateVersion written to the current version', w2.store.outlookSync && w2.store.outlookSync.stateVersion === O.create(w2.deps()).STATE_VERSION, w2.store.outlookSync);
-    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), pend2);
+    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), { ids: (pend2.incoming || []).map((x) => x.messageId), diag: s2 && s2.diagnostics });
     check('upgrade sync ok', s2.ok, s2);
   }
 
@@ -417,10 +461,186 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('gone draft becomes undone with reopen', undone.length >= 1 && undone[0].outlookReopen, undone);
     check('gone draft no longer resolved', (w.store.resolvedMessageIds || []).indexOf('gone1') === -1, w.store.resolvedMessageIds);
 
+    w.storage.getActiveOutlookReceipts = async () => (w.store.log || []).slice();
+    w.store.log.push({
+      ts: NOW, kind: 'written', messageId: 'task1', connectorId: 'outlookTask',
+      ref: { taskId: 'e2e-todo-1', externalId: 'e2e-todo-1' },
+      fetchedBack: true, system: 'microsoft/todo', app: 'outlook'
+    });
+    const before = w.calls.length;
+    const kept = await o.reconcileReceipts();
+    const task = (w.store.log || []).find((e) => e && e.messageId === 'task1' && e.kind === 'written' && !e.undone);
+    const urls = w.calls.slice(before).map((c) => String(c.url));
+    check('reconcile leaves a To Do receipt in the log', !!task && kept.ok === true, { task: task, kept: kept });
+    check('reconcile does not read a task ref as a message id', !urls.some((u) => u.indexOf('object') >= 0 || u.indexOf('e2e-todo') >= 0), urls);
+
     const gone = await o.undoReplyDraft('still-missing');
     check('Undo when draft already missing is success alreadyGone', gone.ok && gone.alreadyGone && /already gone/i.test(gone.written), gone);
   }
 
+
+  console.log('\n--- Check now is not Turn off; a stale schedule card does not outlive the file check ---\n');
+  {
+    const w = world({});
+    const o = O.create(w.deps());
+    w.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME] };
+    w.store.outlookSync = { stateVersion: O.create(w.deps()).STATE_VERSION };
+    const r = await o.sync({ force: true });
+    check('Check now does not remove the Microsoft permission', r.ok === true && w.removed !== true && w.store.outlookAuth && w.store.outlookAuth.token && w.store.outlookAuth.token.accessToken === 'AT', { ok: r.ok, removed: w.removed });
+    const dropped = world({});
+    const deps = dropped.deps();
+    deps.auth = Object.assign({}, A, {
+      session: async () => ({ ok: false, error: 'network', transient: true, needsSignIn: false })
+    });
+    const oDrop = O.create(deps);
+    dropped.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME] };
+    const rDrop = await oDrop.sync({ force: true });
+    const stDrop = await oDrop.status();
+    check('a reload that misses the worker stays connected', rDrop.ok === false && rDrop.transient === true && dropped.removed !== true && stDrop.needsSignIn !== true && stDrop.connected === true, { r: rDrop, st: stDrop, removed: dropped.removed });
+
+    const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+    vm.createContext(sandbox);
+    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'close-chains.js']) {
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+    }
+    const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+    const FlowActions = vm.runInContext('FlowActions', sandbox);
+    const FlowFileAttach = vm.runInContext('FlowFileAttach', sandbox);
+    const FlowCloseChains = vm.runInContext('FlowCloseChains', sandbox);
+    global.FlowFileAttach = FlowFileAttach;
+    global.FlowCloseChains = FlowCloseChains;
+    const Q4 = "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?";
+    const q4msg = inMsg('q4', 'cq4', Q4, 0);
+    q4msg.subject = 'Q4 pricing';
+    const stale = {
+      messageId: 'old-schedule',
+      outlookConversationId: 'cq4',
+      threadId: 'ol:cq4',
+      sender: { name: 'Dana Cole', email: 'dana@acme.com' },
+      intent: { type: 'event', label: 'Schedule the meeting' },
+      process: { id: 'schedule-confirm', name: 'Schedule & Confirm', closingLine: 'Scheduling this, drafting a reply to confirm, and setting a follow-up.', steps: [] }
+    };
+    function judged(send) {
+      const wj = world({ inbox: [q4msg], sent: [] });
+      const dj = wj.deps();
+      dj.planDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+      dj.actions = FlowActions;
+      dj.send = async (m) => { wj.sends.push(m); return send(m); };
+      const oj = O.create(dj);
+      wj.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME], requestedScopes: CFG.SCOPES };
+      wj.store.outlookSync = { stateVersion: oj.STATE_VERSION, lastAt: NOW - 11 * 60 * 1000 };
+      wj.store.outlookPending = { offers: [], asks: [], incoming: [stale] };
+      wj.store.stillOpenScan = [Object.assign({ app: 'outlook' }, stale)];
+      wj.storage.forgetStillOpenScan = async (_thread, messageId) => {
+        wj.store.stillOpenScan = (wj.store.stillOpenScan || []).filter((row) => !row || row.messageId !== messageId);
+      };
+      return { wj, oj };
+    }
+    const denied = judged((m) => m.type === 'flow:search-drive'
+      ? { ok: false, reason: 'drive-not-granted', status: 403, error: 'insufficientPermissions', files: [], fileCount: 0 }
+      : { ok: true });
+    NOW += 11 * 60 * 1000;
+    const deniedSync = await denied.oj.sync({ force: true });
+    const deniedIn = (denied.wj.store.outlookPending && denied.wj.store.outlookPending.incoming) || [];
+    const deniedDiag = (denied.wj.store.outlookSync && denied.wj.store.outlookSync.diagnostics) || [];
+    check('Google disconnected: the stale schedule card is gone', deniedSync.ok && !deniedIn.some((x) => x && x.process && x.process.id === 'schedule-confirm'), deniedIn);
+    check('Google disconnected: the check says drive-not-granted', deniedDiag.some((d) => d && d.conversationId === 'cq4' && d.reason === 'drive-not-granted'), deniedDiag);
+    check('Google disconnected: the still-open schedule row is forgotten', !(denied.wj.store.stillOpenScan || []).some((x) => x && x.process && x.process.id === 'schedule-confirm'), denied.wj.store.stillOpenScan);
+    check('that check did not turn Outlook off', denied.wj.removed !== true && denied.wj.store.outlookAuth.token.accessToken === 'AT');
+
+    const one = judged((m) => m.type === 'flow:search-drive'
+      ? { ok: true, status: 200, files: [{ id: 'f-q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }], fileCount: 1 }
+      : { ok: true });
+    NOW += 11 * 60 * 1000;
+    const oneSync = await one.oj.sync({ force: true });
+    const oneIn = (one.wj.store.outlookPending && one.wj.store.outlookPending.incoming) || [];
+    check('one Drive file: the stale schedule card is not kept', oneSync.ok && !oneIn.some((x) => x && x.process && x.process.id === 'schedule-confirm'), oneIn);
+
+    const aliasMsg = inMsg('alias1', 'calias', Q4, 0);
+    aliasMsg.from = { emailAddress: { name: 'Me', address: ME } };
+    aliasMsg.subject = 'Note';
+    const wa = world({ inbox: [aliasMsg], sent: [] });
+    const da = wa.deps();
+    da.planDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+    da.actions = FlowActions;
+    const oa = O.create(da);
+    wa.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME] };
+    wa.store.outlookSync = { stateVersion: oa.STATE_VERSION, lastAt: NOW - 11 * 60 * 1000 };
+    wa.store.outlookPending = { offers: [], asks: [], incoming: [Object.assign({}, stale, { outlookConversationId: 'calias', threadId: 'ol:calias' })] };
+    NOW += 11 * 60 * 1000;
+    const aliasSync = await oa.sync({ force: true });
+    const aliasIn = (wa.store.outlookPending && wa.store.outlookPending.incoming) || [];
+    const aliasDiag = (wa.store.outlookSync && wa.store.outlookSync.diagnostics) || [];
+    check('a mail from the account to itself is not silenced as own-sender',
+      aliasSync.ok && !aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')),
+      { incoming: aliasIn, diag: aliasDiag });
+    delete global.FlowFileAttach;
+    delete global.FlowCloseChains;
+  }
+
+  console.log('\n--- Google off, Instinct grant on: To Do and the file list ---\n');
+  {
+    const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+    vm.createContext(sandbox);
+    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js']) {
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+    }
+    const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+    const FlowActions = vm.runInContext('FlowActions', sandbox);
+    global.FlowGoogleCloses = vm.runInContext('FlowGoogleCloses', sandbox);
+    const SAVE = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
+    const COMMIT = 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate';
+    const pdf = { id: 'att1', name: 'signed-NDA.pdf', isInline: false, contentType: 'application/pdf', '@odata.type': '#microsoft.graph.fileAttachment' };
+    const save = inMsg('save1', 'csave', SAVE, 0);
+    save.subject = 'Gate 0.9.37 OneDrive save';
+    save.hasAttachments = true;
+    const other = inMsg('other1', 'cother', ASK, 0);
+    other.subject = 'Lease ask';
+    other.hasAttachments = true;
+    const commit = inMsg('todo1', 'ctodo', COMMIT, 0);
+    commit.subject = 'Gate 0.9.35 To Do title';
+    const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Files.ReadWrite'];
+    function armed(over) {
+      const w = world(Object.assign({ inbox: [save, other, commit], sent: [], attachmentLists: { save1: [pdf] } }, over || {}));
+      const d = w.deps();
+      d.planDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+      d.actions = FlowActions;
+      const o = O.create(d);
+      w.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW, grantedScopes: scopes }, account: { address: ME }, ownAddresses: [ME] };
+      return { w, o };
+    }
+    const ok = armed();
+    const synced = await ok.o.sync({ force: true });
+    const incoming = (ok.w.store.outlookPending && ok.w.store.outlookPending.incoming) || [];
+    const diags = (ok.w.store.outlookSync && ok.w.store.outlookSync.diagnostics) || [];
+    const cardFor = (list, conv) => list.find((x) => x && (x.outlookConversationId === conv || x.conversationId === conv));
+    const saveCard = cardFor(incoming, 'csave');
+    const todoCard = cardFor(incoming, 'ctodo');
+    const saveKinds = saveCard && saveCard.process && saveCard.process.steps.map((s) => s.kind);
+    const todoKinds = todoCard && todoCard.process && todoCard.process.steps.map((s) => s.kind);
+    const attGets = ok.w.calls.filter((c) => /\/attachments/i.test(c.url) && c.method === 'GET');
+    check('the check reads the file list for the save, and not for a mail that is not a save',
+      synced.ok === true && attGets.length === 1 && /\/messages\/save1\/attachments/.test(attGets[0].url),
+      attGets.map((c) => c.url));
+    check('that save is the OneDrive card, not outlook:attachments-unread',
+      saveKinds && saveKinds[0] === 'onedriveFile' && saveKinds.indexOf('outlookDraft') >= 0 && !diags.some((d) => d && d.conversationId === 'csave' && d.reason === 'outlook:attachments-unread'),
+      { kinds: saveKinds, diags: diags.filter((d) => d && d.conversationId === 'csave') });
+    check('the commitment is Microsoft To Do only, with Google disconnected',
+      todoKinds && todoKinds.length === 1 && todoKinds[0] === 'outlookTask' && !ok.w.store.googleTasksAuth && !ok.w.calls.some((c) => /googleapis/.test(c.url)) && !ok.w.calls.some((c) => /createReply/.test(c.url)),
+      { kinds: todoKinds, sends: ok.w.sends });
+    delete save.attachments;
+    delete save.attachmentsUnread;
+    const bad = armed({ attachmentFail: { save1: true }, attachmentLists: {} });
+    await bad.o.sync({ force: true });
+    const badIn = (bad.w.store.outlookPending && bad.w.store.outlookPending.incoming) || [];
+    const badDiag = (bad.w.store.outlookSync && bad.w.store.outlookSync.diagnostics) || [];
+    check('a failed file read stays unread and does not invent a save card',
+      !cardFor(badIn, 'csave') && badDiag.some((d) => d && d.conversationId === 'csave' && d.reason === 'outlook:attachments-unread'),
+      badDiag.filter((d) => d && d.conversationId === 'csave'));
+    delete global.FlowGoogleCloses;
+  }
 
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
   console.log('TOTAL FAILURES: ' + failures);

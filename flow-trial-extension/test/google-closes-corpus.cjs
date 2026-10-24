@@ -17,6 +17,7 @@ for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
 const FlowActions = vm.runInContext('FlowActions', sandbox);
 const FlowGoogleCloses = vm.runInContext('FlowGoogleCloses', sandbox);
+const FlowExtract = vm.runInContext('FlowExtract', sandbox);
 
 const NOW = new Date('2026-09-17T12:00:00Z');
 let failures = 0;
@@ -103,6 +104,7 @@ console.log('\n--- family I: clear artifact, no file, template ---\n');
     row.process.steps[1].dependsOn === 'doc' &&
     row.process.steps[1].params.shareLink === true &&
     !row.process.steps[1].params.requestedObjectTerm);
+  check('a quote create still needs a template body', FlowGoogleCloses.needsArtifactBody(row.intent.googleClose) === true);
   const body = FlowGoogleCloses.artifactBody(row.intent.googleClose, {});
   check('doc body contains the template, the logo, and the amount',
     body && body.blank === false && /Acme quote/.test(body.html) && /Acme/.test(body.html) && /\$3,900|3,900/.test(body.html),
@@ -232,6 +234,121 @@ console.log('\n--- family C: create is the ask ---\n');
   check('two attachments are not one file', two.intent.googleSilence === true);
   const none = plan('Please save the attached pdf to Drive.', { attachmentCount: 0 });
   check('no attachment is not a Drive save', none.intent.googleSilence === true);
+  const refused = [
+    "Please don't save the attachment to Drive.",
+    'Do not save the attached file to Drive.',
+    'No need to save the attachment to Drive.',
+    'Never mind, do not save the attached file to Drive.'
+  ];
+  refused.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file',
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const still = plan('No need to call. Please save the attached file to Drive.', { attachmentCount: 1 });
+  check('a different no-need does not hide a real save',
+    still.intent && still.intent.personalClose === 'drive-file', still.intent && still.intent.personalClose);
+  // With no known name the engine holds the mail as names-pending (0.9.56); the refusal is read once a name is known.
+  const laterIt = plan("Please save the attached contract to Drive. Actually, don't save it, I'll send a new version.", { attachmentCount: 1, ownNames: ['Sali'], userName: 'Sali' });
+  check("a later don't-save-it refers back and stays quiet",
+    // Quiet either way: since 0.9.56 the hedge and negation gate can answer before the Google silence rule does.
+    laterIt.intent && !laterIt.intent.type && (laterIt.intent.googleSilence === true || Boolean(laterIt.intent.googleWait) || laterIt.intent.quiet === 'hedge') && laterIt.intent.personalClose !== 'drive-file' && !laterIt.process,
+    laterIt.intent && { type: laterIt.intent.type, quiet: laterIt.intent.quiet, reason: laterIt.intent.reason, silence: laterIt.intent.googleSilence, wait: laterIt.intent.googleWait, personal: laterIt.intent.personalClose, process: laterIt.process && laterIt.process.id });
+  const readOnly = plan("don't save it yet, just read", { attachmentCount: 1 });
+  check("don't save it yet, just read stays quiet",
+    readOnly.intent && readOnly.intent.personalClose !== 'drive-file' && !(readOnly.process && readOnly.process.steps && readOnly.process.steps.some((s) => s.kind === 'driveFile' || s.kind === 'onedriveFile')),
+    readOnly.intent && readOnly.intent.personalClose);
+  const laterHe = plan('תשמור את הקובץ בדרייב. בעצם אל תשמור אותו', { attachmentCount: 1 });
+  check('a later Hebrew אל תשמור אותו refers back and stays quiet',
+    laterHe.intent && !laterHe.intent.type && laterHe.intent.googleSilence === true && !laterHe.process,
+    laterHe.intent && { type: laterHe.intent.type, personal: laterHe.intent.personalClose });
+  const laterThis = plan("Please save the attached file to Drive. Don't save this.", { attachmentCount: 1 });
+  const laterThat = plan("Please save the attached file to Drive. Don't save that.", { attachmentCount: 1 });
+  const laterZe = plan('תשמור את הקובץ בדרייב. אל תשמור את זה', { attachmentCount: 1 });
+  [laterThis, laterThat, laterZe].forEach((row, i) => {
+    check('a later anaphor still refuses the same save ' + i,
+      row.intent && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file' && !row.process,
+      row.intent && row.intent.personalClose);
+  });
+  const typos = [
+    "You don't ned to save the attachmment to Drive.",
+    "You don't need to save the attachment to Drive.",
+    'No need to save the attachment to Drive.'
+  ];
+  typos.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a typo refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && !row.process,
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const sheet = plan('please save the attached sheet to Drive by 20/10', { attachmentCount: 1 });
+  check('please save the attached sheet to Drive by 20/10 is still a file',
+    sheet.intent && sheet.intent.personalClose === 'drive-file' && sheet.process && sheet.process.steps.some((s) => s.kind === 'driveFile'),
+    sheet.intent && sheet.intent.personalClose);
+}
+
+console.log('\n--- OneDrive wording is the same save; shared files are not ---\n');
+{
+  const fires = [
+    'Please save the attachment to OneDrive.',
+    'Please store the attached file on OneDrive.',
+    'Please upload the attachment to OneDrive.'
+  ];
+  fires.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('one file to OneDrive is a drive-file save: ' + text,
+      row.intent && row.intent.personalClose === 'drive-file' && row.intent.googleClose && row.intent.googleClose.target === 'onedrive' &&
+      row.process && row.process.steps[0].kind === 'driveFile' && row.process.steps[0].label === 'OneDrive',
+      row.intent && { type: row.intent.type, personal: row.intent.personalClose, quiet: row.intent.quiet, target: row.intent.googleClose && row.intent.googleClose.target });
+  });
+  const heNo = [
+    'אל תשמור את הקובץ המצורף בדרייב.',
+    'לא צריך לשמור את הקובץ בדרייב.',
+    'אין צורך לשמור את הקובץ המצורף בדרייב.',
+    'לא לשמור את הקובץ בדרייב.'
+  ];
+  heNo.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a Hebrew refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file',
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const heTypos = [
+    'לא צרכי לשמור את הקובץ המצורף ל-Drive',
+    'לא צריך לשמור את הקובץ המצורף ל-Drive',
+    'אל תשמור את הקובץ המצורף ל-Drive',
+    'לא לשמור את הקובץ המצורף ל-Drive',
+    'אין צורך לשמור את הקובץ המצורף ל-Drive',
+    'אין צרך לשמור את הקובץ המצורף בדרייב.',
+    'לא צרךי לשמור את הקובץ המצורף ל-Drive'
+  ];
+  heTypos.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a Hebrew typo refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && !row.process,
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const forget = plan("Don't forget to save the attached file to OneDrive.", { attachmentCount: 1 });
+  check('don\'t forget to save still names OneDrive',
+    forget.intent && forget.intent.personalClose === 'drive-file' && forget.intent.googleClose && forget.intent.googleClose.target === 'onedrive',
+    forget.intent && { type: forget.intent.type, personal: forget.intent.personalClose, target: forget.intent.googleClose && forget.intent.googleClose.target });
+  const zero = plan('Please save the attachment to OneDrive.', { attachmentCount: 0 });
+  const two = plan('Please save the attachment to OneDrive.', { attachmentCount: 2 });
+  check('zero or two OneDrive files stay silent',
+    zero.intent && zero.intent.googleSilence === true && !zero.intent.type &&
+    two.intent && two.intent.googleSilence === true && !two.intent.type);
+  const hedge = plan('Maybe save the attachment to OneDrive.', { attachmentCount: 1 });
+  check('a hedged OneDrive save stays silent', hedge.intent && hedge.intent.googleSilence === true && !hedge.intent.type, hedge.intent);
+  const fyi = plan('FYI, please save the attachment to OneDrive.', { attachmentCount: 1 });
+  check('FYI stays noise, not a save', fyi.intent && !fyi.intent.type && fyi.intent.quiet === 'noise' && fyi.intent.personalClose !== 'drive-file', fyi.intent);
+  const shared = plan('Hi, Attached is the signed NDA. Please save it to our shared files by Friday, October 9. Thanks, Flow Gate', { attachmentCount: 1 });
+  check('save it to our shared files stays an ordinary miss',
+    shared.intent && !shared.intent.type && !shared.intent.quiet && shared.intent.personalClose !== 'drive-file',
+    shared.intent && { type: shared.intent.type, quiet: shared.intent.quiet, personal: shared.intent.personalClose });
+  check('shared files do not ask for an attachment count',
+    FlowGoogleCloses.needsOneAttachment('Please save it to our shared files by Friday, October 9.') === false &&
+    FlowGoogleCloses.needsOneAttachment('Please save the attachment to OneDrive.') === true);
 }
 
 console.log('\n--- family B: one file, one target ---\n');
@@ -287,6 +404,155 @@ console.log('\n--- pickOneFile ---\n');
   ], 'quote') === null);
   check('quotation is not the word quote', FlowGoogleCloses.pickOneFile([{ id: '1', name: 'quotation-backup.pdf' }], 'quote') === null);
   check('a two-word name still counts as one file', FlowGoogleCloses.pickOneFile([{ id: '1', name: 'Acme decision log.pdf' }], 'decision log').id === '1');
+}
+
+console.log('\n--- Path A gate: named pdf on my calendar, file lives in Drive ---\n');
+{
+  const OWN = 'ai.local.flow@gmail.com';
+  // Wednesday 7 Oct 2026, the day the gate mail calls Oct 8 "tomorrow".
+  const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0);
+  // After that day, "tomorrow" would be the wrong slot. The written date stays.
+  const AFTER = new Date(2026, 9, 9, 12, 0, 0);
+  const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+  const HE = 'שים את glance-pricing-q4.pdf ביומן מחר (8 באוקטובר 2026) בשעה 10:00.';
+  const HE_FILE = 'שים את קובץ glance-pricing-q4.pdf ביומן מחר בשעה 10:00.';
+  function gate(text, extra) {
+    return plan(text, Object.assign({ now: GATE_NOW, senderEmail: OWN, attachmentCount: 0 }, extra));
+  }
+  const dated = FlowExtract.parseDate(EN, AFTER);
+  check('Oct 8, 2026 wins over tomorrow', dated && dated.iso === '2026-10-08', dated);
+  check('maybe 3 is not a month', FlowExtract.parseDate('maybe 3 people', GATE_NOW) === null);
+
+  const row = gate(EN, { fileMatch: 'one' });
+  check('EN gate is file-on-hold for glance-pricing-q4.pdf',
+    row.intent && row.intent.personalClose === 'file-on-hold' &&
+    row.intent.googleClose && row.intent.googleClose.family === 'B' &&
+    row.intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    row.intent.googleClose.destination === 'calendar' &&
+    row.intent.entities.dateIso === '2026-10-08' &&
+    row.intent.entities.hour === 10 && row.intent.entities.minute === 0,
+    row.intent && { personal: row.intent.personalClose, g: row.intent.googleClose, e: row.intent.entities });
+  check('EN gate calendar step carries the file term and the clock',
+    row.process && row.process.id === 'file-on-hold' && row.process.steps.length === 1 &&
+    row.process.steps[0].kind === 'calendar' &&
+    row.process.steps[0].params.fileTerm === 'glance-pricing-q4.pdf' &&
+    row.process.steps[0].params.requireTime === true &&
+    row.process.steps[0].params.dateIso === '2026-10-08' &&
+    row.process.steps[0].params.hour === 10 &&
+    row.process.steps[0].params.minute === 0,
+    row.process && row.process.steps && row.process.steps[0]);
+  // artifactBody is blank here on purpose: there is no template. Do It must
+  // not treat that blank as "stop". The 0.9.23 live gate clicked Do It and
+  // the card never left Hold it because it did.
+  check('file-on-hold does not need a template body',
+    row.intent && FlowGoogleCloses.needsArtifactBody(row.intent.googleClose) === false);
+  check('file-on-task does not need a template body',
+    FlowGoogleCloses.needsArtifactBody({ personalClose: 'file-on-task', copyAttachment: false, templateName: null, kind: null }) === false);
+  check('file-on-hold artifact body stays blank (not a Doc to create)',
+    row.intent && FlowGoogleCloses.artifactBody(row.intent.googleClose, {}).blank === true);
+  check('Drive-only: no attachment is still the hold',
+    row.intent && row.intent.personalClose === 'file-on-hold' && row.intent.googleClose.copyAttachment === false);
+
+  const waiting = gate(EN, {});
+  check('unclear Drive match waits on that file name',
+    waiting.intent && waiting.intent.googleWait && waiting.intent.googleWait.fileTerm === 'glance-pricing-q4.pdf' && !waiting.intent.type,
+    waiting.intent);
+  const missing = gate(EN, { fileMatch: 'none' });
+  check('no Drive file stays silent (not a blank create)',
+    missing.intent && missing.intent.googleSilence === true && !missing.intent.type && !missing.intent.googleClose,
+    missing.intent);
+  const many = gate(EN, { fileMatch: 'many' });
+  check('two Drive files stay silent', many.intent && many.intent.googleSilence === true && !many.intent.type);
+  const hedge = gate('Maybe put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.', { fileMatch: 'one' });
+  check('a hedged calendar file stays silent', hedge.intent && hedge.intent.googleSilence === true && !hedge.intent.type);
+  const generic = gate('Put the file on my calendar tomorrow (Oct 8, 2026) at 10:00.', { fileMatch: 'one' });
+  check('a generic file stays silent', generic.intent && (generic.intent.googleSilence === true || !generic.intent.type) && generic.intent.personalClose !== 'file-on-hold', generic.intent);
+
+  const he = gate(HE, { fileMatch: 'one' });
+  check('HE שים את … ביומן is file-on-hold',
+    he.intent && he.intent.personalClose === 'file-on-hold' &&
+    he.intent.googleClose.lang === 'he' &&
+    he.intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    he.intent.entities.dateIso === '2026-10-08' &&
+    he.intent.entities.hour === 10,
+    he.intent && { g: he.intent.googleClose, e: he.intent.entities });
+  const heFile = gate(HE_FILE, { fileMatch: 'one' });
+  check('HE קובץ plus the Latin name is that file, not the word קובץ',
+    heFile.intent && heFile.intent.personalClose === 'file-on-hold' &&
+    heFile.intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    heFile.process && heFile.process.steps[0].params.fileTerm === 'glance-pricing-q4.pdf',
+    heFile.intent && heFile.intent.googleClose);
+  const heGeneric = gate('שים את הקובץ ביומן מחר בשעה 10:00.', { fileMatch: 'one' });
+  check('HE generic הקובץ stays silent',
+    heGeneric.intent && heGeneric.intent.personalClose !== 'file-on-hold' && !heGeneric.intent.type,
+    heGeneric.intent);
+
+  check('one Drive pdf matches the gate name',
+    FlowGoogleCloses.pickOneFile([{ id: '1', name: 'glance-pricing-q4.pdf' }], 'glance-pricing-q4.pdf').id === '1');
+  check('a second pdf with the same name is not one file',
+    FlowGoogleCloses.pickOneFile([
+      { id: '1', name: 'glance-pricing-q4.pdf' },
+      { id: '2', name: 'copy-glance-pricing-q4.pdf' }
+    ], 'glance-pricing-q4.pdf') === null);
+
+  check('a self-mail is the message to judge',
+    FlowGoogleCloses.messageToJudge([[OWN, OWN]], OWN) === 0);
+  check('own mail to someone else stays quiet',
+    FlowGoogleCloses.messageToJudge([[OWN, 'dana@meridian.com']], OWN) === -1);
+  check('an incoming message still wins over a later reply of yours',
+    FlowGoogleCloses.messageToJudge([['dana@meridian.com', OWN], [OWN, 'dana@meridian.com']], OWN) === 0);
+  check('a newest note to yourself is judged even when an older message is incoming',
+    FlowGoogleCloses.messageToJudge([['dana@meridian.com', OWN], [OWN, OWN]], OWN) === 1);
+  check('no own address stays quiet',
+    FlowGoogleCloses.messageToJudge([[OWN, OWN]], '') === -1);
+}
+
+console.log('\n--- Path A gate with close-families loaded, same order as Gmail ---\n');
+{
+  const live = { module: undefined, console };
+  vm.createContext(live);
+  for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), live, { filename: f });
+  }
+  const LiveIntent = vm.runInContext('FlowIntent', live);
+  const LiveActions = vm.runInContext('FlowActions', live);
+  const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0);
+  const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+  const intent = LiveIntent.classify(EN, {
+    senderEmail: 'ai.local.flow@gmail.com',
+    now: GATE_NOW,
+    fileMatch: 'one',
+    attachmentCount: 0
+  });
+  const process = intent && intent.type ? LiveActions.planFor(intent, { threadUrl: 'https://mail.google.com/x' }) : null;
+  check('live script order still files the pdf on the hold',
+    intent && intent.personalClose === 'file-on-hold' && intent.googleClose &&
+    intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    intent.quiet !== 'family' &&
+    process && process.id === 'file-on-hold' &&
+    process.steps[0].params.dateIso === '2026-10-08' &&
+    process.steps[0].params.hour === 10,
+    { personal: intent && intent.personalClose, quiet: intent && intent.quiet, family: intent && intent.closeFamily, g: intent && intent.googleClose });
+  const heIntent = LiveIntent.classify('שים את glance-pricing-q4.pdf ביומן מחר (8 באוקטובר 2026) בשעה 10:00.', {
+    senderEmail: 'ai.local.flow@gmail.com',
+    now: GATE_NOW,
+    fileMatch: 'one',
+    attachmentCount: 0
+  });
+  check('live script order keeps the Hebrew file on the hold',
+    heIntent && heIntent.personalClose === 'file-on-hold' && heIntent.googleClose &&
+    heIntent.googleClose.fileTerm === 'glance-pricing-q4.pdf' && heIntent.quiet !== 'family',
+    heIntent && { personal: heIntent.personalClose, quiet: heIntent.quiet, family: heIntent.closeFamily, g: heIntent.googleClose });
+}
+
+console.log('\n--- Do It must not treat a file-on-hold as a blank template ---\n');
+{
+  const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+  const gate = gmail.indexOf('FlowGoogleCloses.needsArtifactBody(ctx.intent.googleClose)');
+  const body = gmail.indexOf('FlowGoogleCloses.artifactBody(ctx.intent.googleClose');
+  check('Do It asks needsArtifactBody before it builds a template', gate !== -1 && body !== -1 && gate < body);
+  check('the old unconditional googleClose body gate is gone',
+    !/googleClose && !ctx\.intent\.googleClose\.copyAttachment && typeof FlowGoogleCloses/.test(gmail));
 }
 
 console.log('\n' + (failures ? failures + ' FAILED' : 'All passed'));

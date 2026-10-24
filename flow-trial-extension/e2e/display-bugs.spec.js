@@ -1,0 +1,161 @@
+const { test, expect } = require('./support/harness');
+const S = require('./support/sentences');
+
+function writtenRow(externalId, ts) {
+  return {
+    kind: 'written',
+    messageId: S.MSG_A,
+    itemId: S.MSG_A,
+    system: 'microsoft/todo',
+    externalId: externalId,
+    connectorId: 'outlookTask',
+    fetchedBack: true,
+    verifiedAt: '2026-10-07T12:00:00.000Z',
+    ref: { taskId: externalId, externalId: externalId, taskListId: 'todo-list' },
+    ts: ts,
+    app: 'outlook'
+  };
+}
+
+test('Undone banner is scoped to its message id', async ({ glance }) => {
+  const line = 'Undone for AQMkGlanceE2EMessageA only.';
+  await glance.seedOutlook({
+    glanceUndoneBanners: {
+      [S.MSG_A]: { line: line, ids: [S.MSG_A], at: Date.now() }
+    }
+  });
+  const other = await glance.openOutlook({
+    id: S.MSG_B,
+    subject: 'Other',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const scanned = (bag.outlookPageDiag || []).length > 0 || await other.locator('.flow-chip-host').count() > 0;
+    const leaked = await other.getByText(line).count();
+    return scanned && leaked === 0;
+  }).toBe(true);
+
+  const page = await glance.openOutlook({
+    id: S.MSG_A,
+    subject: 'The one',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(page.getByText(line)).toBeVisible();
+  await expect(page.locator('.flow-chip-host')).toHaveCount(1);
+});
+
+test('exactly one Handled receipt after two written rows', async ({ glance }) => {
+  await glance.seedOutlook({
+    log: [writtenRow('todo-a', 2), writtenRow('todo-b', 1)]
+  });
+  const page = await glance.openOutlook({
+    id: S.MSG_A,
+    subject: 'Transfer',
+    senderEmail: S.SENDER,
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-handled')).toHaveCount(1);
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);
+});
+
+test('Why-not-shown drops the message once its card is showing', async ({ glance }) => {
+  await glance.seedOutlook({
+    outlookPageDiag: [
+      {
+        key: 'page:intent-null|' + S.MSG_A,
+        reason: 'page:intent-null',
+        messageId: S.MSG_A,
+        subject: 'Show me',
+        at: 2
+      },
+      {
+        key: 'page:intent-null|' + S.MSG_B,
+        reason: 'page:intent-null',
+        messageId: S.MSG_B,
+        subject: 'Stay quiet',
+        at: 1
+      }
+    ]
+  });
+  const page = await glance.openOutlook({
+    id: S.MSG_A,
+    subject: 'Show me',
+    senderEmail: S.SENDER,
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+  await expect(page.locator('#ReadingPaneContainerId .flow-why-not')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const diags = bag.outlookPageDiag || [];
+    const quiet = diags.filter((d) => d && d.verdict !== 'show');
+    return {
+      show: quiet.filter((d) => d.messageId === S.MSG_A || d.subject === 'Show me').length,
+      stay: quiet.filter((d) => d.messageId === S.MSG_B || d.subject === 'Stay quiet').length,
+      current: bag.glanceWhyCurrent || null
+    };
+  }).toEqual({ show: 0, stay: 1, current: null });
+
+  const popup = await glance.openPopup();
+  const list = popup.locator('#surface-list');
+  await expect(list.getByText('Show me')).toHaveCount(0);
+  await expect(list.locator('[data-glance-why-line]')).toHaveCount(0);
+  const quiet = await glance.openOutlook({
+    id: S.MSG_B,
+    subject: 'Stay quiet',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(quiet.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const cur = bag.glanceWhyCurrent;
+    return Boolean(cur && cur.subject === 'Stay quiet' && cur.reason);
+  }).toBe(true);
+  const quietPopup = await glance.openPopup();
+  const quietList = quietPopup.locator('#surface-list');
+  const why = quietList.locator('[data-glance-why-line]');
+  await expect(why).toHaveCount(1);
+  await expect(quietList.getByText('Stay quiet')).toBeVisible();
+  await expect(why).toContainText('לא זוהתה בקשה');
+  await expect(quietList.getByText('Show me')).toHaveCount(0);
+});
+
+test('two quiet tabs each keep a why line in the popup', async ({ glance }) => {
+  const first = await glance.openOutlook({
+    id: S.MSG_A,
+    subject: 'Quiet one',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(first.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const row = bag.glanceWhyByConv && bag.glanceWhyByConv[S.MSG_A];
+    return Boolean(row && row.reason && row.subject === 'Quiet one');
+  }).toBe(true);
+
+  const second = await glance.openOutlook({
+    id: S.MSG_B,
+    subject: 'Quiet two',
+    senderEmail: S.SENDER,
+    body: S.SILENT
+  });
+  await expect(second.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const map = bag.glanceWhyByConv || {};
+    const one = map[S.MSG_A];
+    const two = map[S.MSG_B];
+    return Boolean(one && one.reason && one.subject === 'Quiet one' && two && two.reason && two.subject === 'Quiet two');
+  }).toBe(true);
+
+  const popup = await glance.openPopup();
+  const list = popup.locator('#surface-list');
+  await expect(list.locator('[data-glance-why-line]')).toHaveCount(2);
+  await expect(list.getByText('Quiet one')).toBeVisible();
+  await expect(list.getByText('Quiet two')).toBeVisible();
+});

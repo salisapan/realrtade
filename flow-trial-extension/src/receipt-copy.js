@@ -24,6 +24,7 @@ const FlowReceipt = (() => {
   // destination is not.
   const PLACE_NOUN = {
     'Google Tasks': 'Google Task',
+    'Microsoft To Do': 'To Do task',
     'Gmail': 'Gmail draft',
     'Google Calendar': 'Calendar event',
     'Google Docs': 'Doc',
@@ -39,13 +40,32 @@ const FlowReceipt = (() => {
 
   // succeeded / total: how many steps in this Do It actually wrote.
   // priorCloses: writeStats.total from BEFORE those writes are logged.
+  // requireProof: this Do It includes a writer that must be read back
+  // (Google Tasks in this slice). Handled only when every proof has
+  // fetchedBack true. Omit requireProof for writers that are not on
+  // this gate yet (Calendar, drafts, Drive).
   function confirmation(input) {
     input = input || {};
     const succeeded = count(input.succeeded);
     const total = count(input.total);
     const priorCloses = count(input.priorCloses);
-    const full = succeeded > 0 && succeeded === total;
     const handled = input.lang === 'he' ? STATUS_HANDLED_HE : STATUS_HANDLED;
+    if (input.requireProof) {
+      const proofs = Array.isArray(input.proofs) ? input.proofs : [];
+      const gate = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+      const proved = !!(gate && proofs.length > 0 && proofs.every((p) => gate.isProof(p)));
+      if (!proved) {
+        const partial = succeeded > 0 && total > succeeded;
+        return {
+          full: false,
+          status: partial ? STATUS_PARTIAL : null,
+          earlyLine: null,
+          undoLabel: succeeded > 1 ? 'Undo all' : 'Undo',
+          verifyStatus: input.verifyStatus || (proofs.length ? 'verify_failed' : 'proof_pending')
+        };
+      }
+    }
+    const full = succeeded > 0 && succeeded === total;
     return {
       full,
       status: succeeded === 0 ? null : (full ? handled : STATUS_PARTIAL),
@@ -98,6 +118,24 @@ const FlowReceipt = (() => {
     return 'Undo all removes ' + joinWithAnd(nouns.map((n) => 'the ' + n)) + '.';
   }
 
+  // Graph can confirm the delete while the To Do website still draws the row.
+  function todoUiCacheLine() {
+    return 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.';
+  }
+
+  // One sentence for a service the sign-in does not include yet. Setup shows
+  // it beside an unchecked box. A failed write shows the same sentence.
+  function missingScopeLine(scope, service) {
+    const name = String(scope || '').trim();
+    const box = String(service || '').trim();
+    if (!name || !box) return '';
+    return name + ' לא כלול בכניסה. בהגדרות, סמן ' + box + '.';
+  }
+
+  function verifyTimeoutLine() {
+    return "Couldn't verify, try again";
+  }
+
   function undoneLine(wheres) {
     const nouns = nounsFor(wheres);
     if (!nouns || !nouns.length) return 'Undone — nothing was kept.';
@@ -125,7 +163,7 @@ const FlowReceipt = (() => {
   }
 
   return {
-    confirmation, undoHint, undoneLine, reverseNote,
+    confirmation, undoHint, undoneLine, reverseNote, todoUiCacheLine, missingScopeLine, verifyTimeoutLine,
     EARLY_CLOSE_LIMIT, EARLY_LINE, STATUS_HANDLED, STATUS_HANDLED_HE, STATUS_PARTIAL
   };
 })();

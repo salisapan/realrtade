@@ -1,0 +1,123 @@
+{
+ "model": "e5-small",
+ "threads": 2,
+ "train_n": 4000,
+ "embed_train_s": 25.7,
+ "per_case_ms_bs1": 11.9,
+ "rss_peak_mb": 768,
+ "hp_threshold": 0.76,
+ "results": {
+  "worker-test (teacher labels) t=0.5": {
+   "wrongDoIt%": 20.7,
+   "wrong_n": "236/1138",
+   "missed%": 42.8,
+   "missed_n": "155/362",
+   "acc%": 73.9
+  },
+  "eval ALL (hand-checked gold) t=0.5": {
+   "wrongDoIt%": 18.6,
+   "wrong_n": "31/167",
+   "missed%": 44.4,
+   "missed_n": "48/108",
+   "acc%": 71.3
+  },
+  "eval EN t=0.5": {
+   "wrongDoIt%": 25.8,
+   "wrong_n": "24/93",
+   "missed%": 15.5,
+   "missed_n": "9/58",
+   "acc%": 78.1
+  },
+  "eval HE t=0.5": {
+   "wrongDoIt%": 9.5,
+   "wrong_n": "7/74",
+   "missed%": 78.0,
+   "missed_n": "39/50",
+   "acc%": 62.9
+  },
+  "eval SetB adversarial t=0.5": {
+   "wrongDoIt%": 12.5,
+   "wrong_n": "4/32",
+   "missed%": 45.5,
+   "missed_n": "5/11",
+   "acc%": 79.1
+  },
+  "eval SetC worker-adversarial t=0.5": {
+   "wrongDoIt%": 54.8,
+   "wrong_n": "17/31",
+   "missed%": 0.0,
+   "missed_n": "0/9",
+   "acc%": 57.5
+  },
+  "eval SetD gold22 real t=0.5": {
+   "wrongDoIt%": 10.0,
+   "wrong_n": "2/20",
+   "missed%": 50.0,
+   "missed_n": "1/2",
+   "acc%": 86.4
+  },
+  "eval ALL + veto t=0.5": {
+   "wrongDoIt%": 3.6,
+   "wrong_n": "6/167",
+   "missed%": 44.4,
+   "missed_n": "48/108",
+   "acc%": 80.4
+  },
+  "worker-test (teacher labels) hp t=0.76": {
+   "wrongDoIt%": 2.3,
+   "wrong_n": "26/1138",
+   "missed%": 84.8,
+   "missed_n": "307/362",
+   "acc%": 77.8
+  },
+  "eval ALL (hand-checked gold) hp t=0.76": {
+   "wrongDoIt%": 0.6,
+   "wrong_n": "1/167",
+   "missed%": 83.3,
+   "missed_n": "90/108",
+   "acc%": 66.9
+  },
+  "eval EN hp t=0.76": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/93",
+   "missed%": 69.0,
+   "missed_n": "40/58",
+   "acc%": 73.5
+  },
+  "eval HE hp t=0.76": {
+   "wrongDoIt%": 1.4,
+   "wrong_n": "1/74",
+   "missed%": 100.0,
+   "missed_n": "50/50",
+   "acc%": 58.9
+  },
+  "eval SetB adversarial hp t=0.76": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/32",
+   "missed%": 90.9,
+   "missed_n": "10/11",
+   "acc%": 76.7
+  },
+  "eval SetC worker-adversarial hp t=0.76": {
+   "wrongDoIt%": 3.2,
+   "wrong_n": "1/31",
+   "missed%": 66.7,
+   "missed_n": "6/9",
+   "acc%": 82.5
+  },
+  "eval SetD gold22 real hp t=0.76": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/20",
+   "missed%": 50.0,
+   "missed_n": "1/2",
+   "acc%": 95.5
+  },
+  "eval ALL + veto hp t=0.76": {
+   "wrongDoIt%": 0.0,
+   "wrong_n": "0/167",
+   "missed%": 83.3,
+   "missed_n": "90/108",
+   "acc%": 67.3
+  }
+ }
+}

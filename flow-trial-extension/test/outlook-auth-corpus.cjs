@@ -29,7 +29,26 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
   {
     const u = new URL(A.authorizeUrl({ authority: CFG.AUTHORITY, clientId: CFG.CLIENT_ID, redirectUri: REDIRECT, scopes: CFG.SCOPES, challenge: 'CH', state: 'ST' }));
     check('it goes to the Microsoft sign-in page with PKCE and the right scopes', u.origin + u.pathname === 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize' && u.searchParams.get('code_challenge_method') === 'S256' && u.searchParams.get('response_type') === 'code' && u.searchParams.get('scope') === 'offline_access User.Read Mail.Read Mail.ReadWrite', u.toString());
+    check('the default sign-in is mail only; Mail.Send is not asked', CFG.SCOPES.indexOf('Tasks.ReadWrite') === -1 && CFG.SCOPES.indexOf('Mail.Read') !== -1 && !CFG.SCOPES.some((s) => /send/i.test(s)), CFG.SCOPES);
     check('Mail.ReadWrite is asked for drafts; Mail.Send is never asked', CFG.SCOPES.indexOf('Mail.ReadWrite') !== -1 && !CFG.SCOPES.some((s) => /send/i.test(s)), CFG.SCOPES);
+    const mailOnly = C.scopesFor(C.defaultConnectIds());
+    check('the default Connect screen asks only the mail scopes', mailOnly.join(' ') === C.SCOPES.join(' ') && mailOnly.indexOf('Tasks.ReadWrite') === -1, mailOnly);
+    const mailSvc = (C.CONNECT_SERVICES || []).find((s) => s.id === 'mail');
+    check('Mail scopes are mail only', mailSvc && mailSvc.required === true && (mailSvc.scopes || []).join(' ') === 'Mail.Read Mail.ReadWrite', mailSvc && mailSvc.scopes);
+    const todo = C.scopesFor(['mail', 'todo']);
+    const todoSvc = (C.CONNECT_SERVICES || []).find((s) => s.id === 'todo');
+    check('the To Do checkbox is its own service and asks Tasks.ReadWrite', todoSvc && todoSvc.required !== true && todoSvc.label === 'To Do' && (todoSvc.scopes || []).indexOf('Tasks.ReadWrite') !== -1 && todo.indexOf('Tasks.ReadWrite') !== -1 && todo.indexOf('Mail.Send') === -1, { todo: todoSvc, scopes: todo });
+    const ids = (C.CONNECT_SERVICES || []).map((s) => s.id);
+    check('one screen lists Mail, To Do, Calendar, OneDrive, Contacts and Teams', ['mail', 'todo', 'calendar', 'onedrive', 'contacts', 'teams'].every((id) => ids.indexOf(id) !== -1), ids);
+    const every = C.scopesFor(ids);
+    check('Select all adds To Do, the calendar write, OneDrive write, and the other optional reads, and never Mail.Send', ['Tasks.ReadWrite', 'Calendars.ReadWrite', 'Files.ReadWrite', 'Contacts.Read', 'Chat.Read'].every((s) => every.indexOf(s) !== -1) && every.indexOf('Files.Read') === -1 && every.indexOf('Calendars.Read') === -1 && !every.some((s) => /send/i.test(s)), every);
+    const drive = C.scopesFor(['mail', 'onedrive']);
+    const driveSvc = (C.CONNECT_SERVICES || []).find((s) => s.id === 'onedrive');
+    check('the OneDrive checkbox asks Files.ReadWrite only when it is checked', driveSvc && driveSvc.required !== true && (driveSvc.scopes || []).indexOf('Files.ReadWrite') !== -1 && (driveSvc.scopes || []).indexOf('Files.Read') === -1 && drive.indexOf('Files.ReadWrite') !== -1 && mailOnly.indexOf('Files.ReadWrite') === -1, { drive: driveSvc, scopes: drive });
+    check('the OneDrive checkbox starts ticked and the other optional boxes start empty; the mail-only default scope list is unchanged',
+      driveSvc && driveSvc.defaultOn === true && (C.CONNECT_SERVICES || []).filter((s) => s.defaultOn === true).map((s) => s.id).join() === 'onedrive' &&
+      C.defaultConnectIds().join() === 'mail' && /Glance/.test(driveSvc.detail || ''), { drive: driveSvc, ids: C.defaultConnectIds() });
+    check('mail-only sign-in does not ask Calendars.ReadWrite or Tasks.ReadWrite', mailOnly.indexOf('Calendars.ReadWrite') === -1 && mailOnly.indexOf('Tasks.ReadWrite') === -1, mailOnly);
     check('a good redirect gives the code', A.parseRedirect(REDIRECT + '?code=abc&state=ST', 'ST').code === 'abc');
     check('a different state is refused (someone else\'s redirect)', A.parseRedirect(REDIRECT + '?code=abc&state=EVIL', 'ST').error === 'state-mismatch');
     check('a missing state is refused', A.parseRedirect(REDIRECT + '?code=abc', 'ST').error === 'state-mismatch');
@@ -114,6 +133,26 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
       fetch: async () => { throw new Error('no'); }
     }, CFG, REDIRECT, 'me@x.com');
     check('silent reauth login_required needs interaction', !fail2.ok && fail2.needsInteraction && fail2.error === 'login_required', fail2);
+  }
+
+  console.log('\n--- one Microsoft status for the panel and Setup ---\n');
+  {
+    function jwt(scp) {
+      const body = Buffer.from(JSON.stringify({ scp: scp })).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return 'e.' + body + '.s';
+    }
+    const live = { token: { accessToken: 'AT', expiresAt: NOW + 3600e3, grantedScopes: ['Mail.ReadWrite', 'Tasks.ReadWrite'] } };
+    check('a live mail token is valid', A.microsoftConnection(live, {}, NOW) === 'valid');
+    check('a past expiry is expired', A.microsoftConnection({ token: Object.assign({}, live.token, { expiresAt: NOW - 1 }) }, {}, NOW) === 'expired');
+    check('needsSignIn is expired', A.microsoftConnection(live, { needsSignIn: true }, NOW) === 'expired');
+    check('mail missing from the token is missing-scope', A.microsoftConnection({ token: { accessToken: 'AT', expiresAt: NOW + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, NOW) === 'missing-scope');
+    check('no token is missing', A.microsoftConnection(null, {}, NOW) === 'missing');
+    check('the JWT scp wins over a stale granted list',
+      A.microsoftConnection({ token: { accessToken: jwt('Mail.Read'), expiresAt: NOW + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, NOW) === 'valid' &&
+      A.microsoftConnection({ token: { accessToken: jwt('Tasks.ReadWrite'), expiresAt: NOW + 1000, grantedScopes: ['Mail.ReadWrite'] } }, {}, NOW) === 'missing-scope');
+    check('a Graph mail audience counts and another audience does not',
+      A.microsoftConnection({ token: { accessToken: jwt('https://graph.microsoft.com/Mail.Read'), expiresAt: NOW + 1000, grantedScopes: ['Tasks.ReadWrite'] } }, {}, NOW) === 'valid' &&
+      A.microsoftConnection({ token: { accessToken: jwt('api://app/Mail.Read'), expiresAt: NOW + 1000, grantedScopes: [] } }, {}, NOW) === 'missing-scope');
   }
 
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

@@ -1,0 +1,28 @@
+{
+  "labeledBy": "cto",
+  "labeledAt": "2026-10-08T16:00:00.000Z",
+  "consent": false,
+  "provisional": false,
+  "note": "Sali 2026-10-08 told CTO to label without asking him. Not owner-verified (labeledBy is cto, not sali). Policy: prefer quiet over wrong Do It; hedge=quiet; explicit OneDrive ask=OneDrive save; dated commitment=dated task. Items 8/12/13/14/15 stay context-dependent.",
+  "answers": [
+    { "item": 1, "mark": "✅", "note": "בקשה מפורשת עם מועד — להציע טיוטה" },
+    { "item": 2, "mark": "✅", "note": "בקשה מפורשת — להציע טיוטה" },
+    { "item": 3, "mark": "✅", "note": "בקשה מפורשת עם מועד — להציע טיוטה" },
+    { "item": 4, "mark": "✅", "note": "בקשה מפורשת — להציע טיוטה" },
+    { "item": 5, "mark": "✅", "note": "בקשה מפורשת עם מועד — להציע טיוטה" },
+    { "item": 6, "mark": "✅", "note": "בקשה מפורשת עם מועד — להציע טיוטה" },
+    { "item": 7, "mark": "✅", "note": "בקשה מפורשת עם מועד — להציע טיוטה" },
+    { "item": 8, "mark": "context-dependent", "depends_on": "user_is_approver_for", "note": "Hi all approve — profile, not binary" },
+    { "item": 9, "mark": "✅", "note": "תזכורת התחייבות עם מועד — משימה" },
+    { "item": 10, "mark": "🤫", "note": "צרף קובץ לזימון; calendar-hold היא פעולה שגויה — לשתוק עד שיש attach-to-invite" },
+    { "item": 11, "mark": "🤫", "note": "אישור סכום בלי בקשה — לשתוק" },
+    { "item": 12, "mark": "context-dependent", "depends_on": "cc_reply_rate", "note": "Cc-only — profile" },
+    { "item": 13, "mark": "context-dependent", "depends_on": "covers_addressee", "note": "addressed-to-other — profile" },
+    { "item": 14, "mark": "context-dependent", "depends_on": "role_matches_topic", "note": "היי לכולם amount — profile" },
+    { "item": 15, "mark": "context-dependent", "depends_on": "work_style.files", "note": "FYI+file — profile" },
+    { "item": 16, "mark": "🤫", "note": "היסוס (אולי) — לשתוק" },
+    { "item": 17, "mark": "⚙️", "actionLabel": "onedrive-file|file_save", "expectedAction": "file_save", "note": "תשמור ב-One Drive עד יום ראשון — שמירה ל-OneDrive, לא משימה ולא שתיקה. Override actionLabel כי engine=task ו-v2=SILENT." },
+    { "item": 18, "mark": "⚙️", "note": "התחייבות עם תאריך יעד — dated-commitment כמו המנוע" },
+    { "item": 19, "mark": "✅", "note": "ראיון עם יום ושעה — אירוע ביומן כמו המודל" }
+  ]
+}

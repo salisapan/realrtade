@@ -18,6 +18,9 @@ import sys
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from stamp_build import git_sha7, stamped_bytes  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXTENSION_ROOT = REPO_ROOT / "flow-trial-extension"
 ZIP_PATH = (
@@ -186,21 +189,31 @@ def manifest_pages(manifest: dict) -> list[str]:
 
 
 SURFACE_TABLE_RE = re.compile(r"const SURFACES = \{(.*?)\n\};", re.S)
+LANE_TABLE_RE = re.compile(r"const LANE_CHAT = \[(.*?)\n\];", re.S)
 SURFACE_FILE_RE = re.compile(r"['\"]((?:src|core)/[A-Za-z0-9_./-]+\.(?:js|css))['\"]")
 
 
 def registered_surface_files(worker: Path) -> list[Path]:
-    """Files named in background.js's SURFACES table (scripts registered at runtime for opt-in sites)."""
+    """Files the worker registers at runtime: SURFACES, and the Meta lane scripts."""
     text = worker.read_text(encoding="utf-8")
+    blocks = []
     table = SURFACE_TABLE_RE.search(text)
-    if not table:
-        return []
+    if table:
+        blocks.append(table.group(1))
+    lanes = LANE_TABLE_RE.search(text)
+    if lanes:
+        blocks.append(lanes.group(1))
     out: list[Path] = []
-    for name in SURFACE_FILE_RE.findall(table.group(1)):
-        path = EXTENSION_ROOT / name
-        if not path.is_file():
-            die(f"background.js SURFACES names {name}, which does not exist")
-        out.append(path)
+    seen: set[str] = set()
+    for block in blocks:
+        for name in SURFACE_FILE_RE.findall(block):
+            if name in seen:
+                continue
+            seen.add(name)
+            path = EXTENSION_ROOT / name
+            if not path.is_file():
+                die(f"background.js names {name}, which does not exist")
+            out.append(path)
     return out
 
 
@@ -236,9 +249,9 @@ def collect(profile: str = "full") -> dict[str, Path]:
     if not worker:
         die("manifest.json has no background.service_worker")
     referenced.append(EXTENSION_ROOT / worker)
-    # Content scripts the worker registers at runtime (chrome.scripting.registerContentScripts: WhatsApp Web, Outlook on
-    # the web) are named only in background.js's SURFACES table, not in the manifest. Without this they were missing from
-    # the install zip, so turning a surface on registered files the install did not contain.
+    # Content scripts the worker registers at runtime (chrome.scripting.registerContentScripts) are named in
+    # background.js's SURFACES table and in LANE_CHAT, not in the manifest. Without this they were missing from
+    # the install zip, so a grant registered files the install did not contain.
     referenced.extend(registered_surface_files(EXTENSION_ROOT / worker))
     for content in manifest.get("content_scripts") or []:
         for name in (content.get("js") or []) + (content.get("css") or []):
@@ -288,11 +301,13 @@ def collect(profile: str = "full") -> dict[str, Path]:
     return files
 
 
-def write_zip(
-    files: dict[str, Path],
-    out: Path,
-    replacements: dict[str, bytes] | None = None,
-) -> int:
+def write_zip(files: dict[str, Path], out: Path) -> int:
+    if "manifest.json" not in files:
+        die("install zip has no manifest.json at its root")
+    for rel in files:
+        if rel.startswith("flow-trial-extension/") or rel.startswith("/") or ".." in Path(rel).parts:
+            die(f"install zip entry would not sit at the extension root: {rel}")
+    sha = os.environ.get("GLANCE_BUILD_STAMP") or git_sha7()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
@@ -305,7 +320,7 @@ def write_zip(
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, replacements.get(rel, files[rel].read_bytes()))
+            archive.writestr(info, stamped_bytes(rel, files[rel].read_bytes(), sha))
     os.replace(tmp, out)
     return out.stat().st_size
 

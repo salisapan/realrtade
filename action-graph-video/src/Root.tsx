@@ -2,6 +2,7 @@ import { Composition } from "remotion";
 import { ActionGraphLoop } from "./ActionGraphLoop";
 import { ActionGraphNarrative } from "./ActionGraphNarrative";
 import { PromoScene } from "./PromoScene";
+import { FlowReveal, REVEAL_FRAMES } from "./reveal/FlowReveal";
 
 // Flow's Action Graph, reimagined as a real 3D scene (Remotion + React Three Fiber)
 // instead of the live site's flat 2D canvas projection — same 4D layered-cone math,
@@ -39,6 +40,17 @@ export const RemotionRoot: React.FC = () => {
         durationInFrames={1650}
         width={2560}
         height={1440}
+      />
+
+      {/* 45s Flow reveal and explainer, 4:5 for social. Words into work: one decision carried through the systems,
+          a person approves, every "done" read back. Voice: Kokoro af_heart, generated locally. */}
+      <Composition
+        id="FlowReveal"
+        component={FlowReveal}
+        fps={30}
+        durationInFrames={REVEAL_FRAMES}
+        width={1080}
+        height={1350}
       />
     </>
   );

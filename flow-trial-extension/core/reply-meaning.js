@@ -64,7 +64,8 @@ const FlowReplyMeaning = (() => {
     /לא (?:אוכל|נוכל|אצליח|נצליח|אשלם|נשלם|אחתום|נחתום|אאשר|נאשר|מעוניין|מעוניינת|מעוניינים|רלוונטי|רלוונטית|ממשיכים|נמשיך|מתקדמים|נתקדם|מסכים|מסכימה|מסכימים)/,
     /החלטנו (?:שלא|לא|לוותר|לבטל)|החלטתי (?:שלא|לא|לוותר|לבטל)|נאלצ(?:ים|ת|ה)? (?:לסרב|לוותר|לבטל)|מסרב|מסרבת|מבטל(?:ים|ת)?|ביטלנו|ביטלתי/,
     /לא מתאים (?:לנו|לי)|לא רלוונטי (?:לנו|לי|כרגע)|(?:נלך|נבחר|בחרנו|נעבוד) עם (?:ספק|גורם|חברה) אח(?:ר|רת)/,
-    /^(?:לא|ממש לא|לא תודה)[.!,]?(?:\s|$)/
+    /^(?:לא תודה|ממש לא|לא)[.!,]?\s*$/,
+    /אין צורך \(ואי אפשר\) ל|אי אפשר לאשר/
   ];
   // "I can't do Tuesday, how about Wednesday?" is a counter-offer, not a no.
   const COUNTER = /\b(?:how about|what about|instead|rather|alternatively|could we (?:do|try|move)|can we (?:do|try|move)|would \w+ work|another (?:time|day|date)|different (?:time|day|date))\b|(?:מה דעתך|מה דעתכם|אולי ב|במקום|במועד אחר|ביום אחר|אפשר (?:ב|לדחות))/i;
@@ -118,8 +119,28 @@ const FlowReplyMeaning = (() => {
       }
     }
 
+    // the ball is back with you: they hand you a task before they will act ("please attach a photo of the licence",
+    // «נא לצרף», «אנא הגש», «אודה לך אם תעדכן»). Only when nothing was delivered, and only in a short reply.
+    const ASK_BACK_EN = /\b(?:please|kindly) (?:attach|provide|submit|upload|include|complete|fill (?:in|out)|reply with|send (?:us|me) (?:a|an|the|your))\b|\b(?:i|we) (?:kindly )?(?:ask|request) that you\b|\bwould you (?:please )?(?:send|provide|attach)\b/i;
+    const ASK_BACK_HE = /(?<![א-ת])(?:נא|אנא) (?:ל|ה)[א-ת]{2,}|אודה לך אם (?:תוכל |תוכלי )?(?:ת[א-ת]{2,})|(?:תצטרך|תצטרכי|עליך|עליכם) (?:להגיש|לשלוח|לצרף|להמציא)|נבקש (?:ממך )?[^.?!]{0,25}(?:לצרף|לשלוח|להמציא)/;
+    if (words(body) <= 80 && !DELIVERED.test(body)) {
+      for (const s of lines) {
+        if (NOT_DECLINE.test(s)) continue;
+        if (ASK_BACK_EN.test(s) || (he && ASK_BACK_HE.test(s))) return { meaning: 'question', why: 'needs something from you', line: s };
+      }
+    }
+
     // declined: a counter-offer or a courtesy never counts.
+    // A redirect ("not my job, contact X" / "I retired, here is my replacement") releases this loop.
+    // It is a no to the ask, not proof the ask was done. A message that also delivers stays a delivery.
+    const REDIRECT_EN = /\b(?:please |kindly )?(?:direct|refer) (?:this|it|them|the (?:email|message|request|thread)) to\b|\b(?:i am|i'm) not the right (?:person|contact)\b|\bi(?:'ve| have) (?:retired|left the (?:company|team|role))\b/i;
+    const NOT_MINE_HE = /(?:אינו|אינה|אינם|אינן) (?:בטיפולי|בטיפולנו|בסמכותי|בסמכותנו|באחריותי|באחריותנו)|(?<![א-ת])לא (?:בטיפולי|בסמכותי|באחריותי)(?![א-ת])/;
+    const REDIRECT_HE = /(?:אנא |נא )?(?:פנה|פנו|תפנה|תפנו) אל|(?:המחליף|המחליפה)/;
+    const RETIRED_HE = /(?<![א-ת])פרשתי(?![א-ת])|יצאתי (?:לגמלאות|לפנסיה)/;
     if (!COUNTER.test(body)) {
+      if (!DELIVERED.test(body) && (REDIRECT_EN.test(body) || (he && (RETIRED_HE.test(body) || (NOT_MINE_HE.test(body) && REDIRECT_HE.test(body)))))) {
+        return { meaning: c.kind === 'payment' ? 'question' : 'declined', why: 'redirected', line: lines[0] || body };
+      }
       for (const s of lines) {
         if (NOT_DECLINE.test(s)) continue;
         if (DECLINE_EN.some((re) => re.test(s)) || (he && DECLINE_HE.some((re) => re.test(s)))) {
