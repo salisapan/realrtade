@@ -136,14 +136,14 @@ async function runBehavioral() {
     );
   }
   function reprobeShowBranchDisabledSrc(src) {
-    const block = 'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {\n        const reprobe = unreadAttachmentReprobe();\n        if (reprobe) return reprobe;\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
-    const stripped = 'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
+    const block = 'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {\n        const reprobe = unreadAttachmentReprobe();\n        if (reprobe) return reprobe;\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
+    const stripped = 'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
     return src.includes(block) ? src.replace(block, stripped) : src;
   }
   function silentUnreadDropSrc(src) {
     return src.replace(
-      'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {',
-      'if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) { return { none: true, reason: \'intent-null\' }; if (false) {'
+      'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {',
+      'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) { return { none: true, reason: \'intent-null\' }; if (false) {'
     );
   }
   function graphFetches(sent) {
@@ -821,11 +821,7 @@ async function runBehavioral() {
   check('wrong-target both-listed bite: identity outlook patch does not satisfy bite',
     wtBothListedNoOpSteps && wtBothListedNoOpSteps.indexOf('onedriveFile') >= 0,
     { kinds: wtBothListedNoOpSteps });
-  logGateRun4Bite('826-838', 'countGateGraphOk + synth onedriveFile', 'minute both-listed bite covers open-pane gate; synth block wired in decideFromText');
-  check('decideFromText wires countGateGraphOk and synthesized onedriveFile step (source)',
-    /let countGateGraphOk = false/.test(outlookSrc) &&
-    /countGateGraphOk && needsSave && proc/.test(outlookSrc) &&
-    /kind: 'onedriveFile'/.test(outlookSrc));
+  console.log('R5 ruling: gate-run4-184-corpus.cjs | mutations: countGateOkOpenPaneOff + reprobeShowBranchDisabled + fileDropWhenUnread on wtGraphOnly/wtAttachBase | result: shown steps still [onedriveFile,outlookDraft] (judge adds save when attachmentCount>=1; reprobe cannot observe gate-only delta) | decision: DELETE countGateGraphOk name + synthesized onedriveFile concat block; keep graphSaveAttachConfirmed for late Graph list + unread file-drop');
   logGateRun4Bite('764-772', 'reply target open message', 'conversation URL: judged card targets M-older not M-newer when older pane is open');
   await require('./gate-184-verifier-addon.cjs')({
     check, runPage, patchOutlook, gateBase, cleanStore, FROM, ME, HME, file, graphFetches,

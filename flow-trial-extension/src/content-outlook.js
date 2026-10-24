@@ -761,7 +761,7 @@
     }).length;
     const countGate = needsSave || (signedForJudge && localAttachN >= 2);
     let attachmentsUnread = Boolean(mailbox && mailbox.attachmentsUnread);
-    let countGateGraphOk = false;
+    let graphSaveAttachConfirmed = false;
     if (countGate) {
       let id = openPaneGraphMessageId(pane);
       if (!id && paneUrlOnlyMessageTarget(pane)) {
@@ -788,7 +788,7 @@
         attachmentsUnread = Boolean(merged.unread);
         if (needsSave && attachmentCount >= 1 && Array.isArray(rows)) {
           attachmentsUnread = false;
-          countGateGraphOk = true;
+          graphSaveAttachConfirmed = true;
         }
       }
     }
@@ -832,7 +832,7 @@
       pane.attachmentsLoading = localAttachN < 1;
       return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process, attachmentsUnread: attachmentsUnread };
     }
-    if (r && r.show && localAttachN >= 1 && !countGateGraphOk) {
+    if (r && r.show && localAttachN >= 1 && !graphSaveAttachConfirmed) {
       const openMsgId = openPaneGraphMessageId(pane);
       let listId = openMsgId;
       if (!listId && paneUrlOnlyMessageTarget(pane)) {
@@ -863,7 +863,7 @@
           if (mergedRows.count >= 1) {
             attachmentCount = mergedRows.count;
             attachmentsUnread = false;
-            countGateGraphOk = true;
+            graphSaveAttachConfirmed = true;
             const again = judgeWith(own);
             if (again && again.show) r = again;
           }
@@ -900,11 +900,11 @@
     if (r && r.show) {
       let proc = r.process;
       let fileDroppedForUnread = false;
-      if (countGateGraphOk && r.process) {
+      if (graphSaveAttachConfirmed && r.process) {
         attachmentsUnread = false;
         proc = r.process;
       }
-      if (countGateGraphOk && needsSave && attachmentCount >= 1 && proc && proc.id === 'file-it') {
+      if (graphSaveAttachConfirmed && needsSave && attachmentCount >= 1 && proc && proc.id === 'file-it') {
         const hasSave = (proc.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
         if (!hasSave) {
           const again = judgeWith(own);
@@ -933,27 +933,13 @@
           }
         }
       }
-      if (countGateGraphOk && needsSave && proc) {
-        const hasSave = (proc.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
-        if (!hasSave) {
-          attachmentsUnread = false;
-          proc = Object.assign({}, proc, {
-            steps: (proc.steps || []).concat([{
-              kind: 'onedriveFile',
-              id: 'onedriveFile',
-              label: 'OneDrive',
-              hint: 'Save the attached file to OneDrive'
-            }])
-          });
-        }
-      }
-      if (attachmentsUnread && proc && proc.id === 'file-it' && !countGateGraphOk) {
+      if (attachmentsUnread && proc && proc.id === 'file-it' && !graphSaveAttachConfirmed) {
         const dropped = processDropFileSteps(proc);
         if (!dropped) return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
         fileDroppedForUnread = true;
         proc = dropped;
       }
-      if (fileDroppedForUnread && attachmentsUnread && !countGateGraphOk) {
+      if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {
         const reprobe = unreadAttachmentReprobe();
         if (reprobe) return reprobe;
         return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
