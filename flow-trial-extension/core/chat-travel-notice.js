@@ -11,6 +11,29 @@ const FlowChatTravelNotice = (() => {
   // Looking back, cancelling, moving, asking, or a thing that is not an appointment of the person's.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|nice)|cancel(?:l?ed|l?ation)?|postpone[d]?|resched\w*|delay(?:ed|s)?|changed|unfortunately|unable|can'?t|cannot|sorry|instead|maybe|might|if\s+you|would\s+you\s+like|deals?|offers?|sale|discount|promo\w*|from\s+only|book\s+now|book\s+(?:your|a)\b|click|tap|choose|select|departed|landed|arrived)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|בוטל|בוטלה|ביטול|לבטל|נדחה|נדחתה|לדחות|עיכוב|עוכב|שונה|השתנה|לצערנו|מצטערים|מצטער|אולי|במקום|מבצע|הנחה|מבצעים|הזמינו\s+עכשיו|לחץ|בחר|בחרי|המריאה|נחתה)/;
+  // A trip told as changed ("Your flight has been delayed, it now departs Sunday at 07:15", «הטיסה שלך נדחתה, היא תמריא ביום ראשון ב-07:15»)
+  // is the same trip at its new day and clock: only a change verb that is followed by a new-time marker counts, the words before the verb
+  // stay (they carry the noun), the old time and the verb are dropped. A change with no new time stays quiet.
+  const CHANGE_EN = /\s*,?\s*(?:(?:has|have)\s+been\s+|was\s+|is\s+)?(?:delayed|rescheduled|postponed|moved|retimed|changed|brought\s+forward)\b/i;
+  const NEWTIME_EN = /\b(?:now\s+(?:departs?|leaves?|takes\s+off|boards?)|will\s+now\s+(?:depart|leave|take\s+off)|(?:to|will)\s+(?:depart|leave)|(?:moved|rescheduled|postponed|changed|delayed)\s+(?:to|until)|new\s+(?:departure\s+)?time\s+(?:is|:))\s*(?:on|at|for)?\s+/i;
+  const CHANGE_HE = /\s*,?\s*(?:נדחתה|נדחה|עוכבה|עוכב|התעכבה|התעכב|הוקדמה|הוקדם|הועברה|הועבר|שונתה|שונה)\s*,?\s*/;
+  const NEWTIME_HE = /(?:היא|הוא|ה)?\s*(?:תמריא|ממריאה|ממריא|תצא|יוצאת|יוצא)\s+/;
+  function changedTo(raw) {
+    let m = raw.match(CHANGE_EN);
+    if (m) {
+      const tail = raw.slice(m.index + m[0].length);
+      const n = tail.match(NEWTIME_EN);
+      if (n) return raw.slice(0, m.index) + ' departs ' + tail.slice(n.index + n[0].length);
+      return raw;
+    }
+    m = raw.match(CHANGE_HE);
+    if (m) {
+      const tail = raw.slice(m.index + m[0].length);
+      const n = tail.match(NEWTIME_HE);
+      if (n) return raw.slice(0, m.index) + ' ממריאה ' + tail.slice(n.index + n[0].length);
+    }
+    return raw;
+  }
   const QUESTION = /[?؟]/;
   const MAX_AHEAD_DAYS = 90;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -61,7 +84,7 @@ const FlowChatTravelNotice = (() => {
 
   // { kind: 'appointment', dateIso, hour, minute, lang } or { kind: 'none', reason }.
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = changedTo(String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim());
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 260) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

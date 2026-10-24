@@ -493,6 +493,16 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a cancelled appointment offers nothing', !(await c.Card.offer(input('Your appointment on Sunday at 10:00 was cancelled', { channel: 'whatsapp' }))).shown);
   }
 
+  // 5w. A trip told as delayed with its new time is offered at the new time; a delay with no new time offers nothing.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input('Your flight LY001 has been delayed, it now departs Sunday at 07:15', { channel: 'whatsapp' }));
+    const st = r.shown && w.injected[0].ctx.process.steps[0].params;
+    check('the delayed flight is offered at its new time', !!st && st.hour === 7 && st.minute === 15, st || r);
+    const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a delay with no new time offers nothing', !(await q.Card.offer(input('Your flight LY001 has been delayed', { channel: 'whatsapp' }))).shown);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

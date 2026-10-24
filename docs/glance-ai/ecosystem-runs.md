@@ -591,3 +591,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** appointment reader corpus (4 more bookings, 5 more quiet lines), chat card corpus (confirmation, then the move is offered; Hebrew; cancelled quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
 - **Open:** live Gate; the old event stays on the calendar until the person removes it (replacing it would be an edit of an event Glance made earlier: a design for the owner, not built); the pickup and trip readers do not read a moved time yet.
 
+## 2026-10-25 Ecosystems builder B (seventieth run) — a delayed flight is offered at its new time
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `BOOKING_NOTICE`, off):** airlines and rail operators message changes: "Your flight LY001 has been delayed, it now departs Sunday at 07:15", «הטיסה שלך נדחתה, היא תמריא ביום ראשון ב-07:15», "Your train has been rescheduled to depart tomorrow at 09:40". The trip reader treated every delay as a cancellation, so the new time was never offered. `core/chat-travel-notice.js` now reads the trip at the new day and clock when a change verb is followed by a new-time marker (also "was delayed from Sunday at 06:30 and now departs Sunday at 08:45"). A delay with no new time, a cancellation, "unfortunately … instead", a promotion and a look back stay quiet. Chat (WhatsApp, Messenger, Instagram) and Outlook/Gmail mail share the reader. Nothing is sent; nobody is invited.
+- **Rule changed on purpose:** the corpus had two lines that said a delay with a new time is not a trip; they now say it is (moved to the YES list with a comment). The precision floor is unchanged: a change verb with no new time, any cancel/sorry/instead word, and every other quiet line still hold.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** trip reader corpus (6 more trips, 5 more quiet lines), chat card corpus (delayed offered at the new time; a delay with no time quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
+- **Open:** live Gate; the old trip event stays until the person removes it; the pickup reader does not read a moved time yet.
+

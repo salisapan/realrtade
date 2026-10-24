@@ -5,6 +5,13 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  // A change that names the new time is the same trip at that time (owner-visible change of 2026-10-24: these were quiet before).
+  ['Your flight has been delayed, now departs Sunday at 08:00', '2026-10-25', 8, 0],
+  ['Your flight LY001 has been delayed, it now departs Sunday at 07:15', '2026-10-25', 7, 15],
+  ['Your train has been rescheduled to depart tomorrow at 09:40', '2026-10-24', 9, 40],
+  ['Your flight LY001 was delayed from Sunday at 06:30 and now departs Sunday at 08:45', '2026-10-25', 8, 45],
+  ['הטיסה שלך נדחתה, היא תמריא ביום ראשון ב-07:15', '2026-10-25', 7, 15],
+  ['הטיסה שלך התעכבה ותמריא ביום ראשון ב-08:00', '2026-10-25', 8, 0],
   ['Your flight LY001 departs Sunday at 06:30', '2026-10-25', 6, 30],
   ['Your flight to Paris is confirmed: it departs Sunday 25 Oct at 06:30', '2026-10-25', 6, 30],
   ['Your train leaves tomorrow at 08:15 from platform 4', '2026-10-24', 8, 15],
@@ -18,17 +25,20 @@ const YES = [
 ];
 for (const [text, day, h, m] of YES) { const r = A.recognize(text, NOW); check('trip: ' + text, r.kind === 'trip' && r.dateIso === day && r.hour === h && r.minute === m, r); }
 const NO = [
+  ['Your flight has been delayed', 'a delay with no new time'],
+  ['הטיסה שלך עוכבה', 'a delay with no new time'],
+  ['Unfortunately your flight is delayed and now departs Sunday at 07:15 instead', 'sorry / instead'],
+  ['Your flight was cancelled and rebooked, it now departs Sunday at 07:15', 'cancelled'],
+  ['Your flight departed Sunday at 06:30 and was delayed', 'look back'],
   ['Your flight departs Sunday', 'no clock'],
   ['Your flight departs at 06:30', 'no day'],
   ['Your flight was cancelled, it departed Sunday at 06:30', 'cancelled'],
-  ['Your flight has been delayed, now departs Sunday at 08:00', 'delayed'],
   ['Flight deals departing Sunday at 06:30 - book now', 'promotion'],
   ['Did your flight depart Sunday at 06:30?', 'question'],
   ['The flight departs Sunday at 06:30', 'not yours'],
   ['Your flight landed yesterday at 06:30', 'look back'],
   ['Your flight departs on 2025-01-02 at 06:30', 'past'],
   ['Your train ticket costs 40 NIS, valid Sunday at 06:30', 'no departure verb'],
-  ['הטיסה שלך התעכבה ותמריא ביום ראשון ב-08:00', 'delayed'],
   ['הטיסה שלך בוטלה, היא הייתה ביום ראשון ב-06:30', 'cancelled'],
   ['מבצע טיסות ביום ראשון ב-06:30, הזמינו עכשיו', 'promotion'],
   ['הטיסה ממריאה ביום ראשון ב-06:30', 'not yours'],
