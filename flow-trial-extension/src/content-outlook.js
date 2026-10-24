@@ -761,7 +761,6 @@
     }).length;
     const countGate = needsSave || (signedForJudge && localAttachN >= 2);
     let attachmentsUnread = Boolean(mailbox && mailbox.attachmentsUnread);
-    let graphSaveAttachConfirmed = false;
     if (countGate) {
       let id = openPaneGraphMessageId(pane);
       if (!id && paneUrlOnlyMessageTarget(pane)) {
@@ -788,7 +787,6 @@
         attachmentsUnread = Boolean(merged.unread);
         if (needsSave && attachmentCount >= 1 && Array.isArray(rows)) {
           attachmentsUnread = false;
-          graphSaveAttachConfirmed = true;
         }
       }
     }
@@ -832,7 +830,7 @@
       pane.attachmentsLoading = localAttachN < 1;
       return { none: true, reason: 'signed-save-suggest', intent: r.intent, process: r.process, attachmentsUnread: attachmentsUnread };
     }
-    if (r && r.show && localAttachN >= 1 && !graphSaveAttachConfirmed) {
+    if (r && r.show && localAttachN >= 1) {
       const openMsgId = openPaneGraphMessageId(pane);
       let listId = openMsgId;
       if (!listId && paneUrlOnlyMessageTarget(pane)) {
@@ -863,7 +861,6 @@
           if (mergedRows.count >= 1) {
             attachmentCount = mergedRows.count;
             attachmentsUnread = false;
-            graphSaveAttachConfirmed = true;
             const again = judgeWith(own);
             if (again && again.show) r = again;
           }
@@ -900,20 +897,6 @@
     if (r && r.show) {
       let proc = r.process;
       let fileDroppedForUnread = false;
-      if (graphSaveAttachConfirmed && r.process) {
-        attachmentsUnread = false;
-        proc = r.process;
-      }
-      if (graphSaveAttachConfirmed && needsSave && attachmentCount >= 1 && proc && proc.id === 'file-it') {
-        const hasSave = (proc.steps || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave'));
-        if (!hasSave) {
-          const again = judgeWith(own);
-          if (again && again.show && again.process) {
-            r = again;
-            proc = again.process;
-          }
-        }
-      }
       if (attachmentsUnread && needsSave && proc && proc.id === 'file-it' && paneUrlOnlyMessageTarget(pane)) {
         const open = await messageIdForOpenPane(pane.conversationId || pane.pathId, ownAddresses, pane.senderEmail, pane);
         if (open && open.id) {
@@ -933,13 +916,13 @@
           }
         }
       }
-      if (attachmentsUnread && proc && proc.id === 'file-it' && !graphSaveAttachConfirmed) {
+      if (attachmentsUnread && proc && proc.id === 'file-it') {
         const dropped = processDropFileSteps(proc);
         if (!dropped) return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
         fileDroppedForUnread = true;
         proc = dropped;
       }
-      if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {
+      if (fileDroppedForUnread && attachmentsUnread) {
         const reprobe = unreadAttachmentReprobe();
         if (reprobe) return reprobe;
         return { none: true, reason: 'page:attachment-count-unread', attachmentsUnread: true };
@@ -1433,13 +1416,20 @@
   async function ensureOutlookMessageId(ctx) {
     const have = ctx && (ctx.outlookIncomingId || ctx.messageId);
     if (have) return have;
-    const pathId = ctx && (ctx.pathId || ctx.conversationId);
-    const convId = ctx && ctx.conversationId;
-    if (!pathId && !convId) return null;
     let own = [];
     try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
     const openSender = (ctx && ctx.sender && ctx.sender.email) || (ctx && ctx.pane && ctx.pane.senderEmail);
-    const found = await resolveOutlookMessageId(pathId, convId, own, openSender);
+    const pane = ctx && ctx.pane;
+    const pathId = ctx && (ctx.pathId || ctx.conversationId);
+    const convId = ctx && ctx.conversationId;
+    let found = null;
+    if (pane && (pane.itemId || pane.pathId || pane.conversationId)) {
+      found = await resolveJudgedReplyMessageId(pane, own, openSender);
+    } else if (pathId || convId) {
+      found = await resolveOutlookMessageId(pathId || convId, convId, own, openSender);
+    } else {
+      return null;
+    }
     if (!found || found.unread || !found.id) return null;
     ctx.messageId = found.id;
     ctx.outlookIncomingId = found.id;
@@ -5134,35 +5124,36 @@
           if (decided && decided.attachmentsUnread && !pane.itemId) {
             dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: null, attachmentsUnread: true });
           } else {
-          const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
-          if (replyTarget && replyTarget.unread) {
-            dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: replyTarget.from || null });
-            dropStuckCard(pane);
-            await pageReason(replyTarget.reason, pane);
-            return;
-          }
-          replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
-          if (!replyId && conversationUrlNeedsRestSpelling(pane)) {
-            if (needsJudgedReplyTarget(decided && decided.process) && !(decided && decided.attachmentsUnread)) {
+            const replyTarget = await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);
+            if (replyTarget && replyTarget.unread) {
+              dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: replyTarget.from || null });
               dropStuckCard(pane);
-              await pageReason('page:no-message-id', pane);
+              await pageReason(replyTarget.reason, pane);
               return;
             }
-            const legacy = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
-            if (legacy && legacy.unread) {
-              dropStuckCard(pane);
-              await pageReason(legacy.reason, pane);
-              return;
+            replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
+            if (!replyId && conversationUrlNeedsRestSpelling(pane)) {
+              if (needsJudgedReplyTarget(decided && decided.process)) {
+                dropStuckCard(pane);
+                await pageReason('page:reply-target-unsure', pane);
+                return;
+              }
+              const legacy = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+              if (legacy && legacy.unread) {
+                dropStuckCard(pane);
+                await pageReason(legacy.reason, pane);
+                return;
+              }
+              msgId = legacy && legacy.id ? legacy.id : null;
+            } else {
+              msgId = replyId;
             }
-            msgId = legacy && legacy.id ? legacy.id : null;
-          } else {
-            msgId = replyId;
-          }
-          dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId, replyId: replyId });
+            dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId, replyId: replyId, attachmentsUnread: Boolean(decided && decided.attachmentsUnread) });
           }
         }
         if (!msgId && !(decided && decided.attachmentsUnread)) {
-          await pageReason('page:no-message-id', pane);
+          dropStuckCard(pane);
+          await pageReason('page:reply-target-unsure', pane);
           return;
         }
         entry = {
@@ -5189,7 +5180,7 @@
           if (!exactId) {
             if (needsJudgedReplyTarget((decided && decided.process) || (entry && entry.process))) {
               dropStuckCard(pane);
-              await pageReason('page:no-message-id', pane);
+              await pageReason('page:reply-target-unsure', pane);
               return;
             }
           } else if (String(exactId) !== String(entry.messageId || '')) {

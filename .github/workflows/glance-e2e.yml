@@ -42,6 +42,9 @@ jobs:
           node test/negation-conditional-corpus.cjs
           node test/self-title-preposition-corpus.cjs
           node test/display-144-followups-corpus.cjs
+          node test/gate-run4-184-corpus.cjs
+          node test/gate-184-verifier-addon-corpus.cjs
+          node test/card-decision-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium

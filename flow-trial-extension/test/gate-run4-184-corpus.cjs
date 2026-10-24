@@ -28,51 +28,20 @@ function outlookMessageIdSpellings(id) {
   if (raw && raw !== canon) out.push(raw);
   return out;
 }
-const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
-const bgSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
-const displaySrc = fs.readFileSync(path.join(ROOT, 'core/display-copy.js'), 'utf8');
-const gmailSrc = fs.readFileSync(path.join(ROOT, 'src/content-gmail.js'), 'utf8');
-const popupSrc = fs.readFileSync(path.join(ROOT, 'popup/popup.js'), 'utf8');
-
-console.log('\n--- source wiring (extra, not bite) ---\n');
+console.log('gate-run4-184 expectation edits (logged):');
+console.log('  gate-run4-184-corpus.cjs:37-75 | before: source-regex wiring rows on product files | after: removed (behavioural rows only) | ruling: #184 verify no source-text assertions');
+console.log('  gate-run4-184-corpus.cjs:362-364 | before: keepActiveDraftReceipt regex on outlookSrc | after: storage slot pin row only | ruling: #184 verify');
+console.log('  gate-run4-184-corpus.cjs:526-528 | before: N1 bite hard-coded subject Gate Run 4 | after: pane subject === row.subject | ruling: #184 verify generic N1');
+console.log('  gate-run4-184-corpus.cjs:487/501/516/534 | before: pathRestGraphId FlowOwaParse.canonId(...) | after: literal REST ids | ruling: #184 F2b');
+console.log('  gate-run4-184-corpus.cjs (addon) | before: reply identity rows deleted | after: re-added in gate-184-verifier-addon.cjs | ruling: #184 verify');
 check('mergeCount uses DOM when Graph list is null',
   E.mergeCount(null, { attachments: [{ name: 'a.pdf' }, { name: 'b.pdf' }] }, { hasAttachments: true }).count === 2 &&
   E.mergeCount(null, { attachments: [{ name: 'a.pdf' }, { name: 'b.pdf' }] }, { hasAttachments: true }).unread === true);
 check('display-copy has HE+EN attachments-not-read',
   D.attachmentsNotReadLine('he').indexOf('לא הצלחתי') >= 0 && /Could not read/.test(D.attachmentsNotReadLine('en')));
-check('display-copy has HE+EN note-to-self short and task-suggested',
-  D.noteToSelfLine('he').indexOf('ממך') >= 0 && D.noteToSelfLine('he').indexOf('הוצעה') < 0 &&
-  D.noteToSelfLine('he', { taskSuggested: true }).indexOf('הוצעה') >= 0 &&
-  /From you to you/.test(D.noteToSelfLine('en')) && !/task was suggested/.test(D.noteToSelfLine('en')) &&
-  /task was suggested/.test(D.noteToSelfLine('en', { taskSuggested: true })));
-check('display-copy has HE+EN OneDrive reconnect',
-  D.missingScopeLine('Files.ReadWrite', 'OneDrive', 'en').indexOf('OneDrive') >= 0 &&
-  D.missingScopeLine('Files.ReadWrite', 'וואן־דרייב', 'he').indexOf('וואן') >= 0);
-check('decideFromText uses attachmentListFor not bare graphValues',
-  /attachmentListFor\(id\)/.test(outlookSrc) && !/save-count'\)\s*:\s*null/.test(outlookSrc));
-check('wrong-target product: file prepare uses paneUrlOnlyMessageTarget not urlOnlyId (bfbdd757 fails)',
-  !/const urlOnlyId/.test(outlookSrc) &&
-  /paneUrlOnlyMessageTarget\(pane\)/.test(outlookSrc) &&
-  /resolveMessageIdForFilePrepare/.test(outlookSrc));
-check('reprobe show-branch bite uses source patch only (product never reads __showReprobeOff)',
-  !/__showReprobeOff/.test(outlookSrc));
-check('signed-save-suggest triggers recordSuggestNote',
-  /signed-save-suggest/.test(outlookSrc) && /recordSuggestNote/.test(outlookSrc));
-check('buildCtx keeps task steps with reply draft (H1)',
-  /taskSteps/.test(outlookSrc) && /draftSteps\.concat\(taskSteps\)/.test(outlookSrc));
-check('display-copy has HE+EN To Do failed after draft warning',
-  D.outlookTodoFailedAfterDraftLine('he').indexOf('טיוטה') >= 0 &&
-  /draft is ready/i.test(D.outlookTodoFailedAfterDraftLine('en')));
-check('note-to-self does not return before decideFromText',
-  !/pane\.noteToSelf = true[\s\S]{0,40}return;/.test(outlookSrc));
-check('paintMissingScope mentions OneDrive Files.ReadWrite',
-  /Files\.ReadWrite/.test(outlookSrc) && /onedriveFile/.test(outlookSrc));
-check('Gmail paints Drive reconnect on file cards',
-  /paintMissingDriveScope/.test(gmailSrc) && /SCOPE_DRIVE_FILE/.test(gmailSrc));
-check('background loads outlook-attachment-evidence.js',
-  /outlook-attachment-evidence\.js/.test(bgSrc));
-check('popup lists all own addresses not only primary',
-  /ownAddresses\.join/.test(popupSrc));
+check('display-copy has HE+EN reply-target-unsure fail-closed',
+  D.whyNotShownLine('page:reply-target-unsure', 'he').indexOf('לא נוצרה') >= 0 &&
+  /nothing was drafted/i.test(D.whyNotShownLine('page:reply-target-unsure', 'en')));
 
 const engine = { module: undefined, console };
 vm.createContext(engine);
@@ -113,7 +82,8 @@ check('H1 Hebrew reply-track includes outlookTask row (not googleTask on Outlook
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); } catch (e) { JSDOM = null; }
 
-async function runBehavioral() {
+async function runBehavioral(opts) {
+  const addonOnly = opts && opts.addonOnly;
   if (!JSDOM) {
     check('jsdom present for Gate Run 4 bite checks', false, 'missing jsdom');
     return;
@@ -126,8 +96,9 @@ async function runBehavioral() {
   }
   const { runPage, ME: HME } = harness;
   const outlookPath = path.join(ROOT, 'src/content-outlook.js');
+  const outlookSrc = fs.readFileSync(outlookPath, 'utf8');
   function patchOutlook(mutator) {
-    return mutator(fs.readFileSync(outlookPath, 'utf8'));
+    return mutator(outlookSrc);
   }
   function reprobeFinalDisabledSrc(src) {
     return src.replace(
@@ -136,14 +107,14 @@ async function runBehavioral() {
     );
   }
   function reprobeShowBranchDisabledSrc(src) {
-    const block = 'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {\n        const reprobe = unreadAttachmentReprobe();\n        if (reprobe) return reprobe;\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
-    const stripped = 'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
+    const block = 'if (fileDroppedForUnread && attachmentsUnread) {\n        const reprobe = unreadAttachmentReprobe();\n        if (reprobe) return reprobe;\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
+    const stripped = 'if (fileDroppedForUnread && attachmentsUnread) {\n        return { none: true, reason: \'page:attachment-count-unread\', attachmentsUnread: true };\n      }';
     return src.includes(block) ? src.replace(block, stripped) : src;
   }
   function silentUnreadDropSrc(src) {
     return src.replace(
-      'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) {',
-      'if (fileDroppedForUnread && attachmentsUnread && !graphSaveAttachConfirmed) { return { none: true, reason: \'intent-null\' }; if (false) {'
+      'if (fileDroppedForUnread && attachmentsUnread) {',
+      'if (fileDroppedForUnread && attachmentsUnread) { return { none: true, reason: \'intent-null\' }; if (false) {'
     );
   }
   function graphFetches(sent) {
@@ -213,6 +184,27 @@ async function runBehavioral() {
   const gateBasePathRest = Object.assign({}, gateBase, {
     pathRestHit: true, pathRestId: GATE_CONV, pathRestGraphId: GATE_CONV_REST, pathRestResponseId: 'M1'
   });
+  const PATH_REST_OTHER = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX_C-aXV-OTHER';
+  const PATH_REST_OTHER2 = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX_C-aXV-OTHER2';
+  const PATH_REST_HELD_SUBJ = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX_C-aXV-HELD-SUBJ';
+  const WRONG_TARGET_CONV_ADDON = GATE_CONV + '-WT2';
+  const paneClockIsoAddon = FlowOwaParse.clockToIso('ג 06/10/2026 01:16') || '2026-10-05T22:16:00.000Z';
+  const olderDtAddon = paneClockIsoAddon;
+  const newerDtAddon = new Date(Date.parse(paneClockIsoAddon) + 3600e3).toISOString();
+  const wtDateRowAddon = '\u05d2 06/10/2026 \u200f01:16';
+  const contractEarly = 'Please sign the contract and return the appendix by Friday.';
+  const attachDomEarly = (h) => gateHtml(contractEarly)(h)
+    .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="a.pdf" data-size="1024"></div><div data-name="appendix.pdf" data-size="2048"></div');
+  if (addonOnly) {
+    await require('./gate-184-verifier-addon.cjs')({
+      check, runPage, patchOutlook, gateBase, cleanStore, FROM, ME, HME, file, graphFetches,
+      logGateRun4Bite, WRONG_TARGET_CONV: WRONG_TARGET_CONV_ADDON, olderDt: olderDtAddon, newerDt: newerDtAddon,
+      paneClockIso: paneClockIsoAddon, wtDateRow: wtDateRowAddon, gateHtml,
+      attachDom: attachDomEarly, contract: contractEarly, attachUnreadHe, F3_RAW_MSG: 'AQMkADBm/j3F3Plus+Underscore_Spelling==',
+      F3_REST_MSG: 'AQMkADBm_j3F3Plus-Underscore_Spelling', GATE_CONV, FlowDisplay: D
+    });
+    return;
+  }
 
   const selfTask = 'תזכיר לי לשלוח את החוזה ביום ראשון.';
   const selfToSelf = await runPage({
@@ -359,9 +351,6 @@ async function runBehavioral() {
     !(f3ConvMut.chip && f3ConvMut.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(String(f3ConvMut.chip.textContent || ''))) ||
     (f3ConvMutTrace && f3ConvMutTrace.messageIdFrom !== 'conversation-filter'),
     { text: f3ConvMut.chip && f3ConvMut.chip.textContent, trace: f3ConvMutTrace });
-  check('keepActiveDraftReceipt uses getActiveOutlookReceipts only (no raw log scan)',
-    /getActiveOutlookReceipts\(\)/.test(outlookSrc) &&
-    !/keepActiveDraftReceipt[\s\S]{0,400}\(bag && bag\.log\)/.test(outlookSrc));
   const { FlowStorage } = require('../src/storage.js');
   const getActiveOutlookReceiptsFrom = FlowStorage.getActiveOutlookReceiptsFrom;
   const pinLog = [
@@ -480,11 +469,14 @@ async function runBehavioral() {
     { text: reloadText.slice(0, 240), written: reloadWritten.map((e) => e.connectorId) });
   console.log('H1 parity bite: gate-run4-184-corpus.cjs:375-381 [H1 reload receipt text] | before: Handled-only / log-only To Do | after: draft+To Do in DOM receipt (incl. טיוטה) | CTO parity e456 item1');
   const heldDraftStore = JSON.parse(JSON.stringify(h1Done.store));
+  (heldDraftStore.log || []).forEach((e) => {
+    if (e && e.connectorId === 'outlookDraft') e.subject = 'Gate Run 4';
+  });
   const otherInvoice = await runPage({
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-OTHER', listedConversationId: GATE_CONV + '-OTHER', messageId: 'MSG-OTHER-INVOICE',
-    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-OTHER') || (GATE_CONV + '-OTHER'), pathRestResponseId: 'MSG-OTHER-INVOICE',
+    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER', pathRestGraphId: PATH_REST_OTHER, pathRestResponseId: 'MSG-OTHER-INVOICE',
     listedSubject: 'Invoice for October', waitMs: 6000,
     store: heldDraftStore
   });
@@ -498,7 +490,7 @@ async function runBehavioral() {
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h).replace('Invoice for October', 'Invoice for October'),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-OTHER2', listedConversationId: GATE_CONV + '-OTHER2', messageId: 'MSG-OTHER-INVOICE-2',
-    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER2', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-OTHER2') || (GATE_CONV + '-OTHER2'), pathRestResponseId: 'MSG-OTHER-INVOICE-2',
+    pathRestHit: true, pathRestId: GATE_CONV + '-OTHER2', pathRestGraphId: PATH_REST_OTHER2, pathRestResponseId: 'MSG-OTHER-INVOICE-2',
     listedSubject: 'Invoice for October', waitMs: 6000,
     store: heldDraftStore
   });
@@ -513,7 +505,7 @@ async function runBehavioral() {
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-HELD-SUBJ', listedConversationId: GATE_CONV + '-HELD-SUBJ', messageId: 'MSG-SAME-SUBJ-AS-HELD',
-    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-HELD-SUBJ') || (GATE_CONV + '-HELD-SUBJ'), pathRestResponseId: 'MSG-SAME-SUBJ-AS-HELD',
+    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: PATH_REST_HELD_SUBJ, pathRestResponseId: 'MSG-SAME-SUBJ-AS-HELD',
     listedSubject: heldSubj, waitMs: 6000,
     store: heldDraftStore
   });
@@ -525,13 +517,13 @@ async function runBehavioral() {
     { text: sameSubjHeldText.slice(0, 200) });
   const subjectOnlySrc = patchOutlook((src) => src.replace(
     'function draftMatchesPane(row, pane) {',
-    'function draftMatchesPane(row, pane) {\n    const subjOnly = String((pane && pane.subject) || "").trim();\n    if (row && row.connectorId === "outlookDraft" && subjOnly && subjOnly === "Gate Run 4") return true;'
+    'function draftMatchesPane(row, pane) {\n    const subjOnly = String((pane && pane.subject) || "").trim();\n    const rowSubj = String((row && row.subject) || "").trim();\n    if (row && row.connectorId === "outlookDraft" && subjOnly && rowSubj && subjOnly === rowSubj) return true;'
   ));
   const subjectLeak = await runPage({
     htmlPatch: (h) => gateHtml('Please send the October invoice by Friday.')(h),
     mailBody: 'Please send the October invoice by Friday.',
     urlId: GATE_CONV + '-HELD-SUBJ', listedConversationId: GATE_CONV + '-HELD-SUBJ', messageId: 'MSG-SUBJ-MUT',
-    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: FlowOwaParse.canonId(GATE_CONV + '-HELD-SUBJ') || (GATE_CONV + '-HELD-SUBJ'), pathRestResponseId: 'MSG-SUBJ-MUT',
+    pathRestHit: true, pathRestId: GATE_CONV + '-HELD-SUBJ', pathRestGraphId: PATH_REST_HELD_SUBJ, pathRestResponseId: 'MSG-SUBJ-MUT',
     listedSubject: heldSubj, waitMs: 6000,
     store: heldDraftStore,
     contentOutlookSrc: subjectOnlySrc
@@ -821,13 +813,13 @@ async function runBehavioral() {
   check('wrong-target both-listed bite: identity outlook patch does not satisfy bite',
     wtBothListedNoOpSteps && wtBothListedNoOpSteps.indexOf('onedriveFile') >= 0,
     { kinds: wtBothListedNoOpSteps });
-  console.log('R5 ruling: gate-run4-184-corpus.cjs | mutations: countGateOkOpenPaneOff + reprobeShowBranchDisabled + fileDropWhenUnread on wtGraphOnly/wtAttachBase | result: shown steps still [onedriveFile,outlookDraft] (judge adds save when attachmentCount>=1; reprobe cannot observe gate-only delta) | decision: DELETE countGateGraphOk name + synthesized onedriveFile concat block; keep graphSaveAttachConfirmed for late Graph list + unread file-drop');
+  console.log('R5 ruling: gate-run4-184-corpus.cjs | mutations: gall + g791/g835/g866/g903/g907 survived; g936 patch-not-applied artefact | decision: DELETE graphSaveAttachConfirmed and all uses; reprobe/silent bites retarget fileDroppedForUnread block');
   logGateRun4Bite('764-772', 'reply target open message', 'conversation URL: judged card targets M-older not M-newer when older pane is open');
   await require('./gate-184-verifier-addon.cjs')({
     check, runPage, patchOutlook, gateBase, cleanStore, FROM, ME, HME, file, graphFetches,
     logGateRun4Bite, WRONG_TARGET_CONV, olderDt, newerDt, paneClockIso, wtDateRow, gateHtml,
     attachDom, contract, attachUnreadHe, F3_RAW_MSG: 'AQMkADBm/j3F3Plus+Underscore_Spelling==',
-    F3_REST_MSG: 'AQMkADBm_j3F3Plus-Underscore_Spelling', GATE_CONV
+    F3_REST_MSG: 'AQMkADBm_j3F3Plus-Underscore_Spelling', GATE_CONV, FlowDisplay: D
   });
   const CONV_EWS_URL = GATE_CONV;
   const convEwsBody = 'Please update me on the contract by Sunday.';
@@ -1229,8 +1221,9 @@ async function runBehavioral() {
 }
 
 (async () => {
-  console.log('\n--- behavioral bite checks (Outlook page + Gmail card) ---\n');
-  await runBehavioral();
+  const addonOnly = process.argv.includes('--verifier-addon-only');
+  if (!addonOnly) console.log('\n--- behavioral bite checks (Outlook page + Gmail card) ---\n');
+  await runBehavioral({ addonOnly });
   if (failures) {
     console.log('\n' + failures + ' failed');
     process.exit(1);

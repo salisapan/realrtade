@@ -467,7 +467,8 @@ const FlowDisplay = (() => {
     'suggest:graph-0': 'לא הצלחתי לקרוא את הקבצים המצורפים',
     'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
-    'names-pending': 'ממתין לשם'
+    'names-pending': 'ממתין לשם',
+    'reply-target-unsure': 'לא הצלחתי לוודא על איזה מייל פתוח — לא נוצרה טיוטה'
   };
 
   const WHY_EN = {
@@ -489,7 +490,8 @@ const FlowDisplay = (() => {
     'suggest:graph-0': 'Could not read the attachments from Outlook',
     'suggest:too-large': 'The attachment is too large to save',
     'scan-skipped': 'Still reading the mail',
-    'names-pending': 'Waiting for your name'
+    'names-pending': 'Waiting for your name',
+    'reply-target-unsure': "I couldn't confirm which message is open — nothing was drafted."
   };
 
   function whyNotShownLine(reason, lang) {

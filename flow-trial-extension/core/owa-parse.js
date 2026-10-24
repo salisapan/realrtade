@@ -113,7 +113,8 @@ const FlowOwaParse = (() => {
     if (!pane || !list.length) return null;
     const ids = (e) => [e.messageId, e.outlookIncomingId, e.id].map(canonId).filter(Boolean);
     const convs = (e) => [e.outlookConversationId, e.conversationId, e.threadId, e.base && e.base.threadId].map(canonId).filter(Boolean);
-    const paneId = canonId(pane.itemId || pane.messageId || pane.pathId);
+    const hasOpenMsg = Boolean(pane.itemId || pane.messageId);
+    const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));
     if (paneId) {
       const hit = list.find((e) => ids(e).indexOf(paneId) >= 0 || canonId(e.internetMessageId) === paneId);
       if (hit) return { entry: hit, how: 'message id' };

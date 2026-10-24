@@ -524,10 +524,7 @@ function panel(store) {
     { email: refused && refused.senderEmail, name: refused && refused.senderName, item: refused && refused.itemId });
   hyd.w.close();
 
-  const outlookSrc = fs.readFileSync(path.join(ROOT, 'src/content-outlook.js'), 'utf8');
   const specPath = path.join(ROOT, '..', 'docs/glance-ai/card-whynotshown-single-source-spec.md');
-  check('the page writes the card decision with commitDecision',
-    outlookSrc.indexOf('async function commitDecision') > 0 && outlookSrc.indexOf('function whyNotShownRows') < 0);
   {
     const MSG_OPEN = 'MSG-OPEN-PICKED-F1';
     const MSG_WRONG = 'MSG-WRONG-URL-F1';
@@ -550,11 +547,29 @@ function panel(store) {
     check('F1: pathId for a different message does not adopt that sync entry when itemId is the open message',
       !matchedCtrl || matchedCtrl.how !== 'message id' || String(matchedCtrl.entry.messageId) !== MSG_WRONG,
       { how: matchedCtrl && matchedCtrl.how, id: matchedCtrl && matchedCtrl.entry && matchedCtrl.entry.messageId });
+    const panePathOnly = {
+      pathId: MSG_WRONG,
+      subject: 'Pilot proposal',
+      senderEmail: FLOW
+    };
+    const matchedPathOnly = FlowOwaParse.matchEntryHow(panePathOnly, [wrongEntry]);
+    check('F1: pathId alone for a different message does not adopt that sync entry',
+      !matchedPathOnly || matchedPathOnly.how !== 'message id' || String(matchedPathOnly.entry.messageId) !== MSG_WRONG,
+      { how: matchedPathOnly && matchedPathOnly.how, id: matchedPathOnly && matchedPathOnly.entry && matchedPathOnly.entry.messageId });
     const owaPath = path.join(ROOT, 'core/owa-parse.js');
     const owaSrc = fs.readFileSync(owaPath, 'utf8');
     function pathIdFirstPaneIdSrc(src) {
       return src.replace(
-        'const paneId = canonId(pane.itemId || pane.messageId || pane.pathId);',
+        'const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));',
+        'const paneId = canonId(pane.pathId || pane.itemId || pane.messageId);'
+      );
+    }
+    function pathIdAnyIdSrc(src) {
+      return src.replace(
+        'const hasOpenMsg = Boolean(pane.itemId || pane.messageId);',
+        'const hasOpenMsg = true;'
+      ).replace(
+        'const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));',
         'const paneId = canonId(pane.pathId || pane.itemId || pane.messageId);'
       );
     }
@@ -566,6 +581,14 @@ function panel(store) {
     check('F1 bite: pathId-before-itemId mutation wrongly matches the URL message entry (must fail on control product)',
       matchedBite && matchedBite.how === 'message id' && String(matchedBite.entry.messageId) === MSG_WRONG,
       { how: matchedBite && matchedBite.how, id: matchedBite && matchedBite.entry && matchedBite.entry.messageId });
+    const owaAnySrc = pathIdAnyIdSrc(owaSrc);
+    const anyCtx = vm.createContext({ module: { exports: {} }, exports: {} });
+    anyCtx.exports = anyCtx.module.exports;
+    vm.runInContext(owaAnySrc + '\nmodule.exports = { FlowOwaParse };', anyCtx);
+    const matchedAnyBite = anyCtx.module.exports.FlowOwaParse.matchEntryHow(panePathOnly, [wrongEntry]);
+    check('F1 bite: pathId-only pane matches any id when comparison accepts any entry (must fail on control product)',
+      matchedAnyBite && matchedAnyBite.how === 'message id' && String(matchedAnyBite.entry.messageId) === MSG_WRONG,
+      { how: matchedAnyBite && matchedAnyBite.how, id: matchedAnyBite && matchedAnyBite.entry && matchedAnyBite.entry.messageId });
     const noopCtx = vm.createContext({ module: { exports: {} }, exports: {} });
     noopCtx.exports = noopCtx.module.exports;
     vm.runInContext(owaSrc + '\nmodule.exports = { FlowOwaParse };', noopCtx);
