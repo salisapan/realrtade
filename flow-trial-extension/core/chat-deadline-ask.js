@@ -58,8 +58,12 @@ const FlowChatDeadlineAsk = (() => {
   }
 
   // { kind: 'ask', dateIso, what } or { kind: 'none', reason }.
+  // A nudge in front of the same ask ("Reminder: please send it by Monday", «תזכורת: תשלח …») is the same ask, not another sentence.
+  const NUDGE_EN = /^(?:(?:a\s+)?(?:gentle|friendly|quick|polite)\s+)?(?:reminder|nudge|ping|follow(?:ing)?[\s-]*up)\s*[:,\-–—]\s*/i;
+  const NUDGE_HE = /^(?:תזכורת(?:\s+(?:ידידותית|קטנה))?|שוב)\s*[:,\-–—]\s*/;
+
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim().replace(NUDGE_EN, '').replace(NUDGE_HE, '');
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

@@ -19,6 +19,8 @@ for (const [text, day, what] of YES) {
   check('reminder: ' + text, r.kind === 'reminder' && r.dateIso === day && what.test(r.what) && !/(?:Monday|ביום|tomorrow|מחר)/.test(r.what), r);
 }
 const NO = [
+  ['Reminder: the form was due Monday', 'a look back'],
+  ['Reminder: please send the signed form by Monday', 'a request, not a reminder to act'],
   ["Don't forget to bring the form", 'no day'],
   ["Don't forget the form on Monday", 'no cue thing'],
   ['Can you remember to bring the form on Monday?', 'question'],

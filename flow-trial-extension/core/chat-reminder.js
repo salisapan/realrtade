@@ -64,6 +64,9 @@ const FlowChatReminder = (() => {
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-reminder' };
     const m = raw.match(CUE_EN) || raw.match(CUE_HE);
     if (!m) return { kind: 'none', reason: 'no-cue' };
+    // A bare "Reminder:" in front of a request ("Reminder: please send it by Monday") is a deadline ask, and in front of a look back
+    // ("Reminder: the form was due Monday") is nothing to do: neither is a reminder to act.
+    if (/^reminder\s*[:\-]/i.test(m[0].trim()) && (/^\s*please\b/i.test(raw.slice(m.index + m[0].length)) || /\b(?:was|were|had|has\s+been|have\s+been)\b/i.test(raw))) return { kind: 'none', reason: 'not-a-reminder' };
     const X = extractApi();
     if (!X || typeof X.parseDate !== 'function') return { kind: 'none', reason: 'not-configured' };
     const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);

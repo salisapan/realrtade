@@ -116,3 +116,15 @@ test('a payment asked in a chat is one To Do task, and "Reminder: …" repeating
   await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(1);
 });
+
+test('a deadline asked in a chat is one To Do task, and "Reminder: …" repeating it is not offered a second one', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Please send the signed form by Monday');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await todo(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML('Reminder: please send the signed form by Monday'));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});

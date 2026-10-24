@@ -467,6 +467,18 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('after the task was undone the same payment is offered again', afterUndo.shown, afterUndo);
   }
 
+  // 5u. A deadline asked and then nudged ("Reminder: please send it by Monday") is one task, not two; a look back is nothing.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleTask' } });
+    await w.Card.offer(input('Please send the signed form by Monday', { channel: 'whatsapp', key: 'd-1' }));
+    check('the deadline ask is offered', w.injected.length === 1);
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    const again = await w.Card.offer(input('Reminder: please send the signed form by Monday', { channel: 'whatsapp', key: 'd-2' }));
+    check('the nudged deadline ask is the same task and is not offered again', !again.shown && again.reason === 'already-on-task-list', again);
+    const q = world({ target: { ok: true, connectorId: 'googleTask' } });
+    check('a Reminder look back offers nothing', !(await q.Card.offer(input('Reminder: the form was due Monday', { channel: 'whatsapp' }))).shown);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

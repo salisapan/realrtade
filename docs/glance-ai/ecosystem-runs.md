@@ -577,3 +577,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/chat-payment-ask-corpus.cjs` (3 more asks, 3 more quiet lines), the chat card corpus on the real "Reminder:" wording, a real-browser Outlook spec (bill, then "Reminder:" quiet; fails on the previous reader), all corpora.
 - **Open:** live Gate; the reminder, deadline and call-back readers do not take a leading nudge yet.
 
+## 2026-10-24 Ecosystems builder B (sixty-eighth run) — "Reminder: send it by Monday" is the ask, not a made-up reminder
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** in WhatsApp, Messenger and Instagram "Reminder: please send the signed form by Monday" was taken by the reminder reader, which made a task titled "please send the signed form", and "Reminder: the form was due Monday" (a look back) was offered as a task too. Now the deadline reader takes the nudge as part of the same ask («תזכורת: תשלח לי את החוזה עד יום חמישי» too), so it gets the right title ("Send the signed form") and the same-chat repeat guard sees it as the task already made; the reminder reader leaves a request and a look back alone.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** deadline reader corpus (3 more asks), reminder reader corpus (2 more quiet lines), chat card corpus (nudged repeat quiet, look back quiet), a real-browser Outlook spec (fails on the previous readers), all corpora.
+- **Open:** live Gate; the call-back reader does not take a leading nudge ("Reminder: call me back" is taken by the reminder reader, which gives a fine task); the bare "Reminder: <event>" (e.g. "Reminder: team lunch on Monday") still makes a reminder task by design.
+

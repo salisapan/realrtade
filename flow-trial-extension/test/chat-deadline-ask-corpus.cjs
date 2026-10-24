@@ -5,6 +5,9 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['Reminder: please send the signed form by Monday', '2026-10-26', /signed form/],
+  ['Gentle reminder, we need the invoice before Thursday', '2026-10-29', /invoice/],
+  ['תזכורת: תשלח לי את החוזה עד יום חמישי', '2026-10-29', /החוזה/],
   ['Need the report by Wednesday', '2026-10-28', /report/],
   ['I need the signed contract by tomorrow', '2026-10-24', /contract/],
   ['We need the invoice before Thursday', '2026-10-29', /invoice/],
