@@ -131,6 +131,27 @@ const FlowChatTaskCard = (() => {
     return null;
   }
 
+  // The same hold must not be made twice: a confirmation and then a reminder for the same appointment in the same chat would add a
+  // second event. A hold this card wrote for the same day and clock in this thread, and not undone since, is the answer.
+  async function findHeldHold(chatKey, params) {
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function' || !params) return null;
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    const thread = String(chatKey).split('|').slice(0, 3).join('|');
+    const undone = {};
+    for (const e of log) {
+      if (!e) continue;
+      if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
+      if (e.kind !== 'written' || !e.ref || undone[e.chatKey]) continue;
+      if (e.connectorId !== 'googleHold' && e.connectorId !== 'outlookCalendar') continue;
+      if (String(e.chatKey || '').split('|').slice(0, 3).join('|') !== thread) continue;
+      const st = e.process && Array.isArray(e.process.steps) ? e.process.steps[0] : null;
+      const p = st && st.params;
+      if (p && p.dateIso === params.dateIso && p.hour === params.hour && p.minute === params.minute) return e;
+    }
+    return null;
+  }
+
   function undoHandler(host, chatKey, connectorId, ref) {
     return async function () {
       const u = await send(undoMessage(connectorId, ref));
@@ -436,6 +457,8 @@ const FlowChatTaskCard = (() => {
     const calStep = taskStep || own ? null : calendarStepOf(judged.process);
     const step = taskStep || calStep;
     if (!step) return { shown: false, reason: 'no-task-step' };
+
+    if (calStep && (await findHeldHold(chatKey, calStep.params))) return { shown: false, reason: 'already-on-calendar' };
 
     const target = await send({ type: 'flow:chat-task-target', kind: calStep ? 'calendar' : 'task', own: own });
     if (!target || !target.connectorId) return { shown: false, reason: (target && target.reason) || 'not-connected' };

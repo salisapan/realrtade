@@ -541,3 +541,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** `test/chat-payment-ask-corpus.cjs` (5 bills, 8 quiet lines), `test/payment-ask-mail-corpus.cjs` (2 bills, 3 quiet mails), the silence corpus (3 more everyday lines), a real-browser Outlook spec (bill, Handled, Undo), all corpora, chat/Outlook/Gmail browser specs.
 - **Open:** live Gate; an overdue bill with a past due date stays quiet by design (no due day to put the task on); owner decision whether an overdue bill should become a task due today.
 
+## 2026-10-24 Ecosystems builder B (sixty-third run) — a reminder no longer adds a second event
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off):** an appointment, a trip or an invitation is usually told twice (the confirmation, then a reminder). The chat card would have offered a second Do It for the reminder and the person would end with two identical events. It now checks the thread: a hold this card wrote for the same day and clock in the same chat, and not undone since, means the reminder shows no card (`already-on-calendar`); a different time, a different chat, or the same time after Undo is offered as before.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** chat card corpus (first hold, reminder not offered, another time offered, same time offered again after Undo), all corpora, chat/Outlook/Gmail browser specs.
+- **Open:** live Gate; the mail cards (Outlook, Gmail) do not dedupe a confirmation mail and its reminder mail yet.
+

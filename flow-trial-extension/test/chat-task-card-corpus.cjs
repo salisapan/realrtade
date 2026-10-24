@@ -435,6 +435,22 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     }
   }
 
+  // 5s. The same hold is not made twice: a reminder for an appointment already on the calendar from this chat is not offered again.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await w.Card.offer(input('Your appointment is confirmed for Sunday at 10:00', { channel: 'whatsapp', key: 'm-1' }));
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    check('the first confirmation makes one hold', w.logRows.length === 1);
+    const shownBefore = w.injected.length;
+    const again = await w.Card.offer(input('Reminder: your appointment is on Sunday at 10:00', { channel: 'whatsapp', key: 'm-2' }));
+    check('a reminder for the same appointment in the same chat is not offered again', !again.shown && again.reason === 'already-on-calendar' && w.injected.length === shownBefore, again);
+    const other = await w.Card.offer(input('Your appointment is confirmed for Sunday at 11:00', { channel: 'whatsapp', key: 'm-3' }));
+    check('another time in the same chat is a different hold and is offered', other.shown, other);
+    await w.receipts.find((x) => x.receipt).receipt.onUndo();
+    const afterUndo = await w.Card.offer(input('Reminder: your appointment is on Sunday at 10:00', { channel: 'whatsapp', key: 'm-4' }));
+    check('after the hold was undone the same time is offered again', afterUndo.shown, afterUndo);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
