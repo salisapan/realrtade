@@ -73,7 +73,7 @@ Two bills that fit equally: silence.
 - **Data:** the held-out set `bill-paid-heldout-v0.jsonl`.
   - 18 bill + message pairs, 10 Hebrew and 8 English: 9 paid, 9 traps.
   - Written and frozen (sha256 `f96ca93b…`) before `core/bill-paid.js` was written, and scored once.
-  - **Disclosure:** I wrote the cases and then the code the same hour, so the set is not blind the way a third party's would be. The in-sample corpus (36 checks) adds more traps.
+  - **Disclosure:** I wrote the cases and then the code the same hour, so the set is not blind the way a third party's would be. The in-sample corpus (27 checks) adds more traps.
 
 ### Held-out (`node scripts/bill-paid-heldout.cjs v0`)
 
@@ -99,7 +99,7 @@ Two bills that fit equally: silence.
   - a refund;
   - a scheduled payment.
 
-**Corpora:** `bill-paid-corpus` (36 checks) passes, and so do all 207 corpora. With the switch off, `judge` returns null on every input. Nothing else calls the module.
+**Corpora:** `bill-paid-corpus` (27 checks) passes, and so do all 207 corpora. With the switch off, `judge` returns null on every input. Nothing else calls the module.
 
 ## Risks and what stays locked
 
