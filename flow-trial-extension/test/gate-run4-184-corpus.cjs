@@ -795,8 +795,8 @@ async function runBehavioral(opts) {
       'if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;\n      if (!openPaneExactGraphRow(pane, m)) continue;\n      hits.push(m);',
       'if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;\n      if (openPaneConversationRow(pane, m)) convSender.push(m);\n      if (!openPaneExactGraphRow(pane, m)) continue;\n      hits.push(m);'
     ).replace(
-      'if (hits.length === 1) return hits[0];\n    return null;',
-      'if (hits.length === 1) return hits[0];\n    if (hits.length > 1) return null;\n    if (convSender.length === 1) return convSender[0];\n    return null;'
+      'if (hits.length > 1) return null;',
+      'if (hits.length > 1) return null;\n    if (convSender.length === 1) return convSender[0];'
     );
     return out.slice(0, start) + chunk + out.slice(end);
   }
@@ -805,9 +805,10 @@ async function runBehavioral(opts) {
   }));
   const wtConvOnlyNewerMutAtt = graphFetches(wtConvOnlyNewerMut.sent).filter((u) => /\/attachments/.test(u));
   const wtConvOnlyNewerMutNewer = wtConvOnlyNewerMutAtt.some((u) => decodeURIComponent(u).indexOf('/M-newer/') >= 0);
+  const wtConvOnlyNewerMutPatch = patchOutlook(convSenderFallbackSrc) !== outlookSrc;
   check('wrong-target bite: convSender length===1 fallback fetches newer attachments when older is open',
-    wtConvOnlyNewerMutNewer,
-    { att: wtConvOnlyNewerMutAtt });
+    wtConvOnlyNewerMutPatch && wtConvOnlyNewerMutNewer,
+    { patch: wtConvOnlyNewerMutPatch, att: wtConvOnlyNewerMutAtt });
   const wtConvOnlyNewerNoOp = await runPage(Object.assign({}, wtAttachBase, { threadMessages: [wtThread[1]] }, {
     contentOutlookSrc: patchOutlook((s) => s)
   }));
