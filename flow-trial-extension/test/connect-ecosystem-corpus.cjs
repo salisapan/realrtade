@@ -300,7 +300,7 @@ await ok('stepsFor microsoft is exactly one Graph step with ecosystem consent sc
   assert.strictEqual(r.steps.length, 1);
   assert.strictEqual(r.steps[0].type, 'microsoft-ecosystem');
   assert.deepStrictEqual(r.steps[0].scopes, MS_EXPECTED);
-  assert.strictEqual(r.steps[0].scopes.length, 12);
+  assert.strictEqual(r.steps[0].scopes.length, 7);
   assert.ok(r.steps[0].scopes.indexOf('openid') >= 0);
   assert.ok(r.steps[0].scopes.indexOf('profile') >= 0);
   assert.ok(r.steps[0].scopes.indexOf('Chat.Read') < 0);
@@ -310,8 +310,14 @@ await ok('microsoft base consent never includes Group.*, Chat.Read, or OnlineMee
   assert.ok(!MS_EXPECTED.some((s) => /^Group\./i.test(s)));
   assert.ok(MS_EXPECTED.indexOf('OnlineMeetings.ReadWrite') < 0);
   assert.ok(MS_EXPECTED.indexOf('Chat.Read') < 0);
+  assert.ok(MS_EXPECTED.indexOf('Calendars.ReadWrite') < 0);
+  assert.ok(MS_EXPECTED.indexOf('Contacts.Read') < 0);
+  assert.ok(MS_EXPECTED.indexOf('Notes.ReadWrite') < 0);
+  assert.ok(MS_EXPECTED.indexOf('MailboxSettings.Read') < 0);
+  assert.ok(MS_EXPECTED.indexOf('People.Read') < 0);
   assert.deepStrictEqual(E.microsoftOptionalScopes.planner, ['Group.Read.All']);
   assert.deepStrictEqual(E.microsoftOptionalScopes.teamsChat, ['Chat.Read']);
+  assert.deepStrictEqual(E.microsoftOptionalScopes.contacts, ['Contacts.Read']);
   assert.ok(E.microsoftOptionalScopes.teamsMeeting === undefined);
   assert.ok(MS_EXPECTED.indexOf('Tasks.ReadWrite') >= 0);
   assert.ok(E.microsoftRequiredScopes().indexOf('openid') < 0);
