@@ -83,11 +83,14 @@ const FlowChatAppointmentNotice = (() => {
   const CLK = '\\d{1,2}(?::\\d{2})?\\s?(?:[ap]\\.?m\\.?)?';
   const RANGE = new RegExp('(?:^|[^\\d:])(' + CLK + ')\\s?(?:-|–|—|to|until|till|עד)\\s?(' + CLK + ')(?![\\d:]|\\s?[ap]\\.?m)', 'i');
   const RANGE_MK = new RegExp('(?:^|[^\\d:])(' + CLK + ')\\s?(?:-|–|—|to|until|till|עד)\\s?(\\d{1,2}(?::\\d{2})?\\s?[ap]\\.?m\\.?)', 'i');
+  const BETWEEN = new RegExp('\\bbetween\\s+(' + CLK + ')\\s+and\\s+(' + CLK + ')', 'i');
+  const flat = (text) => String(text == null ? '' : text).replace(/\s+/g, ' ').trim().replace(BETWEEN, '$1-$2');
   const mk = (x) => { const k = String(x).match(/[ap]\.?m/i); return k ? k[0].toLowerCase().replace('.', '') : ''; };
 
   // The start of "from 10:00 to 11:30" / "10:00-11:00" when the plain clock reader gave nothing for a range.
   function rangeStart(text) {
-    const m = String(text == null ? '' : text).replace(/\s+/g, ' ').trim().match(RANGE_MK) || String(text == null ? '' : text).replace(/\s+/g, ' ').trim().match(RANGE);
+    const f = flat(text);
+    const m = f.match(RANGE_MK) || f.match(RANGE);
     if (!m) return null;
     let sa = String(m[1]).trim();
     let sb = String(m[2]).trim();
@@ -102,7 +105,7 @@ const FlowChatAppointmentNotice = (() => {
   // "from 10:00 to 11:30"), or "for 45 minutes", "for an hour", "for an hour and a half", «למשך שעה», «למשך 45 דקות». Read from the
   // person's own words. null when nothing says so; a range that does not start at the booked clock is not this appointment's length.
   function lengthOf(text, start) {
-    const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    const t = flat(text);
     const m = t.match(RANGE_MK) || t.match(RANGE);
     if (m && start) {
       let sa = String(m[1]).trim();
@@ -195,7 +198,7 @@ const FlowChatAppointmentNotice = (() => {
     return { kind: 'cancelled', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize, cancelled: cancelled, lengthOf: lengthOf };
+  return { recognize: recognize, cancelled: cancelled, lengthOf: lengthOf, rangeStart: rangeStart };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatAppointmentNotice };

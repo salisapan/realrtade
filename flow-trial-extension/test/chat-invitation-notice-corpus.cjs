@@ -60,5 +60,15 @@ const NOT_GONE = [
 ];
 for (const [text, why] of NOT_GONE) check('not a cancellation (' + why + '): ' + text.slice(0, 50), A.cancelled(text, NOW).kind === 'none', A.cancelled(text, NOW));
 
+// The told length of an invitation (durationMinutes) and the start of a written range.
+const LEN = [
+  ["You're invited to my birthday on Saturday from 20:00 to 23:00", 20, 180],
+  ["You're invited to the party on Saturday between 8 and 11pm", 20, 180],
+  ['מוזמנים ליום ההולדת ביום שישי 20:00-23:00', 20, 180],
+  ["You're invited to the opening on Thursday at 19:00 for 2 hours", 19, 120]
+];
+for (const [text, h, n] of LEN) { const r = A.recognize(text, NOW); check('length ' + n + ': ' + text.slice(0, 60), r.kind === 'invitation' && r.hour === h && r.durationMinutes === n, r); }
+for (const text of ["You're invited to my birthday on Saturday at 8pm until late", "You're invited to the opening on Thursday at 19:00"]) { const r = A.recognize(text, NOW); check('no told length: ' + text.slice(0, 60), r.kind === 'invitation' && r.durationMinutes === undefined, r); }
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-invitation-notice checks passed');
 process.exit(failures ? 1 : 0);

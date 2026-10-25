@@ -548,7 +548,7 @@ const FlowChatTaskCard = (() => {
       };
       callProposal = held === dlv ? 'delivery' : held === trip ? 'trip' : held === inv ? 'invitation' : 'appointment';
       if (held === dlv) deliveryWindow = dlv;
-      if (held === appt && appt.durationMinutes) holdMinutes = appt.durationMinutes;
+      if ((held === appt || held === inv) && held.durationMinutes) holdMinutes = held.durationMinutes;
     } else {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });

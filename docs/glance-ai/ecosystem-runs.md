@@ -710,3 +710,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** 18 new lines in `test/chat-appointment-notice-corpus.cjs` (lengths in English and Hebrew, no length for "arrive 10 minutes early", a lunch range, an absurd length), three real-browser specs (Outlook mail, Gmail, WhatsApp) that check the end of the written event, booking and chat-hold specs unchanged and green, every `test/*corpus.cjs` green.
 - **Open:** live Gate; "between 2 and 3pm" still starts at 15:00 (the plain clock reader takes the last clock; left as it was, needs its own fix and corpus); flights and invitations that name a length are not read.
+
+## Run 86 (builder B, 2026-10-25): invitations take their told hours; "between 2 and 3pm" starts at 2pm
+
+- **Capability shipped:** an invitation that names its hours ("you're invited on Saturday from 20:00 to 23:00", "between 8 and 11pm", «20:00-23:00», "for 2 hours") is now held for those hours (was 30 minutes) in WhatsApp, Messenger, Instagram, Outlook mail and Gmail, on the existing Hold It card with read back and Undo. Also fixed the run 85 open item: "between 2 and 3pm" started the appointment at 15:00; it now starts at 14:00 and lasts an hour. Switches `BOOKING_NOTICE`, `CHAT_TASK_CARD` (off).
+- **Code:** `core/chat-invitation-notice.js` takes `lengthOf` and `rangeStart` from the appointment reader; `core/chat-appointment-notice.js` reads "between X and Y"; `durationMinutes` carried by the judge's invitation step and the chat card.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** corpus lines in `test/chat-invitation-notice-corpus.cjs` and `test/chat-appointment-notice-corpus.cjs`, one real-browser Outlook spec (end of the written event is 21:30), booking and chat-hold specs green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; flights that name a length are not read.

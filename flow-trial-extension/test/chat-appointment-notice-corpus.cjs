@@ -105,6 +105,7 @@ const NOLEN = [
   'התור שלך נקבע ליום ראשון ב-10:00, נא להגיע 10 דקות לפני'
 ];
 for (const text of NOLEN) { const r = A.recognize(text, NOW); check('no told length: ' + text.slice(0, 60), r.kind === 'appointment' && r.durationMinutes === undefined, r); }
+for (const [text, h, n] of [['Your appointment is confirmed for Sunday between 2 and 3pm', 14, 60], ['Your appointment is confirmed for Sunday between 14:00 and 15:30', 14, 90]]) { const r = A.recognize(text, NOW); check('between X and Y starts at X: ' + text.slice(0, 60), r.kind === 'appointment' && r.hour === h && r.durationMinutes === n, r); }
 check('a range that starts at another clock is not its length', A.lengthOf('lunch 12:00-13:00', { hour: 10, minute: 0 }) === null);
 check('the range start is the clock when the plain reader fails', (() => { const r = A.recognize('Your appointment is confirmed for Sunday from 10:00 to 11:30', NOW); return r.hour === 10 && r.minute === 0; })());
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-appointment-notice checks passed');

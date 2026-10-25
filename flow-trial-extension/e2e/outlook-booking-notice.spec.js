@@ -284,3 +284,18 @@ test('BOOKING_NOTICE on: an appointment mail that names its length is one hold o
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
+
+test('BOOKING_NOTICE on: an invitation that names its hours is one hold for those hours, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, "Hi, you're invited to our product launch tomorrow from 19:00 to 21:30. We'd love to see you.", true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Invitation/);
+  expect(list[0].attendees || []).toEqual([]);
+  expect(JSON.stringify(list[0].start)).toContain('19:00');
+  expect(JSON.stringify(list[0].end)).toContain('21:30');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
