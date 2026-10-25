@@ -61,12 +61,14 @@ console.log('\n--- prepareForJudge strips invisible formatting once ---\n');
 
 console.log('\n--- a phone signature drops only when the line is only the signature ---\n');
 {
+  console.log('expectation edit: mail-format-corpus.cjs:69 | before: kinds [outlookDraft, googleTask] | after: [outlookDraft, outlookTask] | ruling: verifier R2 / H1 CTO');
   // Frozen from engine 0.9.36 (182efb5f) on these exact lines.
   const rows = [
     ['Sent from my iPhone. Could you confirm the transfer by Friday?', 'gmail', 0,
       { show: true, reason: null, type: 'request', label: 'Reply requested by Oct 9', kinds: ['gmailDraft', 'googleTask'] }],
+    // H1 (#184 verifier R2): Outlook reply-track uses outlookTask, not googleTask.
     ['Sent from my iPhone. Could you confirm the transfer by Friday?', 'outlook', 1,
-      { show: true, reason: null, type: 'request', label: 'Reply requested by Oct 9', kinds: ['outlookDraft', 'googleTask'] }],
+      { show: true, reason: null, type: 'request', label: 'Reply requested by Oct 9', kinds: ['outlookDraft', 'outlookTask'] }],
     ['Sent from my iPhone — could you send the deck by Friday?', 'gmail', 0,
       { show: true, reason: null, type: 'request', label: 'Reply requested by Oct 9', kinds: ['gmailDraft', 'googleTask'] }],
     ['Sent from my iPhone — could you send the deck by Friday?', 'outlook', 1,
