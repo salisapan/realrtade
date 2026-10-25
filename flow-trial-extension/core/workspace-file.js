@@ -55,6 +55,9 @@ const FlowWorkspaceFile = (() => {
   const OTHER_APP = /\b(?:typeform|jotform|survey\s*monkey|microsoft\s+forms|ms\s+forms|word|excel|pages|numbers|notion|confluence|onenote|powerpoint|keynote)\b|וורד|אקסל|נושן/i;
   const NEG = /\b(?:no need (?:to|for)|don'?t (?:need|create|make|open)|do not (?:create|make|open)|not necessary|without (?:a|an))\b|אין\s+צורך|אל\s+תפתח|לא\s+צריך/i;
   const HEDGE = /\b(?:maybe|perhaps|if you want|if you'?d like|if it helps|no pressure|sometime|at some point|one day|might)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם\s+בא\s+לך|אם\s+יש\s+זמן/i;
+  // Looking back ("it was possible yesterday") and the writer's own promise ("I'll open a doc") are not an ask of the reader.
+  const PAST_HE = /(?:^|[\s,.])(?:אתמול|שבוע\s+שעבר|בעבר)(?:[\s,.?!]|$)/;
+  const SELF_HE = /(?:^|[\s,.])(?:אני|אנחנו|אנו)\s+(?:א|נ)(?:פתח|יצור|כין|קים)(?![֐-׿])/;
   const FYI = /\b(?:fyi|for your information|no action needed)\b|לידיעתך|לידיעה/i;
   const THIRD = /\b(?:ask|have|get|tell|let)\s+(?!(?:me|us|you)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,3}\s+(?:to\s+)?(?:create|set\s+up|start|open|make|build|prepare)\b|תבקש(?:י|ו)?\s*מ|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))/i;
   const NAMED_EN = /\b(?:called|named|titled|entitled)\s+["“'‘]?([^"”'’\n.;?!]{3,60}?)["”'’]?(?=\s*(?:[.;?!,]|\bso\b|\band\b|\bby\b|\bbefore\b|\bfor\s+(?:us|me|everyone|the\s+team)\b|$))/i;
@@ -99,6 +102,7 @@ const FlowWorkspaceFile = (() => {
     const named = s.match(lang === 'he' ? NAMED_HE : NAMED_EN) || s.match(NAMED_EN);
     // A word inside the name the person gave ("Board update Q4") is not an instruction.
     const rest = named ? s.replace(named[0], ' ') : s;
+    if (PAST_HE.test(s) || SELF_HE.test(s)) return { kind: 'block', reason: PAST_HE.test(s) ? 'past' : 'own-promise' };
     if (EXISTING.test(rest)) return { kind: 'block', reason: 'existing-file' };
     if (CONTENT.test(rest)) return { kind: 'block', reason: 'asks-content' };
     let name = named ? cleanName(named[1]) : '';
@@ -111,6 +115,8 @@ const FlowWorkspaceFile = (() => {
         name = name.slice(0, 60);
       }
     }
+    // "... בשם הצעה ולשתף": the share is the person's own step; it is not part of the name.
+    name = name.replace(/\s+ו(?:לשתף|לשלוח|להוסיף|לכתוב|למלא|לסכם|תשתף|תשלח)(?:\s.*)?$/, '').trim();
     if (!name) return { kind: 'block', reason: 'no-name' };
     return { kind: 'clear', lang: lang, fileKind: kind, name: name };
   }

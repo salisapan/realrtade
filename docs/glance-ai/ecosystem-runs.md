@@ -726,3 +726,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; the card is the existing one.
 - **Tests:** `test/sharepoint-new-file-corpus.cjs` (recognition in both languages, silences with reasons, site resolution, create, read-back failures withdraw, scope, Undo edited or gone), `e2e/outlook-sharepoint-file.spec.js` (7 real-browser specs on the Graph stand-in: off, box not ticked, the whole loop with reload and Undo, Hebrew, edited file, name taken, site not found or ambiguous or content asked), Connect-screen and Labs specs green, every `test/*corpus.cjs` green.
 - **Open (owner, open-tasks row 84):** Entra permission and admin consent, privacy and store wording («מאשר», not edited here), live Gate. A SharePoint list item and saving an attachment to SharePoint are not built.
+
+## Run 88 (builder B, 2026-10-25): Hebrew new-file asks with an infinitive
+
+- **Capability shipped:** a Hebrew mail «אפשר לפתוח מסמך בשם הצעה לספק?», «תוכל להכין לנו גיליון בשם …», «נא לפתוח …», «צריך להקים …» now gets the Word or Excel card on Outlook (and on a named SharePoint site). Before, only the imperative («תפתח», «תיצור») was read on the Microsoft side; the Google twin already read the infinitive, so a Hebrew Outlook user was served worse than a Hebrew Gmail user. Also, on both readers: «היה אפשר לפתוח … אתמול» (a past ask) and «אני אפתח …» (the writer's own promise) stay quiet, and «… ולשתף» is not part of the file name (sharing stays the person's step). Switches `ONEDRIVE_NEW_FILE`, `SHAREPOINT_NEW_FILE`, `WORKSPACE_FILE` (off).
+- **Code:** `core/onedrive-new-file.js` and `core/workspace-file.js` (the SharePoint reader inherits the first).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** 10 new lines in `test/onedrive-new-file-corpus.cjs` and 4 in `test/workspace-file-corpus.cjs`, a real-browser Hebrew spec (the file is "הצעה לספק.docx", Undo deletes it), the OneDrive, SharePoint and Gmail new-file specs green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; «מתי אפשר לפתוח …?» (a question about when) still reads as an ask.
