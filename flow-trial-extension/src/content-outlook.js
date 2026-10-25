@@ -462,6 +462,14 @@
     return reason === 'page:intent-null' || reason === 'intent-null';
   }
 
+  function heldReplyTargetUnsure(pane) {
+    const id = decisionIdFrom(pane) || openDecisionId;
+    const existing = decisionFor(id);
+    if (!existing || existing.verdict === 'show') return false;
+    const reason = String(existing.reason || '');
+    return reason === 'page:reply-target-unsure' || reason === 'reply-target-unsure';
+  }
+
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
   async function pageReason(reason, pane, extra) {
     if (!paneCurrent(pane)) return;
@@ -1896,6 +1904,8 @@
       if (convPane && pane) {
         paintIfCurrent(token, function () { paintRemove(host); });
         await pageReason('page:reply-target-unsure', pane);
+        lastOutcome = 'reason';
+        lastLoggedReason = 'page:reply-target-unsure';
       } else {
         paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message'); });
       }
@@ -5061,6 +5071,16 @@
       return;
     }
     dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, idSource: pane.idSource, chars: (pane.text || '').length });
+    if (heldReplyTargetUnsure(pane)) {
+      dropStuckCard(pane);
+      const whyMount = mountPoint();
+      if (whyMount && !whyMount.querySelector('.flow-chip-host') && !whyMount.querySelector('.flow-why-not')) {
+        paintIfCurrent(token, function () { return paintWhyNot(whyMount, 'page:reply-target-unsure'); });
+      }
+      lastOutcome = 'reason';
+      lastLoggedReason = 'page:reply-target-unsure';
+      return;
+    }
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
     if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(pane); await pageReason('page:not-connected', pane); return; }
     try {

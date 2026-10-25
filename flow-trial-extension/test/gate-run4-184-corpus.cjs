@@ -687,19 +687,22 @@ async function runBehavioral(opts) {
     return { ok: false, status: 404, body: '{}' };
   }
   const wtReplyBody = 'Can you confirm by October 9 whether we can proceed? Thanks';
-  const soleNoClockDom = (h) => gateHtml(wtReplyBody)(h)
+  const soleNoClockDom = (h) => gateHtml(wtSaveBody)(h)
+    .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-OLDER-nda.pdf" data-size="1024"></div>')
     .replace(/<div class="date">[\s\S]*?<\/div>/, '')
     .replace(/<time datetime="[^"]*"><\/time>/, '');
   const soleOlderRow = {
-    id: 'M-newer', conversationId: WRONG_TARGET_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: false,
+    id: 'M-older', conversationId: WRONG_TARGET_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: true,
     from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
-    receivedDateTime: olderDt, bodyPreview: wtReplyBody,
-    body: { contentType: 'text', content: wtReplyBody }
+    receivedDateTime: olderDt, bodyPreview: wtSaveBody,
+    body: { contentType: 'text', content: wtSaveBody }
   };
   const soleNoClockGate = {
-    htmlPatch: soleNoClockDom, mailBody: wtReplyBody,
+    htmlPatch: soleNoClockDom, mailBody: wtSaveBody,
+    messageId: 'M-older',
     urlId: WRONG_TARGET_CONV, listedConversationId: WRONG_TARGET_CONV, listedSubject: 'Gate Run 4',
     threadMessages: [soleOlderRow], pathRestMisses: 2, inboxLookupEmpty: true,
+    gateAttachments: true, attachmentFiles: [file], hasAttachments: true,
     store: Object.assign({}, cleanStore, { glanceOutlookFileTrace: 1 }),
     waitMs: 7000, clickDoIt: true
   };
@@ -707,11 +710,10 @@ async function runBehavioral(opts) {
   const soleNoClockActs = (soleNoClockDoIt.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
   const soleNoClockWhy = (soleNoClockDoIt.store.outlookPageDiag || []).map((d) => d.reason);
   logGateRun4Bite('soleNoClock', 'single Graph row, no pane clock', 'exact-or-unsure fail-closed');
-  console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:soleNoClock | before: save+attach sole M-older drafts | after: reply sole row fail-closed unsure | ruling: #184 delete sole rule');
   console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:711-720 | before: drafts M-older | after: page:reply-target-unsure | ruling: #184 delete sole rule');
   check('sole conv-filter row without pane clock: Do It fails closed (exact-or-unsure)',
     !soleNoClockActs.some((m) => m.payload.connectorId === 'outlookDraft') &&
-    soleNoClockWhy.some((r) => r === 'page:reply-target-unsure' || r === 'suggest:unresolved'),
+    soleNoClockWhy.some((r) => r === 'page:reply-target-unsure'),
     {
       connectors: soleNoClockActs.map((m) => m.payload.connectorId),
       chip: Boolean(soleNoClockDoIt.chip),

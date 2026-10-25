@@ -1379,7 +1379,7 @@ const FlowOwaParse = (() => {
     const none = { iso: '', unread: false, ambiguous: false, alt: '' };
     if (!container || !container.querySelector) return none;
     const marked = container.querySelector('[data-received]');
-    if (marked) {
+    if (marked && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(marked))) {
       const raw = marked.getAttribute('data-received') || '';
       if (minuteKey(raw)) return { iso: raw, unread: false, ambiguous: false, alt: '' };
     }

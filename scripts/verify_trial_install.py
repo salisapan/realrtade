@@ -23,6 +23,8 @@ REQUIRED = [
     "popup/popup.html",
     "popup/popup.js",
     "popup/popup.css",
+    "picker/picker.html",
+    "picker/picker.js",
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",

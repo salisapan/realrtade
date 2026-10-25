@@ -875,7 +875,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       });
     }
     if (variant === 'prefix255') {
-      const paneBody = 'x'.repeat(200) + wtReplyBody;
+      const paneBody = 'x'.repeat(230) + ' ' + wtReplyBody;
       const prefix = paneBody.slice(0, 255);
       return Object.assign({}, base, {
         bodyPreview: prefix,
@@ -907,7 +907,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       : [row];
     const listedSubject = variant === 'reChain' ? 'Gate Run 4' : 'Gate Run 4';
     const paneMailBody = variant === 'prefixGreeting' ? ('Hi, thanks for your note. ' + wtReplyBody)
-      : variant === 'prefix255' ? ('x'.repeat(200) + wtReplyBody)
+      : variant === 'prefix255' ? ('x'.repeat(230) + ' ' + wtReplyBody)
       : wtReplyBody;
     const base = Object.assign({}, gateBase, wtReplyDoItBase, {
       urlId: convId, listedConversationId: convId, listedSubject,
@@ -1020,12 +1020,12 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const fileitInboxSkew = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase));
   logGateRun4Bite('fileitInboxSkew', 'file prepare skew + inbox lists both', 'fail closed; M-older attachment only');
   assertSkewFailClosed('file prepare conversation URL +7min with inbox listing both fails closed (never M-newer)', fileitInboxSkew);
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: stacked legacySkew | after: fileitLegacy L5193 only | ruling: #184 CTO item 2');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: fail-closed skew | after: legacySkewDraftsNewerSrc | ruling: #184 file prepare skew inbox both');
   const fileitInboxSkewMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
-    contentOutlookSrc: patchOutlook(fileitLegacyResolverOrderSrc)
+    contentOutlookSrc: patchOutlook(legacySkewDraftsNewerSrc)
   }));
   const fileitInboxSkewMutDraft = replyDraftActs(fileitInboxSkewMut)[0] && replyDraftActs(fileitInboxSkewMut)[0].payload;
-  const fileitInboxSkewMutPatch = patchOutlook(fileitLegacyResolverOrderSrc) !== OUTLOOK_PRODUCT_SRC;
+  const fileitInboxSkewMutPatch = patchOutlook(legacySkewDraftsNewerSrc) !== OUTLOOK_PRODUCT_SRC;
   const fileitInboxSkewMutExec = (fileitInboxSkewMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
   const fileitMutNewer = (fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId === 'M-newer') ||
     fileitInboxSkewMutExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
@@ -1033,13 +1033,50 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     const blob = JSON.stringify(m.payload || '');
     return blob.indexOf('Gate-NEWER') >= 0 || blob.indexOf('att-new') >= 0;
   });
-  check('fileitInboxSkew bite: fileit_legacy resolver order alone drafts M-newer on skewed file-prepare',
+  check('fileitInboxSkew bite: legacy skew fail-closed disabled drafts M-newer on skewed file-prepare',
     fileitInboxSkewMutPatch && fileitMutNewer && fileitMutNewerAtt,
     { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId, exec: fileitInboxSkewMutExec.map((m) => m.payload.outlookIncomingId), newerAtt: fileitMutNewerAtt });
   const fileitInboxSkewNoOp = await runPage(Object.assign({}, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook((s) => s)
   }));
   noclockNewerOnlyBiteCheck('fileitInboxSkew', fileitInboxSkewMut, fileitInboxSkewNoOp, fileitInboxSkewMutDraft);
+
+  function bothListedSameMinuteLastHitSrc(src) {
+    return src.replace(
+      'if (hits.length > 1) return null;',
+      'if (hits.length > 1) return hits[hits.length - 1];'
+    );
+  }
+  const sameMinReplyThread = [
+    { id: 'M-older', conversationId: WRONG_TARGET_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: false,
+      from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+      receivedDateTime: olderDt, bodyPreview: wtReplyBody,
+      body: { contentType: 'text', content: wtReplyBody } },
+    { id: 'M-newer', conversationId: WRONG_TARGET_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: false,
+      from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+      receivedDateTime: olderDt, bodyPreview: 'Please send an update on the contract.',
+      body: { contentType: 'text', content: 'Please send an update on the contract.' } }
+  ];
+  const sameMinReplyBase = Object.assign({}, gateBase, wtReplyDoItBase, {
+    htmlPatch: wtReplyDom, mailBody: wtReplyBody,
+    threadMessages: sameMinReplyThread, waitMs: 8000
+  });
+  const sameMinReply = await runPage(sameMinReplyBase);
+  logGateRun4Bite('bothListedSameMinute', 'same sender same minute two exact pins', 'ambiguous exactOpenMessageInList fails closed');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:bothListedSameMinute | before: last-hit on duplicate minute | after: null on hits>1 | ruling: #184 exact list ambiguity');
+  assertNoclockFailClosed('both-listed same-sender same-minute reply: Do It fails closed (no card, unsure line)', sameMinReply);
+  const sameMinReplyMut = await runPage(Object.assign({}, sameMinReplyBase, {
+    contentOutlookSrc: patchOutlook(bothListedSameMinuteLastHitSrc)
+  }));
+  const sameMinReplyMutDraft = replyDraftActs(sameMinReplyMut)[0] && replyDraftActs(sameMinReplyMut)[0].payload;
+  const sameMinReplyMutPatch = patchOutlook(bothListedSameMinuteLastHitSrc) !== OUTLOOK_PRODUCT_SRC;
+  check('both-listed same-minute bite: last-hit on duplicate minute drafts M-newer',
+    sameMinReplyMutPatch && sameMinReplyMutDraft && sameMinReplyMutDraft.outlookIncomingId === 'M-newer',
+    { patch: sameMinReplyMutPatch, id: sameMinReplyMutDraft && sameMinReplyMutDraft.outlookIncomingId });
+  const sameMinReplyNoOp = await runPage(Object.assign({}, sameMinReplyBase, {
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  noclockNewerOnlyBiteCheck('both-listed same-minute', sameMinReplyMut, sameMinReplyNoOp, sameMinReplyMutDraft);
 
   const bareConvInboxNewer = [wtReplyThread[1]];
   const bareConvBase = Object.assign({}, gateBase, prepSkewBase, {
