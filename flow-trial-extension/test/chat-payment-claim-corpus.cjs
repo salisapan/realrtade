@@ -19,8 +19,13 @@ const YES = [
   ['התשלום בוצע', null, null],
   ['העברנו 300 שקל', '300', 'NIS']
 ];
+for (const text of ['I sent the invoice payment', 'I sent 500 NIS for the contract']) check('a payment that names a document is still a payment: ' + text, A.recognize(text).kind === 'claim', A.recognize(text));
 for (const [text, amount, currency] of YES) { const r = A.recognize(text); check('claim: ' + text, r.kind === 'claim' && r.amount === amount && r.currency === currency, r); }
 const NO = [
+  ['I sent you the contract', 'a document'],
+  ['I have sent the invoice', 'a document'],
+  ['I just sent the signed agreement', 'a document'],
+  ['שלחתי לך את החוזה', 'a document'],
   ['I will pay tomorrow', 'later'],
   ["I'll transfer 500 NIS tonight", 'later'],
   ["I haven't paid yet", 'not yet'],

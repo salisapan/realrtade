@@ -775,7 +775,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-delivery-window\.js', 'core\/chat-payment-claim\.js', 'core\/chat-chase\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-delivery-window\.js', 'core\/chat-payment-claim\.js', 'core\/chat-sent-claim\.js', 'core\/chat-chase\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {

@@ -8,6 +8,9 @@ const FlowChatPaymentClaim = (() => {
   // Later, never, not yet, a condition, somebody else, or a question: not a payment made.
   const NO_EN = /\b(?:paid\s+for|pay\s+for|will|won'?t|going\s+to|gonna|'ll|haven'?t|hasn'?t|not\s+yet|didn'?t|did\s+not|never|can'?t|cannot|if\s+i|once\s+i|when\s+i|after\s+i|tomorrow|tonight|later|soon|he\s+(?:paid|transferred|sent)|she\s+(?:paid|transferred|sent)|they\s+(?:paid|transferred|sent))\b/i;
   const NO_HE = /(?:שילמתי\s+על|שילמנו\s+על|אעביר|אשלם|אשלח|נעביר|נשלם|נשלח|אני\s+אעביר|עוד\s+לא|לא\s+(?:שילמתי|העברתי|שלחתי)|אם\s+אעביר|ברגע\s+ש|מחר|הערב|בהמשך|בקרוב|הוא\s+(?:שילם|העביר)|היא\s+(?:שילמה|העבירה)|הם\s+(?:שילמו|העבירו))/;
+  // "I sent you the contract" is a document, not money: the document claim (core/chat-sent-claim.js) owns it. Money is named by an amount or by a
+  // payment word; "I sent it" with nothing named stays a possible payment claim.
+  const DOC_SENT = /\b(?:sent|emailed|e-?mailed|uploaded|shared|forwarded)\s+(?:you\s+)?(?:over\s+)?(?:the\s+|my\s+|your\s+|our\s+|a\s+|an\s+)?(?:signed\s+|updated\s+|final\s+|new\s+)?(?:contract|agreement|file|files|document|documents|doc|docs|invoice|pdf|quote|report|link|photos?|pictures?|email|mail|message|form|details|proposal|offer|receipt|screenshot|presentation|deck|sheet|photo)\b|שלחתי\s+(?:לך\s+)?את\s+(?:ה)?(?:חוזה|קובץ|קבצים|מסמך|חשבונית|הצעה|דוח|קישור|תמונה|תמונות|טופס|מצגת)/i;
   const QUESTION = /[?؟]/;
   const AMOUNT = /(?:(?:[$€£₪])\s?(\d[\d,]*(?:\.\d{1,2})?))|(?:(\d[\d,]*(?:\.\d{1,2})?)\s?(?:₪|\$|€|£|nis|ils|usd|eur|gbp|shekels?|shekel|dollars?|euros?|ש"ח|ש״ח|שח|שקל(?:ים)?|דולר(?:ים)?|אירו))/i;
   const CUR = [[/(?:₪|nis|ils|shekel|ש"ח|ש״ח|שח|שקל)/i, 'NIS'], [/(?:\$|usd|dollar|דולר)/i, 'USD'], [/(?:€|eur|euro|אירו)/i, 'EUR'], [/(?:£|gbp)/i, 'GBP']];
@@ -32,6 +35,7 @@ const FlowChatPaymentClaim = (() => {
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-payment-made' };
     if (!CLAIM_EN.test(raw) && !CLAIM_HE.test(raw)) return { kind: 'none', reason: 'no-claim' };
+    if (DOC_SENT.test(raw) && !AMOUNT.test(raw) && !/\b(?:payment|transfer|money|paid)\b|תשלום|כסף/i.test(raw)) return { kind: 'none', reason: 'a-document-not-a-payment' };
     const a = amountOf(raw);
     return { kind: 'claim', amount: a ? a.amount : null, currency: a ? a.currency : null, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }

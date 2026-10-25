@@ -376,6 +376,37 @@ const FlowChatTaskCard = (() => {
     }
   }
 
+  // The card that marks one waiting task done, read back as completed, Undo reopens it. prefix is the question it asks ("Paid? ", "Received? ").
+  async function offerClose(i, chatKey, mount, pick, heC, prefix, personalClose) {
+    const st = pick.row.process && pick.row.process.steps && pick.row.process.steps[0];
+    const title = String((st && st.params && st.params.title) || pick.row.label || '').slice(0, 120);
+    const ctxC = {
+      app: i.channel || 'chat',
+      doLabel: 'Do It',
+      messageId: chatKey,
+      intent: { type: 'request', label: prefix + title, confidence: 0.9, personalClose: personalClose, signals: { score: 90, threshold: 50 }, entities: { what: title } },
+      process: { id: CHAIN, name: heC ? 'סמן כבוצע' : 'Mark done', closingLine: heC ? 'מסמן את המשימה כבוצעה.' : 'Marking the task done.', closedLine: heC ? 'המשימה סומנה כבוצעה.' : 'Task marked done.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'task', kind: pick.connectorId === 'outlookTask' ? 'outlookTask' : 'googleTask', label: 'Task', hint: (heC ? 'לסמן כבוצע: ' : 'Mark done: ') + title, params: { title: title }, dependsOn: null }] },
+      sender: i.sender || {},
+      bodyText: '',
+      subject: '',
+      uiLang: heC ? 'he' : 'en',
+      glanceChain: CHAIN,
+      chatTask: { connectorId: pick.connectorId === 'outlookTask' ? 'outlookTaskClose' : 'googleTaskClose', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heC, own: false, close: { chatKey: pick.row.chatKey, ref: pick.row.ref, connectorId: pick.connectorId } }
+    };
+    const oldC = mount.querySelector('.flow-chip-host');
+    if (oldC) oldC.remove();
+    const hostC = FlowChipHost.inject(mount, ctxC, {
+      onDoIt: (h, chip, c) => onDoIt(h, chip, c),
+      onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
+    });
+    if (!hostC) return { shown: false, reason: 'inject-failed' };
+    mount.setAttribute('data-glance-key', chatKey);
+    mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
+    hostC.setAttribute('data-glance-chain', CHAIN);
+    return { shown: true, reason: 'close-offered' };
+  }
+
   // The other side says they paid: Do It marks the waiting task done, through the same Google lane, read back that it shows completed.
   // The person's click is the deliberate part; Glance has not seen any money. A task the person changed is left as it is.
   async function closePaid(host, chip, ctx) {
@@ -528,35 +559,24 @@ const FlowChatTaskCard = (() => {
         const open = await findOpenPaymentTasks(chatKey);
         const fits = open.filter((c) => !claim.amount || (c.amount === claim.amount && (!claim.currency || c.currency === claim.currency)));
         if (fits.length === 1 && (claim.amount || open.length === 1)) {
-          const pick = fits[0];
-          const heC = claim.lang === 'he';
-          const st = pick.row.process && pick.row.process.steps && pick.row.process.steps[0];
-          const title = String((st && st.params && st.params.title) || pick.row.label || '').slice(0, 120);
-          const ctxC = {
-            app: i.channel || 'chat',
-            doLabel: 'Do It',
-            messageId: chatKey,
-            intent: { type: 'request', label: (heC ? 'שולם? ' : 'Paid? ') + title, confidence: 0.9, personalClose: 'payment-claimed', signals: { score: 90, threshold: 50 }, entities: { what: title } },
-            process: { id: CHAIN, name: heC ? 'סמן כבוצע' : 'Mark done', closingLine: heC ? 'מסמן את המשימה כבוצעה.' : 'Marking the task done.', closedLine: heC ? 'המשימה סומנה כבוצעה.' : 'Task marked done.', needsDateChoice: false, dateChoices: null,
-              steps: [{ id: 'task', kind: pick.connectorId === 'outlookTask' ? 'outlookTask' : 'googleTask', label: 'Task', hint: (heC ? 'לסמן כבוצע: ' : 'Mark done: ') + title, params: { title: title }, dependsOn: null }] },
-            sender: i.sender || {},
-            bodyText: '',
-            subject: '',
-            uiLang: heC ? 'he' : 'en',
-            glanceChain: CHAIN,
-            chatTask: { connectorId: pick.connectorId === 'outlookTask' ? 'outlookTaskClose' : 'googleTaskClose', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heC, own: false, close: { chatKey: pick.row.chatKey, ref: pick.row.ref, connectorId: pick.connectorId } }
-          };
-          const oldC = mount.querySelector('.flow-chip-host');
-          if (oldC) oldC.remove();
-          const hostC = FlowChipHost.inject(mount, ctxC, {
-            onDoIt: (h, chip, c) => onDoIt(h, chip, c),
-            onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
-          });
-          if (!hostC) return { shown: false, reason: 'inject-failed' };
-          mount.setAttribute('data-glance-key', chatKey);
-          mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
-          hostC.setAttribute('data-glance-chain', CHAIN);
-          return { shown: true, reason: 'close-offered' };
+          return offerClose(i, chatKey, mount, fits[0], claim.lang === 'he', claim.lang === 'he' ? 'שולם? ' : 'Paid? ', 'payment-claimed');
+        }
+      }
+    }
+
+    // The other side says they sent what was asked for ("I just sent you the signed contract", «שלחתי לך את החוזה החתום») while this chat has a
+    // "Waiting on ...: <that thing>" task Glance wrote: the card offers to mark it done. The words must name the thing (a shared content word) and
+    // fit exactly one task; a claim that names nothing fits only when it is the one open waiting task. Glance has not seen the file.
+    if (!own && typeof FlowChatSentClaim !== 'undefined') {
+      let sent = null;
+      try { sent = FlowChatSentClaim.recognize(i.text); } catch (e) { sent = null; }
+      if (sent && sent.kind === 'sent') {
+        const waiting = await findOpenWaiting(chatKey);
+        const docs = waiting.filter((t) => !/^(?:Waiting on|מחכים ל-?)[^:]*:\s*(?:Payment|תשלום) /.test(t.title));
+        const fitting = FlowChatSentClaim.fits(sent, docs, waiting.length);
+        if (fitting.length === 1) {
+          const t = fitting[0];
+          return offerClose(i, chatKey, mount, { row: t.row, connectorId: t.row.connectorId }, sent.lang === 'he', sent.lang === 'he' ? 'התקבל? ' : 'Received? ', 'document-claimed');
         }
       }
     }
