@@ -974,6 +974,7 @@ const FlowOwaParse = (() => {
       cc: whoTo.cc,
       rawToLine: whoTo.rawToLine || '',
       receivedDateTime: when.iso,
+      clockFromPane: Boolean(when.iso),
       clockUnread: when.unread,
       clockAmbiguous: when.ambiguous === true,
       clockAlt: when.alt || '',
