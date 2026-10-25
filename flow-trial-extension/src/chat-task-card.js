@@ -301,7 +301,7 @@ const FlowChatTaskCard = (() => {
       const st = e.process && Array.isArray(e.process.steps) ? e.process.steps[0] : null;
       const p = st && st.params;
       if (!p || !p.title || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.dateIso || ''))) continue;
-      out.push({ row: e, title: String(p.title), dueIso: p.dateIso, lastNudgeAt: 0 });
+      out.push({ row: e, title: String(p.title), dueIso: p.dateIso, lastNudgeAt: 0, waiting: /^(?:Waiting on|מחכים ל)/.test(String(p.title)) });
     }
     out.forEach((t) => { t.lastNudgeAt = nudged[t.row.chatKey] || 0; });
     return out;
@@ -550,6 +550,21 @@ const FlowChatTaskCard = (() => {
       return { shown: true, reason: 'receipt' };
     }
 
+    // The person says they sent what they had promised ("Sent you the contract", «שלחתי לך את החוזה») while this chat has a task Glance wrote for that
+    // promise ("Send the contract on Thursday"): the card offers to mark it done. The words must share a content word with exactly one of the person's
+    // own open tasks from this chat (a claim that names nothing fits only the one open task); a "Waiting on ..." task is the other side's, not this.
+    if (own && typeof FlowChatSentClaim !== 'undefined') {
+      let sentOwn = null;
+      try { sentOwn = FlowChatSentClaim.recognize(i.text); } catch (e) { sentOwn = null; }
+      if (sentOwn && sentOwn.kind === 'sent') {
+        const mine = (await findOpenWaiting(chatKey)).filter((t) => !t.waiting);
+        const fittingOwn = FlowChatSentClaim.fits(sentOwn, mine, mine.length);
+        if (fittingOwn.length === 1) {
+          return offerClose(i, chatKey, mount, { row: fittingOwn[0].row, connectorId: fittingOwn[0].row.connectorId }, sentOwn.lang === 'he', sentOwn.lang === 'he' ? 'בוצע? ' : 'Done? ', 'own-sent');
+        }
+      }
+    }
+
     // The other side says they paid ("I transferred 500 NIS", «העברתי לך 500 ש"ח») while this chat has a "Waiting on ...: Payment" task
     // Glance wrote (Google Tasks): the card offers to mark that task done. One amount matches one task; no amount needs exactly one.
     if (!own && typeof FlowChatPaymentClaim !== 'undefined') {
@@ -571,7 +586,7 @@ const FlowChatTaskCard = (() => {
       let sent = null;
       try { sent = FlowChatSentClaim.recognize(i.text); } catch (e) { sent = null; }
       if (sent && sent.kind === 'sent') {
-        const waiting = await findOpenWaiting(chatKey);
+        const waiting = (await findOpenWaiting(chatKey)).filter((t) => t.waiting);
         const docs = waiting.filter((t) => !/^(?:Waiting on|מחכים ל-?)[^:]*:\s*(?:Payment|תשלום) /.test(t.title));
         const fitting = FlowChatSentClaim.fits(sent, docs, waiting.length);
         if (fitting.length === 1) {

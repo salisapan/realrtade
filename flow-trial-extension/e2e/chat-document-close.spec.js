@@ -85,3 +85,59 @@ test('"I sent you the contract" no longer offers to close a payment task', async
   await expect(page.locator(CARD)).toHaveCount(0);
   expect(tasks()[0].status).toBe('needsAction');
 });
+
+// The person's own promise: "I'll send you the signed contract on Thursday" is a task for the person (CHAT_PROMISE_CARD); when the person later
+// writes that they sent it, the card offers to mark that task done. The other side's "I sent you ..." is never the close of the person's own task.
+const OWN_PROMISE = "I'll send you the signed contract on Thursday";
+
+async function ownTask(glance) {
+  expect(await registerWhatsApp(glance)).toBe(true);
+  await glance.seedGmail({ googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' }, glanceSwitches: { CHAT_TASK_CARD: true, CHAT_PROMISE_CARD: true } });
+  const page = await glance.openWhatsApp(whatsappHtml(OWN_PROMISE, { own: true }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].status).toBe('needsAction');
+  expect(tasks()[0].title).not.toMatch(/^Waiting on/);
+}
+
+test('the person writes that they sent what they promised: the card marks their own task done, read back as completed, and Undo reopens it', async ({ glance }) => {
+  await ownTask(glance);
+  const page = await glance.openWhatsApp(whatsappHtml('I sent you the signed contract', { own: true, id: 'SSS' }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(CARD)).toContainText('Mark done');
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].status).toBe('completed');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(() => tasks()[0].status).toBe('needsAction');
+});
+
+test('the other side writing "I sent you the contract" never closes the person\'s own task, and a thing the person promised nothing about shows no card', async ({ glance }) => {
+  await ownTask(glance);
+  let page = await glance.openWhatsApp(whatsappHtml('I just sent you the signed contract', { id: 'TTT' }));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ':has-text("Mark done")')).toHaveCount(0);
+  page = await glance.openWhatsApp(whatsappHtml('I sent you the logo', { own: true, id: 'UUU' }));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ':has-text("Mark done")')).toHaveCount(0);
+  expect(tasks()[0].status).toBe('needsAction');
+});
+
+test('a Hebrew promise and a Hebrew "I sent it" by the person close their own task', async ({ glance }) => {
+  expect(await registerWhatsApp(glance)).toBe(true);
+  await glance.seedGmail({ googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' }, glanceSwitches: { CHAT_TASK_CARD: true, CHAT_PROMISE_CARD: true } });
+  let page = await glance.openWhatsApp(whatsappHtml('אשלח לך את החוזה החתום ביום חמישי', { own: true }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  page = await glance.openWhatsApp(whatsappHtml('שלחתי לך את החוזה החתום', { own: true, id: 'SSS' }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()[0].status).toBe('completed');
+});
