@@ -148,3 +148,31 @@ test('WhatsApp, CHAT_TASK_CARD on: a Hebrew payment ask is one To Do task and a 
   await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(1);
 });
+
+test('WhatsApp, CHAT_PROMISE_CARD on: what the person asked the other side for is one follow-up task "Waiting on Dana: Payment 500 NIS", read back, nothing is sent, Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_PROMISE_CARD: true }, whatsappHtml('Please transfer 500 NIS to my account by Thursday', { own: true }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toContain('Waiting on Dana: Payment 500 NIS');
+  expect(JSON.stringify(list[0])).not.toContain('my account');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
+
+test('WhatsApp, CHAT_PROMISE_CARD on: a Hebrew ask for a document by a day is one follow-up task and a question shows nothing', async ({ glance }) => {
+  let page = await open(glance, { CHAT_PROMISE_CARD: true }, whatsappHtml('תחתום על החוזה עד יום שישי', { own: true }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toContain('מחכים ל-Dana');
+  page = await glance.openWhatsApp(whatsappHtml('Could you send me the contract by Thursday?', { own: true, id: 'QQQ' }));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});

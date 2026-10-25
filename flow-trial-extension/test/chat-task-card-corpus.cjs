@@ -637,6 +637,42 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('CHAT_PROMISE_CARD does not turn on the inbound card', !(await inboundOff.Card.offer(input(ASKS[0][0]))).shown);
   }
 
+  // 5ad. What the person asked the other side for in their own message is a loop to chase: "Waiting on Dana: ..." due that day.
+  {
+    const mine = (text, extra) => input(text, Object.assign({ fromMe: true, own: true, sender: { name: 'Dana' } }, extra || {}));
+    for (const [text, titleRe] of [
+      ['Please transfer 500 NIS to my account by Sunday', /^Waiting on Dana: Payment 500 NIS$/],
+      ['תעביר לי 500 שקל עד יום ראשון', /^מחכים ל-Dana: תשלום 500 NIS$/],
+      ['Please send me the signed contract by Thursday', /^Waiting on Dana: /],
+      ['I need the report by Wednesday', /^Waiting on Dana: /],
+      ['תחתום על החוזה עד יום שישי', /^מחכים ל-Dana: /]
+    ]) {
+      const w = world({ switchOn: false, switchOwn: true });
+      const r = await w.Card.offer(mine(text));
+      check('own ask offers one follow-up task: ' + text, r.shown && w.injected[0].ctx.process.steps.length === 1, r);
+      if (!w.injected[0]) continue;
+      const st = w.injected[0].ctx.process.steps[0].params;
+      check('the follow-up task is titled Waiting on the person, due that day: ' + text, titleRe.test(st.title) && /^\d{4}-\d{2}-\d{2}$/.test(st.dateIso), st);
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+      const exec = w.calls.find((c) => c.type === 'flow:google-write');
+      check('the follow-up is written through the lane with no message words: ' + text, !!exec && titleRe.test(exec.input.title) && JSON.stringify(exec.input).indexOf('my account') < 0, exec && exec.input);
+      check('the follow-up is logged as written (Handled only after the read-back): ' + text, w.logRows.length === 1 && w.logRows[0].kind === 'written', w.logRows);
+    }
+    const off = world({ switchOn: true, switchOwn: false });
+    check('CHAT_PROMISE_CARD off: an own ask shows nothing', !(await off.Card.offer(mine('Please transfer 500 NIS to my account by Sunday'))).shown && off.calls.length === 0);
+    for (const quiet of ['Could you send me the contract by Thursday?', 'Please send me the contract', 'Thanks for the report, got it', 'I paid you 500 NIS on Sunday', 'תעביר לי את זה מתישהו']) {
+      const q = world({ switchOn: false, switchOwn: true });
+      check('own message stays quiet: ' + quiet, !(await q.Card.offer(mine(quiet))).shown && q.injected.length === 0);
+    }
+    const g = world({ switchOwn: true });
+    check('an own ask in a group stays out', !(await g.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { group: true }))).shown);
+    const again = world({ switchOn: false, switchOwn: true });
+    await again.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { key: 'a-1' }));
+    await again.injected[0].handlers.onDoIt(again.injected[0].host, {}, again.injected[0].ctx);
+    const rep = await again.Card.offer(mine('Hi again, please transfer 500 NIS to my account by Sunday', { key: 'a-2' }));
+    check('the same ask repeated is not a second follow-up task', !rep.shown && rep.reason === 'already-on-task-list', rep);
+  }
+
   // 5f. An agreed meeting is a hold too, titled "Meeting · Dana", never with the whole message.
   for (const [text, he] of [['מעולה, נתראה ביום חמישי ב-15:00', true], ['Sounds good, see you Thursday at 3pm', false], ['סגור, מחר ב-10:00 אצלך', true]]) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

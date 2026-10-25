@@ -133,6 +133,13 @@ const FlowChatTaskCard = (() => {
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
+  // What the person asked the other side for is a loop to chase: "Waiting on Dana: payment 500 NIS" / «מחכים ל-Dana: תשלום 500 NIS».
+  function waitingTitle(he, who, base) {
+    const name = String(who || '').trim();
+    const lead = he ? (name ? 'מחכים ל' + (/[\u0590-\u05FF]/.test(name) ? '' : '-') + name : 'מחכים') : (name ? 'Waiting on ' + name : 'Waiting');
+    return (lead + ': ' + String(base || '')).slice(0, 120);
+  }
+
   // The same hold must not be made twice: a confirmation and then a reminder for the same appointment in the same chat would add a
   // second event. A hold this card wrote for the same day and clock in this thread, and not undone since, is the answer.
   async function findHeldHold(chatKey, params) {
@@ -400,6 +407,7 @@ const FlowChatTaskCard = (() => {
     let trip = null;
     let dlv = null;
     let deliveryWindow = null;
+    let ownAskTitle = '';
     try { dlv = (!own && typeof FlowChatDeliveryWindow !== 'undefined') ? FlowChatDeliveryWindow.recognize(i.text, i.now) : null; } catch (e) { dlv = null; }
     try { trip = (!own && typeof FlowChatTravelNotice !== 'undefined') ? FlowChatTravelNotice.recognize(i.text, i.now) : null; } catch (e) { trip = null; }
     let selfNote = null;
@@ -507,6 +515,26 @@ const FlowChatTaskCard = (() => {
           };
         }
       }
+      // What the person asked the other side for in their own message ("Please transfer 500 NIS by Sunday", "Please send me the contract by
+      // Thursday", «תעביר לי 500 שקל עד יום ראשון») is a loop to chase: a task "Waiting on Dana: ..." due that day (CHAT_PROMISE_CARD).
+      // Glance asks nothing of anyone and sends nothing.
+      if (own) {
+        const who0 = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+        const he0 = uiLangOf(i.text) === 'he';
+        let pay0 = null;
+        try { pay0 = typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk.recognize(i.text, i.now) : null; } catch (e) { pay0 = null; }
+        let ask0 = null;
+        if (!(pay0 && pay0.kind === 'ask')) { try { ask0 = typeof FlowChatDeadlineAsk !== 'undefined' ? FlowChatDeadlineAsk.recognize(i.text, i.now) : null; } catch (e) { ask0 = null; } }
+        const hit0 = (pay0 && pay0.kind === 'ask') ? { dateIso: pay0.dateIso, base: (pay0.lang === 'he' ? 'תשלום ' : 'Payment ') + pay0.amount + ' ' + pay0.currency } : (ask0 && ask0.kind === 'ask') ? { dateIso: ask0.dateIso, base: ask0.what } : null;
+        if (hit0) {
+          ownAskTitle = waitingTitle(he0, who0, hit0.base);
+          judged = {
+            show: true,
+            intent: { type: 'commitment', label: ownAskTitle, entities: { dateIso: hit0.dateIso, what: ownAskTitle } },
+            process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + ownAskTitle, params: { title: ownAskTitle, dateIso: hit0.dateIso, amount: null, what: ownAskTitle, threadUrl: null }, dependsOn: null }] }
+          };
+        }
+      }
       // "Please call me back tomorrow" / «תתקשר אליי מחר» (core/chat-callback-ask.js): a task to call the sender, due that day.
       // The call itself is the person's; Glance only keeps the promise to make it.
       if ((!judged || !judged.show) && !own && typeof FlowChatCallbackAsk !== 'undefined') {
@@ -566,11 +594,11 @@ const FlowChatTaskCard = (() => {
       let base = '';
       try { base = (typeof FlowCommitmentTitle !== 'undefined' && FlowCommitmentTitle.titleFromBody(String(i.text || ''))) || ''; } catch (e) { base = ''; }
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      const title = ((base || (he ? 'הבטחה' : 'Promise')) + (who ? ' · ' + who : '')).slice(0, 120);
+      const title = ownAskTitle || ((base || (he ? 'הבטחה' : 'Promise')) + (who ? ' · ' + who : '')).slice(0, 120);
       liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: title }) });
     }
     if (kind !== 'calendar' && (await findHeldTask(chatKey, liveStep))) return { shown: false, reason: 'already-on-task-list' };
-    const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, name: own ? (selfNote && selfNote.kind === 'note' ? (he ? 'תזכורת' : 'Reminder') : (he ? 'ההבטחה שלך' : 'Your promise')) : judged.process.name, steps: [liveStep] });
+    const process = Object.assign({}, judged.process, { id: judged.process.id || CHAIN, name: own ? (selfNote && selfNote.kind === 'note' ? (he ? 'תזכורת' : 'Reminder') : (ownAskTitle ? (he ? 'מעקב' : 'Follow-up') : (he ? 'ההבטחה שלך' : 'Your promise'))) : judged.process.name, steps: [liveStep] });
     const ctx = {
       app: i.channel || 'chat',
       doLabel: 'Do It',
