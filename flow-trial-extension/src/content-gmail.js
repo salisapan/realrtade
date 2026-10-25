@@ -3192,6 +3192,52 @@ function glanceUiCopy(kind) {
     host.appendChild(note);
   }
 
+  function paintHint(host, text) {
+    if (!host || !text) return;
+    if (host.querySelector('.flow-chip-undo-hint')) return;
+    host.appendChild(el('span', 'flow-chip-undo-hint flow-chip-undo-failed', text));
+  }
+
+  function paintMissingDriveScope(host, ctx) {
+    if (!host || !ctx || !ctx.process) return;
+    const needsDrive = (ctx.process.steps || []).some((s) => s && (s.kind === 'driveFile' || s.kind === 'attachmentSave'));
+    if (!needsDrive) return;
+    const driveScopeOk = (scopes) => {
+      if (typeof FlowGoogleDrive !== 'undefined' && typeof FlowGoogleDrive.hasWriteScope === 'function') {
+        return FlowGoogleDrive.hasWriteScope(scopes);
+      }
+      const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+      if (!C || typeof C.hasScope !== 'function' || !C.SCOPE_DRIVE_FILE) return null;
+      return C.hasScope(scopes, C.SCOPE_DRIVE_FILE);
+    };
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return;
+    const paintLine = (scopes) => {
+      const ok = driveScopeOk(scopes);
+      if (ok === false) {
+        const lang = glanceUiLang();
+        const svc = glanceUiHebrew() ? 'דרייב' : 'Drive';
+        const scope = (typeof FlowGoogleConfig !== 'undefined' && FlowGoogleConfig.SCOPE_DRIVE_FILE)
+          ? FlowGoogleConfig.SCOPE_DRIVE_FILE
+          : 'https://www.googleapis.com/auth/drive.file';
+        const line = (typeof FlowDisplay !== 'undefined' && FlowDisplay.missingScopeLine)
+          ? FlowDisplay.missingScopeLine(scope, svc, lang)
+          : glanceUiCopy('missingPermission');
+        paintHint(host, line);
+      }
+    };
+    const readScopes = (bag) => {
+      const rec = bag && bag.googleGrantedScopes;
+      return rec && rec.version ? String(rec.version).split('\n').filter(Boolean) : null;
+    };
+    try {
+      chrome.storage.local.get(['googleGrantedScopes'], (bag) => {
+        paintLine(readScopes(bag || {}));
+      });
+    } catch (e) {
+      void FlowStorage.get(['googleGrantedScopes']).then((bag) => paintLine(readScopes(bag))).catch(() => {});
+    }
+  }
+
   function appendCardWhen(host, ctx, lang) {
     if (!host || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.holdClockFrom !== 'function') return;
     const clock = FlowDisplay.holdClockFrom(ctx);
@@ -3522,6 +3568,7 @@ function glanceUiCopy(kind) {
       stampInviteDraft(host, ctx);
       appendSaveAttachmentUi(host, ctx);
       appendCardWhen(host, ctx, lang);
+      paintMissingDriveScope(host, ctx);
       messageNode.insertBefore(host, messageNode.firstChild);
       return;
     }
@@ -3544,6 +3591,7 @@ function glanceUiCopy(kind) {
     stampInviteDraft(host, ctx);
     appendSaveAttachmentUi(host, ctx);
     appendCardWhen(host, ctx, lang);
+    paintMissingDriveScope(host, ctx);
 
     messageNode.insertBefore(host, messageNode.firstChild);
   }

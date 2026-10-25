@@ -18,6 +18,10 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 
+check('messageIdSpellings tries REST spelling before URL spelling',
+  F.messageIdSpellings('AQMkADBm/j3Plus+Slash_Spelling==').length >= 2 &&
+  F.messageIdSpellings('AQMkADBm/j3Plus+Slash_Spelling==')[0].indexOf('+') < 0);
+
 function background(opts) {
   opts = opts || {};
   const calls = [];

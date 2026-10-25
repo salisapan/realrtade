@@ -84,7 +84,7 @@ const FlowOwaParse = (() => {
 
   // Normalize for matching against Graph/sync entries.
   function norm(s) {
-    return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return String(s || '').replace(INLINE_MARKS, '').toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
   function normEmail(s) {
@@ -113,7 +113,8 @@ const FlowOwaParse = (() => {
     if (!pane || !list.length) return null;
     const ids = (e) => [e.messageId, e.outlookIncomingId, e.id].map(canonId).filter(Boolean);
     const convs = (e) => [e.outlookConversationId, e.conversationId, e.threadId, e.base && e.base.threadId].map(canonId).filter(Boolean);
-    const paneId = canonId(pane.itemId || pane.messageId);
+    const hasOpenMsg = Boolean(pane.itemId || pane.messageId);
+    const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));
     if (paneId) {
       const hit = list.find((e) => ids(e).indexOf(paneId) >= 0 || canonId(e.internetMessageId) === paneId);
       if (hit) return { entry: hit, how: 'message id' };
@@ -594,7 +595,7 @@ const FlowOwaParse = (() => {
   // node that holds the CONV_ heading; prefer the focused message; take the
   // last in document order. No visibility filter: the prose wrapper's
   // visibility="hidden" attribute has no style and still renders.
-  function openBodyRoot(roots) {
+  function messageBodyPool(roots) {
     const list = (roots || []).filter(Boolean);
     const isSubject = (n) => /^CONV_.*_SUBJECT$/.test(n.id || '') ||
       Boolean(n.querySelector && n.querySelector('[id^="CONV_"][id$="_SUBJECT"]'));
@@ -602,7 +603,24 @@ const FlowOwaParse = (() => {
       Boolean(n.querySelector && n.querySelector('[role="document"]'));
     let pool = list.filter((n) => isBody(n) && !isSubject(n));
     if (!pool.length) pool = list.filter((n) => !isSubject(n));
-    if (!pool.length) return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    return pool;
+  }
+
+  function visibleMessageBodyCount(roots) {
+    const pool = messageBodyPool(roots);
+    if (!pool.length) {
+      const list = (roots || []).filter(Boolean);
+      return list.find((n) => n.id === 'ReadingPaneContainerId') ? 1 : 0;
+    }
+    return pool.length;
+  }
+
+  function openBodyRoot(roots) {
+    let pool = messageBodyPool(roots);
+    if (!pool.length) {
+      const list = (roots || []).filter(Boolean);
+      return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    }
     const focused = pool.filter((n) => n.closest && n.closest('#focused'));
     if (focused.length) pool = focused;
     pool = pool.slice().sort((a, b) => {
@@ -895,6 +913,7 @@ const FlowOwaParse = (() => {
     if (!d) return null;
     const roots = readingPaneRoots(d);
     const bodyRoot = openBodyRoot(roots);
+    const visibleMessageBodies = visibleMessageBodyCount(roots);
     if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
     const head = headerOf(bodyRoot, d);
     const container = head.container;
@@ -955,12 +974,14 @@ const FlowOwaParse = (() => {
       cc: whoTo.cc,
       rawToLine: whoTo.rawToLine || '',
       receivedDateTime: when.iso,
+      clockFromPane: Boolean(when.iso),
       clockUnread: when.unread,
       clockAmbiguous: when.ambiguous === true,
       clockAlt: when.alt || '',
       pageHour24: pageProves24h(d),
       hourCycle: hourCycleOf(d),
-      attachments: attachmentsOf(container, bodyRoot)
+      attachments: attachmentsOf(container, bodyRoot),
+      visibleMessageBodies: visibleMessageBodies
     };
   }
 

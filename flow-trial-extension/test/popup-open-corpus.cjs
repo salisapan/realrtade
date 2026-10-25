@@ -1262,6 +1262,7 @@ async function run() {
   const whyStore = {
     outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Mail.Read'] }, account: { address: 'me@outlook.com' } },
     outlookSync: {},
+    glanceUiLanguage: 'he',
     glanceWhyCurrent: { reason: 'page:intent-null', subject: 'Mail 0', messageId: 'w0' },
     outlookPageDiag: whyReasons.map((reason, i) => ({ id: 'w' + i, reason: 'page:' + reason, verdict: 'quiet', subject: 'Mail ' + i }))
   };
@@ -1273,8 +1274,22 @@ async function run() {
     if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) whyNodes.push(n);
     (n.children || []).forEach(walk);
   })(whyPanel.document.getElementById('surface-list'));
-  const pageSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
-  const pageUsesShared = /function whyNotText\(reason\) \{[\s\S]*?FlowDisplay\.whyNotShownLine\(reason\)/.test(pageSrc);
+  const popupSrc = fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8');
+  const whyPanelEn = load(Object.assign({}, whyStore, {
+    glanceUiLanguage: 'en',
+    glanceWhyCurrent: { reason: 'page:reply-target-unsure', subject: 'Mail EN', messageId: 'w-en' },
+    outlookPageDiag: [{ id: 'w-en', reason: 'page:reply-target-unsure', verdict: 'quiet', subject: 'Mail EN' }]
+  }), { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] });
+  vm.runInContext(popupSrc, whyPanelEn.sandbox, { filename: 'popup-en-why.js' });
+  for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+  const enWhyLine = whyPanelEn.sandbox.FlowDisplay.whyNotShownLine('page:reply-target-unsure', 'en');
+  const enWhyNodes = [];
+  (function walkEn(n) {
+    if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) enWhyNodes.push(n);
+    (n.children || []).forEach(walkEn);
+  })(whyPanelEn.document.getElementById('surface-list'));
+  const enWhyNode = enWhyNodes.find((n) => n.getAttribute('data-glance-why') === 'page:reply-target-unsure');
+  const enWhyRendered = enWhyNode && enWhyNode.getAttribute('data-glance-why-line') === enWhyLine;
   const whyLog = [];
   (function walkLog(n) {
     if (n && n.getAttribute && n.getAttribute('data-glance-why-line')) whyLog.push(n);
@@ -1285,20 +1300,24 @@ async function run() {
     whyNodes.length === 1 && whyLog.length === 1 && whyLog[0].getAttribute('data-glance-why-line') === whyNodes[0].getAttribute('data-glance-why-line'),
     whyLog.map((n) => n.textContent));
   whyReasons.forEach((reason) => {
-    const expected = whyPanel.sandbox.FlowDisplay.whyNotShownLine(reason);
-    const expectedPage = whyPanel.sandbox.FlowDisplay.whyNotShownLine('page:' + reason);
+    const expected = whyPanel.sandbox.FlowDisplay.whyNotShownLine(reason, 'he');
+    const expectedPage = whyPanel.sandbox.FlowDisplay.whyNotShownLine('page:' + reason, 'he');
     const node = whyNodes.filter((n) => n.getAttribute('data-glance-why') === 'page:' + reason)[0];
     const shown = reason === 'intent-null';
     check('page and Setup say the same Hebrew for ' + reason,
-      pageUsesShared && expected === expectedPage && (shown ? (node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0) : !node),
+      expected === expectedPage && (shown ? (node && node.getAttribute('data-glance-why-line') === expected && node.textContent.indexOf(expected) === 0) : !node),
       { expected, page: expectedPage, text: node && node.textContent });
   });
+  check('popup whyCopy passes uiLang: EN host shows reply-target-unsure EN line',
+    enWhyRendered,
+    { line: enWhyLine, rendered: enWhyNode && enWhyNode.getAttribute('data-glance-why-line') });
 
   console.log('\n--- popup.js: a why line that arrives after open still paints ---\n');
   const lateOpts = { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }] };
   const latePanel = load({
     outlookAuth: whyStore.outlookAuth,
     outlookSync: {},
+    glanceUiLanguage: 'he',
     glanceWhyCurrent: null
   }, lateOpts);
   vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), latePanel.sandbox, { filename: 'popup.js' });

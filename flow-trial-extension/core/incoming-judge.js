@@ -255,7 +255,7 @@ const FlowIncomingJudge = (() => {
       if (s && s.kind === 'gmailDraft') {
         return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
       }
-      if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
+      if (s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
         return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
       }
       if (s && s.kind === 'driveFile') {
