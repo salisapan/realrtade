@@ -1,14 +1,13 @@
-// Messenger (messenger.com and facebook.com/messages). Off until the person turns it on.
+// Messenger (messenger.com and facebook.com/messages). Click-only: nothing runs until runUserRead().
 //
-// Reads the open one-to-one conversation and, when the newest message asks for one
-// answer the core judge can find, places a draft in the message box. The person sends it.
-// What it never does: press Enter, click Send, react, mark as read, open a chat, or touch a group.
-//
-// The page is not a public interface. If the open chat cannot be read, Glance says so once and stays silent.
+// On an explicit read, Glance reads the open one-to-one conversation and, when the newest
+// message asks for one answer the core judge can find, places a draft in the message box.
+// The person sends it. What it never does: press Enter, click Send, react, mark as read,
+// open a chat, or touch a group.
 (() => {
   if (window.__glanceLaneChat) return;
   if (typeof FlowMessengerParse === 'undefined') return;
-  window.__glanceLaneChat = { observers: 0 };
+  window.__glanceLaneChat = { observers: 0, autoReads: 0 };
   const P = FlowMessengerParse;
   const DEBOUNCE_MS = 1200;
   const RETRY_MS = 1000;
@@ -326,18 +325,27 @@
     maybeDraft(main, list, party, direct, threadId);
   }
 
-  function schedule() {
-    if (!guard()) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => { if (guard()) scan(); }, DEBOUNCE_MS);
+  async function runUserRead() {
+    if (!guard()) return { ok: false, reason: 'stopped' };
+    if (typeof FlowChatKillSwitch !== 'undefined' && await FlowChatKillSwitch.silenced('messenger')) {
+      whyNot('kill-switch', 'messenger');
+      return { ok: false, reason: 'kill-switch' };
+    }
+    let chip = null;
+    if (typeof FlowChatIndicator !== 'undefined') chip = FlowChatIndicator.show();
+    const title = titleOf(root());
+    try {
+      globalThis.__glanceChatRedactActive = true;
+      globalThis.__glanceChatRedactNames = title ? [title] : [];
+      await scan();
+      return { ok: true };
+    } finally {
+      globalThis.__glanceChatRedactActive = false;
+      globalThis.__glanceChatRedactNames = [];
+      if (typeof FlowChatIndicator !== 'undefined') FlowChatIndicator.hide(chip);
+    }
   }
-  const watch = document.documentElement || document.body;
-  if (watch) {
-    observer = new MutationObserver(() => { if (guard()) schedule(); });
-    observer.observe(watch, { childList: true, subtree: true });
-    window.__glanceLaneChat.observers += 1;
-  }
-  schedule();
+
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
-  globalThis.__glanceChatSurfaces.messenger = { scan: scan };
+  globalThis.__glanceChatSurfaces.messenger = { scan: scan, runUserRead: runUserRead };
 })();

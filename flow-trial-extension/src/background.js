@@ -74,6 +74,7 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import { installChatOnDemand } from './chat-on-demand.js';
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
@@ -607,11 +608,7 @@ const LANE_CHAT = [
       'https://www.facebook.com/messages',
       'https://www.facebook.com/messages/*',
       'https://facebook.com/messages',
-      'https://facebook.com/messages/*',
-      'https://business.facebook.com/latest/inbox',
-      'https://business.facebook.com/latest/inbox/*',
-      'https://www.business.facebook.com/latest/inbox',
-      'https://www.business.facebook.com/latest/inbox/*'
+      'https://facebook.com/messages/*'
     ],
     js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
   },
@@ -659,16 +656,10 @@ async function restoreLaneChats() {
   } catch (e) { on = false; known = false; }
   if (!on) {
     if (known) await clearLaneChats();
-    if (chrome.tabs && chrome.tabs.query) {
-      const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
-      const urls = messenger ? messenger.origins.filter((origin) => origin.indexOf('business.facebook.com') >= 0) : [];
-      let open = [];
-      try { open = urls.length ? await chrome.tabs.query({ url: urls }) : []; } catch (e) { open = []; }
-      if (open.length) console.info('[Glance] whyNotShown: messenger-not-granted');
-    }
     return;
   }
   for (const lane of LANE_CHAT) {
+    if (lane.id === 'glance-lane-messenger' || lane.id === 'glance-lane-instagram') continue;
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
     try {
       await chrome.scripting.registerContentScripts([{
@@ -709,6 +700,7 @@ async function restoreLaneChats() {
 dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();
+installChatOnDemand();
 chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
 if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
 try {

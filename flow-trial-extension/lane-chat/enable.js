@@ -1,7 +1,7 @@
 // One consent for Meta chats. The browser asks once, for every Meta host.
 // Nothing here is a static content script. After the grant, every lane is on.
 // There is no per-feature switch to turn one of them off.
-// business.facebook.com stays an optional host. This page does not send.
+// Messenger and Instagram load on demand (click-only). This page does not send.
 const SCRIPTS = [
   'core/fact-reply.js',
   'core/close-chains.js',
@@ -25,11 +25,7 @@ const LANES = [
       'https://www.facebook.com/messages',
       'https://www.facebook.com/messages/*',
       'https://facebook.com/messages',
-      'https://facebook.com/messages/*',
-      'https://business.facebook.com/latest/inbox',
-      'https://business.facebook.com/latest/inbox/*',
-      'https://www.business.facebook.com/latest/inbox',
-      'https://www.business.facebook.com/latest/inbox/*'
+      'https://facebook.com/messages/*'
     ],
     js: SCRIPTS.concat(['src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js'])
   },
@@ -138,7 +134,8 @@ async function registerAll() {
   if (!scripting || !scripting.registerContentScripts) return;
   const ids = LANES.map((lane) => 'glance-lane-' + lane.id);
   try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* not registered yet */ }
-  await scripting.registerContentScripts(LANES.map((lane) => ({
+  const onDemand = { messenger: true, instagram: true };
+  await scripting.registerContentScripts(LANES.filter((lane) => !onDemand[lane.id]).map((lane) => ({
     id: 'glance-lane-' + lane.id,
     matches: lane.origins,
     js: lane.js,
