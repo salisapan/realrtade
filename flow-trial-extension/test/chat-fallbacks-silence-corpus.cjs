@@ -10,12 +10,16 @@ const R = {
   pickup: require('../core/chat-pickup-notice.js').FlowChatPickupNotice,
   invitation: require('../core/chat-invitation-notice.js').FlowChatInvitationNotice,
   selfNote: require('../core/chat-self-note.js').FlowChatSelfNote,
-  travel: require('../core/chat-travel-notice.js').FlowChatTravelNotice
+  travel: require('../core/chat-travel-notice.js').FlowChatTravelNotice,
+  delivery: require('../core/chat-delivery-window.js').FlowChatDeliveryWindow
 };
 const NOW = new Date(2026, 9, 23, 10, 0, 0);
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const CHATTER = [
+  'The courier was late yesterday again', 'My package will arrive soon, I hope', 'Pizza delivery tomorrow at 8?', 'I will deliver the report tomorrow between 14:00 and 16:00',
+  'The delivery guy was so rude', 'Did the courier come? I was out between 14:00 and 18:00', 'We deliver on Tuesdays only', 'השליח איחר אתמול שוב', 'אני אביא את הדוח מחר בין 14:00 ל-16:00',
+  'ההזמנה שלי תגיע בקרוב', 'היית בבית בין 14:00 ל-18:00?',
   'Thanks, see you on Thursday', 'Good morning! How was your weekend?', 'I was at the gym until 9pm on Monday',
   'The meeting on Tuesday was great', 'Haha that is so funny', 'Did you see the match last Saturday?',
   'It costs 500 NIS at the store', 'I paid 300 NIS yesterday for the tickets', 'The train leaves at 18:15 on Friday',

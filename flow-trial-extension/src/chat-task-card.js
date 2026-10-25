@@ -131,6 +131,8 @@ const FlowChatTaskCard = (() => {
     return null;
   }
 
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
   // The same hold must not be made twice: a confirmation and then a reminder for the same appointment in the same chat would add a
   // second event. A hold this card wrote for the same day and clock in this thread, and not undone since, is the answer.
   async function findHeldHold(chatKey, params) {
@@ -396,6 +398,9 @@ const FlowChatTaskCard = (() => {
     let appt = null;
     let inv = null;
     let trip = null;
+    let dlv = null;
+    let deliveryWindow = null;
+    try { dlv = (!own && typeof FlowChatDeliveryWindow !== 'undefined') ? FlowChatDeliveryWindow.recognize(i.text, i.now) : null; } catch (e) { dlv = null; }
     try { trip = (!own && typeof FlowChatTravelNotice !== 'undefined') ? FlowChatTravelNotice.recognize(i.text, i.now) : null; } catch (e) { trip = null; }
     let selfNote = null;
     try { selfNote = (own && typeof FlowChatSelfNote !== 'undefined') ? FlowChatSelfNote.recognize(i.text, i.now) : null; } catch (e) { selfNote = null; }
@@ -410,22 +415,23 @@ const FlowChatTaskCard = (() => {
         intent: { type: 'commitment', label: selfNote.what, entities: { dateIso: selfNote.dateIso, what: selfNote.what } },
         process: { id: 'log', name: 'Log It', closingLine: 'Adding this to your tasks.', closedLine: 'In your tasks.', steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + selfNote.what, params: { title: selfNote.what, dateIso: selfNote.dateIso, what: selfNote.what }, dependsOn: null }] }
       };
-    } else if (!(appt && appt.kind === 'appointment') && !(inv && inv.kind === 'invitation') && !(trip && trip.kind === 'trip') && confirmed && confirmed.kind === 'confirmed') {
+    } else if (!(appt && appt.kind === 'appointment') && !(inv && inv.kind === 'invitation') && !(trip && trip.kind === 'trip') && !(dlv && dlv.kind === 'delivery') && confirmed && confirmed.kind === 'confirmed') {
       judged = {
         show: true,
         intent: { type: 'event', label: 'Meeting ' + confirmed.when, entities: { dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute } },
         process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: Meeting ' + confirmed.when, params: { title: '', dateIso: confirmed.dateIso, hour: confirmed.hour, minute: confirmed.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
       };
-    } else if ((appt && appt.kind === 'appointment') || (inv && inv.kind === 'invitation') || (trip && trip.kind === 'trip')) {
-      const held = (appt && appt.kind === 'appointment') ? appt : (inv && inv.kind === 'invitation') ? inv : trip;
+    } else if ((appt && appt.kind === 'appointment') || (inv && inv.kind === 'invitation') || (trip && trip.kind === 'trip') || (dlv && dlv.kind === 'delivery')) {
+      const held = (appt && appt.kind === 'appointment') ? appt : (inv && inv.kind === 'invitation') ? inv : (trip && trip.kind === 'trip') ? trip : dlv;
       // "Your appointment is confirmed for Sunday at 10:00" / «התור שלך נקבע ליום ראשון בשעה 10:00» (core/chat-appointment-notice.js):
       // a booking someone confirmed to the person becomes a hold titled "Appointment · name". Nobody is invited.
       judged = {
         show: true,
-        intent: { type: 'event', label: held === trip ? 'Trip' : held === inv ? 'Invitation' : 'Appointment', entities: { dateIso: held.dateIso, hour: held.hour, minute: held.minute } },
-        process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + (held === trip ? 'Trip' : held === inv ? 'Invitation' : 'Appointment'), params: { title: '', dateIso: held.dateIso, hour: held.hour, minute: held.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
+        intent: { type: 'event', label: held === dlv ? 'Delivery' : held === trip ? 'Trip' : held === inv ? 'Invitation' : 'Appointment', entities: { dateIso: held.dateIso, hour: held.hour, minute: held.minute } },
+        process: { id: 'hold', name: 'Hold It', closingLine: 'Putting this on your calendar.', closedLine: 'On your calendar.', steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + (held === dlv ? 'Delivery' : held === trip ? 'Trip' : held === inv ? 'Invitation' : 'Appointment'), params: { title: '', dateIso: held.dateIso, hour: held.hour, minute: held.minute, calendarOp: null, quote: '', requireTime: true, threadUrl: null }, dependsOn: null }] }
       };
-      callProposal = held === trip ? 'trip' : held === inv ? 'invitation' : 'appointment';
+      callProposal = held === dlv ? 'delivery' : held === trip ? 'trip' : held === inv ? 'invitation' : 'appointment';
+      if (held === dlv) deliveryWindow = dlv;
     } else {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
@@ -553,7 +559,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? 'משלוח' : 'Delivery') + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
     }
     if (own && !(selfNote && selfNote.kind === 'note')) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").

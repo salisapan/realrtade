@@ -122,3 +122,16 @@ test('PAYMENT_ASK on: the reminder of a bill already on the task list is not off
   await expect(page.locator(MAIN + ' button.flow-chip')).toHaveCount(0);
   expect(tasks()).toHaveLength(1);
 });
+
+test('BOOKING_NOTICE on: a delivery window told in a mail is one Google Calendar hold at the start of the window, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Your package will be delivered tomorrow between 14:00 and 18:00. Thanks for your order.');
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  expect(events()[0].summary).toMatch(/^Hold .*14:00/);
+  expect(events()[0].attendees || []).toEqual([]);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});

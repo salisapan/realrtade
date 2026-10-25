@@ -12,7 +12,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'day-words.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-invitation-notice.js', 'incoming-judge.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'system-notice.js', 'day-words.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-delivery-window.js', 'chat-invitation-notice.js', 'incoming-judge.js'];
 const box = { module: undefined, console };
 vm.createContext(box);
 for (const f of CORE) vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), box, { filename: f });
@@ -39,6 +39,19 @@ for (const [text, day, h, m] of TRIP) {
   const r = judge(text);
   const st = r.show && r.process.steps[0];
   check('trip mail offers one calendar hold: ' + text.slice(0, 50), r.show && st.kind === 'calendar' && st.params.dateIso === day && st.params.hour === h && st.params.minute === m && /^(Trip|נסיעה) · Studio Nofar$/.test(st.params.title), r);
+}
+const DELIVERY = [
+  ['Your package will be delivered on Thursday between 14:00 and 18:00. Thanks for your order.', '2026-10-29', 14, 0, /^Delivery 14:00–18:00 · Studio Nofar$/],
+  ['שלום סלי, השליח יגיע ביום חמישי בין 10:00 ל-12:00', '2026-10-29', 10, 0, /^משלוח 10:00–12:00 · Studio Nofar$/],
+  ['Your order will arrive on Thursday at 16:30. Thanks for shopping with us.', '2026-10-29', 16, 30, /^Delivery · Studio Nofar$/]
+];
+for (const [text, day, h, m, titleRe] of DELIVERY) {
+  const r = judge(text);
+  const st = r.show && r.process.steps[0];
+  check('delivery mail offers one calendar hold: ' + text.slice(0, 50), r.show && st.kind === 'calendar' && st.params.dateIso === day && st.params.hour === h && st.params.minute === m && titleRe.test(st.params.title), r);
+}
+for (const text of ['Hi Sali, your package was delivered on Thursday between 14:00 and 18:00.', 'Your delivery on Thursday between 14:00 and 18:00 was cancelled. Sorry!', 'Hi, we deliver on Thursdays between 14:00 and 18:00 only. Order now!']) {
+  check('delivery mail stays quiet: ' + text.slice(0, 50), !judge(text).show, judge(text));
 }
 const INVITE = [
   ["You're invited to our product launch on Thursday at 19:00", '2026-10-29', 19, 0],

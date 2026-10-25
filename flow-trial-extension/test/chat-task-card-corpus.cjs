@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-delivery-window.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -580,6 +580,23 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a cancelled flight with no hold offers nothing', !(await none.Card.offer(input('Your flight LY001 departing Monday at 06:30 was cancelled', { channel: 'whatsapp' }))).shown);
   }
 
+  // 5ab. A delivery window told to the person is a hold at the start of the window titled "Delivery 14:00–18:00 · name"; nobody is invited.
+  {
+    for (const [text, titleRe, hour] of [['Your package will be delivered tomorrow between 14:00 and 18:00', /^Delivery 14:00–18:00 · Dana$/, 14], ['השליח יגיע מחר בין 10:00 ל-12:00', /^משלוח 10:00–12:00 · Dana$/, 10], ['Your order will arrive tomorrow at 15:30', /^Delivery · Dana$/, 15]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleHold' } });
+      const r = await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      check('delivery offers one calendar step: ' + text, r.shown && g.injected[0].ctx.process.steps.length === 1 && g.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the hold is the delivery at the start of the window, no guest, no message words: ' + text, !!ge && titleRe.test(ge.input.title) && ge.input.hour === hour && !('attendees' in ge.input) && (ge.input.title + ' ' + ge.input.quote).indexOf('package') < 0, ge && ge.input);
+    }
+    for (const quiet of ['Your package was delivered yesterday at 14:00', 'The courier will arrive tomorrow between 4 and 6', 'Your order is ready for pickup tomorrow between 14:00 and 18:00']) {
+      const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+      check('no delivery card for: ' + quiet, !(await q.Card.offer(input(quiet, { channel: 'whatsapp' }))).shown || q.injected[0].ctx.process.steps[0].params.title !== 'Delivery');
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -634,7 +651,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-delivery-window\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {
