@@ -5157,7 +5157,7 @@
         return;
       }
       if (decided && !decided.none && decided.process && conversationPanePathKey(pane) && !pane.itemId
-        && processNeedsConversationMessageId(decided.process)) {
+        && needsJudgedReplyTarget(decided.process)) {
         const exactPin = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
         if (exactPin && exactPin.unread) {
           dropStuckCard(pane);
