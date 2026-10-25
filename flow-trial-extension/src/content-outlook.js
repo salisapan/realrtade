@@ -5336,10 +5336,8 @@
                 return;
               }
             }
-            if (conversationPanePathKey(pane) && needsJudgedReplyTarget(proc)) {
+            if (conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {
               replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
-            } else if (conversationPanePathKey(pane)) {
-              replyTarget = await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail);
             } else {
               const judged = needsJudgedReplyTarget(proc);
               replyTarget = judged
@@ -5353,7 +5351,7 @@
               return;
             }
             replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
-            if (!replyId && conversationPanePathKey(pane) && needsJudgedReplyTarget(proc)) {
+            if (!replyId && conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {
               dropStuckCard(pane);
               await pageReason('page:reply-target-unsure', pane);
               return;
@@ -5379,7 +5377,7 @@
           attachmentsUnread: Boolean(decided.attachmentsUnread)
         };
       } else {
-        if (needsJudgedReplyTarget((decided && decided.process) || (entry && entry.process))
+        if (processNeedsConversationMessageId((decided && decided.process) || (entry && entry.process))
           && conversationPanePathKey(pane) && !pane.itemId) {
           const replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
           if (replyTarget && replyTarget.unread) {
