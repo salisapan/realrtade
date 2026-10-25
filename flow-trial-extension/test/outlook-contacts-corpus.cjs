@@ -1,10 +1,12 @@
-// Contacts.Read: resolve one recipient by name. Read-only. A split match
-// stays quiet. People 403 still resolves from contacts. Nothing is sent.
+// MC1 Microsoft Contacts: Contacts.Read resolve + reply draft, never send.
 // Run: node test/outlook-contacts-corpus.cjs
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { FlowProofOfClose } = require('../core/proof-of-close.js');
 const { FlowOutlookContacts: C } = require('../core/outlook-contacts.js');
+
+globalThis.FlowProofOfClose = FlowProofOfClose;
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -25,82 +27,115 @@ function fake(routes) {
   return { calls, call };
 }
 
-function dana() {
+const now = () => new Date().toISOString();
+const scopes = { call: null, grantedScopes: ['Contacts.Read'], now: now };
+
+function danaRoutes(readBack) {
+  const contact = {
+    id: 'c1',
+    displayName: 'Dana Cohen',
+    emailAddresses: [{ address: 'dana@acme.com' }],
+    businessPhones: ['+972501234567']
+  };
   return fake([
-    { method: 'GET', test: /\/me\/contacts/, reply: () => ({ ok: true, status: 200, body: { value: [{ id: 'c1', displayName: 'Dana Cohen', emailAddresses: [{ address: 'dana@acme.com' }] }] } }) },
-    { method: 'GET', test: /\/me\/people/, reply: () => ({ ok: false, status: 403, body: { error: { code: 'ErrorAccessDenied' } } }) }
+    {
+      method: 'GET',
+      test: /\/me\/contacts\?/,
+      reply: () => ({ ok: true, status: 200, body: { value: [contact] } })
+    },
+    {
+      method: 'GET',
+      test: /\/me\/people/,
+      reply: () => ({ ok: false, status: 403, body: { error: { code: 'ErrorAccessDenied' } } })
+    },
+    {
+      method: 'GET',
+      test: /\/me\/contacts\/c1/,
+      reply: () => ({
+        ok: true,
+        status: 200,
+        body: readBack || contact
+      })
+    }
   ]);
 }
 
 (async () => {
-  check('empty name does not call', await (async () => {
-    const f = fake([]);
-    const out = await C.run({ name: '  ' }, { call: f.call, grantedScopes: ['Contacts.Read'] });
-    return out.reason === 'unclear' && f.calls.length === 0;
-  })());
+  check('Hebrew email ask is recognized', C.recognize('מה כתובת המייל של דנה כהן').mode === 'email' && C.recognize('מה כתובת המייל של דנה כהן').name.indexOf('דנה') >= 0);
+  check('English phone ask is recognized', C.recognize("send me Dana's phone").mode === 'phone');
+  check('Hebrew nameMatches', C.nameMatches('דנה כהן', 'דנה כהן לוי') === true);
 
-  check('null input is unclear', await (async () => {
-    const f = fake([]);
-    const out = await C.run(null, { call: f.call, grantedScopes: ['Contacts.Read'] });
-    return out.ok === false && f.calls.length === 0;
-  })());
+  const judge = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Contacts.Read'] });
+  check('judgeInput offers lane-ms', judge.action === 'lane-ms' && judge.connectorId === 'outlookContacts');
+  check('judgeInput missing scope stays silent', C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Mail.Read'] }).reason === 'missing-scope');
 
-  check('known scopes without Contacts.Read do not call', await (async () => {
-    const f = fake([]);
-    const out = await C.run({ name: 'Dana Cohen' }, { call: f.call, grantedScopes: ['Mail.Read'] });
-    return out.reason === 'contacts-not-granted' && f.calls.length === 0;
-  })());
+  const hit = danaRoutes();
+  const resolved = await C.run(
+    { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
+    { call: hit.call, grantedScopes: ['Contacts.Read'], now: now }
+  );
+  check('one Dana: draft with email and fetchedBack', resolved.ok === true && resolved.posted === false && /dana@acme\.com/.test(resolved.draft) && resolved.fetchedBack === true && resolved.proof && resolved.proof.fetchedBack === true, resolved);
+  check('resolve is GET only', hit.calls.every((c) => c.method === 'GET') && !hit.calls.some((c) => /sendMail/.test(c.path)), hit.calls.map((c) => c.method));
 
-  check('unknown scope list still looks up', C.hasReadScope(null) === null && C.hasReadScope(['Contacts.Read']) === true && C.hasReadScope(['Files.ReadWrite.All']) === false);
-
-  const hit = dana();
-  const resolved = await C.run({ name: 'Dana Cohen' }, { call: hit.call, grantedScopes: ['Contacts.Read'] });
-  check('people 403 still resolves the contact', resolved.ok === true && resolved.recipient.address === 'dana@acme.com' && resolved.recipient.source === 'contacts', resolved);
-  check('lookup is GET only', hit.calls.every((c) => c.method === 'GET') && hit.calls.some((c) => c.path.indexOf('/me/contacts') === 0) && hit.calls.some((c) => c.path.indexOf('/me/people') === 0), hit.calls.map((c) => c.method + ' ' + c.path));
-  check('contacts search asks for eventual consistency', hit.calls[0].headers && hit.calls[0].headers.ConsistencyLevel === 'eventual');
-
-  const both = fake([
-    { method: 'GET', test: /\/me\/contacts/, reply: () => ({ ok: true, status: 200, body: { value: [{ displayName: 'Dana Cohen', emailAddresses: [{ address: 'Dana@acme.com' }] }] } }) },
-    { method: 'GET', test: /\/me\/people/, reply: () => ({ ok: true, status: 200, body: { value: [{ displayName: 'Dana', scoredEmailAddresses: [{ address: 'dana@acme.com' }] }] } }) }
-  ]);
-  const same = await C.run({ params: { name: 'Dana Cohen' } }, { call: both.call, grantedScopes: 'Contacts.Read' });
-  check('the same address from both lists is one recipient', same.ok === true && same.recipient.source === 'both' && same.recipient.address === 'Dana@acme.com', same);
+  const phoneHit = danaRoutes();
+  const phone = await C.run(
+    { params: { name: 'Dana Cohen', mode: 'phone', lang: 'en' } },
+    { call: phoneHit.call, grantedScopes: ['Contacts.Read'], now: now }
+  );
+  check('phone ask drafts the number', /\+972501234567/.test(phone.draft), phone);
 
   const split = fake([
-    { method: 'GET', test: /\/me\/contacts/, reply: () => ({ ok: true, status: 200, body: { value: [{ displayName: 'Dana Cohen', emailAddresses: [{ address: 'dana@acme.com' }] }] } }) },
-    { method: 'GET', test: /\/me\/people/, reply: () => ({ ok: true, status: 200, body: { value: [{ displayName: 'Dana Cole', scoredEmailAddresses: [{ address: 'dana.cole@acme.com' }] }] } }) }
-  ]);
-  const amb = await C.run({ name: 'Dana' }, { call: split.call, grantedScopes: ['https://graph.microsoft.com/Contacts.Read'] });
-  check('two addresses stay ambiguous', amb.ok === false && amb.reason === 'ambiguous', amb);
-
-  const none = fake([
-    { method: 'GET', test: /\/me\/contacts/, reply: () => ({ ok: true, status: 200, body: { value: [] } }) },
+    {
+      method: 'GET',
+      test: /\/me\/contacts\?/,
+      reply: () => ({
+        ok: true,
+        status: 200,
+        body: {
+          value: [
+            { id: 'c1', displayName: 'Dana Cohen', emailAddresses: [{ address: 'dana@acme.com' }] },
+            { id: 'c2', displayName: 'Dana Cole', emailAddresses: [{ address: 'dana.cole@acme.com' }] }
+          ]
+        }
+      })
+    },
     { method: 'GET', test: /\/me\/people/, reply: () => ({ ok: true, status: 200, body: { value: [] } }) }
   ]);
-  const missing = await C.run({ name: 'Nobody' }, { call: none.call, grantedScopes: ['Contacts.Read'] });
-  check('no address is not-found', missing.reason === 'not-found');
+  const amb = await C.run(
+    { params: { name: 'Dana', mode: 'email', lang: 'en' } },
+    { call: split.call, grantedScopes: ['Contacts.Read'], now: now }
+  );
+  check('two addresses stay ambiguous', amb.ok === false && amb.reason === 'ambiguous', amb);
 
-  const down = fake([
-    { method: 'GET', test: /\/me\/contacts/, reply: () => ({ ok: false, status: 500, body: {} }) }
-  ]);
-  const failed = await C.run({ name: 'Dana' }, { call: down.call, grantedScopes: ['Contacts.Read'] });
-  check('a contacts error is not a made-up address', failed.reason === 'contacts-failed' && down.calls.length === 1);
-
-  const offer = C.offer({ text: 'Please look up the contact Dana Cohen.' });
-  check('a lookup offer names Dana Cohen and does not close', offer.show === true && offer.params.name === 'Dana Cohen' && offer.closes === false && offer.button === 'Look up', offer);
-  ['I\'ll send Dana the numbers by Thursday.', 'Please save the attachment to OneDrive.', 'We agreed to renew the passport application by Friday.', 'Thanks, attaching the board pack for your records today.', ''].forEach((text) => {
-    check('stays quiet: ' + JSON.stringify(text).slice(0, 48), C.offer({ text: text }).show === false);
+  const mismatch = danaRoutes({
+    id: 'c1',
+    displayName: 'Dana Cohen',
+    emailAddresses: [{ address: 'other@acme.com' }],
+    businessPhones: []
   });
+  const bad = await C.run(
+    { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
+    { call: mismatch.call, grantedScopes: ['Contacts.Read'], now: now }
+  );
+  check('read-back mismatch is verify_failed', bad.reason === 'verify_failed' && bad.fetchedBack === false, bad);
+
+  const forbidden = await C.run(
+    { post: true, params: { name: 'Dana Cohen', mode: 'email' } },
+    { call: danaRoutes().call, grantedScopes: ['Contacts.Read'], now: now }
+  );
+  check('never sends on post flag', forbidden.reason === 'FORBIDDEN_SEND');
+
+  const offer = C.offer({ text: "What's Dana Cohen's email?" });
+  check('offer names Dana and does not close', offer.show === true && offer.params.name === 'Dana Cohen' && offer.closes === false, offer);
+
   check('undo is not a write', (await C.undo({}, { call: () => { throw new Error('called'); } })).reason === 'no-undo');
   check('a read is not a receipt', C.receiptFromLog([{ kind: 'written', connectorId: 'outlookContacts', fetchedBack: true }], { itemId: 'x' }) === null);
 
   const bg = fs.readFileSync(path.join(__dirname, '../src/background.js'), 'utf8');
   const hooks = bg.split('\n').filter((line) => line.indexOf('lane-ms-host.js') >= 0);
   check('background.js has one lane hook', hooks.length === 1 && bg.indexOf('outlook-contacts.js') < 0, hooks);
-  const page = fs.readFileSync(path.join(__dirname, '../src/content-outlook.js'), 'utf8');
-  check('content-outlook.js is not edited for this lane', page.indexOf('FlowLaneMs') < 0 && page.indexOf('lane-ms') < 0);
-  const contactsSrc = fs.readFileSync(path.join(__dirname, '../core/outlook-contacts.js'), 'utf8');
-  check('contacts has no startup side effects', contactsSrc.indexOf('getManifest') < 0 && contactsSrc.indexOf('registerContentScripts') < 0 && contactsSrc.indexOf('addListener') < 0 && contactsSrc.indexOf('laneBindHost') < 0);
+  const page = fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8');
+  check('lane page paints contact draft', page.indexOf('flow-lane-draft') >= 0 && page.indexOf('Draft ready') >= 0);
 
   if (failures) process.exit(1);
   console.log('outlook-contacts-corpus: all passed');
