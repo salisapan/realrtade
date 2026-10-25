@@ -827,7 +827,57 @@
         if (FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.keyOf(r.intent), [pane.itemId, pane.pathId, pane.conversationId])) return { none: true, reason: 'already-on-calendar' };
       } catch (e) { /* the log is unreadable: offer as before */ }
     }
+    if (!(r && r.show) && bookingNoticeSwitch === true && pane.senderEmail) {
+      const gone = await cancelledHold(pane, own);
+      if (gone) return gone;
+    }
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
+  }
+
+  // The business cancelled a booking, a trip or an invitation that Glance put on this calendar from its own earlier mail: Do It takes
+  // that same event off again, through the same undo the hold's receipt has (read back that it is gone; an event the person changed is
+  // left alone and says so). Quiet when no hold of this sender at that day and clock is on the calendar. Never sends anything.
+  async function cancelledHold(pane, ownText) {
+    if (typeof FlowHeldHold === 'undefined') return null;
+    const text = String(ownText || '') || String(pane.subject || '');
+    let gone = null;
+    for (const reader of [typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null]) {
+      if (!reader || typeof reader.cancelled !== 'function') continue;
+      try { const g = reader.cancelled(text, new Date()); if (g && g.kind === 'cancelled') { gone = g; break; } } catch (e) { /* the next reader */ }
+    }
+    if (!gone) return null;
+    let held = null;
+    try {
+      const bag = await FlowStorage.get();
+      held = FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.holdAt(gone), []);
+    } catch (e) { return null; }
+    if (!held || held.connectorId !== 'outlookCalendar' || !held.ref) return null;
+    const he = gone.lang === 'he';
+    const title = String(held.label || '').replace(/^Calendar\s*·\s*/i, '').slice(0, 80);
+    return {
+      intent: { type: 'event', label: (he ? 'בוטל: ' : 'Cancelled: ') + title, confidence: 0.9, personalClose: 'booking-cancelled', signals: { score: 90, threshold: 50 }, entities: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute } },
+      process: { id: 'booking-cancelled', name: he ? 'הסר מהיומן' : 'Remove It', closingLine: he ? 'מסיר מהיומן.' : 'Removing it from your calendar.', closedLine: he ? 'הוסר מהיומן.' : 'Removed from your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: (he ? 'להסיר מהיומן: ' : 'Remove from calendar: ') + title, params: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute, title: title }, dependsOn: null }] },
+      removeHeld: { connectorId: held.connectorId, ref: held.ref, messageId: held.messageId || null, he: he }
+    };
+  }
+
+  // Do It on a cancellation: remove the hold through the worker's undo. A changed event stays and the card says so.
+  async function removeHeldHold(host, chip, ctx) {
+    const held = ctx.removeHeld;
+    const token = captureMailToken();
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', held.he ? 'מסיר…' : 'Removing…'); });
+    const u = await send({ type: 'flow:undo-action', connectorId: held.connectorId, ref: held.ref, created: held.ref && held.ref.created });
+    if (!(u && u.ok)) {
+      const edited = u && u.reason === 'user-edited';
+      const text = edited ? (held.he ? 'שינית את האירוע, השארתי אותו' : 'You changed this event, so I left it') : (held.he ? 'לא הצלחתי להסיר, נסה שוב' : "Couldn't remove it, try again");
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', text); });
+      return;
+    }
+    try { await FlowStorage.markOutlookCalendarUndone(held.messageId, held.ref); } catch (e) { /* the receipt still shows */ }
+    paintIfCurrent(token, function () {
+      if (typeof FlowChipHost.showDraftReceipt === 'function') FlowChipHost.showDraftReceipt(host, { status: 'Handled.', written: u.written || (held.he ? 'הוסר מהיומן.' : 'Removed from your calendar.') });
+    });
   }
 
   function userNameOf(st) {
@@ -1201,6 +1251,7 @@
       key: entry.key,
       hydrateHow: (pane && pane.hydrateHow) || null,
       priorConversationId: (pane && pane.priorConversationId) || null,
+      removeHeld: (decided && decided.removeHeld) || null,
       __epoch: paneEpoch(pane)
     };
   }
@@ -1246,6 +1297,7 @@
   async function onDoIt(host, chip, ctx, liveSteps) {
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
+    if (ctx && ctx.removeHeld) return removeHeldHold(host, chip, ctx);
     const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
     const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const earlyDraft = earlySteps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));

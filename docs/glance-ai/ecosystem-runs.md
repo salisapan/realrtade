@@ -686,3 +686,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Found:** `glance-gmail-addon/test/v1.test.cjs` has 5 red expectations (not run by CI, not caused by this work): the shared judge treats a meeting with a day and no clock as `no-process`, the add-on test expects an all-day hold. Recorded as `docs/open-tasks.md` row 83 for the owner or David; the judge policy was not changed.
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Open:** unchanged from run 81 (live Gates; mail-side removal of a cancelled booking; Planner tasks; no cross-chat matching).
+
+## Run 83 (builder B, 2026-10-25): Outlook, a cancelled booking comes off the calendar
+
+- **Capability shipped:** the business that confirmed an appointment (and whose hold Glance wrote) sends "your appointment on Sunday at 10:00 was cancelled" / «התור שלך … בוטל». On Outlook web the mail now shows a Remove It card (the existing canonical Do It card, text from the chat version in `card-requests-2026-10-20.md`). Do It removes that same event through the hold's own undo, and Handled is shown only after the worker confirms it is gone. An event the person changed is left alone and the card says so. No hold from that sender at that day and clock: no card. Switch `BOOKING_NOTICE` (off). Nothing is sent; no new scope.
+- **Code:** `cancelledHold` and `removeHeldHold` in `src/content-outlook.js` (same readers and `FlowHeldHold.find` as the chat removal), `removeHeld` carried by `buildCtx`.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/booking-cancel-corpus.cjs` (new), `e2e/outlook-booking-cancel.spec.js` (4 real-browser specs: removed and read back; edited event stays; other clock or sender quiet; switch off), booking-notice and chat-hold specs unchanged and green, every `test/*corpus.cjs` green.
+- **Open:** live Gate on Outlook web; the same removal for Gmail mail (googleHold undo from the Gmail card); a hold the person undid by hand is not touched; no cross-chat matching.
