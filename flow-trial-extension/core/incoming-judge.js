@@ -198,7 +198,8 @@ const FlowIncomingJudge = (() => {
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
       namesWaitDone: i.namesWaitDone === true,
-      readerEmail: i.readerEmail || null
+      readerEmail: i.readerEmail || null,
+      strictSignedAttachments: i.strictSignedAttachments === true
     });
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.

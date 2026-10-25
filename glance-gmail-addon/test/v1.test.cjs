@@ -76,6 +76,7 @@ const DEFAULT_TO_RECIPIENTS = [
 
 function judge(text, extra) {
   const opts = extra || {};
+  const reader = opts.reader || { userName: READER_DISPLAY, ownNames: READER_NAMES };
   const eng = opts.reader ? function (t) { return engine(t, opts.reader); } : engine;
   const rest = Object.assign({}, opts);
   delete rest.reader;
@@ -83,8 +84,8 @@ function judge(text, extra) {
     now: NOW,
     timeZone: TZ,
     engine: eng,
-    userName: READER_DISPLAY,
-    ownNames: READER_NAMES,
+    userName: reader.userName,
+    ownNames: reader.ownNames,
     readerEmail: READER_EMAIL,
     toRecipients: DEFAULT_TO_RECIPIENTS,
     ccRecipients: []
@@ -957,7 +958,8 @@ console.log('\n--- message path parity ---');
         now: NOW,
         surface: 'gmail',
         attachmentCount: fields.attachmentCount == null ? 0 : fields.attachmentCount,
-        inbound: true
+        inbound: true,
+        strictSignedAttachments: true
       }, {});
       if (!judged || !judged.show || !judged.process) return null;
       return judged.process;

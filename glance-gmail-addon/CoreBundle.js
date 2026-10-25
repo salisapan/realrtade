@@ -2204,7 +2204,10 @@ const FlowGoogleCloses = (() => {
     const signedInbound = Number(input.attachmentCount) >= 1 && signedCopyDelivered(text) && !refusesSave(text)
       && !OTHER_TARGET.test(text) && !noreply;
     if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
-      const attachOk = signedInbound ? Number(input.attachmentCount) >= 1 : input.attachmentCount === 1;
+      const signedAttachMax = input.strictSignedAttachments === true ? 1 : 2;
+      const attachOk = signedInbound
+        ? (Number(input.attachmentCount) >= 1 && Number(input.attachmentCount) <= signedAttachMax)
+        : input.attachmentCount === 1;
       if (refusesSave(text) || !attachOk || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
@@ -6603,7 +6606,8 @@ const FlowIntent = (() => {
         template: ctx.companyTemplate || null,
         fileMatch: ctx.fileMatch || null,
         attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount,
-        senderEmail: ctx.senderEmail || null
+        senderEmail: ctx.senderEmail || null,
+        strictSignedAttachments: ctx.strictSignedAttachments === true
       });
       if (google && google.wait) {
         const rescued = rescueSelfSent('google-wait');
@@ -9897,7 +9901,8 @@ const FlowIncomingJudge = (() => {
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
       namesWaitDone: i.namesWaitDone === true,
-      readerEmail: i.readerEmail || null
+      readerEmail: i.readerEmail || null,
+      strictSignedAttachments: i.strictSignedAttachments === true
     });
     // The profile names are not cached yet. No card, and not a quiet.
     // The host judges this mail again when the names land.
@@ -10816,7 +10821,7 @@ var GlanceIntent = (function () {
   function replyTrackCardTitle(text, rawTitle, dueIso) {
     var title = String(rawTitle || '').trim();
     var he = mailIsHebrew(text);
-    var isReplyLabel = /^reply requested\b/i.test(title);
+    var isReplyLabel = /^reply requested\b/i.test(title) || (he && /^נדרשת תשובה/.test(title));
     if (!isReplyLabel && !(he && /reply requested/i.test(title))) return sanitizeTitle(title);
     var sendReportEn = /\b(?:please\s+)?send\b[^.\n]{0,80}\breport\b/i.test(text);
     var sendReportHe = /(?:בבקשה\s+)?תשלח[^.\n]{0,80}דוח/.test(text);

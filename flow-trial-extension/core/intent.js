@@ -1913,7 +1913,8 @@ const FlowIntent = (() => {
         template: ctx.companyTemplate || null,
         fileMatch: ctx.fileMatch || null,
         attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount,
-        senderEmail: ctx.senderEmail || null
+        senderEmail: ctx.senderEmail || null,
+        strictSignedAttachments: ctx.strictSignedAttachments === true
       });
       if (google && google.wait) {
         const rescued = rescueSelfSent('google-wait');

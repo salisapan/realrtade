@@ -563,7 +563,7 @@ var GlanceIntent = (function () {
   function replyTrackCardTitle(text, rawTitle, dueIso) {
     var title = String(rawTitle || '').trim();
     var he = mailIsHebrew(text);
-    var isReplyLabel = /^reply requested\b/i.test(title);
+    var isReplyLabel = /^reply requested\b/i.test(title) || (he && /^נדרשת תשובה/.test(title));
     if (!isReplyLabel && !(he && /reply requested/i.test(title))) return sanitizeTitle(title);
     var sendReportEn = /\b(?:please\s+)?send\b[^.\n]{0,80}\breport\b/i.test(text);
     var sendReportHe = /(?:בבקשה\s+)?תשלח[^.\n]{0,80}דוח/.test(text);

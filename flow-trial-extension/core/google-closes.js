@@ -449,7 +449,10 @@ const FlowGoogleCloses = (() => {
     const signedInbound = Number(input.attachmentCount) >= 1 && signedCopyDelivered(text) && !refusesSave(text)
       && !OTHER_TARGET.test(text) && !noreply;
     if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
-      const attachOk = signedInbound ? Number(input.attachmentCount) >= 1 : input.attachmentCount === 1;
+      const signedAttachMax = input.strictSignedAttachments === true ? 1 : 2;
+      const attachOk = signedInbound
+        ? (Number(input.attachmentCount) >= 1 && Number(input.attachmentCount) <= signedAttachMax)
+        : input.attachmentCount === 1;
       if (refusesSave(text) || !attachOk || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);

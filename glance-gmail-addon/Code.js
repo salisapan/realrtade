@@ -387,7 +387,8 @@ function engineHit_(text, opened, now) {
       now: now,
       surface: 'gmail',
       attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
-      inbound: true
+      inbound: true,
+      strictSignedAttachments: true
     });
     if (!judged || !judged.show) {
       return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
