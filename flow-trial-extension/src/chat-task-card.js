@@ -279,6 +279,103 @@ const FlowChatTaskCard = (() => {
     return out;
   }
 
+  // The open "Waiting on ..." tasks Glance wrote from this chat, newest first, each with its title, its due day and the last time a reminder was
+  // drafted for it (a 'nudge' row). A task that was undone or closed here is not open.
+  async function findOpenWaiting(chatKey) {
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return [];
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    const thread = String(chatKey).split('|').slice(0, 3).join('|');
+    const undone = {};
+    const closed = {};
+    const nudged = {};
+    const out = [];
+    for (const e of log) {
+      if (!e) continue;
+      if (e.kind === 'nudge' && e.nudgeFor) { if (!nudged[e.nudgeFor] || e.at > nudged[e.nudgeFor]) nudged[e.nudgeFor] = e.at; continue; }
+      if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
+      if (e.kind !== 'written' || !e.ref) continue;
+      if (String(e.chatKey || '').split('|').slice(0, 3).join('|') !== thread) continue;
+      if (e.connectorId === 'googleTaskClose' || e.connectorId === 'outlookTaskClose') { if (!undone[e.chatKey] && e.closes) closed[e.closes] = true; continue; }
+      if ((e.connectorId !== 'googleTask' && e.connectorId !== 'outlookTask') || undone[e.chatKey] || closed[e.chatKey] || !e.ref.taskId) continue;
+      const st = e.process && Array.isArray(e.process.steps) ? e.process.steps[0] : null;
+      const p = st && st.params;
+      if (!p || !p.title || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.dateIso || ''))) continue;
+      out.push({ row: e, title: String(p.title), dueIso: p.dateIso, lastNudgeAt: 0 });
+    }
+    out.forEach((t) => { t.lastNudgeAt = nudged[t.row.chatKey] || 0; });
+    return out;
+  }
+
+  // A "Waiting on Dana: ..." task whose day has passed, and the other side wrote something that is not the answer: the card offers the short,
+  // polite reminder as a draft in the box (core/chat-chase.js, CHAT_CHASE_DRAFT). Do It only writes the box; the person reads it and sends it.
+  async function offerChase(i, chatKey, mount) {
+    if (typeof FlowChatChase === 'undefined' || typeof FlowChatCompose === 'undefined') return null;
+    if (!(await switchOn(FlowChatChase.SWITCH))) return null;
+    const box = i.composer || null;
+    if (!box) return null;
+    const open = await findOpenWaiting(chatKey);
+    const now = Date.now(); // today, not the message's own time
+    const pick = FlowChatChase.pick(open, now);
+    if (!pick) return null;
+    const text = FlowChatChase.draft(pick, now);
+    if (!text) return null;
+    const w = FlowChatChase.parseWaiting(pick.title);
+    const he = !!(w && w.he);
+    const label = (he ? 'תזכורת ל' + (/[\u0590-\u05FF]/.test(w.name) ? '' : '-') + w.name : 'Remind ' + w.name).slice(0, 100);
+    const ctx = {
+      app: i.channel || 'chat',
+      doLabel: 'Do It',
+      messageId: chatKey,
+      intent: { type: 'request', label: label, confidence: 0.9, personalClose: 'waiting-chase', signals: { score: 90, threshold: 50 }, entities: { what: pick.title } },
+      process: { id: CHAIN, name: he ? 'טיוטת תזכורת' : 'Draft a reminder', closingLine: he ? 'מכין טיוטה בתיבה.' : 'Putting a draft in the box.', closedLine: he ? 'הטיוטה בתיבה.' : 'The draft is in the box.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'reminder', kind: 'reminder', label: he ? 'תזכורת ל' + (/[\u0590-\u05FF]/.test(w.name) ? '' : '-') + w.name + ' בצ\'אט' : 'Reminder to ' + w.name + ' in the chat', hint: text, params: { text: text }, dependsOn: null }] },
+      sender: i.sender || {},
+      bodyText: '',
+      subject: '',
+      uiLang: he ? 'he' : 'en',
+      glanceChain: CHAIN,
+      chatTask: { connectorId: 'chatChase', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: he, own: false, chase: { text: text, box: box, taskChatKey: pick.row.chatKey, title: pick.title } }
+    };
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: (h, chip, c) => onDoIt(h, chip, c),
+      onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
+    });
+    if (!host) return { shown: false, reason: 'inject-failed' };
+    mount.setAttribute('data-glance-key', chatKey);
+    mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
+    host.setAttribute('data-glance-chain', CHAIN);
+    return { shown: true, reason: 'chase-offered' };
+  }
+
+  // Do It on the reminder: the words go into the box and nowhere else (a box that already has text is left alone). Nothing is sent, and the
+  // waiting task stays open: the loop closes when the other side answers, not when a draft exists. Undo empties the box only while it still
+  // holds exactly these words.
+  async function doChase(host, chip, ctx) {
+    const t = ctx.chatTask;
+    const c = t.chase;
+    const r = FlowChatCompose.insertDraft(c.box, c.text);
+    if (!(r && r.ok)) {
+      const text = r && r.reason === 'composer-not-empty' ? (t.he ? 'יש כבר טקסט בתיבה, השארתי אותו' : 'The box already has text, so I left it') : (t.he ? 'לא הצלחתי לכתוב בתיבה' : "Couldn't write in the box");
+      if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-error', text);
+      return;
+    }
+    try { await FlowStorage.appendLog({ kind: 'nudge', label: t.he ? 'טיוטת תזכורת בצ\'אט. לא נשלחה.' : 'Reminder drafted in the chat. Not sent.', app: 'chat', connectorId: 'chatChase', chatKey: t.chatKey, nudgeFor: c.taskChatKey, at: Date.now() }); } catch (e) { /* the draft is in the box */ }
+    if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.showDraftReceipt === 'function') {
+      FlowChipHost.showDraftReceipt(host, {
+        status: t.he ? 'הטיוטה בתיבה.' : 'Draft ready.',
+        written: t.he ? 'התזכורת בתיבת הצ\'אט. לא נשלחה.' : 'Reminder in the chat box. Not sent.',
+        onUndo: async () => {
+          const u = FlowChatCompose.clearIfUnchanged(c.box, c.text);
+          if (u.ok) { try { host.remove(); } catch (e) { /* gone already */ } dismissed.delete(t.chatKey); return { ok: true, written: t.he ? 'הטיוטה הוסרה.' : 'Draft removed.', reopen: true }; }
+          return { ok: false, reason: u.reason, written: u.reason === 'user-edited' ? (t.he ? 'ערכת את הטיוטה. ביטול השאיר אותה.' : 'You edited this. Undo left it alone.') : '' };
+        }
+      });
+    }
+  }
+
   // The other side says they paid: Do It marks the waiting task done, through the same Google lane, read back that it shows completed.
   // The person's click is the deliberate part; Glance has not seen any money. A task the person changed is left as it is.
   async function closePaid(host, chip, ctx) {
@@ -339,6 +436,7 @@ const FlowChatTaskCard = (() => {
 
   async function onDoIt(host, chip, ctx) {
     const t = ctx.chatTask;
+    if (t && t.chase) return doChase(host, chip, ctx);
     if (t && t.remove) return removeHeld(host, chip, ctx);
     if (t && t.close) return closePaid(host, chip, ctx);
     if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
@@ -660,7 +758,10 @@ const FlowChatTaskCard = (() => {
         }
       }
     }
-    if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
+    if (!judged || !judged.show) {
+      if (!own) { const chased = await offerChase(i, chatKey, mount); if (chased) return chased; }
+      return { shown: false, reason: (judged && judged.reason) || 'silent' };
+    }
     let taskStep = taskStepOf(judged.process);
     // Something the sender promised the person ("I'll send you the contract on Sunday") is logged to follow up on, not to do:
     // the judge's "Log commitment for Oct 25" becomes "Waiting on Dana: send the contract on Sunday", due that day.
@@ -736,10 +837,11 @@ const FlowChatTaskCard = (() => {
 
   // The call sites hand over what draftInto answered: a place or fact draft keeps the chat to itself; anything else
   // (silence, no answer, no box) lets the card see the same message. Never throws into the page's scan.
-  function afterDraft(result, input) {
+  // box is the open chat's input (optional): a reminder to someone who is late is offered only when there is a box to put it in.
+  function afterDraft(result, input, box) {
     if (result && result.reason === 'invalidated') return Promise.resolve({ shown: false, reason: 'invalidated' });
     if (result && result.ok && result.judged && result.judged.draft) return Promise.resolve({ shown: false, reason: 'drafted' });
-    return offer(input).catch(() => ({ shown: false, reason: 'error' }));
+    return offer(box ? Object.assign({}, input, { composer: box }) : input).catch(() => ({ shown: false, reason: 'error' }));
   }
 
   // The card belongs to one inbound message. When the newest message in the open chat is another one (or the person's

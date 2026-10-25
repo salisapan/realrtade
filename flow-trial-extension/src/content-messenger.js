@@ -264,7 +264,7 @@
         key: key
       };
       const r = await FlowChatLane.draftInto(box, input);
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
       if (!runtimeAlive() || (r && r.reason === 'invalidated')) { stopQuietly(); return; }
       if (r && r.reason === 'no-box') { whyNot('no-box', key); return; }
       if (!(r && r.ok && r.judged && r.judged.draft)) {

@@ -52,6 +52,7 @@
         "core/chat-travel-notice.js",
         "core/chat-delivery-window.js",
         "core/chat-payment-claim.js",
+        "core/chat-chase.js",
         "core/chat-invitation-notice.js",
         "core/chat-payment-ask.js",
         "core/chat-reminder.js",
