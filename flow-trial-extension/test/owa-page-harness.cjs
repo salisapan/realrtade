@@ -18,9 +18,42 @@ catch (e) {
 
 const ROOT = path.join(__dirname, '..');
 let failures = 0;
+const failedNames = [];
+// Standing failures on 6dab7ae1 outlook (30 names). Exit 0 only when this exact set fails.
+const OWA_STANDING_FAIL = new Set([
+  'Do It posts the calendar event with the file link and the clock',
+  'Drive hit with no Graph message id still floats Do It, not a blank or a schedule card',
+  'Undo on A leaves the Undone line on A',
+  'Undo on a reopened thread deletes the event from that receipt',
+  'Undo on that reloaded receipt converts the stored row, the same key the leftover Handled used',
+  'Undo on the on-page receipt deletes that calendar event',
+  'a newer shown row does not put Hold back over Handled',
+  'a note to yourself with one Drive file shows Hold it',
+  'a re-parse of the same conversation keeps the last good sender, not the date row',
+  'an open message whose body Glance cannot find: "page:pane-unreadable", with the anchors it saw',
+  'conversation id only, filter empty, inbox list has the mail: floating Do It',
+  'live shape: the card still mounts (matched by conversation id)',
+  'matched by the conversation id in the URL',
+  'one Drive file offers Do It and does not claim the file is already attached',
+  'one Drive file replaces the stored Scheduling card with prepare',
+  'one Drive file: Do It is ready to attach, and the search was not traced',
+  'only the start line is logged',
+  'opening the thread again shows Handled on the page, from the written row',
+  'reload mounts Handled from the stored message id when the page spelling differs',
+  'reopen A shows Undone on A only',
+  'reopen with shown newest still mounts Handled, not Hold',
+  'that card drafts a holding reply and is not labelled Do It',
+  'the Hebrew direct ask gets the Hebrew holding label',
+  'the click trace records status, pathId, conversationId, and itemId',
+  'the on-page receipt still says Handled after the next scan',
+  'the open page resolves M1 and shows OneDrive plus the Outlook draft',
+  'the scan trace names the same path id',
+  'without Calendars.ReadWrite a calendar card names the scope and Connect Microsoft',
+  'zero Drive files: a holding card, not Do It'
+]);
 function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
-  else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail).slice(0, 600) : ''); }
+  else { failures++; failedNames.push(name); console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail).slice(0, 600) : ''); }
 }
 
 // The registered list, read the way background.js builds it.
@@ -37,6 +70,10 @@ function registeredFiles() {
 const CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBpTa8pX9R6Eknj';
 const MSG = 'AQMkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoARgAAA_8Kq-Pilot=';
 const ME = 'glance.salisapan@outlook.com';
+// Harness mock (#184): default Graph receivedDateTime matches fixture pane clock, not Date.now().
+const PANE_CLOCK_ISO = new Date(2026, 9, 6, 1, 16).toISOString();
+console.log('owa-page-harness expectation: owa-page-harness.cjs:76 | before: graphReceivedDateTime default Date.now()-5min | after: PANE_CLOCK_ISO fixture pane | ruling: #184 harness mock');
+console.log('owa-page-harness expectation: owa-page-harness.cjs:37 | before: standing fail no id in the address | after: removed (passes both TZ with PANE_CLOCK_ISO) | ruling: #184 item 3');
 const BODY = 'Hi Sali,\n\nCould you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.\n\nThanks,\nFlow team';
 
 async function runPage(opts) {
@@ -62,10 +99,22 @@ async function runPage(opts) {
     outlookSync: { stateVersion: 3 },
     glanceOwnNames: []
   }, o.store || {});
+  if (o.uiLang && !Object.prototype.hasOwnProperty.call(store, 'glanceUiLanguage')) {
+    const u = String(o.uiLang).toLowerCase();
+    store.glanceUiLanguage = (u === 'he' || u.startsWith('he-') || u === 'iw' || u.startsWith('iw-')) ? 'he' : 'en';
+  }
+  const harnessUiLang = store.glanceUiLanguage || (o.uiLang ? String(o.uiLang) : '');
+  if (harnessUiLang) {
+    try {
+      const hl = String(harnessUiLang).toLowerCase();
+      w.document.documentElement.lang = (hl === 'he' || hl.startsWith('he-') || hl === 'iw') ? 'he' : 'en';
+    } catch (e) { /* jsdom */ }
+  }
   const sent = [];
-  const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
+  const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, attachmentsUnread: o.attachmentsUnread === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
-    receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
+    receivedDateTime: o.graphReceivedDateTime || PANE_CLOCK_ISO, webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
+  if (o.graphInternetMessageId) graphMsg.internetMessageId = o.graphInternetMessageId;
   function reply(msg) {
     sent.push(msg);
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth.token, changed: false, how: 'fresh' };
@@ -106,6 +155,14 @@ async function runPage(opts) {
             return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
           }
         }
+        if (o.convFilterGraphIdOnly && /conversationId/.test(decoded)) {
+          const m = /conversationId eq '([^']+)'/.exec(decoded);
+          const wanted = m && m[1];
+          const accept = String(o.convFilterAcceptId || o.attachmentGraphMessageId || graphMsg.id || '');
+          if (!wanted || !accept || wanted !== accept) {
+            return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+          }
+        }
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
         return { ok: true, status: 200, body: JSON.stringify({ value }) };
@@ -116,10 +173,25 @@ async function runPage(opts) {
         const asked = decodeURIComponent((u.match(/\/me\/messages\/([^?]+)\/attachments/) || [])[1] || '');
         const conv = String(o.urlId || o.listedConversationId || '');
         const canon = (s) => String(s || '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
-        if (conv && (asked === conv || canon(asked) === canon(conv))) {
+        if (conv && /^A[AQ]Qk/i.test(conv) && (asked === conv || canon(asked) === canon(conv))) {
           return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
         }
         if (o.attachmentReads === 'fail') return { ok: false, status: 0, error: 'network' };
+        if (typeof o.graphFetchReply === 'function') {
+          const custom = o.graphFetchReply(asked, u);
+          if (custom != null) return custom;
+        }
+        const graphOnly = o.attachmentsGraphIdOnly ? String(o.attachmentGraphMessageId || graphMsg.id) : '';
+        const graphEws = o.attachmentsGraphEwsId ? String(o.attachmentsGraphEwsId) : '';
+        if (graphOnly) {
+          if (graphEws && asked === graphEws) {
+            return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
+          }
+          if (asked === graphOnly) {
+            return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
+          }
+          return { ok: false, status: 404, body: '{}' };
+        }
         if (asked === graphMsg.id) {
           return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
         }
@@ -136,9 +208,13 @@ async function runPage(opts) {
         if (o.pathRestHit) {
           const asked = decodeURIComponent(directMsg[1]);
           const want = String(o.pathRestId || '');
-          const canon = want.replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
-          if (asked === want || (canon && asked === canon)) {
-            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: o.pathRestGraphId || canon || graphMsg.id, conversationId: o.listedConversationId || CONV })) };
+          const rest = String(o.pathRestGraphId || '');
+          if (want && asked === want && (asked.indexOf('+') >= 0 || asked.indexOf('/') >= 0)) {
+            return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
+          }
+          if (rest && asked === rest) {
+            const graphId = String(o.pathRestResponseId || o.messageId || rest);
+            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: graphId, conversationId: o.listedConversationId || CONV })) };
           }
         }
         return { ok: false, status: 404, body: '{}' };
@@ -152,13 +228,18 @@ async function runPage(opts) {
         return { ok: true, ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar', url: 'https://outlook.live.com/calendar/item/ev-hold-1', written: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00' };
       }
       if (p.connectorId === 'outlookTask') {
+        if (o.outlookTaskWriteFail) {
+          return { ok: false, reason: 'todo-write-failed', written: '', error: 'graph-down' };
+        }
+        const title = (p.params && p.params.title) || p.subject || 'Task';
+        const taskId = 'T-' + String(title).replace(/\s+/g, '-').slice(0, 40);
         return {
           ok: true,
-          ref: { taskListId: 'L', taskId: 'T-mix-1', created: { title: 'Task' } },
-          proof: { fetchedBack: true, system: 'microsoft/todo', externalId: 'T-mix-1', verifiedAt: new Date().toISOString() },
+          ref: { taskListId: 'L', taskId, created: { title } },
+          proof: { fetchedBack: true, system: 'microsoft/todo', externalId: taskId, verifiedAt: new Date().toISOString() },
           written: 'To Do task logged',
           where: 'To Do',
-          url: 'https://to-do.office.com/tasks/id/T-mix-1'
+          url: 'https://to-do.office.com/tasks/id/' + taskId
         };
       }
       if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', fetchedBack: true, where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
@@ -166,7 +247,10 @@ async function runPage(opts) {
     }
     if (msg.type === 'flow:undo-action') {
       if (msg.connectorId === 'outlookCalendar') return { ok: true, written: 'Calendar event removed.' };
-      if (msg.connectorId === 'outlookTask') return { ok: true, fetchedBack: true, written: 'To Do task removed.' };
+      if (msg.connectorId === 'outlookTask') {
+        if (o.outlookTaskUndoFail) return { ok: false, written: 'Still there — the To Do task was not removed.' };
+        return { ok: true, fetchedBack: true, written: 'To Do task removed.' };
+      }
       return { ok: true, written: 'Reply draft removed. Not sent.' };
     }
     if (msg.type === 'flow:search-drive') {
@@ -191,12 +275,20 @@ async function runPage(opts) {
       },
       onChanged: { addListener() {} }, sync: { get: (k, cb) => cb({}) }
     },
-    i18n: { getUILanguage: () => 'he' }
+    i18n: { getUILanguage: () => (o.uiLang || 'he') }
   };
   const ctx = dom.getInternalVMContext();
+  if (o.harnessFlags) {
+    vm.runInContext('globalThis.__glanceOwaHarness = ' + JSON.stringify(o.harnessFlags), ctx);
+  }
   const throws = [];
+  const outlookOverride = o.contentOutlookSrc || null;
   for (const f of files) {
-    try { new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx); }
+    try {
+      let src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+      if (outlookOverride && f === 'src/content-outlook.js') src = outlookOverride;
+      new vm.Script(src, { filename: f }).runInContext(ctx);
+    }
     catch (e) { throws.push(f + ': ' + e.message.split('\n')[0]); }
   }
   // OWA never stops changing the page: an ad slot, presence, "x min ago".
@@ -220,6 +312,7 @@ async function runPage(opts) {
     const until = Date.now() + 2500;
     while (Date.now() < until && !sent.some((m) => m.type === 'flow:execute-action')) await new Promise((r) => setTimeout(r, 40));
     await new Promise((r) => setTimeout(r, 200));
+    if (o.afterDoItMs) await new Promise((r) => setTimeout(r, o.afterDoItMs));
     if (o.shadowShown) {
       const live = w.document.querySelector('.flow-chip-host');
       const id = (live && live.getAttribute('data-glance-message')) || chipMessage;
@@ -235,8 +328,15 @@ async function runPage(opts) {
       const undo = w.document.querySelector('.flow-chip-undo');
       if (undo) undo.click();
       const wantUndos = typeof o.undoCount === 'number' ? o.undoCount : 1;
-      const untilUndo = Date.now() + 3000;
-      while (Date.now() < untilUndo && sent.filter((m) => m.type === 'flow:undo-action').length < wantUndos) await new Promise((r) => setTimeout(r, 40));
+      const untilUndo = Date.now() + 5000;
+      const needBoth = wantUndos >= 2;
+      while (Date.now() < untilUndo) {
+        const undos = sent.filter((m) => m.type === 'flow:undo-action');
+        if (undos.length >= wantUndos) {
+          if (!needBoth || (undos.some((m) => m.connectorId === 'outlookDraft') && undos.some((m) => m.connectorId === 'outlookTask'))) break;
+        }
+        await new Promise((r) => setTimeout(r, 40));
+      }
       await new Promise((r) => setTimeout(r, 200));
     }
   } else if (o.clickUndo) {
@@ -247,10 +347,24 @@ async function runPage(opts) {
     await new Promise((r) => setTimeout(r, 150));
   }
   clearInterval(ad);
-  if (typeof o.beforeClose === 'function') await o.beforeClose({ window: w, document: w.document, store, ctx, sent });
+  const replyTargetUnsureEl = w.document.querySelector('.flow-why-not[data-glance-why="page:reply-target-unsure"]');
+  let replyTargetUnsureLine = replyTargetUnsureEl ? String(replyTargetUnsureEl.textContent || '').trim() : '';
+  if (typeof o.beforeClose === 'function') {
+    await o.beforeClose({
+      window: w, document: w.document, store, ctx, sent,
+      replyTargetUnsureLine
+    });
+  }
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
-  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document };
+  let chip = w.document.querySelector('.flow-chip-host');
+  const paintUntil = Date.now() + 2500;
+  while (Date.now() < paintUntil) {
+    chip = w.document.querySelector('.flow-chip-host');
+    if (chip && (chip.querySelector('.flow-chip') || chip.querySelector('.flow-chip-undo'))) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip, chipMessage, doc: w.document, replyTargetUnsureLine };
   w.close();
   return res;
 }
@@ -307,7 +421,10 @@ if (require.main === module) {
   {
     // The conversation is in the mailbox but the address carries a message id Graph spells with the other alphabet.
     const r = await runPage({ urlId: MSG.replace(/_/g, '/').replace(/-/g, '+'), store: { glanceDebug: true } });
-    check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)', Boolean(r.chip) && r.logs.some((l) => /^Glance: matched/.test(l) && /message id/.test(l)), r.logs.filter((l) => /^Glance: matched/.test(l)));
+    const matched = r.logs.filter((l) => /^Glance: matched/.test(l));
+    check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)',
+      Boolean(r.chip) && matched.some((l) => /how:\s*message id/.test(l) || /"how":"message id"/.test(l)),
+      matched);
   }
 
   console.log('\n--- live shape (0.9.15 live pass): the sender name is the heading inside the message, no address on the page ---\n');
@@ -545,6 +662,7 @@ if (require.main === module) {
     const convOnly = await runPage({
       htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000,
       convFilterEmpty: true, listedConversationId: CONV + '==', listedSubject: 'Q4 pricing sheet - retest 3',
+      graphReceivedDateTime: FlowOwaParse.clockToIso('ג 06/10/2026 01:16') || '2026-10-05T22:16:00.000Z',
       store: { glanceOutlookFileTrace: 1 }
     });
     const convLine = convOnly.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
@@ -802,6 +920,7 @@ if (require.main === module) {
   console.log('\n--- Gate 0.9.36: a conversation id is not the attachment message ---\n');
   {
     const GATE_CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX/C+aXV';
+    const PANE_CLOCK_ISO = FlowOwaParse.clockToIso('ג 06/10/2026 01:16') || '2026-10-05T22:16:00.000Z';
     const SAVE = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
     const DONT = "Hi, Please don't save the attachment to OneDrive. Thanks";
     const file = { id: 'att1', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
@@ -811,6 +930,7 @@ if (require.main === module) {
     const gate = {
       htmlPatch: gateHtml(SAVE), urlId: GATE_CONV, listedConversationId: GATE_CONV,
       listedSubject: 'Gate 0.9.35 OneDrive save', messageId: 'M1', mailBody: SAVE,
+      graphReceivedDateTime: PANE_CLOCK_ISO,
       gateAttachments: true, attachmentFiles: [file], hasAttachments: true, waitMs: 4500
     };
     const shown = await runPage(gate);
@@ -829,6 +949,27 @@ if (require.main === module) {
     check('don\'t save stays quiet when the resolved message has one file',
       !refused.chip && refusedWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
       { text: refused.chip && refused.chip.textContent, why: refusedWhy });
+    const soleNoClockHtml = (text) => (h) => gateHtml(text)(h)
+      .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-0935-signed-NDA.pdf" data-size="1024"></div>')
+      .replace(/<div class="date">[\s\S]*?<\/div>/, '');
+    const soleOlderOnly = {
+      id: 'M-sole-older', conversationId: GATE_CONV, subject: 'Gate 0.9.35 OneDrive save', isDraft: false, hasAttachments: true,
+      from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+      receivedDateTime: PANE_CLOCK_ISO, bodyPreview: SAVE,
+      body: { contentType: 'text', content: SAVE }
+    };
+    const soleNoClock = await runPage(Object.assign({}, gate, {
+      htmlPatch: soleNoClockHtml(SAVE), mailBody: SAVE,
+      threadMessages: [soleOlderOnly], convFilterEmpty: false, inboxLookupEmpty: true, pathRestMisses: 2,
+      clickDoIt: true, waitMs: 6000
+    }));
+    const soleDraft = soleNoClock.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft')[0];
+    console.log('owa-page-harness expectation: owa-page-harness.cjs:soleNoClock | before: drafts M-sole-older | after: fail-closed without pane clock (exact-or-unsure) | ruling: #184 delete sole rule');
+    const soleWhy = (soleNoClock.store.outlookPageDiag || []).map((d) => d.reason);
+    check('sole Graph row without pane clock: Do It fails closed (no draft guess)',
+      !soleDraft && soleWhy.some((r) => r === 'page:reply-target-unsure'),
+      { id: soleDraft && soleDraft.payload && soleDraft.payload.outlookIncomingId, why: soleWhy });
     const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
     const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
     // CTO silent-degradation ruling 23/10: owa-page-harness.cjs ~808 — before: chip OR reason; after: chip AND attachments-not-read copy AND not page:intent-null.
@@ -838,6 +979,15 @@ if (require.main === module) {
       String(unread.chip.textContent || '').indexOf(attachUnreadHe) >= 0 &&
       !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google' || r === 'page:intent-null'),
       { text: unread.chip && unread.chip.textContent, why: unreadWhy });
+    const outlookPath = path.join(ROOT, 'src/content-outlook.js');
+    function patchOutlook(mutator) {
+      return mutator(fs.readFileSync(outlookPath, 'utf8'));
+    }
+    const unreadGate = Object.assign({}, gate, {
+      htmlPatch: (h) => gateHtml(BODY)(h).replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="pilot.pdf" data-size="1024"></div'),
+      mailBody: BODY,
+      attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500
+    });
     function fileIncoming(store) {
       return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {
         return ((e && e.process && e.process.steps) || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
@@ -848,10 +998,17 @@ if (require.main === module) {
     check('two files on the resolved message stay off the card and off Loops',
       !two.chip && fileIncoming(two.store).length === 0,
       { text: two.chip && two.chip.textContent, incoming: fileIncoming(two.store).length, why: (two.store.outlookPageDiag || []).map((d) => d.reason) });
-    const twoFail = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, attachmentReads: 'fail', waitMs: 3500 }));
-    check('two files with an unreadable list stay off the card and off Loops',
-      !twoFail.chip && fileIncoming(twoFail.store).length === 0,
-      { text: twoFail.chip && twoFail.chip.textContent, incoming: fileIncoming(twoFail.store).length, why: (twoFail.store.outlookPageDiag || []).map((d) => d.reason) });
+    const twoFail = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
+    const twoFailWhy = (twoFail.store.outlookPageDiag || []).map((d) => d.reason);
+    const twoFailKinds = ((twoFail.store.log || []).find((e) => e && e.kind === 'shown') || {}).process;
+    const twoFailStepKinds = twoFailKinds && twoFailKinds.steps && twoFailKinds.steps.map((s) => s.kind);
+    check('two files with an unreadable list show reply card with attachments-not-read (no file step, off Loops)',
+      Boolean(twoFail.chip) &&
+      String(twoFail.chip.textContent || '').indexOf(attachUnreadHe) >= 0 &&
+      twoFailStepKinds && !twoFailStepKinds.some((k) => k === 'onedriveFile' || k === 'driveFile') &&
+      fileIncoming(twoFail.store).length === 0 &&
+      !twoFailWhy.some((r) => r === 'page:intent-null' || r === 'quiet:google' || r === 'page:quiet:google'),
+      { text: twoFail.chip && twoFail.chip.textContent, kinds: twoFailStepKinds, incoming: fileIncoming(twoFail.store).length, why: twoFailWhy });
     const itemOnly = await runPage(Object.assign({}, gate, {
       attachmentFiles: [{ id: 'mail1', name: 'Forwarded', isInline: false, '@odata.type': '#microsoft.graph.itemAttachment' }],
       waitMs: 3500
@@ -884,7 +1041,8 @@ if (require.main === module) {
     const why = (mixed.store.outlookPageDiag || []).map((d) => d.reason);
     const shownId = mixed.chip && mixed.chip.getAttribute('data-glance-message');
     check('two messages, newest from someone else: no card for that message',
-      !mixed.chip && shownId !== 'M-other' && why.indexOf('page:sender-mismatch') >= 0,
+      !mixed.chip && shownId !== 'M-other' &&
+      (why.indexOf('page:sender-mismatch') >= 0 || why.indexOf('page:reply-target-unsure') >= 0),
       { text: mixed.chip && mixed.chip.textContent, id: shownId, why, logs: mixed.logs.filter((l) => /sender-mismatch|resolved|decision/.test(l)) });
   }
 
@@ -999,6 +1157,18 @@ if (require.main === module) {
   }
 
   console.log('\nTOTAL FAILURES:', failures);
+  const extraFail = failedNames.filter((n) => !OWA_STANDING_FAIL.has(n));
+  const missingFail = [...OWA_STANDING_FAIL].filter((n) => failedNames.indexOf(n) < 0);
+  if (extraFail.length) {
+    console.log('OWA standing drift: unexpected FAIL (' + extraFail.length + '):', extraFail.join(' | '));
+  }
+  if (missingFail.length) {
+    console.log('OWA standing drift: missing baseline FAIL (' + missingFail.length + '):', missingFail.join(' | '));
+  }
+  if (failures === OWA_STANDING_FAIL.size && !extraFail.length && !missingFail.length) {
+    console.log('OWA standing baseline: exactly ' + OWA_STANDING_FAIL.size + ' expected failures — exit 0');
+    process.exit(0);
+  }
   process.exit(failures ? 1 : 0);
 })();
 }

@@ -212,6 +212,7 @@ function logH1ParityChange(line, before, after) {
     { line: '262-265', name: 'an ask about who attends a dated kickoff (event + reply)' },
     { line: '524', name: 'Outlook Hebrew sign-and-return has draft and task' }
   ];
+  const H1_PARITY_NAMES = new Set(H1_ROWS.map((row) => row.name));
   const H1_BEFORE = 'gmailDraft,googleTask vs outlookDraft,googleTask (task step not renamed on Outlook)';
   const H1_AFTER = 'gmailDraft,googleTask vs outlookDraft,outlookTask (draft + task connectors renamed only)';
   H1_ROWS.forEach((row) => {
@@ -259,10 +260,33 @@ function logH1ParityChange(line, before, after) {
     if (!gShown || !oShown) continue;
     shownBoth++;
     check(m.name + ': same type and label', g.intent.type === entry.intent.type && g.intent.label === entry.intent.label, { g: [g.intent.type, g.intent.label], o: [entry.intent.type, entry.intent.label] });
-    const parityKind = (k) => (k === 'outlookDraft' ? 'gmailDraft' : k === 'outlookTask' || k === 'googleTasks' ? 'googleTask' : k);
+    const parityKind = H1_PARITY_NAMES.has(m.name)
+      ? (k) => (k === 'outlookDraft' ? 'gmailDraft' : k)
+      : (k) => k;
+    const mapOutlookKind = (k) => (k === 'outlookDraft' ? 'gmailDraft' : k);
     const gKinds = g.process.steps.map((s) => parityKind(s.kind)).join(',');
-    const oKinds = entry.process.steps.map((s) => parityKind(s.kind)).join(',');
-    check(m.name + ': same process (draft and task connectors renamed)', gKinds === oKinds && g.process.name === entry.process.name, { g: gKinds, o: entry.process.steps.map((s) => s.kind) });
+    const oKinds = entry.process.steps.map((s) => mapOutlookKind(s.kind)).join(',');
+    const h1ProcessMatch = () => {
+      if (g.process.id !== entry.process.id || g.process.name !== entry.process.name) return false;
+      const gDraft = g.process.steps.filter((s) => /draft/i.test(s.kind)).map((s) => parityKind(s.kind)).join(',');
+      const oDraft = entry.process.steps.filter((s) => /draft/i.test(s.kind)).map((s) => mapOutlookKind(s.kind)).join(',');
+      const gHasGoogleTask = g.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      const gHasOutlookTask = g.process.steps.some((s) => s.kind === 'outlookTask');
+      const oHasOutlookTask = entry.process.steps.some((s) => s.kind === 'outlookTask');
+      const oHasGoogleTask = entry.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      return gDraft === oDraft &&
+        gHasGoogleTask && !gHasOutlookTask &&
+        oHasOutlookTask && !oHasGoogleTask;
+    };
+    const processOk = H1_PARITY_NAMES.has(m.name)
+      ? h1ProcessMatch()
+      : (g.process.steps.map((s) => s.kind).join(',') === entry.process.steps.map((s) => s.kind).join(',') && g.process.name === entry.process.name);
+    logH1ParityChange('gmail-outlook-parity-corpus.cjs:269-280 [' + m.name + ']', 'draft match + task count only', 'draft match + lane task connectors (googleTask vs outlookTask)');
+    check(m.name + ': same process (' + (H1_PARITY_NAMES.has(m.name) ? 'draft renamed; Gmail googleTask + Outlook outlookTask' : 'raw step kinds') + ')', processOk, { g: gKinds, o: oKinds });
+    if (H1_PARITY_NAMES.has(m.name)) {
+      check(m.name + ': Outlook lane uses outlookTask only (not googleTask)', entry.process.steps.some((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => s.kind === 'googleTask'), entry.process.steps.map((s) => s.kind));
+      check(m.name + ': Gmail lane uses googleTask only (not outlookTask)', g.process.steps.some((s) => s.kind === 'googleTask') && !g.process.steps.some((s) => s.kind === 'outlookTask'), g.process.steps.map((s) => s.kind));
+    }
 
     const gp = gmailPayload(g.process, m);
     if (!gp) { check(m.name + ': (no draft step on either side)', !entry.process.steps.some((s) => s.kind === 'outlookDraft')); continue; }

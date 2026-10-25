@@ -50,7 +50,7 @@ const FlowOutlookAttachmentEvidence = (() => {
     }
     const he = lang === 'he' || lang === 'iw';
     const withTask = opts && (opts.taskSuggested === true || opts.withTask === true);
-    if (withTask) return he ? 'ממך אליך — הוצעה משימה.' : 'From you to you — a task was suggested.';
+    if (withTask) return he ? 'ממך אליך — הוצעה משימה' : 'From you to you — a task was suggested.';
     return he ? 'ממך אליך' : 'From you to you';
   }
 
@@ -75,4 +75,5 @@ const FlowOutlookAttachmentEvidence = (() => {
   };
 })();
 
+if (typeof globalThis !== 'undefined') globalThis.FlowOutlookAttachmentEvidence = FlowOutlookAttachmentEvidence;
 if (typeof module !== 'undefined') module.exports = { FlowOutlookAttachmentEvidence };
