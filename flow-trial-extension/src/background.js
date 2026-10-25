@@ -73,6 +73,8 @@ import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOut
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import '../core/teams-web-read.js'; // classic: sets globalThis.FlowTeamsWebRead (Teams web lane, Chat.Read fallback)
+import './lane-teams-worker.js'; // answers flow:teams-web-read for teams.microsoft.com
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
@@ -627,6 +629,14 @@ const LANE_CHAT = [
   }
 ];
 
+const LANE_TEAMS = {
+  id: 'glance-lane-teams',
+  origins: ['https://teams.microsoft.com/*', 'https://teams.live.com/*'],
+  js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/teams-parse.js', 'src/content-teams.js']
+};
+
+const TEAMS_HOSTS = LANE_TEAMS.origins.slice();
+
 // The chat task card needs the one shared judge, the step kit and the canonical card, which the lean chat lists do
 // not carry. Each chat registration loads the same base the Outlook surface does (minus the Gmail-only pieces and the
 // Gmail follow-up scripts), the lane's own files, then the card, so the card file always loads after chat-lane.js.
@@ -640,6 +650,7 @@ function laneChatScripts(lane) {
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
 globalThis.__glanceLaneChatScripts = laneChatScripts;
 globalThis.__glanceLaneChatDefs = LANE_CHAT;
+globalThis.__glanceLaneTeamsDef = LANE_TEAMS;
 
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
@@ -706,17 +717,39 @@ async function restoreLaneChats() {
   }
 }
 
+async function restoreLaneTeams() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  let on = false;
+  try { on = await chrome.permissions.contains({ origins: TEAMS_HOSTS }); } catch (e) { on = false; }
+  const id = LANE_TEAMS.id;
+  try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* not registered */ }
+  if (!on) return;
+  try {
+    await chrome.scripting.registerContentScripts([{
+      id: id,
+      matches: LANE_TEAMS.origins,
+      js: laneChatScripts(LANE_TEAMS),
+      css: LANE_CHAT_CSS,
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    }]);
+  } catch (e) {
+    console.info('[Glance] whyNotShown: teams-lane-not-registered');
+  }
+}
+
 dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();
-chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+restoreLaneTeams();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); restoreLaneTeams(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); restoreLaneTeams(); });
 try {
   if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
-    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); restoreLaneTeams(); });
   }
   if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
-    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); restoreLaneTeams(); });
   }
 } catch (e) { /* the next wake reads the grant again */ }
 

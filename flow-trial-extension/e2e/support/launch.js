@@ -628,7 +628,7 @@ async function boot() {
   });
 
   const documents = new Map();
-  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com|www\.instagram\.com)\//, async (route) => {
+  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com|www\.instagram\.com|teams\.microsoft\.com|teams\.live\.com)\//, async (route) => {
     const req = route.request();
     const bare = req.url().split('#')[0];
     if (req.resourceType() === 'document' && documents.has(bare)) {
