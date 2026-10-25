@@ -1070,15 +1070,14 @@
     t = t.replace(/(?:\u2026|\.{3})\s*$/u, '').trim();
     return t;
   }
-  function solePreviewAllowsPrefix(pane, m) {
+  function soleBodyExactMatch(pane, m) {
     const paneBody = normalizeSoleBodyText(pane && pane.text);
+    if (!paneBody) return false;
     const preview = normalizeSoleBodyText(m && m.bodyPreview);
     const fullGraph = normalizeSoleBodyText((m && m.body && m.body.content) || '');
-    if (!paneBody || !preview) return false;
-    if (preview === paneBody || (fullGraph && preview === fullGraph && paneBody === fullGraph)) return true;
-    if (preview !== paneBody.slice(0, preview.length)) return false;
-    const nonSpace = preview.replace(/\s/g, '').length;
-    return nonSpace >= 250;
+    if (preview && preview === paneBody) return true;
+    if (fullGraph && fullGraph === paneBody) return true;
+    return false;
   }
   function openPaneExactGraphRow(pane, m) {
     if (!pane || !m) return false;
@@ -1128,7 +1127,7 @@
       const preview = normalizeSoleBodyText(sole.bodyPreview);
       const paneBody = normalizeSoleBodyText(pane && pane.text);
       if (!paneAnchored) return null;
-      if (solePreviewAllowsPrefix(pane, sole)) return sole;
+      if (soleBodyExactMatch(pane, sole)) return sole;
     }
     return null;
   }
@@ -1168,33 +1167,14 @@
     }
     if (convList.length <= 1) return false;
     const exact = await exactOpenMessageInList(convList, pane, openSender);
-    if (exact && exact.id) {
-      const rows = await attachmentListFor(exact.id);
-      if (!Array.isArray(rows)) return true;
-      for (let a = 0; a < paneAtts.length; a++) {
-        const hits = rows.filter((g) => graphAttMatchesPane(paneAtts[a], g));
-        if (hits.length !== 1) return true;
-      }
-      return false;
+    if (!exact || !exact.id) return true;
+    const rows = await attachmentListFor(exact.id);
+    if (!Array.isArray(rows)) return true;
+    for (let a = 0; a < paneAtts.length; a++) {
+      const hits = rows.filter((g) => graphAttMatchesPane(paneAtts[a], g));
+      if (hits.length !== 1) return true;
     }
-    const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
-    let matchedIds = 0;
-    for (let i = 0; i < convList.length; i++) {
-      const m = convList[i];
-      if (!m || !m.id) continue;
-      const from = fromAddress(m);
-      if (behalfSplit(m.from, m.sender)) continue;
-      if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;
-      const rows = await attachmentListFor(m.id);
-      if (!Array.isArray(rows)) continue;
-      let ok = true;
-      for (let a = 0; a < paneAtts.length; a++) {
-        const hits = rows.filter((g) => graphAttMatchesPane(paneAtts[a], g));
-        if (hits.length !== 1) { ok = false; break; }
-      }
-      if (ok) matchedIds += 1;
-    }
-    return matchedIds !== 1;
+    return false;
   }
 
   function paneUrlOnlyMessageTarget(pane) {
@@ -5185,13 +5165,9 @@
           return;
         }
         if (!exactPin || !exactPin.id) {
-          const paneMinute = minuteOf(pane && pane.receivedDateTime);
-          const paneClockOk = Boolean((pane && pane.internetMessageId) || (paneMinute && pane.clockFromPane === true));
-          if (!(decided.attachmentsUnread && paneClockOk)) {
-            dropStuckCard(pane);
-            await pageReason('page:reply-target-unsure', pane);
-            return;
-          }
+          dropStuckCard(pane);
+          await pageReason('page:reply-target-unsure', pane);
+          return;
         }
       }
       // Either side saying this is a file ask is enough to run the chain.
