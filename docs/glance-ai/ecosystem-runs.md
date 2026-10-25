@@ -678,3 +678,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** chat card corpus (a claim offers the close for a To Do task, the close call carries ids and the snapshot only, the row, Undo through the worker), two real-browser WhatsApp specs on the Graph stand-in (the whole loop: task completed on the stand-in then reopened by Undo; an edited task untouched with the card saying so), all corpora.
 - **Open:** live Gate (Graph PATCH on `/me/todo/lists/{id}/tasks/{id}` and Undo have never run against the real Graph); a task Glance wrote into Planner (a plan named in the message) is not closed this way; mail does not close a chat task; no cross-chat matching.
 
+
+## Run 82 (builder B, 2026-10-25): QA and proof run, no new capability
+
+- **Said plainly:** this run pushes no new user-facing capability. It was spent proving the previous runs.
+- **Proof:** the whole Playwright suite on the unpacked extension at `b3ff4c73`: 410 passed, 0 failed (18.8 minutes), including the WhatsApp, Business Suite, Instagram and payment-loop specs (Google Tasks and Microsoft To Do).
+- **Found:** `glance-gmail-addon/test/v1.test.cjs` has 5 red expectations (not run by CI, not caused by this work): the shared judge treats a meeting with a day and no clock as `no-process`, the add-on test expects an all-day hold. Recorded as `docs/open-tasks.md` row 83 for the owner or David; the judge policy was not changed.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Open:** unchanged from run 81 (live Gates; mail-side removal of a cancelled booking; Planner tasks; no cross-chat matching).
