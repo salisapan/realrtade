@@ -1535,8 +1535,13 @@ const FlowStorage = (() => {
       if (undoTsByMsg[e.messageId] == null || ts >= undoTsByMsg[e.messageId]) undoTsByMsg[e.messageId] = ts;
       if (e.ref) undoByRef[e.messageId + '|' + e.ref] = ts;
     }
-    const out = [];
+    const bestBySlot = Object.create(null);
     const seen = new Set();
+    function receiptSlotKey(entry) {
+      if (!entry || !entry.messageId) return '';
+      const slot = entry.connectorId === 'outlookDraft' ? 'draft' : 'other';
+      return entry.messageId + '|' + slot;
+    }
     const panelReceipt = (typeof FlowDisplay !== 'undefined' && FlowDisplay.isPanelReceipt)
       ? FlowDisplay.isPanelReceipt
       : function (e) { return e && e.kind === 'written' && e.connectorId === 'outlookDraft' && e.messageId && !e.undone && e.outlookReceipt !== false && !e.outlookSent; };
@@ -1545,9 +1550,15 @@ const FlowStorage = (() => {
       const wts = e.ts || 0;
       if (e.ref && undoByRef[e.messageId + '|' + e.ref] != null && undoByRef[e.messageId + '|' + e.ref] >= wts) continue;
       if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) continue;
-      if (seen.has(e.messageId)) continue;
-      seen.add(e.messageId);
-      out.push(e);
+      const slot = receiptSlotKey(e);
+      if (!slot) continue;
+      const prev = bestBySlot[slot];
+      if (!prev || wts >= (prev.ts || 0)) bestBySlot[slot] = e;
+    }
+    const out = Object.keys(bestBySlot).map((k) => bestBySlot[k]);
+    for (let i = 0; i < out.length; i++) {
+      const slot = receiptSlotKey(out[i]);
+      if (slot) seen.add(slot);
     }
     const P = proofApi();
     const store = state && state.glanceProofs;
@@ -1566,10 +1577,12 @@ const FlowStorage = (() => {
       }
       Object.keys(store.records).forEach((mid) => {
         const rec = store.records[mid];
-        if (!rec || rec.undone === true || seen.has(rec.messageId)) return;
+        if (!rec || rec.undone === true) return;
         const view = P.proofAsLogRow(rec);
         if (!view || !panelReceipt(view)) return;
-        seen.add(view.messageId);
+        const slot = receiptSlotKey(view);
+        if (!slot || seen.has(slot)) return;
+        seen.add(slot);
         out.push(view);
       });
     }
