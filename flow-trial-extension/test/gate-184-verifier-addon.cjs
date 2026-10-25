@@ -4,8 +4,8 @@ const path = require('path');
 const { FlowOwaParse } = require('../core/owa-parse.js');
 const OUTLOOK_PRODUCT_SRC = fs.readFileSync(path.join(__dirname, '..', 'src/content-outlook.js'), 'utf8');
 
-console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:noclockNewerOnly | before: graphOnlyNewer with pane clock + legacySkew bite | after: 16 noclock probes (4 variants x EWS/REST x exact/skew) + subject/containment bites | ruling: #184 item 2');
-console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:soleTop25 | before: (missing) | after: $top=25 padded conv filter fail-closed + <= regression bite | ruling: #184 item 4');
+console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:noclockNewerOnly | before: sole-rule rows | after: exact-or-unsure fail-closed + legacy matcher bites | ruling: #184 delete sole rule');
+console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:noclock-1 | before: drafts M-older without clock | after: fail-closed (ruling) | ruling: #184 exact-or-unsure');
 
 module.exports = async function runGate184VerifierAddon(ctx) {
   const {
@@ -58,13 +58,19 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     return src.includes(needle) ? src.replace(needle, repl) : src;
   }
   function fileitLegacyResolverOrderSrc(src) {
-    const needle = `const replyTarget = judged
-              ? await resolveJudgedReplyMessageId(pane, own, pane.senderEmail)
-              : await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail);`;
-    const repl = `const replyTarget = judged
-              ? await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail)
-              : await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);`;
-    return src.includes(needle) ? src.replace(needle, repl) : src;
+    const exactBlock = `if (conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {
+              replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
+            } else {
+              const judged = needsJudgedReplyTarget(proc);
+              replyTarget = judged
+                ? await resolveJudgedReplyMessageId(pane, own, pane.senderEmail)
+                : await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail);
+            }`;
+    const legacyBlock = `const judged = needsJudgedReplyTarget(proc);
+              replyTarget = judged
+                ? await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail)
+                : await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);`;
+    return src.includes(exactBlock) ? src.replace(exactBlock, legacyBlock) : src;
   }
   function newestOnlyResolveSrc(src) {
     const needle = 'async function messageIdForOpenPane(convId, own, openSender, pane) {';
@@ -73,14 +79,14 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     const nextFn = src.indexOf('\n  async function ', start + needle.length);
     const end = nextFn > start ? nextFn : src.length;
     let chunk = src.slice(start, end);
-    const pickNeedle = 'const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender, { soleConvFilterComplete: false });';
+    const pickNeedle = 'const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender);';
     if (chunk.indexOf(pickNeedle) >= 0) {
       chunk = chunk.replace(
         pickNeedle,
         'const known = await loadUserAddresses();\n      const pickExactOnly = (list) => Promise.resolve(newestOther(list, own, openSender, known));'
       );
     }
-    const filterNeedle = 'const fromFilter = await exactOpenMessageInList(convList, pane, openSender, { soleConvFilterComplete: soleComplete });';
+    const filterNeedle = 'const fromFilter = await exactOpenMessageInList(convList, pane, openSender);';
     if (chunk.indexOf(filterNeedle) >= 0) {
       chunk = chunk.replace(
         filterNeedle,
@@ -98,26 +104,29 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   function legacySkewDraftsNewerSrc(src) {
     return newestOnlyResolveSrc(legacyFailClosedSrc(src));
   }
-  function replaceOpenPaneBodyMatchFn(src, fnSource) {
-    const start = src.indexOf('function openPaneBodyOrSubjectMatch(pane, m) {');
-    if (start < 0) return src;
-    let depth = 0;
-    let end = start;
-    for (let i = start; i < src.length; i++) {
-      if (src[i] === '{') depth++;
-      else if (src[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+  const exactListTail = 'if (hits.length === 1) return hits[0];\n    return null;';
+  function injectExactListLegacyBite(src, soleReturnLine) {
+    if (!src.includes(exactListTail)) return src;
+    const block = `if (hits.length === 1) return hits[0];
+    if (hits.length > 1) return null;
+    if (rows.length === 1) {
+      const sole = rows[0];
+      const from = fromAddress(sole);
+      if (behalfSplit(sole.from, sole.sender)) return null;
+      if (!(await sameOpenSender(from, open, senderAddress(sole)))) return null;
+      ${soleReturnLine}
     }
-    return src.slice(0, start) + fnSource + src.slice(end);
+    return null;`;
+    return src.replace(exactListTail, block);
   }
-  const soleMatchSubjectOnlyFn = `function openPaneBodyOrSubjectMatch(pane, m) {
-    if (!pane || !m) return false;
-    function norm(s) { return String(s || '').replace(/\\s+/g, ' ').trim().toLowerCase(); }
-    const subjPane = norm(pane.subject);
-    const subjMsg = norm(m.subject);
-    return Boolean(subjPane && subjMsg && subjPane === subjMsg);
-  }`;
-  const soleMatchContainmentFn = `function openPaneBodyOrSubjectMatch(pane, m) {
-    if (!pane || !m) return false;
+  const legacyPrefixHelperFn = `function legacyPaneBodyPrefixMatch(pane, m) {
+    function normB(s) { let t = String(s || '').replace(/\\s+/g, ' ').trim().toLowerCase(); t = t.replace(/(?:\\u2026|\\.{3})\\s*$/u, '').trim(); return t; }
+    const paneBody = normB(pane.text);
+    const graphText = normB(m.bodyPreview || (m.body && m.body.content) || '');
+    if (!paneBody || !graphText || graphText.replace(/\\s/g, '').length < 20) return false;
+    return paneBody.slice(0, graphText.length) === graphText;
+  }
+  function legacyPaneBodyContainmentMatch(pane, m) {
     function norm(s) { return String(s || '').replace(/\\s+/g, ' ').trim().toLowerCase(); }
     const paneBody = norm(pane.text);
     const preview = norm(m.bodyPreview);
@@ -128,34 +137,24 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     if (graphText.length >= 12 && paneBody.indexOf(graphText) >= 0) return true;
     if (paneBody.length >= 12 && graphText.indexOf(paneBody) >= 0) return true;
     return false;
-  }`;
-  function soleMatchSubjectOnlyBiteSrc(src) {
-    return replaceOpenPaneBodyMatchFn(src, soleMatchSubjectOnlyFn);
   }
-  function soleMatchContainmentBiteSrc(src) {
-    return replaceOpenPaneBodyMatchFn(src, soleMatchContainmentFn);
+  `;
+  function ensureLegacyMatchHelpers(src) {
+    if (src.indexOf('function legacyPaneBodyPrefixMatch') >= 0) return src;
+    return src.replace('async function exactOpenMessageInList(list, pane, openSender) {', legacyPrefixHelperFn + 'async function exactOpenMessageInList(list, pane, openSender) {');
   }
-  function soleConvFilterOnInboxBiteSrc(src) {
-    return src.replace(
-      'const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender, { soleConvFilterComplete: false });',
-      'const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender, { soleConvFilterComplete: true });'
-    );
+  function legacySubjectRowBiteSrc(src) {
+    return injectExactListLegacyBite(src, `function normSubj(s) { return String(s || '').replace(/\\s+/g, ' ').trim().toLowerCase(); }
+      if (normSubj(pane.subject) && normSubj(sole.subject) && normSubj(pane.subject) === normSubj(sole.subject)) return sole;`);
   }
-  function inboxSoleSubjectBiteSrc(src) {
-    return soleMatchSubjectOnlyBiteSrc(soleConvFilterOnInboxBiteSrc(src));
+  function legacyContainmentBiteSrc(src) {
+    return injectExactListLegacyBite(ensureLegacyMatchHelpers(src), 'if (legacyPaneBodyContainmentMatch(pane, sole)) return sole;');
   }
-  function soleTopInclusiveBiteSrc(src) {
-    return src.replace(
-      'const soleComplete = Array.isArray(convList) && convList.length > 0 && convList.length < convFilterTop;',
-      'const soleComplete = Array.isArray(convList) && convList.length > 0 && convList.length <= convFilterTop;'
-    );
+  function legacyPrefixBiteSrc(src) {
+    return injectExactListLegacyBite(ensureLegacyMatchHelpers(src), 'if (legacyPaneBodyPrefixMatch(pane, sole)) return sole;');
   }
-  function soleTopRegressedBiteSrc(src) {
-    let s = soleTopInclusiveBiteSrc(src);
-    return s.replace(
-      'if (rows.length !== 1 || pane.visibleMessageBodies !== 1) return null;',
-      'if ((!soleConvFilterComplete && rows.length !== 1) || pane.visibleMessageBodies !== 1) return null;'
-    );
+  function inboxLegacySubjectBiteSrc(src) {
+    return legacySubjectRowBiteSrc(src);
   }
   function legacyReplyOnlySrc(src) {
     const pickNeedle = 'const pick = (list) => exactOpenMessageInList(list, pane, openSender);';
@@ -849,30 +848,66 @@ module.exports = async function runGate184VerifierAddon(ctx) {
         body: { contentType: 'text', content: quoted }
       });
     }
+    if (variant === 'prefixShort') {
+      const prefix = 'Could you confirm the contract status by Sunday?';
+      return Object.assign({}, base, {
+        bodyPreview: prefix,
+        body: { contentType: 'text', content: prefix + ' (follow-up)' }
+      });
+    }
+    if (variant === 'prefixGreeting') {
+      const paneBody = 'Hi, thanks for your note. ' + wtReplyBody;
+      const prefix = paneBody.slice(0, 48);
+      return Object.assign({}, base, {
+        bodyPreview: prefix,
+        body: { contentType: 'text', content: prefix }
+      });
+    }
+    if (variant === 'prefix255') {
+      const pad = 'x'.repeat(200);
+      const prefix = (pad + wtReplyBody).slice(0, 255);
+      return Object.assign({}, base, {
+        bodyPreview: prefix,
+        body: { contentType: 'text', content: prefix + ' tail' }
+      });
+    }
     return base;
   }
   function biteForNewerOnlyVariant(variant) {
-    if (variant === 'quotePane' || variant === 'reChain') return soleMatchContainmentBiteSrc;
-    return soleMatchSubjectOnlyBiteSrc;
+    if (variant === 'prefixShort' || variant === 'prefixGreeting' || variant === 'prefix255') return legacyPrefixBiteSrc;
+    if (variant === 'quotePane' || variant === 'reChain') return legacyContainmentBiteSrc;
+    return legacySubjectRowBiteSrc;
+  }
+  function variantLabel(variant) {
+    if (variant === 'newerOnly') return 'noclock-newerOnly';
+    if (variant === 'sameSubject') return 'same subject';
+    if (variant === 'reChain') return 'RE-chain';
+    if (variant === 'quotePane') return 'quoting reply';
+    if (variant === 'prefixShort') return 'prefix short contract';
+    if (variant === 'prefixGreeting') return 'prefix greeting';
+    if (variant === 'prefix255') return 'prefix 255';
+    return variant;
   }
   async function noclockNewerOnlyMatrix(transportLabel, convId, skew, variant) {
-    const variantLabel = variant === 'newerOnly' ? 'noclock-newerOnly' :
-      variant === 'sameSubject' ? 'same subject' :
-      variant === 'reChain' ? 'RE-chain' : 'quoting reply';
+    const vLabel = variantLabel(variant);
     const row = newerOnlyGraphRow(variant);
     const threadMessages = skew
       ? [Object.assign({}, row, { receivedDateTime: newerDt })]
       : [row];
     const listedSubject = variant === 'reChain' ? 'Gate Run 4' : 'Gate Run 4';
+    const paneMailBody = variant === 'prefixGreeting' ? ('Hi, thanks for your note. ' + wtReplyBody)
+      : variant === 'prefix255' ? ('x'.repeat(200) + wtReplyBody)
+      : wtReplyBody;
     const base = Object.assign({}, gateBase, wtReplyDoItBase, {
       urlId: convId, listedConversationId: convId, listedSubject,
-      htmlPatch: wtReplyNoClockDom, mailBody: wtReplyBody,
+      htmlPatch: (h) => wtReplyNoClockDom(gateHtml(paneMailBody)(h)),
+      mailBody: paneMailBody,
       threadMessages, pathRestMisses: 2, inboxLookupEmpty: true, waitMs: 8000
     });
-    const label = 'noclock ' + variantLabel + ' ' + transportLabel + (skew ? ' skew' : ' exact');
+    const label = 'noclock ' + vLabel + ' ' + transportLabel + (skew ? ' skew' : ' exact');
     const page = await runPage(base);
     logGateRun4Bite('noclockNewerOnly:' + variant + ':' + transportLabel + (skew ? ':skew' : ':exact'),
-      'no pane clock; conv filter only M-newer; ' + variantLabel, 'reply-target-unsure; no M-newer draft');
+      'no pane clock; conv filter only M-newer; ' + vLabel, 'reply-target-unsure; no M-newer draft');
     assertSkewFailClosed(label + ': Do It fails closed (never M-newer)', page);
     const biteSrc = biteForNewerOnlyVariant(variant);
     const mut = await runPage(Object.assign({}, base, { contentOutlookSrc: patchOutlook(biteSrc) }));
@@ -884,7 +919,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     const noop = await runPage(Object.assign({}, base, { contentOutlookSrc: patchOutlook((s) => s) }));
     noclockNewerOnlyBiteCheck(label, mut, noop, mutDraft);
   }
-  const noclockVariants = ['newerOnly', 'sameSubject', 'reChain', 'quotePane'];
+  const noclockVariants = ['newerOnly', 'sameSubject', 'reChain', 'quotePane', 'prefixShort', 'prefixGreeting', 'prefix255'];
   for (const variant of noclockVariants) {
     await noclockNewerOnlyMatrix('EWS', WRONG_TARGET_CONV, false, variant);
     await noclockNewerOnlyMatrix('EWS', WRONG_TARGET_CONV, true, variant);
@@ -903,10 +938,12 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     threadMessages: [noclockOlderOnlyRow], pathRestMisses: 2, inboxLookupEmpty: true, waitMs: 8000
   }));
   const noclockOlderDraft = replyDraftActs(noclockOlderCtrl)[0] && replyDraftActs(noclockOlderCtrl)[0].payload;
-  logGateRun4Bite('noclock-1', 'sole M-older row without pane clock', 'exact bodyPreview drafts M-older');
-  check('noclock-1: sole conv-filter M-older without pane clock drafts M-older',
-    noclockOlderDraft && noclockOlderDraft.outlookIncomingId === 'M-older',
-    { id: noclockOlderDraft && noclockOlderDraft.outlookIncomingId });
+  logGateRun4Bite('noclock-1', 'M-older row without pane clock', 'exact-or-unsure: fail closed');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:907-909 | before: drafts M-older | after: reply-target-unsure | ruling: #184 delete sole rule');
+  check('noclock-1: conv-filter M-older without pane clock fails closed (no M-newer draft)',
+    !replyDraftActs(noclockOlderCtrl).some((m) => m.payload && m.payload.outlookIncomingId === 'M-newer') &&
+    expectsUnsureLine(noclockOlderCtrl),
+    { id: noclockOlderDraft && noclockOlderDraft.outlookIncomingId, why: pageWhyText(noclockOlderCtrl).slice(0, 120) });
 
   const inboxNewerOnlyBase = Object.assign({}, gateBase, wtReplyDoItBase, {
     htmlPatch: wtReplyNoClockDom, mailBody: wtReplyBody,
@@ -918,11 +955,11 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   logGateRun4Bite('inboxNewerOnly', 'no pane clock; inbox lists only M-newer', 'sole rule not on inbox window');
   assertSkewFailClosed('inbox fallback only M-newer without pane clock: Do It fails closed', inboxNewerOnly);
   const inboxNewerOnlyMut = await runPage(Object.assign({}, inboxNewerOnlyBase, {
-    contentOutlookSrc: patchOutlook(inboxSoleSubjectBiteSrc)
+    contentOutlookSrc: patchOutlook(inboxLegacySubjectBiteSrc)
   }));
   const inboxNewerMutDraft = replyDraftActs(inboxNewerOnlyMut)[0] && replyDraftActs(inboxNewerOnlyMut)[0].payload;
-  const inboxNewerMutPatch = patchOutlook(inboxSoleSubjectBiteSrc) !== OUTLOOK_PRODUCT_SRC;
-  check('inboxNewerOnly bite: sole rule on inbox window drafts M-newer',
+  const inboxNewerMutPatch = patchOutlook(inboxLegacySubjectBiteSrc) !== OUTLOOK_PRODUCT_SRC;
+  check('inboxNewerOnly bite: legacy subject-only matcher on inbox list drafts M-newer',
     inboxNewerMutPatch && inboxNewerMutDraft && inboxNewerMutDraft.outlookIncomingId === 'M-newer',
     { patch: inboxNewerMutPatch, id: inboxNewerMutDraft && inboxNewerMutDraft.outlookIncomingId });
   const inboxNewerOnlyNoOp = await runPage(Object.assign({}, inboxNewerOnlyBase, {
@@ -930,64 +967,39 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   }));
   noclockNewerOnlyBiteCheck('inbox fallback only M-newer', inboxNewerOnlyMut, inboxNewerOnlyNoOp, inboxNewerMutDraft);
 
-  const soleTopBase = Object.assign({}, gateBase, wtReplyDoItBase, {
-    urlId: WRONG_TARGET_CONV, listedConversationId: WRONG_TARGET_CONV,
-    htmlPatch: wtReplyNoClockDom, mailBody: wtReplyBody,
-    threadMessages: [newerOnlyGraphRow('newerOnly')], convFilterPadToTop: 25,
-    pathRestMisses: 2, inboxLookupEmpty: true, waitMs: 8000
-  });
-  const soleTopCtrl = await runPage(soleTopBase);
-  const soleTopCtrlDraft = replyDraftActs(soleTopCtrl)[0] && replyDraftActs(soleTopCtrl)[0].payload;
-  logGateRun4Bite('soleTop25', 'conv filter returns 25 rows with one same-sender row', 'soleComplete false at full $top; fail closed');
-  check('soleTop25: $top=25 padded filter with one same-sender row fails closed (no M-newer draft)',
-    !replyDraftActs(soleTopCtrl).some((m) => m.payload && m.payload.outlookIncomingId === 'M-newer') &&
-    expectsUnsureLine(soleTopCtrl),
-    { id: soleTopCtrlDraft && soleTopCtrlDraft.outlookIncomingId, why: pageWhyText(soleTopCtrl).slice(0, 120) });
-  function soleTopInclusiveSubjectBiteSrc(src) {
-    return soleMatchSubjectOnlyBiteSrc(soleTopRegressedBiteSrc(src));
+  const fileitSkewThread = wtReplySkewThread;
+  const fileitOlderFile = { id: 'att-old', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
+  const fileitNewerFile = { id: 'att-new', name: 'Gate-NEWER-nda.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
+  function fileitAttachReply(asked) {
+    if (String(asked) === 'M-older') return { ok: true, status: 200, body: JSON.stringify({ value: [fileitOlderFile] }) };
+    if (String(asked) === 'M-newer') return { ok: true, status: 200, body: JSON.stringify({ value: [fileitNewerFile] }) };
+    return { ok: false, status: 404, body: '{}' };
   }
-  const soleTopMut = await runPage(Object.assign({}, soleTopBase, {
-    contentOutlookSrc: patchOutlook(soleTopInclusiveSubjectBiteSrc)
-  }));
-  const soleTopMutDraft = replyDraftActs(soleTopMut)[0] && replyDraftActs(soleTopMut)[0].payload;
-  const soleTopMutPatch = patchOutlook(soleTopInclusiveSubjectBiteSrc) !== OUTLOOK_PRODUCT_SRC;
-  check('soleTop25 bite: <= $top regression plus subject-only sole match drafts M-newer on full filter page',
-    soleTopMutPatch && soleTopMutDraft && soleTopMutDraft.outlookIncomingId === 'M-newer',
-    { patch: soleTopMutPatch, id: soleTopMutDraft && soleTopMutDraft.outlookIncomingId });
-  const soleTopNoOp = await runPage(Object.assign({}, soleTopBase, {
-    contentOutlookSrc: patchOutlook((s) => s)
-  }));
-  const soleTopNoOpDraft = replyDraftActs(soleTopNoOp)[0] && replyDraftActs(soleTopNoOp)[0].payload;
-  check('soleTop25 bite: identity outlook patch does not satisfy bite',
-    !(soleTopMutDraft && soleTopMutDraft.outlookIncomingId === 'M-newer' &&
-      soleTopNoOpDraft && soleTopNoOpDraft.outlookIncomingId === 'M-newer'),
-    { mut: soleTopMutDraft && soleTopMutDraft.outlookIncomingId, noop: soleTopNoOpDraft && soleTopNoOpDraft.outlookIncomingId });
-
-  const fileitInboxSkewBase = Object.assign({}, gateBase, {
-    htmlPatch: saveJudgedSkewDom, mailBody: g2SaveBody,
-    urlId: WRONG_TARGET_CONV_REST, listedConversationId: WRONG_TARGET_CONV_REST, listedSubject: 'Gate Run 4',
-    graphReceivedDateTime: olderDt, threadMessages: skewConvThread(WRONG_TARGET_CONV_REST),
-    pathRestMisses: 2, inboxLookupEmpty: false,
-    gateAttachments: true, attachmentFiles: [file], attachmentReads: 'fail', attachmentsUnread: true,
-    hasAttachments: true, waitMs: 8000, clickDoIt: true,
-    store: Object.assign({}, cleanStore, {
-      glanceTodoConsent: { mode: 'always', scope: 'Tasks.ReadWrite', revoked: false, at: 1 },
-      outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: HME }, ownAddresses: [HME] }
-    })
+  const fileitInboxSkewDom = (h) => gateHtml(prepBody)(h)
+    .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-0935-signed-NDA.pdf" data-size="1024"></div>')
+    .replace('<div class="hdr">', '<div class="hdr"><time datetime="' + olderDt + '"></time>')
+    .replace('<div class="date">\u05d2 06/10/2026 01:16</div>',
+      '<div class="date" data-received="' + olderDt + '">' + wtDateRow + '</div>');
+  const fileitInboxSkewBase = Object.assign({}, prepSkewBase, {
+    htmlPatch: fileitInboxSkewDom, mailBody: prepBody,
+    threadMessages: fileitSkewThread,
+    inboxLookupEmpty: false,
+    pathRestMisses: 2,
+    gateAttachments: true, attachmentFiles: [fileitOlderFile, fileitNewerFile], hasAttachments: true,
+    attachmentReads: 'ok', attachmentsUnread: false,
+    graphFetchReply: fileitAttachReply,
+    clickDoIt: true, waitMs: 8000
   });
-  const fileitInboxSkew = await runPage(fileitInboxSkewBase);
-  logGateRun4Bite('fileitInboxSkew', 'OneDrive conv URL +7min non-empty inbox', 'fail closed; no M-newer draft');
-  assertSkewFailClosed('file prepare conversation URL +7min with non-empty inbox fails closed (OneDrive chain)', fileitInboxSkew);
-  function fileitInboxSkewBiteSrc(src) {
-    return fileitLegacyResolverOrderSrc(legacySkewDraftsNewerSrc(src));
-  }
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: fileitLegacy only (fails on strict sole rule) | after: fileitLegacy(L5164)+legacySkewDraftsNewerSrc | ruling: #184 item 5 bite sensitivity');
-  const fileitInboxSkewMut = await runPage(Object.assign({}, fileitInboxSkewBase, {
-    contentOutlookSrc: patchOutlook(fileitInboxSkewBiteSrc)
+  const fileitInboxSkew = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase));
+  logGateRun4Bite('fileitInboxSkew', 'file prepare skew + inbox lists both', 'fail closed; M-older attachment only');
+  assertSkewFailClosed('file prepare conversation URL +7min with inbox listing both fails closed (never M-newer)', fileitInboxSkew);
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: stacked legacySkew | after: fileitLegacy L5193 only | ruling: #184 item 3');
+  const fileitInboxSkewMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
+    contentOutlookSrc: patchOutlook(fileitLegacyResolverOrderSrc)
   }));
   const fileitInboxSkewMutDraft = replyDraftActs(fileitInboxSkewMut)[0] && replyDraftActs(fileitInboxSkewMut)[0].payload;
-  const fileitInboxSkewMutPatch = patchOutlook(fileitInboxSkewBiteSrc) !== OUTLOOK_PRODUCT_SRC;
-  check('fileitInboxSkew bite: fileit_legacy resolver order drafts M-newer on judged save skew with non-empty inbox',
+  const fileitInboxSkewMutPatch = patchOutlook(fileitLegacyResolverOrderSrc) !== OUTLOOK_PRODUCT_SRC;
+  check('fileitInboxSkew bite: fileit_legacy resolver order alone drafts M-newer on skewed file-prepare',
     fileitInboxSkewMutPatch && fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId === 'M-newer',
     { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId });
   const fileitInboxSkewNoOp = await runPage(Object.assign({}, fileitInboxSkewBase, {
