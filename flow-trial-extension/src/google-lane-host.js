@@ -14,6 +14,7 @@ import '../core/workspace-file.js';
 import '../core/event-call-link.js';
 // FlowFullDocumentClose: a full quote/proposal Doc in the person's style (Gmail+Docs), switch FULL_DOCUMENT_CLOSE, off.
 import '../core/google-closes.js';
+import '../core/style-profile.js';
 import '../core/full-document-close.js';
 import '../core/google-tasks.js';
 import '../core/google-task-close.js';
@@ -871,7 +872,10 @@ function verifyUrlFor(connectorId, ref) {
     return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
   }
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
-  if (fileId && /^google(DriveSave|DocFull|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
+  if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
+    return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
+  }
+  if (connectorId === 'googleDocFull' && fileId) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
   }
   return '';

@@ -3202,6 +3202,10 @@ function glanceUiCopy(kind) {
   // A full quote/proposal Doc in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
   // One Do It creates the Doc for preview; Glance never sends mail.
   async function showFullDocumentChip(message, c) {
+    try {
+      const st = await FlowStorage.get();
+      if (!(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
+    } catch (e) { return false; }
     const lang = mailLanguage({ bodyText: c.text });
     let styleSummary = null;
     try {
@@ -3988,9 +3992,29 @@ function glanceUiCopy(kind) {
     return (g && g.artifact) || (ctx && ctx.process && ctx.process.id) || 'unknown';
   }
 
+  let userContextSwitchOn = null;
+  async function userContextEnabled() {
+    if (userContextSwitchOn != null) return userContextSwitchOn;
+    try {
+      const st = await FlowStorage.get();
+      userContextSwitchOn = !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
+    } catch (e) { userContextSwitchOn = false; }
+    return userContextSwitchOn;
+  }
+
   function userContextEvent(ev) {
     if (!chromeLive()) return;
-    try { chrome.runtime.sendMessage({ type: 'flow:user-context-event', event: ev }); } catch (e) { /* worker off */ }
+    userContextEnabled().then((on) => {
+      if (!on) return;
+      const lane = laneAccountContext();
+      try {
+        chrome.runtime.sendMessage({
+          type: 'flow:user-context-event',
+          event: ev,
+          accountKey: lane.tabAccount || 'default'
+        });
+      } catch (e) { /* worker off */ }
+    });
   }
 
   function sendRuntime(msg) {
@@ -5001,7 +5025,9 @@ function glanceUiCopy(kind) {
       undo.textContent = he ? 'מבטל…' : 'Undoing…';
       sendLaneUndo('googleDoc', response.ref).then((undone) => {
         undo.textContent = undone && undone.ok ? (he ? 'בוטל' : 'Undone') : (undone && undone.error) || (he ? 'לא בוטל' : 'Undo failed');
-        userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
+        if (undone && undone.ok) {
+          userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
+        }
       });
     });
     const actionsRow = el('div', 'flow-chip-actions-row');
@@ -5558,6 +5584,17 @@ function glanceUiCopy(kind) {
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     if (host.__glanceSteps) host.__glanceSteps.setAll('preparing');
+    const slotFills = readSlotFills(host);
+    if (slotFills && Object.keys(slotFills).length) {
+      userContextEvent({ type: 'edited', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
+    }
+    userContextEvent({
+      type: 'approved',
+      partyKey: userContextParty(ctx),
+      intentFamily: userContextFamily(ctx),
+      fetchedBack: false,
+      at: new Date().toISOString()
+    });
     FlowStorage.appendLog({ kind: 'clicked', label: activityLabel(ctx), messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });

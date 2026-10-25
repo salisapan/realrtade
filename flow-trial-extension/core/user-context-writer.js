@@ -180,7 +180,8 @@ const FlowUserContextWriter = (() => {
       approved += (Number(r.approvedFetchedBack) || 0) * w;
       dismissed += (Number(r.dismissed) || 0) * w;
     }
-    if (approved >= 2 && dismissed === 0) return { relevance: 'relevant', reason: 'history_closed' };
+    const relevantFloor = 2 - 1e-2;
+    if (dismissed === 0 && approved >= relevantFloor) return { relevance: 'relevant', reason: 'history_closed' };
     if (dismissed >= 3 && approved === 0) return { relevance: 'not_relevant', reason: 'history_dismissed' };
     return { relevance: 'unknown', reason: 'cold_profile' };
   }

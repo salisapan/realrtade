@@ -6,6 +6,7 @@
 const FlowFullDocumentClose = (() => {
   const SWITCH = 'FULL_DOCUMENT_CLOSE';
   const CONNECTOR = 'googleDocFull';
+  const PRICE_PLACEHOLDER = '[מחיר / price]';
 
   const ASK_EN = /\b(?:send|prepare|draft|write|put together|share)\b.{0,40}\b(?:the\s+)?(?:quote|quotation|proposal|contract|agreement|sow|statement of work)\b/i;
   const ASK_HE = /(?:שלח|שלחי|הכן|הכיני|תכין|תכיני|להכין|נא\s+להכין).{0,40}(?:הצעת\s*מחיר|הצעה|חוזה|הסכם)/u;
@@ -53,14 +54,34 @@ const FlowFullDocumentClose = (() => {
   }
 
   function amountInText(text) {
-    return /\d[\d,.]*\s*(?:₪|\$|€|usd|ils|eur)?/i.test(String(text || '')) || /[\u0590-\u05FF].*\d/.test(String(text || ''));
+    const s = String(text || '');
+    return /\$[\d,.]+(?:\.\d{2})?/.test(s) || /₪[\d,.]+/.test(s) || /€[\d,.]+/.test(s) || /[\d,.]+\s*(?:USD|ILS|EUR)\b/i.test(s);
+  }
+
+  function amountVerbatimInSource(sourceText, amountVal) {
+    const s = String(sourceText || '');
+    const a = String(amountVal || '').trim();
+    if (!a) return false;
+    return s.indexOf(a) !== -1;
   }
 
   function stripInventedAmounts(close, sourceText) {
     if (!close || !close.filled) return close;
-    if (amountInText(sourceText)) return close;
     const filled = Object.assign({}, close.filled);
-    if (filled.amount) delete filled.amount;
+    if (filled.amount && !amountVerbatimInSource(sourceText, filled.amount)) delete filled.amount;
+    return Object.assign({}, close, { filled: filled });
+  }
+
+  function ensurePricePlaceholder(close, sourceText) {
+    if (!close) return close;
+    const slots = close.slots || [];
+    const needsAmount = slots.indexOf('amount') !== -1 || close.artifact === 'quote';
+    if (!needsAmount) return close;
+    const filled = Object.assign({}, close.filled || {});
+    if (!filled.amount) filled.amount = PRICE_PLACEHOLDER;
+    else if (!amountVerbatimInSource(sourceText, filled.amount) && filled.amount !== PRICE_PLACEHOLDER) {
+      filled.amount = PRICE_PLACEHOLDER;
+    }
     return Object.assign({}, close, { filled: filled });
   }
 
@@ -132,6 +153,7 @@ const FlowFullDocumentClose = (() => {
     if (!consider || !consider.close) return { action: 'silence', reason: consider && consider.wait ? 'need-slot' : 'no-close' };
     let close = consider.close;
     close = stripInventedAmounts(close, text);
+    close = ensurePricePlaceholder(close, text);
     const built = composeHtml(close, { lang: input.lang, styleSummary: input.styleSummary, partyName: close.filled && close.filled.party });
     if (!built || built.blank) return { action: 'silence', reason: 'incomplete-slots' };
 
@@ -160,7 +182,9 @@ const FlowFullDocumentClose = (() => {
     plan,
     composeHtml,
     stripInventedAmounts,
-    amountInText
+    ensurePricePlaceholder,
+    amountInText,
+    PRICE_PLACEHOLDER
   };
 })();
 
