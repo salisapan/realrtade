@@ -37,11 +37,7 @@ function copyExtension(opts) {
     // This copy only. The repo manifest lists WhatsApp Web as an optional host;
     // the scenario rehearsal registers the WhatsApp lane against a fixture here.
     'https://web.whatsapp.com/*',
-    // This copy only. The repo manifest already lists these as optional hosts.
-    'https://business.facebook.com/latest/inbox',
-    'https://business.facebook.com/latest/inbox/*',
-    'https://www.business.facebook.com/latest/inbox',
-    'https://www.business.facebook.com/latest/inbox/*',
+    // Business Suite is excluded from v1 (PR-M); do not add it to the e2e copy.
     // This copy only: the Instagram lane against a fixture on this host.
     'https://www.instagram.com/direct',
     'https://www.instagram.com/direct/*',

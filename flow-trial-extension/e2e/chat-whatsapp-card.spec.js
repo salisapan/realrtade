@@ -92,7 +92,7 @@ const path = require('path');
 const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
-test('Business Suite, CHAT_TASK_CARD on: a customer\'s payment ask on the page inbox is one To Do task, nothing is sent', async ({ glance }) => {
+test.skip('Business Suite is excluded from v1 (PR-M)', async ({ glance }) => {
   const registered = await glance.evaluateWorker(async () => {
     const lane = globalThis.__glanceLaneChatDefs.find((l) => l.id === 'glance-lane-messenger');
     const id = 'glance-lane-messenger-e2e';

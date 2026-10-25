@@ -82,7 +82,7 @@ const required = manifest.host_permissions || [];
 const optional = manifest.optional_host_permissions || [];
 const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
 check('chat hosts are optional, never required', !required.some((h) => chatHost.test(h)) && optional.some((h) => /messenger\.com/.test(h)) && optional.some((h) => /instagram\.com\/direct/.test(h)) && optional.some((h) => /web\.whatsapp\.com/.test(h)));
-check('Business Suite inbox is an optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
+check('Business Suite inbox is not an optional host in v1', !required.some((h) => /business\.facebook\.com/.test(h)) && !optional.some((h) => /business\.facebook\.com/.test(h)));
 function chromeHostCovers(pattern, url) {
   const u = new URL(url);
   const m = String(pattern || '').match(/^(https?):\/\/([^/]+)(\/.*)$/);
@@ -117,18 +117,19 @@ check('WhatsApp Web is not a separate surface', !/label: 'WhatsApp Web'/.test(ba
 check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
-check('the service worker re-registers Business Suite when it is already allowed', /glance-lane-messenger/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc) && /whyNotShown: messenger-not-granted/.test(backgroundSrc));
+check('Messenger and Instagram are not persistently registered in the worker', /glance-lane-messenger/.test(backgroundSrc) && /glance-lane-instagram/.test(backgroundSrc) && /glance-lane-messenger' \|\| lane\.id === 'glance-lane-instagram'\) continue/.test(backgroundSrc));
 check('the service worker pings a tab before injecting the lane', /window\.__glanceLaneChat/.test(backgroundSrc));
 const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
+check('Messenger content script does not attach a MutationObserver', !/new MutationObserver/.test(messengerSrc));
 check('Messenger logs a quiet reason and retries an empty thread', /whyNotShown/.test(messengerSrc) && /RETRY_LIMIT/.test(messengerSrc) && /time\[datetime\]/.test(messengerSrc));
 const metaSrc = fs.readFileSync(path.join(ROOT, 'lane-chat/meta-consent.js'), 'utf8');
 const enableHtml = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.html'), 'utf8');
 const popupHtml = fs.readFileSync(path.join(ROOT, 'popup/popup.html'), 'utf8');
 const popupJs = fs.readFileSync(path.join(ROOT, 'popup/popup.js'), 'utf8');
 check('one Meta consent replaces the per-app off line', enableSrc.indexOf('Messenger is off, so Business Suite stays quiet') < 0 && enableSrc.split('permissions.request(').length === 2);
-check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns on drafts in Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web/.test(enableHtml) && /Glance סוגר לולאות פתוחות\. Gmail הוא המקום שבו הוא מתחיל היום\./.test(enableHtml) && /הסכמה אחת מפעילה טיוטות/.test(enableHtml));
+check('the options page says one consent turns Meta on', enableHtml.indexOf('Each app stays off') < 0 && /One consent turns on drafts in Messenger, Facebook messages, Instagram, and WhatsApp Web/.test(enableHtml) && /not affiliated with, sponsored by, or endorsed by Meta/.test(enableHtml) && /Glance סוגר לולאות פתוחות\. Gmail הוא המקום שבו הוא מתחיל היום\./.test(enableHtml) && /הסכמה אחת מפעילה טיוטות/.test(enableHtml));
 check('Hebrew and English name the one Meta button', metaSrc.indexOf('Turn on Meta chats') >= 0 && metaSrc.indexOf('הפעל צ׳אטים של Meta') >= 0 && metaSrc.indexOf('צ׳אטים של Meta פועלים') >= 0);
-check('the consent names every capability and says nothing is sent automatically', /Nothing is ever sent automatically/.test(enableHtml) && /reads the chat you have open/.test(enableHtml) && /tracks follow-ups/.test(enableHtml) && /location of events/.test(enableHtml) && /שום דבר לא נשלח אוטומטית/.test(enableHtml) && /קורא את הצ׳אט שפתוח/.test(enableHtml) && /בצ׳אטים של WhatsApp הוא גם עוקב אחרי המשך/.test(enableHtml) && /המיקום של אירועים/.test(enableHtml));
+check('the consent names every capability and says nothing is sent automatically', /Nothing is ever sent automatically/.test(enableHtml) && /only after you click/.test(enableHtml) && /end-to-end encrypted Messenger/.test(enableHtml) && /not affiliated with, sponsored by, or endorsed by Meta/.test(enableHtml) && /שום דבר לא נשלח אוטומטית/.test(enableHtml) && /אין קריאה ברקע/.test(enableHtml) && /מוצר עצמאי ואינו קשור ל-Meta/.test(enableHtml));
 check('the consent page uses the shared locale helper', enableSrc.indexOf('FlowDisplay.uiLangFrom') >= 0 && enableHtml.indexOf('core/display-copy.js') >= 0);
 check('the popup Meta row follows the panel locale and a permission change', popupJs.indexOf('document.documentElement.lang') >= 0 && /permissions\.onAdded[\s\S]{0,220}renderMetaChats/.test(popupJs) && /permissions\.onRemoved[\s\S]{0,220}renderMetaChats/.test(popupJs) && popupJs.indexOf('block.hidden = Boolean(on)') < 0);
 check('the popup page has a Meta row', popupHtml.indexOf('id="meta-chats"') >= 0 && popupHtml.indexOf('meta-consent.js') >= 0);
@@ -1238,7 +1239,7 @@ console.log('\n--- calendar evidence ---\n');
   const guardSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
   for (let n = 0; n < 3; n++) new vm.Script(guardSrc, { filename: 'src/content-messenger.js' }).runInContext(guardCtx);
   const observers = vm.runInContext('(window.__glanceLaneChat && window.__glanceLaneChat.observers) || 0', guardCtx);
-  check('three injections leave one observer', observers === 1, observers);
+  check('three injections leave zero background observers', observers === 0, observers);
   guardDom.window.close();
 
   const META_ORIGINS = [
@@ -1249,10 +1250,6 @@ console.log('\n--- calendar evidence ---\n');
     'https://www.facebook.com/messages/*',
     'https://facebook.com/messages',
     'https://facebook.com/messages/*',
-    'https://business.facebook.com/latest/inbox',
-    'https://business.facebook.com/latest/inbox/*',
-    'https://www.business.facebook.com/latest/inbox',
-    'https://www.business.facebook.com/latest/inbox/*',
     'https://www.instagram.com/direct',
     'https://www.instagram.com/direct/*',
     'https://instagram.com/direct',
@@ -1288,17 +1285,17 @@ console.log('\n--- calendar evidence ---\n');
   const enCopy = en.enable.window.document.querySelector('[data-lang="en"]');
   const enHeCopy = en.enable.window.document.querySelector('[data-lang="he"]');
   check('the prompt waits for the one Meta button', en.asked.length === 0 && en.registered.length === 0 && enButtons.length === 1 && enLabel && enLabel.textContent === 'Turn on Meta chats' && enButtons[0].querySelector('.shell') && enButtons[0].querySelector('.ring') && enButtons[0].querySelector('.shine'));
-  check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && /Nothing is ever sent automatically/.test(enCopy.textContent) && /tracks follow-ups/.test(enCopy.textContent) && /location of events/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
+  check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && /only after you click/.test(enCopy.textContent) && /not affiliated with, sponsored by, or endorsed by Meta/.test(enCopy.textContent) && /Nothing is ever sent automatically/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
   enButtons[0].click();
   await new Promise((r) => setTimeout(r, 40));
   check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => optional.indexOf(origin) >= 0) && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
   const scripts = en.registered[0] || [];
   const scriptIds = scripts.map((row) => row.id).slice().sort().join(',');
-  check('the grant registers every Meta lane once', en.registered.length === 1 && scripts.length === 3 && scriptIds === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp');
+  check('the grant registers WhatsApp only at load (Messenger and Instagram are click-only)', en.registered.length === 1 && scripts.length === 1 && scriptIds === 'glance-lane-whatsapp');
   const byId = {};
   scripts.forEach((row) => { byId[row.id] = row.matches.join('\n'); });
-  check('each lane stays on its own hosts', byId['glance-lane-whatsapp'] === 'https://web.whatsapp.com/*' && /business\.facebook\.com\/latest\/inbox/.test(byId['glance-lane-messenger']) && /facebook\.com\/messages/.test(byId['glance-lane-messenger']) && byId['glance-lane-messenger'].indexOf('web.whatsapp.com') < 0 && /instagram\.com\/direct/.test(byId['glance-lane-instagram']) && byId['glance-lane-instagram'].indexOf('messenger.com') < 0);
-  check('Business Suite is registered at runtime, not from the manifest', /business\.facebook\.com/.test(JSON.stringify(en.registered)) && JSON.stringify(manifest.content_scripts).indexOf('business.facebook.com') < 0);
+  check('WhatsApp stays on its own host', byId['glance-lane-whatsapp'] === 'https://web.whatsapp.com/*');
+  check('Business Suite is not registered at runtime', JSON.stringify(en.registered).indexOf('business.facebook.com') < 0 && JSON.stringify(manifest.content_scripts).indexOf('business.facebook.com') < 0);
   check('a granted page has no off switch', en.enable.window.document.querySelectorAll('button').length === 0);
   en.enable.window.close();
 
@@ -1315,7 +1312,7 @@ console.log('\n--- calendar evidence ---\n');
   const heCopy = he.enable.window.document.querySelector('[data-lang="he"]');
   const heEnCopy = he.enable.window.document.querySelector('[data-lang="en"]');
   check('Hebrew UI names the one Meta button', he.asked.length === 0 && heLabel && heLabel.textContent === 'הפעל צ׳אטים של Meta' && he.enable.window.document.documentElement.lang === 'he');
-  check('Hebrew UI shows the Hebrew explanation', heCopy && heCopy.hidden === false && /Glance סוגר לולאות פתוחות/.test(heCopy.textContent) && /הסכמה אחת מפעילה טיוטות/.test(heCopy.textContent) && /בצ׳אטים של WhatsApp הוא גם עוקב אחרי המשך/.test(heCopy.textContent) && /המיקום של אירועים/.test(heCopy.textContent) && /שום דבר לא נשלח אוטומטית/.test(heCopy.textContent) && /טיוטה אינה לולאה סגורה/.test(heCopy.textContent) && heEnCopy && heEnCopy.hidden === true);
+  check('Hebrew UI shows the Hebrew explanation', heCopy && heCopy.hidden === false && /Glance סוגר לולאות פתוחות/.test(heCopy.textContent) && /הסכמה אחת מפעילה טיוטות/.test(heCopy.textContent) && /אין קריאה ברקע/.test(heCopy.textContent) && /מוצר עצמאי ואינו קשור ל-Meta/.test(heCopy.textContent) && /שום דבר לא נשלח אוטומטית/.test(heCopy.textContent) && heEnCopy && heEnCopy.hidden === true);
   he.enable.window.close();
 
   const panel = bootEnable({ unsetLang: true, ui: 'en-US' });
@@ -1328,7 +1325,7 @@ console.log('\n--- calendar evidence ---\n');
 
   const already = bootEnable({ lang: 'en', granted: true });
   await new Promise((r) => setTimeout(r, 40));
-  check('an existing grant registers every lane without a second prompt', already.asked.length === 0 && already.registered.length === 1 && (already.registered[0] || []).length === 3 && already.enable.window.document.querySelectorAll('button').length === 0);
+  check('an existing grant registers WhatsApp only without a second prompt', already.asked.length === 0 && already.registered.length === 1 && (already.registered[0] || []).length === 1 && already.enable.window.document.querySelectorAll('button').length === 0);
   already.enable.window.close();
 
   const pop = new JSDOM('<div id="metaChatsBlock"><div id="meta-chats"></div></div>', { runScripts: 'outside-only', url: 'chrome-extension://glance/popup/popup.html' });
@@ -1411,7 +1408,7 @@ console.log('\n--- calendar evidence ---\n');
   const full = loadLanes(META_ORIGINS.slice());
   await full.settle();
   const fullIds = full.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
-  check('a full Meta grant registers three lanes', fullIds.join(',') === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp', fullIds);
+  check('a full Meta grant registers WhatsApp only at load', fullIds.join(',') === 'glance-lane-whatsapp', fullIds);
 
   const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
   const fixtureClock = fs.readFileSync(path.join(ROOT, 'dev/fixture-clock.js'), 'utf8');

@@ -22,6 +22,8 @@ const FlowLabsSwitches = (() => {
     { id: 'SHAREPOINT_NEW_FILE', who: 'מסמך או גיליון באתר SharePoint', note: 'קובץ ריק בשם שביקשו, באתר אחד ששמו נכתב במייל' },
     { id: 'SHAREPOINT_SAVE_FILE', who: 'קובץ מצורף באתר SharePoint', note: 'שמירת הקובץ המצורף, כמו שהוא, באתר אחד ששמו נכתב במייל' },
     { id: 'CHAT_CHASE_DRAFT', who: 'תזכורת בצ\'אט למי שמאחר', note: 'טיוטת תזכורת בתיבת הצ\'אט כשמשימת "מחכים ל..." עברה את היום שלה (לא נשלחת)' },
+    { id: 'MESSENGER_CLICK_LANE', who: 'Messenger: קריאה בלחיצה', note: 'for Messenger בלבד — טיוטה רק אחרי לחיצה מפורשת (לא עבר Gate)' },
+    { id: 'INSTAGRAM_CLICK_LANE', who: 'Instagram: קריאה בלחיצה', note: 'for Instagram — כבוי ב-v1, ללא קריאה ברקע' },
     { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' }
   ];
   const IDS = LIST.map((r) => r.id);
