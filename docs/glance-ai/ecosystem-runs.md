@@ -778,3 +778,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; the existing Mark done card (title "Done? ...").
 - **Tests:** `e2e/chat-document-close.spec.js` gained 3 real-browser specs (the own loop with Undo, Hebrew, and the two guards), the 5 specs of run 92 stay green, every `test/*corpus.cjs` green.
 - **Open:** live Gate; words only, an attached file bubble is not read; Messenger and Instagram have no spec for the two document closes; no close from mail.
+
+## Run 94 (builder B, 2026-10-25): the "sent" claim reads real short replies
+
+- **Capability shipped (same switches as runs 92 and 93: `CHAT_TASK_CARD` for the other side's claim, `CHAT_PROMISE_CARD` for the person's own):** run 92 and 93 recognised "I just sent you the signed contract" but not what people actually type: "Sent!", "Done, sent", "Just emailed it", "Sent you an email", "sent the quote", «שלחתי», «בוצע, שלחתי», «שלחתי במייל». They now count. The measure was a probe of invented lines, not the corpus I had tuned on, and it found three real defects, all fixed: (1) a short reply with no verb frame was not a claim; (2) a recipient ("I forwarded it to Dana") or a channel (email, מייל) was taken for the thing that was sent, so it could have matched a task by a name; (3) the Hebrew prefix strip cut מייל to ייל. A claim that names nothing still fits only when it is the one open task of its kind, so "Sent!" with two open tasks offers nothing.
+- **Code:** `core/chat-sent-claim.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-sent-claim-corpus.cjs` gained 9 sent lines, 2 quiet lines and 2 token checks; `e2e/chat-document-close.spec.js` gained the "Sent!" loop (9 specs, all green); every `test/*corpus.cjs` green.
+- **Open:** live Gate; words only; Messenger and Instagram have no spec for the document closes; no close from mail. This run changes recall only, so the user-visible gain is real but small.
