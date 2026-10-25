@@ -769,16 +769,20 @@
         id = open && open.id;
       }
       if (!id) {
-        const found = conversationPanePathKey(pane)
-          ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)
-          : (paneUrlOnlyMessageTarget(pane)
-            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)
-            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));
+        const msgKey = messageUrlPathKey(pane);
+        let found = null;
+        if (msgKey) {
+          found = await messageIdFromPathRest(msgKey);
+          if (found && found.id) pane.pathRestMessageUrl = true;
+        } else if (conversationPanePathKey(pane)) {
+          found = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);
+        } else if (paneUrlOnlyMessageTarget(pane)) {
+          found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);
+        } else {
+          found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+        }
         if (found && found.unread) return { none: true, reason: found.reason };
         id = found && found.id;
-      }
-      if (urlOnlyId) {
-        await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
       }
       const ev = typeof FlowOutlookAttachmentEvidence !== 'undefined' ? FlowOutlookAttachmentEvidence : null;
       const rows = id ? await attachmentListFor(id) : null;
@@ -1041,7 +1045,7 @@
   }
 
   async function exactConversationPaneMessageId(pane, own, openSender) {
-    if (!pane || pane.itemId || !conversationPanePathKey(pane)) return null;
+    if (!pane || pane.itemId || messageUrlPathKey(pane) || !conversationPanePathKey(pane)) return null;
     const found = await messageIdForOpenPane(pane.conversationId || pane.pathId, own, openSender, pane);
     if (!found || !found.id) return null;
     if (found.unread) return found;
@@ -1404,6 +1408,7 @@
   }
 
   async function messageIdForOpenPane(convId, own, openSender, pane) {
+    if (pane && messageUrlPathKey(pane)) return null;
     const raw = pane ? rawConversationIdForSpells(pane.conversationId, pane.pathId) : String(convId || '');
     const want = FlowOwaParse.canonId(raw);
     if (!want || !pane) return null;
