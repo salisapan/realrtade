@@ -3,7 +3,7 @@ const S = require('./support/sentences');
 const FIX = require('./fixtures/ms-contacts');
 const lane = require('./support/lane-ms-mock');
 
-test('Contacts.Read resolves one recipient and does not write', async ({ glance }) => {
+test('Contacts.Read drafts one contact card and does not write', async ({ glance }) => {
   await glance.seedOutlook();
   await lane.run(glance, { scopes: ['Contacts.Read'], scenario: FIX.SCENARIO }, {
     id: FIX.ID,
@@ -15,13 +15,14 @@ test('Contacts.Read resolves one recipient and does not write', async ({ glance 
     const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
     await expect(card).toBeVisible();
     await card.locator('button.flow-lane-do').click();
-    await expect(card.locator('.flow-lane-address')).toHaveText('dana@acme.com');
+    await expect(card.locator('.flow-lane-draft')).toContainText('dana@acme.com');
     const calls = await glance.apiCalls();
     const looked = calls.filter((c) => c.url.indexOf('/me/contacts') >= 0 || c.url.indexOf('/me/people') >= 0);
     expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/contacts') >= 0)).toBe(true);
     expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/people') >= 0)).toBe(true);
     expect(looked.some((c) => c.method !== 'GET')).toBe(false);
     expect(calls.some((c) => c.url.indexOf('sendMail') >= 0)).toBe(false);
+    await expect(card).toContainText('You send');
     await expect(card).not.toContainText('Handled');
   });
 });
