@@ -1012,11 +1012,18 @@ async function runBehavioral(opts) {
     convEwsDraft && convEwsDraft.outlookIncomingId === 'M-ews-conv',
     { id: convEwsDraft && convEwsDraft.outlookIncomingId });
   function exactOpenPaneDisabledSrc(src) {
-    const needle = 'async function resolveExactOpenPaneMessageId(pane, own, openSender) {';
-    const start = src.indexOf(needle);
-    if (start < 0) return src;
-    const insert = needle + '\n    return null;\n    /* bite-disabled */';
-    return src.slice(0, start) + insert + src.slice(start + needle.length);
+    let s = src;
+    const needles = [
+      'async function resolveExactOpenPaneMessageId(pane, own, openSender) {',
+      'async function exactConversationPaneMessageId(pane, own, openSender) {'
+    ];
+    for (let n = 0; n < needles.length; n++) {
+      const needle = needles[n];
+      const start = s.indexOf(needle);
+      if (start < 0) continue;
+      s = s.slice(0, start) + needle + '\n    return null;\n    /* bite-disabled */' + s.slice(start + needle.length);
+    }
+    return s;
   }
   function noOutlookIdResolveSrc(src) {
     const needle = 'async function resolveOutlookMessageId(pathId, convId, own, openSender) {';
@@ -1145,8 +1152,8 @@ async function runBehavioral(opts) {
     return s;
   }
   function urlOnlyIdRegressionSrc(src) {
-    const needle = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      if (!id && conversationPanePathKey(pane)) {\n        const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n        id = open && open.id;\n      }\n      if (!id) {\n        const found = conversationPanePathKey(pane)\n          ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)\n          : (paneUrlOnlyMessageTarget(pane)\n            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
-    const repl = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = Boolean(id && pathKey && messageUrlPathKey(pane));\n      if (!id && conversationPanePathKey(pane)) {\n        const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n        id = open && open.id;\n      }\n      if (!id) {\n        const found = conversationPanePathKey(pane)\n          ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)\n          : (paneUrlOnlyMessageTarget(pane)\n            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
+    const needle = 'if (countGate) {\n      let id = null;\n      const restKey = String((pane && (pane.pathId || pane.rawUrlId)) || \'\').trim();\n      if (restKey && !pane.itemId) {\n        const pathRest = await messageIdFromPathRest(restKey);\n        if (pathRest && pathRest.id) {\n          pane.pathRestMessageUrl = true;\n          id = pathRest.id;\n        }\n      }\n      if (!id) {\n        id = openPaneGraphMessageId(pane);\n        if (!id && conversationPanePathKey(pane)) {\n          const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n          id = open && open.id;\n          if (id) rememberExactConvMessageId(pane, id);\n        }\n        if (!id) {\n          let found = null;\n          if (conversationPanePathKey(pane)) {\n            found = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n          } else if (paneUrlOnlyMessageTarget(pane)) {\n            found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);\n          } else {\n            found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n          }\n          if (found && found.unread) return { none: true, reason: found.reason };\n          id = found && found.id;\n          if (id) rememberExactConvMessageId(pane, id);\n        }\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
+    const repl = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = Boolean(id && pathKey && messageUrlPathKey(pane));\n      const restKey = String((pane && (pane.pathId || pane.rawUrlId)) || \'\').trim();\n      if (!id && restKey && !pane.itemId) {\n        const pathRest = await messageIdFromPathRest(restKey);\n        if (pathRest && pathRest.id) {\n          pane.pathRestMessageUrl = true;\n          id = pathRest.id;\n        }\n      }\n      if (!id) {\n        if (!id && conversationPanePathKey(pane)) {\n          const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n          id = open && open.id;\n          if (id) rememberExactConvMessageId(pane, id);\n        }\n        if (!id) {\n          let found = null;\n          if (conversationPanePathKey(pane)) {\n            found = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n          } else if (paneUrlOnlyMessageTarget(pane)) {\n            found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);\n          } else {\n            found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n          }\n          if (found && found.unread) return { none: true, reason: found.reason };\n          id = found && found.id;\n          if (id) rememberExactConvMessageId(pane, id);\n        }\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
     let out = src.replace(needle, repl);
     const extra = 'if (urlOnlyId) {\n        await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n      }';
     const anchor = 'if (merged.count == null) {\n        attachmentsUnread = true;';

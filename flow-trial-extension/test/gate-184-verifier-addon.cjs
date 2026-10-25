@@ -59,19 +59,12 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     return src.includes(needle) ? src.replace(needle, repl) : src;
   }
   function fileitLegacyResolverOrderSrc(src) {
-    const exactBlock = `if (conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {
-              replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
-            } else {
-              const judged = needsJudgedReplyTarget(proc);
-              replyTarget = judged
-                ? await resolveJudgedReplyMessageId(pane, own, pane.senderEmail)
-                : await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail);
-            }`;
     const legacyBlock = `const judged = needsJudgedReplyTarget(proc);
               replyTarget = judged
                 ? await resolveMessageIdForFilePrepare(pane, own, pane.senderEmail)
                 : await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);`;
-    return src.includes(exactBlock) ? src.replace(exactBlock, legacyBlock) : src;
+    const re = /if \(conversationPanePathKey\(pane\) && processNeedsConversationMessageId\(proc\)\) \{\s*replyTarget = await exactConversationPaneMessageId\(pane, own, pane\.senderEmail\);\s*\} else \{\s*const judged = needsJudgedReplyTarget\(proc\);\s*replyTarget = judged\s*\? await resolveJudgedReplyMessageId\(pane, own, pane\.senderEmail\)\s*: await resolveMessageIdForFilePrepare\(pane, own, pane\.senderEmail\);\s*\}/;
+    return re.test(src) ? src.replace(re, legacyBlock) : src;
   }
   function conversationIncomingIdPinDisabledSrc(src) {
     let s = src;
@@ -920,7 +913,8 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       urlId: convId, listedConversationId: convId, listedSubject,
       htmlPatch: (h) => wtReplyNoClockDom(gateHtml(paneMailBody)(h)),
       mailBody: paneMailBody,
-      threadMessages, pathRestMisses: 2, inboxLookupEmpty: true, waitMs: 8000
+      threadMessages, pathRestMisses: 2, inboxLookupEmpty: true,
+      waitMs: variant === 'prefix255' ? 12000 : 8000
     });
     const label = 'noclock ' + vLabel + ' ' + transportLabel + (skew ? ' skew' : ' exact');
     const page = await runPage(base);
