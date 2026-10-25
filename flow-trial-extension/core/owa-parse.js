@@ -312,8 +312,14 @@ const FlowOwaParse = (() => {
     return true;
   }
 
+  function paneConvId(pane) {
+    if (!pane) return '';
+    const raw = pane.conversationId || ((pane.idSource === 'url-unconfirmed' && pane.pathId) ? pane.pathId : '');
+    return canonId(raw);
+  }
+
   function idHit(pane, m) {
-    const paneConv = canonId(pane && pane.conversationId);
+    const paneConv = paneConvId(pane);
     const paneNet = canonId(pane && pane.internetMessageId);
     const convOk = paneConv && canonId(m.conversationId) === paneConv;
     const netOk = paneNet && canonId(m.internetMessageId) === paneNet;
@@ -327,7 +333,14 @@ const FlowOwaParse = (() => {
   // name the one matching row.
   function fileMayLink(pane, m) {
     if (!pane || !m) return false;
-    if (pane.idSource === 'url-unconfirmed' || pane.idSource === 'url-stale') return false;
+    if (pane.idSource === 'url-stale') return false;
+    if (pane.idSource === 'url-unconfirmed') {
+      const paneConv = paneConvId(pane);
+      const msgConv = canonId(m.conversationId);
+      if (paneConv && msgConv && paneConv !== msgConv) return false;
+      if (paneConv && msgConv && paneConv === msgConv) return true;
+      return false;
+    }
     const paneItem = canonId(pane.itemId);
     const msgId = canonId(m.id);
     if (paneItem && msgId && paneItem !== msgId) return false;
@@ -336,7 +349,7 @@ const FlowOwaParse = (() => {
     const msgNet = canonId(m.internetMessageId);
     if (paneNet && msgNet && paneNet !== msgNet) return false;
     if (paneNet && msgNet && paneNet === msgNet) return true;
-    const paneConv = canonId(pane.conversationId);
+    const paneConv = paneConvId(pane);
     const msgConv = canonId(m.conversationId);
     if (paneConv && msgConv && paneConv !== msgConv) return false;
     if (paneConv && !msgConv) return false;
@@ -378,7 +391,7 @@ const FlowOwaParse = (() => {
   // True when the open id is actually on one of these Graph rows.
   // A search URL that merely looks like a conversation id is not.
   function idEvidence(pane, messages) {
-    const conv = canonId(pane && pane.conversationId);
+    const conv = paneConvId(pane);
     const net = canonId(pane && pane.internetMessageId);
     let convHit = false;
     let netHit = false;
@@ -1366,7 +1379,7 @@ const FlowOwaParse = (() => {
     const none = { iso: '', unread: false, ambiguous: false, alt: '' };
     if (!container || !container.querySelector) return none;
     const marked = container.querySelector('[data-received]');
-    if (marked && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(marked))) {
+    if (marked) {
       const raw = marked.getAttribute('data-received') || '';
       if (minuteKey(raw)) return { iso: raw, unread: false, ambiguous: false, alt: '' };
     }

@@ -955,7 +955,7 @@ async function runBehavioral(opts) {
     { kinds: wtBothListedSteps, att: wtBothListedAtt });
   function minuteMatchDisabledSrc(src) {
     return src.replace(
-      'let minOk = Boolean(minute && minuteOf(m.receivedDateTime) === minute);',
+      'let minOk = Boolean(pane && pane.clockFromPane === true && minute && minuteOf(m.receivedDateTime) === minute);',
       'let minOk = true;'
     );
   }

@@ -762,27 +762,35 @@
     const countGate = needsSave || (signedForJudge && localAttachN >= 2);
     let attachmentsUnread = Boolean(mailbox && mailbox.attachmentsUnread);
     if (countGate) {
-      let id = openPaneGraphMessageId(pane);
-      const urlOnlyId = Boolean(id && messageUrlPathKey(pane));
-      if (!id && conversationPanePathKey(pane)) {
-        const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);
-        id = open && open.id;
+      let id = null;
+      const restKey = String((pane && (pane.pathId || pane.rawUrlId)) || '').trim();
+      if (restKey && !pane.itemId) {
+        const pathRest = await messageIdFromPathRest(restKey);
+        if (pathRest && pathRest.id) {
+          pane.pathRestMessageUrl = true;
+          id = pathRest.id;
+        }
       }
       if (!id) {
-        const msgKey = messageUrlPathKey(pane);
-        let found = null;
-        if (msgKey) {
-          found = await messageIdFromPathRest(msgKey);
-          if (found && found.id) pane.pathRestMessageUrl = true;
-        } else if (conversationPanePathKey(pane)) {
-          found = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);
-        } else if (paneUrlOnlyMessageTarget(pane)) {
-          found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);
-        } else {
-          found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+        id = openPaneGraphMessageId(pane);
+        if (!id && conversationPanePathKey(pane)) {
+          const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);
+          id = open && open.id;
+          if (id) rememberExactConvMessageId(pane, id);
         }
-        if (found && found.unread) return { none: true, reason: found.reason };
-        id = found && found.id;
+        if (!id) {
+          let found = null;
+          if (conversationPanePathKey(pane)) {
+            found = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);
+          } else if (paneUrlOnlyMessageTarget(pane)) {
+            found = await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);
+          } else {
+            found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+          }
+          if (found && found.unread) return { none: true, reason: found.reason };
+          id = found && found.id;
+          if (id) rememberExactConvMessageId(pane, id);
+        }
       }
       const ev = typeof FlowOutlookAttachmentEvidence !== 'undefined' ? FlowOutlookAttachmentEvidence : null;
       const rows = id ? await attachmentListFor(id) : null;
@@ -801,6 +809,7 @@
       }
     }
     if (signedForJudge && localAttachN >= 1 && !needsSave) attachmentCount = localAttachN;
+    if (needsSave && localAttachN >= 1 && attachmentCount < 1) attachmentCount = localAttachN;
     if (!needsSave && localAttachN >= 1 && attachmentCount < 1) attachmentCount = localAttachN;
     const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
       senderEmail: pane.senderEmail,
@@ -854,6 +863,7 @@
             ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)
             : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));
         listId = found && found.id;
+        if (listId) rememberExactConvMessageId(pane, listId);
       }
       if (listId) {
         let rows = await attachmentListFor(listId);
@@ -910,6 +920,10 @@
       let proc = r.process;
       let fileDroppedForUnread = false;
       if (attachmentsUnread && needsSave && proc && proc.id === 'file-it' && paneUrlOnlyMessageTarget(pane)) {
+        if (conversationPanePathKey(pane)) {
+          const looseSave = await fileItLooseOpenPaneAmbiguous(pane, pane.senderEmail);
+          if (looseSave) return { none: true, reason: 'page:reply-target-unsure' };
+        }
         const open = conversationPanePathKey(pane)
           ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)
           : await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail);
@@ -1044,10 +1058,15 @@
     return steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile' || s.kind === 'attachmentSave' || s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
   }
 
+  function rememberExactConvMessageId(pane, id) {
+    if (pane && id) pane.__exactConvMessageId = String(id);
+  }
+
   async function exactConversationPaneMessageId(pane, own, openSender) {
     if (!pane || pane.itemId || messageUrlPathKey(pane) || !conversationPanePathKey(pane)) return null;
     const found = await messageIdForOpenPane(pane.conversationId || pane.pathId, own, openSender, pane);
     if (!found || !found.id) return null;
+    rememberExactConvMessageId(pane, found.id);
     if (found.unread) return found;
     if (!(await sameOpenSender(found.from, openSender, found.sender))) {
       return senderMismatch(found, openSender);
@@ -1118,6 +1137,27 @@
     }
     if (hits.length === 1) return hits[0];
     if (hits.length > 1) return null;
+    if (!hits.length && rows.length > 1 && pane.clockFromPane === true) {
+      const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
+      const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || '');
+      const wantConv = canon(pane.conversationId || pane.pathId);
+      const minute = minuteOf(pane.receivedDateTime);
+      const alt = pane.clockAmbiguous ? minuteOf(pane.clockAlt) : '';
+      if (minute && wantConv) {
+        const pin = [];
+        for (let i = 0; i < rows.length; i++) {
+          const m = rows[i];
+          const from = fromAddress(m);
+          if (behalfSplit(m.from, m.sender)) continue;
+          if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;
+          if (canon(m.conversationId) !== wantConv) continue;
+          const got = minuteOf(m.receivedDateTime);
+          if (got !== minute && (!alt || got !== alt)) continue;
+          pin.push(m);
+        }
+        if (pin.length === 1) return pin[0];
+      }
+    }
     if (rows.length === 1) {
       const sole = rows[0];
       const from = fromAddress(sole);
@@ -1152,10 +1192,8 @@
     if (s1 != null && s2 == null) return false;
     return true;
   }
-  async function fileItPaneAttachmentTargetAmbiguous(pane, own, openSender) {
+  async function fileItLooseOpenPaneAmbiguous(pane, openSender) {
     if (!pane || pane.itemId || !conversationPanePathKey(pane)) return false;
-    const paneAtts = paneFileAttachments(pane);
-    if (!paneAtts.length) return false;
     const raw = rawConversationIdForSpells(pane.conversationId, pane.pathId);
     if (!raw) return false;
     const spells = idSpellings(raw);
@@ -1170,8 +1208,72 @@
       if (convList.length) break;
     }
     if (convList.length <= 1) return false;
-    const exact = await exactOpenMessageInList(convList, pane, openSender);
+    let looseHits = 0;
+    for (let li = 0; li < convList.length; li++) {
+      const row = convList[li];
+      if (!row || !row.id) continue;
+      const fromLoose = fromAddress(row);
+      const openLoose = String(openSender || pane.senderEmail || '').trim().toLowerCase();
+      if (behalfSplit(row.from, row.sender)) continue;
+      if (!(await sameOpenSender(fromLoose, openLoose, senderAddress(row)))) continue;
+      if (!openPaneExactGraphRow(pane, row)) continue;
+      looseHits += 1;
+    }
+    return looseHits > 1;
+  }
+
+  async function fileItPaneAttachmentTargetAmbiguous(pane, own, openSender) {
+    if (!pane || pane.itemId || !conversationPanePathKey(pane)) return false;
+    const paneAtts = paneFileAttachments(pane);
+    if (!paneAtts.length) return false;
+    if (pane.__exactConvMessageId) {
+      const rows = await attachmentListFor(pane.__exactConvMessageId);
+      if (!Array.isArray(rows)) return true;
+      for (let a = 0; a < paneAtts.length; a++) {
+        const hits = rows.filter((g) => graphAttMatchesPane(paneAtts[a], g));
+        if (hits.length !== 1) return true;
+      }
+      return false;
+    }
+    const raw = rawConversationIdForSpells(pane.conversationId, pane.pathId);
+    if (!raw) return false;
+    const spells = idSpellings(raw);
+    const prefers = [null, GRAPH_IMMUTABLE];
+    let convList = [];
+    for (let p = 0; p < prefers.length; p++) {
+      for (let i = 0; i < spells.length; i++) {
+        const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId,bodyPreview&$top=25';
+        const list = await graphValues(q, 'file-it-conv-list', prefers[p]);
+        if (Array.isArray(list) && list.length) { convList = list; break; }
+      }
+      if (convList.length) break;
+    }
+    if (convList.length <= 1) return false;
+    let exact = await exactOpenMessageInList(convList, pane, openSender);
+    if ((!exact || !exact.id) && pane.clockFromPane === true) {
+      const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
+      const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || '');
+      const wantConv = canon(pane.conversationId || pane.pathId);
+      const minute = minuteOf(pane.receivedDateTime);
+      const alt = pane.clockAmbiguous ? minuteOf(pane.clockAlt) : '';
+      const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
+      if (minute && wantConv) {
+        const pin = [];
+        for (let i = 0; i < convList.length; i++) {
+          const m = convList[i];
+          const from = fromAddress(m);
+          if (behalfSplit(m.from, m.sender)) continue;
+          if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;
+          if (canon(m.conversationId) !== wantConv) continue;
+          const got = minuteOf(m.receivedDateTime);
+          if (got !== minute && (!alt || got !== alt)) continue;
+          pin.push(m);
+        }
+        if (pin.length === 1) exact = pin[0];
+      }
+    }
     if (!exact || !exact.id) return true;
+    rememberExactConvMessageId(pane, exact.id);
     const rows = await attachmentListFor(exact.id);
     if (!Array.isArray(rows)) return true;
     for (let a = 0; a < paneAtts.length; a++) {
@@ -1496,9 +1598,9 @@
   // otherwise an exact open-pane match. Never newest-from-sender (wrong attachment target).
   async function resolveMessageIdForFilePrepare(pane, own, openSender) {
     if (!pane || !paneUrlOnlyMessageTarget(pane)) return null;
-    const msgKey = messageUrlPathKey(pane);
-    if (msgKey) {
-      const direct = await messageIdFromPathRest(msgKey);
+    const restKey = String((pane.pathId || pane.rawUrlId) || '').trim();
+    if (restKey) {
+      const direct = await messageIdFromPathRest(restKey);
       if (direct && direct.id) {
         const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
         const from = String(direct.from || '').trim().toLowerCase();
@@ -1522,6 +1624,9 @@
   }
 
   function messageUrlPathKey(pane) {
+    if (pane && pane.pathRestMessageUrl) {
+      return String((pane && (pane.pathId || pane.rawUrlId)) || '').trim();
+    }
     const pathKey = String((pane && (pane.pathId || pane.rawUrlId)) || '').trim();
     return pathKey && !isConversationId(pathKey) ? pathKey : '';
   }
@@ -5129,6 +5234,7 @@
       const ownScan = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(preparedScan) : preparedScan;
       const closesScan = typeof FlowGoogleCloses !== 'undefined' ? FlowGoogleCloses : null;
       const needsSaveScan = closesScan && typeof closesScan.needsOneAttachment === 'function' && closesScan.needsOneAttachment(ownScan);
+      const saveAttachScan = needsSaveScan;
       let replyTrackScan = false;
       if (!needsSaveScan && typeof FlowIncomingJudge !== 'undefined') {
         const probe = FlowIncomingJudge.judge({
@@ -5142,7 +5248,7 @@
         });
         replyTrackScan = Boolean(probe && probe.show && probe.process && needsJudgedReplyTarget(probe.process));
       }
-      if (!needsSaveScan && replyTrackScan && conversationPanePathKey(pane) && !pane.itemId) {
+      if (!saveAttachScan && replyTrackScan && conversationPanePathKey(pane) && !pane.itemId) {
         const exactPinEarly = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
         if (exactPinEarly && exactPinEarly.unread) {
           dropStuckCard(pane);
@@ -5162,7 +5268,7 @@
         return;
       }
       if (decided && !decided.none && decided.process && conversationPanePathKey(pane) && !pane.itemId
-        && needsJudgedReplyTarget(decided.process)) {
+        && needsJudgedReplyTarget(decided.process) && !saveAttachScan) {
         const exactPin = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
         if (exactPin && exactPin.unread) {
           dropStuckCard(pane);
@@ -5334,11 +5440,19 @@
             const proc = decided && decided.process;
             let replyTarget = null;
             if (proc && proc.id === 'file-it' && !pane.itemId && conversationPanePathKey(pane)) {
-              const fileAmbig = await fileItPaneAttachmentTargetAmbiguous(pane, own, pane.senderEmail);
-              if (fileAmbig) {
+              const looseAmbig = await fileItLooseOpenPaneAmbiguous(pane, pane.senderEmail);
+              if (looseAmbig) {
                 dropStuckCard(pane);
                 await pageReason('page:reply-target-unsure', pane);
                 return;
+              }
+              if (!saveAttachScan) {
+                const fileAmbig = await fileItPaneAttachmentTargetAmbiguous(pane, own, pane.senderEmail);
+                if (fileAmbig) {
+                  dropStuckCard(pane);
+                  await pageReason('page:reply-target-unsure', pane);
+                  return;
+                }
               }
             }
             if (conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {
@@ -5356,7 +5470,8 @@
               return;
             }
             replyId = replyTarget && replyTarget.id ? replyTarget.id : null;
-            if (!replyId && conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {
+            if (!replyId && conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)
+              && !(saveAttachScan && proc && proc.id === 'file-it')) {
               dropStuckCard(pane);
               await pageReason('page:reply-target-unsure', pane);
               return;
@@ -5384,6 +5499,15 @@
       } else {
         if (processNeedsConversationMessageId((decided && decided.process) || (entry && entry.process))
           && conversationPanePathKey(pane) && !pane.itemId) {
+          const procHeld = (decided && decided.process) || (entry && entry.process);
+          if (procHeld && procHeld.id === 'file-it') {
+            const looseHeld = await fileItLooseOpenPaneAmbiguous(pane, pane.senderEmail);
+            if (looseHeld) {
+              dropStuckCard(pane);
+              await pageReason('page:reply-target-unsure', pane);
+              return;
+            }
+          }
           const replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);
           if (replyTarget && replyTarget.unread) {
             dropStuckCard(pane);
@@ -6234,14 +6358,31 @@
   // Each miss names the stage: no id, Graph status, no candidate, unresolved, empty list.
   async function suggestFiles(pane) {
     if (pane && pane.idSource === 'url-stale') return suggestFail('suggest:pane-stale');
-    if (pane && pane.idSource === 'url-unconfirmed') return suggestFail('suggest:unresolved', 'unconfirmed');
+    const convPaneUrl = pane && paneUrlOnlyMessageTarget(pane) && conversationPanePathKey(pane);
+    if (pane && pane.idSource === 'url-unconfirmed' && !convPaneUrl) {
+      const restKey = String((pane.pathId || pane.rawUrlId) || '').trim();
+      if (restKey) {
+        const pathRest = await messageIdFromPathRest(restKey);
+        if (pathRest && pathRest.id) {
+          pane.pathRestMessageUrl = true;
+          const direct = await attachmentListFor(pathRest.id);
+          if (Array.isArray(direct)) return { files: direct, messageId: pathRest.id };
+          const st = lastGraphStatus;
+          if (st && st !== 200) return suggestFail('suggest:graph-' + st);
+          return suggestFail('suggest:attachments-unread');
+        }
+      }
+      return suggestFail('suggest:unresolved', 'unconfirmed');
+    }
     // Subject fallback must not hand this save the other message's id.
     const priorConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane && pane.priorConversationId) : '';
     const nowConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane && pane.conversationId) : '';
     const crossed = pane && (pane.hydrateHow === 'subject-fallback' || pane.hydrateHow === 'subject-unique')
       && priorConv && nowConv && priorConv !== nowConv;
     const id = crossed ? null : (pane.itemId || null);
-    const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.conversationId) : '';
+    const pathConv = (pane && pane.pathId && isConversationId(pane.pathId)) ? pane.pathId : '';
+    const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId)
+      ? FlowOwaParse.canonId(pane.conversationId || pathConv) : '';
     const wantNet = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.internetMessageId) : '';
     if (!id && !wantConv && !wantNet && !(pane && pane.subject)) return suggestFail('suggest:no-message-id');
     if (id && !isConversationId(id)) {
@@ -6268,21 +6409,22 @@
     const list = found.rows;
     const convPane = pane && paneUrlOnlyMessageTarget(pane) && conversationPanePathKey(pane);
     const hits = [];
-    for (let i = 0; i < list.length; i++) {
-      const m = list[i];
-      if (!m || !m.id || isConversationId(m.id)) continue;
-      const netOk = wantNet && FlowOwaParse.canonId(m.internetMessageId) === wantNet;
-      if (convPane) {
-        if (netOk || openPaneExactGraphRow(pane, m)) hits.push(m);
-      } else {
+    const openSender = pane && pane.senderEmail;
+    if (convPane) {
+      const cand = list.filter((m) => m && m.id && !isConversationId(m.id));
+      const exact = await exactOpenMessageInList(cand, pane, openSender);
+      if (!exact || !exact.id) return suggestFail('suggest:unresolved', 'conv-pane-exact=0');
+      hits.push(exact);
+    } else {
+      for (let i = 0; i < list.length; i++) {
+        const m = list[i];
+        if (!m || !m.id || isConversationId(m.id)) continue;
+        const netOk = wantNet && FlowOwaParse.canonId(m.internetMessageId) === wantNet;
         const convOk = wantConv && FlowOwaParse.canonId(m.conversationId) === wantConv;
         if (convOk || netOk || sameSubjectRow(pane, m)) hits.push(m);
       }
     }
     if (!hits.length) return suggestFail('suggest:no-candidate', 'mailbox=' + list.length + ' subject=' + String(pane.subject || '').slice(0, 80));
-    if (convPane && hits.length !== 1) {
-      return suggestFail('suggest:unresolved', 'conv-pane-exact=' + hits.length);
-    }
     const enriched = [];
     let unreadStatus = 0;
     let anyRead = false;
