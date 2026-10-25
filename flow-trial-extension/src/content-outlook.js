@@ -1064,21 +1064,26 @@
     return Boolean(wantConv && gotConv && wantConv === gotConv);
   }
 
+  function normalizeSoleBodyText(raw) {
+    let t = String(raw || '').replace(/\s+/g, ' ').trim();
+    t = t.replace(/(?:\u2026|\.{3})\s*$/u, '').trim();
+    return t.toLowerCase();
+  }
+
+  function soleBodyNonSpaceCount(raw) {
+    return String(raw || '').replace(/\s/g, '').length;
+  }
+
+  // Sole-row only: Graph bodyPreview must equal the same-length prefix of the open pane body (no subject, no containment).
   function openPaneBodyOrSubjectMatch(pane, m) {
     if (!pane || !m) return false;
-    function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
-    const subjPane = norm(pane.subject);
-    const subjMsg = norm(m.subject);
-    if (subjPane && subjMsg && subjPane === subjMsg) return true;
-    const paneBody = norm(pane.text);
-    const preview = norm(m.bodyPreview);
-    const bodyContent = m.body && m.body.content ? norm(m.body.content) : '';
-    const graphText = preview || bodyContent;
+    const paneBody = normalizeSoleBodyText(pane.text);
+    const previewRaw = m.bodyPreview || (m.body && m.body.content) || '';
+    const graphText = normalizeSoleBodyText(previewRaw);
     if (!paneBody || !graphText) return false;
-    if (paneBody === graphText) return true;
-    if (graphText.length >= 12 && paneBody.indexOf(graphText) >= 0) return true;
-    if (paneBody.length >= 12 && graphText.indexOf(paneBody) >= 0) return true;
-    return false;
+    if (soleBodyNonSpaceCount(graphText) < 20) return false;
+    const prefixLen = graphText.length;
+    return paneBody.slice(0, prefixLen) === graphText;
   }
 
   async function exactOpenMessageInList(list, pane, openSender, opts) {
