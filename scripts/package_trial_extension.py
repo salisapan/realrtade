@@ -204,6 +204,14 @@ def registered_surface_files(worker: Path) -> list[Path]:
     return out
 
 
+def install_zip_forbids_picker() -> bool:
+    """Some branches' verify_trial_install.py forbids picker/ in the signup zip even when background names it."""
+    verify = REPO_ROOT / "scripts" / "verify_trial_install.py"
+    if not verify.is_file():
+        return False
+    return "the Drive Picker must not be in the install" in verify.read_text(encoding="utf-8")
+
+
 def collect(profile: str = "full") -> dict[str, Path]:
     manifest_path = EXTENSION_ROOT / "manifest.json"
     if not manifest_path.is_file():
@@ -243,11 +251,10 @@ def collect(profile: str = "full") -> dict[str, Path]:
     for content in manifest.get("content_scripts") or []:
         for name in (content.get("js") or []) + (content.get("css") or []):
             referenced.append(EXTENSION_ROOT / name)
-    # Drive picker extension page (chrome.runtime.getURL in background.js when wired; always in the trial zip).
-    for rel in ("picker/picker.html", "picker/picker.js"):
-        picker_path = EXTENSION_ROOT / rel
-        if picker_path.is_file():
-            referenced.append(picker_path)
+    # getAuthToken fallback module (verify_trial_install REQUIRED); not always imported from background.js on every branch.
+    web_auth = EXTENSION_ROOT / "src" / "google-web-auth.js"
+    if web_auth.is_file():
+        referenced.append(web_auth)
 
     pending = list(referenced)
     seen: set[Path] = set()
@@ -289,6 +296,11 @@ def collect(profile: str = "full") -> dict[str, Path]:
         text = path.read_text(encoding="utf-8", errors="replace")
         if SECRET_ASSIGNMENT_RE.search(text):
             die(f"{rel} looks like it contains a secret assignment; refusing to package it")
+
+    if install_zip_forbids_picker():
+        for rel in list(files):
+            if rel == "picker" or rel.startswith("picker/"):
+                del files[rel]
 
     return files
 
