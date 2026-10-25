@@ -30,6 +30,7 @@ test('WhatsApp, CHAT_TASK_CARD on: a courier\'s delivery window is one hold titl
   expect(list).toHaveLength(1);
   expect(list[0].subject).toMatch(/Delivery 14:00–18:00/);
   expect(list[0].attendees || []).toEqual([]);
+  expect(JSON.stringify(list[0].end)).toContain('18:00');
   expect(JSON.stringify(list[0])).not.toContain('package');
   expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
   await page.locator(CARD + ' button.flow-chip-undo').click();

@@ -233,7 +233,7 @@ const FlowChatTaskCard = (() => {
     return {
       type: 'flow:google-write',
       connectorId: 'googleHold',
-      input: { title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', quote: note, dateIso: params.dateIso, hour: params.hour, minute: params.minute, params: { dateIso: params.dateIso, hour: params.hour, minute: params.minute, title: params.title || '', quote: note, callText: callTextOf(ctx) } },
+      input: { title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', quote: note, dateIso: params.dateIso, hour: params.hour, minute: params.minute, durationMinutes: params.durationMinutes, params: { dateIso: params.dateIso, hour: params.hour, minute: params.minute, durationMinutes: params.durationMinutes, title: params.title || '', quote: note, callText: callTextOf(ctx) } },
       tabAccount: '',
       lang: t.he ? 'he' : 'en'
     };
@@ -280,7 +280,7 @@ const FlowChatTaskCard = (() => {
         threadLabel: OPEN_LABELS[t.channel] || 'Open chat',
         label: params.title || (ctx.intent && ctx.intent.label) || 'Task',
         params: t.connectorId === 'outlookCalendar'
-          ? { meeting: true, title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', dateIso: params.dateIso, hour: params.hour, minute: params.minute, callText: callTextOf(ctx) }
+          ? { meeting: true, title: params.title || (ctx.intent && ctx.intent.label) || 'Meeting', dateIso: params.dateIso, hour: params.hour, minute: params.minute, durationMinutes: params.durationMinutes, callText: callTextOf(ctx) }
           : { dateIso: params.dateIso || null, amount: params.amount || null, what: null, fileTerm: params.fileTerm || null },
         facts: (ctx.intent && ctx.intent.facts) || null,
         entities: null,
@@ -559,7 +559,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? 'משלוח' : 'Delivery') + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '' }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? 'משלוח' : 'Delivery') + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '', durationMinutes: callProposal === 'delivery' && deliveryWindow && deliveryWindow.durationMinutes ? deliveryWindow.durationMinutes : undefined }) });
     }
     if (own && !(selfNote && selfNote.kind === 'note')) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").

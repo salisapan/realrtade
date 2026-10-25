@@ -3106,6 +3106,8 @@
     const bags = [];
     const steps = (ctx && ctx.process && ctx.process.steps) || [];
     steps.forEach((step) => { if (step && step.params) bags.push(step.params); });
+    // A length the plan names (a delivery window) rides along; anything else is the default half hour.
+    const named = steps.map((step) => step && step.params && step.params.durationMinutes).find((n) => n);
     if (ctx && ctx.intent) bags.push(ctx.intent.entities, ctx.intent.facts, ctx.intent);
     for (let i = 0; i < bags.length; i++) {
       const found = clockFrom(bags[i]);
@@ -3113,6 +3115,7 @@
       const title = found.what || (ctx.intent && ctx.intent.label) || ctx.subject || 'Meeting';
       return {
         meeting: true,
+        durationMinutes: named || undefined,
         dateIso: found.dateIso,
         hour: found.hour,
         minute: found.minute,
@@ -3440,6 +3443,7 @@
       requireTime: p.requireTime === true
     };
     if (p.calendarOp) params.calendarOp = p.calendarOp;
+    if (p.durationMinutes) params.durationMinutes = p.durationMinutes;
     if (p.fileTerm || p.fileName || p.fileUrl) {
       if (p.fileTerm) params.fileTerm = p.fileTerm;
       if (p.fileName) params.fileName = p.fileName;

@@ -267,6 +267,7 @@ test('BOOKING_NOTICE on: a delivery window told in a mail is one hold titled Del
   expect(list[0].subject).toMatch(/Delivery 14:00–18:00/);
   expect(list[0].attendees || []).toEqual([]);
   expect(JSON.stringify(list[0].start)).toContain('14:00');
+  expect(JSON.stringify(list[0].end)).toContain('18:00');
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });

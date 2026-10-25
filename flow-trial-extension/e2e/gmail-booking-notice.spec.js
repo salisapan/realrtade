@@ -131,6 +131,7 @@ test('BOOKING_NOTICE on: a delivery window told in a mail is one Google Calendar
   await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(events()).toHaveLength(1);
   expect(events()[0].summary).toMatch(/^Hold .*14:00/);
+  expect(JSON.stringify(events()[0].end)).toContain('18:00');
   expect(events()[0].attendees || []).toEqual([]);
   await page.locator(MAIN + ' button.flow-chip-undo').click();
   await expect.poll(() => events().length).toBe(0);

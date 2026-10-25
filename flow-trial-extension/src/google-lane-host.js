@@ -652,6 +652,7 @@ async function prepareWrite(connectorId, input, cred) {
       dateIso: params.dateIso || i.dateIso,
       hour: params.hour != null ? params.hour : i.hour,
       minute: params.minute != null ? params.minute : i.minute,
+      durationMinutes: params.durationMinutes != null ? params.durationMinutes : i.durationMinutes,
       fileName: params.fileName || params.fileTerm || i.fileName || '',
       fileUrl: params.fileUrl || params.shareUrl || i.fileUrl || '',
       fileTerm: params.fileTerm || i.fileTerm || '',

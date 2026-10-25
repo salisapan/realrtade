@@ -125,7 +125,7 @@ const FlowChatDeliveryWindow = (() => {
     if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
     const lastMin = (endH != null ? endH * 60 + endM : startH * 60 + startM);
     if (ahead === 0 && lastMin <= (at.getHours() * 60 + at.getMinutes())) return { kind: 'none', reason: 'already-past' };
-    return { kind: 'delivery', dateIso: d.iso, hour: startH, minute: startM, endHour: endH, endMinute: endM, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    return { kind: 'delivery', dateIso: d.iso, hour: startH, minute: startM, endHour: endH, endMinute: endM, durationMinutes: endH != null ? (endH * 60 + endM) - (startH * 60 + startM) : null, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
   return { recognize: recognize };

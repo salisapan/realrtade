@@ -2853,6 +2853,11 @@ async function outlookGlanceZone(explicit) {
 // rather than a guess dressed up as a fact, and the event's own real time
 // (not its length) is what actually matters for "don't miss this".
 const CALENDAR_DEFAULT_DURATION_MIN = 30;
+// A hold is 30 minutes unless the card names a length (a delivery window): a whole number of minutes from 5 to 720.
+function calendarDurationOf(v) {
+  const n = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,3}$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 5 && n <= 720 ? n : CALENDAR_DEFAULT_DURATION_MIN;
+}
 
 function calendarDateTime(dateIso, hour, minute, addMinutes) {
   const [y, m, d] = dateIso.split('-').map(Number);
@@ -3054,7 +3059,7 @@ async function googleCalendarWrite(p) {
   };
   if (!clock.absent) {
     body.start = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute), timeZone };
-    body.end = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone };
+    body.end = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, calendarDurationOf(params.durationMinutes)), timeZone };
   } else {
     body.start = { date: dateIso };
     body.end = { date: nextDateIso(dateIso) };
@@ -5842,6 +5847,7 @@ async function outlookMeetingWrite(p) {
     minute: clock.minute,
     title: title,
     quote: lines.length ? lines.join('\n') : title,
+    durationMinutes: params.durationMinutes,
     timeZone: zone
   });
   if (!built) return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };

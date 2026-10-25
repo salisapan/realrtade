@@ -642,3 +642,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** the 8 specs above, all corpora.
 - **Open:** live Gate for each surface (the owner); real WhatsApp, Instagram and Business Suite markup can differ from the fixtures (`TODO-LIVE-DOM` in `test/fixtures/chat`); the next run should build capability again (candidates: a duration field in both calendar writers so a delivery window has its real end; mail-side removal of a cancelled booking).
 
+## 2026-10-25 Ecosystems builder B (seventy-seventh run) — a delivery window is blocked out for its whole length
+
+- **Capability shipped (switches `BOOKING_NOTICE`, `CHAT_TASK_CARD`, off):** the seventy-fifth run put a courier's window on the calendar as a 30-minute event at the start, with the window only in the title. A four-hour window ("between 14:00 and 18:00") now makes a four-hour event, in Google Calendar and Outlook Calendar, from chat (WhatsApp, Messenger, Instagram, Business Suite) and from Outlook and Gmail mail. Both calendar writers (`core/google-calendar.js`, `core/outlook-calendar.js`, the Gmail card's worker hold in `src/background.js`) take an optional `durationMinutes` (a whole number from 5 to 720; anything else, a negative, a fraction or text, stays 30), the delivery reader names the window's length, and the plans carry it. Other holds are unchanged (30 minutes). Nobody is invited; no new scope.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical Hold card reused.
+- **Tests:** new `test/hold-duration-corpus.cjs` (13 lengths for each writer, defaults, nobody invited, the reader's length in English and Hebrew), real-browser specs that now read the event's end: Outlook mail, Gmail mail, WhatsApp and Instagram chat (the Outlook mail one failed until the mail card's own hold path carried the length: `meetingClock` in `src/content-outlook.js`), all corpora.
+- **Open:** live Gate; a flight or an appointment could use the same field when the message names an end (not read yet); Gmail still titles every hold "Hold <day> <time>".
+
