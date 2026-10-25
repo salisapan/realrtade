@@ -58,6 +58,11 @@ SECRET_ASSIGNMENT_RE = re.compile(
     re.I,
 )
 
+# The Drive picker is a hosted page, not part of the extension install.
+# verify_trial_install.py rejects picker/ in both the signup and store zips.
+def is_picker_archive_path(rel: str) -> bool:
+    return rel == "picker" or rel.startswith("picker/")
+
 
 def die(message: str) -> None:
     print(f"package_trial_extension: {message}", file=sys.stderr)
@@ -93,6 +98,8 @@ def add_file(files: dict[str, Path], path: Path) -> None:
     if any(part.startswith(".") for part in rel.parts):
         die(f"refusing to package dotfile {rel}")
     key = posix(rel)
+    if is_picker_archive_path(key):
+        return
     files[key] = path
 
 
@@ -297,6 +304,10 @@ def collect(profile: str = "full") -> dict[str, Path]:
         text = path.read_text(encoding="utf-8", errors="replace")
         if SECRET_ASSIGNMENT_RE.search(text):
             die(f"{rel} looks like it contains a secret assignment; refusing to package it")
+
+    for key in list(files):
+        if is_picker_archive_path(key):
+            del files[key]
 
     return files
 
