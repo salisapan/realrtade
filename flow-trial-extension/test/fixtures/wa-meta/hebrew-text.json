@@ -1,0 +1,21 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "WABA_TEST",
+    "changes": [{
+      "field": "messages",
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": { "phone_number_id": "PHONE_ID_1" },
+        "contacts": [{ "profile": { "name": "שרה" }, "wa_id": "972507777777" }],
+        "messages": [{
+          "from": "972507777777",
+          "id": "wamid.HE_FIXTURE_1",
+          "timestamp": "1729900300",
+          "type": "text",
+          "text": { "body": "תשלח לי את הקבלה עד יום ראשון, בבקשה." }
+        }]
+      }
+    }]
+  }]
+}

@@ -90,6 +90,12 @@ import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClos
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
+import { WA_BUSINESS } from '../config/wa-business.public.js';
+import '../core/wa-business-redact.js';
+import '../core/wa-business-lane.js';
+import '../core/wa-business-consent.js';
+import './wa-business-sw.js';
+globalThis.__glanceWaBusinessConfig = WA_BUSINESS;
 import './google-lane-host.js';
 import './gmail-reinject.js';
 
@@ -708,9 +714,47 @@ async function restoreLaneChats() {
 
 dropLegacyWhatsApp();
 restoreSurfaces();
+const WA_BUSINESS_HOST_ID = 'glance-wa-business-host';
+const WA_BUSINESS_HOST_ORIGINS = [
+  'https://mail.google.com/*',
+  'https://outlook.live.com/*',
+  'https://outlook.office.com/*',
+  'https://outlook.office365.com/*',
+];
+const WA_BUSINESS_HOST_JS = [
+  'core/wa-business-redact.js',
+  'core/wa-business-lane.js',
+  'src/wa-business-card.js',
+  'src/wa-business-host.js',
+];
+
+async function restoreWaBusinessHost() {
+  if (!chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  const buildOn = WA_BUSINESS && WA_BUSINESS.enabled === true;
+  let labsOn = false;
+  try { labsOn = await glanceSwitchOn('WHATSAPP_BUSINESS'); } catch (e) { labsOn = false; }
+  if (!buildOn || !labsOn) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [WA_BUSINESS_HOST_ID] }); } catch (e) { /* not registered */ }
+    return;
+  }
+  try { await chrome.scripting.unregisterContentScripts({ ids: [WA_BUSINESS_HOST_ID] }); } catch (e) { /* not registered yet */ }
+  try {
+    await chrome.scripting.registerContentScripts([{
+      id: WA_BUSINESS_HOST_ID,
+      matches: WA_BUSINESS_HOST_ORIGINS,
+      js: WA_BUSINESS_HOST_JS,
+      css: ['design/step-states-v1/scoped.css', 'src/chip.css'],
+      runAt: 'document_idle',
+    }]);
+  } catch (e) {
+    console.error('[Glance] could not register WhatsApp Business host', e);
+  }
+}
+
 restoreLaneChats();
-chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+restoreWaBusinessHost();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); restoreWaBusinessHost(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); restoreWaBusinessHost(); });
 try {
   if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
     chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
@@ -7092,6 +7136,48 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:outlook-keepalive') {
     if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
     return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());
+  }
+
+  if (msg.type === 'flow:wa-business-config') {
+    return reply(sendResponse, (async () => {
+      let globalKill = false;
+      try {
+        if (WA_BUSINESS.enabled === true && typeof FlowWaBusinessSW !== 'undefined') globalKill = await FlowWaBusinessSW.globalKill();
+      } catch (e) { globalKill = false; }
+      return { ok: true, buildEnabled: WA_BUSINESS.enabled === true, globalKill: globalKill === true };
+    })());
+  }
+  if (msg.type === 'flow:wa-business-poll') {
+    return reply(sendResponse, (async () => {
+      if (WA_BUSINESS.enabled !== true) return { ok: true, items: [], reason: 'build-off' };
+      if (!(await glanceSwitchOn('WHATSAPP_BUSINESS'))) return { ok: true, items: [], reason: 'switch-off' };
+      if (typeof FlowWaBusinessSW === 'undefined') return { ok: false, reason: 'worker-missing' };
+      return FlowWaBusinessSW.pollInbox();
+    })());
+  }
+  if (msg.type === 'flow:wa-business-save-draft') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, (async () => {
+      if (WA_BUSINESS.enabled !== true) return { ok: false, reason: 'build-off' };
+      if (!(await glanceSwitchOn('WHATSAPP_BUSINESS'))) return { ok: false, reason: 'switch-off' };
+      const inboundId = msg.inboundId;
+      const draftBody = String(msg.draftBody || '');
+      if (!inboundId || !draftBody) return { ok: false, reason: 'bad-request' };
+      const lane = typeof FlowWaBusinessLane !== 'undefined' ? FlowWaBusinessLane : null;
+      const proof = lane && lane.buildProof ? lane.buildProof('pending', false) : { system: 'whatsapp/business-draft', externalId: 'pending', fetchedBack: false };
+      if (typeof FlowWaBusinessSW === 'undefined') return { ok: false, reason: 'worker-missing' };
+      return FlowWaBusinessSW.saveDraft(inboundId, draftBody, proof);
+    })());
+  }
+  if (msg.type === 'flow:wa-business-undo') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, (async () => {
+      if (typeof FlowWaBusinessSW === 'undefined') return { ok: false, reason: 'worker-missing' };
+      return FlowWaBusinessSW.undoDraft(msg.draftId);
+    })());
+  }
+  if (msg.type === 'flow:wa-business-restore-host') {
+    return reply(sendResponse, restoreWaBusinessHost());
   }
 
   if (msg.type === 'flow:surface-status') return reply(sendResponse, surfaceStatus());

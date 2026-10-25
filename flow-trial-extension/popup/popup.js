@@ -2289,6 +2289,9 @@
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        if (r.id === 'WHATSAPP_BUSINESS') {
+          try { await send({ type: 'flow:wa-business-restore-host' }); } catch (e) { /* host registration is best-effort */ }
+        }
         await renderLabs();
       });
       acts.appendChild(btn);

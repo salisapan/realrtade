@@ -22,6 +22,7 @@ const FlowLabsSwitches = (() => {
     { id: 'SHAREPOINT_NEW_FILE', who: 'מסמך או גיליון באתר SharePoint', note: 'קובץ ריק בשם שביקשו, באתר אחד ששמו נכתב במייל' },
     { id: 'SHAREPOINT_SAVE_FILE', who: 'קובץ מצורף באתר SharePoint', note: 'שמירת הקובץ המצורף, כמו שהוא, באתר אחד ששמו נכתב במייל' },
     { id: 'CHAT_CHASE_DRAFT', who: 'תזכורת בצ\'אט למי שמאחר', note: 'טיוטת תזכורת בתיבת הצ\'אט כשמשימת "מחכים ל..." עברה את היום שלה (לא נשלחת)' },
+    { id: 'WHATSAPP_BUSINESS', who: 'WhatsApp Business (ענן)', note: 'הודעות עסקיות מ-Cloud API: כרטיס Do It וטיוטה לבדיקה בלבד, בלי שליחה' },
     { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' }
   ];
   const IDS = LIST.map((r) => r.id);
