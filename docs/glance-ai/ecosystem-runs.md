@@ -599,3 +599,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** trip reader corpus (6 more trips, 5 more quiet lines), chat card corpus (delayed offered at the new time; a delay with no time quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
 - **Open:** live Gate; the old trip event stays until the person removes it; the pickup reader does not read a moved time yet.
 
+## 2026-10-25 Ecosystems builder B (seventy-first run) — an extended pickup deadline is offered with the new day
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `BOOKING_NOTICE`, off):** shops and couriers extend pickups: "The pickup deadline for your order was moved to Thursday", "Your parcel collection was postponed until Friday", «מועד האיסוף של ההזמנה שלך הוארך עד יום חמישי». The pickup reader saw no pickup frame in these lines and stayed quiet, so the person kept the old, expired deadline. `core/chat-pickup-notice.js` now reads a moved or extended pickup with the new last day, and the existing "Pick up the order" task is offered due that day, in chat (WhatsApp, Messenger, Instagram) and in Outlook/Gmail mail. A moved delivery (nothing to collect), a cancellation, "sorry …" and a pickup that is not the person's own stay quiet.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** pickup reader corpus (5 more pickups, 4 more quiet lines), chat card corpus (extended pickup offered; moved delivery quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
+- **Open:** live Gate; the invitation reader does not read a moved event yet; the first (old) pickup task stays until the person removes it.
+

@@ -503,6 +503,16 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a delay with no new time offers nothing', !(await q.Card.offer(input('Your flight LY001 has been delayed', { channel: 'whatsapp' }))).shown);
   }
 
+  // 5x. A pickup whose last day was moved is offered as a task due the new day; a delivery moved is nothing to pick up.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleTask' } });
+    const r = await w.Card.offer(input('Your order pickup has been extended to Thursday', { channel: 'whatsapp' }));
+    const st = r.shown && w.injected[0].ctx.process.steps[0].params;
+    check('the extended pickup is offered with the new last day', !!st && /^\d{4}-\d{2}-\d{2}$/.test(st.dateIso) && /pick up/i.test(st.title), st || r);
+    const q = world({ target: { ok: true, connectorId: 'googleTask' } });
+    check('a moved delivery offers nothing', !(await q.Card.offer(input('Your order delivery was moved to Thursday', { channel: 'whatsapp' }))).shown);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

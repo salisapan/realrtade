@@ -14,6 +14,17 @@ const FlowChatPickupNotice = (() => {
   // A look back, a cancellation, a question, an offer, or a delivery that arrives by itself.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night)|(?:was|were|has\s+been|have\s+been|been)\s+(?:picked\s+up|collected|delivered)|already\s+(?:picked|collected)|cancel(?:l?ed)?|returned|unfortunately|sorry|would\s+you\s+like|choose|select|click|tap|will\s+(?:arrive|be\s+delivered|reach)|out\s+for\s+delivery|arriv(?:es|ing)|expected)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|נאסף|נמסר|נמסרה|בוטל|בוטלה|לצערנו|מצטערים|לחץ|בחר|בחרי|תגיע|יגיע|מגיע|בדרך\s+אליך|צפוי)/;
+  // A pickup whose last day was moved ("Your order pickup has been extended to Thursday", «מועד האיסוף של ההזמנה שלך הוארך עד יום חמישי»)
+  // is the same pickup with the new last day: the words up to the verb stay (they carry the noun and the pickup word).
+  const EXT_EN = /\s*,?\s*(?:(?:has|have)\s+been\s+|was\s+|is\s+now\s+)?(?:extended|moved|postponed|changed|pushed\s+back)\s+(?:to|until)\s+/i;
+  const EXT_HE = /\s+(?:הוארך|הוארכה|נדחה|נדחתה|הועבר|הועברה)\s+(?:עד|ל)\s*/;
+  function extendedTo(raw) {
+    let m = raw.match(EXT_EN);
+    if (m && /\b(?:pick\s?-?up|collect(?:ion)?)\b/i.test(raw.slice(0, m.index))) return raw.slice(0, m.index) + ' is ready for pickup until ' + raw.slice(m.index + m[0].length);
+    m = raw.match(EXT_HE);
+    if (m && /(?:האיסוף|לאיסוף)/.test(raw.slice(0, m.index))) return raw.slice(0, m.index) + ' מוכנה לאיסוף עד ' + raw.slice(m.index + m[0].length);
+    return raw;
+  }
   const QUESTION = /[?؟]/;
   const MAX_AHEAD_DAYS = 60;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -52,7 +63,7 @@ const FlowChatPickupNotice = (() => {
 
   // { kind: 'pickup', dateIso, lang } or { kind: 'none', reason }.
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = extendedTo(String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim());
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 240) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

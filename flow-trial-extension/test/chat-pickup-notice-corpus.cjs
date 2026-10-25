@@ -12,10 +12,19 @@ const YES = [
   ['ההזמנה שלך מוכנה לאיסוף עד יום חמישי', '2026-10-29'],
   ['החבילה שלך ממתינה בדואר, לאיסוף עד יום שלישי', '2026-10-27'],
   ['שלום, הרכב שלך מוכן, אפשר לאסוף עד מחר', '2026-10-24'],
-  ['המרשם שלכם מוכן לאיסוף עד יום ראשון', '2026-10-25']
+  ['המרשם שלכם מוכן לאיסוף עד יום ראשון', '2026-10-25'],
+  ['Your order pickup has been extended to Thursday', '2026-10-29'],
+  ['The pickup deadline for your order was moved to Thursday', '2026-10-29'],
+  ['Your parcel collection was postponed until Friday', '2026-10-30'],
+  ['מועד האיסוף של ההזמנה שלך הוארך עד יום חמישי', '2026-10-29'],
+  ['מועד האיסוף של ההזמנה שלך נדחה ליום חמישי', '2026-10-29']
 ];
 for (const [text, day] of YES) { const r = A.recognize(text, NOW); check('pickup: ' + text, r.kind === 'pickup' && r.dateIso === day, r); }
 const NO = [
+  ['Your order delivery was moved to Thursday', 'a delivery, not a pickup'],
+  ['Your order pickup was cancelled, moved to Thursday', 'cancelled'],
+  ['Sorry, your order pickup has been extended to Thursday', 'sorry'],
+  ['The pickup was moved to Thursday', 'not yours'],
   ['Your order is ready for pickup', 'no deadline'],
   ['Your package will arrive on Monday', 'delivery arrives'],
   ['Your order is out for delivery, expected by Tuesday', 'delivery'],
