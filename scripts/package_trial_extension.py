@@ -312,7 +312,6 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
         tmp.unlink()
-    replacements = replacements or {}
     # Fixed timestamps keep two builds of the same tree byte-identical.
     info_date = (2026, 1, 1, 0, 0, 0)
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as archive:
