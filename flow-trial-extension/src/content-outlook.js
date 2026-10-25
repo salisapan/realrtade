@@ -1118,7 +1118,15 @@
         (pane && pane.internetMessageId && (pane.clockFromPane || pane.idSource === 'open-mail')) ||
         (paneMinute && pane && pane.clockFromPane === true)
       );
-      if (!paneAnchored) return null;
+      const preview = normalizeSoleBodyText(sole.bodyPreview);
+      const paneBody = normalizeSoleBodyText(pane && pane.text);
+      if (!paneAnchored) {
+        if (preview && paneBody && preview === paneBody.slice(0, preview.length)) {
+          const nonSpace = preview.replace(/\s/g, '').length;
+          if (nonSpace >= 250) return sole;
+        }
+        return null;
+      }
       if (solePreviewAllowsPrefix(pane, sole)) return sole;
     }
     return null;

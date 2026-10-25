@@ -909,7 +909,8 @@ async function runBehavioral(opts) {
     const needle = 'async function exactOpenMessageInList(list, pane, openSender) {';
     const start = out.indexOf(needle);
     if (start < 0) return out;
-    const nextFn = out.indexOf('\n  function paneUrlOnlyMessageTarget', start + needle.length);
+    let nextFn = out.indexOf('\n  function paneFileAttachments', start + needle.length);
+    if (nextFn < 0) nextFn = out.indexOf('\n  function paneUrlOnlyMessageTarget', start + needle.length);
     const end = nextFn > start ? nextFn : out.length;
     let chunk = out.slice(start, end);
     chunk = chunk.replace(
@@ -921,8 +922,8 @@ async function runBehavioral(opts) {
     );
     if (chunk.indexOf('if (convSender.length === 1) return convSender[0];') < 0) {
       chunk = chunk.replace(
-        'if (hits.length === 1) return hits[0];\n    return null;',
-        'if (hits.length === 1) return hits[0];\n    if (hits.length > 1) return null;\n    if (convSender.length === 1) return convSender[0];\n    return null;'
+        'if (hits.length > 1) return null;',
+        'if (hits.length > 1) return null;\n    if (convSender.length === 1) return convSender[0];'
       );
     }
     return out.slice(0, start) + chunk + out.slice(end);
