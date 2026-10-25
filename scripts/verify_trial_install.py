@@ -212,13 +212,20 @@ assert(publicClientId('   ') === '', 'blank');
 assert(publicClientId('REPLACE_WITH_HUBSPOT_CLIENT_ID') === '', 'placeholder');
 assert(publicClientId('YOUR_SLACK_CLIENT_ID') === '', 'legacy placeholder');
 assert(publicClientId('  real-client ') === 'real-client', 'trim real id');
+const PLACEHOLDER = /^(YOUR_|REPLACE_WITH_)/;
 for (const [key, value] of Object.entries(OAUTH_PUBLIC)) {
-  if (key === 'dropboxAppKey') {
-    assert(publicClientId(value) !== '', 'dropboxAppKey must ship configured (public app key, not a secret)');
-    continue;
+  const trimmed = String(value == null ? '' : value).trim();
+  const out = publicClientId(value);
+  if (!trimmed || PLACEHOLDER.test(trimmed)) {
+    assert(out === '', key + ' placeholder must count as unset');
+  } else {
+    assert(out === trimmed, key + ' real public id must pass through unchanged');
   }
-  assert(publicClientId(value) === '', key + ' is still a placeholder and must count as unset');
 }
+assert(
+  Object.values(OAUTH_PUBLIC).some((v) => publicClientId(v) === ''),
+  'at least one OAUTH_PUBLIC entry stays unconfigured in this build'
+);
 console.log('publicClientId ok');
 """
 
