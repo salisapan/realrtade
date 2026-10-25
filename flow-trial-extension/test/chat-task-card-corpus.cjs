@@ -669,7 +669,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const again = world({ switchOn: false, switchOwn: true });
     await again.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { key: 'a-1' }));
     await again.injected[0].handlers.onDoIt(again.injected[0].host, {}, again.injected[0].ctx);
-    const rep = await again.Card.offer(mine('Hi again, please transfer 500 NIS to my account by Sunday', { key: 'a-2' }));
+    const rep = await again.Card.offer(mine('Reminder: please transfer 500 NIS to my account by Sunday', { key: 'a-2' }));
     check('the same ask repeated is not a second follow-up task', !rep.shown && rep.reason === 'already-on-task-list', rep);
   }
 

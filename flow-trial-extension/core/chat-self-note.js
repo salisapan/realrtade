@@ -8,6 +8,10 @@ const FlowChatSelfNote = (() => {
   const CUE_HE = /^(?:(?:תזכיר|תזכירי)\s+לי(?:\s+(?:ב|ל|עד|מחר|היום|הערב|ביום)\S*)?[^.!?]{0,30}?\s(?=ל)|לעצמי\s*[:\-,]?\s*|תזכורת\s*[:\-]\s*|תזכורת\s+לעצמי\s*[:\-]?\s*)/;
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night)|already|never\s*mind|maybe|might|cancel(?:l?ed)?|don'?t)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|כבר\s|עזוב|אולי|בוטל|לבטל|אל\s+תזכיר)/;
+  // A bare "Reminder:" / «תזכורת:» in front of words addressed to somebody ("Reminder: please transfer 500 NIS to my account") is an
+  // ask of the other person, not a note to oneself; the explicit cues (remind me, note to self, לעצמי, תזכיר לי) stay notes.
+  const BARE = /^(?:reminder|to-?do)\s*[:\-]|^תזכורת\s*[:\-]/i;
+  const ADDRESSED = /\b(?:please|pls|kindly|you|your|yours|you'?re)\b|(?:בבקשה|תעביר|תעבירי|תשלח|תשלחי|תחתום|תחתמי|תחזור|תחזרי|שלך|שלכם|\sלך\s|אתה|אתם)/i;
   const QUESTION = /[?؟]/;
   const MAX_AHEAD_DAYS = 120;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -60,6 +64,7 @@ const FlowChatSelfNote = (() => {
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-note' };
     const cue = raw.match(CUE_EN) || raw.match(CUE_HE);
     if (!cue) return { kind: 'none', reason: 'no-cue' };
+    if (BARE.test(raw) && ADDRESSED.test(raw.slice(cue[0].length))) return { kind: 'none', reason: 'addressed-to-someone' };
     const X = extractApi();
     if (!X || typeof X.parseDate !== 'function') return { kind: 'none', reason: 'not-configured' };
     const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
