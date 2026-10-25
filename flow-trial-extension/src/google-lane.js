@@ -7,6 +7,7 @@ const FlowGoogleLane = (() => {
     googleLaneTask: 'FlowGoogleTasks',
     googleDriveSave: 'FlowGoogleDrive',
     googleDoc: 'FlowGoogleDocs',
+    googleDocFull: 'FlowGoogleDocs',
     googleSheetAppend: 'FlowGoogleSheets',
     googleNewFile: 'FlowWorkspaceFile',
     googleEventCallLink: 'FlowEventCallLink'
