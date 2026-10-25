@@ -626,6 +626,53 @@ function logH1ParityChange(line, before, after) {
 
   }
 
+  console.log('\n--- #179 5a/5b action-required and OneDrive (PR #186) ---\n');
+  {
+    const judgeDeps = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    const inbound = {
+      sender: { name: 'Dana Levi', email: 'dana@acme.io' },
+      to: [ME],
+      ownAddresses: [ME, 'ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      readerEmail: ME,
+      namesWaitDone: true,
+      now: new Date(NOW),
+      attachmentCount: 0,
+      inbound: true
+    };
+    for (const surface of ['gmail', 'outlook']) {
+      const ok = J.judge(Object.assign({ text: 'פעולה נדרשת מצד: חתימה על ה-deck', subject: 'deck', surface }, inbound), judgeDeps);
+      check('פעולה נדרשת unnamed shows on ' + surface, ok.show && ok.process && ok.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'outlookTask'), { reason: ok.reason });
+      const neg = J.judge(Object.assign({ text: 'פעולה נדרשת מצד: יוסי כהן — חתימה על ה-deck', subject: 'deck', surface }, inbound), judgeDeps);
+      check('פעולה נדרשת third party quiet on ' + surface, !neg.show && String(neg.reason || '').indexOf('hedge') >= 0, { reason: neg.reason });
+    }
+    const enG = J.judge(Object.assign({}, inbound, {
+      text: 'Please save the attachment to OneDrive.',
+      subject: 'file',
+      surface: 'gmail',
+      attachmentCount: 1,
+      hasThreadAttachment: true
+    }), judgeDeps);
+    check('EN OneDrive save on Gmail stays quiet', !enG.show && enG.reason === 'onedrive-target-on-gmail', { reason: enG.reason });
+    const enO = J.judge(Object.assign({}, inbound, {
+      text: 'Please save the attachment to OneDrive.',
+      subject: 'file',
+      surface: 'outlook',
+      attachmentCount: 1,
+      hasThreadAttachment: true
+    }), judgeDeps);
+    check('EN OneDrive save on Outlook shows file-it', enO.show && enO.process && enO.process.id === 'file-it', { reason: enO.reason, id: enO.process && enO.process.id });
+    const heG = J.judge(Object.assign({}, inbound, {
+      text: 'תשמרי את המצורף בוואן דרייב',
+      subject: 'דוח',
+      surface: 'gmail',
+      attachmentCount: 1,
+      hasThreadAttachment: true
+    }), judgeDeps);
+    check('HE OneDrive save inbound on Gmail stays quiet', !heG.show && heG.reason === 'onedrive-target-on-gmail', { reason: heG.reason });
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();

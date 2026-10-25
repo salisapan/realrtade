@@ -1601,5 +1601,69 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   check('Lior, could you stays quiet even when the user is in To', otherEn && !otherEn.type && otherEn.quiet === 'hedge', { type: otherEn && otherEn.type, quiet: otherEn && otherEn.quiet });
 }
 
+console.log('\n--- #179 5a/5b inbound פעולה נדרשת and OneDrive (PR #186) ---\n');
+{
+  const inbound = {
+    senderEmail: 'dana@acme.io',
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'Sali',
+    ownNames: ['Sali', 'Sali Sapan'],
+    readerEmail: 'ai.local.flow@gmail.com',
+    namesWaitDone: true,
+    surface: 'gmail',
+    attachmentCount: 1
+  };
+  const showDeck = classify('פעולה נדרשת מצד: חתימה על ה-deck', inbound);
+  check('HE action-required unnamed party shows', showDeck && showDeck.type === 'request' && showDeck.selfTask === true, showDeck);
+  const showReader = classify('פעולה נדרשת מצדך: חתימה על החוזה', inbound);
+  check('HE action-required מצדך shows', showReader && showReader.type === 'request' && showReader.selfTask === true, showReader);
+  const quietNamed = classify('פעולה נדרשת מצד: יוסי כהן — חתימה על ה-deck', inbound);
+  check('HE action-required names someone else stays quiet', quietNamed && !quietNamed.type && quietNamed.quiet === 'hedge', quietNamed);
+  const quietRole = classify('פעולה נדרשת מצד: רואה החשבון\nחתימה על הדוח השנתי', inbound);
+  check('HE action-required names a role stays quiet', quietRole && !quietRole.type && quietRole.quiet === 'hedge', quietRole);
+  const signoffLine = classify('פעולה נדרשת מצד: חתימה על ה-deck  בתודה, דנה', inbound);
+  check('HE action-required sign-off on same line does not leave dangling ב', signoffLine && signoffLine.label === 'לחתום על ה-deck', signoffLine && signoffLine.label);
+  const enOd = classify('Please save the attachment to OneDrive.', inbound);
+  check('EN save to OneDrive on Gmail is not a selfTask bypass', enOd && !enOd.selfTask, enOd);
+  const heOd = classify('תשמרי את המצורף בוואן דרייב', Object.assign({}, inbound, { senderEmail: 'dana@meridian.com' }));
+  check('heOneDriveSave selfTask block removed (no intent.js:1842 copyAttachment→selfTask)', heOd && !heOd.selfTask, heOd);
+  check('HE inbound OneDrive save uses google-closes SAVE_HE (drive-file), not intent selfTask', heOd && heOd.googleClose && heOd.googleClose.target === 'onedrive', heOd);
+}
+
+console.log('\n--- intent.js:638 / :1535 nameIsReader allows reader, blocks third party (PR #186) ---\n');
+{
+  const readerCtx = {
+    senderEmail: 'dana@acme.io',
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    userName: 'Sali',
+    ownNames: ['Sali', 'Sali Sapan'],
+    readerEmail: 'ai.local.flow@gmail.com',
+    namesWaitDone: true,
+    inbound: true
+  };
+  const readerNamed = classify('פעולה נדרשת מצד: Sali Sapan — חתימה על ה-deck', readerCtx);
+  check('intent.js:1535 nameIsReader allows reader-named פעולה נדרשת', readerNamed && readerNamed.type === 'request' && readerNamed.selfTask === true, readerNamed);
+  const thirdParty = classify('פעולה נדרשת מצד: יוסי כהן — חתימה על ה-deck', readerCtx);
+  check('intent.js:1535 nameIsReader blocks third-party name', thirdParty && !thirdParty.type && thirdParty.quiet === 'hedge', thirdParty);
+  const handoff = classify('Hi Sali, please send the signed contract by Friday.', readerCtx);
+  check('intent.js:638 nameIsReader allows handoff when opening names reader', handoff && handoff.type === 'request', handoff);
+}
+
+console.log('\n--- intent.js:3048 SIGNOFF_TAIL anchored (ברכה הפקות, מכתב תודה ללקוח) ---\n');
+{
+  const self = {
+    senderEmail: 'ai.local.flow@gmail.com',
+    to: ['ai.local.flow@gmail.com'],
+    ownAddresses: ['ai.local.flow@gmail.com'],
+    inbound: false
+  };
+  const prod = classify('הוחלט: ברכה הפקות הספק לקליטת העובד', self);
+  check('ברכה הפקות is not stripped as a sign-off tail', prod && prod.label && prod.label.indexOf('ברכה הפקות') !== -1, prod && prod.label);
+  const letter = classify('הוחלט סופית על מכתב תודה ללקוח', self);
+  check('מכתב תודה ללקוח is not stripped as בתודה sign-off (intent.js:3048)', letter && letter.label && letter.label.indexOf('מכתב תודה') !== -1, letter && letter.label);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
