@@ -160,25 +160,17 @@ const FlowSharepointNewFile = (() => {
     return word && word.docxBytes ? word.docxBytes('') : null;
   }
 
-  // Do It. The host passes the plan's kind, file name and site id as the person saw them; the site is read once more, by id, first.
-  async function create(input, io) {
-    input = input || {};
-    io = io || {};
-    if (!enabled(input.flags)) return miss('switch-off');
-    if (typeof io.call !== 'function') return miss('no-host');
-    if (!drive) return miss('no-onedrive-module');
-    const kind = input.fileKind === 'sheet' ? 'sheet' : input.fileKind === 'doc' ? 'doc' : '';
-    const fileName = kind ? fileNameFor(kind, input.fileName || input.name) : '';
-    const siteId = String(input.siteId || '').trim();
-    if (!kind || !fileName || !siteId) return miss('unclear');
-    if (input.grantedScopes != null && hasScope(input.grantedScopes) === false) return miss('sharepoint-not-granted');
-    const bytes = bytesFor(kind);
-    if (!bytes) return miss('no-office-module');
+  // The write itself, shared with the attachment save (core/sharepoint-save-file.js): resolve nothing, trust the site id the person saw,
+  // read it once more by id, upload without replacing, read back by id. input: { siteId, fileName, siteName, now, expectedSize? };
+  // bytes and contentType come from the caller. system is the ProofOfClose system.
+  async function writeFile(input, bytes, contentType, kind, io) {
     const call = io.call;
+    const siteId = String(input.siteId || '').trim();
+    const fileName = String(input.fileName || '');
     const site = await call({ method: 'GET', path: '/sites/' + enc(siteId) });
     if (site && (site.status === 401 || site.status === 403)) return miss('not-connected');
     if (!site || site.ok !== true || !site.body || String(site.body.id) !== siteId) return miss('site-not-found');
-    const put = await call({ method: 'PUT', path: createPath(siteId, fileName) + '?@microsoft.graph.conflictBehavior=fail', raw: bytes, contentType: TYPE[kind] });
+    const put = await call({ method: 'PUT', path: createPath(siteId, fileName) + '?@microsoft.graph.conflictBehavior=fail', raw: bytes, contentType: contentType });
     if (put && (put.status === 401 || put.status === 403)) return miss('not-connected');
     if (put && put.status === 409) return miss('name-taken');
     if (!put || put.ok !== true || !put.body || !put.body.id) return miss('write-failed');
@@ -197,6 +189,7 @@ const FlowSharepointNewFile = (() => {
     if (String(f.name || '') !== fileName) return withdraw('name-differs');
     if (!f.file) return withdraw('not-a-file');
     if (!(Number(f.size) > 0)) return withdraw('empty-upload');
+    if (input.expectedSize != null && Number(f.size) !== Number(input.expectedSize)) return withdraw('size-differs');
     if (!f.eTag || !f.lastModifiedDateTime) return withdraw('no-stamp');
     const verifiedAt = typeof input.now === 'string' ? input.now : new Date().toISOString();
     const url = f.webUrl && String(f.webUrl).slice(0, 8) === 'https://' ? f.webUrl : '';
@@ -213,9 +206,26 @@ const FlowSharepointNewFile = (() => {
       url: url || null,
       proof: proof,
       ref: finalRef,
-      // The file exists, empty and not shared. Whether the people it was for have used it is theirs.
+      // The file exists and is not shared. Whether the people it was for have used it is theirs.
       loopClosed: true
     };
+  }
+
+  // Do It. The host passes the plan's kind, file name and site id as the person saw them; the site is read once more, by id, first.
+  async function create(input, io) {
+    input = input || {};
+    io = io || {};
+    if (!enabled(input.flags)) return miss('switch-off');
+    if (typeof io.call !== 'function') return miss('no-host');
+    if (!drive) return miss('no-onedrive-module');
+    const kind = input.fileKind === 'sheet' ? 'sheet' : input.fileKind === 'doc' ? 'doc' : '';
+    const fileName = kind ? fileNameFor(kind, input.fileName || input.name) : '';
+    const siteId = String(input.siteId || '').trim();
+    if (!kind || !fileName || !siteId) return miss('unclear');
+    if (input.grantedScopes != null && hasScope(input.grantedScopes) === false) return miss('sharepoint-not-granted');
+    const bytes = bytesFor(kind);
+    if (!bytes) return miss('no-office-module');
+    return writeFile(Object.assign({}, input, { fileName: fileName }), bytes, TYPE[kind], kind, io);
   }
 
   // Undo: delete the file, only while it is still exactly what Glance made.
@@ -243,7 +253,7 @@ const FlowSharepointNewFile = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.itemId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SCOPE, SYSTEM, CONNECTOR, FOLDER, enabled, hasScope, siteOf, recognize, resolveSite, plan, create, undo };
+  return { SWITCH, SWITCH_DEFAULT, SCOPE, SYSTEM, CONNECTOR, FOLDER, enabled, hasScope, siteOf, recognize, resolveSite, plan, create, writeFile, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowSharepointNewFile };

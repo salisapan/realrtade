@@ -86,6 +86,17 @@ const FlowOnedriveNewFile = (() => {
     return s;
   }
 
+  // The guards every ask of this family shares (a Glance own-promise, a past ask, a negation, FYI, a hedge, a third party): the reason or ''.
+  function blockedBy(text) {
+    const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
+    if (NEG.test(s)) return 'negation';
+    if (FYI.test(s)) return 'fyi';
+    if (HEDGE.test(s)) return 'hedge';
+    if (THIRD.test(s) || (attach && attach.asksThirdParty && attach.asksThirdParty(s))) return 'third-party';
+    if (PAST_HE.test(s) || SELF_HE.test(s)) return PAST_HE.test(s) ? 'past' : 'own-promise';
+    return '';
+  }
+
   // The ask, or silence with a reason.
   function recognize(text) {
     const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
@@ -241,7 +252,7 @@ const FlowOnedriveNewFile = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.itemId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, CONNECTOR, enabled, recognize, plan, create, undo };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, CONNECTOR, enabled, recognize, blockedBy, plan, create, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOnedriveNewFile };

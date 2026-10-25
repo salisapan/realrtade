@@ -4166,7 +4166,14 @@
       if (!cfg.scopeOk(st)) return false;
       const text = ((pane && pane.subject) ? pane.subject + '. ' : '') + holdTextOf(pane);
       if (!String(text).trim()) return false;
-      const plan = await send({ type: cfg.planMessage, text: text });
+      let plan = await send({ type: cfg.planMessage, text: text });
+      // The ask reads as explicit; the worker needs the Graph message id to list the attachments (a chain that sets needsGraphId).
+      if (plan && plan.action === 'need-message-id' && cfg.needsGraphId) {
+        const graphId = await ensureOutlookMessageId({ pathId: pane.pathId || pane.conversationId, conversationId: pane.conversationId, itemId: pane.itemId, outlookIncomingId: pane.itemId, sender: { email: pane.senderEmail } });
+        if (!graphId) return false;
+        plan = await send({ type: cfg.planMessage, text: text, graphMessageId: graphId });
+        if (plan && plan.action === 'offer') plan = Object.assign({}, plan, { graphMessageId: graphId });
+      }
       if (!plan || plan.action !== 'offer' || !cfg.planOk(plan)) return false;
       return showCard(pane, plan, messageId);
     }
@@ -4221,6 +4228,33 @@
     })
   });
 
+  // The mail's own attachment saved on the ONE SharePoint site the mail names (switch SHAREPOINT_SAVE_FILE, off). Needs the SharePoint box.
+  const sharepointSaveChain = makeCloseChain({
+    chain: 'sharepoint-save',
+    connectorId: 'sharepointSaveFile',
+    planMessage: 'flow:sharepoint-save-plan',
+    needsGraphId: true,
+    refKey: 'itemId',
+    stepKind: 'drive',
+    name: 'Save the file',
+    undone: 'File removed from SharePoint.',
+    undoFailed: 'Could not remove the file.',
+    writtenDefault: 'Saved in SharePoint.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'sites.readwrite.all'),
+    planOk: (plan) => Boolean(plan.fileName && plan.siteId && plan.attachmentId && plan.graphMessageId),
+    cardLabel: (plan) => plan.fileName,
+    paramsOf: (plan) => ({ fileName: plan.fileName, siteId: plan.siteId, siteName: plan.siteName, attachmentId: plan.attachmentId, graphMessageId: plan.graphMessageId }),
+    reasons: () => ({
+      'name-taken': pageUiLang() === 'he' ? 'כבר יש קובץ בשם הזה בתיקיית Glance באתר' : 'A file with that name is already in the site\'s Glance folder',
+      'site-not-found': pageUiLang() === 'he' ? 'האתר לא נמצא' : 'The SharePoint site was not found',
+      'sharepoint-not-granted': pageUiLang() === 'he' ? 'צריך הרשאה ל-SharePoint' : 'SharePoint needs to be allowed first',
+      'attachment-differs': pageUiLang() === 'he' ? 'הקובץ המצורף השתנה' : 'The attachment is not the one on the card',
+      'no-bytes': pageUiLang() === 'he' ? 'לא הצלחתי לקרוא את הקובץ המצורף' : 'Could not read the attachment',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook'
+    })
+  });
+
   const eventLinkChain = makeCloseChain({
     chain: 'event-link',
     connectorId: 'outlookEventCallLink',
@@ -4247,6 +4281,7 @@
   async function settleCloseChains(pane, st) {
     if (await newFileChain.settle(pane, st)) return newFileChain.chain;
     if (await sharepointFileChain.settle(pane, st)) return sharepointFileChain.chain;
+    if (await sharepointSaveChain.settle(pane, st)) return sharepointSaveChain.chain;
     if (await eventLinkChain.settle(pane, st)) return eventLinkChain.chain;
     return '';
   }

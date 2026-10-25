@@ -67,6 +67,7 @@ import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (a
 import '../core/outlook-excel.js'; // classic: sets globalThis.FlowOutlookExcel (an empty .xlsx for a new file)
 import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)
 import '../core/sharepoint-new-file.js'; // classic: sets globalThis.FlowSharepointNewFile (switch SHAREPOINT_NEW_FILE, off)
+import '../core/sharepoint-save-file.js'; // classic: sets globalThis.FlowSharepointSaveFile (switch SHAREPOINT_SAVE_FILE, off)
 import '../core/event-call-link.js'; // classic: sets globalThis.FlowEventCallLink (the event picker the Outlook twin uses)
 import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOutlookEventCallLink (switch OUTLOOK_EVENT_CALL_LINK, off)
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
@@ -5746,6 +5747,48 @@ async function sharepointNewFileUndo(ref) {
   return { ok: false, reason: (u && u.reason) || 'undo-failed' };
 }
 
+// The mail's own attachment saved, unchanged, into the Glance folder of the ONE SharePoint site the mail names
+// ("please save the attached contract on the Marketing SharePoint site", core/sharepoint-save-file.js). Off unless the owner's
+// switch SHAREPOINT_SAVE_FILE is true. The page first asks with the text alone; only an ask that reads as an explicit save is
+// answered 'need-message-id', and then the page sends the Graph message id so the worker can list the attachments (read only).
+// The write reads the bytes of the one attachment the card named, uploads without replacing, reads back by id (name, file,
+// same size). Undo deletes it only while it is still the file Glance made. Nothing is shared, changed or sent.
+async function sharepointSavePlan(msg) {
+  const V = globalThis.FlowSharepointSaveFile;
+  if (!V || typeof V.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  if (!(await glanceSwitchOn(V.SWITCH))) return { action: 'off', reason: 'switch-off' };
+  const text = String((msg && msg.text) || '').slice(0, 4000);
+  const ask = V.recognize(text);
+  if (ask.kind !== 'clear') return { action: 'silence', reason: ask.reason || 'no-ask' };
+  const id = String((msg && msg.graphMessageId) || '').trim();
+  if (!id || /^A[AQ]Qk/i.test(id)) return { action: 'need-message-id' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { action: 'silence', reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const S = globalThis.FlowSharepointNewFile;
+  if (scopes != null && S && S.hasScope(scopes) === false) return { action: 'silence', reason: 'sharepoint-not-granted' };
+  const list = await onedriveNewFileCall({ method: 'GET', path: '/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,size,contentType,isInline' });
+  if (!list || list.ok !== true || !list.body || !Array.isArray(list.body.value)) return { action: 'silence', reason: 'attachments-unread' };
+  return V.plan({ flags: { [V.SWITCH]: true }, text: text, attachments: list.body.value }, { call: onedriveNewFileCall });
+}
+
+async function sharepointSaveWrite(p) {
+  const V = globalThis.FlowSharepointSaveFile;
+  if (!V) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(V.SWITCH);
+  const got = await outlookAttachmentBytes(String(params.graphMessageId || ''), String(params.attachmentId || ''));
+  if (!got) return { ok: false, reason: 'no-bytes' };
+  const r = await V.save({ flags: { [V.SWITCH]: on }, fileName: params.fileName, siteId: params.siteId, siteName: params.siteName, base64: got.base64, contentType: got.contentType, attachmentName: got.name, grantedScopes: scopes }, { call: onedriveNewFileCall });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
 // A Teams link on an event that is already on the calendar ("add a Teams link to the Thursday sync"),
 // core/outlook-event-call-link.js. Off unless the owner's switch OUTLOOK_EVENT_CALL_LINK is true. The
 // worker lists the next fortnight of the person's events (read only), the module picks the one event
@@ -6772,7 +6815,7 @@ const WRITERS = {
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
   outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite, outlookTaskClose: outlookTaskCloseWrite,
-  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, sharepointNewFile: sharepointNewFileWrite, outlookEventCallLink: eventLinkWrite,
+  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, sharepointNewFile: sharepointNewFileWrite, sharepointSaveFile: sharepointSaveWrite, outlookEventCallLink: eventLinkWrite,
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
@@ -6785,7 +6828,7 @@ const UNDOERS = {
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
   outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo, outlookTaskClose: outlookTaskCloseUndo,
-  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, sharepointNewFile: sharepointNewFileUndo, outlookEventCallLink: eventLinkUndo,
+  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, sharepointNewFile: sharepointNewFileUndo, sharepointSaveFile: sharepointNewFileUndo, outlookEventCallLink: eventLinkUndo,
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
@@ -6982,6 +7025,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:sharepoint-file-plan') {
     return reply(sendResponse, sharepointFilePlan(msg));
+  }
+
+  if (msg.type === 'flow:sharepoint-save-plan') {
+    return reply(sendResponse, sharepointSavePlan(msg));
   }
 
   if (msg.type === 'flow:execute-action') {
