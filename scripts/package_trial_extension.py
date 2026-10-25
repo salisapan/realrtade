@@ -256,6 +256,11 @@ def collect(profile: str = "full") -> dict[str, Path]:
     for content in manifest.get("content_scripts") or []:
         for name in (content.get("js") or []) + (content.get("css") or []):
             referenced.append(EXTENSION_ROOT / name)
+    # Drive picker extension page (chrome.runtime.getURL in background.js when wired; always in the trial zip).
+    for rel in ("picker/picker.html", "picker/picker.js"):
+        picker_path = EXTENSION_ROOT / rel
+        if picker_path.is_file():
+            referenced.append(picker_path)
 
     pending = list(referenced)
     seen: set[Path] = set()
