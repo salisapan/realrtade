@@ -180,5 +180,19 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f3 = mock(200, { access_token: 'x', note: 'DS-DEMO-SECRET' });
     assert.strictEqual((await relay(ev({ vendor: 'docusign-demo', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
   });
+  await t('zoom: Basic auth + form body to zoom.us/oauth/token; PKCE verifier forwarded; refresh works; secret never returned', async () => {
+    const env = Object.assign({}, ENV, { ZOOM_CLIENT_ID: 'zcid', ZOOM_CLIENT_SECRET: 'ZM-SECRET' });
+    const f = mock(200, { access_token: 'a', refresh_token: 'b' });
+    const r = await relay(ev({ vendor: 'zoom', grant: 'code', code: 'c1', code_verifier: 'ver-1', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(f.calls[0].url, 'https://zoom.us/oauth/token');
+    assert.strictEqual(f.calls[0].init.headers.Authorization, 'Basic ' + Buffer.from('zcid:ZM-SECRET').toString('base64'));
+    const form = new URLSearchParams(f.calls[0].init.body); assert.strictEqual(form.get('grant_type'), 'authorization_code'); assert.strictEqual(form.get('code_verifier'), 'ver-1'); assert.ok(!form.has('client_secret'));
+    assert.ok(r.body.indexOf('ZM-SECRET') < 0);
+    const f2 = mock(200, { access_token: 'x', refresh_token: 'y' });
+    assert.strictEqual((await relay(ev({ vendor: 'zoom', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 200);
+    assert.strictEqual(new URLSearchParams(f2.calls[0].init.body).get('grant_type'), 'refresh_token');
+    const f3 = mock(200, { access_token: 'x', note: 'ZM-SECRET' });
+    assert.strictEqual((await relay(ev({ vendor: 'zoom', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

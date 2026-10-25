@@ -86,6 +86,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/zoom-close.js'; // classic: sets globalThis.FlowZoomClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
@@ -1831,7 +1832,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth', zoom: 'zoomAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1859,7 +1860,7 @@ async function disconnectConnector(connectorId) {
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'zoom' ? [key, 'zoomLedger'] : key);
   return { ok: true };
 }
 
@@ -4137,8 +4138,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, zoom: CONNECTORS.zoomReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', zoom: 'zoom/meeting' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4665,6 +4666,81 @@ async function dropboxSave(payload) {
 async function dropboxUndo(payload) {
   const r = await dropboxCloseEngine().undo((payload || {}).ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'dropbox', closeType: 'file' });
+  return r;
+}
+
+/* --------------------------------------------------------------- Zoom, with a proof */
+// docs/glance-ai/connectors/zoom.md. One scheduled meeting on the person's own Zoom, nobody invited, read back by id, topic, start and join link.
+// Everything here is behind config/connectors.public.js (zoomReadBack, zoomOAuth), both off.
+
+const ZOOM_AUTH_BASE = 'https://zoom.us/oauth/authorize';
+const ZOOM_SCOPES = 'meeting:write:meeting meeting:read:meeting meeting:delete:meeting';
+const ZOOM_LEDGER_KEY = 'zoomLedger';
+
+async function getZoomAuth() {
+  const { zoomAuth } = await chrome.storage.local.get('zoomAuth');
+  return zoomAuth || null;
+}
+
+// "Sign in with Zoom" (OAuth with PKCE). The one-time code and the verifier go to the relay, which adds the secret.
+async function connectZoomOAuth() {
+  if (!CONNECTORS.zoomOAuth) throw new Error('Sign in with Zoom is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.zoomClientId);
+  if (!clientId) throw new Error('Zoom sign-in isn’t configured on this build yet.');
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(ZOOM_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&redirect_uri=' + encodeURIComponent(redirectUri) + '&scope=' + encodeURIComponent(ZOOM_SCOPES) + '&code_challenge=' + challenge + '&code_challenge_method=S256', 'Zoom');
+  const got = await relayTokenRequest({ vendor: 'zoom', grant: 'code', code: code, code_verifier: verifier, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Zoom connection failed (' + got.error + ').');
+  await chrome.storage.local.set({ zoomAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, via: 'oauth' } });
+  return { title: 'Zoom' };
+}
+
+// Zoom rotates the refresh token: the new one replaces the old on every refresh.
+async function zoomRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'zoom', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function zoomCloseEngine() {
+  return globalThis.FlowZoomClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getZoomAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ zoomAuth: a }); },
+    refresh: zoomRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(ZOOM_LEDGER_KEY))[ZOOM_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(ZOOM_LEDGER_KEY))[ZOOM_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [ZOOM_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, topic, startIso, durationMin? } — the loop's own id, the meeting's topic and its start (an instant with a zone), from the person's own Do It.
+async function zoomCreate(payload) {
+  const started = Date.now();
+  const p = payload || {};
+  const lang = /[֐-׿]/.test(String(p.topic || '')) ? 'he' : 'en';
+  const r = await zoomCloseEngine().write({ key: String(p.key || ''), topic: p.topic, startIso: p.startIso, durationMin: p.durationMin });
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'zoom', closeType: 'meeting', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'zoom', closeType: 'meeting', lang: lang });
+  } else if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'zoom', closeType: 'meeting', lang: lang });
+  return r;
+}
+
+async function zoomUndo(payload) {
+  const r = await zoomCloseEngine().undo((payload || {}).ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'zoom', closeType: 'meeting' });
   return r;
 }
 
@@ -6820,6 +6896,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'zoom') return reply(sendResponse, connectZoomOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
@@ -6845,6 +6922,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:dropbox-save' ? dropboxSave(msg.payload) : dropboxUndo(msg.payload));
+  }
+
+  // Zoom: create one meeting the person approved on their own Zoom (nobody invited), read it back; undo removes it unless the person changed it. Off = not live.
+  if (msg.type === 'flow:zoom-create' || msg.type === 'flow:zoom-undo') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.zoomReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:zoom-create' ? zoomCreate(msg.payload) : zoomUndo(msg.payload));
   }
 
   // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.

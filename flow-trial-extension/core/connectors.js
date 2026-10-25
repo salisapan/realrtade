@@ -158,6 +158,14 @@ const FLOW_CONNECTORS = [
     auth: 'oauth',
     note: 'Saves one file you approve into a Glance folder in your Dropbox and reads it back before it counts as saved. Never overwrites. Off in this build; needs a Dropbox app key (docs/glance-ai/connectors/dropbox.md).'
   },
+  {
+    id: 'zoom',
+    label: 'Zoom',
+    kind: 'Meetings',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Creates one meeting you approve on your own Zoom account, with nobody invited, and reads it back before it counts as created. Undo removes it unless you changed it. Off in this build; needs a Zoom app (docs/glance-ai/connectors/zoom.md).'
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 

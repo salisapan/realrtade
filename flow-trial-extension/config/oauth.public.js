@@ -20,7 +20,8 @@ export const OAUTH_PUBLIC = {
   jiraClientId: 'REPLACE_WITH_JIRA_CLIENT_ID',
   linearClientId: 'REPLACE_WITH_LINEAR_CLIENT_ID',
   docusignClientId: 'REPLACE_WITH_DOCUSIGN_INTEGRATION_KEY',
-  dropboxAppKey: 'REPLACE_WITH_DROPBOX_APP_KEY'
+  dropboxAppKey: 'REPLACE_WITH_DROPBOX_APP_KEY',
+  zoomClientId: 'REPLACE_WITH_ZOOM_CLIENT_ID'
 };
 
 // Web application OAuth client for chrome.identity.launchWebAuthFlow.

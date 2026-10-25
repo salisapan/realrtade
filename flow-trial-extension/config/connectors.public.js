@@ -8,6 +8,11 @@
 // notionOAuth: "Sign in with Notion" through the token relay (flow-landing/netlify/functions/token-relay). Needs the relay deployed,
 //              NOTION_CLIENT_ID / NOTION_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.notionClientId set. Off = the pasted token only.
 //
+// zoomReadBack:    one scheduled meeting created on the person's own Zoom with nobody invited, read back by id, topic, start and a zoom.us join link
+//                  (core/zoom-close.js). Undo refuses a meeting the person changed. Off = the messages flow:zoom-create / flow:zoom-undo answer connector-not-live.
+// zoomOAuth:       "Sign in with Zoom" (OAuth with PKCE) through the token relay. Needs the relay deployed, ZOOM_CLIENT_ID / ZOOM_CLIENT_SECRET set in Netlify,
+//                  and OAUTH_PUBLIC.zoomClientId set.
+//
 // dropboxReadBack: one file saved into the person's Dropbox app folder, read back by id, size and content hash (core/dropbox-close.js). Never overwrites, never
 //                  renames; Undo refuses a file the person edited. Off = the messages flow:dropbox-save / flow:dropbox-undo answer connector-not-live.
 // dropboxOAuth:    "Sign in with Dropbox" (OAuth with PKCE, no secret, no relay). Needs OAUTH_PUBLIC.dropboxAppKey set.
@@ -32,4 +37,4 @@
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false, zoomReadBack: false, zoomOAuth: false };

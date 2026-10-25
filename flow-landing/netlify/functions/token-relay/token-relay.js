@@ -57,6 +57,16 @@ const VENDORS = {
     extraHeaders: {},
     supportsRefresh: true
   },
+  zoom: {
+    tokenUrl: 'https://zoom.us/oauth/token',
+    idEnv: 'ZOOM_CLIENT_ID',
+    secretEnv: 'ZOOM_CLIENT_SECRET',
+    // Zoom takes the client id and secret as HTTP Basic auth and a form body; the PKCE code_verifier is forwarded as sent; a refresh rotates the refresh token (verify against the vendor page before go-live).
+    clientAuth: 'basic',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
+  },
   // DocuSign: HTTP Basic client auth and a form body (verify against the vendor page before go-live). Production and the developer (demo) servers are two vendors:
   // the integration key is the same, the secret is not.
   docusign: {
