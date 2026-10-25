@@ -35,7 +35,7 @@
 // to undo it. Nothing here ever edits or deletes something the user already
 // had.
 
-import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
+import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -2450,8 +2450,8 @@ async function gmailDraftUndo(ref) {
 // content-gmail.js can't open chrome.windows itself (that API isn't exposed
 // to content scripts), and the picker has to live in its own extension page
 // rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether Google's gapi loader is even allowed to run there,
-// and there is no reason to depend on that. So the
+// one deciding whether https://apis.google.com's gapi loader is even
+// allowed to run there, and there is no reason to depend on that. So the
 // content script asks this worker to open the window, and this worker
 // remembers which Gmail tab asked, keyed by the requestId the content
 // script minted — multiple Gmail tabs can each have a picker open at once
