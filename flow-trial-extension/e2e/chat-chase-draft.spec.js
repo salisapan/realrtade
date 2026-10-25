@@ -145,3 +145,15 @@ test('CHAT_CHASE_DRAFT on: a Hebrew payment ask gets a Hebrew reminder', async (
   expect(text).toMatch(/^היי Dana, תזכורת קטנה: עדיין מחכה לתשלום של 500 NIS \(היה אמור להגיע עד יום /);
   expect(await SEND(page)).toBe(0);
 });
+
+test('CHAT_CHASE_DRAFT on: a document asked for is chased with the request quoted, in the same box, never sent', async ({ glance }) => {
+  await waitingTask(glance, { CHAT_CHASE_DRAFT: true }, 'Please send me the signed contract by Thursday', 3);
+  expect(tasks()[0].title).toBe('Waiting on Dana: Send me the signed contract');
+  const page = await glance.openWhatsApp(whatsappHtml('ok, working on it', { id: 'BBB' }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await page.locator(BOX).innerText()).toMatch(/^Hi Dana, a quick reminder about "Send me the signed contract" \(it was due [A-Z][a-z]+day\)\./);
+  expect(await SEND(page)).toBe(0);
+  expect(tasks()[0].status).toBe('needsAction');
+});

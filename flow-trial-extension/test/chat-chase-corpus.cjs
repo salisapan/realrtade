@@ -38,11 +38,13 @@ console.log('\n--- the words ---\n');
 let d = C.draft({ title: 'Waiting on Dana: Payment 500 NIS', dueIso: '2026-10-22' }, NOW);
 check('English payment reminder names the person, the amount and the due day', /^Hi Dana,/.test(d) && /the 500 NIS payment/.test(d) && /due Thursday/.test(d) && /Thanks!$/.test(d) && d.length < 220, d);
 d = C.draft({ title: 'Waiting on Dana: the signed contract', dueIso: '2026-10-22' }, NOW);
-check('English reminder for a document', /still waiting on the signed contract/.test(d) && /due Thursday/.test(d), d);
+check('English reminder for a document quotes the request', /about "the signed contract"/.test(d) && /due Thursday/.test(d) && /Thanks!$/.test(d), d);
+d = C.draft({ title: 'Waiting on Dana: Send me the signed contract', dueIso: '2026-10-22' }, NOW);
+check('an imperative request stays grammatical because it is quoted', /about "Send me the signed contract" \(it was due Thursday\)/.test(d), d);
 d = C.draft({ title: 'מחכים ל-Dana: תשלום 500 NIS', dueIso: '2026-10-22' }, NOW);
 check('Hebrew payment reminder', /^היי Dana,/.test(d) && /לתשלום של 500 NIS/.test(d) && /יום חמישי/.test(d) && /תודה!$/.test(d), d);
 d = C.draft({ title: 'מחכים לדנה: החוזה החתום', dueIso: '2026-10-22' }, NOW);
-check('Hebrew reminder for a document', /^היי דנה,/.test(d) && /ל: החוזה החתום/.test(d), d);
+check('Hebrew reminder for a document quotes the request', /^היי דנה,/.test(d) && /לגבי הבקשה "החוזה החתום"/.test(d), d);
 check('no draft for a task that is not waiting or has no day', C.draft({ title: 'Pay 500 NIS', dueIso: '2026-10-22' }, NOW) === '' && C.draft({ title: 'Waiting on Dana: x y z', dueIso: 'soon' }, NOW) === '');
 check('the draft never asks for money to be sent to an account or makes a threat', !/account|IBAN|bank|legal|court|penalt|fine|interest/i.test(C.draft({ title: 'Waiting on Dana: Payment 500 NIS', dueIso: '2026-10-22' }, NOW)));
 

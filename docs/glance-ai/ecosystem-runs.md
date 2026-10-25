@@ -751,3 +751,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; the card is the existing one (the step row reads "Reminder to Dana in the chat · You").
 - **Tests:** `test/chat-chase-corpus.cjs` (title parse, overdue days, the words in both languages, which task, not twice, switch), `e2e/chat-chase-draft.spec.js` (7 real-browser specs on WhatsApp: off, the whole loop with Undo, edited draft kept, box with text kept, not late and nudged yesterday quiet, a payment claim still wins, Hebrew), the other chat specs and every `test/*corpus.cjs` green.
 - **Open:** live Gate; Messenger and Instagram pass the box the same way but are not exercised by a spec; no chase from mail; the reminder wording is fixed (no tone choice).
+
+## Run 91 (builder B, 2026-10-25): the late-"Waiting on" reminder reads well for a document and is proved on three surfaces
+
+- **Capability shipped (still behind `CHAT_CHASE_DRAFT`, off):** the reminder of run 90 spliced a document request into a sentence ("still waiting on send me the signed contract"). It now quotes the request: «Hi Dana, a quick reminder about "Send me the signed contract" (it was due Thursday). Could you let me know where it stands? Thanks!» and «היי Dana, תזכורת קטנה לגבי הבקשה "תשלח לי את החוזה החתום" (היה אמור להגיע עד יום חמישי). אשמח לעדכון. תודה!». A payment keeps its own sentence with the amount. Same card, same rules: the box only, nothing sent, the task stays open, Undo empties the box only while unchanged.
+- **Proof:** run 90 said Messenger and Instagram were not exercised. Now `e2e/chat-chase-messenger.spec.js` and `e2e/chat-chase-instagram.spec.js` (production lane registrations, fixture DOM, Microsoft To Do as the task store, the Graph stand-in) show the whole loop on both: the card, the draft in the box, no Send, the To Do task still open, Undo empties the box, and nothing with the switch off.
+- **Code:** `core/chat-chase.js` only (the wording).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-chase-corpus.cjs` (quoted request in both languages), one new WhatsApp spec for a document ask, the two new surface specs (4 tests), every `test/*corpus.cjs` green.
+- **Open:** live Gate; no chase from mail; the wording is fixed; this run adds no new switch and no new surface behaviour beyond the wording, so the user-visible change is small.

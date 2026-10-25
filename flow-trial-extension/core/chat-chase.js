@@ -56,14 +56,16 @@ const FlowChatChase = (() => {
     const od = daysOverdue(t.dueIso, now);
     if (!w || od == null) return '';
     const due = civil(t.dueIso);
+    // A payment is told by its amount. Anything else is quoted as the person wrote it (an imperative, "Send me the signed contract"), so the
+    // words stay grammatical whatever the request was.
     if (w.he) {
       const day = 'יום ' + DAYS_HE[due.getDay()];
-      const what = w.payment ? 'לתשלום של ' + w.payment.amount + ' ' + w.payment.currency : w.what;
-      return 'היי ' + w.name + ', תזכורת קטנה: עדיין מחכה ' + (w.payment ? what : 'ל: ' + what) + ' (היה אמור להגיע עד ' + day + '). אשמח לעדכון. תודה!';
+      if (w.payment) return 'היי ' + w.name + ', תזכורת קטנה: עדיין מחכה לתשלום של ' + w.payment.amount + ' ' + w.payment.currency + ' (היה אמור להגיע עד ' + day + '). אשמח לעדכון. תודה!';
+      return 'היי ' + w.name + ', תזכורת קטנה לגבי הבקשה "' + w.what + '" (היה אמור להגיע עד ' + day + '). אשמח לעדכון. תודה!';
     }
     const day = DAYS_EN[due.getDay()];
-    const what = w.payment ? 'the ' + w.payment.amount + ' ' + w.payment.currency + ' payment' : w.what.charAt(0).toLowerCase() + w.what.slice(1);
-    return 'Hi ' + w.name + ', a quick reminder: I\'m still waiting on ' + what + ' (it was due ' + day + '). Could you let me know where it stands? Thanks!';
+    if (w.payment) return 'Hi ' + w.name + ', a quick reminder: I\'m still waiting on the ' + w.payment.amount + ' ' + w.payment.currency + ' payment (it was due ' + day + '). Could you let me know where it stands? Thanks!';
+    return 'Hi ' + w.name + ', a quick reminder about "' + w.what + '" (it was due ' + day + '). Could you let me know where it stands? Thanks!';
   }
 
   // Which of the open waiting tasks (newest first, each { title, dueIso, lastNudgeAt }) to chase now, or null.
