@@ -27,8 +27,8 @@ __pycache__/
 flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip
 flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip.partial
 
-# Apps Script project id from clasp create. The example file is the template.
-glance-gmail-addon/.clasp.json
+# clasp login token — never commit
+glance-gmail-addon/.clasprc.json
 
 # Editor directories and files
 .vscode/*

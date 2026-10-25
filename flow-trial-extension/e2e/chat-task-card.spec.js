@@ -1,0 +1,97 @@
+// The chat task card, behind the owner's off switch CHAT_TASK_CARD in glanceSwitches (docs/glance-ai/chat-task-card-spec.md).
+// A one-to-one Messenger chat (the real chat lane registration, with the judge and card files the production lane loads),
+// the local Google lane server. Off: no card, no task call. On: the canonical Do It card in a corner, Do It writes one
+// Google Task whose note names the chat, reads it back by id, a receipt that survives a reload, Undo removes it and refuses
+// after the person edited it. Nothing is sent and no key is pressed.
+const fs = require('fs');
+const path = require('path');
+const { test, expect } = require('./support/harness');
+const { startGoogleLaneServer } = require('./support/google-lane-server');
+
+const ASK = 'Can you review the draft by Wednesday?';
+const HTML = (text) => '<!doctype html><html><body><div role="main"><header><h2 data-glance-title>Dana</h2><a href="/100012345678/" role="link">Dana</a>' +
+  '<a aria-label="Conversation information" href="https://www.messenger.com/t/100012345678">Conversation information</a></header>' +
+  '<div role="row" data-author="them" data-message-id="m1"><span dir="auto">' + text + '</span></div>' +
+  '<div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Message"></div>' +
+  '<button type="button" aria-label="Send"></button></div></body></html>';
+
+let server;
+test.beforeAll(async () => { server = await startGoogleLaneServer(); });
+test.afterAll(async () => { if (server) await server.close(); });
+test.beforeEach(async ({ glance }) => {
+  server.reset();
+  server.setAccount('me@x.com');
+  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
+});
+
+// The production registration: the lane's own definition run through the builder the worker uses.
+async function registerRealLane(glance) {
+  const ok = await glance.evaluateWorker(async () => {
+    const lane = globalThis.__glanceLaneChatDefs.find((l) => l.id === 'glance-lane-messenger');
+    const id = 'glance-lane-messenger-e2e';
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* first run */ }
+    await chrome.scripting.registerContentScripts([{
+      id: id,
+      matches: ['https://www.messenger.com/*', 'https://messenger.com/*'],
+      js: globalThis.__glanceLaneChatScripts(lane),
+      css: ['design/step-states-v1/scoped.css', 'src/chip.css'],
+      runAt: 'document_idle'
+    }]);
+    const listed = await chrome.scripting.getRegisteredContentScripts({ ids: [id] });
+    const js = listed[0].js;
+    return js.indexOf('core/incoming-judge.js') >= 0 && js.indexOf('src/chat-task-card.js') > js.indexOf('src/chat-lane.js');
+  });
+  expect(ok).toBe(true);
+}
+
+async function open(glance, switches, text) {
+  await registerRealLane(glance);
+  await glance.seedGmail(Object.assign({ googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' } }, switches ? { glanceSwitches: switches } : {}));
+  return glance.openMessenger(HTML(text || ASK));
+}
+const CARD = '#glance-chat-task .flow-chip-host';
+const tasks = () => Object.values(server.tasks());
+const taskCalls = () => server.calls.filter((c) => /tasks\/v1/.test(c.path) && c.method !== 'GET');
+
+test('CHAT_TASK_CARD off: no card and no task call', async ({ glance }) => {
+  const page = await open(glance, null);
+  await page.waitForTimeout(5000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+  expect(taskCalls()).toHaveLength(0);
+});
+
+test('CHAT_TASK_CARD on: the card shows, Do It writes one task naming the chat, reads it back, survives a reload, and Undo removes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true });
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+  expect(tasks()[0].notes).toContain('Open in Messenger');
+  expect(tasks()[0].notes).toContain('https://www.messenger.com/t/100012345678');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+
+  await page.reload();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()).toHaveLength(1);
+
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(() => tasks().length).toBe(0);
+});
+
+test('CHAT_TASK_CARD on: Undo refuses after the person edited the task, and the task stays', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = Object.keys(server.tasks())[0];
+  server.editTask(id, { title: 'Changed by the person' });
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect(page.locator(CARD)).toContainText(/changed the task|left it as you left it/i, { timeout: 15000 });
+  expect(server.tasks()[id].title).toBe('Changed by the person');
+});
+
+test('CHAT_TASK_CARD on: a line that is not a task shows nothing', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'Thanks, got it!');
+  await page.waitForTimeout(5000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+  expect(taskCalls()).toHaveLength(0);
+});

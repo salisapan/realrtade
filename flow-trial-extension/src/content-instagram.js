@@ -81,14 +81,15 @@
     const last = list[list.length - 1];
     if (!last) return;
     const who = author(last);
-    if (who !== 'them') return;
+    if (who !== 'them') { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
     const text = textOf(last);
     const id = last.getAttribute('data-message-id') || text.slice(0, 80);
     const key = id + '\n' + text;
+    if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
     const box = composerBox(main);
-    FlowChatLane.draftInto(box, {
+    const input = {
       text: text,
       fromMe: false,
       oneToOne: true,
@@ -96,8 +97,11 @@
       quoted: forwarded(last),
       channel: 'instagram',
       now: Date.now(),
-      sender: { name: party.name }
-    }).then((r) => {
+      sender: { name: party.name },
+      key: key
+    };
+    FlowChatLane.draftInto(box, input).then((r) => {
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
