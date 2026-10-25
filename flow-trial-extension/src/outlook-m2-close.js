@@ -60,7 +60,10 @@ const FlowOutlookM2Close = (() => {
       let bytes = null;
       if (ok && /\/content$/.test(path) && m === 'GET') {
         if (res.arrayBuffer) bytes = new Uint8Array(await res.arrayBuffer());
-        else if (res.text) bytes = new Uint8Array(Buffer.from(await res.text(), 'binary'));
+        else if (res.text) {
+          const t = await res.text();
+          bytes = Uint8Array.from(t, (ch) => ch.charCodeAt(0) & 0xff);
+        }
       } else if (ok && status !== 204) {
         if (typeof res.json === 'function') { try { json = await res.json(); } catch (e) { json = null; } }
         else if (res.body && typeof res.body === 'object') json = res.body;
@@ -82,11 +85,12 @@ const FlowOutlookM2Close = (() => {
       let json = null;
       let bytes = null;
       if (ok) {
-        try {
-          const parsed = JSON.parse((r && r.body) || 'null');
-          if (/\/content$/.test(path)) bytes = new Uint8Array(Buffer.from((r && r.body) || '', 'binary'));
-          else json = parsed;
-        } catch (e) { json = null; }
+        const body = (r && r.body) != null ? String(r.body) : '';
+        if (/\/content$/.test(path)) {
+          bytes = Uint8Array.from(body, (ch) => ch.charCodeAt(0) & 0xff);
+        } else {
+          try { json = JSON.parse(body || 'null'); } catch (e) { json = null; }
+        }
       }
       return { status: status, ok: ok, json: json, bytes: bytes };
     };
@@ -152,6 +156,10 @@ const FlowOutlookM2Close = (() => {
       now: new Date().toISOString()
     }, { graph: graph });
     if (!r || !r.ok || !Proof.allowsHandled(r)) return r || { ok: false, reason: 'write-failed' };
+    const meta = params.draftMeta;
+    if (meta && r.ref && typeof r.ref === 'object') {
+      r.ref = Object.assign({}, r.ref, meta, { draftCreatedByGlance: true });
+    }
     return Object.assign({}, r, { fetchedBack: true, connectorId: CONNECTOR_FIND });
   }
 
@@ -159,8 +167,18 @@ const FlowOutlookM2Close = (() => {
     if (!Find) return { ok: false };
     const graph = graphFromOutlookFetch(outlookFetch);
     const u = await Find.undo(ref, { graph: graph });
-    if (u && u.ok) return { ok: true, written: 'Attachment removed from the draft.' };
-    return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+    if (!u || !u.ok) return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+    const draftId = ref && ref.draftId;
+    if (!draftId || ref.draftCreatedByGlance !== true) {
+      return { ok: true, written: 'Attachment removed from the draft.' };
+    }
+    const del = await graph('DELETE', '/me/messages/' + encodeURIComponent(draftId));
+    if (!del.ok && del.status !== 404) return { ok: false, reason: 'draft-undo-failed' };
+    const got = await graph('GET', '/me/messages/' + encodeURIComponent(draftId) + '?$select=id');
+    if (got.status === 404) {
+      return { ok: true, written: 'Attachment and reply draft removed.' };
+    }
+    return { ok: false, reason: 'undo-unverified' };
   }
 
   async function localFileSaveWrite(outlookFetch, p, hostIo) {

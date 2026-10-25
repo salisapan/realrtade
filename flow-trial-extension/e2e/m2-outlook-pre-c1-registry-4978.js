@@ -11,19 +11,19 @@ function patchPreC1Registry(dest) {
   if (!bg.includes('outlook-m2-close.js')) {
     bg = bg.replace(
       "'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js']",
-      "'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js', 'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js']"
+      "'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js']"
     );
     if (!bg.includes('outlook-m2-close.js')) {
       bg = bg.replace(
         /'core\/outlook-sync\.js', 'src\/outlook\.js', 'src\/chip-host\.js', 'src\/content-outlook\.js'\]/,
-        "'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js', 'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js']"
+        "'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js']"
       );
     }
   }
   if (!bg.includes("import '../src/outlook-m2-close.js'")) {
     bg = bg.replace(
       "import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)",
-      "import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)\nimport '../core/onedrive-find.js';\nimport '../core/local-file.js';\nimport '../core/onedrive-file.js';\nimport '../src/outlook-m2-close.js';"
+      "import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)\nimport '../core/onedrive-find.js';\nimport '../core/local-file.js';\nimport '../src/outlook-m2-close.js';"
     );
   }
   const hook = 'const WRITERS = {';
@@ -146,7 +146,7 @@ function extendM2Harness(harness) {
       const tabs = await chrome.tabs.query({ url: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'] });
       const tab = (tabs || []).find((t) => t && t.url && wantUrl && t.url.split('#')[0] === wantUrl.split('#')[0]) || (tabs || [])[tabs.length - 1];
       if (!tab || tab.id == null) return { ok: false, reason: 'no-tab' };
-      const files = ['core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js', 'src/outlook-m2-close.js'];
+      const files = ['core/onedrive-find.js', 'core/local-file.js', 'src/outlook-m2-close.js'];
       for (const f of files) {
         try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [f] }); } catch (e) { /* already in bundle */ }
       }

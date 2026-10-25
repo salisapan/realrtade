@@ -9,7 +9,7 @@ Add before `src/content-outlook.js`:
 ```diff
      extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
 -      'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
-+      'core/outlook-calendar.js', 'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js', 'core/onedrive-file.js',
++      'core/outlook-calendar.js', 'core/outlook-sync.js', 'core/onedrive-find.js', 'core/local-file.js',
 +      'src/outlook.js', 'src/chip-host.js', 'src/outlook-m2-close.js', 'src/content-outlook.js'],
 ```
 
@@ -21,7 +21,6 @@ Without this line, `FlowOutlookM2Close` / `FlowOnedriveFind` are undefined in th
  import '../core/onedrive-new-file.js';
 +import '../core/onedrive-find.js';
 +import '../core/local-file.js';
-+import '../core/onedrive-file.js';
 +import '../src/outlook-m2-close.js';
 ```
 

@@ -4479,13 +4479,29 @@
     return typeof FlowOutlookM2Close !== 'undefined' ? FlowOutlookM2Close : null;
   }
 
+  async function resolveOnedriveCloseMessageId(pane, own, openSender) {
+    if (!pane) return { unsure: true };
+    let msgId = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId).trim() : '';
+    if (!msgId && pane.pathId && !isConversationId(pane.pathId)) msgId = String(pane.pathId).trim();
+    if (!msgId && conversationPanePathKey(pane)) {
+      const exact = await exactConversationPaneMessageId(pane, own, openSender);
+      if (exact && exact.unread) return { error: exact.reason || 'page:sender-mismatch' };
+      if (!exact || !exact.id) return { unsure: true };
+      msgId = String(exact.id);
+    }
+    if (!msgId || isConversationId(msgId)) return { unsure: true };
+    return { id: msgId };
+  }
+
   async function prepareOutlookDraftForM2(ctx) {
+    const incoming = ctx.outlookIncomingId || ctx.messageId;
+    if (!incoming || isConversationId(incoming)) return { error: { reason: 'reply-target-unsure' } };
     const r = await send({
       type: 'flow:execute-action',
       payload: {
         connectorId: 'outlookDraft',
-        messageId: ctx.messageId,
-        outlookIncomingId: ctx.messageId || ctx.outlookIncomingId,
+        messageId: incoming,
+        outlookIncomingId: incoming,
         itemId: ctx.itemId,
         subject: ctx.subject,
         text: ctx.bodyText,
@@ -4497,7 +4513,12 @@
     if (!r || !r.ok || !r.ref) return { error: r || { reason: 'draft-failed' } };
     const draftId = typeof r.ref === 'string' ? r.ref : (r.ref.draftId || r.ref.id || '');
     if (!draftId) return { error: { reason: 'no-draft' } };
-    return { draftId: draftId };
+    const created = r.created || (typeof r.ref === 'object' ? r.ref.created : null);
+    return {
+      draftId: draftId,
+      created: created,
+      draftMeta: { draftId: draftId, created: created, outlookIncomingId: incoming }
+    };
   }
 
   async function m2CloudHits(pane, st, text) {
@@ -4626,6 +4647,7 @@
       const ctx = {
         app: 'outlook',
         doLabel: 'Do It',
+        pane: pane,
         messageId: messageId,
         outlookIncomingId: messageId,
         outlookConversationId: (pane && pane.conversationId) || null,
@@ -4778,7 +4800,21 @@
         plan = await send({ type: cfg.planMessage, text: text });
       }
       if (!plan || plan.action !== 'offer' || !cfg.planOk(plan)) return false;
-      return showCard(pane, plan, messageId);
+      let replyId = messageId;
+      if (cfg.needsReplyTarget) {
+        const own = ownAddressesOf(st);
+        const resolved = await resolveOnedriveCloseMessageId(pane, own, pane && pane.senderEmail);
+        if (resolved.unsure) {
+          await pageReason('page:reply-target-unsure', pane);
+          return false;
+        }
+        if (resolved.error) {
+          await pageReason(resolved.error, pane);
+          return false;
+        }
+        replyId = resolved.id;
+      }
+      return showCard(pane, plan, replyId);
     }
 
     return { settle: settle, chain: CHAIN };
@@ -4788,6 +4824,7 @@
     chain: 'onedrive-find',
     connectorId: 'onedriveFindAttach',
     switchName: 'ONEDRIVE_FIND',
+    needsReplyTarget: true,
     refKey: 'attachmentId',
     stepKind: 'onedrive',
     name: 'OneDrive file',
@@ -4812,15 +4849,31 @@
     cardLabel: (plan) => (plan.file && plan.file.name) || 'OneDrive file',
     paramsOf: (plan) => ({ file: plan.file }),
     prepareExecute: async (ctx, params) => {
+      const pane = ctx && ctx.pane;
+      if (pane) {
+        const st = await FlowStorage.get();
+        const resolved = await resolveOnedriveCloseMessageId(pane, ownAddressesOf(st), pane.senderEmail);
+        if (resolved.unsure) return { error: { reason: 'reply-target-unsure' } };
+        if (resolved.error) return { error: { reason: resolved.error } };
+        ctx.messageId = resolved.id;
+        ctx.outlookIncomingId = resolved.id;
+      }
       const prep = await prepareOutlookDraftForM2(ctx);
       if (prep.error) return prep;
-      return { params: { file: params.file, draftId: prep.draftId } };
+      return {
+        params: {
+          file: params.file,
+          draftId: prep.draftId,
+          draftMeta: prep.draftMeta
+        }
+      };
     },
     reasons: () => ({
       'files-scope-missing': pageUiLang() === 'he' ? 'צריך הרשאה ל-OneDrive' : 'OneDrive needs to be allowed first',
       'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook',
       'connector-not-live': pageUiLang() === 'he' ? 'החיבור עדיין לא רשום — C1' : 'Worker connector not registered yet (C1)',
       'draft-failed': pageUiLang() === 'he' ? 'לא הצלחתי לפתוח טיוטה' : 'Could not open a reply draft',
+      'reply-target-unsure': pageUiLang() === 'he' ? 'לא הצלחתי לזהות את המייל לטיוטה' : 'Could not tell which message to reply to',
       'attach-failed': pageUiLang() === 'he' ? 'לא הצלחתי לצרף הקובץ' : 'Could not attach that file'
     })
   });

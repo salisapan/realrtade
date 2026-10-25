@@ -78,7 +78,12 @@ const BODY = 'Hi Sali,\n\nCould you review the attached pilot proposal and confi
 
 async function runPage(opts) {
   const o = opts || {};
-  const files = registeredFiles();
+  let files = registeredFiles();
+  if (o.extraFiles && o.extraFiles.length) {
+    const idx = files.indexOf('src/content-outlook.js');
+    const at = idx >= 0 ? idx : files.length;
+    files = files.slice(0, at).concat(o.extraFiles).concat(files.slice(at));
+  }
   let html = fs.readFileSync(path.join(__dirname, 'fixtures/owa-reading-pane-he.html'), 'utf8');
   if (o.htmlPatch) html = o.htmlPatch(html);
   const url = o.url || ('https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(o.urlId || CONV));
@@ -141,6 +146,10 @@ async function runPage(opts) {
         return { ok: true, status: 200, body: JSON.stringify({ value }) };
       }
       if (/mailFolders\/sentitems\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+      if (/\/me\/drive\/root\/search/.test(u)) {
+        const items = (o.onedriveSearchResults || o.driveFiles || []).filter((f) => f && f.file);
+        return { ok: true, status: 200, body: JSON.stringify({ value: items }) };
+      }
       if (/\/me\/messages\?/.test(u)) {
         // Live Graph often answers the conversationId filter with an empty page (or refuses it).
         // The inbox list above is the fallback the open page must use.
@@ -242,10 +251,21 @@ async function runPage(opts) {
           url: 'https://to-do.office.com/tasks/id/' + taskId
         };
       }
+      if (p.connectorId === 'onedriveFindAttach') {
+        return {
+          ok: true,
+          fetchedBack: true,
+          ref: { draftId: 'draft-m2-page', attachmentId: 'att-m2-page', createdByGlance: true, draftCreatedByGlance: true },
+          written: 'File attached from OneDrive to the reply draft.'
+        };
+      }
       if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', fetchedBack: true, where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
       return { ok: true, ref: 'draft-1', fetchedBack: true, where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts', written: 'Reply draft ready in Outlook Drafts. Not sent.' };
     }
     if (msg.type === 'flow:undo-action') {
+      if (msg.connectorId === 'onedriveFindAttach') {
+        return { ok: true, written: 'Attachment and reply draft removed.' };
+      }
       if (msg.connectorId === 'outlookCalendar') return { ok: true, written: 'Calendar event removed.' };
       if (msg.connectorId === 'outlookTask') {
         if (o.outlookTaskUndoFail) return { ok: false, written: 'Still there — the To Do task was not removed.' };
