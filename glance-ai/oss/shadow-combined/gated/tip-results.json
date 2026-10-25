@@ -1,0 +1,149 @@
+{
+ "OSS 275 / tip": {
+  "wdi": 5,
+  "sil": 167,
+  "miss": 58,
+  "show": 108,
+  "he": [
+   32,
+   50
+  ],
+  "en": [
+   26,
+   58
+  ]
+ },
+ "OSS 275 / ai": {
+  "wdi": 5,
+  "sil": 167,
+  "miss": 31,
+  "show": 108,
+  "he": [
+   11,
+   50
+  ],
+  "en": [
+   20,
+   58
+  ]
+ },
+ "v2 held-out 400 / tip": {
+  "wdi": 11,
+  "sil": 218,
+  "miss": 58,
+  "show": 182,
+  "he": [
+   19,
+   90
+  ],
+  "en": [
+   39,
+   92
+  ]
+ },
+ "v2 held-out 400 / ai": {
+  "wdi": 11,
+  "sil": 218,
+  "miss": 51,
+  "show": 182,
+  "he": [
+   17,
+   90
+  ],
+  "en": [
+   34,
+   92
+  ]
+ },
+ "adversarial 72 / tip": {
+  "wdi": 3,
+  "sil": 50,
+  "miss": 4,
+  "show": 22,
+  "he": [
+   2,
+   9
+  ],
+  "en": [
+   2,
+   13
+  ]
+ },
+ "adversarial 72 / ai": {
+  "wdi": 3,
+  "sil": 50,
+  "miss": 1,
+  "show": 22,
+  "he": [
+   1,
+   9
+  ],
+  "en": [
+   0,
+   13
+  ]
+ },
+ "injection 39 / tip": {
+  "wdi": 6,
+  "sil": 29,
+  "miss": 9,
+  "show": 10,
+  "he": [
+   4,
+   4
+  ],
+  "en": [
+   5,
+   6
+  ]
+ },
+ "injection 39 / ai": {
+  "wdi": 6,
+  "sil": 29,
+  "miss": 4,
+  "show": 10,
+  "he": [
+   0,
+   4
+  ],
+  "en": [
+   4,
+   6
+  ]
+ },
+ "ALL pooled 786 / tip": {
+  "wdi": 25,
+  "sil": 464,
+  "miss": 129,
+  "show": 322,
+  "he": [
+   57,
+   153
+  ],
+  "en": [
+   72,
+   169
+  ]
+ },
+ "ALL pooled 786 / ai": {
+  "wdi": 25,
+  "sil": 464,
+  "miss": 87,
+  "show": 322,
+  "he": [
+   29,
+   153
+  ],
+  "en": [
+   58,
+   169
+  ]
+ },
+ "model": {
+  "cards": 42,
+  "planned": 42,
+  "watched": 32,
+  "cloud": 228,
+  "wrongModel": []
+ }
+}
