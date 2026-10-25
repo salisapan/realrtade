@@ -66,11 +66,13 @@ const FlowChatOnDemand = (() => {
       });
       const scanResult = await api.scripting.executeScript({
         target: { tabId: tabId },
-        func: (key) => {
+        func: async (key) => {
           const bag = window.__glanceChatSurfaces || {};
           const row = bag[key];
-          if (row && typeof row.scan === 'function') return row.scan({ gesture: true });
-          return { ok: false, reason: 'no-scan' };
+          let out = { ok: false, reason: 'no-scan' };
+          if (row && typeof row.scan === 'function') out = await row.scan({ gesture: true }) || out;
+          if (row && typeof row.followScan === 'function') await row.followScan({ gesture: true });
+          return out;
         },
         args: [surfaceKey]
       });
