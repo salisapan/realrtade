@@ -79,6 +79,12 @@ a Netlify secret. It cannot update `company`, `role`, `website`, or
 `confirmed_at` (row level security). Those columns are written by the
 functions above, using the service-role key.
 
+## W4 WhatsApp Business Cloud (not applied in repo PRs until owner approves)
+
+Migration: `migrations/20261025120000_wa_business_cloud.sql`  
+Edge function: `functions/whatsapp-cloud-webhook/` (Meta verify + signed POST, idempotent `wamid` storage).  
+Project ref remains `zjquktirlrhbqcnkfaok` only.
+
 ## Edge function in this folder
 
 `functions/send-waitlist-welcome/` is not what the landing pages call.

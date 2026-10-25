@@ -1,0 +1,26 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "WABA_TEST",
+    "changes": [{
+      "field": "messages",
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": { "phone_number_id": "PHONE_ID_1" },
+        "contacts": [{ "profile": { "name": "Avi" }, "wa_id": "972509999999" }],
+        "messages": [{
+          "from": "972509999999",
+          "id": "wamid.IMAGE_FIXTURE_1",
+          "timestamp": "1729900100",
+          "type": "image",
+          "image": {
+            "caption": "Can you confirm policy 8844221 is active?",
+            "mime_type": "image/jpeg",
+            "sha256": "abc123",
+            "id": "MEDIA_ID_IMG"
+          }
+        }]
+      }
+    }]
+  }]
+}
