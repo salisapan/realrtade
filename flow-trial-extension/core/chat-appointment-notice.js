@@ -96,7 +96,37 @@ const FlowChatAppointmentNotice = (() => {
     return { kind: 'appointment', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize };
+  // A booking the business cancelled ("Your appointment on Sunday at 10:00 was cancelled", «התור שלך ביום ראשון ב-10:00 בוטל»): the day and
+  // the clock of what is gone, so the chat card can offer to remove the hold Glance made for it. Only a plain, past-tense cancellation of
+  // a possessive booking with one day and one clock; a move, a policy line, an offer to cancel and a question stay quiet.
+  const CANCELLED_EN = /\b(?:(?:has|have)\s+been|was|were|is\s+now|got)\s+cancel(?:l?ed)\b|\bcancel(?:l?ed)\s+(?:your|the)\b/i;
+  const CANCELLED_HE = /(?:בוטל|בוטלה|מבוטל|מבוטלת)/;
+  const NOT_PLAIN_EN = /\b(?:resched\w*|moved|postpone[d]?|instead|new\s+(?:time|date)|to\s+cancel|if\s+you\s+(?:need|want|wish)|you\s+can|cancel(?:l?ation)?\s+(?:policy|fee)|click|tap|reply|book\s+(?:again|a\s+new)|rebook|would\s+you\s+like)\b/i;
+  const NOT_PLAIN_HE = /(?:נדחה|נדחתה|הועבר|הועברה|שונה|במקום|מועד\s+חדש|ניתן\s+לבטל|אפשר\s+לבטל|לחץ|השב|לקביעת\s+תור\s+חדש|בחר)/;
+
+  function cancelled(text, now) {
+    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return { kind: 'none', reason: 'empty' };
+    if (raw.length > 260) return { kind: 'none', reason: 'long' };
+    if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
+    if (!CANCELLED_EN.test(raw) && !CANCELLED_HE.test(raw)) return { kind: 'none', reason: 'not-cancelled' };
+    if (NOT_PLAIN_EN.test(raw) || NOT_PLAIN_HE.test(raw)) return { kind: 'none', reason: 'not-a-plain-cancellation' };
+    if (!NOUN_EN.test(raw) && !NOUN_HE.test(raw)) return { kind: 'none', reason: 'no-appointment-noun' };
+    const X = extractApi();
+    if (!X || typeof X.parseDate !== 'function' || typeof X.parseTime !== 'function') return { kind: 'none', reason: 'not-configured' };
+    const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
+    const d = X.parseDate(raw, at) || weekdayDate(raw, at);
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.iso || ''))) return { kind: 'none', reason: 'no-day' };
+    let t = X.parseTime(raw);
+    if (!(t && Number.isInteger(t.hour) && Number.isInteger(t.minute))) t = englishClock(raw);
+    if (!t || !Number.isInteger(t.hour) || !Number.isInteger(t.minute) || t.hour < 0 || t.hour > 23 || t.minute < 0 || t.minute > 59) return { kind: 'none', reason: 'no-clock' };
+    const today = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const ahead = Math.round((new Date(d.iso + 'T00:00:00') - today) / 86400000);
+    if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
+    return { kind: 'cancelled', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+  }
+
+  return { recognize: recognize, cancelled: cancelled };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatAppointmentNotice };

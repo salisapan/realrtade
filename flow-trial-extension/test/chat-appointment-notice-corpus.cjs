@@ -58,5 +58,28 @@ const NO = [
 for (const [text, why] of NO) check('not an appointment (' + why + '): ' + text.slice(0, 50), A.recognize(text, NOW).kind === 'none', A.recognize(text, NOW));
 check('a clock already past today is not held', A.recognize('Your appointment is confirmed for today at 08:00', NOW).kind === 'none');
 check('no throw on junk', (() => { try { A.recognize(null, null); A.recognize(undefined, 'x'); return true; } catch (e) { return false; } })());
+
+// The cancellation reader: the day and clock of a booking that was cancelled, for removing the hold Glance made for it.
+const GONE = [
+  ['Your appointment on Sunday at 10:00 was cancelled', '2026-10-25', 10, 0],
+  ['Unfortunately your appointment on Monday at 11:00 has been cancelled', '2026-10-26', 11, 0],
+  ['Your table on Thursday at 8pm was cancelled', '2026-10-29', 20, 0],
+  ['התור שלך ביום שני ב-11:00 בוטל', '2026-10-26', 11, 0],
+  ['התור שלך ליום שלישי בשעה 09:30 בוטל, מצטערים', '2026-10-27', 9, 30]
+];
+for (const [text, day, h, m] of GONE) { const r = A.cancelled(text, NOW); check('cancelled: ' + text, r.kind === 'cancelled' && r.dateIso === day && r.hour === h && r.minute === m, r); }
+const NOT_GONE = [
+  ['Your appointment on Monday at 11:00 was cancelled. Click to rebook', 'a rebook link'],
+  ['Your appointment on Monday at 11:00 has been moved to Tuesday at 9am', 'a move'],
+  ['To cancel your appointment on Monday at 11:00 reply 1', 'an offer to cancel'],
+  ['You can cancel your appointment on Monday at 11:00 for free', 'a policy line'],
+  ['Was your appointment on Monday at 11:00 cancelled?', 'a question'],
+  ['Your appointment was cancelled', 'no day or clock'],
+  ['The meeting on Monday at 11:00 was cancelled', 'not a possessive booking'],
+  ['Your appointment is confirmed for Monday at 11:00', 'a confirmation'],
+  ['Your appointment on 2025-01-02 at 11:00 was cancelled', 'long past'],
+  ['התור שלך נדחה ליום שלישי ב-09:00', 'a move']
+];
+for (const [text, why] of NOT_GONE) check('not a cancellation (' + why + '): ' + text.slice(0, 50), A.cancelled(text, NOW).kind === 'none', A.cancelled(text, NOW));
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-appointment-notice checks passed');
 process.exit(failures ? 1 : 0);

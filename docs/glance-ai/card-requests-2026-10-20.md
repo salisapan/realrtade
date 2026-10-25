@@ -126,3 +126,7 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 - Update 2026-10-21 (W1): no new card. The empty Doc, Sheet or Slides deck is wired on the existing Gmail card (canonical Do It, one step) behind `glanceSwitches.WORKSPACE_FILE`. Text slots for the card owner: the step row reads `Drive · <file name>` (the file lands in My Drive, so it must not say the Glance folder); the receipt row reads `Doc · <name>`, `Sheet · <name>` or `Slides · <name>`.
 - Update 2026-10-21 (M2): no new card. The Meet link on an existing event is wired on the existing Gmail card (canonical Do It, one step, the calendar glyph) behind `glanceSwitches.EVENT_CALL_LINK`. Text slots for the card owner: the step row reads `Calendar` with the event's title as the card name; the receipt row reads `Calendar · <event> · Meet` and the receipt carries `meetUrl` for a Copy control.
 
+## 2026-10-25 Builder B: "Remove It" on the existing chat card (CHAT_TASK_CARD, off)
+
+The chat card now has one more state, drawn with the existing canonical Do It component, no new design: title "Cancelled: <booking name>" (Hebrew «בוטל: …»), one step "Remove from calendar: <booking name>", Do It, closed line "Removed from your calendar." (Hebrew «הוסר מהיומן.»), Handled receipt without an Undo button (a deleted event is not restored). Error text when the person changed the event: "You changed this event, so I left it" («שינית את האירוע, השארתי אותו»). Grok: please check the receipt state has no Undo slot gap.
+

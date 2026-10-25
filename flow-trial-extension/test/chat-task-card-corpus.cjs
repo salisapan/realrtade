@@ -513,6 +513,43 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a moved delivery offers nothing', !(await q.Card.offer(input('Your order delivery was moved to Thursday', { channel: 'whatsapp' }))).shown);
   }
 
+  // 5y. A cancellation of a booking this chat already put on the calendar offers to remove that event; with no hold there is nothing to do.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await w.Card.offer(input('Your appointment is confirmed for Monday at 11:00', { channel: 'whatsapp', key: 'c-1' }));
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    check('the confirmation makes one hold', w.logRows.length === 1);
+    const r = await w.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'c-2' }));
+    const last = w.injected[w.injected.length - 1];
+    check('the cancellation offers to remove the hold', r.shown && r.reason === 'remove-offered' && !!last.ctx.chatTask.remove, r);
+    check('the removal card shows no message words', last.ctx.bodyText === '' && !/cancelled$/i.test(JSON.stringify(last.ctx.process)), last.ctx.process);
+    const callsBefore = w.calls.length;
+    await last.handlers.onDoIt(last.host, {}, last.ctx);
+    const undo = w.calls.slice(callsBefore).find((c) => c.type === 'flow:google-undo');
+    check('Do It runs the hold undo with the held ref', !!undo && undo.connectorId === 'googleHold' && !!undo.ref, undo);
+    check('the removal is logged as undone', w.logRows[w.logRows.length - 1].kind === 'undone' && w.logRows[w.logRows.length - 1].chatKey === w.logRows[0].chatKey, w.logRows[w.logRows.length - 1]);
+    const again = await w.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'c-3' }));
+    check('once removed, a second cancellation offers nothing', !again.shown && again.reason === 'no-hold-to-remove', again);
+
+    const none = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const n = await none.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'c-4' }));
+    check('a cancellation with no hold offers nothing', !n.shown && n.reason === 'no-hold-to-remove', n);
+
+    const ed = world({ target: { ok: true, connectorId: 'googleHold' }, undo: { ok: false, reason: 'user-edited' } });
+    await ed.Card.offer(input('Your appointment is confirmed for Monday at 11:00', { channel: 'whatsapp', key: 'e-1' }));
+    await ed.injected[0].handlers.onDoIt(ed.injected[0].host, {}, ed.injected[0].ctx);
+    await ed.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'e-2' }));
+    const lastEd = ed.injected[ed.injected.length - 1];
+    await lastEd.handlers.onDoIt(lastEd.host, {}, lastEd.ctx);
+    check('an event the person edited is left alone and says so', ed.receipts.some((x) => x.state === 'flow-chip-error' && /changed this event/.test(x.text)) && ed.logRows.every((r) => r.kind !== 'undone'), ed.receipts);
+
+    const he = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await he.Card.offer(input('התור שלך נקבע ליום שני בשעה 11:00', { channel: 'whatsapp', key: 'h-1' }));
+    await he.injected[0].handlers.onDoIt(he.injected[0].host, {}, he.injected[0].ctx);
+    const hr = await he.Card.offer(input('התור שלך ביום שני ב-11:00 בוטל', { channel: 'whatsapp', key: 'h-2' }));
+    check('Hebrew cancellation offers the removal', hr.shown && hr.reason === 'remove-offered', hr);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

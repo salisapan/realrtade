@@ -128,3 +128,22 @@ test('a deadline asked in a chat is one To Do task, and "Reminder: …" repeatin
   await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(1);
 });
+
+test('a booking the business cancelled offers to remove the hold Glance made from this chat; Do It removes that event and it is gone', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Your appointment is confirmed for tomorrow at 14:00');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML('Your appointment tomorrow at 14:00 was cancelled'));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+test('a cancellation with no hold from this chat offers nothing', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'Your appointment tomorrow at 14:00 was cancelled');
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+});

@@ -245,8 +245,28 @@ const FlowChatTaskCard = (() => {
       : { type: 'flow:undo-action', connectorId: connectorId, ref: ref, created: ref && ref.created };
   }
 
+  // The business cancelled a booking Glance put on the calendar from this chat: Do It removes that same event through the same undo the
+  // receipt has (read back that it is gone; an event the person edited is left alone and says so). Nothing else is touched.
+  async function removeHeld(host, chip, ctx) {
+    const t = ctx.chatTask;
+    const held = t.remove;
+    if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', t.he ? 'מסיר…' : 'Removing…');
+    const u = await send(undoMessage(held.connectorId, held.ref));
+    if (!(u && u.ok)) {
+      const edited = u && (u.reason === 'user-edited');
+      const text = edited ? (t.he ? 'שינית את האירוע, השארתי אותו' : 'You changed this event, so I left it') : (t.he ? 'לא הצלחתי להסיר, נסה שוב' : "Couldn't remove it, try again");
+      if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-error', text);
+      return;
+    }
+    try { await FlowStorage.appendLog({ kind: 'undone', label: 'Removed.', app: 'chat', connectorId: held.connectorId, chatKey: held.chatKey }); } catch (e) { /* the receipt still shows */ }
+    if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.showDraftReceipt === 'function') {
+      FlowChipHost.showDraftReceipt(host, { status: 'Handled.', written: u.written || (t.he ? 'הוסר מהיומן.' : 'Removed from your calendar.') });
+    }
+  }
+
   async function onDoIt(host, chip, ctx) {
     const t = ctx.chatTask;
+    if (t && t.remove) return removeHeld(host, chip, ctx);
     if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     const step = t.step;
     const params = step.params || {};
@@ -325,6 +345,43 @@ const FlowChatTaskCard = (() => {
       mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
       showReceipt(host, row, chatKey, row.connectorId);
       return { shown: true, reason: 'receipt' };
+    }
+
+    // A cancellation of a booking this chat already put on the calendar offers to take that event off again.
+    if (!own && typeof FlowChatAppointmentNotice !== 'undefined' && typeof FlowChatAppointmentNotice.cancelled === 'function') {
+      let gone = null;
+      try { gone = FlowChatAppointmentNotice.cancelled(i.text, i.now); } catch (e) { gone = null; }
+      if (gone && gone.kind === 'cancelled') {
+        const held = await findHeldHold(chatKey, gone);
+        if (!held) return { shown: false, reason: 'no-hold-to-remove' };
+        const heHold = gone.lang === 'he';
+        const title = String(held.label || '').replace(/^Calendar\s*·\s*/i, '').slice(0, 80);
+        const ctxRm = {
+          app: i.channel || 'chat',
+          doLabel: 'Do It',
+          messageId: chatKey,
+          intent: { type: 'event', label: (heHold ? 'בוטל: ' : 'Cancelled: ') + title, confidence: 0.9, personalClose: 'booking-cancelled', signals: { score: 90, threshold: 50 }, entities: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute } },
+          process: { id: CHAIN, name: heHold ? 'הסר מהיומן' : 'Remove It', closingLine: heHold ? 'מסיר מהיומן.' : 'Removing it from your calendar.', closedLine: heHold ? 'הוסר מהיומן.' : 'Removed from your calendar.', needsDateChoice: false, dateChoices: null,
+            steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: (heHold ? 'להסיר מהיומן: ' : 'Remove from calendar: ') + title, params: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute, title: title }, dependsOn: null }] },
+          sender: i.sender || {},
+          bodyText: '',
+          subject: '',
+          uiLang: heHold ? 'he' : 'en',
+          glanceChain: CHAIN,
+          chatTask: { connectorId: held.connectorId, channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heHold, own: false, remove: { connectorId: held.connectorId, ref: held.ref, chatKey: held.chatKey } }
+        };
+        const oldRm = mount.querySelector('.flow-chip-host');
+        if (oldRm) oldRm.remove();
+        const hostRm = FlowChipHost.inject(mount, ctxRm, {
+          onDoIt: (h, chip, c) => onDoIt(h, chip, c),
+          onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
+        });
+        if (!hostRm) return { shown: false, reason: 'inject-failed' };
+        mount.setAttribute('data-glance-key', chatKey);
+        mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
+        hostRm.setAttribute('data-glance-chain', CHAIN);
+        return { shown: true, reason: 'remove-offered' };
+      }
     }
 
     const judge = typeof FlowIncomingJudge !== 'undefined' ? FlowIncomingJudge : null;
