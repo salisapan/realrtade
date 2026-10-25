@@ -639,6 +639,28 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
       check('no close card for ' + why + ': ' + text, !(r.shown && r.reason === 'close-offered') && w.injected.length === before + (r.shown ? 1 : 0), r);
     }
     {
+      // A person on Microsoft only: the waiting task is a To Do task and the close goes through the worker, with the snapshot Glance took.
+      const sent = [];
+      const snap = { title: 'Waiting on Dana: Payment 500 NIS', status: 'notStarted' };
+      const exec = (msg) => {
+        sent.push(msg);
+        if (msg.payload && msg.payload.connectorId === 'outlookTaskClose') return { ok: true, fetchedBack: true, written: 'To Do task done · Waiting on Dana: Payment 500 NIS', where: 'Microsoft To Do', ref: { taskListId: 'ML1', taskId: 'MT1', externalId: 'MT1', closed: { title: snap.title, status: 'completed' }, closedByGlance: true }, proof: { system: 'microsoft/todo', externalId: 'MT1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+        return { ok: true, fetchedBack: true, written: 'To Do task', where: 'Microsoft To Do', ref: { taskListId: 'ML1', taskId: 'MT1', externalId: 'MT1', created: snap }, proof: { system: 'microsoft/todo', externalId: 'MT1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+      };
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'outlookTask' }, exec: exec });
+      await make(w);
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'o-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('a claim offers the close for a To Do task too', r.shown && r.reason === 'close-offered' && last.ctx.chatTask.connectorId === 'outlookTaskClose', r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      const call = sent.find((m) => m.payload && m.payload.connectorId === 'outlookTaskClose');
+      check('Do It closes the To Do task by its ids and the snapshot Glance took, nothing else', !!call && call.type === 'flow:execute-action' && call.payload.params.taskId === 'MT1' && call.payload.params.taskListId === 'ML1' && call.payload.params.created.status === 'notStarted' && Object.keys(call.payload.params).length === 3, call);
+      const row = w.logRows[w.logRows.length - 1];
+      check('the To Do close is logged as written with the task it closes', row.kind === 'written' && row.connectorId === 'outlookTaskClose' && row.closes === w.logRows[0].chatKey, row);
+      await w.receipts.filter((x) => x.receipt).pop().receipt.onUndo();
+      check('Undo of the To Do close goes through the worker undo of outlookTaskClose', w.calls.some((c) => c.type === 'flow:undo-action' && c.connectorId === 'outlookTaskClose'), w.calls.map((c) => c.type + ':' + c.connectorId));
+    }
+    {
       const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
       const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'n-1' }));
       check('a claim with no waiting task offers nothing', !r.shown || r.reason !== 'close-offered', r);

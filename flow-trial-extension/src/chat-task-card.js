@@ -271,10 +271,10 @@ const FlowChatTaskCard = (() => {
       if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
       if (e.kind !== 'written' || !e.ref) continue;
       if (String(e.chatKey || '').split('|').slice(0, 3).join('|') !== thread) continue;
-      if (e.connectorId === 'googleTaskClose') { if (!undone[e.chatKey] && e.closes) closed[e.closes] = true; continue; }
-      if (e.connectorId !== 'googleTask' || undone[e.chatKey] || closed[e.chatKey] || !e.ref.taskId) continue;
+      if (e.connectorId === 'googleTaskClose' || e.connectorId === 'outlookTaskClose') { if (!undone[e.chatKey] && e.closes) closed[e.closes] = true; continue; }
+      if ((e.connectorId !== 'googleTask' && e.connectorId !== 'outlookTask') || undone[e.chatKey] || closed[e.chatKey] || !e.ref.taskId) continue;
       const m = /(?:payment|תשלום) (\d+(?:\.\d+)?) ([a-z]{3})$/.exec(String(e.heldKey || ''));
-      if (m) out.push({ row: e, amount: m[1], currency: m[2].toUpperCase() });
+      if (m) out.push({ row: e, amount: m[1], currency: m[2].toUpperCase(), connectorId: e.connectorId });
     }
     return out;
   }
@@ -285,7 +285,10 @@ const FlowChatTaskCard = (() => {
     const t = ctx.chatTask;
     const open = t.close;
     if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', t.he ? 'מסמן…' : 'Marking…');
-    const r = await send({ type: 'flow:google-write', connectorId: 'googleTaskClose', input: { taskListId: open.ref.taskListId, taskId: open.ref.taskId, contentHash: open.ref.contentHash }, tabAccount: '', lang: t.he ? 'he' : 'en' });
+    const closeId = open.connectorId === 'outlookTask' ? 'outlookTaskClose' : 'googleTaskClose';
+    const r = closeId === 'outlookTaskClose'
+      ? await send({ type: 'flow:execute-action', payload: { connectorId: 'outlookTaskClose', params: { taskListId: open.ref.taskListId, taskId: open.ref.taskId, created: open.ref.created } } })
+      : await send({ type: 'flow:google-write', connectorId: 'googleTaskClose', input: { taskListId: open.ref.taskListId, taskId: open.ref.taskId, contentHash: open.ref.contentHash }, tabAccount: '', lang: t.he ? 'he' : 'en' });
     const ref = r && r.ref;
     const proved = !!(r && (r.fetchedBack === true || (r.proof && r.proof.fetchedBack === true)));
     if (!(r && r.ok && ref && ref.taskId && proved)) {
@@ -298,7 +301,7 @@ const FlowChatTaskCard = (() => {
       kind: 'written',
       label: r.written || 'Google Task done.',
       app: 'chat',
-      connectorId: 'googleTaskClose',
+      connectorId: closeId,
       ref: ref,
       where: r.where,
       url: r.url || null,
@@ -312,7 +315,7 @@ const FlowChatTaskCard = (() => {
       messageId: t.chatKey
     };
     try { await FlowStorage.appendLog(row); } catch (e) { /* the receipt still shows */ }
-    showReceipt(host, row, t.chatKey, 'googleTaskClose');
+    showReceipt(host, row, t.chatKey, closeId);
   }
 
   // The business cancelled a booking Glance put on the calendar from this chat: Do It removes that same event through the same undo the
@@ -437,13 +440,13 @@ const FlowChatTaskCard = (() => {
             messageId: chatKey,
             intent: { type: 'request', label: (heC ? 'שולם? ' : 'Paid? ') + title, confidence: 0.9, personalClose: 'payment-claimed', signals: { score: 90, threshold: 50 }, entities: { what: title } },
             process: { id: CHAIN, name: heC ? 'סמן כבוצע' : 'Mark done', closingLine: heC ? 'מסמן את המשימה כבוצעה.' : 'Marking the task done.', closedLine: heC ? 'המשימה סומנה כבוצעה.' : 'Task marked done.', needsDateChoice: false, dateChoices: null,
-              steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: (heC ? 'לסמן כבוצע: ' : 'Mark done: ') + title, params: { title: title }, dependsOn: null }] },
+              steps: [{ id: 'task', kind: pick.connectorId === 'outlookTask' ? 'outlookTask' : 'googleTask', label: 'Task', hint: (heC ? 'לסמן כבוצע: ' : 'Mark done: ') + title, params: { title: title }, dependsOn: null }] },
             sender: i.sender || {},
             bodyText: '',
             subject: '',
             uiLang: heC ? 'he' : 'en',
             glanceChain: CHAIN,
-            chatTask: { connectorId: 'googleTaskClose', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heC, own: false, close: { chatKey: pick.row.chatKey, ref: pick.row.ref } }
+            chatTask: { connectorId: pick.connectorId === 'outlookTask' ? 'outlookTaskClose' : 'googleTaskClose', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heC, own: false, close: { chatKey: pick.row.chatKey, ref: pick.row.ref, connectorId: pick.connectorId } }
           };
           const oldC = mount.querySelector('.flow-chip-host');
           if (oldC) oldC.remove();

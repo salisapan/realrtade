@@ -354,6 +354,14 @@ function installE2EHooks() {
           return Promise.resolve(json(404, { error: { message: 'verify-fail' } }));
         }
         const task = e2e.todoTasks[id];
+        if (task && method === 'PATCH') {
+          let patch = {};
+          try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
+          if (patch.status === 'completed') task.completedDateTime = { dateTime: '2026-10-25T09:00:00.0000000', timeZone: 'UTC' };
+          if (patch.status === 'notStarted') delete task.completedDateTime;
+          Object.assign(task, patch);
+          return Promise.resolve(json(200, task));
+        }
         return Promise.resolve(task ? json(200, task) : json(404, { error: { message: 'missing' } }));
       }
       if (todoCol && method === 'POST') {
@@ -361,7 +369,7 @@ function installE2EHooks() {
         let posted = {};
         try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
         // Read-back compares this body with the POST. A stand-in title is a mismatch.
-        const stored = { id: id };
+        const stored = { id: id, status: 'notStarted' };
         ['title', 'body', 'dueDateTime', 'status', 'importance', 'recurrence', 'isReminderOn', 'reminderDateTime'].forEach((key) => {
           if (posted[key] != null) stored[key] = posted[key];
         });

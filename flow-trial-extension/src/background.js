@@ -6248,6 +6248,70 @@ async function outlookTaskWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
+// Closing a To Do task Glance wrote (the other side said they paid): PATCH status completed, and Handled only when a GET shows it
+// completed. A task the person changed since Glance wrote it (title, body, due day, status ...) is left as it is. Undo reopens it, and only
+// while it still has the content the close left.
+async function outlookTaskCloseWrite(p) {
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) {
+    if (session && (session.needsSignIn || session.error === 'expired' || session.error === 'login_required')) return { ok: false, reason: 'token-expired' };
+    return { ok: false, reason: 'not-connected' };
+  }
+  if (outlookHasTasksScope(session.token) === false) return { ok: false, reason: 'tasks-not-granted' };
+  const params = (p && p.params) || {};
+  const listId = String(params.taskListId || '').trim();
+  const taskId = String(params.taskId || '').trim();
+  if (!listId || !taskId || plannerRawId(taskId) || !outlookHasSnap(params.created)) return { ok: false, reason: 'unclear', error: 'No single task to close.' };
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const refused = await outlookRefuseIfEdited(url, params.created);
+  if (refused && refused.alreadyGone) return { ok: false, reason: 'not-found', error: 'That task is gone, so there is nothing to close.' };
+  if (refused) return refused;
+  const Proof = globalThis.FlowProofOfClose;
+  const doneRef = (task, wrote) => ({ taskListId: listId, taskId: taskId, externalId: taskId, closed: outlookCreationSnap(task), closedByGlance: wrote === true });
+  const finish = (task, wrote) => {
+    const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
+    const proof = Proof && Proof.buildProof({ system: Proof.SYSTEM_MICROSOFT_TODO, externalId: taskId, url: link || undefined, fetchedBack: true, verifiedAt: new Date().toISOString() });
+    const base = { where: 'Microsoft To Do', target: 'default list', written: 'To Do task done · ' + String(task.title || ''), url: link, title: String(task.title || '') };
+    if (!proof) return Object.assign({ ok: false, reason: (Proof && Proof.REASON_PENDING) || 'proof_pending', ref: doneRef(task, wrote), proof: null }, base);
+    return Object.assign({ ok: true, ref: doneRef(task, wrote), proof: proof, fetchedBack: true }, base);
+  };
+  const before = await outlookTaskFetchOnce(listId, taskId);
+  if (before.ok && before.task && before.task.status === 'completed') return finish(before.task, false);
+  const res = await outlookFetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'completed' }) });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 401) return { ok: false, reason: 'token-expired' };
+  if (res && res.status === 403) return { ok: false, reason: 'tasks-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  const waits = [0, 250, 500, 1000, 1250];
+  let last = { ok: false };
+  for (let attempt = 0; attempt < waits.length; attempt++) {
+    if (waits[attempt]) await new Promise((resolve) => setTimeout(resolve, waits[attempt]));
+    last = await outlookTaskFetchOnce(listId, taskId);
+    if (last.ok && last.task && last.task.status === 'completed') return finish(last.task, true);
+  }
+  return { ok: false, reason: (Proof && Proof.REASON_FAILED) || 'verify_failed', ref: { taskListId: listId, taskId: taskId, externalId: taskId, closed: null, closedByGlance: true }, proof: null, fetchedBack: false };
+}
+
+async function outlookTaskCloseUndo(ref) {
+  const taskId = ref && (ref.externalId || ref.taskId);
+  const listId = ref && ref.taskListId;
+  if (!taskId || !listId) return { ok: false };
+  if (ref.closedByGlance === false) return { ok: true, fetchedBack: true, written: 'It was already done before, so it stays done.' };
+  if (!outlookHasSnap(ref.closed)) return outlookUnconfirmed();
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const refused = await outlookRefuseIfEdited(url, ref.closed);
+  if (refused && refused.alreadyGone) return { ok: true, fetchedBack: true, written: 'The task is gone.' };
+  if (refused) return refused;
+  const res = await outlookFetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'notStarted' }) });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  const back = await outlookTaskFetchOnce(listId, taskId);
+  if (!back.ok || !back.task || back.task.status === 'completed') return { ok: false, reason: 'unverified', written: 'Not verified: To Do still shows the task as done.' };
+  return { ok: true, fetchedBack: true, written: 'To Do task is open again.' };
+}
+
 function outlookZoneKey(zone) {
   const s = String(zone || '').trim().toLowerCase();
   if (!s) return '';
@@ -6666,7 +6730,7 @@ const WRITERS = {
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
-  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
+  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite, outlookTaskClose: outlookTaskCloseWrite,
   onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, outlookEventCallLink: eventLinkWrite,
   attachmentSave: attachmentSaveWrite
 };
@@ -6679,7 +6743,7 @@ const UNDOERS = {
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
-  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
+  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo, outlookTaskClose: outlookTaskCloseUndo,
   onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, outlookEventCallLink: eventLinkUndo,
   attachmentSave: attachmentSaveUndo
 };

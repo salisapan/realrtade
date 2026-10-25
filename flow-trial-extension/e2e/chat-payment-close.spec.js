@@ -65,3 +65,45 @@ test('a promise to pay later, another amount and a denial show no close card', a
   }
   expect(tasks()[0].status).toBe('needsAction');
 });
+
+// The same loop for a person on Microsoft only (the Graph stand-in): the waiting task is a To Do task.
+const todo = (glance) => glance.evaluateWorker(() => Object.values(globalThis.__glanceE2e.todoTasks));
+
+async function setupOutlook(glance) {
+  expect(await registerWhatsApp(glance)).toBe(true);
+  await glance.seedOutlook({ glanceSwitches: { CHAT_TASK_CARD: true, CHAT_PROMISE_CARD: true } }, { calendar: true });
+  const page = await glance.openWhatsApp(whatsappHtml('Please transfer 500 NIS to my account by Thursday', { own: true }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].title).toBe('Waiting on Dana: Payment 500 NIS');
+}
+
+test('Microsoft To Do: Dana says she transferred it, the card marks the waiting To Do task done, read back as completed, and Undo reopens it', async ({ glance }) => {
+  await setupOutlook(glance);
+  const page = await glance.openWhatsApp(whatsappHtml('I transferred 500 NIS', { id: 'BBB' }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  let list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].status).toBe('completed');
+  expect(list[0].title).toBe('Waiting on Dana: Payment 500 NIS');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance))[0].status).toBe('notStarted');
+});
+
+test('Microsoft To Do: a task the person changed is left alone and the card says so', async ({ glance }) => {
+  await setupOutlook(glance);
+  await glance.evaluateWorker(() => { const t = Object.values(globalThis.__glanceE2e.todoTasks)[0]; t.title = 'Waiting on Dana: Payment 500 NIS (half paid)'; });
+  const page = await glance.openWhatsApp(whatsappHtml('העברתי לך 500 ש"ח', { id: 'CCC' }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' [data-glance-chip-state="flow-chip-error"]')).toHaveAttribute('data-glance-chip-label', /שינית את המשימה|changed this task/, { timeout: 15000 });
+  const list = await todo(glance);
+  expect(list[0].status).toBe('notStarted');
+  expect(list[0].title).toBe('Waiting on Dana: Payment 500 NIS (half paid)');
+});
