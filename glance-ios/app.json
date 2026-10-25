@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Glance",
+    "slug": "glance-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "glance",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.theflowai.glance",
+      "supportsTablet": true,
+      "appleTeamId": "TEAM_ID_PLACEHOLDER"
+    },
+    "plugins": [
+      "@bacons/apple-targets"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "EAS_PROJECT_ID_PLACEHOLDER"
+      }
+    }
+  }
+}
