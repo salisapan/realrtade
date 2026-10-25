@@ -235,15 +235,6 @@ exports.handler = async function (event) {
   var followUpFn = kind === 'trial' ? 'send-trial-access' : kind === 'pro' ? null : 'send-playbook';
   log('token verified', { email: maskEmail(email), kind: kind, followUpFn: followUpFn });
 
-  var downloadUrl;
-  if (kind === 'trial') {
-    var downloadExp = Date.now() + DOWNLOAD_TTL_MS;
-    var downloadSig = signDownload(email, downloadExp, secret);
-    downloadUrl =
-      SITE_URL + '/.netlify/functions/download-trial-zip?email=' + encodeURIComponent(email) +
-      '&exp=' + downloadExp + '&sig=' + encodeURIComponent(downloadSig);
-  }
-
   // A confirmation link is a plain GET that stays valid for 72 hours, and
   // nothing marked it used. So every reload re-sent the email, and — worse —
   // corporate mail scanners that prefetch links would confirm the address and
@@ -254,7 +245,9 @@ exports.handler = async function (event) {
   // one that actually changed it, makes the send happen exactly once. The
   // filter requires confirmed_at to still be null, so two concurrent requests
   // cannot both match — Postgres serialises them and the loser updates nothing.
+  // A failed claim must not mint a download link — the person can retry this URL.
   var alreadyConfirmed = false;
+  var claimRecorded = false;
   try {
     if (!SB_SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
     var claim = await fetch(
@@ -268,13 +261,24 @@ exports.handler = async function (event) {
         body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
       }
     );
-    var claimed = claim.ok ? await claim.json() : null;
-    alreadyConfirmed = Array.isArray(claimed) && claimed.length === 0;
+    if (!claim.ok) throw new Error('Supabase PATCH failed: HTTP ' + claim.status);
+    var claimed = await claim.json();
+    if (!Array.isArray(claimed)) throw new Error('Unexpected claim response');
+    alreadyConfirmed = claimed.length === 0;
+    claimRecorded = true;
     if (alreadyConfirmed) log('already confirmed — showing the page without re-sending', { email: maskEmail(email) });
   } catch (err) {
-    // If the claim cannot be recorded we still send, because a signup that
-    // silently receives nothing is a worse failure than a duplicate email.
-    logErr('failed to claim waitlist row (will send anyway)', String(err));
+    logErr('failed to claim waitlist row — not issuing download link', String(err));
+    return { statusCode: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, false, kind) };
+  }
+
+  var downloadUrl;
+  if (kind === 'trial' && claimRecorded) {
+    var downloadExp = Date.now() + DOWNLOAD_TTL_MS;
+    var downloadSig = signDownload(email, downloadExp, secret);
+    downloadUrl =
+      SITE_URL + '/.netlify/functions/download-trial-zip?email=' + encodeURIComponent(email) +
+      '&exp=' + downloadExp + '&sig=' + encodeURIComponent(downloadSig);
   }
 
   if (!alreadyConfirmed && followUpFn) {
