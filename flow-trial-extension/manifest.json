@@ -163,8 +163,18 @@
     "notifications",
     "scripting",
     "contextMenus",
-    "offscreen"
+    "offscreen",
+    "activeTab"
   ],
+  "commands": {
+    "glance-analyze-chat": {
+      "suggested_key": {
+        "default": "Alt+Shift+G",
+        "mac": "Alt+Shift+G"
+      },
+      "description": "Analyze the open chat (Glance)"
+    }
+  },
   "host_permissions": [
     "https://mail.google.com/*",
     "https://tasks.googleapis.com/*",
