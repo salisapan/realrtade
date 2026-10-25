@@ -14,9 +14,9 @@ A mail that has a card is a mail Glance decided to show. Why not shown is the li
 
 ## Current implementation status (this tip)
 
-The card and Why not shown read one decision record. `commitDecision` in `src/content-outlook.js` is the writer for the open mail. A quiet commit stores the reason of the branch that stayed quiet (`decideFromText`, or the page code that branch already uses, such as `note-to-self` or `page:no-mount`). It does not copy the sync row's `planned.reason` over that decision. A show commit stores the branch that painted, and drops the quiet record and the sync line for that id and for `priorConversationId`. `FlowDisplay.whyNotShownRows` lists quiet page records. A sync row is listed only when no page record claims that id. A commit whose epoch is not the current `mailEpoch` is dropped. Subject fallback sets `id` to the picked Graph message id and `hydrateHow` to `subject-fallback` only when that row is the open message: the same confirmed conversation, at the page minute. A row from another conversation is not adopted. A file links only to that open message. A kilobyte size match does not cross messages. An unconfirmed conversation stays quiet. Two rows with the same subject stay `hydrateHow: none` and do not copy either row's recipients. A click fails closed when the open-mail token, the epoch, or the card hash is missing or does not match. The hydrate cache key includes the epoch.
+Outlook on the web paints a card from the open message, and the panel's Why not shown list is a concatenation of two logs. Those logs are written by different code, from different inputs, and a later branch may store the mailbox-sync reason in place of the reason that belongs to the card. Graph hydrate, including the subject fallback, can judge a different message than the one the sync row names. Clicks on Hold It, the calendar card, Dismiss, and four Undo closures do not check the open-mail epoch. The stale-click guard that does exist fails open when the card has no token.
 
-`flow-trial-extension/test/card-decision-corpus.cjs` locks that record. The sections below are the contract. The line numbers in them describe the split this record replaced.
+Nothing in this commit wires the decision record. The behaviour below is what the code does today.
 
 ## The split
 

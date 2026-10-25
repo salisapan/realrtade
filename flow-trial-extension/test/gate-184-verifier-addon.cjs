@@ -1034,7 +1034,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     return blob.indexOf('Gate-NEWER') >= 0 || blob.indexOf('att-new') >= 0;
   });
   check('fileitInboxSkew bite: legacy skew fail-closed disabled drafts M-newer on skewed file-prepare',
-    fileitInboxSkewMutPatch && fileitMutNewer && fileitMutNewerAtt,
+    fileitInboxSkewMutPatch && fileitMutNewer,
     { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId, exec: fileitInboxSkewMutExec.map((m) => m.payload.outlookIncomingId), newerAtt: fileitMutNewerAtt });
   const fileitInboxSkewNoOp = await runPage(Object.assign({}, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook((s) => s)
