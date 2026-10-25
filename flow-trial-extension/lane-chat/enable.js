@@ -136,15 +136,30 @@ async function granted(origins) {
 async function registerAll() {
   const scripting = typeof chrome !== 'undefined' && chrome.scripting;
   if (!scripting || !scripting.registerContentScripts) return;
-  const ids = LANES.map((lane) => 'glance-lane-' + lane.id);
-  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* not registered yet */ }
-  await scripting.registerContentScripts(LANES.map((lane) => ({
-    id: 'glance-lane-' + lane.id,
-    matches: lane.origins,
-    js: lane.js,
-    runAt: 'document_idle',
-    persistAcrossSessions: true
-  })));
+  const trigger = (typeof FlowLaneChatSurfaces !== 'undefined' && FlowLaneChatSurfaces.TRIGGER_JS)
+    ? ['lane-chat/surfaces.js'].concat(FlowLaneChatSurfaces.TRIGGER_JS)
+    : ['src/chat-indicator.js', 'src/chat-lane-trigger.js'];
+  const rows = (typeof FlowLaneChatSurfaces !== 'undefined' && FlowLaneChatSurfaces.SURFACES)
+    ? FlowLaneChatSurfaces.SURFACES
+    : LANES.map((lane) => ({ id: 'glance-lane-' + lane.id, origins: lane.origins }));
+  const ids = rows.map((lane) => lane.id);
+  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* legacy full lane */ }
+  for (const lane of rows) {
+    const tid = lane.id + '-trigger';
+    const surfaceKey = lane.key || String(lane.id || '').replace('glance-lane-', '');
+    try { await scripting.unregisterContentScripts({ ids: [tid] }); } catch (e) { /* first run */ }
+    if (typeof FlowChatKillSwitch !== 'undefined' && FlowChatKillSwitch.isAllowed) {
+      const allowed = await FlowChatKillSwitch.isAllowed(chrome, surfaceKey);
+      if (!allowed) continue;
+    }
+    await scripting.registerContentScripts([{
+      id: tid,
+      matches: lane.origins,
+      js: trigger,
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    }]);
+  }
 }
 
 function showButton(code) {
@@ -172,6 +187,10 @@ function showButton(code) {
 }
 
 async function turnOn(code) {
+  if (!ageOk(code)) {
+    say(isHe(code) ? 'יש לאשר גיל 18 ומעלה.' : 'Confirm you are 18 or older.');
+    return;
+  }
   if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) { say(cannotAsk(code)); return; }
   let ok = false;
   try { ok = await chrome.permissions.request({ origins: metaOrigins() }); }
@@ -183,9 +202,29 @@ async function turnOn(code) {
   say(nowOn(code));
 }
 
+function paintDisclosure(code) {
+  const he = isHe(code);
+  const disc = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.disclosure) ? FlowMetaConsent.disclosure(code) : '';
+  const en = doc.getElementById('meta-disclosure-en');
+  const hi = doc.getElementById('meta-disclosure-he');
+  if (en) en.textContent = disc;
+  if (hi) hi.textContent = disc;
+  const ageEn = doc.getElementById('meta-age-en');
+  const ageHe = doc.getElementById('meta-age-he');
+  if (ageEn) ageEn.checked = false;
+  if (ageHe) ageHe.checked = false;
+}
+
+function ageOk(code) {
+  const he = isHe(code);
+  const box = doc.getElementById(he ? 'meta-age-he' : 'meta-age-en');
+  return box && box.checked === true;
+}
+
 async function start() {
   const code = await preferredLang();
   showCopy(code);
+  paintDisclosure(code);
   const on = await granted(metaOrigins());
   if (!on) { showButton(code); return; }
   try {
