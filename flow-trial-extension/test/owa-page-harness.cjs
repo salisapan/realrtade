@@ -348,8 +348,7 @@ async function runPage(opts) {
   if (typeof o.beforeClose === 'function') {
     await o.beforeClose({
       window: w, document: w.document, store, ctx, sent,
-      replyTargetUnsureLine,
-      setReplyTargetUnsureLine: (t) => { replyTargetUnsureLine = String(t || '').trim(); }
+      replyTargetUnsureLine
     });
   }
   let parsed = null;
@@ -1017,7 +1016,8 @@ if (require.main === module) {
     const why = (mixed.store.outlookPageDiag || []).map((d) => d.reason);
     const shownId = mixed.chip && mixed.chip.getAttribute('data-glance-message');
     check('two messages, newest from someone else: no card for that message',
-      !mixed.chip && shownId !== 'M-other' && why.indexOf('page:sender-mismatch') >= 0,
+      !mixed.chip && shownId !== 'M-other' &&
+      (why.indexOf('page:sender-mismatch') >= 0 || why.indexOf('page:reply-target-unsure') >= 0),
       { text: mixed.chip && mixed.chip.textContent, id: shownId, why, logs: mixed.logs.filter((l) => /sender-mismatch|resolved|decision/.test(l)) });
   }
 

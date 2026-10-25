@@ -1055,12 +1055,22 @@
     if (!netOk && !minOk) return false;
     return true;
   }
+  function openPaneConversationRow(pane, m) {
+    if (!pane || !m) return false;
+    const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
+    const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || '');
+    const wantConv = canon(pane.conversationId || pane.pathId);
+    const gotConv = canon(m.conversationId);
+    return Boolean(wantConv && gotConv && wantConv === gotConv);
+  }
+
   async function exactOpenMessageInList(list, pane, openSender) {
     if (!pane) return null;
     const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
     const hits = [];
-    for (let i = 0; i < (list || []).length; i++) {
-      const m = list[i];
+    const rows = (list || []).filter(Boolean);
+    for (let i = 0; i < rows.length; i++) {
+      const m = rows[i];
       const from = fromAddress(m);
       if (behalfSplit(m.from, m.sender)) continue;
       if (!(await sameOpenSender(from, open, senderAddress(m)))) continue;
@@ -1068,6 +1078,17 @@
       hits.push(m);
     }
     if (hits.length === 1) return hits[0];
+    if (hits.length > 1) return null;
+    if (rows.length !== 1 || pane.visibleMessageBodies !== 1) return null;
+    const sole = rows[0];
+    const from = fromAddress(sole);
+    if (behalfSplit(sole.from, sole.sender)) return null;
+    if (!(await sameOpenSender(from, open, senderAddress(sole)))) return null;
+    if (!openPaneConversationRow(pane, sole)) return null;
+    if (openPaneExactGraphRow(pane, sole)) return sole;
+    const paneNet = canon(pane.internetMessageId);
+    const minute = minuteOf(pane.receivedDateTime);
+    if (!paneNet && !minute) return sole;
     return null;
   }
 
@@ -1276,13 +1297,6 @@
       const known = await loadUserAddresses();
       const spells = idSpellings(raw);
       const prefers = [null, GRAPH_IMMUTABLE];
-      for (let p = 0; p < prefers.length; p++) {
-        for (let i = 0; i < spells.length; i++) {
-          const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId&$top=25';
-          const fromFilter = newestOther(await graphValues(q, 'conversation-filter', prefers[p]), own, openSender, known);
-          if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]), from: fromAddress(fromFilter), sender: senderAddress(fromFilter) };
-        }
-      }
       if (!conversationSpellsAllowInboxFallback(spells, raw)) return null;
       const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
       const select = '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId';
@@ -1427,12 +1441,15 @@
     const convId = ctx && ctx.conversationId;
     let found = null;
     if (pane && (pane.itemId || pane.pathId || pane.conversationId)) {
-      found = await resolveJudgedReplyMessageId(pane, own, openSender);
+      if (paneUrlOnlyMessageTarget(pane)) {
+        found = await resolveMessageIdForFilePrepare(pane, own, openSender);
+        if (!found || !found.id) found = await resolveJudgedReplyMessageId(pane, own, openSender);
+      } else {
+        found = await resolveJudgedReplyMessageId(pane, own, openSender);
+      }
     } else if (pathId || convId) {
       const bareKey = String(pathId || convId || '').trim();
-      const draftStep = ctx && ctx.process && Array.isArray(ctx.process.steps) &&
-        ctx.process.steps.some((s) => s && s.kind === 'outlookDraft');
-      if (draftStep && bareKey && isConversationId(bareKey)) return null;
+      if (bareKey && isConversationId(bareKey)) return null;
       found = await resolveOutlookMessageId(pathId || convId, convId, own, openSender);
     } else {
       return null;
@@ -5387,7 +5404,9 @@
       if (painted && typeof FlowOutlookAttachmentEvidence !== 'undefined') {
         const acct = st && st.outlookAuth && st.outlookAuth.account && st.outlookAuth.account.address;
         const from = ctx.sender && ctx.sender.email ? String(ctx.sender.email).toLowerCase() : '';
-        const noteSelf = ctx.noteToSelf || (from && acct && from === String(acct).toLowerCase());
+        const noteSelf = ctx.noteToSelf === true || (pane && pane.noteToSelf === true) ||
+          (ctx.intent && ctx.intent.selfTask === true) ||
+          (from && acct && from === String(acct).toLowerCase());
         if (noteSelf) {
           paintNoteHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: hasTaskRow }));
         }
@@ -6609,7 +6628,17 @@
         onDoIt: (h, chip, c, steps) => { onDoIt(h, chip, c, steps); },
         onDismiss: (h, c) => { onDismiss(h, c); }
       });
-      if (painted) paintMissingScope(painted, ctx, loopSt);
+      if (painted) {
+        const hasTaskRow = (ctx.process && ctx.process.steps || []).some((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+        if (typeof FlowOutlookAttachmentEvidence !== 'undefined') {
+          const noteSelf = ctx.noteToSelf === true || (pane && pane.noteToSelf === true) ||
+            (ctx.intent && ctx.intent.selfTask === true);
+          if (noteSelf) {
+            paintNoteHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: hasTaskRow }));
+          }
+        }
+        paintMissingScope(painted, ctx, loopSt);
+      }
       return painted;
     });
     if (!host) return false;

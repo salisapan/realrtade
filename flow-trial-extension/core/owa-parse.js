@@ -595,7 +595,7 @@ const FlowOwaParse = (() => {
   // node that holds the CONV_ heading; prefer the focused message; take the
   // last in document order. No visibility filter: the prose wrapper's
   // visibility="hidden" attribute has no style and still renders.
-  function openBodyRoot(roots) {
+  function messageBodyPool(roots) {
     const list = (roots || []).filter(Boolean);
     const isSubject = (n) => /^CONV_.*_SUBJECT$/.test(n.id || '') ||
       Boolean(n.querySelector && n.querySelector('[id^="CONV_"][id$="_SUBJECT"]'));
@@ -603,7 +603,24 @@ const FlowOwaParse = (() => {
       Boolean(n.querySelector && n.querySelector('[role="document"]'));
     let pool = list.filter((n) => isBody(n) && !isSubject(n));
     if (!pool.length) pool = list.filter((n) => !isSubject(n));
-    if (!pool.length) return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    return pool;
+  }
+
+  function visibleMessageBodyCount(roots) {
+    const pool = messageBodyPool(roots);
+    if (!pool.length) {
+      const list = (roots || []).filter(Boolean);
+      return list.find((n) => n.id === 'ReadingPaneContainerId') ? 1 : 0;
+    }
+    return pool.length;
+  }
+
+  function openBodyRoot(roots) {
+    let pool = messageBodyPool(roots);
+    if (!pool.length) {
+      const list = (roots || []).filter(Boolean);
+      return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    }
     const focused = pool.filter((n) => n.closest && n.closest('#focused'));
     if (focused.length) pool = focused;
     pool = pool.slice().sort((a, b) => {
@@ -896,6 +913,7 @@ const FlowOwaParse = (() => {
     if (!d) return null;
     const roots = readingPaneRoots(d);
     const bodyRoot = openBodyRoot(roots);
+    const visibleMessageBodies = visibleMessageBodyCount(roots);
     if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
     const head = headerOf(bodyRoot, d);
     const container = head.container;
@@ -961,7 +979,8 @@ const FlowOwaParse = (() => {
       clockAlt: when.alt || '',
       pageHour24: pageProves24h(d),
       hourCycle: hourCycleOf(d),
-      attachments: attachmentsOf(container, bodyRoot)
+      attachments: attachmentsOf(container, bodyRoot),
+      visibleMessageBodies: visibleMessageBodies
     };
   }
 

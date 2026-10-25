@@ -29,8 +29,8 @@ function outlookMessageIdSpellings(id) {
   return out;
 }
 console.log('gate-run4-184 expectation edits (logged):');
-console.log('  gate-run4-184-corpus.cjs:37-75 | before: source-regex wiring rows on product files | after: removed (behavioural rows only) | ruling: #184 verify no source-text assertions');
-console.log('  gate-run4-184-corpus.cjs:209-250 | label source-regex | restored behavioural rows (not source-regex): note-to-self HE/EN (D), OneDrive reconnect HE/EN, To Do failed-after-draft HE/EN');
+console.log('  gate-run4-184-corpus.cjs:46-55 | restored behavioural display-copy rows (note-to-self HE+EN, OneDrive reconnect HE+EN, To Do failed-after-draft HE+EN) | ruling: #184 verify copy rows');
+console.log('  gate-run4-184-corpus.cjs:238-262 | before: note-to-self with-task allowed מוצע fallback | after: exact D.noteToSelfLine only + paint bite | ruling: @9204196e');
 console.log('  gate-run4-184-corpus.cjs:362-364 | before: keepActiveDraftReceipt regex on outlookSrc | after: storage slot pin row only | ruling: #184 verify');
 console.log('  gate-run4-184-corpus.cjs:526-528 | before: N1 bite hard-coded subject Gate Run 4 | after: pane subject === row.subject | ruling: #184 verify generic N1');
 console.log('  gate-run4-184-corpus.cjs:487/501/516/534 | before: pathRestGraphId FlowOwaParse.canonId(...) | after: literal REST ids | ruling: #184 F2b');
@@ -43,6 +43,17 @@ check('display-copy has HE+EN attachments-not-read',
 check('display-copy has HE+EN reply-target-unsure fail-closed',
   D.whyNotShownLine('page:reply-target-unsure', 'he').indexOf('לא נוצרה') >= 0 &&
   /nothing was drafted/i.test(D.whyNotShownLine('page:reply-target-unsure', 'en')));
+check('display-copy has HE+EN note-to-self short and task-suggested',
+  D.noteToSelfLine('he').indexOf('ממך') >= 0 && D.noteToSelfLine('he').indexOf('הוצעה') < 0 &&
+  D.noteToSelfLine('he', { taskSuggested: true }).indexOf('הוצעה') >= 0 &&
+  /From you to you/.test(D.noteToSelfLine('en')) && !/task was suggested/.test(D.noteToSelfLine('en')) &&
+  /task was suggested/.test(D.noteToSelfLine('en', { taskSuggested: true })));
+check('display-copy has HE+EN OneDrive reconnect',
+  D.missingScopeLine('Files.ReadWrite', 'OneDrive', 'en').indexOf('OneDrive') >= 0 &&
+  D.missingScopeLine('Files.ReadWrite', 'וואן־דרייב', 'he').indexOf('וואן') >= 0);
+check('display-copy has HE+EN To Do failed after draft warning',
+  D.outlookTodoFailedAfterDraftLine('he').indexOf('טיוטה') >= 0 &&
+  /draft is ready/i.test(D.outlookTodoFailedAfterDraftLine('en')));
 
 const engine = { module: undefined, console };
 vm.createContext(engine);
@@ -226,8 +237,30 @@ async function runBehavioral(opts) {
   const noteSelfTaskUi = selfHintText + selfChipText;
   check('(D) note-to-self with task row: full task-suggested line',
     Boolean(selfToSelf.chip) && selfHasTask &&
-    (noteSelfTaskUi.indexOf(noteSelfTaskLine) >= 0 || /הוצעה|מוצע/.test(noteSelfTaskUi)),
+    noteSelfTaskUi.indexOf(noteSelfTaskLine) >= 0,
     { hint: selfHintText.slice(0, 200), text: selfChipText.slice(0, 200), kinds: selfStepKinds, note: noteSelfTaskLine });
+  function noteSelfTaskMutedSrc(src) {
+    const needle = 'paintNoteHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: hasTaskRow }));';
+    const repl = 'paintNoteHint(painted, FlowOutlookAttachmentEvidence.noteToSelfLine(pageUiLang(), { taskSuggested: false }));';
+    return src.includes(needle) ? src.split(needle).join(repl) : src;
+  }
+  const selfToSelfMut = await runPage(Object.assign({
+    htmlPatch: selfHtmlPatch(selfTask),
+    mailBody: selfTask,
+    graphFrom: { name: 'Sali', address: HME },
+    urlId: GATE_CONV, listedConversationId: GATE_CONV, messageId: 'M-self-task-mut',
+    waitMs: 4500,
+    store: Object.assign({}, cleanStore, { glanceOwnNames: ['Sali'] })
+  }, { contentOutlookSrc: patchOutlook(noteSelfTaskMutedSrc) }));
+  const selfMutHint = selfToSelfMut.chip && selfToSelfMut.chip.querySelector('.flow-chip-note-hint');
+  const selfMutUi = (selfMutHint ? String(selfMutHint.textContent || '') : '') +
+    (selfToSelfMut.chip ? String(selfToSelfMut.chip.textContent || '') : '');
+  const selfMutPatch = patchOutlook(noteSelfTaskMutedSrc) !== outlookSrc;
+  check('(D) note-to-self bite: muting task-suggested line fails with-task row',
+    selfMutPatch && Boolean(selfToSelf.chip) && selfHasTask &&
+    noteSelfTaskUi.indexOf(noteSelfTaskLine) >= 0 &&
+    selfMutUi.indexOf(noteSelfTaskLine) < 0,
+    { patch: selfMutPatch, mutUi: selfMutUi.slice(0, 200) });
 
   const selfNoteOnly = await runPage({
     htmlPatch: selfHtmlPatch('תודה על העדכון — אעקוב מכאן.'),

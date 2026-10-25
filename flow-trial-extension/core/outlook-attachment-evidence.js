@@ -75,4 +75,5 @@ const FlowOutlookAttachmentEvidence = (() => {
   };
 })();
 
+if (typeof globalThis !== 'undefined') globalThis.FlowOutlookAttachmentEvidence = FlowOutlookAttachmentEvidence;
 if (typeof module !== 'undefined') module.exports = { FlowOutlookAttachmentEvidence };
