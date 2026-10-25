@@ -4,7 +4,8 @@ const path = require('path');
 const { FlowOwaParse } = require('../core/owa-parse.js');
 const OUTLOOK_PRODUCT_SRC = fs.readFileSync(path.join(__dirname, '..', 'src/content-outlook.js'), 'utf8');
 
-console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:noclockNewerOnly | before: sole-rule rows | after: exact-or-unsure fail-closed + legacy matcher bites | ruling: #184 delete sole rule');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:prefix255 | before: graph body full paneBody | after: graph body prefix slice only | ruling: #184 prefix255 noclock collision');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:noclockNewerOnly | before: sole-rule rows | after: exact-or-unsure fail-closed + legacy matcher bites | ruling: #184 delete sole rule');
 console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:noclock-1 | before: drafts M-older without clock | after: fail-closed (ruling) | ruling: #184 exact-or-unsure');
 
 module.exports = async function runGate184VerifierAddon(ctx) {
@@ -72,6 +73,22 @@ module.exports = async function runGate184VerifierAddon(ctx) {
                 : await resolveJudgedReplyMessageId(pane, own, pane.senderEmail);`;
     return src.includes(exactBlock) ? src.replace(exactBlock, legacyBlock) : src;
   }
+  function conversationIncomingIdPinDisabledSrc(src) {
+    let s = src;
+    s = s.replace(
+      'if (decided && !decided.none && decided.process && conversationPanePathKey(pane) && !pane.itemId\n        && processNeedsConversationMessageId(decided.process)) {',
+      'if (false && decided && !decided.none && decided.process && conversationPanePathKey(pane) && !pane.itemId\n        && processNeedsConversationMessageId(decided.process)) {'
+    );
+    s = s.replace(
+      'if (processNeedsConversationMessageId((decided && decided.process) || (entry && entry.process))\n          && conversationPanePathKey(pane) && !pane.itemId) {',
+      'if (false && processNeedsConversationMessageId((decided && decided.process) || (entry && entry.process))\n          && conversationPanePathKey(pane) && !pane.itemId) {'
+    );
+    s = s.replace(
+      'if (conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {\n              replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);\n            } else {',
+      'if (false && conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {\n              replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);\n            } else {'
+    );
+    return s;
+  }
   function newestOnlyResolveSrc(src) {
     const needle = 'async function messageIdForOpenPane(convId, own, openSender, pane) {';
     const start = src.indexOf(needle);
@@ -104,20 +121,12 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   function legacySkewDraftsNewerSrc(src) {
     return newestOnlyResolveSrc(legacyFailClosedSrc(src));
   }
-  const exactListTail = 'if (hits.length === 1) return hits[0];\n    return null;';
+  const soleRowNeedle = 'if (!(await sameOpenSender(from, open, senderAddress(sole)))) return null;';
   function injectExactListLegacyBite(src, soleReturnLine) {
-    if (!src.includes(exactListTail)) return src;
-    const block = `if (hits.length === 1) return hits[0];
-    if (hits.length > 1) return null;
-    if (rows.length === 1) {
-      const sole = rows[0];
-      const from = fromAddress(sole);
-      if (behalfSplit(sole.from, sole.sender)) return null;
-      if (!(await sameOpenSender(from, open, senderAddress(sole)))) return null;
-      ${soleReturnLine}
-    }
-    return null;`;
-    return src.replace(exactListTail, block);
+    const anchor = soleRowNeedle + '\n      const paneMinute = minuteOf(pane && pane.receivedDateTime);';
+    if (!src.includes(anchor)) return src;
+    const inject = soleRowNeedle + '\n      ' + soleReturnLine.trim() + '\n      const paneMinute = minuteOf(pane && pane.receivedDateTime);';
+    return src.replace(anchor, inject);
   }
   const legacyPrefixHelperFn = `function legacyPaneBodyPrefixMatch(pane, m) {
     function normB(s) { let t = String(s || '').replace(/\\s+/g, ' ').trim().toLowerCase(); t = t.replace(/(?:\\u2026|\\.{3})\\s*$/u, '').trim(); return t; }
@@ -460,6 +469,15 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       expectsUnsureLine(page),
       Object.assign({ drafts: drafts.map((m) => m.payload && m.payload.outlookIncomingId), why: pageWhyText(page).slice(0, 160) }, extra || {}));
   }
+  function assertNoclockFailClosed(name, page, extra) {
+    const drafts = replyDraftActs(page);
+    check(name,
+      !page.chip &&
+      !drafts.some((m) => m.payload && (m.payload.outlookIncomingId === 'M-newer' || m.payload.outlookIncomingId === 'M-older')) &&
+      !/Reply draft ready|טיוטת תשובה מוכנה/.test(replyReadyText(page)) &&
+      expectsUnsureLine(page),
+      Object.assign({ chip: Boolean(page.chip), drafts: drafts.map((m) => m.payload && m.payload.outlookIncomingId), why: pageWhyText(page).slice(0, 160) }, extra || {}));
+  }
 
   const restSkewDoIt = await runPage(Object.assign({}, gateBase, wtReplyDoItBase, {
     urlId: WRONG_TARGET_CONV_REST, listedConversationId: WRONG_TARGET_CONV_REST,
@@ -763,11 +781,11 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       glanceTodoConsent: { mode: 'always', scope: 'Tasks.ReadWrite', revoked: false, at: 1 },
       outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: HME }, ownAddresses: [HME] }
     }),
-    contentOutlookSrc: patchOutlook((s) => fileitLegacyResolverOrderSrc(legacySkewDraftsNewerSrc(s)))
+    contentOutlookSrc: patchOutlook(legacySkewDraftsNewerSrc)
   }));
   const saveJudgedSkewMutDraft = replyDraftActs(saveJudgedSkewMut)[0] && replyDraftActs(saveJudgedSkewMut)[0].payload;
-  const saveJudgedSkewMutPatch = patchOutlook((s) => fileitLegacyResolverOrderSrc(legacySkewDraftsNewerSrc(s))) !== OUTLOOK_PRODUCT_SRC;
-  check('saveJudgedSkew bite: fileit_legacy newest-from-sender drafts M-newer on judged save skew',
+  const saveJudgedSkewMutPatch = patchOutlook(legacySkewDraftsNewerSrc) !== OUTLOOK_PRODUCT_SRC;
+  check('saveJudgedSkew bite: disabling conversation fail-closed drafts M-newer on judged save skew',
     saveJudgedSkewMutPatch && saveJudgedSkewMutDraft && saveJudgedSkewMutDraft.outlookIncomingId === 'M-newer',
     { patch: saveJudgedSkewMutPatch, id: saveJudgedSkewMutDraft && saveJudgedSkewMutDraft.outlookIncomingId });
   const saveJudgedSkewNoOp = await runPage(Object.assign({}, gateBase, {
@@ -868,7 +886,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       const prefix = paneBody.slice(0, 255);
       return Object.assign({}, base, {
         bodyPreview: prefix,
-        body: { contentType: 'text', content: paneBody }
+        body: { contentType: 'text', content: prefix }
       });
     }
     return base;
@@ -908,7 +926,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     const page = await runPage(base);
     logGateRun4Bite('noclockNewerOnly:' + variant + ':' + transportLabel + (skew ? ':skew' : ':exact'),
       'no pane clock; conv filter only M-newer; ' + vLabel, 'reply-target-unsure; no M-newer draft');
-    assertSkewFailClosed(label + ': Do It fails closed (never M-newer)', page);
+    assertNoclockFailClosed(label + ': Do It fails closed (no card, unsure line)', page);
     const biteSrc = biteForNewerOnlyVariant(variant);
     const mut = await runPage(Object.assign({}, base, { contentOutlookSrc: patchOutlook(biteSrc) }));
     const mutDraft = replyDraftActs(mut)[0] && replyDraftActs(mut)[0].payload;
@@ -940,10 +958,25 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const noclockOlderDraft = replyDraftActs(noclockOlderCtrl)[0] && replyDraftActs(noclockOlderCtrl)[0].payload;
   logGateRun4Bite('noclock-1', 'M-older row without pane clock', 'exact-or-unsure: fail closed');
   console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:907-909 | before: drafts M-older | after: reply-target-unsure | ruling: #184 delete sole rule');
-  check('noclock-1: conv-filter M-older without pane clock fails closed (no M-newer draft)',
-    !replyDraftActs(noclockOlderCtrl).some((m) => m.payload && m.payload.outlookIncomingId === 'M-newer') &&
-    expectsUnsureLine(noclockOlderCtrl),
-    { id: noclockOlderDraft && noclockOlderDraft.outlookIncomingId, why: pageWhyText(noclockOlderCtrl).slice(0, 120) });
+  assertNoclockFailClosed('noclock-1: conv-filter M-older without pane clock fails closed (no card, unsure line)', noclockOlderCtrl);
+  const noclockOlderMut = await runPage(Object.assign({}, gateBase, wtReplyDoItBase, {
+    urlId: WRONG_TARGET_CONV, listedConversationId: WRONG_TARGET_CONV,
+    htmlPatch: wtReplyNoClockDom, mailBody: wtReplyBody,
+    threadMessages: [noclockOlderOnlyRow], pathRestMisses: 2, inboxLookupEmpty: true, waitMs: 8000,
+    contentOutlookSrc: patchOutlook(legacySubjectRowBiteSrc)
+  }));
+  const noclockOlderMutDraft = replyDraftActs(noclockOlderMut)[0] && replyDraftActs(noclockOlderMut)[0].payload;
+  const noclockOlderMutPatch = patchOutlook(legacySubjectRowBiteSrc) !== OUTLOOK_PRODUCT_SRC;
+  check('noclock-1 bite: legacy subject-only matcher on sole M-older row drafts M-older',
+    noclockOlderMutPatch && noclockOlderMutDraft && noclockOlderMutDraft.outlookIncomingId === 'M-older',
+    { patch: noclockOlderMutPatch, id: noclockOlderMutDraft && noclockOlderMutDraft.outlookIncomingId });
+  const noclockOlderNoOp = await runPage(Object.assign({}, gateBase, wtReplyDoItBase, {
+    urlId: WRONG_TARGET_CONV, listedConversationId: WRONG_TARGET_CONV,
+    htmlPatch: wtReplyNoClockDom, mailBody: wtReplyBody,
+    threadMessages: [noclockOlderOnlyRow], pathRestMisses: 2, inboxLookupEmpty: true, waitMs: 8000,
+    contentOutlookSrc: patchOutlook((s) => s)
+  }));
+  noclockNewerOnlyBiteCheck('noclock-1', noclockOlderMut, noclockOlderNoOp, noclockOlderMutDraft);
 
   const inboxNewerOnlyBase = Object.assign({}, gateBase, wtReplyDoItBase, {
     htmlPatch: wtReplyNoClockDom, mailBody: wtReplyBody,
@@ -993,15 +1026,22 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const fileitInboxSkew = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase));
   logGateRun4Bite('fileitInboxSkew', 'file prepare skew + inbox lists both', 'fail closed; M-older attachment only');
   assertSkewFailClosed('file prepare conversation URL +7min with inbox listing both fails closed (never M-newer)', fileitInboxSkew);
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: stacked legacySkew | after: fileitLegacy L5193 only | ruling: #184 item 3');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: stacked legacySkew | after: fileitLegacy L5193 only | ruling: #184 CTO item 2');
   const fileitInboxSkewMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook(fileitLegacyResolverOrderSrc)
   }));
   const fileitInboxSkewMutDraft = replyDraftActs(fileitInboxSkewMut)[0] && replyDraftActs(fileitInboxSkewMut)[0].payload;
   const fileitInboxSkewMutPatch = patchOutlook(fileitLegacyResolverOrderSrc) !== OUTLOOK_PRODUCT_SRC;
+  const fileitInboxSkewMutExec = (fileitInboxSkewMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
+  const fileitMutNewer = (fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId === 'M-newer') ||
+    fileitInboxSkewMutExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
+  const fileitMutNewerAtt = fileitInboxSkewMutExec.some((m) => {
+    const blob = JSON.stringify(m.payload || '');
+    return blob.indexOf('Gate-NEWER') >= 0 || blob.indexOf('att-new') >= 0;
+  });
   check('fileitInboxSkew bite: fileit_legacy resolver order alone drafts M-newer on skewed file-prepare',
-    fileitInboxSkewMutPatch && fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId === 'M-newer',
-    { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId });
+    fileitInboxSkewMutPatch && fileitMutNewer && fileitMutNewerAtt,
+    { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId, exec: fileitInboxSkewMutExec.map((m) => m.payload.outlookIncomingId), newerAtt: fileitMutNewerAtt });
   const fileitInboxSkewNoOp = await runPage(Object.assign({}, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook((s) => s)
   }));

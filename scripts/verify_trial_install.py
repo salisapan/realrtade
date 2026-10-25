@@ -23,8 +23,6 @@ REQUIRED = [
     "popup/popup.html",
     "popup/popup.js",
     "popup/popup.css",
-    "picker/picker.html",
-    "picker/picker.js",
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",
@@ -215,6 +213,10 @@ assert(publicClientId('REPLACE_WITH_HUBSPOT_CLIENT_ID') === '', 'placeholder');
 assert(publicClientId('YOUR_SLACK_CLIENT_ID') === '', 'legacy placeholder');
 assert(publicClientId('  real-client ') === 'real-client', 'trim real id');
 for (const [key, value] of Object.entries(OAUTH_PUBLIC)) {
+  if (key === 'dropboxAppKey') {
+    assert(publicClientId(value) !== '', 'dropboxAppKey must ship configured (public app key, not a secret)');
+    continue;
+  }
   assert(publicClientId(value) === '', key + ' is still a placeholder and must count as unset');
 }
 console.log('publicClientId ok');

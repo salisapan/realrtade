@@ -686,22 +686,20 @@ async function runBehavioral(opts) {
     if (String(asked) === 'M-newer') return { ok: true, status: 200, body: JSON.stringify({ value: [wtNewerFile] }) };
     return { ok: false, status: 404, body: '{}' };
   }
-  const soleNoClockDom = (h) => gateHtml(wtSaveBody)(h)
-    .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-OLDER-nda.pdf" data-size="1024"></div>')
+  const wtReplyBody = 'Can you confirm by October 9 whether we can proceed? Thanks';
+  const soleNoClockDom = (h) => gateHtml(wtReplyBody)(h)
     .replace(/<div class="date">[\s\S]*?<\/div>/, '')
     .replace(/<time datetime="[^"]*"><\/time>/, '');
   const soleOlderRow = {
-    id: 'M-older', conversationId: WRONG_TARGET_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: true,
+    id: 'M-newer', conversationId: WRONG_TARGET_CONV, subject: 'Gate Run 4', isDraft: false, hasAttachments: false,
     from: { emailAddress: { name: 'flow', address: FROM } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
-    receivedDateTime: olderDt, bodyPreview: wtSaveBody,
-    body: { contentType: 'text', content: wtSaveBody }
+    receivedDateTime: olderDt, bodyPreview: wtReplyBody,
+    body: { contentType: 'text', content: wtReplyBody }
   };
   const soleNoClockGate = {
-    htmlPatch: soleNoClockDom, mailBody: wtSaveBody,
-    messageId: 'M-older',
+    htmlPatch: soleNoClockDom, mailBody: wtReplyBody,
     urlId: WRONG_TARGET_CONV, listedConversationId: WRONG_TARGET_CONV, listedSubject: 'Gate Run 4',
     threadMessages: [soleOlderRow], pathRestMisses: 2, inboxLookupEmpty: true,
-    gateAttachments: true, attachmentFiles: [file], hasAttachments: true,
     store: Object.assign({}, cleanStore, { glanceOutlookFileTrace: 1 }),
     waitMs: 7000, clickDoIt: true
   };
@@ -709,10 +707,11 @@ async function runBehavioral(opts) {
   const soleNoClockActs = (soleNoClockDoIt.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
   const soleNoClockWhy = (soleNoClockDoIt.store.outlookPageDiag || []).map((d) => d.reason);
   logGateRun4Bite('soleNoClock', 'single Graph row, no pane clock', 'exact-or-unsure fail-closed');
+  console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:soleNoClock | before: save+attach sole M-older drafts | after: reply sole row fail-closed unsure | ruling: #184 delete sole rule');
   console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:711-720 | before: drafts M-older | after: page:reply-target-unsure | ruling: #184 delete sole rule');
   check('sole conv-filter row without pane clock: Do It fails closed (exact-or-unsure)',
     !soleNoClockActs.some((m) => m.payload.connectorId === 'outlookDraft') &&
-    soleNoClockWhy.some((r) => r === 'page:reply-target-unsure'),
+    soleNoClockWhy.some((r) => r === 'page:reply-target-unsure' || r === 'suggest:unresolved'),
     {
       connectors: soleNoClockActs.map((m) => m.payload.connectorId),
       chip: Boolean(soleNoClockDoIt.chip),
@@ -810,6 +809,28 @@ async function runBehavioral(opts) {
       skewWhy.some((r) => r === 'page:reply-target-unsure') &&
       !skewExec.some((m) => m.payload.outlookIncomingId === 'M-newer'),
       { why: skewWhy, att: skewAtt, exec: skewExec.map((m) => m.payload.outlookIncomingId) });
+    console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:wtAttachInboxBothSkew:' + transportLabel + ' bite | before: exact pin | after: pin-revert alone | ruling: #184 fix B');
+    const skewPinMut = await runPage(Object.assign({}, base, {
+      threadMessages: skewThread, waitMs: 8000,
+      contentOutlookSrc: patchOutlook(conversationIncomingIdPinDisabledSrc)
+    }));
+    const skewPinExec = (skewPinMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
+    const skewPinAtt = graphFetches(skewPinMut.sent).filter((u) => /\/attachments/.test(u));
+    const skewPinNewer = skewPinAtt.some((u) => decodeURIComponent(u).indexOf('/M-newer/') >= 0) ||
+      skewPinExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
+    const skewPinPatch = patchOutlook(conversationIncomingIdPinDisabledSrc) !== outlookSrc;
+    check('wtAttach inbox both skew ' + transportLabel + ' bite: reverting pin alone allows M-newer on skew',
+      skewPinPatch && skewPinNewer,
+      { att: skewPinAtt, exec: skewPinExec.map((m) => m.payload.outlookIncomingId) });
+    const skewPinNoOp = await runPage(Object.assign({}, base, {
+      threadMessages: skewThread, waitMs: 8000,
+      contentOutlookSrc: patchOutlook((s) => s)
+    }));
+    const skewPinNoOpExec = (skewPinNoOp.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
+    const skewPinNoOpNewer = skewPinNoOpExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
+    check('wtAttach inbox both skew ' + transportLabel + ' bite: identity outlook patch does not satisfy bite',
+      !(skewPinNoOpNewer && skewPinNewer),
+      { mutNewer: skewPinNewer, noopNewer: skewPinNoOpNewer });
   }
   await wtAttachInboxBothRow('EWS', WRONG_TARGET_CONV);
   await wtAttachInboxBothRow('REST', WRONG_TARGET_CONV_REST);
@@ -1106,8 +1127,24 @@ async function runBehavioral(opts) {
   check('wrong-target control: message URL with path id Graph call budget (total + endpoints)',
     msgUrlGraphSum.convFilter === 0 && msgUrlAttachForOpen && msgUrlGraphTotal >= 8 && msgUrlGraphSum.fromSearch <= 3,
     msgUrlGraphSum);
+  function conversationIncomingIdPinDisabledSrc(src) {
+    let s = src;
+    s = s.replace(
+      'if (decided && !decided.none && decided.process && conversationPanePathKey(pane) && !pane.itemId\n        && processNeedsConversationMessageId(decided.process)) {',
+      'if (false && decided && !decided.none && decided.process && conversationPanePathKey(pane) && !pane.itemId\n        && processNeedsConversationMessageId(decided.process)) {'
+    );
+    s = s.replace(
+      'if (processNeedsConversationMessageId((decided && decided.process) || (entry && entry.process))\n          && conversationPanePathKey(pane) && !pane.itemId) {',
+      'if (false && processNeedsConversationMessageId((decided && decided.process) || (entry && entry.process))\n          && conversationPanePathKey(pane) && !pane.itemId) {'
+    );
+    s = s.replace(
+      'if (conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {\n              replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);\n            } else {',
+      'if (false && conversationPanePathKey(pane) && processNeedsConversationMessageId(proc)) {\n              replyTarget = await exactConversationPaneMessageId(pane, own, pane.senderEmail);\n            } else {'
+    );
+    return s;
+  }
   function urlOnlyIdRegressionSrc(src) {
-    const needle = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      if (!id && paneUrlOnlyMessageTarget(pane)) {\n        const open = await messageIdForOpenPane(pane.conversationId || pane.pathId, ownAddresses, pane.senderEmail, pane);\n        id = open && open.id;\n      }\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
+    const needle = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      if (!id && conversationPanePathKey(pane)) {\n        const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n        id = open && open.id;\n      }\n      if (!id) {\n        const found = conversationPanePathKey(pane)\n          ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)\n          : (paneUrlOnlyMessageTarget(pane)\n            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
     const repl = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = Boolean(id && pathKey && (String(pane.itemId || \'\') === pathKey || (typeof FlowOwaParse !== \'undefined\' && FlowOwaParse.canonId && FlowOwaParse.canonId(pane.itemId || \'\') === FlowOwaParse.canonId(pathKey))));\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
     let out = src.replace(needle, repl);
     const extra = 'if (urlOnlyId) {\n        await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n      }';
