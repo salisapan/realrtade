@@ -550,6 +550,16 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('Hebrew cancellation offers the removal', hr.shown && hr.reason === 'remove-offered', hr);
   }
 
+  // 5z. An invitation that was moved is offered at the new day and clock; a cancelled one offers nothing.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input('The launch party you were invited to has been moved to Monday at 20:00', { channel: 'whatsapp' }));
+    const st = r.shown && w.injected[0].ctx.process.steps[0].params;
+    check('the moved invitation is offered at its new time', !!st && st.hour === 20 && st.minute === 0, st || r);
+    const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a cancelled invitation offers nothing', !(await q.Card.offer(input('The party you were invited to was cancelled', { channel: 'whatsapp' }))).shown);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

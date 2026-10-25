@@ -5,6 +5,9 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['The launch party you were invited to has been moved to Monday at 20:00', '2026-10-26', 20, 0],
+  ['Your invitation to the party was rescheduled from Sunday at 19:00 to Monday at 20:00', '2026-10-26', 20, 0],
+  ['האירוע שהוזמנת אליו הועבר ליום שני בשעה 20:00', '2026-10-26', 20, 0],
   ["You're invited to my birthday on Saturday at 8pm", '2026-10-24', 20, 0],
   ['Join us for the opening on Thursday at 19:00', '2026-10-29', 19, 0],
   ["We'd love to invite you to our housewarming Sunday at 6:30pm", '2026-10-25', 18, 30],
@@ -16,6 +19,11 @@ const YES = [
 ];
 for (const [text, day, h, m] of YES) { const r = A.recognize(text, NOW); check('invitation: ' + text, r.kind === 'invitation' && r.dateIso === day && r.hour === h && r.minute === m, r); }
 const NO = [
+  ['Unfortunately the party you were invited to has been moved to Monday at 20:00 instead', 'sorry / instead'],
+  ['לצערנו האירוע שהוזמנת אליו הועבר ליום שני בשעה 20:00', 'sorry'],
+  ['The meeting was moved to Monday at 20:00', 'no invitation'],
+  ['The party you were invited to was cancelled', 'cancelled'],
+  ['The party you were invited to has been moved to Monday', 'no clock'],
   ["You're invited to my birthday on Saturday", 'no clock'],
   ["You're invited to my birthday at 8pm", 'no day'],
   ["Are you coming to my birthday on Saturday at 8pm? You're invited", 'question'],

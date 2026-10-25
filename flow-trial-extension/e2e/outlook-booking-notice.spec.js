@@ -242,3 +242,17 @@ test('BOOKING_NOTICE on: a mail that says the pickup deadline was extended is on
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await todo(glance)).length).toBe(0);
 });
+
+test('BOOKING_NOTICE on: a mail that says the event you were invited to was moved is one hold titled Invitation at the new clock, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi Sali, the launch party you were invited to has been moved to tomorrow at 20:00.', true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Invitation/);
+  expect(list[0].attendees || []).toEqual([]);
+  expect(JSON.stringify(list[0].start)).toContain('20:00');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});

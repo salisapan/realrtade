@@ -9,6 +9,22 @@ const FlowChatInvitationNotice = (() => {
   const FRAME_HE = /(?:מוזמ[נן](?:ת|ים|ות)?\s+(?:ל|ל-)|מזמינ(?:ה|ים|ות)?\s+(?:אותך|אתכם|אתכן|אותכם)|מזמין\s+אותך|הזמנה\s+ל|נשמח\s+(?:לראות|שתצטרפו|שתבואו|שתגיע|שתצטרף)|הצטרפו\s+אלינו|בואו\s+לחגוג|שמרו\s+את\s+התאריך)/;
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|amazing|nice)|thank(?:s|\s+you)\s+for|cancel(?:l?ed)?|postpone[d]?|resched\w*|unfortunately|sorry|maybe|might|webinar|sale|discount|offer|subscribe|unsubscribe|click\s+here|register\s+now|rsvp\s+by)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|היה\s+(?:נהדר|כיף|מדהים)|תודה\s+על|בוטל|בוטלה|נדחה|לצערנו|מצטער|מצטערים|אולי|וובינר|מבצע|הנחה|הרשמה|לחץ\s+כאן|הירשמו)/;
+  // An invitation whose day or clock was moved ("The party you were invited to has been moved to Monday at 20:00", «האירוע שהוזמנת אליו הועבר
+  // ליום שני בשעה 20:00») is the same invitation at the new time. Only when the words before the verb speak of an invitation; the old time
+  // before "to" is dropped.
+  const MOVE_EN = /\s*,?\s*(?:(?:has|have)\s+been\s+|was\s+|is\s+now\s+)?(?:moved|rescheduled|postponed|changed|brought\s+forward|pushed\s+back)(?:\s+from\s+.+?)?\s+(?:to|until|for)\s+/i;
+  const MOVE_HE = /\s+(?:הועבר|הועברה|נדחה|נדחתה|שונה|שונתה|הוקדם|הוקדמה)\s+(?=ל|אל\s)/;
+  const INVITED_EN = /\b(?:invit(?:ed|ation)|save\s+the\s+date|rsvp)\b/i;
+  const INVITED_HE = /(?:הוזמנת|הוזמנתם|מוזמ[נן]|הזמנה|הזמנתך)/;
+  const HEDGE = /\b(?:unfortunately|sorry|instead|cancel\w*|maybe|might|if\s+you)\b|(?:לצערנו|מצטער|מצטערים|במקום|אולי|בוטל)/i;
+  function movedInvitation(raw) {
+    if (HEDGE.test(raw)) return raw;
+    let m = raw.match(MOVE_EN);
+    if (m && INVITED_EN.test(raw.slice(0, m.index))) return "You're invited " + raw.slice(m.index + m[0].length).replace(/^(?:on|at)\s+/i, 'on ');
+    m = raw.match(MOVE_HE);
+    if (m && INVITED_HE.test(raw.slice(0, m.index))) return 'מוזמנים ל' + raw.slice(m.index + m[0].length).replace(/^ל/, '');
+    return raw;
+  }
   const QUESTION = /[?؟]/;
   const MAX_AHEAD_DAYS = 120;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -59,7 +75,7 @@ const FlowChatInvitationNotice = (() => {
 
   // { kind: 'invitation', dateIso, hour, minute, lang } or { kind: 'none', reason }.
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = movedInvitation(String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim());
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 280) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };

@@ -613,3 +613,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** appointment reader corpus (5 cancellations, 10 quiet lines), chat card corpus (remove offered, undo called with the held ref, logged as undone, second cancellation quiet, no-hold quiet, edited event left alone, Hebrew), two real-browser Outlook specs (the removal deletes the event; no hold, nothing; the first fails on the previous card), all corpora.
 - **Open:** live Gate; mail (Outlook/Gmail) does not offer the removal yet; the removal has no Undo of its own (restoring a deleted event is not built).
 
+## 2026-10-25 Ecosystems builder B (seventy-third run) — a moved invitation is offered at its new time
+
+- **Capability shipped (switches `CHAT_TASK_CARD`, `BOOKING_NOTICE`, off):** hosts move events by message ("The launch party you were invited to has been moved to Monday at 20:00", «האירוע שהוזמנת אליו הועבר ליום שני בשעה 20:00», "Your invitation was rescheduled from Sunday at 19:00 to Monday at 20:00"). The invitation reader needs an invite frame ("you're invited") and treated "moved" and «נדחה» as cancellation, so the new time was never offered. `core/chat-invitation-notice.js` now reads an invitation told as moved, only when the words before the verb speak of an invitation, at the new day and clock; "unfortunately/sorry/instead", a cancellation, a move with no new clock and a meeting that is not an invitation stay quiet. Chat (WhatsApp, Messenger, Instagram) and Outlook/Gmail mail share the reader. Nothing is sent; nobody is invited.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; canonical card reused.
+- **Tests:** invitation reader corpus (3 more invitations, 5 more quiet lines), chat card corpus (moved offered at the new time, cancelled quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
+- **Open:** live Gate; the first (old) hold stays until the person removes it; the cancelled-booking removal is chat only (no mail, no trip/invitation cancellations yet).
+
