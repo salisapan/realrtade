@@ -163,8 +163,18 @@
     "notifications",
     "scripting",
     "contextMenus",
-    "offscreen"
+    "offscreen",
+    "activeTab"
   ],
+  "commands": {
+    "glance-read-chat": {
+      "suggested_key": {
+        "default": "Alt+Shift+G",
+        "mac": "Alt+Shift+G"
+      },
+      "description": "Read this Messenger chat for Glance (one click)"
+    }
+  },
   "host_permissions": [
     "https://mail.google.com/*",
     "https://tasks.googleapis.com/*",
@@ -224,10 +234,6 @@
     "https://www.facebook.com/messages/*",
     "https://facebook.com/messages",
     "https://facebook.com/messages/*",
-    "https://business.facebook.com/latest/inbox",
-    "https://business.facebook.com/latest/inbox/*",
-    "https://www.business.facebook.com/latest/inbox",
-    "https://www.business.facebook.com/latest/inbox/*",
     "https://www.instagram.com/direct",
     "https://www.instagram.com/direct/*",
     "https://instagram.com/direct",
