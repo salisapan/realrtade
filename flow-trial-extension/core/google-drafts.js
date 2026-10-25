@@ -9,7 +9,9 @@ const FlowGoogleDrafts = (() => {
   const API = 'https://gmail.googleapis.com/gmail/v1/users/me/drafts';
 
   function cfg() {
-    return typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+    if (typeof FlowGoogleConfig !== 'undefined') return FlowGoogleConfig;
+    const g = typeof globalThis !== 'undefined' ? globalThis : {};
+    return g.FlowGoogleConfig || null;
   }
 
   function emailOf(value) {
@@ -175,6 +177,18 @@ const FlowGoogleDrafts = (() => {
 
   async function write(input, http, clock) {
     const C = cfg();
+    const i = input || {};
+    const scopes = i.scopes || i.grantedScopes || null;
+    if (C && !C.gmailDraftApiAllowed(scopes)) {
+      return {
+        ok: false,
+        reason: 'compose-closed',
+        preview: true,
+        closes: false,
+        sent: false,
+        error: 'Open Reply first. Glance does not press Send.'
+      };
+    }
     const planned = plan(input);
     if (!planned.ok) return planned;
     const base = {

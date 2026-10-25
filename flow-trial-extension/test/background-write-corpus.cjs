@@ -47,12 +47,12 @@ function load(opts) {
     stored.googleGrantedScopes = {
       version: [
         'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/drive.readonly',
-        'https://www.googleapis.com/auth/gmail.compose',
         'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/contacts.readonly',
+        'https://www.googleapis.com/auth/drive.file',
+        'openid',
         'https://www.googleapis.com/auth/userinfo.profile',
-        'openid'
+        'https://www.googleapis.com/auth/userinfo.email'
       ].join('\n'),
       status: 'granted',
       source: 'chrome',
@@ -180,7 +180,31 @@ function decodeDraftRaw(raw) {
 
 // A connected person has a granted-scope record for the scope list in the manifest; without it the first write drops
 // the cached token once and asks again (googleScopeAction), which is the upgrade path and not the ordinary write.
-const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: { version: 'https://www.googleapis.com/auth/tasks', status: 'granted' } };
+const OAUTH_SCOPES_EXACT = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/contacts.readonly',
+  'https://www.googleapis.com/auth/drive.file',
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email'
+];
+const GRANTED_OAUTH = { version: OAUTH_SCOPES_EXACT.join('\n'), status: 'granted', source: 'chrome', at: 1 };
+const GRANTED_MAILBOX_DRIVE = {
+  version: OAUTH_SCOPES_EXACT.concat(['https://www.googleapis.com/auth/drive.readonly']).join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+const GRANTED_GMAIL_COMPOSE = {
+  version: OAUTH_SCOPES_EXACT.concat(['https://www.googleapis.com/auth/gmail.compose']).join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: GRANTED_OAUTH };
+const CONNECTED_DRIVE_SEARCH = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: GRANTED_MAILBOX_DRIVE };
+const CONNECTED_GMAIL_DRAFT = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: GRANTED_GMAIL_COMPOSE };
 const PAYLOAD = { label: 'Send the signed SOW', facts: {}, senderName: 'Dana', threadUrl: 'https://mail.google.com/x' };
 
 async function run() {
@@ -558,7 +582,7 @@ async function run() {
   console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_1' }), method: 'POST' }]
@@ -584,7 +608,7 @@ async function run() {
   console.log('\n--- background.js: gmailDraftWrite — a resolved file is attached; a bare term is not a search ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/file_1\?fields=/, { reply: res(200, { name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '2048' }) }],
@@ -605,7 +629,7 @@ async function run() {
     check('the body names the attached file', decoded.body.includes('Attached: Contract-Signed.pdf'), decoded.body);
 
     const termOnly = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_term' }), method: 'POST' }]
@@ -621,7 +645,7 @@ async function run() {
   console.log('\n--- background.js: a Google Doc match is exported, not downloaded as media ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/doc_1\?fields=/, { reply: res(200, { name: 'Invoice', mimeType: 'application/vnd.google-apps.document' }) }],
@@ -645,7 +669,7 @@ async function run() {
   {
     let page = 0;
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: () => {
         page += 1;
         if (page === 1) {
@@ -661,7 +685,7 @@ async function run() {
     check('the second request carries the page token', env.calls.some((c) => c.includes('pageToken=tok2')), env.calls);
     check('page size is 100, not a top-five sample', env.calls.some((c) => c.includes('pageSize=100')), env.calls);
     const broken = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, {}) }]]
     });
     const failed = await attempt(broken.fn('searchDriveFiles')("trashed = false and name contains 'invoice'"));
@@ -682,7 +706,7 @@ async function run() {
 
     let n = 0;
     const once = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: () => {
         n += 1;
         if (n === 1) return res(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } });
@@ -695,7 +719,7 @@ async function run() {
     check('Drive is listed twice, not left on the first 403', once.calls.filter((c) => c.indexOf('/drive/v3/files?q=') >= 0).length === 2, once.calls);
 
     const twice = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: res(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } }) }]]
     });
     const detail = {};
@@ -705,7 +729,7 @@ async function run() {
     check('a missing scope is not retried forever', twice.calls.filter((c) => c.indexOf('/drive/v3/files?q=') >= 0).length === 2, twice.calls);
 
     const http = {};
-    const five = load({ stored: CONNECTED, routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, { error: { message: 'backend' } }) }]] });
+    const five = load({ stored: CONNECTED_DRIVE_SEARCH, routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, { error: { message: 'backend' } }) }]] });
     const fiveOut = await attempt(five.fn('searchDriveFiles')("name contains 'invoice'", http));
     check('a 500 stays null, drive-search-failed, and does not evict', fiveOut === null && http.reason === 'drive-search-failed' && http.error === 'backend' && !five.calls.some((c) => c.indexOf('EVICT ') === 0), { fiveOut, http, calls: five.calls });
 
@@ -714,12 +738,19 @@ async function run() {
     const blankOut = await attempt(blank.fn('searchDriveFiles')('', emptyDetail));
     check('an empty query does not call Drive', blankOut === null && emptyDetail.reason === 'drive-search-failed' && emptyDetail.error === 'empty-query' && blank.calls.length === 0, { blankOut, emptyDetail, calls: blank.calls });
 
+    const hiddenMailbox = load({ stored: CONNECTED });
+    const hiddenDetail = {};
+    const hiddenSearch = await attempt(hiddenMailbox.fn('searchDriveFiles')("name contains 'invoice'", hiddenDetail));
+    check('without drive.readonly mailbox search stays hidden and never calls Drive', hiddenSearch === null && hiddenDetail.reason === 'drive-search-unavailable' && hiddenMailbox.calls.length === 0, { hiddenSearch, hiddenDetail, calls: hiddenMailbox.calls });
+    const hiddenDraft = await attempt(hiddenMailbox.fn('gmailDraftWrite')({ senderEmail: 'dana@meridian.com', subject: 'Hi', params: { what: 'invoice' } }));
+    check('without gmail.compose the Gmail drafts API path stays hidden', hiddenDraft && hiddenDraft.ok === false && hiddenDraft.reason === 'compose-closed' && !hiddenMailbox.calls.some((c) => c.includes('/users/me/drafts')), hiddenDraft);
+
     const off = load({ stored: {} });
     const notConn = await attempt(off.fn('searchDriveMessage')({ query: "name contains 'x'", trace: true }));
     check('Google not connected is drive-not-granted', notConn && notConn.ok === false && notConn.reason === 'drive-not-granted' && notConn.error === 'not-connected' && notConn.fileCount === 0, notConn);
 
     const traced = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [
         [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [{ id: 'q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] }) }],
         [/\/oauth2\/v3\/tokeninfo/, { reply: res(200, { scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/tasks' }) }]
@@ -732,7 +763,7 @@ async function run() {
     check('without the trace, scopes are absent', noTrace && noTrace.ok === true && noTrace.fileCount === 1 && noTrace.scopes == null, noTrace);
 
     const failedMsg = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: res(503, { error: { message: 'backend' } }) }]]
     });
     const msgOut = await attempt(failedMsg.fn('searchDriveMessage')({ query: "name contains 'x'" }));
@@ -750,7 +781,7 @@ async function run() {
     // silently masking the real bug — so the call log itself is the
     // assertion, not just the final attachment.
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_4' }), method: 'POST' }]
@@ -773,7 +804,7 @@ async function run() {
   console.log('\n--- background.js: a resolved file that cannot be read does not become a plain success ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/file_big\?fields=/, { reply: res(200, { name: 'Contract-4K-Scan.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) }) }]
@@ -791,7 +822,7 @@ async function run() {
   console.log('\n--- background.js: create-when-missing copies a template, attaches it, and undo deletes both ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/tpl\?fields=/, { reply: res(200, { name: 'Invoice Template', mimeType: 'application/vnd.google-apps.document' }) }],
@@ -822,7 +853,7 @@ async function run() {
     check('the prepared file is the draft attachment', decoded.attachmentFilename === 'invoice — Dana — 1042.pdf', decoded);
     check('the draft body carries the filled fields', decoded.body.includes('Bill to: Dana') && decoded.body.includes('Invoice number: 1042'), decoded.body);
 
-    const empty = load({ stored: CONNECTED, routes: [] });
+    const empty = load({ stored: CONNECTED_GMAIL_DRAFT, routes: [] });
     const refused = await attempt(empty.fn('gmailDraftWrite')({
       senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Invoice',
       params: { templateId: 'tpl', fields: [{ id: 'number', label: 'Invoice number', value: '  ' }] }

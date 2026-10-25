@@ -2405,6 +2405,10 @@ function glanceUiCopy(kind) {
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
+      if (searched && searched.reason === 'drive-search-unavailable') {
+        logScanSkip(messageId, 'file');
+        recordSilence(messageId, 'file');
+      } else {
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment
       // search is not connected (compose-only Gmail). Null Drive means the
@@ -2467,6 +2471,7 @@ function glanceUiCopy(kind) {
           return;
         }
         attachFile = decision.file;
+      }
       }
     }
 
@@ -3340,9 +3345,18 @@ function glanceUiCopy(kind) {
     });
     const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
     if (!shownAlready) {
+      const logSteps = process.steps.map((step) => {
+        if (!step || !step.params) return step;
+        const hash = typeof FlowGoogleContacts !== 'undefined' && typeof FlowGoogleContacts.contactLogHash === 'function'
+          ? FlowGoogleContacts.contactLogHash(step.params.email)
+          : '';
+        return Object.assign({}, step, {
+          params: { mode: step.params.mode, lang: step.params.lang, contactHash: hash }
+        });
+      });
       FlowStorage.appendLog({
         kind: 'shown', label: plan.title || plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
-        process: { id: process.id, name: process.name, steps: process.steps },
+        process: { id: process.id, name: process.name, steps: logSteps },
         threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
         intent: compactIntent(intent), app: SOURCE_APP
       });
@@ -4205,22 +4219,17 @@ function glanceUiCopy(kind) {
     return !!FlowGoogleComposePage.findBody(document);
   }
 
-  // No compose window is open. The reply draft is saved in the thread
-  // through the Gmail drafts API and read back by its id. Glance never sends.
+  // No compose window is open. Gmail drafts are filled in the DOM only;
+  // the Gmail drafts API (gmail.compose) is not in the OAuth grant.
   async function saveReplyDraft(payload, input) {
-    const planned = typeof FlowGoogleCompose !== 'undefined' && typeof FlowGoogleCompose.plan === 'function'
-      ? FlowGoogleCompose.plan(input)
-      : { ok: false };
-    const threadId = (payload && payload.threadId) || '';
-    if (!planned.ok || !threadId) {
-      return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: glanceUiHebrew() ? 'לא הצלחתי להכין טיוטת תשובה בשרשור הזה.' : 'Could not prepare a reply draft in this thread.' };
-    }
-    return sendRuntime(Object.assign({
-      type: 'flow:google-write',
-      connectorId: 'googleReplyDraft',
-      input: { to: planned.to, subject: planned.subject, body: planned.body, threadId: threadId }
-    }, laneAccountContext()));
-
+    return {
+      ok: false,
+      reason: 'compose-closed',
+      preview: true,
+      closes: false,
+      sent: false,
+      error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
+    };
   }
 
   async function sendGmailCompose(payload) {

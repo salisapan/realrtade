@@ -2805,6 +2805,7 @@ async function followTaskReopen(ref, dueIso) {
 
 async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -2818,6 +2819,9 @@ async function findThreadIdTo(recipientEmail, subject) {
 
 async function followDraftCreate(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  if (!(await gmailComposeApiAllowedNow())) {
+    return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false };
+  }
   const to = String((p && p.to) || '').trim();
   const text = String((p && p.body) || '').trim();
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
@@ -3271,6 +3275,7 @@ function buildMimeMessage(opts) {
 // whole action because a search query came back empty.
 async function findThreadId(senderEmail, subject) {
   if (!senderEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -3378,12 +3383,50 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
+// Mailbox-wide Drive search needs drive.readonly, which is not in the OAuth
+// grant. Without it, stay quiet — never call files.list and surface a 403.
+async function googleGrantedScopeList() {
+  try {
+    const bag = await chrome.storage.local.get('googleGrantedScopes');
+    const rec = bag.googleGrantedScopes;
+    if (!rec) return null;
+    const v = rec.version;
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string' && v) return v.split('\n').filter(Boolean);
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function gmailComposeApiAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.gmailDraftApiAllowed(scopes));
+}
+
+async function mailboxDriveSearchAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.mailboxDriveSearchAllowed(scopes));
+}
+
 // One 403 for a missing Drive scope drops the cached Chrome token and asks
 // once more, silently. A grant that already includes drive.readonly can be
 // reused. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
+    return null;
+  }
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.mailboxDriveSearchAllowed(scopes)) {
+    if (detail) {
+      detail.status = 0;
+      detail.reason = 'drive-search-unavailable';
+      detail.error = 'mailbox-search-not-granted';
+    }
     return null;
   }
   const files = [];
@@ -3503,6 +3546,7 @@ function driveQuote(value) {
 
 async function factSources(ask) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, sources: [], truncated: false };
   const factLabel = driveQuote(ask && ask.factLabel);
   const sourceName = driveQuote(ask && ask.sourceName);
   const kind = ask && (ask.sourceKind === 'sheet' || ask.sourceKind === 'doc') ? ask.sourceKind : null;
@@ -3543,6 +3587,18 @@ async function factSources(ask) {
 
 async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.gmailDraftApiAllowed(scopes)) {
+    return {
+      ok: false,
+      reason: 'compose-closed',
+      preview: true,
+      closes: false,
+      sent: false,
+      error: 'Open Reply first. Glance does not press Send.'
+    };
+  }
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
 
   const params = p.params || {};
@@ -3848,6 +3904,7 @@ async function deleteDriveFile(fileId) {
 
 async function gmailDraftUndo(ref) {
   if (!ref || !ref.draftId) return { ok: false };
+  if (!(await gmailComposeApiAllowedNow())) return { ok: false, reason: 'compose-closed' };
   const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
     method: 'DELETE'
   });
@@ -7311,6 +7368,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:outside-drive') {
     return reply(sendResponse, (async () => {
       if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, files: [] };
       const since = Number(msg.sinceMs);
       const terms = (Array.isArray(msg.terms) ? msg.terms : []).map((t) => String(t).replace(/['\\]/g, '')).filter((t) => t.length >= 2).slice(0, 8);
       if (!(since > 0) || !terms.length) return { ok: false, reason: 'bad-request' };

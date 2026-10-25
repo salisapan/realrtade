@@ -878,10 +878,9 @@ async function boot() {
           'https://www.googleapis.com/auth/calendar.events',
           'https://www.googleapis.com/auth/contacts.readonly',
           'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/gmail.compose',
           'https://www.googleapis.com/auth/tasks',
           'https://www.googleapis.com/auth/userinfo.profile',
+          'https://www.googleapis.com/auth/userinfo.email',
           'openid'
         ].slice().sort().join('\n'),
         status: 'granted',

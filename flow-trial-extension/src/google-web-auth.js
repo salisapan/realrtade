@@ -28,14 +28,13 @@ const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השא�
 // Used only when manifest oauth2.scopes is missing. Keep this list identical
 // to manifest.json so a fallback grant covers the same APIs as getAuthToken.
 export const GOOGLE_OAUTH_SCOPES = [
-  'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/contacts.readonly',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.file',
   'openid',
-  'https://www.googleapis.com/auth/userinfo.profile'
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email'
 ];
 
 const WEB_TOKEN_SKEW_MS = 60 * 1000;

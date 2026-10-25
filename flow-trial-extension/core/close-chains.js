@@ -468,6 +468,8 @@ const FlowCloseChains = (() => {
     if (!searched) return 'file-chain-not-run';
     if (searched.ok === true) return null;
     const reason = String(searched.reason || '');
+    // Mailbox-wide Drive search is off the grant: treat like the chain never ran — no why line.
+    if (reason === 'drive-search-unavailable') return null;
     if (reason === 'drive-not-granted' || reason === 'not-connected') return 'drive-not-granted';
     return 'drive-search-failed';
   }

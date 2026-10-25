@@ -61,7 +61,14 @@ const FlowGoogleContacts = (() => {
       const pack = D.chrome(lang === 'he' ? 'he' : 'en');
       if (pack && pack.googleContactNotFound) return pack.googleContactNotFound;
     }
-    return lang === 'he' ? 'לא נמצא איש קשר כזה ב-Google Contacts.' : 'No contact matched that name in Google Contacts.';
+    return lang === 'he' ? 'לא נמצא איש קשר בשם הזה באנשי הקשר.' : 'No contact matched that name in Google Contacts.';
+  }
+
+  function contactLogHash(value) {
+    let h = 5381;
+    const s = String(value || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return 'gc_' + h.toString(16);
   }
 
   function chooseLine(name, lang) {
@@ -280,7 +287,8 @@ const FlowGoogleContacts = (() => {
     composeInputFromOffer: composeInputFromOffer,
     write: write,
     undo: undo,
-    titleFor: titleFor
+    titleFor: titleFor,
+    contactLogHash: contactLogHash
   };
 })();
 

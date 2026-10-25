@@ -761,7 +761,7 @@ const FlowDisplay = (() => {
       plannerTodoFallbackDenied: 'לא ניתנה גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
       googleContactAnswerTitle: 'לענות עם הכתובת של {name}',
       googleContactForwardTitle: 'להעביר ל{name}',
-      googleContactNotFound: 'לא נמצא איש קשר כזה ב-Google Contacts.',
+      googleContactNotFound: 'לא נמצא איש קשר בשם הזה באנשי הקשר.',
       googleContactChoose: 'איזו {name} התכוונת?',
       googleContactCopy: 'העתק',
       skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',

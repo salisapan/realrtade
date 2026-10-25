@@ -181,14 +181,13 @@
   "oauth2": {
     "client_id": "93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/contacts.readonly",
-      "https://www.googleapis.com/auth/gmail.compose",
-      "https://www.googleapis.com/auth/drive.readonly",
       "https://www.googleapis.com/auth/drive.file",
       "openid",
-      "https://www.googleapis.com/auth/userinfo.profile"
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email"
     ]
   },
   "web_accessible_resources": [
