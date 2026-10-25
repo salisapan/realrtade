@@ -32,7 +32,9 @@ const FlowLocalFile = (() => {
     if (globalValue) return globalValue;
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
-  const attach = sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
+  function fileAttach() {
+    return sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
+  }
   const proofs = sibling(typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null, './proof-of-close.js', 'FlowProofOfClose');
   const onedrive = sibling(typeof FlowOnedriveFile !== 'undefined' ? FlowOnedriveFile : null, './onedrive-file.js', 'FlowOnedriveFile');
 
@@ -104,6 +106,7 @@ const FlowLocalFile = (() => {
   function plan(input) {
     input = input || {};
     if (!enabled(input.flags)) return { action: 'off', reason: 'switch-off' };
+    const attach = fileAttach();
     if (!attach) return silence('no-gate');
     const text = String(input.text || '');
     const g = attach.gate(text);
@@ -114,7 +117,7 @@ const FlowLocalFile = (() => {
     const files = asCandidates(input.listing);
     if (!files) return silence('no-folder');
     if (!files.length) return silence('none');
-    const picked = attach.decide(ask, files, {}, text);
+    const picked = fileAttach().decide(ask, files, {}, text);
     if (picked.action !== 'attach') return silence(picked.reason === 'conflict' ? 'conflict' : 'none');
     const file = files.find((f) => f.id === picked.file.id);
     if (!file) return silence('none');

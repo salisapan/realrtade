@@ -36,7 +36,9 @@ const FlowOnedriveFind = (() => {
     if (globalValue) return globalValue;
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
-  const attach = sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
+  function fileAttach() {
+    return sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
+  }
   const proofs = sibling(typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null, './proof-of-close.js', 'FlowProofOfClose');
 
   const SWITCH = 'ONEDRIVE_FIND';
@@ -134,6 +136,7 @@ const FlowOnedriveFind = (() => {
     input = input || {};
     if (!enabled(input.flags)) return { action: 'off', reason: 'switch-off' };
     if (input.surface !== 'outlook') return silence('not-outlook');
+    const attach = fileAttach();
     if (!attach) return silence('no-gate');
     const g = attach.gate(String(input.text || ''));
     if (g.kind !== 'clear') return silence(g.reason || 'no-ask');
@@ -151,7 +154,7 @@ const FlowOnedriveFind = (() => {
     const files = asCandidates(input.searchResults);
     if (!files) return silence('not-searched');
     if (!files.length) return silence('none');
-    const picked = attach.decide(r.ask, files, {}, String(input.text || ''));
+    const picked = fileAttach().decide(r.ask, files, {}, String(input.text || ''));
     if (picked.action !== 'attach') return silence(picked.reason === 'conflict' ? 'conflict' : 'none');
     const file = files.find((f) => f.id === picked.file.id);
     if (!file) return silence('none');
