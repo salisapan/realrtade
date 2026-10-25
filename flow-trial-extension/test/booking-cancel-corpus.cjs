@@ -46,5 +46,10 @@ const NOT = [
 ];
 for (const t of NOT) check('not a cancellation: ' + t.slice(0, 55), A.cancelled(t, NOW).kind === 'none', A.cancelled(t, NOW));
 check('a trip cancellation reads too', T.cancelled('Your flight on Sunday at 10:00 was cancelled', NOW).kind === 'cancelled', T.cancelled('Your flight on Sunday at 10:00 was cancelled', NOW));
+// A Gmail hold row (connector 'calendar', keyed by holdAt and holdSender) is found the same way; the Gmail card writes its own undone row.
+const gmailRow = { kind: 'written', messageId: 'g1', holdSender: 'Studio@Nofar.example', holdAt: '2026-10-25 10:00', ref: { eventId: 'ge1' }, connectorId: 'calendar' };
+const gg = A.cancelled('Hi, unfortunately your appointment on Sunday at 10:00 was cancelled.', NOW);
+check('gmail hold row found by holdAt and sender', !!H.find([gmailRow], SENDER, H.holdAt(gg), []));
+check('gmail hold row once removed is not offered again', H.find([{ kind: 'undone', messageId: 'g1' }, gmailRow], SENDER, H.holdAt(gg), []) === null);
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

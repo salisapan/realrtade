@@ -694,3 +694,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/booking-cancel-corpus.cjs` (new), `e2e/outlook-booking-cancel.spec.js` (4 real-browser specs: removed and read back; edited event stays; other clock or sender quiet; switch off), booking-notice and chat-hold specs unchanged and green, every `test/*corpus.cjs` green.
 - **Open:** live Gate on Outlook web; the same removal for Gmail mail (googleHold undo from the Gmail card); a hold the person undid by hand is not touched; no cross-chat matching.
+
+## Run 84 (builder B, 2026-10-25): Gmail, a cancelled booking comes off the calendar
+
+- **Capability shipped:** the Gmail twin of run 83. A cancellation mail from the sender whose confirmation Glance already put on Google Calendar shows a Remove It card (existing canonical Do It card). Do It removes that same event through the hold's lane undo; Handled is shown only when the lane confirms; an event the person changed is left alone and the card says so; no hold at that day and clock, or from another sender: no card. `BOOKING_NOTICE` (off). Nothing is sent, no new scope.
+- **Code:** `cancelledHoldIntent` and `removeHeldHold` in `src/content-gmail.js`; the cancellation mail itself is logged closed with `fetchedBack`, so the card does not come back on rescan (found by the real-browser spec: without that row the card reappeared).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `e2e/gmail-booking-cancel.spec.js` (4 real-browser specs against the local Google lane server), `test/booking-cancel-corpus.cjs` extended (Gmail row shape), booking-notice specs on both surfaces green, every `test/*corpus.cjs` green.
+- **Open:** live Gate on both surfaces; Planner tasks not closed by the payment close; no cross-chat matching.
