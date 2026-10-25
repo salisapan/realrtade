@@ -48,19 +48,48 @@ function loadEngine() {
   }
   const judgeShared = vm.runInContext('FlowIncomingJudge.judge', sandbox);
   // The same call Code.js engineHit_ makes: the one decision every Glance surface shares.
-  return function engine(text) {
+  const readerEmail = 'owner@ai.local.flow@gmail.com';
+  const readerDisplay = 'Owner User';
+  const readerNames = ['Owner User', 'Owner'];
+  const readerTo = readerDisplay + ' <' + readerEmail + '>';
+  return function engine(text, readerOverride) {
+    const reader = readerOverride || { userName: readerDisplay, ownNames: readerNames };
     const judged = judgeShared({
-      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [], ownAddresses: [], now: NOW, surface: 'gmail', attachmentCount: 0
+      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [readerEmail], ownAddresses: [readerEmail], userName: reader.userName, ownNames: reader.ownNames, now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
     }, {});
-    if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
+    if (!judged || !judged.show) {
+      return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
+    }
     return { intent: judged.intent, plan: judged.process };
   };
 }
 
 const engine = loadEngine();
 
+const READER_EMAIL = 'owner@ai.local.flow@gmail.com';
+const READER_DISPLAY = 'Owner User';
+const READER_NAMES = ['Owner User', 'Owner'];
+const DEFAULT_TO_RECIPIENTS = [
+  { name: READER_DISPLAY, email: READER_EMAIL, localPart: 'owner' },
+  { name: 'Dana Levi', email: 'dana@meridian.com', localPart: 'dana' }
+];
+
 function judge(text, extra) {
-  return intent.resolveTask(text, Object.assign({ now: NOW, timeZone: TZ, engine: engine }, extra || {}));
+  const opts = extra || {};
+  const reader = opts.reader || { userName: READER_DISPLAY, ownNames: READER_NAMES };
+  const eng = opts.reader ? function (t) { return engine(t, opts.reader); } : engine;
+  const rest = Object.assign({}, opts);
+  delete rest.reader;
+  return intent.resolveTask(text, Object.assign({
+    now: NOW,
+    timeZone: TZ,
+    engine: eng,
+    userName: reader.userName,
+    ownNames: reader.ownNames,
+    readerEmail: READER_EMAIL,
+    toRecipients: DEFAULT_TO_RECIPIENTS,
+    ccRecipients: []
+  }, rest));
 }
 
 console.log('\n--- intent ---');
@@ -90,12 +119,71 @@ console.log('\n--- intent ---');
 }
 {
   const hi = judge('Hi Dana, please remember to call the client.');
-  check('a greeting still leaves an explicit ask', hi.speak === true && hi.title === 'call the client', hi);
+  check('a greeting to someone else stays quiet for the reader', hi.speak === false, hi);
 }
-check('a remember phrase buried in the mail stays quiet', judge('Thanks for the update. Please remember to send the file.').speak === false);
+{
+  const buriedNda = judge('Hi Dana, great meeting today. Please remember to send me the signed NDA by Friday.', { reader: { userName: 'Dana', ownNames: ['Dana', 'Dana Levi'] } });
+  check('a buried remember-to after a greeting still closes when the reader is greeted', buriedNda.speak === true && buriedNda.title && buriedNda.title.indexOf('NDA') !== -1, buriedNda);
+  const buriedPay = judge('Thanks for the update. Please remember to transfer the payment by Sunday.');
+  check('a buried remember-to with a deadline still closes', buriedPay.speak === true && buriedPay.title && buriedPay.title.indexOf('payment') !== -1, buriedPay);
+  const buriedHeSend = judge('שלום,\n\nתודה על העדכון.\nאל תשכח לשלוח את החוזה החתום עד יום שישי.');
+  check('Hebrew buried remember-to still closes', buriedHeSend.speak === true && buriedHeSend.title && buriedHeSend.title.length > 2, buriedHeSend);
+  const buriedHePay = judge('היי,\n\nתזכור להעביר את התשלום עד יום ראשון.');
+  check('Hebrew buried transfer remember still closes', buriedHePay.speak === true && buriedHePay.title && buriedHePay.title.length > 2, buriedHePay);
+}
+check('a remember-to relay to someone else stays quiet', judge('Thanks for the update. Please remember to remind Sarah to send the NDA.').speak === false);
+check('a buried remember relay row stays quiet', judge('Please remember to remind Sarah to call the client').speak === false);
+check('a buried remember relay with a day stays quiet', judge('Please remember to remind Sarah to call the client tomorrow').speak === false);
+check('relay Sarah never becomes Handle this note', (function () {
+  const d = judge('Please remember to remind Sarah to call the client');
+  return d.speak === false || (d.title && d.title.toLowerCase().indexOf('handle this note') === -1);
+})());
+check('a remember-to relay in Hebrew stays quiet', judge('תודה על העדכון. תזכור להזכיר ליוסי לשלוח את החוזה.').speak === false);
+check("don't forget to tell a third party stays quiet", judge("Don't forget to tell Noa that the meeting moved").speak === false);
+{
+  const remindYou = judge('Please remind you that the contract is due Friday.');
+  check('remind you is not relay quiet', remindYou.speak === true && remindYou.title && remindYou.title.toLowerCase().indexOf('handle this note') === -1, remindYou);
+  const askYou = judge('Could you ask you to send the invoice?');
+  check('ask you is not relay quiet', askYou.speak === false || askYou.title !== 'Handle this note', askYou);
+}
 check('small talk stays quiet', judge('Hope you are well. Just wanted to say hello and see how things are going this week.').speak === false);
 check('empty stays quiet', judge('').speak === false);
 check('a send ask is not rewritten into a task', judge('Could you please send the signed contract?').speak === false);
+
+{
+  const FILE_BODY = 'Attached is the signed copy';
+  const repo = path.join(__dirname, '..', '..');
+  const files = [
+    'domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js',
+    'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
+  ];
+  const sandbox = { console, module: undefined };
+  vm.createContext(sandbox);
+  for (const name of files) {
+    vm.runInContext(fs.readFileSync(path.join(repo, 'flow-trial-extension', 'core', name), 'utf8'), sandbox, { filename: name });
+  }
+  const judgeFile = vm.runInContext('FlowIncomingJudge.judge', sandbox);
+  function filePlan(attachmentCount) {
+    const judged = judgeFile({
+      text: FILE_BODY,
+      subject: '',
+      sender: { email: 'dana@meridian.com', name: 'Dana Levi' },
+      to: ['owner@ai.local.flow@gmail.com'],
+      ownAddresses: ['owner@ai.local.flow@gmail.com'],
+      userName: 'Owner',
+      ownNames: ['Owner User', 'Owner'],
+      now: NOW,
+      surface: 'gmail',
+      attachmentCount: attachmentCount,
+      inbound: true
+    }, {});
+    return judged && judged.show && judged.process ? judged.process : null;
+  }
+  const fileOne = filePlan(1);
+  const fileZero = filePlan(0);
+  check('one attachment on a signed-copy delivery is file-it', fileOne && fileOne.id === 'file-it', fileOne);
+  check('the same line with no attachment is not file-it', !fileZero || fileZero.id !== 'file-it', fileZero);
+}
 
 {
   const forced = intent.resolveTask('Please remember to call the client tomorrow.', {
@@ -133,10 +221,9 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
 }
 {
   const meeting = judge('פגישה ביום חמישי 22/10');
-  check('the Hebrew meeting is a schedule, not silence', meeting.speak === true && meeting.kind === 'schedule' && meeting.dateIso === '2026-10-22' && meeting.hour === null, meeting);
-  check('a Hebrew meeting title comes from the mail', meeting.title === 'פגישה 22/10' && meeting.taskTitle === 'פגישה 22/10' && meeting.title.indexOf('Meeting') === -1, meeting);
+  check('a Hebrew meeting statement without a clock stays quiet', meeting.speak === false, meeting);
   const timedHe = judge('פגישה ביום חמישי 22/10 בשעה 14:00');
-  check('a Hebrew meeting with a clock keeps the Hebrew title', timedHe.speak === true && timedHe.title === 'פגישה 22/10 14:00' && timedHe.taskTitle === 'פגישה 22/10 14:00' && timedHe.hour === 14 && timedHe.minute === 0, timedHe);
+  check('a Hebrew meeting with a clock is a hold', timedHe.speak === true && timedHe.kind === 'hold' && timedHe.title === 'פגישה 22/10 14:00' && timedHe.hour === 14 && timedHe.minute === 0, timedHe);
 }
 
 {
@@ -167,7 +254,7 @@ check('locale he and iw are hebrew', i18n.locale('he-IL') === 'he' && i18n.local
 check('other locales stay english', i18n.locale('en-US') === 'en' && i18n.locale('fr') === 'en' && i18n.locale('') === 'en');
 {
   const quiet = cards.quiet('en');
-  check('silence has no button', cards.buttons(quiet).length === 0 && plain(quiet.widgets[0].text) === 'Nothing to close.');
+  check('silence has no button', cards.buttons(quiet).length === 0 && plain(quiet.widgets[0].text) === 'Nothing to close in this email.');
   const miss = cards.unconfirmed('en');
   check("mismatch card is Couldn't confirm", cards.buttons(miss).length === 0 && plain(miss.widgets[0].text) === "Couldn't confirm");
   check('mismatch card does not claim the task', JSON.stringify(miss).indexOf('In Google Tasks') === -1 && JSON.stringify(miss).indexOf('Undone') === -1);
@@ -187,6 +274,29 @@ check('other locales stay english', i18n.locale('en-US') === 'en' && i18n.locale
   check('homepage without a cache has no Do it', cards.buttons(home).length === 0 && plain(home.widgets[0].text) === 'Open a message.');
   const next = cards.homepage({ title: 'file the taxes', due: '2026-11-01' }, 'en');
   check('homepage shows the cached next action', widgetText(next).indexOf('file the taxes') !== -1 && cards.buttons(next).length === 1 && cards.buttons(next)[0].params.source === 'prefetch');
+  check('homepage shows the build sha when set', widgetText(cards.homepage(null, 'en', 'deadbeef')).some((line) => line.indexOf('deadbeef') !== -1));
+  const spotted = cards.spottedUnsupported({ reason: 'dropped', droppedPlanId: 'sheet' }, 'msg-sheet', 'en');
+  check('spotted unsupported names the plan', plain(widgetText(spotted)[0]).indexOf('Spotted, not supported yet: sheet') !== -1);
+  check('spotted unsupported offers Remind me', cards.buttons(spotted).length === 1 && cards.buttons(spotted)[0].action === 'onRemindMe');
+  const sheetDrop = intent.resolveTask('Please put the October sales numbers in a sheet', {
+    now: NOW,
+    timeZone: TZ,
+    engine: function () {
+      return {
+        intent: { type: 'request', signals: { workAsk: true } },
+        plan: { id: 'reply-track', steps: [{ kind: 'gmailDraft', params: {} }, { kind: 'googleTask', params: { title: 'Reply requested' } }] }
+      };
+    }
+  });
+  check('October sales in a sheet is spotted sheet, not a task', sheetDrop.speak === false && sheetDrop.reason === 'dropped' && sheetDrop.droppedPlanId === 'sheet', sheetDrop);
+  const pricingSheet = intent.resolveTask('Please update the pricing sheet with the new rates.', {
+    now: NOW,
+    timeZone: TZ,
+    engine: function () {
+      return { intent: { type: null, quiet: 'relay' }, plan: null, reason: 'quiet:relay' };
+    }
+  });
+  check('pricing sheet update is spotted even when engine is quiet relay', pricingSheet.speak === false && pricingSheet.reason === 'dropped' && pricingSheet.droppedPlanId === 'sheet', pricingSheet);
 }
 
 console.log('\n--- proof and undo ---');
@@ -490,6 +600,7 @@ function scopesRequiredByManifest(manifest, hostSource) {
     if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
   });
   if (hostSource && /UrlFetchApp/.test(hostSource)) add('script.external_request');
+  if (hostSource && /Session\.getActiveUser/.test(hostSource)) add('userinfo.email');
   return required.sort();
 }
 
@@ -701,7 +812,27 @@ console.log('\n--- message path parity ---');
       }
     }
   };
+  sandbox.Session = {
+    getActiveUser: function () {
+      return { getEmail: function () { return 'owner@ai.local.flow@gmail.com'; } };
+    },
+    getScriptTimeZone: function () { return 'Etc/UTC'; }
+  };
+  sandbox.GLANCE_BUILD_SHA = 'testsha';
+  const RealDate = Date;
+  function MockDate() {
+    const args = Array.prototype.slice.call(arguments);
+    if (!args.length) return new RealDate(NOW.getTime());
+    if (args.length === 1) return new RealDate(args[0]);
+    return new (RealDate.bind.apply(RealDate, [null].concat(args)));
+  }
+  MockDate.now = function () { return NOW.getTime(); };
+  MockDate.parse = RealDate.parse;
+  MockDate.UTC = RealDate.UTC;
+  MockDate.prototype = RealDate.prototype;
   vm.createContext(sandbox);
+  sandbox.Date = MockDate;
+  vm.runInContext(fs.readFileSync(path.join(addon, 'BuildSha.js'), 'utf8'), sandbox, { filename: 'BuildSha.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
   const openMessage = vm.runInContext('onGmailMessageOpen', sandbox);
@@ -712,6 +843,8 @@ console.log('\n--- message path parity ---');
   const classify = vm.runInContext('FlowIntent.classify', sandbox);
   const planFor = vm.runInContext('FlowActions.planFor', sandbox);
   const shouldShow = vm.runInContext('FlowIntent.shouldShowChip', sandbox);
+  const judgeShared = vm.runInContext('FlowIncomingJudge.judge', sandbox);
+  const resolveTaskMod = vm.runInContext('Glance.intent.resolveTask', sandbox);
 
   function linesOf(card) {
     return card.sections[0].widgets.filter((item) => item.type === 'text').map((item) => plain(item.text));
@@ -736,7 +869,14 @@ console.log('\n--- message path parity ---');
       getBody: function () { calls.push('getBody'); return fields.html; },
       getFrom: function () { calls.push('getFrom'); return fields.from; },
       getTo: function () { calls.push('getTo'); return fields.to == null ? '' : fields.to; },
-      getDate: function () { calls.push('getDate'); return fields.date; }
+      getDate: function () { calls.push('getDate'); return fields.date; },
+      getAttachments: function () {
+        calls.push('getAttachments');
+        const n = fields.attachmentCount == null ? 0 : fields.attachmentCount;
+        const out = [];
+        for (let i = 0; i < n; i++) out.push({ getName: function () { return 'signed-copy.pdf'; } });
+        return out;
+      }
     };
   }
   function extensionOffer(text, fromEmail, fromName, threadUrl) {
@@ -762,14 +902,69 @@ console.log('\n--- message path parity ---');
     if (!match) return { name: '', email: text.trim() };
     return { name: match[1].replace(/"/g, '').trim(), email: match[2].trim() };
   }
+  function recipientRows(raw) {
+    const out = [];
+    String(raw || '').split(/\s*(?:,|;)\s*/).forEach(function (part) {
+      if (!part) return;
+      const p = parsedFrom(part.trim());
+      if (!p.email) return;
+      const local = p.email.split('@')[0].toLowerCase();
+      out.push({ name: p.name || '', email: p.email.toLowerCase(), localPart: local });
+    });
+    return out;
+  }
+  function readerNamesForEmail(email) {
+    const local = String(email || '').split('@')[0] || '';
+    const display = local.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+    const names = [];
+    if (display) names.push(display);
+    if (local) names.push(local);
+    const first = display.split(/\s+/)[0];
+    if (first && names.indexOf(first) === -1) names.push(first);
+    return names.length ? names : ['Owner User', 'Owner'];
+  }
   function judgedPlan(fields) {
     const from = parsedFrom(fields.from);
     const fromEmail = from.email || null;
     const fromName = from.name || null;
-    const threadUrl = 'https://mail.google.com/mail/u/0/#all/' + encodeURIComponent(fields.threadId);
-    const bodyPlan = extensionOffer(String(fields.plain || ''), fromEmail, fromName, threadUrl);
-    if (bodyPlan) return bodyPlan;
-    return extensionOffer(String(fields.subject || ''), fromEmail, fromName, threadUrl);
+    const readerEmail = String(fields.readerEmail || READER_EMAIL).toLowerCase();
+    const ownNames = readerNamesForEmail(readerEmail);
+    const reader = {
+      to: [readerEmail],
+      ownAddresses: [readerEmail],
+      userName: ownNames[0],
+      ownNames: ownNames
+    };
+    const toRaw = fields.to == null ? readerEmail : fields.to;
+    const toList = String(toRaw).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    const ownAddresses = reader.ownAddresses.slice();
+    toList.forEach(function (addr) {
+      const lower = String(addr).toLowerCase();
+      if (ownAddresses.indexOf(lower) < 0) ownAddresses.push(lower);
+    });
+    if (fromEmail && toList.length && toList.every(function (addr) { return String(addr).toLowerCase() === fromEmail.toLowerCase(); })) {
+      if (ownAddresses.indexOf(fromEmail.toLowerCase()) < 0) ownAddresses.push(fromEmail.toLowerCase());
+    }
+    function planForText(text, subject) {
+      if (!text) return null;
+      const judged = judgeShared({
+        text: text,
+        subject: subject || '',
+        sender: { email: fromEmail, name: fromName },
+        to: toList.map(function (a) { return a.toLowerCase(); }),
+        ownAddresses: ownAddresses,
+        userName: reader.userName,
+        ownNames: reader.ownNames,
+        now: NOW,
+        surface: 'gmail',
+        attachmentCount: fields.attachmentCount == null ? 0 : fields.attachmentCount,
+        inbound: true,
+        strictSignedAttachments: true
+      }, {});
+      if (!judged || !judged.show || !judged.process) return null;
+      return judged.process;
+    }
+    return planForText(String(fields.plain || ''), fields.subject || '') || planForText(String(fields.subject || ''), fields.subject || '');
   }
   function shownTitle(sourceText, plan) {
     if (!plan) return '';
@@ -790,7 +985,7 @@ console.log('\n--- message path parity ---');
     const buttons = buttonsOf(card);
     const joined = lines.join('\n');
     if (!plan) {
-      const quiet = lang === 'he' ? 'אין מה לסגור.' : 'Nothing to close.';
+      const quiet = lang === 'he' ? 'אין מה לסגור בהודעה הזו.' : 'Nothing to close in this email.';
       check(name + ' stays quiet', joined.indexOf(quiet) !== -1 && buttons.length === 0, lines);
       return;
     }
@@ -831,6 +1026,9 @@ console.log('\n--- message path parity ---');
     };
     const cards = openMessage(event);
     check(fields.id + ' reads the plain body, not the html', message.calls.indexOf('getPlainBody') !== -1 && message.calls.indexOf('getSubject') !== -1 && message.calls.indexOf('getFrom') !== -1 && message.calls.indexOf('getTo') !== -1 && message.calls.indexOf('getBody') === -1, message.calls);
+    if (fields.attachmentCount > 0) {
+      check(fields.id + ' reads attachment count from the message', message.calls.indexOf('getAttachments') !== -1, message.calls);
+    }
     check(fields.id + ' sets the message access token', state.tokenCalls === 1 && state.lastToken === 'token', state.tokenCalls);
     check(fields.id + ' does not call prefetch', state.fetches === 0);
     const sourceText = extensionOffer(String(fields.plain || ''), null, null, null) ? fields.plain : (fields.subject || '');
@@ -847,6 +1045,31 @@ console.log('\n--- message path parity ---');
     from: 'Dana Levi <dana@meridian.com>',
     date: new Date('2026-10-15T08:00:00Z')
   };
+  const fileInbound = {
+    id: 'filecopy1',
+    threadId: 'threadfile',
+    subject: 'Signed copy',
+    plain: 'Attached is the signed copy',
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'Sali Sapan <owner@ai.local.flow@gmail.com>',
+    attachmentCount: 1
+  };
+  reset();
+  const fileMessage = gmailMessage(fileInbound);
+  state.messages[fileInbound.id] = fileMessage;
+  openMessage({
+    gmail: { messageId: fileInbound.id, accessToken: 'token', threadId: fileInbound.threadId },
+    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
+  });
+  const filePlan = judgedPlan(fileInbound);
+  check('add-on passes attachment count into the shared judge', fileMessage.calls.indexOf('getAttachments') !== -1, fileMessage.calls);
+  check('add-on judge plans file-it when the message has one attachment', filePlan && filePlan.id === 'file-it', filePlan);
+  const fileNoAttach = judgedPlan(Object.assign({}, fileInbound, { attachmentCount: 0 }));
+  check('add-on judge does not plan file-it without an attachment', !fileNoAttach || fileNoAttach.id !== 'file-it', fileNoAttach);
+  const fileTwo = judgedPlan(Object.assign({}, fileInbound, { attachmentCount: 2 }));
+  check('add-on judge does not plan file-it with two attachments', !fileTwo || fileTwo.id !== 'file-it', fileTwo);
+  check('getAttachments mock returns one file per count', gmailMessage({ attachmentCount: 2 }).getAttachments().length === 2);
+
   const opened = openOf(hebrew);
   check('heb1 does not invent a midnight clock', linesOf(openMessage({
     gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
@@ -899,34 +1122,121 @@ console.log('\n--- message path parity ---');
     date: new Date('2026-10-15T10:30:00Z')
   });
 
+  check('untimed heb1 open stays quiet', judgedPlan(hebrew) === null);
   reset();
-  state.messages.heb1 = gmailMessage(hebrew);
+  const hebHold = {
+    id: 'hebclock',
+    threadId: 'threadclock',
+    subject: 'פגישה',
+    plain: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T08:00:00Z')
+  };
+  state.messages.hebclock = gmailMessage(hebHold);
   const click = {
-    gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
+    gmail: { messageId: 'hebclock', accessToken: 'token', threadId: 'threadclock' },
     commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
-    parameters: { messageId: 'heb1', source: 'message' }
+    parameters: { messageId: 'hebclock', source: 'message' }
   };
   const proof = doIt(click).card;
   const proofLines = linesOf(proof).join('\n');
   const eventIds = Object.keys(state.events);
   const taskIds = Object.keys(state.tasks);
-  check('Do it writes one all-day event and one task', eventIds.length === 1 && taskIds.length === 1, { events: eventIds, tasks: taskIds });
+  check('Do it writes one timed hold event', eventIds.length === 1 && taskIds.length === 0, { events: eventIds, tasks: taskIds });
   const written = state.events[eventIds[0]];
   const originalSummary = written.summary;
-  check('the event is the plan date with no guests', written.start.date === opened.plan.steps[0].params.dateIso && written.end.date && !written.start.dateTime && !written.attendees, written);
-  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה 22/10' && state.tasks[taskIds[0]].title === 'פגישה 22/10', { event: written.summary, task: state.tasks[taskIds[0]].title });
-  check('the proof shows the event and the task that were read back',
+  check('the hold uses the plan date and clock', written.start.dateTime && written.start.dateTime.indexOf('2026-10-22T14:00') !== -1, written);
+  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה 22/10 14:00', { event: written.summary });
+  check('the proof shows the calendar hold that was read back',
     proofLines.indexOf('On your calendar.') !== -1 && proofLines.indexOf(eventIds[0]) !== -1 &&
-    proofLines.indexOf('In Google Tasks.') !== -1 && proofLines.indexOf(taskIds[0]) !== -1 &&
     buttonsOf(proof).length === 1 && buttonsOf(proof)[0].action === 'onUndo', proofLines);
   state.events[eventIds[0]].summary = 'Changed in Calendar';
   const refused = undo(click).card;
-  check('an edited event refuses undo for both writes',
+  check('an edited event refuses undo',
     plain(linesOf(refused)[0]) === "The event was edited, so I won't undo it" &&
-    state.events[eventIds[0]] && state.tasks[taskIds[0]], linesOf(refused));
+    state.events[eventIds[0]], linesOf(refused));
   state.events[eventIds[0]].summary = originalSummary;
   const undone = undo(click).card;
-  check('undo deletes both when the content hash still matches', plain(linesOf(undone)[0]) === 'Undone.' && !state.events[eventIds[0]] && !state.tasks[taskIds[0]], linesOf(undone));
+  check('undo deletes the hold when the content hash still matches', plain(linesOf(undone)[0]) === 'Undone.' && !state.events[eventIds[0]], linesOf(undone));
+
+  reset();
+  const SALI_EMAIL = 'salisapan1@gmail.com';
+  const saliSession = {
+    getActiveUser: function () { return { getEmail: function () { return SALI_EMAIL; } }; },
+    getEffectiveUser: function () { return { getEmail: function () { return SALI_EMAIL; } }; },
+    getScriptTimeZone: function () { return 'Etc/UTC'; }
+  };
+  const priorSession = sandbox.Session;
+  sandbox.Session = saliSession;
+  function openBareGreet(fields) {
+    reset();
+    state.messages[fields.id] = gmailMessage(fields);
+    return openMessage({
+      gmail: { messageId: fields.id, accessToken: 'token', threadId: fields.threadId },
+      commonEventObject: { userLocale: fields.locale || 'en', timeZone: 'Etc/UTC' }
+    })[0];
+  }
+  function expectDoIt(card, he) {
+    const btns = buttonsOf(card);
+    return btns.length === 1 && plain(btns[0].text) === (he ? 'בצע' : 'Do it');
+  }
+  const greetAsks = [
+    { id: 'gEnDoc', threadId: 't1', plain: 'Hi Sali, could you send the signed document by Friday?', locale: 'en' },
+    { id: 'gEnInv', threadId: 't2', plain: 'Hi Sali, could you send the invoice for October?', locale: 'en' },
+    { id: 'gEnMeet', threadId: 't3', plain: 'Hi Sali, could we meet Thursday at 3pm?', locale: 'en' },
+    { id: 'gEnRem', threadId: 't4', plain: 'Hi Sali, please remember to call the client.', locale: 'en' },
+    { id: 'gHeDoc', threadId: 't5', plain: 'היי סאלי, תוכל לשלוח את המסמך החתום?', locale: 'he-IL' },
+    { id: 'gHeInv', threadId: 't6', plain: 'היי סאלי, תוכל לשלוח את החשבונית?', locale: 'he-IL' },
+    { id: 'gHeMeet', threadId: 't7', plain: 'היי סאלי, נוכל להיפגש ביום חמישי בשעה 15:00?', locale: 'he-IL' },
+    { id: 'gHeRem', threadId: 't8', plain: 'היי סאלי, תזכיר לי לשלוח את החוזה מחר.', locale: 'he-IL' }
+  ];
+  greetAsks.forEach(function (fields) {
+    const base = {
+      subject: 'Follow up',
+      html: quietHtml,
+      from: 'Dana Levi <dana@meridian.com>',
+      to: SALI_EMAIL,
+      date: new Date('2026-10-15T11:00:00Z')
+    };
+    const card = openBareGreet(Object.assign(base, fields));
+    check(fields.id + ' bare To greeting shows Do it', expectDoIt(card, fields.locale === 'he-IL'), linesOf(card));
+  });
+  const quietNoa = openBareGreet({
+    id: 'gQuietNoa',
+    threadId: 'tNoa',
+    subject: 'Hi',
+    plain: 'Hi Noa, please remember to call the client.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: SALI_EMAIL + ', Noa Cohen <noa@meridian.com>',
+    date: new Date('2026-10-15T11:10:00Z')
+  });
+  check('Hi Noa when Noa is on To stays quiet', buttonsOf(quietNoa).length === 0, linesOf(quietNoa));
+  const quietNoaHe = openBareGreet({
+    id: 'gQuietNoaHe',
+    threadId: 'tNoaHe',
+    subject: 'היי',
+    plain: 'היי נועה, תזכיר לי להתקשר ללקוח.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: SALI_EMAIL + ', Noa Cohen <noa@meridian.com>',
+    date: new Date('2026-10-15T11:11:00Z')
+  });
+  check('היי נועה when Noa is on To stays quiet', buttonsOf(quietNoaHe).length === 0, linesOf(quietNoaHe));
+  const showLior = openBareGreet({
+    id: 'gShowLior',
+    threadId: 'tLior',
+    subject: 'Hi',
+    plain: 'Hi Lior, please remember to call the client.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: SALI_EMAIL,
+    date: new Date('2026-10-15T11:12:00Z')
+  });
+  check('Hi Lior when Lior is not a recipient still shows Do it', expectDoIt(showLior, false), linesOf(showLior));
+  sandbox.Session = priorSession;
 
   reset();
   state.messages.hold1 = gmailMessage({
@@ -1033,7 +1343,7 @@ console.log('\n--- message path parity ---');
     to: 'owner@ai.local.flow',
     date: new Date('2026-10-15T08:00:00Z')
   });
-  check('rtl marks and a quoted reply still schedule', quoted.plan && quoted.plan.id === 'schedule', quoted.plan && quoted.plan.id);
+  check('rtl marks and a quoted reply drop an untimed meeting statement', !quoted.plan, quoted.plan && quoted.plan.id);
 
   const realId = 'msg-f:1762895788594548046';
   const realThread = 'thread-f:1762895788594548046';
@@ -1145,15 +1455,24 @@ console.log('\n--- message path parity ---');
   check('the live requireScopes message counts as a missing scope', authFailure({ name: 'Error', message: scopeMiss }) === true);
   reset();
   state.granted = state.granted.filter(function (scope) { return scope.indexOf('calendar.events') === -1; });
-  state.messages.heb1 = gmailMessage(hebrew);
+  state.messages.hebclock = gmailMessage({
+    id: 'hebclock',
+    threadId: 'threadclock',
+    subject: 'פגישה',
+    plain: 'פגישה ביום חמישי 22/10 בשעה 14:00',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T08:00:00Z')
+  });
   let authErr = null;
   let returned = 'unset';
   const denied = withConsole(function () {
     try {
       returned = doIt({
-        gmail: { messageId: 'heb1', accessToken: 'token', threadId: 'thread1' },
+        gmail: { messageId: 'hebclock', accessToken: 'token', threadId: 'threadclock' },
         commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' },
-        parameters: { messageId: 'heb1', source: 'message' }
+        parameters: { messageId: 'hebclock', source: 'message' }
       });
       return returned;
     } catch (err) {

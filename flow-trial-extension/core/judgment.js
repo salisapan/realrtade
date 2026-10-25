@@ -136,7 +136,7 @@ const FlowJudgment = (() => {
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
   const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)תזכור(?:י|ו)?\s+ל|(?:^|\s)אל\s+תשכח(?:י|ו)?\s+ל|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
   // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
   // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
   // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).

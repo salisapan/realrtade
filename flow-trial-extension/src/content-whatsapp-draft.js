@@ -58,14 +58,15 @@
     const last = list[list.length - 1];
     if (!last) return;
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
-    if (!parsed || parsed.fromMe) return;
+    if (!parsed || parsed.fromMe) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
+    if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
     const ids = list.map((n) => n.getAttribute('data-id'));
     const party = P.partyFromChat(title(main), ids);
-    FlowChatLane.draftInto(composerBox(main), {
+    const input = {
       text: text,
       fromMe: false,
       oneToOne: true,
@@ -73,8 +74,11 @@
       quoted: quoted(last),
       channel: 'whatsapp',
       now: Date.now(),
-      sender: { name: party.name, phone: party.phone }
-    }).then((r) => {
+      sender: { name: party.name, phone: party.phone },
+      key: key
+    };
+    FlowChatLane.draftInto(composerBox(main), input).then((r) => {
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }

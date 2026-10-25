@@ -401,7 +401,10 @@ const FlowDisplay = (() => {
         return { title: intent.label, sentence: p.closingLine || '', fileCard: false, logIt: true };
       }
       const titled = commitmentTitle({ text: extra && (extra.bodyText || extra.text), intent: intent });
-      const title = titled || ((intent && intent.label && !genericLabel(intent.label)) ? intent.label : '') || (intent && intent.label) || name || 'Log It';
+      let title = titled || ((intent && intent.label && !genericLabel(intent.label)) ? intent.label : '') || (intent && intent.label) || name || 'Log It';
+      if (!titled && title && /[\u0590-\u05FF]/.test(title)) {
+        title = title.replace(/^(?:היי|הי|שלום)\s*,\s*/, '').trim();
+      }
       return { title: title, sentence: p.closingLine || '', fileCard: false, logIt: true };
     }
     if (id === 'attach-invite' || (intent && intent.inviteFile)) {

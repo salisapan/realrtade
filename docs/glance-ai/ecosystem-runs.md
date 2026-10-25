@@ -199,3 +199,58 @@ No Google gap is both unblocked and of user value: every built Google module is 
 ## 2026-10-21 (Ecosystems builder B, fourteenth run) — idle
 
 - Nothing changed on the Microsoft and Meta side since the last run: SharePoint still waits on the owner's scope (row 79), PowerPoint on a way to verify a hand-built `.pptx`, Meta on the owner's setup. Nothing touched.
+
+## 2026-10-21 (Ecosystems builder A, sixteenth and seventeenth runs, 13:13 and 14:13) — idle by the run-discipline rule
+
+Nothing changed on the Google side since the fifteenth run: no new unwired module, no owner answer on row 79 (Forms scope), Keep has no public API. Nothing touched. The whole corpus sweep and the full e2e are still due once, on the last run of the day.
+
+## 2026-10-21 (Ecosystems builder B, fourteenth run) — chat task card
+
+- **Capability shipped (switch off):** the chat task card, per `docs/glance-ai/chat-task-card-spec.md`. With `glanceSwitches.CHAT_TASK_CARD` true, a task ask in a one-to-one WhatsApp, Messenger or Instagram chat shows the canonical Do It card; Do It writes one Google Task through the Gmail card's lane (or a Microsoft To Do task when only Microsoft is connected), reads it back by id, shows Handled only on `fetchedBack`, and Undo refuses a task the person changed. Nothing is sent, no key is pressed, no composer is written.
+- **Spec points:** (1) when: shipped (the judge's `show` with a task step after `draftInto` finds no fact or place answer; groups, the person's own message, a quoted message, and a chat the person already answered stay out); (2) the card: shipped, existing `.flow-chip-host`, `chip.css` and the step css added to every chat registration, no new design, no missing slot found; (3) the write: shipped (Google lane `googleLaneTask`, Outlook `outlookTask`, `threadUrl` is the chat address, the note names the chat); (4) never: shipped, a corpus check fails if the card file touches keys, clicks or the composer; (5) tests: shipped, `test/chat-task-card-corpus.cjs` and `e2e/chat-task-card.spec.js` on the real chat lane registration; (6) reports: this entry.
+- **Real findings from the browser run:** production chat lanes did not carry the judge, step kit or storage (now `laneChatScripts` loads the shared base plus the card); the Do It picture is not web-accessible on chat sites (button had zero width), so the worker sends the four pictures as `data:` URLs (`flow:asset-data`, allowlist of four files) without touching the manifest; Google must go through the lane (the older direct writer deletes an edited task on Undo).
+- **Open:** live Gate on the three chat sites; owner option to add the chat hosts to `web_accessible_resources` instead of the data-URL path (manifest, needs «מאשר»); builder A extends the card to the Gmail app card.
+
+## 2026-10-21 Ecosystems run A (15th): review only, no user-facing capability (failed run, said plainly)
+
+- Reviewed B's chat task card (`8dd75b6`) against `chat-task-card-spec.md`; the Gmail app card has no inbound-ask Do It of its own, and the add-on's `test/v1.test.cjs` has 5 failures that predate this package (same at `58ac720~1`): the shared judge is now deliberately quiet on a Hebrew meeting with a date but no clock and on a buried "please remember" phrase. Those fixtures are stale against a precision-first judge; loosening the judge to match them would trade precision for recall, so nothing was changed. Needs a decision: update the fixtures to the quiet behaviour, or add a contrast-pair corpus case if the owner wants the Hebrew date-only meeting to speak.
+- No code, no switch, no corpus touched.
+
+## 2026-10-21 Ecosystems builder B (fifteenth run): idle by the run-discipline rule
+
+- The chat task card shipped in the previous run; what is left on the Microsoft and Meta side needs the owner (SharePoint scope, Meta business verification, live Gates) or a Grok card. Nothing else touched.
+
+## 2026-10-21 Ecosystems run A (16th): system notices with a deadline (owner priority 3)
+
+- **Capability:** a mail from a known service (Netlify, Vercel, Supabase, GitHub, Google, Microsoft, Namecheap, GoDaddy and others) that says something will be paused, suspended or expire on a date unless you act, now offers one Do It: a task "Update your billing details (Netlify) by Oct 28" with the date (Google Tasks on Gmail, Microsoft To Do on Outlook), English and Hebrew. Unknown or lookalike senders, newsletters, promotions, webinars and notices missing a deadline or an action stay quiet. Behind `glanceSwitches.SYSTEM_NOTICE` (off). Nothing is paid, renewed or signed in by Glance.
+- **Code:** `core/system-notice.js`, `core/incoming-judge.js`, `src/content-gmail.js` (`classifyForChip`, `planOpenMail`), `src/content-outlook.js`, `manifest.json` (one core file added to the content-script list, no permission change), add-on bundle rebuilt.
+- **Tests:** `test/system-notice-corpus.cjs` (all pass); surface-parity, gmail-outlook-parity, identity-copy, chat-task-card, cc-only, deadline-meeting, intent-model green. Not mine and already red before: `gate-0950-proof` (1) and the add-on `v1.test.cjs` (5). docs-consistency red only until this commit's README row. No e2e in a real browser for this card yet.
+- **Open:** live Gate (owner); the phone card and chat do not pass the switch; a sender list from the person's own correspondents; Gmail page path covered by wiring checks only.
+
+## 2026-10-21 Ecosystems builder B (sixteenth run): idle by the run-discipline rule
+
+- No Microsoft or Meta gap is unblocked (SharePoint scope, Meta verification, live Gates and Grok cards are the owner's). Builder A shipped system notices; chat does not carry that switch and a service notice in a chat is not a real situation. Nothing touched.
+
+## 2026-10-21 Ecosystems run A (17th): idle. Every owner priority is built; the Google rows left are Forms (owner scope) and Keep (no API); nothing unblocked. No code touched.
+
+## 2026-10-21 Ecosystems builder B (seventeenth run): idle by the run-discipline rule (nothing unblocked, nothing touched)
+
+## 2026-10-21 Ecosystems builder B (eighteenth run): idle, nothing changed since the last run
+
+## 2026-10-21 Ecosystems run A (18th): idle. Nothing unblocked on the Google side (Forms needs the owner, Keep has no API); no code touched.
+
+## 2026-10-21 Ecosystems builder B (nineteenth run): idle, nothing changed since the last run
+
+## 2026-10-21 Ecosystems run A (19th): idle. Same state as the 18th; no code touched.
+
+## 2026-10-21 Ecosystems builder B (twentieth run): idle, nothing changed since the last run
+
+## 2026-10-21 Ecosystems run A (20th): idle. Same state as the 18th; no code touched.
+
+## 2026-10-21 Ecosystems builder B (twenty-first run): idle, nothing changed since the last run
+
+## 2026-10-21 Ecosystems run A (21st): idle. Same state as the 18th; no code touched.
+
+## 2026-10-21 Ecosystems builder B (twenty-second run): idle, nothing changed since the last run
+
+## 2026-10-21 Ecosystems run A (22nd): idle. Same state as the 18th; no code touched.
