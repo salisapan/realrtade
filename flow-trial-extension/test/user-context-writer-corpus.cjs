@@ -1,6 +1,10 @@
 // UserContext writer (D1 part 1): features and counts only; no mail bodies.
 // Run: TZ=UTC node test/user-context-writer-corpus.cjs
 'use strict';
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const { webcrypto } = require('crypto');
 const { FlowUserContextWriter: W } = require('../core/user-context-writer.js');
 
 let failures = 0;
@@ -27,12 +31,26 @@ p = W.applyEvent(p, { type: 'approved', partyKey: 'dana@x.com', intentFamily: 'q
 const hint = W.relevanceHint(p);
 check('two approvals read as relevant', hint.relevance === 'relevant');
 
+const t24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+const tNow = new Date().toISOString();
+const dayApart = W.applyEvent(W.empty('24h'), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: t24h });
+const dayApart2 = W.applyEvent(dayApart, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tNow });
+check('24h apart: decay-weighted approvals still read as relevant', W.relevanceHint(dayApart2).relevance === 'relevant', W.relevanceHint(dayApart2));
+
+const t7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+const weekOld = W.applyEvent(W.empty('7d'), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: t7d });
+const weekOld2 = W.applyEvent(weekOld, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tNow });
+check('7d apart: two approvals still reach relevant with 30-day half-life', W.relevanceHint(weekOld2).relevance === 'relevant', W.relevanceHint(weekOld2));
+
 const t1 = new Date(Date.now() - 36 * 3600 * 1000).toISOString();
 const t2 = new Date().toISOString();
 const decayed = W.applyEvent(W.empty('decay'), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: t1 });
 const d2 = W.applyEvent(decayed, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: t2 });
-const decayHint = W.relevanceHint(d2);
-check('decay-tolerant relevance (30/30 flake)', decayHint.relevance === 'relevant', decayHint);
+let decayPass = 0;
+for (let i = 0; i < 100; i++) {
+  if (W.relevanceHint(d2).relevance === 'relevant') decayPass += 1;
+}
+check('decay relevance stable 100/100 in this TZ', decayPass === 100, { decayPass });
 
 let a = W.empty('acct-a');
 let b = W.empty('acct-b');
@@ -47,5 +65,84 @@ check('three dismissals read as not_relevant', W.relevanceHint(p).relevance === 
 
 check('switch name is stable', W.SWITCH === 'USER_CONTEXT_WRITER');
 
-console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
-process.exit(failures ? 1 : 0);
+console.log('\n--- worker guards (switch off does not persist) ---\n');
+
+function loadWorker(stored) {
+  const bag = JSON.parse(JSON.stringify(stored || { glanceSwitches: {}, glanceUserContextV0: { byAccount: {} } }));
+  const listeners = [];
+  const sandbox = {
+    console,
+    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+    chrome: {
+      runtime: {
+        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
+        onMessage: { addListener: (fn) => listeners.push(fn) },
+        onInstalled: { addListener() {} },
+        onStartup: { addListener() {} },
+        lastError: null,
+        getURL: (s) => s,
+        id: 'ext'
+      },
+      identity: { getAuthToken: (o, cb) => cb('tok'), removeCachedAuthToken: (o, cb) => cb(), launchWebAuthFlow: () => {} },
+      storage: {
+        local: {
+          get: async (k) => {
+            if (typeof k === 'string') return { [k]: bag[k] };
+            const defaults = (k && typeof k === 'object' && !Array.isArray(k)) ? k : {};
+            const out = {};
+            const keys = Object.keys(defaults).length ? Object.keys(defaults) : Object.keys(bag);
+            keys.forEach((key) => { out[key] = bag[key] !== undefined ? bag[key] : defaults[key]; });
+            return out;
+          },
+          set: async (patch) => { Object.assign(bag, patch); }
+        }
+      },
+      contextMenus: { onClicked: { addListener() {} }, create() {}, removeAll(cb) { if (cb) cb(); } },
+      windows: { create: () => {}, onRemoved: { addListener() {} } },
+      tabs: { sendMessage: () => {} },
+      alarms: { create: () => {}, onAlarm: { addListener() {} } }
+    },
+    URLSearchParams,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+    crypto: webcrypto,
+    TextEncoder,
+    Uint8Array
+  };
+  sandbox.self = sandbox;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  const send = (msg) => new Promise((resolve) => {
+    const l = listeners[listeners.length - 1];
+    const keep = l(msg, {}, resolve);
+    if (keep !== true) resolve(undefined);
+  });
+  return { bag, send, W: sandbox.FlowUserContextWriter };
+}
+
+(async () => {
+  let w = loadWorker();
+  const wrote = await w.send({
+    type: 'flow:user-context-event',
+    event: { type: 'approved', partyKey: 'z@z.com', intentFamily: 'quote', fetchedBack: true }
+  });
+  check('flow:user-context-event refuses when USER_CONTEXT_WRITER is off', wrote && wrote.ok === false && wrote.reason === 'switch-off', wrote);
+  check('switch off leaves glanceUserContextV0 empty', !w.bag.glanceUserContextV0 || !w.bag.glanceUserContextV0.byAccount || !Object.keys(w.bag.glanceUserContextV0.byAccount).length, w.bag.glanceUserContextV0);
+
+  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: {} } });
+  const wroteOn = await w.send({
+    type: 'flow:user-context-event',
+    accountKey: 'on@test.com',
+    event: { type: 'approved', partyKey: 'z@z.com', intentFamily: 'quote', fetchedBack: true }
+  });
+  check('flow:user-context-event persists when switch is on', wroteOn && wroteOn.ok === true && w.bag.glanceUserContextV0.byAccount['on@test.com'], wroteOn);
+
+  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: {} } });
+  const before = JSON.stringify(w.bag.glanceUserContextV0);
+  const missing = await w.send({ type: 'flow:user-context-event', event: {} });
+  check('missing event type is rejected before storage', missing && missing.ok === false && missing.reason === 'missing-event' && JSON.stringify(w.bag.glanceUserContextV0) === before);
+
+  console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
+  process.exit(failures ? 1 : 0);
+})();

@@ -6,6 +6,10 @@ const FlowUserContextWriter = (() => {
   const VERSION = 'user-context-v0';
   const SWITCH = 'USER_CONTEXT_WRITER';
   const DECAY_HALF_LIFE_DAYS = 30;
+  const RELEVANT_MIN_APPROVED = 2;
+  const NOT_RELEVANT_MIN_DISMISS = 3;
+  // Approvals or dismissals below this weight are too stale to count (half-life 30d → ~60d).
+  const DECAY_ACTIVE_FLOOR = 0.25;
 
   function normId(userId) {
     const s = String(userId || '').trim();
@@ -67,11 +71,33 @@ const FlowUserContextWriter = (() => {
     const key = String(party || 'unknown').trim().toLowerCase();
     let row = findDecision(p.decisionHistory, fam, key);
     if (!row) {
-      row = { intentFamily: fam, party: key, approvedFetchedBack: 0, dismissed: 0, undo: 0, edited: 0, missedClose: 0, lastAt: null };
+      row = {
+        intentFamily: fam,
+        party: key,
+        approvedFetchedBack: 0,
+        dismissed: 0,
+        undo: 0,
+        edited: 0,
+        missedClose: 0,
+        lastAt: null,
+        approvalAts: [],
+        dismissAts: []
+      };
       p.decisionHistory.push(row);
     }
+    const atIso = at || new Date().toISOString();
     row[field] = (Number(row[field]) || 0) + 1;
-    row.lastAt = at || new Date().toISOString();
+    row.lastAt = atIso;
+    if (field === 'approvedFetchedBack') {
+      if (!Array.isArray(row.approvalAts)) row.approvalAts = [];
+      row.approvalAts.push(atIso);
+      row.approvedFetchedBack = row.approvalAts.length;
+    }
+    if (field === 'dismissed') {
+      if (!Array.isArray(row.dismissAts)) row.dismissAts = [];
+      row.dismissAts.push(atIso);
+      row.dismissed = row.dismissAts.length;
+    }
     return p;
   }
 
@@ -169,20 +195,47 @@ const FlowUserContextWriter = (() => {
     return p;
   }
 
+  function activeDecayCounts(ats, legacyCount, lastAt, now) {
+    const stamps = Array.isArray(ats) && ats.length ? ats : null;
+    let active = 0;
+    let weight = 0;
+    if (stamps) {
+      for (const atIso of stamps) {
+        const w = decayWeight(atIso, now);
+        if (w >= DECAY_ACTIVE_FLOOR) {
+          active += 1;
+          weight += w;
+        }
+      }
+      return { active, weight };
+    }
+    const n = Number(legacyCount) || 0;
+    if (n <= 0) return { active: 0, weight: 0 };
+    const w = decayWeight(lastAt, now);
+    if (w < DECAY_ACTIVE_FLOOR) return { active: 0, weight: 0 };
+    return { active: n, weight: n * w };
+  }
+
   function relevanceHint(profile) {
     const p = norm(profile);
     const rows = p.decisionHistory || [];
-    let approved = 0;
-    let dismissed = 0;
+    let activeApprovals = 0;
+    let approvalWeight = 0;
+    let activeDismiss = 0;
     const now = new Date().toISOString();
     for (const r of rows) {
-      const w = decayWeight(r.lastAt, now);
-      approved += (Number(r.approvedFetchedBack) || 0) * w;
-      dismissed += (Number(r.dismissed) || 0) * w;
+      const a = activeDecayCounts(r.approvalAts, r.approvedFetchedBack, r.lastAt, now);
+      const d = activeDecayCounts(r.dismissAts, r.dismissed, r.lastAt, now);
+      activeApprovals += a.active;
+      approvalWeight += a.weight;
+      activeDismiss += d.active;
     }
-    const relevantFloor = 2 - 1e-2;
-    if (dismissed === 0 && approved >= relevantFloor) return { relevance: 'relevant', reason: 'history_closed' };
-    if (dismissed >= 3 && approved === 0) return { relevance: 'not_relevant', reason: 'history_dismissed' };
+    if (activeDismiss <= 0 && activeApprovals >= RELEVANT_MIN_APPROVED) {
+      return { relevance: 'relevant', reason: 'history_closed' };
+    }
+    if (activeDismiss >= NOT_RELEVANT_MIN_DISMISS && approvalWeight <= 0) {
+      return { relevance: 'not_relevant', reason: 'history_dismissed' };
+    }
     return { relevance: 'unknown', reason: 'cold_profile' };
   }
 

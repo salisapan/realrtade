@@ -40,6 +40,16 @@ check('no price in mail still offers with placeholder', (() => {
   const p = plan('Please prepare a quote for Dana Cole titled "Floor 14".');
   return p.action === 'offer' && p.built && p.built.html && p.built.html.indexOf(F.PRICE_PLACEHOLDER) !== -1;
 })());
+check('Hebrew no-price ask without quoted title still offers with placeholder', (() => {
+  const p = F.plan({
+    flags: flagsOn,
+    text: 'נא להכין הצעת מחיר עבור דנה כהן',
+    lang: 'he',
+    companyTemplate: template,
+    styleSummary: { greeting: 'shalom-name', signoff: 'best' }
+  });
+  return p.action === 'offer' && p.built && p.built.html && p.built.html.indexOf(F.PRICE_PLACEHOLDER) !== -1;
+})());
 check('stray digit in title does not block price stripping', (() => {
   const invented = F.stripInventedAmounts({ filled: { party: 'Dana', amount: '$1,000' } }, 'Please prepare a quote for Floor 14.');
   return invented.filled && !invented.filled.amount;

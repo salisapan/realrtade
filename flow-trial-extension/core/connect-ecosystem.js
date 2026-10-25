@@ -9,19 +9,15 @@ const FlowConnectEcosystem = (() => {
     'profile',
     'User.Read',
     'Mail.ReadWrite',
-    'Calendars.ReadWrite',
     'Tasks.ReadWrite',
-    'Files.ReadWrite',
-    'Contacts.Read',
-    'Notes.ReadWrite',
-    'MailboxSettings.Read',
-    'People.Read'
+    'Files.ReadWrite'
   ];
 
   // Work-account-only or card-time incremental scopes (not in one-consent).
   const MICROSOFT_OPTIONAL_SCOPES = {
     planner: ['Group.Read.All'],
-    teamsChat: ['Chat.Read']
+    teamsChat: ['Chat.Read'],
+    contacts: ['Contacts.Read']
   };
 
   const MS_CONSUMER_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad';
@@ -312,11 +308,11 @@ const FlowConnectEcosystem = (() => {
   // Connect-3 tool lines (design/connect-3/index.html). Office names come from catalog().
   const CONNECT_SCREEN_TOOLS = {
     he: {
-      google: ['Gmail', 'יומן ו-<bdi>Meet</bdi>', 'משימות', 'Drive', 'Docs', 'Sheets', 'Slides', 'אנשי קשר'],
+      google: ['Gmail', 'יומן ו-<bdi>Meet</bdi>', 'משימות', 'Drive', 'Docs', 'Sheets', 'Slides'],
       meta: ['WhatsApp', 'Messenger', 'Instagram']
     },
     en: {
-      google: ['Gmail', 'Calendar & Meet', 'Tasks', 'Drive', 'Docs', 'Sheets', 'Slides', 'Contacts'],
+      google: ['Gmail', 'Calendar & Meet', 'Tasks', 'Drive', 'Docs', 'Sheets', 'Slides'],
       meta: ['WhatsApp', 'Messenger', 'Instagram']
     }
   };

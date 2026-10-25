@@ -7,6 +7,7 @@ const FlowFullDocumentClose = (() => {
   const SWITCH = 'FULL_DOCUMENT_CLOSE';
   const CONNECTOR = 'googleDocFull';
   const PRICE_PLACEHOLDER = '[מחיר / price]';
+  const TITLE_PLACEHOLDER = '[כותרת / title]';
 
   const ASK_EN = /\b(?:send|prepare|draft|write|put together|share)\b.{0,40}\b(?:the\s+)?(?:quote|quotation|proposal|contract|agreement|sow|statement of work)\b/i;
   const ASK_HE = /(?:שלח|שלחי|הכן|הכיני|תכין|תכיני|להכין|נא\s+להכין).{0,40}(?:הצעת\s*מחיר|הצעה|חוזה|הסכם)/u;
@@ -85,6 +86,25 @@ const FlowFullDocumentClose = (() => {
     return Object.assign({}, close, { filled: filled });
   }
 
+  function ensureTitlePlaceholder(close) {
+    if (!close) return close;
+    const slots = close.slots || [];
+    if (slots.indexOf('title') === -1) return close;
+    const filled = Object.assign({}, close.filled || {});
+    if (!filled.title) filled.title = TITLE_PLACEHOLDER;
+    const missing = (close.missing || []).filter((name) => name !== 'title' && name !== 'amount' && !filled[name]);
+    return Object.assign({}, close, { filled: filled, missing: missing });
+  }
+
+  function applyPreviewPlaceholders(close, sourceText) {
+    let c = stripInventedAmounts(close, sourceText);
+    c = ensurePricePlaceholder(c, sourceText);
+    c = ensureTitlePlaceholder(c);
+    const filled = c.filled || {};
+    const missing = (c.missing || []).filter((name) => !filled[name]);
+    return Object.assign({}, c, { missing: missing });
+  }
+
   function greetingLine(styleSummary, lang, partyName) {
     const S = Style();
     if (!S || !styleSummary) return lang === 'he' ? 'שלום,' : 'Hi,';
@@ -151,9 +171,7 @@ const FlowFullDocumentClose = (() => {
       attachmentCount: 0
     });
     if (!consider || !consider.close) return { action: 'silence', reason: consider && consider.wait ? 'need-slot' : 'no-close' };
-    let close = consider.close;
-    close = stripInventedAmounts(close, text);
-    close = ensurePricePlaceholder(close, text);
+    let close = applyPreviewPlaceholders(consider.close, text);
     const built = composeHtml(close, { lang: input.lang, styleSummary: input.styleSummary, partyName: close.filled && close.filled.party });
     if (!built || built.blank) return { action: 'silence', reason: 'incomplete-slots' };
 
@@ -183,8 +201,11 @@ const FlowFullDocumentClose = (() => {
     composeHtml,
     stripInventedAmounts,
     ensurePricePlaceholder,
+    ensureTitlePlaceholder,
+    applyPreviewPlaceholders,
     amountInText,
-    PRICE_PLACEHOLDER
+    PRICE_PLACEHOLDER,
+    TITLE_PLACEHOLDER
   };
 })();
 

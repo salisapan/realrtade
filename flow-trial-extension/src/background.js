@@ -2409,6 +2409,18 @@ async function connectGoogleTasks(interactive, preset) {
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
   });
+  const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
+    ? await globalThis.FlowGoogleLaneAccount.read()
+    : '';
+  const profBag = await chrome.storage.local.get({ googleProfile: null, glanceOwnNames: [] });
+  const names = Array.isArray(profBag.glanceOwnNames) ? profBag.glanceOwnNames : [];
+  const gp = profBag.googleProfile && typeof profBag.googleProfile === 'object' ? profBag.googleProfile : null;
+  await seedUserContextFromConnect({
+    email: accountEmail,
+    name: (gp && (gp.name || gp.given_name)) || names[0] || '',
+    title: gp && gp.title,
+    department: gp && gp.department
+  });
   return true;
 }
 
@@ -5760,6 +5772,7 @@ async function readUserContextProfile(accountKey) {
 async function writeUserContextProfile(profile, accountKey) {
   const W = globalThis.FlowUserContextWriter;
   if (!W || !profile) return false;
+  if (!(await glanceSwitchOn(W.SWITCH))) return false;
   const key = String(accountKey || profile.userId || 'default').trim().toLowerCase() || 'default';
   try {
     const store = await readUserContextStore();
