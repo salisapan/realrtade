@@ -1064,8 +1064,27 @@
     return Boolean(wantConv && gotConv && wantConv === gotConv);
   }
 
-  async function exactOpenMessageInList(list, pane, openSender) {
+  function openPaneBodyOrSubjectMatch(pane, m) {
+    if (!pane || !m) return false;
+    function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+    const subjPane = norm(pane.subject);
+    const subjMsg = norm(m.subject);
+    if (subjPane && subjMsg && subjPane === subjMsg) return true;
+    const paneBody = norm(pane.text);
+    const preview = norm(m.bodyPreview);
+    const bodyContent = m.body && m.body.content ? norm(m.body.content) : '';
+    const graphText = preview || bodyContent;
+    if (!paneBody || !graphText) return false;
+    if (paneBody === graphText) return true;
+    if (graphText.length >= 12 && paneBody.indexOf(graphText) >= 0) return true;
+    if (paneBody.length >= 12 && graphText.indexOf(paneBody) >= 0) return true;
+    return false;
+  }
+
+  async function exactOpenMessageInList(list, pane, openSender, opts) {
     if (!pane) return null;
+    const o = opts || {};
+    const soleConvFilterComplete = o.soleConvFilterComplete === true;
     const open = String(openSender || pane.senderEmail || '').trim().toLowerCase();
     const hits = [];
     const rows = (list || []).filter(Boolean);
@@ -1079,14 +1098,17 @@
     }
     if (hits.length === 1) return hits[0];
     if (hits.length > 1) return null;
+    if (!soleConvFilterComplete) return null;
     if (rows.length !== 1 || pane.visibleMessageBodies !== 1) return null;
     const sole = rows[0];
     const from = fromAddress(sole);
     if (behalfSplit(sole.from, sole.sender)) return null;
     if (!(await sameOpenSender(from, open, senderAddress(sole)))) return null;
     if (!openPaneConversationRow(pane, sole)) return null;
+    if (!openPaneBodyOrSubjectMatch(pane, sole)) return null;
     if (openPaneExactGraphRow(pane, sole)) return sole;
-    const paneNet = canon(pane.internetMessageId);
+    const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
+    const paneNet = parse && parse.canonId ? parse.canonId(pane.internetMessageId || '') : '';
     const minute = minuteOf(pane.receivedDateTime);
     if (!paneNet && !minute) return sole;
     return null;
@@ -1325,11 +1347,14 @@
     try {
       const spells = idSpellings(raw);
       const prefers = [null, GRAPH_IMMUTABLE];
-      const pick = (list) => exactOpenMessageInList(list, pane, openSender);
+      const convFilterTop = 25;
+      const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender, { soleConvFilterComplete: false });
       for (let p = 0; p < prefers.length; p++) {
         for (let i = 0; i < spells.length; i++) {
-          const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId&$top=25';
-          const fromFilter = await pick(await graphValues(q, 'conversation-filter', prefers[p]));
+          const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,sender,subject,internetMessageId,bodyPreview&$top=' + convFilterTop;
+          const convList = await graphValues(q, 'conversation-filter', prefers[p]);
+          const soleComplete = Array.isArray(convList) && convList.length > 0 && convList.length < convFilterTop;
+          const fromFilter = await exactOpenMessageInList(convList, pane, openSender, { soleConvFilterComplete: soleComplete });
           if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]), from: fromAddress(fromFilter), sender: senderAddress(fromFilter) };
         }
       }
@@ -1347,17 +1372,16 @@
           how = 'inbox-list-plain';
         }
         const hits = openInboxRows(list, want);
-        const fromList = await pick(hits);
+        const fromList = await pickExactOnly(hits);
         if (fromList && fromList.id) return { id: fromList.id, how: how, immutable: Boolean(prefers[p]), from: fromAddress(fromList), sender: senderAddress(fromList) };
       }
       return null;
     } catch (e) { return null; }
   }
 
-  // Path RestId first (GET /me/messages/{id}), then the conversation filter and the inbox list.
-  // A conversation resolves to one message. The newest message from someone
-  // else is not the open message. Return its from-address; on a mismatch the
-  // result is unread and is never used as the open message.
+  // Path RestId first (GET /me/messages/{id}), then open-pane conversation filter
+  // (exact match, then sole-row only on a complete filter page), then inbox list
+  // (exact match only — never sole-row on a windowed inbox fallback).
   function senderMismatch(found, openSender) {
     dbg('sender-mismatch', { how: found.how, from: found.from || null, sender: found.sender || null, open: String(openSender || '').toLowerCase() || null });
     return { unread: true, reason: 'page:sender-mismatch', from: found.from || null };

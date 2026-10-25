@@ -34,7 +34,6 @@ const OWA_STANDING_FAIL = new Set([
   'conversation id only, filter empty, inbox list has the mail: floating Do It',
   'live shape: the card still mounts (matched by conversation id)',
   'matched by the conversation id in the URL',
-  'no id in the address: the card mounts, matched by subject and sender name',
   'one Drive file offers Do It and does not claim the file is already attached',
   'one Drive file replaces the stored Scheduling card with prepare',
   'one Drive file: Do It is ready to attach, and the search was not traced',
@@ -71,6 +70,10 @@ function registeredFiles() {
 const CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBpTa8pX9R6Eknj';
 const MSG = 'AQMkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoARgAAA_8Kq-Pilot=';
 const ME = 'glance.salisapan@outlook.com';
+// Harness mock (#184): default Graph receivedDateTime matches fixture pane clock, not Date.now().
+const PANE_CLOCK_ISO = new Date(2026, 9, 6, 1, 16).toISOString();
+console.log('owa-page-harness expectation: owa-page-harness.cjs:76 | before: graphReceivedDateTime default Date.now()-5min | after: PANE_CLOCK_ISO fixture pane | ruling: #184 harness mock');
+console.log('owa-page-harness expectation: owa-page-harness.cjs:37 | before: standing fail no id in the address | after: removed (passes both TZ with PANE_CLOCK_ISO) | ruling: #184 item 3');
 const BODY = 'Hi Sali,\n\nCould you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.\n\nThanks,\nFlow team';
 
 async function runPage(opts) {
@@ -110,7 +113,7 @@ async function runPage(opts) {
   const sent = [];
   const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, attachmentsUnread: o.attachmentsUnread === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
-    receivedDateTime: o.graphReceivedDateTime || new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
+    receivedDateTime: o.graphReceivedDateTime || PANE_CLOCK_ISO, webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   if (o.graphInternetMessageId) graphMsg.internetMessageId = o.graphInternetMessageId;
   function reply(msg) {
     sent.push(msg);
@@ -309,6 +312,7 @@ async function runPage(opts) {
     const until = Date.now() + 2500;
     while (Date.now() < until && !sent.some((m) => m.type === 'flow:execute-action')) await new Promise((r) => setTimeout(r, 40));
     await new Promise((r) => setTimeout(r, 200));
+    if (o.afterDoItMs) await new Promise((r) => setTimeout(r, o.afterDoItMs));
     if (o.shadowShown) {
       const live = w.document.querySelector('.flow-chip-host');
       const id = (live && live.getAttribute('data-glance-message')) || chipMessage;
@@ -945,6 +949,26 @@ if (require.main === module) {
     check('don\'t save stays quiet when the resolved message has one file',
       !refused.chip && refusedWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
       { text: refused.chip && refused.chip.textContent, why: refusedWhy });
+    const soleNoClockHtml = (text) => (h) => gateHtml(text)(h)
+      .replace('id="ReadingPaneContainerId"', 'id="ReadingPaneContainerId"><div data-name="Gate-0935-signed-NDA.pdf" data-size="1024"></div>')
+      .replace(/<div class="date">[\s\S]*?<\/div>/, '');
+    const soleOlderOnly = {
+      id: 'M-sole-older', conversationId: GATE_CONV, subject: 'Gate 0.9.35 OneDrive save', isDraft: false, hasAttachments: true,
+      from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+      receivedDateTime: PANE_CLOCK_ISO, bodyPreview: SAVE,
+      body: { contentType: 'text', content: SAVE }
+    };
+    const soleNoClock = await runPage(Object.assign({}, gate, {
+      htmlPatch: soleNoClockHtml(SAVE), mailBody: SAVE,
+      threadMessages: [soleOlderOnly], convFilterEmpty: false, inboxLookupEmpty: true, pathRestMisses: 2,
+      clickDoIt: true, waitMs: 6000
+    }));
+    const soleDraft = soleNoClock.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft')[0];
+    console.log('owa-page-harness expectation: owa-page-harness.cjs:soleNoClock | before: (missing) | after: sole conv-filter row without pane clock drafts M-sole-older | ruling: #184 item 1');
+    check('sole Graph row without pane clock: Do It drafts the listed message, not a newer guess',
+      soleDraft && soleDraft.payload && soleDraft.payload.outlookIncomingId === 'M-sole-older',
+      { id: soleDraft && soleDraft.payload && soleDraft.payload.outlookIncomingId });
     const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
     const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
     // CTO silent-degradation ruling 23/10: owa-page-harness.cjs ~808 — before: chip OR reason; after: chip AND attachments-not-read copy AND not page:intent-null.
