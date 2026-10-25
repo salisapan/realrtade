@@ -481,11 +481,17 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
     { tokenBefore: tokenBefore, tokenNow: subject.w.__glanceOutlookPage.openMailToken(), cleared: clearedAfter - clearedBefore, text: chipText(subject.doc) });
   const liveDo = hostSub && (hostSub.querySelector('.do-halo') || hostSub.querySelector('button.flow-chip'));
   const actsBefore = subject.sent.filter((m) => m.type === 'flow:execute-action').length;
+  const stepsOnCard = hostSub && hostSub.__glanceSteps && typeof hostSub.__glanceSteps.count === 'function'
+    ? hostSub.__glanceSteps.count() : null;
+  const draftActsBefore = subject.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft').length;
   if (liveDo) liveDo.click();
   await sleep(300);
+  const actsAfter = subject.sent.filter((m) => m.type === 'flow:execute-action').length;
+  const draftActsAfter = subject.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft').length;
+  console.log('expectation edit: mail-switch-race-corpus.cjs:486 | before: actsBefore+1 total execute-actions | after: draft execute-actions +1 (card lists draft+task; subjectEditedInPlace guard removed per verifier R1) | ruling: verifier R1');
   check('Do It still runs after a subject-only edit',
-    subject.sent.filter((m) => m.type === 'flow:execute-action').length === actsBefore + 1,
-    { acts: subject.sent.filter((m) => m.type === 'flow:execute-action').length });
+    draftActsAfter === draftActsBefore + 1,
+    { acts: actsAfter, draftActs: draftActsAfter, stepsOnCard: stepsOnCard });
   subject.w.close();
 
   const actions = await boot({ holdAfterRead: false });
