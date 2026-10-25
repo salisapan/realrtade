@@ -1124,9 +1124,9 @@
         (pane && pane.internetMessageId && (pane.clockFromPane || pane.idSource === 'open-mail')) ||
         (paneMinute && pane && pane.clockFromPane === true)
       );
-      const preview = normalizeSoleBodyText(sole.bodyPreview);
-      const paneBody = normalizeSoleBodyText(pane && pane.text);
       if (!paneAnchored) return null;
+      if (openPaneExactGraphRow(pane, sole)) return sole;
+      if (pane.clockFromPane === true) return null;
       if (soleBodyExactMatch(pane, sole)) return sole;
     }
     return null;
