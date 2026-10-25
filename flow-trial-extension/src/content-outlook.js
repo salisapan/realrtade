@@ -4196,6 +4196,31 @@
     })
   });
 
+  // An empty Word or Excel file on the ONE SharePoint site a mail names (switch SHAREPOINT_NEW_FILE, off): the worker reads the site by
+  // name and is silent unless exactly one site has it. Needs the SharePoint box (Sites.ReadWrite.All) on the Connect screen.
+  const sharepointFileChain = makeCloseChain({
+    chain: 'sharepoint-file',
+    connectorId: 'sharepointNewFile',
+    planMessage: 'flow:sharepoint-file-plan',
+    refKey: 'itemId',
+    stepKind: 'drive',
+    name: 'New file',
+    undone: 'File removed from SharePoint.',
+    undoFailed: 'Could not remove the file.',
+    writtenDefault: 'New file in SharePoint.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'sites.readwrite.all'),
+    planOk: (plan) => Boolean(plan.fileName && plan.siteId),
+    cardLabel: (plan) => plan.fileName,
+    paramsOf: (plan) => ({ fileKind: plan.fileKind, fileName: plan.fileName, name: plan.name, siteId: plan.siteId, siteName: plan.siteName }),
+    reasons: () => ({
+      'name-taken': pageUiLang() === 'he' ? 'כבר יש קובץ בשם הזה בתיקיית Glance באתר' : 'A file with that name is already in the site\'s Glance folder',
+      'site-not-found': pageUiLang() === 'he' ? 'האתר לא נמצא' : 'The SharePoint site was not found',
+      'sharepoint-not-granted': pageUiLang() === 'he' ? 'צריך הרשאה ל-SharePoint' : 'SharePoint needs to be allowed first',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook'
+    })
+  });
+
   const eventLinkChain = makeCloseChain({
     chain: 'event-link',
     connectorId: 'outlookEventCallLink',
@@ -4221,6 +4246,7 @@
 
   async function settleCloseChains(pane, st) {
     if (await newFileChain.settle(pane, st)) return newFileChain.chain;
+    if (await sharepointFileChain.settle(pane, st)) return sharepointFileChain.chain;
     if (await eventLinkChain.settle(pane, st)) return eventLinkChain.chain;
     return '';
   }
