@@ -148,6 +148,7 @@ it, not touching the module.
 | `draft-reply.js` | Shared reply-draft body for Gmail and Outlook (never sent): rich ack of concrete asks (facts when known; placeholders only when needed), same shape on both surfaces. |
 | `owa-parse.js` | Outlook on the web reading-pane helpers (URL item id, subject/sender/body, match to sync entries). Selectors are best-effort against OWA markup. |
 | `outside-signals.js` | Loops that close without the other person replying |
+| `bill-paid.js` | A bill the person owes is closed only when it is paid: the payee's receipt, a bank or card debit naming the payee, or the person's own "I paid" to the payee, with the message as proof; lists bills past due (off: `opts.enabled`; not wired yet) |
 | `labs-switches.js` | The closes that ship behind an off switch, in one list, for the popup's Labs rows |
 | `person-model.js` | A model of HOW LONG each person takes — portable, no chrome.*, no DOM, no network, no model service. |
 | `pmf-metrics.js` | Turns the durable local counters storage.js already keeps (shownStats, writeStats, undoneStats, activeDays, closeStats) into the three product- market-fit signals this product actually needs to know whether it's working |
