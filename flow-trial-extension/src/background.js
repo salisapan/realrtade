@@ -1691,11 +1691,6 @@ function rememberGoogleProfile(token) {
       if (!sameTextList(prev, merged)) patch.glanceOwnNames = merged;
       if (!sameGoogleProfile(bag.googleProfile, profile)) patch.googleProfile = profile;
       if (Object.keys(patch).length) await chrome.storage.local.set(patch);
-      await seedUserContextFromConnect({
-        email: profile.email,
-        name: profile.displayName,
-        displayName: profile.displayName
-      });
       googleNamesFilled = true;
     } catch (e) { /* userinfo refused; the greeting stays on the names already stored */ }
     finally { googleProfileFlight = null; }
@@ -5458,20 +5453,43 @@ async function glanceSwitchOn(name) {
 
 const USER_CONTEXT_STORAGE_KEY = 'glanceUserContextV0';
 
-async function readUserContextProfile() {
-  const W = globalThis.FlowUserContextWriter;
-  if (!W) return null;
-  try {
-    const bag = await chrome.storage.local.get({ [USER_CONTEXT_STORAGE_KEY]: null });
-    return W.norm(bag[USER_CONTEXT_STORAGE_KEY]);
-  } catch (e) { return W.empty(); }
+function userContextAccountKey(msg) {
+  const raw = msg && (msg.accountKey || msg.tabAccount || (msg.event && msg.event.accountKey));
+  const k = String(raw || '').trim().toLowerCase();
+  return k || 'default';
 }
 
-async function writeUserContextProfile(profile) {
+async function readUserContextStore() {
+  try {
+    const bag = await chrome.storage.local.get({ [USER_CONTEXT_STORAGE_KEY]: null });
+    const root = bag[USER_CONTEXT_STORAGE_KEY];
+    if (root && root.byAccount && typeof root.byAccount === 'object') return root;
+    if (root && root.schemaVersion) {
+      return { byAccount: { default: root } };
+    }
+    return { byAccount: {} };
+  } catch (e) { return { byAccount: {} }; }
+}
+
+async function readUserContextProfile(accountKey) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W) return null;
+  const key = String(accountKey || 'default').trim().toLowerCase() || 'default';
+  const store = await readUserContextStore();
+  return W.norm((store.byAccount && store.byAccount[key]) || W.empty(key));
+}
+
+async function writeUserContextProfile(profile, accountKey) {
   const W = globalThis.FlowUserContextWriter;
   if (!W || !profile) return false;
+  const key = String(accountKey || profile.userId || 'default').trim().toLowerCase() || 'default';
   try {
-    await chrome.storage.local.set({ [USER_CONTEXT_STORAGE_KEY]: W.norm(profile) });
+    const store = await readUserContextStore();
+    const byAccount = Object.assign({}, store.byAccount || {});
+    const norm = W.norm(profile);
+    norm.userId = key;
+    byAccount[key] = norm;
+    await chrome.storage.local.set({ [USER_CONTEXT_STORAGE_KEY]: { byAccount: byAccount } });
     return true;
   } catch (e) { return false; }
 }
@@ -5488,8 +5506,9 @@ async function applyUserContextEvent(msg) {
   if (!W || !(await glanceSwitchOn(W.SWITCH))) return { ok: false, reason: 'switch-off' };
   const ev = msg && msg.event;
   if (!ev || !ev.type) return { ok: false, reason: 'missing-event' };
-  const next = W.applyEvent(await readUserContextProfile(), ev);
-  await writeUserContextProfile(next);
+  const accountKey = userContextAccountKey(msg);
+  const next = W.applyEvent(await readUserContextProfile(accountKey), Object.assign({}, ev, { accountKey: accountKey }));
+  await writeUserContextProfile(next, accountKey);
   return { ok: true, profile: next };
 }
 

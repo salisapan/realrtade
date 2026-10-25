@@ -52,9 +52,11 @@ const noAmt = F.plan({
   flags: flagsOn,
   text: 'Please prepare a quote for Dana Cole titled "Floor 14".',
   lang: 'en',
-  companyTemplate: Object.assign({}, quoteTemplate(), { slots: ['party', 'title'] })
+  companyTemplate: quoteTemplate()
 });
-check('built html omits invented price when mail had no amount', noAmt.action === 'offer' && noAmt.built && noAmt.built.html && !/\$[\d,]+/.test(noAmt.built.html), noAmt);
+check('built html shows placeholder when mail had no amount', noAmt.action === 'offer' && noAmt.built && noAmt.built.html && noAmt.built.html.indexOf(F.PRICE_PLACEHOLDER) !== -1 && !/\$[\d,]+/.test(noAmt.built.html), noAmt);
+const invented = F.stripInventedAmounts({ filled: { party: 'Dana', amount: '$1,000' } }, 'Please prepare a quote for Floor 14.');
+check('invented $1,000 stripped when not verbatim in mail', invented.filled && !invented.filled.amount);
 
 check('Hebrew document ask is recognized before template fill', F.recognize('נא להכין הצעת מחיר עבור דנה כהן').kind === 'clear');
 
