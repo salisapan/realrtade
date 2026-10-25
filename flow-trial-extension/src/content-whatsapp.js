@@ -1,21 +1,8 @@
-// WhatsApp Web, read-only, one-to-one chats only. It ships with the Meta chat lane and runs after the one Meta consent. There is no separate popup row.
-//
-// What it does: when the newest message in the open chat is yours and asks for something, the same small card as in Gmail offers to
-// stay on it; when the other person answers, the same rules close it (or not). An answer here can also settle a loop you opened by
-// email (core/cross-channel.js), and the other way round.
-// What it never does: type, send, react, mark as read, open a chat, or touch a group, a broadcast list, a channel or a status.
-//
-// Honesty: WhatsApp Web's page structure is not a public interface and changes without notice. This file reads message ids
-// (data-id), the chat title and the message text spans, and checks on every pass that it can still make sense of the page.
-// If it cannot, it says so once (popup) and stays silent. Chat messages are short and informal, so this surface is stricter than
-// Gmail: only requests that match a known wording create an offer; the learned model, the language-model tier and the single
-// question never act here until there is a labelled set of real chats to measure them on (docs/multi-platform.md).
+// WhatsApp Web follow-up lane (gesture-only). No background reads.
 (() => {
   if (typeof FlowFollow === 'undefined' || typeof FlowWhatsAppParse === 'undefined') return;
   const P = FlowWhatsAppParse;
-  const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
-  let timer = null;
   let lastReportedHealth = null;
 
   function chatPane() { return document.getElementById('main'); }
@@ -47,17 +34,18 @@
     try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'whatsapp', ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* the page may be closing */ }
   }
 
-  function scan() {
+  function scan(opts) {
+    if (!opts || opts.gesture !== true) return { ok: false, reason: 'no-gesture' };
     const main = chatPane();
-    if (!main) return;                                  // no chat open: nothing to read, nothing to report
+    if (!main) return { ok: false, reason: 'no-chat' };
     const list = rows(main);
-    if (!list.length) { report(false, 'no-messages-recognised'); return; }
+    if (!list.length) { report(false, 'no-messages-recognised'); return { ok: false, reason: 'no-messages' }; }
     const ids = list.map((n) => n.getAttribute('data-id'));
-    if (!P.isOneToOne(ids)) { report(true); return; }   // a group, a list or a channel: left alone, on purpose
+    if (!P.isOneToOne(ids)) { report(true); return { ok: true, reason: 'group-skipped' }; }
     const t = title(main);
     const party = P.partyFromChat(t, ids);
     const threadId = P.threadIdFor(t, ids);
-    if (!threadId || (!party.name && !party.phone)) { report(false, 'chat-not-identified'); return; }
+    if (!threadId || (!party.name && !party.phone)) { report(false, 'chat-not-identified'); return { ok: false, reason: 'chat-not-identified' }; }
     report(true);
     const idOf = (n) => n.getAttribute('data-id');
     const ctx = {
@@ -77,11 +65,10 @@
       attachmentsOf: () => []
     };
     FlowFollow.consider(ctx).catch((e) => console.error('[Glance] WhatsApp follow-up check failed', e));
+    return { ok: true };
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-
-  const app = document.getElementById('app') || document.body;
-  new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
-  schedule();
+  globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
+  if (!globalThis.__glanceChatSurfaces.whatsapp) globalThis.__glanceChatSurfaces.whatsapp = {};
+  globalThis.__glanceChatSurfaces.whatsapp.followScan = scan;
 })();
