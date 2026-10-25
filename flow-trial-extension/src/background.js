@@ -98,6 +98,7 @@ import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnector
 import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
+import '../core/user-context-writer.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -1705,6 +1706,11 @@ function rememberGoogleProfile(token) {
       if (!sameTextList(prev, merged)) patch.glanceOwnNames = merged;
       if (!sameGoogleProfile(bag.googleProfile, profile)) patch.googleProfile = profile;
       if (Object.keys(patch).length) await chrome.storage.local.set(patch);
+      await seedUserContextFromConnect({
+        email: profile.email,
+        name: profile.displayName,
+        displayName: profile.displayName
+      });
       googleNamesFilled = true;
     } catch (e) { /* userinfo refused; the greeting stays on the names already stored */ }
     finally { googleProfileFlight = null; }
@@ -5728,6 +5734,43 @@ async function glanceSwitchOn(name) {
   } catch (e) { return false; }
 }
 
+const USER_CONTEXT_STORAGE_KEY = 'glanceUserContextV0';
+
+async function readUserContextProfile() {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W) return null;
+  try {
+    const bag = await chrome.storage.local.get({ [USER_CONTEXT_STORAGE_KEY]: null });
+    return W.norm(bag[USER_CONTEXT_STORAGE_KEY]);
+  } catch (e) { return W.empty(); }
+}
+
+async function writeUserContextProfile(profile) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !profile) return false;
+  try {
+    await chrome.storage.local.set({ [USER_CONTEXT_STORAGE_KEY]: W.norm(profile) });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function seedUserContextFromConnect(connectPatch) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !(await glanceSwitchOn(W.SWITCH))) return;
+  const next = W.fromConnect(await readUserContextProfile(), connectPatch || {});
+  await writeUserContextProfile(next);
+}
+
+async function applyUserContextEvent(msg) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !(await glanceSwitchOn(W.SWITCH))) return { ok: false, reason: 'switch-off' };
+  const ev = msg && msg.event;
+  if (!ev || !ev.type) return { ok: false, reason: 'missing-event' };
+  const next = W.applyEvent(await readUserContextProfile(), ev);
+  await writeUserContextProfile(next);
+  return { ok: true, profile: next };
+}
+
 async function outlookTeamsWanted(callText) {
   const T = globalThis.FlowTeamsMeeting;
   if (!T || typeof T.callAsked !== 'function' || !callText) return false;
@@ -7132,6 +7175,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:sharepoint-save-plan') {
     return reply(sendResponse, sharepointSavePlan(msg));
+  }
+
+  if (msg.type === 'flow:user-context-get') {
+    return reply(sendResponse, readUserContextProfile().then((p) => ({ ok: true, profile: p })));
+  }
+
+  if (msg.type === 'flow:user-context-event') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, applyUserContextEvent(msg));
   }
 
   if (msg.type === 'flow:execute-action') {
