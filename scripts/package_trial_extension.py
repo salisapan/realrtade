@@ -312,12 +312,14 @@ def collect(profile: str = "full") -> dict[str, Path]:
     return files
 
 
-def write_zip(files: dict[str, Path], out: Path) -> int:
+def write_zip(files: dict[str, Path], out: Path, replacements: dict[str, bytes] | None = None) -> int:
     if "manifest.json" not in files:
         die("install zip has no manifest.json at its root")
     for rel in files:
         if rel.startswith("flow-trial-extension/") or rel.startswith("/") or ".." in Path(rel).parts:
             die(f"install zip entry would not sit at the extension root: {rel}")
+    replacements = replacements or {}
+    picker_bundled = "picker/picker.html" in files
     sha = os.environ.get("GLANCE_BUILD_STAMP") or git_sha7()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
@@ -330,7 +332,8 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, stamped_bytes(rel, files[rel].read_bytes(), sha))
+            raw = replacements[rel] if rel in replacements else files[rel].read_bytes()
+            archive.writestr(info, stamped_bytes(rel, raw, sha, picker_bundled=picker_bundled))
     os.replace(tmp, out)
     return out.stat().st_size
 

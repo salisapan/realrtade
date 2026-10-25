@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,51 @@ REQUIRED = [
 def die(message: str) -> None:
     print(f"verify_trial_install: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+APIS_GOOGLE_LOAD_RE = re.compile(
+    rb"""<
+      \s*script\b[^>]*\ssrc\s*=\s*['"]https?://apis\.google\.com[^'"]*['"]
+    |importScripts\(\s*['"]https?://apis\.google\.com[^'"]*['"]\s*\)
+    |import\s+[^;\n]*\s+from\s+['"]https?://apis\.google\.com[^'"]*['"]
+    |(?:\.)?src\s*=\s*['"]https?://apis\.google\.com[^'"]*['"]
+    """,
+    re.I | re.VERBOSE,
+)
+
+
+def strip_js_html_comments(text: str) -> str:
+    text = HTML_COMMENT_RE.sub("", text)
+    text = BLOCK_COMMENT_RE.sub("", text)
+    # Whole-line // comments only — do not treat https:// inside code as a comment opener.
+    return re.sub(r"^\s*//[^\n]*", "", text, flags=re.M)
+
+
+def entry_loads_remote_google_script(name: str, data: bytes) -> bool:
+    if not name.endswith((".js", ".html")):
+        return False
+    cleaned = strip_js_html_comments(data.decode("utf-8", errors="replace"))
+    return APIS_GOOGLE_LOAD_RE.search(cleaned.encode("utf-8")) is not None
+
+
+def check_apis_google_script_guard() -> None:
+    """Self-test: real gapi loads fail; comments (including background.js) pass."""
+    if not entry_loads_remote_google_script("load.js", b"importScripts('https://apis.google.com/js/api.js');"):
+        die("apis.google guard: must detect importScripts load")
+    if not entry_loads_remote_google_script(
+        "load.html", b'<script src="https://apis.google.com/js/api.js"></script>'
+    ):
+        die("apis.google guard: must detect HTML script src load")
+    if entry_loads_remote_google_script(
+        "comment.js", b"// whether https://apis.google.com's gapi loader is even\n"
+    ):
+        die("apis.google guard: must not match line comments")
+    background = package.EXTENSION_ROOT / "src" / "background.js"
+    if entry_loads_remote_google_script("src/background.js", background.read_bytes()):
+        die("apis.google guard: packaged background.js must not look like a remote gapi load")
 
 
 def assert_manifest_at_extract_root(archive: zipfile.ZipFile, label: str) -> None:
@@ -87,8 +133,11 @@ def check_zip() -> None:
                 die(f"zip contains {name}; only docs/SETUP.md belongs in the install")
             if "CLIENT_SECRET" in name.upper():
                 die(f"zip entry name looks secret: {name}")
-            if name.endswith((".js", ".html")) and b"apis.google.com" in archive.read(name):
+            if entry_loads_remote_google_script(name, archive.read(name)):
                 die(f"zip entry {name} loads a remote Google script")
+        stamp = archive.read("core/build-stamp.js").decode("utf-8")
+        if not re.search(r"PICKER_BUNDLED\s*=\s*false", stamp):
+            die("install zip build-stamp.js must set PICKER_BUNDLED false when picker/ is omitted")
         background = archive.read("src/background.js").decode("utf-8")
         if "config/oauth.public.js" not in background:
             die("packaged background.js does not import config/oauth.public.js")
@@ -224,8 +273,11 @@ def check_cws_zip() -> None:
         for name in names:
             if name == "picker" or name.startswith("picker/"):
                 die(f"store zip contains {name}; the Drive Picker must not ship")
-            if name.endswith((".js", ".html")) and b"apis.google.com" in archive.read(name):
+            if entry_loads_remote_google_script(name, archive.read(name)):
                 die(f"store zip entry {name} loads a remote Google script")
+        stamp = archive.read("core/build-stamp.js").decode("utf-8")
+        if not re.search(r"PICKER_BUNDLED\s*=\s*false", stamp):
+            die("store zip build-stamp.js must set PICKER_BUNDLED false when picker/ is omitted")
         manifest = json.loads(archive.read("manifest.json"))
         store_oauth = archive.read("config/oauth.public.js").decode("utf-8")
         store_background = archive.read("src/background.js").decode("utf-8")
@@ -242,13 +294,14 @@ def check_cws_zip() -> None:
     if manifest.get("description") != cws.STORE_DESCRIPTION or len(cws.STORE_DESCRIPTION) > 132:
         die("store zip description is not the store line")
     source = json.loads((package.EXTENSION_ROOT / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("version") != "0.7.5" or source.get("version") != "0.7.5":
-        die("extension version must stay 0.7.5")
+    if manifest.get("version") != "0.9.56" or source.get("version") != "0.9.56":
+        die("extension version must stay 0.9.56")
     if source.get("oauth2", {}).get("client_id") != cws.UNPACKED_CLIENT_ID or "key" not in source:
         die("repo manifest must keep the unpacked key and unpacked Google client")
 
 
 def main() -> None:
+    check_apis_google_script_guard()
     check_profiles()
     package.main([])
     check_zip()
