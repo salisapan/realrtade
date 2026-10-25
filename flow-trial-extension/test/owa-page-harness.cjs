@@ -164,7 +164,21 @@ async function runPage(opts) {
           }
         }
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
-        const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
+        let value = Array.isArray(o.threadMessages) ? o.threadMessages.slice() : (o.emptyInbox ? [] : [graphMsg]);
+        if (o.convFilterPadToTop && /conversationId/.test(decoded) && typeof o.convFilterPadToTop === 'number') {
+          const want = o.convFilterPadToTop;
+          const conv = String(o.listedConversationId || graphMsg.conversationId || '');
+          let n = 0;
+          while (value.length < want) {
+            value.push({
+              id: 'PAD-' + n, conversationId: conv, subject: 'Pad ' + n, isDraft: false, hasAttachments: false,
+              from: { emailAddress: { name: 'other', address: 'other' + n + '@example.com' } },
+              receivedDateTime: graphMsg.receivedDateTime, body: { contentType: 'text', content: 'padding' }
+            });
+            n++;
+          }
+          value = value.slice(0, want);
+        }
         return { ok: true, status: 200, body: JSON.stringify({ value }) };
       }
       // Attachments are not the message. A conversation id on this path is a 400.
