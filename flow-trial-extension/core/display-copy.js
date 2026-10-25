@@ -276,6 +276,14 @@ const FlowDisplay = (() => {
     return '';
   }
 
+  function localCallTopic(phrase, lang) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
+    if (/[\u0590-\u05FF]/.test(raw)) return raw;
+    const he = translateCallTopic(raw);
+    return he || raw;
+  }
+
   function hebrewCallAbout(phrase, extra) {
     const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
     if (/[\u0590-\u05FF]/.test(raw)) return 'שיחה בנושא ' + raw;
@@ -545,6 +553,7 @@ const FlowDisplay = (() => {
       draftReady: 'Draft ready.',
       draftReadyLong: 'Reply draft ready in Outlook Drafts. Not sent.',
       draftReadyNotSent: 'Draft ready. Not sent.',
+      composeDraftOpened: 'Draft opened in compose. You send it.',
       draftWithFile: 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.',
       draftRemoved: 'Reply draft removed. Not sent.',
       draftGone: 'Draft was already gone. Nothing left to undo.',
@@ -581,7 +590,12 @@ const FlowDisplay = (() => {
       notWired: 'That action isn’t wired up yet.',
       couldntComplete: 'Couldn’t complete that action.',
       composeClosed: 'Open Reply first. Glance does not press Send.',
+      missingPermission: 'Google is missing permission for this action. Reconnect Google with the required access.',
       composeEmpty: 'The compose window is still empty.',
+      driveFileScope: 'Glance can’t open that Drive file with the access in this version. Use a thread attachment, or a file Glance already saved for you.',
+      plannerGroupConsentWhy: 'Planner needs read access to your work groups so Glance can list your plans. This is separate from your main Microsoft sign-in and is only asked when you use Planner.',
+      plannerTodoFallbackAdmin: 'Your organization has to approve Planner access. Glance added this to Microsoft To Do instead.',
+      plannerTodoFallbackDenied: 'Planner access wasn’t granted. Glance added this to Microsoft To Do instead.',
       skippedEarlier: 'Skipped — an earlier step in this process didn’t complete.',
       todoUiCache: 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
       notAllGone: 'Not all of it is gone. Undo again to remove what’s left.',
@@ -675,10 +689,7 @@ const FlowDisplay = (() => {
       amountOpen: 'A confirmed amount is still open',
       lmOn: 'The model built into this browser also reads wording nothing else recognises, for {langs} (it passed a precision check on this device). It only suggests; you decide.',
       lmOff: 'The model built into this browser did not pass the precision check on this device, so it stays off.',
-      lmAnd: ' and ', langEn: 'English', langHe: 'Hebrew',
-      plannerGroupConsentWhy: 'Planner needs read access to your work groups so Glance can list your plans. This is separate from your main Microsoft sign-in and is only asked when you use Planner.',
-      plannerTodoFallbackAdmin: 'Your organization has to approve Planner access. Glance added this to Microsoft To Do instead.',
-      plannerTodoFallbackDenied: 'Planner access wasn’t granted. Glance added this to Microsoft To Do instead.'
+      lmAnd: ' and ', langEn: 'English', langHe: 'Hebrew'
     },
     he: {
       brand: 'Glance', intentLabel: 'כוונה שזוהתה', will: 'Glance יבצע', prepared: 'מוכן · שום דבר לא נשלח', done: 'בוצע',
@@ -700,6 +711,7 @@ const FlowDisplay = (() => {
       draftReady: 'טיוטה מוכנה.',
       draftReadyLong: 'טיוטת תשובה מוכנה. לא נשלח.',
       draftReadyNotSent: 'הטיוטה מוכנה. לא נשלח.',
+      composeDraftOpened: 'הטיוטה מוכנה בחלון ההודעה. אתה שולח.',
       draftWithFile: 'טיוטת תשובה מוכנה, עם הקובץ. לא נשלח.',
       draftRemoved: 'טיוטת התשובה הוסרה. לא נשלח.',
       draftGone: 'הטיוטה כבר לא שם. אין מה לבטל.',
@@ -736,7 +748,12 @@ const FlowDisplay = (() => {
       notWired: 'הפעולה הזו עדיין לא מחוברת.',
       couldntComplete: 'לא הצלחתי להשלים את הפעולה.',
       composeClosed: 'פתח קודם תשובה. Glance לא לוחץ על שליחה.',
+      missingPermission: 'חסרה הרשאה ל-Google לפעולה הזו. חבר מחדש את Google עם ההרשאות הנדרשות.',
       composeEmpty: 'חלון הכתיבה עדיין ריק.',
+      driveFileScope: 'Glance עדיין לא יכול לפתוח את קובץ Drive הזה עם ההרשאות בגרסה הזו. השתמש בקובץ מצורף בשרשור, או בקובץ ש-Glance כבר שמר עבורך.',
+      plannerGroupConsentWhy: 'Planner צריך הרשאת קריאה לקבוצות העבודה שלך כדי ש-Glance יוכל להציג את התוכניות. זה נפרד מהחיבור הראשי ל-Microsoft ונשאל רק כשמשתמשים ב-Planner.',
+      plannerTodoFallbackAdmin: 'הארגון שלך צריך לאשר גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
+      plannerTodoFallbackDenied: 'לא ניתנה גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
       skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',
       todoUiCache: 'ב-Microsoft To Do המשימה יכולה להישאר על המסך כשתי דקות. אחרי רענון היא נעלמת.',
       notAllGone: 'לא הכול הוסר. בטל שוב כדי להסיר את מה שנשאר.',
@@ -830,10 +847,7 @@ const FlowDisplay = (() => {
       amountOpen: 'סכום שסוכם עדיין פתוח',
       lmOn: 'המודל שבדפדפן הזה גם קורא ניסוח ששום דבר אחר לא מזהה, עבור {langs} (הוא עבר בדיקת דיוק במכשיר הזה). הוא רק מציע; אתה מחליט.',
       lmOff: 'המודל שבדפדפן הזה לא עבר את בדיקת הדיוק במכשיר הזה, אז הוא נשאר כבוי.',
-      lmAnd: ' ו-', langEn: 'אנגלית', langHe: 'עברית',
-      plannerGroupConsentWhy: 'ל-Planner צריך גישת קריאה לקבוצות העבודה שלך כדי ש-Glance יוכל להציג את התוכניות. זה נפרד מההתחברות הראשית ל-Microsoft ונשאל רק כשמשתמשים ב-Planner.',
-      plannerTodoFallbackAdmin: 'הארגון שלך צריך לאשר גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
-      plannerTodoFallbackDenied: 'לא ניתנה גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.'
+      lmAnd: ' ו-', langEn: 'אנגלית', langHe: 'עברית'
     }
   };
 
@@ -999,6 +1013,9 @@ const FlowDisplay = (() => {
       const nouns = nounsHe(m[1], false);
       return nouns ? nouns[0] + ' עדיין שם. בטל שוב כדי להסיר.' : raw;
     }
+    m = raw.match(/^Saved (.+?) to OneDrive$/i);
+    if (m) return 'נשמר ' + m[1] + ' ב-OneDrive';
+    if (raw === 'Save the file?') return 'לשמור את הקובץ?';
     return raw;
   }
 
@@ -1091,14 +1108,23 @@ const FlowDisplay = (() => {
 
   // What Glance writes (a calendar event, a Google Task, a To Do) is titled
   // exactly as the card shows it. A hold keeps the sentence it closes.
+  function mailContentLang(ctx) {
+    const blob = String((ctx && (ctx.bodyText || ctx.text || ctx.body)) || '');
+    if (/[\u0590-\u05FF]/.test(blob)) return 'he';
+    if (ctx && ctx.intent && ctx.intent.lang === 'he') return 'he';
+    return 'en';
+  }
+
   function artifactTitle(lang, ctx, title) {
     const raw = title == null ? '' : String(title);
     if (!raw) return raw;
     const hold = ctx && (ctx.glanceChain === 'calendar-hold' || (ctx.process && ctx.process.id === 'hold'));
     if (hold) return raw;
+    const contentLang = mailContentLang(ctx);
+    const headingLang = contentLang === 'he' || uiLangFrom({ setting: lang }) === 'he' ? 'he' : lang;
     const p = ctx && ctx.process;
-    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(lang, SAVE_TITLE, ctx);
-    return localizeHeading(lang, raw, ctx);
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(contentLang === 'he' ? 'he' : headingLang, SAVE_TITLE, ctx);
+    return localizeHeading(headingLang, raw, ctx);
   }
 
   function activityMetric(lang, text) {
@@ -1179,6 +1205,7 @@ const FlowDisplay = (() => {
     holdClockFrom: holdClockFrom,
     cardTitle: cardTitle,
     artifactTitle: artifactTitle,
+    localCallTopic: localCallTopic,
     localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,
