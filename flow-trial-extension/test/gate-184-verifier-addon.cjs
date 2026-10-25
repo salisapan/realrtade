@@ -864,11 +864,11 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       });
     }
     if (variant === 'prefix255') {
-      const pad = 'x'.repeat(200);
-      const prefix = (pad + wtReplyBody).slice(0, 255);
+      const paneBody = 'x'.repeat(200) + wtReplyBody;
+      const prefix = paneBody.slice(0, 255);
       return Object.assign({}, base, {
         bodyPreview: prefix,
-        body: { contentType: 'text', content: prefix + ' tail' }
+        body: { contentType: 'text', content: paneBody }
       });
     }
     return base;

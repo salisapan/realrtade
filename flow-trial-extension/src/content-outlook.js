@@ -5020,7 +5020,7 @@
         }
         if (!exactPin || !exactPin.id) {
           const paneMinute = minuteOf(pane && pane.receivedDateTime);
-          const paneClockOk = Boolean(paneMinute || (pane && pane.internetMessageId));
+          const paneClockOk = Boolean((pane && pane.internetMessageId) || (paneMinute && pane.clockFromPane === true));
           if (!(decided.attachmentsUnread && paneClockOk)) {
             dropStuckCard(pane);
             await pageReason('page:reply-target-unsure', pane);
