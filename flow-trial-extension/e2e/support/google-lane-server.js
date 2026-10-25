@@ -166,6 +166,7 @@ function startGoogleLaneServer() {
     state.tasks = {};
     state.events = {};
     state.files = {};
+    state.forms = {};
     state.docs = {};
     state.sheets = {};
     state.last = {};
@@ -268,6 +269,25 @@ function startGoogleLaneServer() {
         return;
       }
 
+      // Google Forms API stand-in: create (title only), read by id. The form is also a Drive file, so trash works.
+      if (path === '/v1/forms' && method === 'POST') {
+        const meta = readJson(raw);
+        const id = 'e2e-form-' + (state.seq++);
+        const title = (meta.info && meta.info.title) || 'Untitled form';
+        state.forms[id] = { formId: id, info: { title: title, documentTitle: (meta.info && meta.info.documentTitle) || title }, revisionId: '00000001', responderUri: 'https://docs.google.com/forms/d/e/' + id + '/viewform' };
+        state.files[id] = stampFile({ id: id, name: title, mimeType: 'application/vnd.google-apps.form', trashed: false, parents: null });
+        state.last.form = id;
+        state.last.file = id;
+        send(res, 200, state.forms[id]);
+        return;
+      }
+      const oneForm = path.match(/^\/v1\/forms\/([^/]+)$/);
+      if (oneForm && method === 'GET') {
+        const form = state.forms[oneForm[1]];
+        if (!form) { send(res, 404, { error: { code: 404, message: 'Requested entity was not found.', status: 'NOT_FOUND' } }); return; }
+        send(res, 200, form);
+        return;
+      }
       if (method === 'GET' && path === '/drive/v3/files') {
         const q = url.searchParams.get('q') || '';
         if (q.indexOf('application/vnd.google-apps.folder') >= 0) {
@@ -536,6 +556,18 @@ function startGoogleLaneServer() {
         send(res, task && task.__list === taskOne[1] ? 200 : 404, task && task.__list === taskOne[1] ? publicTask(task) : GOOGLE_404('Not Found'));
         return;
       }
+      if (taskOne && method === 'PATCH') {
+        const task = state.tasks[taskOne[2]];
+        if (!task || task.__list !== taskOne[1]) { send(res, 404, GOOGLE_404('Not Found')); return; }
+        const body = readJson(raw) || {};
+        if (body.status === 'completed') { task.status = 'completed'; task.completed = '2026-10-25T09:00:00.000Z'; }
+        else if (body.status === 'needsAction') { task.status = 'needsAction'; delete task.completed; }
+        if (typeof body.title === 'string') task.title = body.title;
+        if (typeof body.notes === 'string') task.notes = body.notes;
+        state.patches = (state.patches || []).concat([{ id: task.id, body: body }]);
+        send(res, 200, publicTask(task));
+        return;
+      }
       if (taskOne && method === 'DELETE') {
         if (!state.tasks[taskOne[2]]) { send(res, 404, GOOGLE_404('Not Found')); return; }
         delete state.tasks[taskOne[2]];
@@ -642,6 +674,7 @@ function startGoogleLaneServer() {
         sheet: (id) => state.sheets[id],
         editTask: (id, patch) => Object.assign(state.tasks[id], patch),
         editEvent: (id, patch) => Object.assign(state.events[id], patch),
+        editForm: (id) => { state.forms[id].revisionId = '0000000' + (state.seq++); },
         editFile: (id, patch) => { Object.assign(state.files[id], patch); bumpFile(state.files[id]); },
         editDocText: (id, text) => {
           const doc = state.docs[id];

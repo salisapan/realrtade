@@ -207,6 +207,7 @@
 
   function maybeDraft(main, list, party, direct, threadId) {
     if (typeof FlowChatLane === 'undefined' || !direct) {
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null);
       if (!direct) whyNot('not-one-to-one', location.href);
       else whyNot('missing-lane', location.href);
       return;
@@ -218,6 +219,11 @@
     const id = last.getAttribute('data-message-id') || text.slice(0, 80);
     const key = draftKey(threadId, id, text);
     if (!key) { whyNot('no-thread-id', location.href); return; }
+    if (typeof FlowChatTaskCard !== 'undefined') {
+      FlowChatTaskCard.sync(who === 'them' || who === 'me' ? key : null);
+      // The person's own newest message: a dated promise in it is offered as a task (CHAT_PROMISE_CARD, off).
+      if (who === 'me' && text && !forwarded(last)) FlowChatTaskCard.offer({ text: text, channel: 'messenger', oneToOne: true, group: false, fromMe: true, own: true, quoted: false, sender: { name: party.name }, key: key, now: Date.now() }).catch(() => {});
+    }
     if (who !== 'them') { whyNot(who === 'me' ? 'from-me' : 'sender-not-identified', key); return; }
     if (!text || inflight.has(key)) return;
     const when = sentAt(last);
@@ -246,7 +252,7 @@
       }
       if (saved && saved.hash) return;
       if (drafted.has(key)) return;
-      const r = await FlowChatLane.draftInto(box, {
+      const input = {
         text: text,
         fromMe: false,
         oneToOne: true,
@@ -254,8 +260,11 @@
         quoted: forwarded(last),
         channel: 'messenger',
         now: when == null ? Date.now() : when,
-        sender: { name: party.name }
-      });
+        sender: { name: party.name },
+        key: key
+      };
+      const r = await FlowChatLane.draftInto(box, input);
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
       if (!runtimeAlive() || (r && r.reason === 'invalidated')) { stopQuietly(); return; }
       if (r && r.reason === 'no-box') { whyNot('no-box', key); return; }
       if (!(r && r.ok && r.judged && r.judged.draft)) {

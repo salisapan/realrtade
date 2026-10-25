@@ -13,6 +13,7 @@ import '../core/workspace-file.js';
 // FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
 import '../core/event-call-link.js';
 import '../core/google-tasks.js';
+import '../core/google-task-close.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
@@ -642,6 +643,13 @@ async function prepareWrite(connectorId, input, cred) {
       dueIso: params.dateIso || i.dueIso || null
     };
   }
+  if (connectorId === 'googleTaskClose') {
+    return {
+      taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
+      taskId: i.taskId || params.taskId || i.externalId || '',
+      contentHash: i.contentHash || params.contentHash || ''
+    };
+  }
   if (connectorId === 'googleHold') {
     let zone = String(params.timeZone || i.timeZone || '').trim();
     if (!zone) zone = await storedTimeZone();
@@ -652,6 +660,7 @@ async function prepareWrite(connectorId, input, cred) {
       dateIso: params.dateIso || i.dateIso,
       hour: params.hour != null ? params.hour : i.hour,
       minute: params.minute != null ? params.minute : i.minute,
+      durationMinutes: params.durationMinutes != null ? params.durationMinutes : i.durationMinutes,
       fileName: params.fileName || params.fileTerm || i.fileName || '',
       fileUrl: params.fileUrl || params.shareUrl || i.fileUrl || '',
       fileTerm: params.fileTerm || i.fileTerm || '',
@@ -659,6 +668,23 @@ async function prepareWrite(connectorId, input, cred) {
       quote: params.quote || i.quote || '',
       timeZone: zone,
       expectAccount: cred && cred.email ? cred.email : ''
+    };
+  }
+  if (connectorId === 'googleRecurringReminder') {
+    const R = globalThis.FlowRecurringReminder;
+    let zone = String(params.timeZone || i.timeZone || '').trim();
+    if (!zone) zone = await storedTimeZone();
+    if (!zone) {
+      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
+    }
+    return {
+      flags: R ? { [R.SWITCH]: await laneSwitchOn(R.SWITCH) } : {},
+      title: params.title || i.title || '',
+      rrule: params.rrule || i.rrule || '',
+      when: params.when || i.when || null,
+      timeZone: zone,
+      expectAccount: cred && cred.email ? cred.email : '',
+      now: new Date().toISOString()
     };
   }
   if (connectorId === 'googleEventCallLink') {
@@ -703,7 +729,7 @@ async function prepareWrite(connectorId, input, cred) {
 }
 
 async function prepareUndo(connectorId, ref) {
-  if (connectorId !== 'googleLaneTask') return ref;
+  if (connectorId !== 'googleLaneTask' && connectorId !== 'googleTaskClose') return ref;
   const next = ref && typeof ref === 'object' ? Object.assign({}, ref) : { externalId: ref };
   if (!next.taskListId && !next.listId) {
     const id = await storedTaskListId();
@@ -829,11 +855,11 @@ async function fetchAttachment(msg) {
 function verifyUrlFor(connectorId, ref) {
   const r = ref || {};
   const enc = encodeURIComponent;
-  if (connectorId === 'googleHold' || connectorId === 'googleEventCallLink') {
+  if (connectorId === 'googleHold' || connectorId === 'googleEventCallLink' || connectorId === 'googleRecurringReminder') {
     const id = r.eventId || r.externalId;
     return id ? 'https://www.googleapis.com/calendar/v3/calendars/' + enc(r.calendarId || 'primary') + '/events/' + enc(id) : '';
   }
-  if (connectorId === 'googleLaneTask') {
+  if (connectorId === 'googleLaneTask' || connectorId === 'googleTaskClose') {
     const id = r.taskId || r.externalId;
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
@@ -900,6 +926,16 @@ function onLaneMessage(msg, sender, sendResponse) {
       const listed = await laneHttp({ method: 'GET', url: url });
       if (!listed || !listed.ok || !listed.json || !Array.isArray(listed.json.items)) return { action: 'silence', reason: 'not-searched' };
       return E.plan({ flags: { [E.SWITCH]: true }, text: text, events: listed.json.items, now: from });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-recurring-plan') {
+    // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
+    const R = globalThis.FlowRecurringReminder;
+    Promise.resolve((async () => {
+      if (!R || typeof R.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(R.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return R.plan({ flags: { [R.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000), todayIso: new Date().toISOString().slice(0, 10) });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }

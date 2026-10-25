@@ -359,6 +359,12 @@ const FlowOutlookCalendar = (() => {
 
   // One meeting, no file, nobody invited. dateTime is the local wall
   // clock with no Z. timeZone is the person's zone.
+  // An event is 30 minutes unless the caller names a length (a delivery window): a whole number of minutes from 5 to 720, anything else is 30.
+  function durationOf(v) {
+    const n = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,3}$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+    return Number.isInteger(n) && n >= 5 && n <= 720 ? n : DURATION_MIN;
+  }
+
   function meetingBody(input) {
     const i = input || {};
     const date = isoDate(i.dateIso);
@@ -371,7 +377,7 @@ const FlowOutlookCalendar = (() => {
     const zone = zoneName(i.timeZone);
     if (!zone || !zoneOk(zone)) return null;
     const startIso = wallIso(date, hour, minute, 0);
-    const endIso = wallIso(date, hour, minute, DURATION_MIN);
+    const endIso = wallIso(date, hour, minute, durationOf(i.durationMinutes));
     if (!startIso || !endIso || /Z$/i.test(startIso)) return null;
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     return {
@@ -401,6 +407,7 @@ const FlowOutlookCalendar = (() => {
   return {
     WRITE_SCOPE: WRITE_SCOPE,
     DURATION_MIN: DURATION_MIN,
+    durationOf: durationOf,
     hasWriteScope: hasWriteScope,
     holdConsentAsk: holdConsentAsk,
     normalizeDelegatedScopes: normalizeDelegatedScopes,

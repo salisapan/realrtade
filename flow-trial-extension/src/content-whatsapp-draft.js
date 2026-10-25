@@ -58,14 +58,25 @@
     const last = list[list.length - 1];
     if (!last) return;
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
-    if (!parsed || parsed.fromMe) return;
+    if (parsed && parsed.fromMe) {
+      // The person's own newest message: a dated promise in it is offered as a task (CHAT_PROMISE_CARD, off).
+      const mine = textOf(last);
+      const mineKey = (last.getAttribute('data-id') || '') + '\n' + mine;
+      if (typeof FlowChatTaskCard !== 'undefined') {
+        FlowChatTaskCard.sync(mineKey);
+        if (mine && !quoted(last)) FlowChatTaskCard.offer({ text: mine, channel: 'whatsapp', oneToOne: true, group: false, fromMe: true, own: true, quoted: false, sender: { name: P.partyFromChat(title(main), list.map((n) => n.getAttribute('data-id'))).name }, key: mineKey, now: Date.now() }).catch(() => {});
+      }
+      return;
+    }
+    if (!parsed) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
+    if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
     if (!text || drafted.has(key) || inflight.has(key)) return;
     inflight.add(key);
     const ids = list.map((n) => n.getAttribute('data-id'));
     const party = P.partyFromChat(title(main), ids);
-    FlowChatLane.draftInto(composerBox(main), {
+    const input = {
       text: text,
       fromMe: false,
       oneToOne: true,
@@ -73,8 +84,11 @@
       quoted: quoted(last),
       channel: 'whatsapp',
       now: Date.now(),
-      sender: { name: party.name, phone: party.phone }
-    }).then((r) => {
+      sender: { name: party.name, phone: party.phone },
+      key: key
+    };
+    FlowChatLane.draftInto(composerBox(main), input).then((r) => {
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }

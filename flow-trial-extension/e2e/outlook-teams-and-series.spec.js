@@ -9,7 +9,8 @@ const S = require('./support/sentences');
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const WHEN = new Date(Date.now() + 9 * 24 * 3600 * 1000);
-const DM = WHEN.getDate() + '/' + (WHEN.getMonth() + 1);
+// A month name, not 2/11: a slash date whose day and month both fit either way is unresolved on purpose, so the spec was red on days 1 to 12.
+const DM = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][WHEN.getMonth()] + ' ' + WHEN.getDate();
 const DAY = WEEKDAYS[WHEN.getDay()];
 const BASE = 'Pricing meeting ' + DM + ' at 14:00, please confirm.';
 const CALL = BASE + ' Can we do a Teams video call?';

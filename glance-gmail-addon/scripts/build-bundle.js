@@ -15,6 +15,7 @@ const out = path.join(__dirname, '..', 'CoreBundle.js');
 
 const files = [
   'domains.js',
+  'day-words.js',
   'extract.js',
   'judgment.js',
   'google-closes.js',
@@ -24,6 +25,7 @@ const files = [
   'intent.js',
   'actions.js',
   'resolution.js',
+  'system-notice.js',
   'incoming-judge.js'
 ].map((name) => path.join(core, name)).concat([
   'i18n.js',

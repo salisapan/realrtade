@@ -720,6 +720,34 @@
     return text.slice(0, OFFICE_READ_MAX_CHARS);
   }
 
+  // glanceSwitches.SYSTEM_NOTICE (off): a known service's deadline notice becomes a To Do task (core/system-notice.js).
+  let systemNoticeSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { systemNoticeSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) systemNoticeSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.SYSTEM_NOTICE === true); });
+  } catch (e) { systemNoticeSwitch = false; }
+
+  // glanceSwitches.BOOKING_NOTICE (off): a booking confirmation becomes a calendar hold, a pickup with a last day a To Do task.
+  let bookingNoticeSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { bookingNoticeSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.BOOKING_NOTICE === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) bookingNoticeSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.BOOKING_NOTICE === true); });
+  } catch (e) { bookingNoticeSwitch = false; }
+
+  // glanceSwitches.PAYMENT_ASK (off): "Please transfer 500 NIS by Sunday" becomes a To Do task Pay 500 NIS due that day. Glance pays nothing.
+  let paymentAskSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { paymentAskSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.PAYMENT_ASK === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) paymentAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.PAYMENT_ASK === true); });
+  } catch (e) { paymentAskSwitch = false; }
+
+  // glanceSwitches.TASK_ASK (off): a reminder or a deadline asked without a question, or a call-back request, becomes a To Do task due that day.
+  let taskAskSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { taskAskSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.TASK_ASK === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) taskAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.TASK_ASK === true); });
+  } catch (e) { taskAskSwitch = false; }
+
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
   async function decideFromText(pane, ownAddresses, mailbox) {
@@ -763,6 +791,10 @@
       forwarded: pane.onBehalf === true
     });
     const judgeWith = (text) => FlowIncomingJudge.judge({
+      systemNoticeOn: systemNoticeSwitch === true,
+      bookingNoticeOn: bookingNoticeSwitch === true,
+      paymentAskOn: paymentAskSwitch === true,
+      taskAskOn: taskAskSwitch === true,
       text: text, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
       now: new Date(), threadUrl: location.href,
@@ -788,7 +820,64 @@
       }
     }
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
+    if (r && r.show && r.intent && pane.senderEmail && typeof FlowHeldHold !== 'undefined' && FlowHeldHold.keyOf(r.intent)) {
+      // A reminder for an appointment this sender's confirmation already put on the calendar (and was not undone) is not offered twice.
+      try {
+        const bag = await FlowStorage.get();
+        if (FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.keyOf(r.intent), [pane.itemId, pane.pathId, pane.conversationId])) return { none: true, reason: 'already-on-calendar' };
+      } catch (e) { /* the log is unreadable: offer as before */ }
+    }
+    if (!(r && r.show) && bookingNoticeSwitch === true && pane.senderEmail) {
+      const gone = await cancelledHold(pane, own);
+      if (gone) return gone;
+    }
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
+  }
+
+  // The business cancelled a booking, a trip or an invitation that Glance put on this calendar from its own earlier mail: Do It takes
+  // that same event off again, through the same undo the hold's receipt has (read back that it is gone; an event the person changed is
+  // left alone and says so). Quiet when no hold of this sender at that day and clock is on the calendar. Never sends anything.
+  async function cancelledHold(pane, ownText) {
+    if (typeof FlowHeldHold === 'undefined') return null;
+    const text = String(ownText || '') || String(pane.subject || '');
+    let gone = null;
+    for (const reader of [typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null]) {
+      if (!reader || typeof reader.cancelled !== 'function') continue;
+      try { const g = reader.cancelled(text, new Date()); if (g && g.kind === 'cancelled') { gone = g; break; } } catch (e) { /* the next reader */ }
+    }
+    if (!gone) return null;
+    let held = null;
+    try {
+      const bag = await FlowStorage.get();
+      held = FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.holdAt(gone), []);
+    } catch (e) { return null; }
+    if (!held || held.connectorId !== 'outlookCalendar' || !held.ref) return null;
+    const he = gone.lang === 'he';
+    const title = String(held.label || '').replace(/^Calendar\s*·\s*/i, '').slice(0, 80);
+    return {
+      intent: { type: 'event', label: (he ? 'בוטל: ' : 'Cancelled: ') + title, confidence: 0.9, personalClose: 'booking-cancelled', signals: { score: 90, threshold: 50 }, entities: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute } },
+      process: { id: 'booking-cancelled', name: he ? 'הסר מהיומן' : 'Remove It', closingLine: he ? 'מסיר מהיומן.' : 'Removing it from your calendar.', closedLine: he ? 'הוסר מהיומן.' : 'Removed from your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: (he ? 'להסיר מהיומן: ' : 'Remove from calendar: ') + title, params: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute, title: title }, dependsOn: null }] },
+      removeHeld: { connectorId: held.connectorId, ref: held.ref, messageId: held.messageId || null, he: he }
+    };
+  }
+
+  // Do It on a cancellation: remove the hold through the worker's undo. A changed event stays and the card says so.
+  async function removeHeldHold(host, chip, ctx) {
+    const held = ctx.removeHeld;
+    const token = captureMailToken();
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', held.he ? 'מסיר…' : 'Removing…'); });
+    const u = await send({ type: 'flow:undo-action', connectorId: held.connectorId, ref: held.ref, created: held.ref && held.ref.created });
+    if (!(u && u.ok)) {
+      const edited = u && u.reason === 'user-edited';
+      const text = edited ? (held.he ? 'שינית את האירוע, השארתי אותו' : 'You changed this event, so I left it') : (held.he ? 'לא הצלחתי להסיר, נסה שוב' : "Couldn't remove it, try again");
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', text); });
+      return;
+    }
+    try { await FlowStorage.markOutlookCalendarUndone(held.messageId, held.ref); } catch (e) { /* the receipt still shows */ }
+    paintIfCurrent(token, function () {
+      if (typeof FlowChipHost.showDraftReceipt === 'function') FlowChipHost.showDraftReceipt(host, { status: 'Handled.', written: u.written || (held.he ? 'הוסר מהיומן.' : 'Removed from your calendar.') });
+    });
   }
 
   function userNameOf(st) {
@@ -1162,6 +1251,7 @@
       key: entry.key,
       hydrateHow: (pane && pane.hydrateHow) || null,
       priorConversationId: (pane && pane.priorConversationId) || null,
+      removeHeld: (decided && decided.removeHeld) || null,
       __epoch: paneEpoch(pane)
     };
   }
@@ -1207,6 +1297,7 @@
   async function onDoIt(host, chip, ctx, liveSteps) {
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
+    if (ctx && ctx.removeHeld) return removeHeldHold(host, chip, ctx);
     const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
     const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const earlyDraft = earlySteps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
@@ -3067,6 +3158,8 @@
     const bags = [];
     const steps = (ctx && ctx.process && ctx.process.steps) || [];
     steps.forEach((step) => { if (step && step.params) bags.push(step.params); });
+    // A length the plan names (a delivery window) rides along; anything else is the default half hour.
+    const named = steps.map((step) => step && step.params && step.params.durationMinutes).find((n) => n);
     if (ctx && ctx.intent) bags.push(ctx.intent.entities, ctx.intent.facts, ctx.intent);
     for (let i = 0; i < bags.length; i++) {
       const found = clockFrom(bags[i]);
@@ -3074,6 +3167,7 @@
       const title = found.what || (ctx.intent && ctx.intent.label) || ctx.subject || 'Meeting';
       return {
         meeting: true,
+        durationMinutes: named || undefined,
         dateIso: found.dateIso,
         hour: found.hour,
         minute: found.minute,
@@ -3401,6 +3495,7 @@
       requireTime: p.requireTime === true
     };
     if (p.calendarOp) params.calendarOp = p.calendarOp;
+    if (p.durationMinutes) params.durationMinutes = p.durationMinutes;
     if (p.fileTerm || p.fileName || p.fileUrl) {
       if (p.fileTerm) params.fileTerm = p.fileTerm;
       if (p.fileName) params.fileName = p.fileName;

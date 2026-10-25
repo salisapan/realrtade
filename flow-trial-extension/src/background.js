@@ -53,6 +53,7 @@ import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConf
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
+import '../core/day-words.js'; // classic: sets globalThis.FlowDayWords (extract.js makes the day forms people write explicit with it)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
 import '../core/recurring-reminder.js'; // classic: sets globalThis.FlowRecurringReminder (recognition only here)
 import '../core/todo-recurrence.js'; // classic: sets globalThis.FlowTodoRecurrence (switch RECURRING_TODO, off)
@@ -624,6 +625,20 @@ const LANE_CHAT = [
   }
 ];
 
+// The chat task card needs the one shared judge, the step kit and the canonical card, which the lean chat lists do
+// not carry. Each chat registration loads the same base the Outlook surface does (minus the Gmail-only pieces and the
+// Gmail follow-up scripts), the lane's own files, then the card, so the card file always loads after chat-lane.js.
+const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
+function laneChatScripts(lane) {
+  const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
+  const out = [];
+  for (const f of base.concat(lane.js, ['core/day-words.js', 'core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-travel-notice.js', 'core/chat-delivery-window.js', 'core/chat-payment-claim.js', 'core/chat-invitation-notice.js', 'core/chat-self-note.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
+  return out;
+}
+const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
+globalThis.__glanceLaneChatScripts = laneChatScripts;
+globalThis.__glanceLaneChatDefs = LANE_CHAT;
+
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
   for (const lane of LANE_CHAT) {
@@ -657,7 +672,8 @@ async function restoreLaneChats() {
       await chrome.scripting.registerContentScripts([{
         id: lane.id,
         matches: lane.origins,
-        js: lane.js,
+        js: laneChatScripts(lane),
+        css: LANE_CHAT_CSS,
         runAt: 'document_idle',
         persistAcrossSessions: true
       }]);
@@ -679,7 +695,10 @@ async function restoreLaneChats() {
         alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
       } catch (e) { alive = false; }
       if (alive) continue;
-      try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: lane.js }); }
+      try {
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneChatScripts(lane) });
+      }
       catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
     }
   }
@@ -2273,6 +2292,63 @@ function googleTasksAuthedFetch(path, options) {
   return googleAuthedFetch(GOOGLE_TASKS_API, path, options);
 }
 
+// A task made from a chat names the chat (Open in WhatsApp), never "Open in Gmail". Only the three known labels count.
+function chatThreadLabel(p, fallback) {
+  const l = p && p.threadLabel;
+  return (l === 'Open in WhatsApp' || l === 'Open in Messenger' || l === 'Open in Instagram') ? l : fallback;
+}
+
+const CHAT_CARD_ASSETS = ['design/step-states-v1/do-it.png', 'design/step-states-v1/do-it-dark.png', 'design/step-states-v1/living/key-idle-512.png', 'design/step-states-v1/living/key-done-512.png'];
+const chatAssetCache = {};
+async function chatAssetData(file) {
+  if (CHAT_CARD_ASSETS.indexOf(file) < 0) return { ok: false, reason: 'not-allowed' };
+  if (chatAssetCache[file]) return { ok: true, url: chatAssetCache[file] };
+  try {
+    const bytes = new Uint8Array(await (await fetch(chrome.runtime.getURL(file))).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    chatAssetCache[file] = 'data:image/png;base64,' + btoa(bin);
+    return { ok: true, url: chatAssetCache[file] };
+  } catch (e) { return { ok: false, reason: 'read-failed' }; }
+}
+
+// A proposed meeting becomes a hold on the person's own calendar: Google Calendar through the lane when the account is on
+// record with the Calendar scope, else Outlook Calendar when its token can write. Nothing is invited.
+async function chatCalendarTarget() {
+  let account = '';
+  try { account = globalThis.FlowGoogleLaneAccount ? await globalThis.FlowGoogleLaneAccount.read() : ''; } catch (e) { account = ''; }
+  if (account && await getGoogleTasksAuth()) {
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const list = (bag.googleGrantedScopes && bag.googleGrantedScopes.version) || [];
+      const C = globalThis.FlowGoogleConfig;
+      if (!C || C.hasScope(list, C.SCOPE_CALENDAR) !== false) return { ok: true, connectorId: 'googleHold' };
+    } catch (e) { /* fall through to Outlook */ }
+  }
+  try {
+    const session = await outlookSession({});
+    const Cal = globalThis.FlowOutlookCalendar;
+    if (session && session.ok && session.token && Cal && Cal.hasWriteScope(Cal.scopesFromToken ? Cal.scopesFromToken(session.token) : session.token.grantedScopes)) {
+      return { ok: true, connectorId: 'outlookCalendar' };
+    }
+  } catch (e) { /* not connected */ }
+  return { ok: false, reason: 'not-connected' };
+}
+
+async function chatTaskTarget(msg) {
+  if (!(await glanceSwitchOn(msg && msg.own === true ? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
+  if (msg && msg.kind === 'calendar') return chatCalendarTarget();
+  // Google writes through the lane, which needs the connected account on record (a chat page has no mailbox to name it).
+  let account = '';
+  try { account = globalThis.FlowGoogleLaneAccount ? await globalThis.FlowGoogleLaneAccount.read() : ''; } catch (e) { account = ''; }
+  if (account && await getGoogleTasksAuth()) return { ok: true, connectorId: 'googleTask' };
+  try {
+    const session = await outlookSession({});
+    if (session && session.ok && session.token && outlookHasTasksScope(session.token) !== false) return { ok: true, connectorId: 'outlookTask' };
+  } catch (e) { /* not connected */ }
+  return { ok: false, reason: 'not-connected' };
+}
+
 async function getGoogleTasksAuth() {
   const { googleTasksAuth } = await chrome.storage.local.get('googleTasksAuth');
   return googleTasksAuth || null;
@@ -2456,7 +2532,7 @@ async function googleTasksWrite(p) {
   const close = taskClosePayload(p);
   const notesLines = factLines(close.forNotes);
   if (taskFile) notesLines.push(['File', taskFile.name + '\n' + taskFile.url]);
-  if (p.threadUrl) notesLines.push(['Open in Gmail', p.threadUrl]);
+  if (p.threadUrl) notesLines.push([chatThreadLabel(p, 'Open in Gmail'), p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n');
 
   const body = { title: googleTaskTitle(p).slice(0, 1024), notes: notes.slice(0, 8192) };
@@ -2777,6 +2853,11 @@ async function outlookGlanceZone(explicit) {
 // rather than a guess dressed up as a fact, and the event's own real time
 // (not its length) is what actually matters for "don't miss this".
 const CALENDAR_DEFAULT_DURATION_MIN = 30;
+// A hold is 30 minutes unless the card names a length (a delivery window): a whole number of minutes from 5 to 720.
+function calendarDurationOf(v) {
+  const n = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,3}$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 5 && n <= 720 ? n : CALENDAR_DEFAULT_DURATION_MIN;
+}
 
 function calendarDateTime(dateIso, hour, minute, addMinutes) {
   const [y, m, d] = dateIso.split('-').map(Number);
@@ -2978,7 +3059,7 @@ async function googleCalendarWrite(p) {
   };
   if (!clock.absent) {
     body.start = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute), timeZone };
-    body.end = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone };
+    body.end = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, calendarDurationOf(params.durationMinutes)), timeZone };
   } else {
     body.start = { date: dateIso };
     body.end = { date: nextDateIso(dateIso) };
@@ -5766,6 +5847,7 @@ async function outlookMeetingWrite(p) {
     minute: clock.minute,
     title: title,
     quote: lines.length ? lines.join('\n') : title,
+    durationMinutes: params.durationMinutes,
     timeZone: zone
   });
   if (!built) return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
@@ -6093,7 +6175,7 @@ async function outlookTaskWrite(p) {
   const planned = await outlookPlannerWrite(p, title, close.dueIso);
   if (planned) return planned;
   const notesLines = factLines(close.forNotes);
-  if (p && p.threadUrl) notesLines.push(['Open in Outlook', p.threadUrl]);
+  if (p && p.threadUrl) notesLines.push([chatThreadLabel(p, 'Open in Outlook'), p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n').slice(0, 8000);
   const body = { title: title };
   if (notes) body.body = { contentType: 'text', content: notes };
@@ -6164,6 +6246,70 @@ async function outlookTaskWrite(p) {
     return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
   }
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+// Closing a To Do task Glance wrote (the other side said they paid): PATCH status completed, and Handled only when a GET shows it
+// completed. A task the person changed since Glance wrote it (title, body, due day, status ...) is left as it is. Undo reopens it, and only
+// while it still has the content the close left.
+async function outlookTaskCloseWrite(p) {
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) {
+    if (session && (session.needsSignIn || session.error === 'expired' || session.error === 'login_required')) return { ok: false, reason: 'token-expired' };
+    return { ok: false, reason: 'not-connected' };
+  }
+  if (outlookHasTasksScope(session.token) === false) return { ok: false, reason: 'tasks-not-granted' };
+  const params = (p && p.params) || {};
+  const listId = String(params.taskListId || '').trim();
+  const taskId = String(params.taskId || '').trim();
+  if (!listId || !taskId || plannerRawId(taskId) || !outlookHasSnap(params.created)) return { ok: false, reason: 'unclear', error: 'No single task to close.' };
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const refused = await outlookRefuseIfEdited(url, params.created);
+  if (refused && refused.alreadyGone) return { ok: false, reason: 'not-found', error: 'That task is gone, so there is nothing to close.' };
+  if (refused) return refused;
+  const Proof = globalThis.FlowProofOfClose;
+  const doneRef = (task, wrote) => ({ taskListId: listId, taskId: taskId, externalId: taskId, closed: outlookCreationSnap(task), closedByGlance: wrote === true });
+  const finish = (task, wrote) => {
+    const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
+    const proof = Proof && Proof.buildProof({ system: Proof.SYSTEM_MICROSOFT_TODO, externalId: taskId, url: link || undefined, fetchedBack: true, verifiedAt: new Date().toISOString() });
+    const base = { where: 'Microsoft To Do', target: 'default list', written: 'To Do task done · ' + String(task.title || ''), url: link, title: String(task.title || '') };
+    if (!proof) return Object.assign({ ok: false, reason: (Proof && Proof.REASON_PENDING) || 'proof_pending', ref: doneRef(task, wrote), proof: null }, base);
+    return Object.assign({ ok: true, ref: doneRef(task, wrote), proof: proof, fetchedBack: true }, base);
+  };
+  const before = await outlookTaskFetchOnce(listId, taskId);
+  if (before.ok && before.task && before.task.status === 'completed') return finish(before.task, false);
+  const res = await outlookFetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'completed' }) });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 401) return { ok: false, reason: 'token-expired' };
+  if (res && res.status === 403) return { ok: false, reason: 'tasks-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  const waits = [0, 250, 500, 1000, 1250];
+  let last = { ok: false };
+  for (let attempt = 0; attempt < waits.length; attempt++) {
+    if (waits[attempt]) await new Promise((resolve) => setTimeout(resolve, waits[attempt]));
+    last = await outlookTaskFetchOnce(listId, taskId);
+    if (last.ok && last.task && last.task.status === 'completed') return finish(last.task, true);
+  }
+  return { ok: false, reason: (Proof && Proof.REASON_FAILED) || 'verify_failed', ref: { taskListId: listId, taskId: taskId, externalId: taskId, closed: null, closedByGlance: true }, proof: null, fetchedBack: false };
+}
+
+async function outlookTaskCloseUndo(ref) {
+  const taskId = ref && (ref.externalId || ref.taskId);
+  const listId = ref && ref.taskListId;
+  if (!taskId || !listId) return { ok: false };
+  if (ref.closedByGlance === false) return { ok: true, fetchedBack: true, written: 'It was already done before, so it stays done.' };
+  if (!outlookHasSnap(ref.closed)) return outlookUnconfirmed();
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const refused = await outlookRefuseIfEdited(url, ref.closed);
+  if (refused && refused.alreadyGone) return { ok: true, fetchedBack: true, written: 'The task is gone.' };
+  if (refused) return refused;
+  const res = await outlookFetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'notStarted' }) });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  const back = await outlookTaskFetchOnce(listId, taskId);
+  if (!back.ok || !back.task || back.task.status === 'completed') return { ok: false, reason: 'unverified', written: 'Not verified: To Do still shows the task as done.' };
+  return { ok: true, fetchedBack: true, written: 'To Do task is open again.' };
 }
 
 function outlookZoneKey(zone) {
@@ -6584,7 +6730,7 @@ const WRITERS = {
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
-  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
+  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite, outlookTaskClose: outlookTaskCloseWrite,
   onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, outlookEventCallLink: eventLinkWrite,
   attachmentSave: attachmentSaveWrite
 };
@@ -6597,7 +6743,7 @@ const UNDOERS = {
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
-  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
+  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo, outlookTaskClose: outlookTaskCloseUndo,
   onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, outlookEventCallLink: eventLinkUndo,
   attachmentSave: attachmentSaveUndo
 };
@@ -6770,6 +6916,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.docusignReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:signature-check' ? docusignCheck(msg.payload) : docusignRelease(msg.payload));
+  }
+
+  // The chat task card (CHAT_TASK_CARD, off): which connected task app can take the task. Google Tasks first, then
+  // Microsoft To Do when the Tasks scope is granted. Nothing is written here.
+  // The card's own pictures are web-accessible on Gmail and Outlook only, and the manifest is not changed for chat sites.
+  // The worker reads its own four files and hands them back as data: URLs. Nothing else is readable this way.
+  if (msg.type === 'flow:asset-data') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, chatAssetData(msg.path));
+  }
+
+  if (msg.type === 'flow:chat-task-target') {
+    return reply(sendResponse, chatTaskTarget(msg));
   }
 
   if (msg.type === 'flow:event-link-plan') {

@@ -230,6 +230,8 @@ const FlowExtract = (() => {
       let monthIdx = null;
       if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
       else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+      // A Hebrew sentence writes day first (01/11 is 1 November): that is the convention in Israel. English stays ambiguous.
+      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; monthIdx = b - 1; }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
       if (year != null && year < 100) year += 2000;
@@ -346,7 +348,17 @@ const FlowExtract = (() => {
 
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
+  // Forms people really write that the readers below do not take (Hebrew weekday abbreviations, dotted dates, «ב-8 בערב»,
+  // "half past 8", "by the 30th", «בעוד יומיים») are made explicit first by core/day-words.js, when it is loaded.
+  function dayWordsFirst(text, now) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
+      return D ? D.normalize(text, now) : text;
+    } catch (e) { return text; }
+  }
+
   function parseDate(text, now) {
+    text = dayWordsFirst(text, now);
     now = now || new Date();
     let m;
 
@@ -591,7 +603,16 @@ const FlowExtract = (() => {
   }
 
   function parseTime(text) {
+    text = dayWordsFirst(text);
     let m;
+
+    // "at 8.30 pm": a dotted clock that carries am or pm is that clock, not 8:00 with ".30 pm" left over.
+    m = text.match(/\bat\s+(\d{1,2})\.([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
+    if (m) {
+      const clock0 = resolveClock(+m[1], +m[2], m[3].toLowerCase().replace(/\./g, ''));
+      if (!clock0) return null;
+      return { raw: m[0], hour: clock0.hour, minute: clock0.minute };
+    }
 
     m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|(?:in the|this) (?:morning|afternoon|evening)|at night)?\b/i);
     if (m) {

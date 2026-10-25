@@ -99,6 +99,103 @@ const FLOW_DOMAINS = [
 
 if (typeof module !== 'undefined') module.exports = { FLOW_DOMAINS };
 
+// ----- flow-trial-extension/core/day-words.js -----
+// Day words the date reader (core/extract.js) does not take, rewritten into forms it does, before a chat or mail reader looks
+// for its one day: Hebrew weekday abbreviations («יום א׳» to «יום ראשון»), the Hebrew hyphen (maqaf) in «ב־10:00», dotted dates
+// after a day marker («עד 28.10» to «עד 28/10», "by 28.10"), and relative spans («בעוד יומיים», «בעוד שלושה ימים», «בעוד שבוע»,
+// "in 3 days", "in two days", "in a week") to an ISO date. It only rewrites; it never decides anything. Portable: no
+// A clock with a part of the day («ב-7 בערב», «ב-4 אחה"צ», "at noon") becomes "at 7:00 pm".
+// chrome.*, no DOM, no network.
+const FlowDayWords = (() => {
+  const ABBR = { 'א': 'ראשון', 'ב': 'שני', 'ג': 'שלישי', 'ד': 'רביעי', 'ה': 'חמישי', 'ו': 'שישי', 'ש': 'שבת' };
+  const HE_NUM = { 'יומיים': 2, 'שלושה': 3, 'שלוש': 3, 'ארבעה': 4, 'ארבע': 4, 'חמישה': 5, 'חמש': 5, 'שישה': 6, 'שש': 6, 'שבעה': 7, 'שבע': 7 };
+  const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, a: 1 };
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function plus(at, days) { return iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days)); }
+
+  function normalize(text, now) {
+    let s = String(text == null ? '' : text);
+    if (!s) return s;
+    const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
+    s = s.replace(/־/g, '-');
+    s = s.replace(/(יום|ליום|ביום)\s+([אבגדהוש])[׳'’`]/g, (m, d, a) => d + ' ' + ABBR[a]);
+    // 28.10 or 28.10.2026 after a day marker, not a price or a version.
+    s = s.replace(/(^|[\s(])((?:עד|לפני|ב-?|ל-?|on|by|before|until|till)\s*)([0-3]?\d)\.([01]?\d)(\.\d{2,4})?(?![\d.]*\d)/gi, (m, pre, mark, d, mo, yr) => {
+      const dn = parseInt(d, 10); const mn = parseInt(mo, 10);
+      if (dn < 1 || dn > 31 || mn < 1 || mn > 12) return m;
+      // Always an ISO date: "5/11" is ambiguous (day or month first) to a reader, an ISO date is not. No year means the next such day.
+      let y = at.getFullYear();
+      if (yr) { y = parseInt(yr.slice(1), 10); if (y < 100) y += 2000; } else if (new Date(y, mn - 1, dn) < new Date(at.getFullYear(), at.getMonth(), at.getDate())) y += 1;
+      const probe = new Date(y, mn - 1, dn);
+      if (probe.getMonth() !== mn - 1 || probe.getDate() !== dn) return m;
+      return pre + mark + iso(probe);
+    });
+    // Clocks written the other ways: «ב-8 וחצי», «ב-8 ורבע», "half past 8", "quarter to 9", and a dotted clock («ב-20.00»,
+    // "at 8.30 pm"). The date reader would take "at 8.30 pm" for 8:00, a wrong hour, so these are made explicit first.
+    s = s.replace(/(^|[^\u0590-\u05FF\d])(ב-?|בשעה\s+)(\d{1,2})\s*ו-?(חצי|רבע)(?![\u0590-\u05FF])/g, (m, pre, lead, h, w) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? pre + lead + h + ':' + (w === 'חצי' ? '30' : '15') : m);
+    s = s.replace(/\bhalf\s+past\s+(\d{1,2})\b/gi, (m, h) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? h + ':30' : m);
+    s = s.replace(/\bquarter\s+past\s+(\d{1,2})\b/gi, (m, h) => (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12) ? h + ':15' : m);
+    s = s.replace(/\bquarter\s+(?:to|of)\s+(\d{1,2})\b/gi, (m, h) => { const n = parseInt(h, 10); return (n >= 1 && n <= 12) ? ((n === 1 ? 12 : n - 1) + ':45') : m; });
+    s = s.replace(/(\d{1,2})\.([0-5]\d)(\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z]))/gi, (m, h, mi, mer) => parseInt(h, 10) >= 1 && parseInt(h, 10) <= 12 ? h + ':' + mi + mer : m);
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)([01]?\d|2[0-3])\.([0-5]\d)(?![\d.])/gi, (m, lead, h, mi) => lead + h + ':' + mi);
+    // A clock written with a leading zero is a 24-hour clock ("06:30", «ב-06:30», "at 06:30"): the date reader leaves a bare 6:30
+    // unresolved, which is right for "6:30" and wrong for "06:30" on a boarding pass. Written out with am, it is 6:30 am.
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])0([1-9]):([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, h, mi) => 'at ' + h + ':' + mi + ' am');
+    s = s.replace(/(\bat\s+|(?<![\u0590-\u05FF])ב-?|בשעה\s+)?(?<![\d:.])00:([0-5]\d)(?![\d:])(?!\s*(?:a\.?m\.?|p\.?m\.?)\b)/gi, (m, lead, mi) => 'at 12:' + mi + ' am');
+    // A clock with a part of the day: «ב-7 בערב» to "at 7:00 pm", «ב-12 בצהריים» to "at 12:00 pm", "at noon" to "at 12:00 pm". The
+    // date reader leaves a bare 12 or 00 unresolved on purpose, and takes a written am or pm.
+    s = s.replace(/(ב-?|בשעה\s+)(\d{1,2})(?::([0-5]\d))?\s+(בבוקר|בצהריים|בצהרים|אחה["״]צ|אחר\s+הצהריים|אחרי\s+הצהריים|בערב|בלילה)/g, (m, lead, h, min, part) => {
+      const hh = parseInt(h, 10);
+      if (hh < 1 || hh > 12) return m;
+      let mer = '';
+      if (part === 'בבוקר') mer = hh === 12 ? '' : 'am';
+      else if (/^בצהר/.test(part)) mer = (hh === 12 || hh <= 5) ? 'pm' : '';
+      else if (part === 'בלילה') mer = hh === 12 || hh <= 5 ? 'am' : 'pm';
+      else mer = 'pm';
+      if (!mer) return m;
+      return 'at ' + hh + ':' + (min || '00') + ' ' + mer;
+    });
+    s = s.replace(/\bat\s+noon\b/gi, 'at 12:00 pm');
+    s = s.replace(/\bat\s+midnight\b/gi, 'at 12:00 am');
+    s = s.replace(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, (m, d, mo) => mo + ' ' + d);
+    // End of the week (Friday) and of the month, and a day of the month by itself: "by the 30th", «עד ה-30», «עד 30 לחודש».
+    // English: Friday. Hebrew «סוף השבוע» follows the product's Israeli work week, as core/follow-up.js does: Thursday.
+    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
+    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - at.getDay() + 7) % 7));
+    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => iso(new Date(at.getFullYear(), at.getMonth() + 1, 0)));
+    const dayOfMonth = (dn) => {
+      if (dn < 1 || dn > 31) return null;
+      for (let k = 0; k < 3; k++) {
+        const probe = new Date(at.getFullYear(), at.getMonth() + k, dn);
+        if (probe.getDate() === dn && probe >= new Date(at.getFullYear(), at.getMonth(), at.getDate())) return iso(probe);
+      }
+      return null;
+    };
+    s = s.replace(/\b(by|before|until|till|on)\s+the\s+(\d{1,2})(?:st|nd|rd|th)\b(?!\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/gi, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? mark + ' ' + v : m; });
+    s = s.replace(/(עד|לפני)\s+ה-?\s*(\d{1,2})(?:\s+לחודש)?(?![\d:./\u0590-\u05FF])/g, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? mark + ' ' + v : m; });
+    s = s.replace(/(עד|לפני|ב-?)\s*(\d{1,2})\s+לחודש(?![\u0590-\u05FF])/g, (m, mark, d) => { const v = dayOfMonth(parseInt(d, 10)); return v ? (/^ב-?$/.test(mark) ? 'ב-' : mark + ' ') + v : m; });
+    // Relative spans to an ISO date.
+    s = s.replace(/בעוד\s+(יומיים|(?:שלושה|שלוש|ארבעה|ארבע|חמישה|חמש|שישה|שש|שבעה|שבע|\d{1,2})\s+ימים)/g, (m, span) => {
+      const n = HE_NUM[span] || HE_NUM[span.split(/\s+/)[0]] || parseInt(span, 10);
+      return n >= 1 && n <= 60 ? plus(at, n) : m;
+    });
+    s = s.replace(/בעוד\s+שבוע(?![֐-׿])/g, () => plus(at, 7));
+    s = s.replace(/\bin\s+(a|one|two|three|four|five|six|seven|\d{1,2})\s+days?\b/gi, (m, w) => {
+      const n = EN_NUM[String(w).toLowerCase()] || parseInt(w, 10);
+      return n >= 1 && n <= 60 ? plus(at, n) : m;
+    });
+    s = s.replace(/\bin\s+(?:a|one)\s+week\b/gi, () => plus(at, 7));
+    return s;
+  }
+
+  return { normalize };
+})();
+
+if (typeof module !== 'undefined') module.exports = { FlowDayWords };
+else if (typeof globalThis !== 'undefined') globalThis.FlowDayWords = FlowDayWords;
+
 // ----- flow-trial-extension/core/extract.js -----
 // Pulls structured facts out of one email's visible text.
 //
@@ -332,6 +429,8 @@ const FlowExtract = (() => {
       let monthIdx = null;
       if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
       else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+      // A Hebrew sentence writes day first (01/11 is 1 November): that is the convention in Israel. English stays ambiguous.
+      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; monthIdx = b - 1; }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
       if (year != null && year < 100) year += 2000;
@@ -448,7 +547,17 @@ const FlowExtract = (() => {
 
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
+  // Forms people really write that the readers below do not take (Hebrew weekday abbreviations, dotted dates, «ב-8 בערב»,
+  // "half past 8", "by the 30th", «בעוד יומיים») are made explicit first by core/day-words.js, when it is loaded.
+  function dayWordsFirst(text, now) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
+      return D ? D.normalize(text, now) : text;
+    } catch (e) { return text; }
+  }
+
   function parseDate(text, now) {
+    text = dayWordsFirst(text, now);
     now = now || new Date();
     let m;
 
@@ -693,7 +802,16 @@ const FlowExtract = (() => {
   }
 
   function parseTime(text) {
+    text = dayWordsFirst(text);
     let m;
+
+    // "at 8.30 pm": a dotted clock that carries am or pm is that clock, not 8:00 with ".30 pm" left over.
+    m = text.match(/\bat\s+(\d{1,2})\.([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
+    if (m) {
+      const clock0 = resolveClock(+m[1], +m[2], m[3].toLowerCase().replace(/\./g, ''));
+      if (!clock0) return null;
+      return { raw: m[0], hour: clock0.hour, minute: clock0.minute };
+    }
 
     m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|(?:in the|this) (?:morning|afternoon|evening)|at night)?\b/i);
     if (m) {
@@ -4507,7 +4625,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגישה|שיחה)|(?:אפשר|נוכל|תוכל(?:י|ו)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
 
   // "This is not happening at the time this message names."
   //
@@ -5419,6 +5537,8 @@ const FlowIntent = (() => {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
     if (/\b(?:please|kindly|do you)\s+(?:agree|accept)\b/i.test(raw)) return true;
+    // Approving is the same decision. With a deadline it becomes a task (see the readerDecisionAsk caller); without one it stays quiet.
+    if (/\b(?:can|could|would|will) you\s+(?:please\s+)?approve\b/i.test(raw) || /\b(?:please|kindly)\s+approve\b/i.test(raw)) return true;
     if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw) && !/\bconfirm\s+by\b/i.test(raw)) return true;
     if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
     if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
@@ -6404,6 +6524,21 @@ const FlowIntent = (() => {
     const familyBlocks = familiesBlockAsk && !inboundAsk;
     if (!quietHint && (askIsSoft || familyBlocks) && requestEvidence) quietHint = 'hedge';
     if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && readerDecisionAsk(text) && !replyAsk) {
+      // Owner, 2026-10-24: a request to approve or accept, with a deadline, is a task: the decision stays the person's, the
+      // deadline is not lost. No reply draft and no answer on their behalf. Without a date it stays the reader's own and quiet.
+      if (hasResolvedDate && !isPast) {
+        const approve = finish(TYPES.REQUEST, 'medium', {
+          who, amount,
+          what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+          when: humanWhen(facts.date, facts.time),
+          dateIso: facts.date && facts.date.iso
+        }, 'follow-up-ask');
+        if (approve && approve.type) {
+          approve.noReplyDraft = true;
+          approve.label = /[\u0590-\u05FF]/.test(text) ? 'אישור נדרש' : 'Approval requested';
+        }
+        return approve;
+      }
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
@@ -9056,6 +9191,185 @@ const FlowResolution = (() => {
 
 if (typeof module !== 'undefined') module.exports = { FlowResolution };
 
+// ----- flow-trial-extension/core/system-notice.js -----
+// A system notice with a deadline and a preventing action: "your project will be paused on October 28 unless you update
+// your billing details", "your domain expires on 2026-11-02, renew it". Portable: no chrome.*, no DOM, no network.
+//
+// This is a request kind of its own, not a person's ask. The sender is a service, so the person-to-person quiets
+// (no-reply, notification senders) do not apply; the ones that do are stricter instead:
+//   - the sender must be a KNOWN service (a domain in KNOWN_DOMAINS, or one the caller passes as knownSenders), never an
+//     unknown address that merely writes the same words (that is a phishing shape);
+//   - the text must carry all three: a consequence (paused, suspended, deleted, expires), a deadline (a date, or a window
+//     such as "within 48 hours") and a preventing action (update, renew, verify, pay);
+//   - a newsletter, a promotion or a webinar never qualifies, even from a known service.
+// The close is a task with the date. It is a proposal the person approves with Do It; Glance never pays, renews or signs in.
+const FlowSystemNotice = (() => {
+  const KNOWN_DOMAINS = [
+    'google.com', 'googlemail.com', 'accounts.google.com', 'workspace.google.com', 'microsoft.com', 'office.com', 'office365.com',
+    'azure.com', 'live.com', 'github.com', 'gitlab.com', 'netlify.com', 'vercel.com', 'supabase.com', 'supabase.io',
+    'cloudflare.com', 'godaddy.com', 'namecheap.com', 'squarespace.com', 'wix.com', 'wordpress.com', 'shopify.com',
+    'amazon.com', 'amazonaws.com', 'aws.amazon.com', 'heroku.com', 'render.com', 'fly.io', 'digitalocean.com', 'atlassian.com',
+    'zoom.us', 'dropbox.com', 'apple.com', 'stripe.com', 'paypal.com', 'meta.com', 'facebook.com', 'facebookmail.com',
+    'slack.com', 'notion.so', 'figma.com', 'canva.com', 'mailchimp.com', 'hostinger.com', 'bluehost.com', 'monday.com',
+    'quickbooks.com', 'intuit.com', 'twilio.com', 'sendgrid.net', 'openai.com', 'anthropic.com'
+  ];
+
+  const MONTHS = {
+    jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7,
+    aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+    'ינואר': 1, 'פברואר': 2, 'מרץ': 3, 'אפריל': 4, 'מאי': 5, 'יוני': 6, 'יולי': 7, 'אוגוסט': 8, 'ספטמבר': 9, 'אוקטובר': 10,
+    'נובמבר': 11, 'דצמבר': 12
+  };
+
+  const CONSEQUENCE = new RegExp([
+    '\\b(?:will|would|may)\\s+(?:be\\s+)?(?:paused|suspended|deleted|disabled|deactivated|terminated|closed|cancell?ed|removed|locked|shut\\s+down|taken\\s+offline|downgraded)\\b',
+    '\\b(?:expires?|expiring|will\\s+expire|expired\\s+on|lapses?|will\\s+lapse|runs?\\s+out|will\\s+be\\s+charged)\\b',
+    '\\b(?:last\\s+day|final\\s+notice)\\b',
+    '(?:יושעה|יושעו|יימחק|יימחקו|יושבת|יושבתו|תושעה|תימחק|תבוטל|יבוטל|יפוג|תפוג|פג\\s+תוקף|ייסגר|ייחסם|תיחסם|יחויב)'
+  ].join('|'), 'i');
+
+  const ACTION = [
+    { re: /\b(update|add|confirm|verify|fix)\s+(?:your\s+|the\s+)?(billing|payment|card|credit card|account|contact)\b[^.\n]{0,40}/i, verb: 1 },
+    { re: /\b(renew|reactivate|upgrade|re-?authenticate|reauthorize|re-?verify)\s+(?:your\s+|the\s+)(?!it\b|now\b)[^.\n]{0,50}/i, verb: 1 },
+    { re: /\b(renew|reactivate)\s+(?:it|now|this|that)\b/i, verb: 1, bare: true },
+    { re: /\b(pay|settle)\s+(?:your\s+|the\s+|this\s+)?(?:outstanding\s+|overdue\s+)?(invoice|balance|bill|amount)\b[^.\n]{0,30}/i, verb: 1 },
+    { re: /\b(verify|confirm)\s+(?:your\s+)?(email|domain|identity|ownership)\b[^.\n]{0,30}/i, verb: 1 },
+    { re: /(?:לחדש|לעדכן|לאמת|לשלם|לאשר|להוסיף)\s+[^.\n]{2,50}/, verb: 0 }
+  ];
+
+  const NEWSLETTER = [
+    /\bunsubscribe\b/i, /\bview (?:this email )?in (?:your )?browser\b/i, /\bnewsletter\b/i, /\bwebinar\b/i, /\bwhat'?s new\b/i,
+    /\b\d{1,2}\s?%\s*off\b/i, /\b(?:sale|discount|promo(?:tion)?|coupon|limited[- ]time offer|special offer)\b/i,
+    /\byou(?:'| a)?re receiving this\b/i, /\byou are receiving this\b/i, /\byou received this email because\b/i,
+    /להסרה מרשימת/, /קיבלת מייל זה/, /ניוזלטר/, /וובינר/, /מבצע/
+  ];
+  const BULK_LOCAL = /^(?:newsletter|news|marketing|mailer|promo|promotions|deals|offers|digest|updates?)(?:[-_.+]|$)/i;
+
+  function domainOf(email) {
+    const m = String(email || '').toLowerCase().match(/@([a-z0-9.-]+)\s*$/);
+    return m ? m[1] : '';
+  }
+  function localOf(email) { return String(email || '').toLowerCase().split('@')[0] || ''; }
+
+  // exact domain or a subdomain of a known one ("billing.netlify.com"); a lookalike ("netlify.com.evil.io") never matches.
+  function knownService(email, extra) {
+    const dom = domainOf(email);
+    if (!dom) return null;
+    const pool = KNOWN_DOMAINS.concat((extra || []).map((d) => String(d || '').toLowerCase().replace(/^@/, '')).filter(Boolean));
+    for (const k of pool) {
+      if (k.indexOf('@') !== -1) { if (String(email).toLowerCase() === k) return dom; continue; }
+      if (dom === k || dom.endsWith('.' + k)) return k;
+    }
+    return null;
+  }
+
+  function providerName(email, known) {
+    const dom = known || domainOf(email);
+    const label = String(dom).split('.')[0] || '';
+    return label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
+  }
+
+  function iso(y, m, d) {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+    return dt.getUTCFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+
+  function nowParts(now) {
+    const n = (now && typeof now.getTime === 'function') ? now : new Date(typeof now === 'number' ? now : Date.now());
+    return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), ms: n.getTime() };
+  }
+
+  // The first deadline in the text that is today or later, as YYYY-MM-DD. Slash dates are not read: 03/04 is two days.
+  function deadlineOf(text, now) {
+    const t = String(text || '');
+    const np = nowParts(now);
+    const today = iso(np.y, np.m, np.d);
+    const cands = [];
+    let m;
+    const reIso = /\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g;
+    while ((m = reIso.exec(t))) { const v = iso(+m[1], +m[2], +m[3]); if (v) cands.push({ at: m.index, iso: v }); }
+    const reMd = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\b/gi;
+    while ((m = reMd.exec(t))) {
+      const mo = MONTHS[m[1].toLowerCase().replace(/\.$/, '')];
+      cands.push({ at: m.index, iso: iso(m[3] ? +m[3] : null, mo, +m[2]) || null, md: [mo, +m[2], m[3] ? +m[3] : null] });
+    }
+    const reDm = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?(?:,?\s+(20\d{2}))?\b/gi;
+    while ((m = reDm.exec(t))) {
+      const mo = MONTHS[m[2].toLowerCase()];
+      cands.push({ at: m.index, md: [mo, +m[1], m[3] ? +m[3] : null] });
+    }
+    const reHe = /\b(\d{1,2})\s+ב?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)(?:\s+(20\d{2}))?/g;
+    while ((m = reHe.exec(t))) cands.push({ at: m.index, md: [MONTHS[m[2]], +m[1], m[3] ? +m[3] : null] });
+    const out = [];
+    for (const c of cands) {
+      let v = c.iso;
+      if (c.md) {
+        const [mo, d, y] = c.md;
+        v = y ? iso(y, mo, d) : (iso(np.y, mo, d) && iso(np.y, mo, d) >= today ? iso(np.y, mo, d) : iso(np.y + 1, mo, d));
+      }
+      if (v && v >= today) out.push({ at: c.at, iso: v });
+    }
+    out.sort((a, b) => a.at - b.at);
+    if (out.length) return out[0].iso;
+    // a window: "within 48 hours", "in 3 days", "תוך 3 ימים"
+    const w = t.match(/\b(?:within|in|over the next)\s+(\d{1,3})\s*(hours?|days?)\b/i) || t.match(/תוך\s+(\d{1,3})\s*(שעות|ימים)/);
+    if (w) {
+      const n = +w[1];
+      const days = /^(?:hour|שעות)/i.test(w[2]) ? Math.max(1, Math.ceil(n / 24)) : n;
+      const dt = new Date(np.ms + days * 86400000);
+      return iso(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    }
+    return null;
+  }
+
+  function actionOf(text) {
+    const t = String(text || '');
+    for (const a of ACTION) {
+      const m = t.match(a.re);
+      if (m && a.bare) {
+        const dom = t.match(/\b[a-z0-9][a-z0-9-]*\.(?:com|net|org|io|co|dev|app|co\.il|org\.il|il)\b/i);
+        return (m[1].toLowerCase() === 'renew' ? 'renew ' : 'reactivate ') + (dom ? dom[0] : 'your plan');
+      }
+      if (m) return m[0].trim().replace(/\s+/g, ' ').replace(/[,;:\s]+$/, '');
+    }
+    return null;
+  }
+
+  function shortDate(isoDate, hebrew) {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return hebrew ? d + '.' + m : names[m - 1] + ' ' + d;
+  }
+
+  // input: { text, subject, sender:{email,name}, now, knownSenders:[domain|address] }
+  // -> { kind:'system-notice', provider, action, dueIso, title } | null
+  function detect(input) {
+    const i = input || {};
+    const email = String((i.sender && i.sender.email) || i.senderEmail || '').trim().toLowerCase();
+    const known = knownService(email, i.knownSenders);
+    if (!known) return null;
+    if (BULK_LOCAL.test(localOf(email))) return null;
+    const blob = (i.subject ? String(i.subject) + '\n' : '') + String(i.text || '');
+    for (const re of NEWSLETTER) if (re.test(blob)) return null;
+    if (!CONSEQUENCE.test(blob)) return null;
+    const dueIso = deadlineOf(blob, i.now);
+    if (!dueIso) return null;
+    const action = actionOf(blob);
+    if (!action) return null;
+    const hebrew = /[֐-׿]/.test(action);
+    const provider = providerName(email, known);
+    const cap = action.charAt(0).toUpperCase() + action.slice(1);
+    const title = cap + (provider ? ' (' + provider + ')' : '') + (hebrew ? ' עד ' : ' by ') + shortDate(dueIso, hebrew);
+    return { kind: 'system-notice', provider, action: cap, dueIso, title };
+  }
+
+  return { KNOWN_DOMAINS, detect, knownService, deadlineOf, actionOf };
+})();
+
+if (typeof module !== 'undefined') module.exports = { FlowSystemNotice };
+else if (typeof globalThis !== 'undefined') globalThis.FlowSystemNotice = FlowSystemNotice;
+
 // ----- flow-trial-extension/core/incoming-judge.js -----
 // One decision for "someone asked you something", the same on every mail surface. Portable: no chrome.*, no DOM, no network.
 //
@@ -9161,6 +9475,41 @@ const FlowIncomingJudge = (() => {
     const quiet = pick(d, 'quietMetrics', typeof FlowQuietMetrics !== 'undefined' ? FlowQuietMetrics : null);
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
+
+    // A service's notice with a deadline and an action that prevents the loss ("your project will be paused on Oct 28 unless
+    // you update billing"). Known services only; a task with the date, never a payment. Runs before the person-to-person quiets
+    // because the sender is a no-reply address by nature. Off unless the host passes systemNoticeOn (glanceSwitches.SYSTEM_NOTICE).
+    const noticeApi = pick(d, 'systemNotice', sibling(typeof FlowSystemNotice !== 'undefined' ? FlowSystemNotice : null, './system-notice.js', 'FlowSystemNotice'));
+    if (i.systemNoticeOn === true && noticeApi && typeof noticeApi.detect === 'function' && i.senderIsUser !== true) {
+      const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+      const notice = noticeApi.detect({ text: prepareForJudge(i.text), subject: prepareForJudge(i.subject || ''), sender: i.sender || {}, now: now0, knownSenders: i.knownSenders || null });
+      if (notice) return { show: true, intent: noticeIntent(intentApi, notice), process: forSurface(noticeProcess(notice, i.threadUrl), i.surface || 'gmail') };
+    }
+
+    // A booking the person is told about ("Your appointment is confirmed for Sunday at 10:00") becomes a hold on their own
+    // calendar, an invitation to an event the same, and a pickup with a last day ("Your order is ready for pickup until Friday") a task due that day. The same
+    // readers the chat card uses (core/chat-appointment-notice.js, core/chat-pickup-notice.js). Off unless the host passes
+    // bookingNoticeOn (glanceSwitches.BOOKING_NOTICE). Nobody is invited and nothing is sent.
+    if (i.bookingNoticeOn === true && i.senderIsUser !== true && i.inbound !== false) {
+      const booking = bookingNotice(i, prepareForJudge(i.text));
+      if (booking) return { show: true, intent: booking.intent, process: forSurface(booking.process, i.surface || 'gmail') };
+    }
+
+    // A reminder or a deadline asked without a question ("Don't forget to bring the signed form on Monday", "I need the signed
+    // contract by Wednesday") and a request to call back on a day become a task due that day (core/chat-reminder.js,
+    // chat-deadline-ask.js, chat-callback-ask.js). Only for a mail addressed to the person (their address on To, not Cc-only).
+    // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
+    if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
+      const ask = taskAsk(i, prepareForJudge(i.text));
+      if (ask) return { show: true, intent: ask.intent, process: forSurface(ask.process, i.surface || 'gmail') };
+    }
+
+    // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
+    // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
+    if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
+      const pay = paymentAsk(i, prepareForJudge(i.text));
+      if (pay) return { show: true, intent: pay.intent, process: forSurface(pay.process, i.surface || 'gmail') };
+    }
 
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
@@ -9300,6 +9649,169 @@ const FlowIncomingJudge = (() => {
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
+  // A real mail is longer than the one-line messages the readers were written for (greeting, a sentence, directions,
+  // a signature). Each reader is asked about one sentence, and about two neighbouring sentences, never the whole body, so a
+  // line that states a booking is found and the rest of the mail cannot add or take away from it.
+  function windowsOf(body) {
+    const text = String(body || '').replace(/\r/g, '');
+    const parts = text.split(/\n+|(?<=[.!?؟:;])\s+/).map((x) => x.trim()).filter((x) => x.length >= 8);
+    const out = [];
+    if (text.replace(/\s+/g, ' ').trim().length <= 200) out.push(text.replace(/\s+/g, ' ').trim());
+    for (let k = 0; k < parts.length && out.length < 60; k++) {
+      out.push(parts[k]);
+      const bare = parts[k].replace(/^(?:hi|hello|hey|dear|good\s+(?:morning|afternoon|evening)|שלום|היי|הי|בוקר\s+טוב|ערב\s+טוב)(?:\s+[^\s,]+)?\s*,\s*/i, '');
+      if (bare.length >= 8 && bare.length < parts[k].length) out.push(bare);
+      const lead = parts[k].split(/,\s+|\s+(?:so|because|since|as|and then)\s+/)[0];
+      if (lead && lead.length >= 8 && lead.length < parts[k].length) out.push(lead);
+      if (k + 1 < parts.length) out.push(parts[k] + ' ' + parts[k + 1]);
+    }
+    return out;
+  }
+
+  function firstHit(api, body, now, kind) {
+    if (!api || typeof api.recognize !== 'function') return null;
+    const wins = windowsOf(body);
+    for (let k = 0; k < wins.length; k++) {
+      const r = api.recognize(wins[k], now);
+      if (r && r.kind === kind) return r;
+    }
+    return null;
+  }
+
+  function addressedOnTo(i) {
+    const list = (v) => (Array.isArray(v) ? v : String(v || '').split(/[;,\s]+/)).map((x) => String(x || '').trim().toLowerCase()).filter((x) => x.indexOf('@') > 0);
+    const own = list(i.ownAddresses);
+    const to = list(i.to);
+    if (!own.length || !to.length || !to.some((a) => own.indexOf(a) !== -1)) return false;
+    const intentApi = typeof FlowIntent !== 'undefined' ? FlowIntent : null;
+    if (intentApi && typeof intentApi.copiedOnly === 'function' && intentApi.copiedOnly(i.text, i)) return false;
+    return true;
+  }
+
+  function taskAsk(i, body) {
+    if (!addressedOnTo(i)) return null;
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const remApi = sibling(typeof FlowChatReminder !== 'undefined' ? FlowChatReminder : null, './chat-reminder.js', 'FlowChatReminder');
+    const dlApi = sibling(typeof FlowChatDeadlineAsk !== 'undefined' ? FlowChatDeadlineAsk : null, './chat-deadline-ask.js', 'FlowChatDeadlineAsk');
+    const cbApi = sibling(typeof FlowChatCallbackAsk !== 'undefined' ? FlowChatCallbackAsk : null, './chat-callback-ask.js', 'FlowChatCallbackAsk');
+    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+    let title = '';
+    let dateIso = '';
+    let lang = 'en';
+    const rem = firstHit(remApi, body, now0, 'reminder');
+    if (rem) { title = rem.what; dateIso = rem.dateIso; lang = rem.lang; }
+    if (!title) { const dl = firstHit(dlApi, body, now0, 'ask'); if (dl) { title = dl.what; dateIso = dl.dateIso; lang = dl.lang; } }
+    if (!title) { const cb = firstHit(cbApi, body, now0, 'ask'); if (cb) { title = (cb.lang === 'he' ? 'להתקשר' : 'Call back') + (who ? ' · ' + who : ''); dateIso = cb.dateIso; lang = cb.lang; } }
+    if (!title) return null;
+    title = title.slice(0, 120);
+    const he = lang === 'he';
+    return {
+      intent: { type: 'request', label: title, confidence: 0.9, taskAsk: true, personalClose: 'task-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: dateIso }, facts: { date: { iso: dateIso } } },
+      process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, taskAsk: true,
+        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
+  }
+
+  function paymentAsk(i, body) {
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const api = sibling(typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk : null, './chat-payment-ask.js', 'FlowChatPaymentAsk');
+    const pay = firstHit(api, body, now0, 'ask');
+    if (!pay) return null;
+    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+    return {
+      intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
+      process: { id: 'log-it', name: 'Log It', closingLine: pay.lang === 'he' ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: pay.lang === 'he' ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, paymentAsk: true,
+        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pay.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function bookingNotice(i, body) {
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const apptApi = sibling(typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, './chat-appointment-notice.js', 'FlowChatAppointmentNotice');
+    const pickApi = sibling(typeof FlowChatPickupNotice !== 'undefined' ? FlowChatPickupNotice : null, './chat-pickup-notice.js', 'FlowChatPickupNotice');
+    const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
+    const tail = who ? ' · ' + who : '';
+    const appt = firstHit(apptApi, body, now0, 'appointment');
+    if (appt) {
+      const he = appt.lang === 'he';
+      const title = ((he ? 'תור' : 'Appointment') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const tripApi = sibling(typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, './chat-travel-notice.js', 'FlowChatTravelNotice');
+    const trip = firstHit(tripApi, body, now0, 'trip');
+    if (trip) {
+      const he = trip.lang === 'he';
+      const title = ((he ? 'נסיעה' : 'Trip') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'trip', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute }, facts: { date: { iso: trip.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: trip.dateIso, hour: trip.hour, minute: trip.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const dlvApi = sibling(typeof FlowChatDeliveryWindow !== 'undefined' ? FlowChatDeliveryWindow : null, './chat-delivery-window.js', 'FlowChatDeliveryWindow');
+    const dlv = firstHit(dlvApi, body, now0, 'delivery');
+    if (dlv) {
+      const he = dlv.lang === 'he';
+      const win = dlv.endHour != null ? ' ' + pad2(dlv.hour) + ':' + pad2(dlv.minute) + '–' + pad2(dlv.endHour) + ':' + pad2(dlv.endMinute) : '';
+      const title = ((he ? 'משלוח' : 'Delivery') + win + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'delivery', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: dlv.dateIso, hour: dlv.hour, minute: dlv.minute }, facts: { date: { iso: dlv.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: dlv.dateIso, hour: dlv.hour, minute: dlv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, durationMinutes: dlv.durationMinutes || undefined, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');
+    const inv = firstHit(invApi, body, now0, 'invitation');
+    if (inv) {
+      const he = inv.lang === 'he';
+      const title = ((he ? 'הזמנה' : 'Invitation') + tail).slice(0, 120);
+      return {
+        intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'invitation', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
+        process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    const pick = firstHit(pickApi, body, now0, 'pickup');
+    if (pick) {
+      const he = pick.lang === 'he';
+      const title = ((he ? 'לאסוף הזמנה' : 'Pick up the order') + tail).slice(0, 120);
+      return {
+        intent: { type: 'request', label: title, confidence: 0.9, bookingNotice: 'pickup', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pick.dateIso }, facts: { date: { iso: pick.dateIso } } },
+        process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
+          steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: pick.dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+      };
+    }
+    return null;
+  }
+
+  function noticeIntent(intentApi, notice) {
+    return {
+      type: intentApi.TYPES ? intentApi.TYPES.REQUEST : 'request', label: 'Deadline notice', confidence: 0.9,
+      systemNotice: true, notice: notice, personalClose: 'system-notice', entities: { what: notice.action, deadline: notice.dueIso },
+      facts: { date: { iso: notice.dueIso } }
+    };
+  }
+
+  // Same step shape as the Log It task, so every surface's existing task writer carries it (Google Tasks, Microsoft To Do).
+  function noticeProcess(notice, threadUrl) {
+    return {
+      id: 'log-it', name: 'Log It', closingLine: 'Logging this so it stays tracked.', closedLine: 'Logged and tracked.',
+      needsDateChoice: false, dateChoices: null, systemNotice: true,
+      steps: [{
+        id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + notice.title,
+        params: { title: notice.title, dateIso: notice.dueIso, amount: null, what: notice.action, threadUrl: threadUrl || null },
+        dependsOn: null
+      }]
+    };
+  }
+
   function taskOnlyProcess(process) {
     const steps = (process && process.steps) || [];
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
@@ -9368,7 +9880,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.attestsPayment === 'function' && resolution.attestsPayment(gate.ask.id));
   }
 
-  return { MIN_TEXT, prepareForJudge, selfSent, textForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
