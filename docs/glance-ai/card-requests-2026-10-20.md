@@ -130,3 +130,7 @@ The words "Handled" / "טופל" appear only after the read-back (`fetchedBack`)
 
 The chat card now has one more state, drawn with the existing canonical Do It component, no new design: title "Cancelled: <booking name>" (Hebrew «בוטל: …»), one step "Remove from calendar: <booking name>", Do It, closed line "Removed from your calendar." (Hebrew «הוסר מהיומן.»), Handled receipt without an Undo button (a deleted event is not restored). Error text when the person changed the event: "You changed this event, so I left it" («שינית את האירוע, השארתי אותו»). Grok: please check the receipt state has no Undo slot gap.
 
+## 2026-10-25 Builder B: "Mark done" on the existing chat task card (CHAT_TASK_CARD, off)
+
+One more state of the chat card, drawn with the existing canonical Do It component, no new design: title "Paid? Waiting on Dana: Payment 500 NIS" (Hebrew «שולם? …»), one step "Mark done: <task>" («לסמן כבוצע: …»), Do It, closed line "Task marked done." («המשימה סומנה כבוצעה.»), Handled receipt with Undo ("Google Task is open again."). Error text when the person changed the task: "You changed this task, so I left it" («שינית את המשימה, השארתי אותה»). Grok: the error text is set through `data-glance-chip-label` on the halo chip; please confirm it is visible in the card.
+

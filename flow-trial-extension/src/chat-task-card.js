@@ -251,7 +251,68 @@ const FlowChatTaskCard = (() => {
       ? { type: 'flow:google-undo', connectorId: 'googleHold', ref: ref, tabAccount: '' }
       : connectorId === 'googleTask'
       ? { type: 'flow:google-undo', connectorId: 'googleLaneTask', ref: ref, tabAccount: '' }
+      : connectorId === 'googleTaskClose'
+      ? { type: 'flow:google-undo', connectorId: 'googleTaskClose', ref: ref, tabAccount: '' }
       : { type: 'flow:undo-action', connectorId: connectorId, ref: ref, created: ref && ref.created };
+  }
+
+  // The open "Waiting on Dana: Payment 500 NIS" tasks Glance wrote from this chat: written, not undone, not already closed here.
+  // Newest first. A close and its Undo are rows of their own, so Undo of a close puts the task back among the open ones.
+  async function findOpenPaymentTasks(chatKey) {
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return [];
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    const thread = String(chatKey).split('|').slice(0, 3).join('|');
+    const undone = {};
+    const closed = {};
+    const out = [];
+    for (const e of log) {
+      if (!e) continue;
+      if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
+      if (e.kind !== 'written' || !e.ref) continue;
+      if (String(e.chatKey || '').split('|').slice(0, 3).join('|') !== thread) continue;
+      if (e.connectorId === 'googleTaskClose') { if (!undone[e.chatKey] && e.closes) closed[e.closes] = true; continue; }
+      if (e.connectorId !== 'googleTask' || undone[e.chatKey] || closed[e.chatKey] || !e.ref.taskId) continue;
+      const m = /(?:payment|תשלום) (\d+(?:\.\d+)?) ([a-z]{3})$/.exec(String(e.heldKey || ''));
+      if (m) out.push({ row: e, amount: m[1], currency: m[2].toUpperCase() });
+    }
+    return out;
+  }
+
+  // The other side says they paid: Do It marks the waiting task done, through the same Google lane, read back that it shows completed.
+  // The person's click is the deliberate part; Glance has not seen any money. A task the person changed is left as it is.
+  async function closePaid(host, chip, ctx) {
+    const t = ctx.chatTask;
+    const open = t.close;
+    if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', t.he ? 'מסמן…' : 'Marking…');
+    const r = await send({ type: 'flow:google-write', connectorId: 'googleTaskClose', input: { taskListId: open.ref.taskListId, taskId: open.ref.taskId, contentHash: open.ref.contentHash }, tabAccount: '', lang: t.he ? 'he' : 'en' });
+    const ref = r && r.ref;
+    const proved = !!(r && (r.fetchedBack === true || (r.proof && r.proof.fetchedBack === true)));
+    if (!(r && r.ok && ref && ref.taskId && proved)) {
+      const edited = r && r.reason === 'user-edited';
+      const text = edited ? (t.he ? 'שינית את המשימה, השארתי אותה' : 'You changed this task, so I left it') : (t.he ? 'לא הצלחתי לסמן, נסה שוב' : "Couldn't mark it, try again");
+      if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-error', text);
+      return;
+    }
+    const row = {
+      kind: 'written',
+      label: r.written || 'Google Task done.',
+      app: 'chat',
+      connectorId: 'googleTaskClose',
+      ref: ref,
+      where: r.where,
+      url: r.url || null,
+      proof: r.proof || null,
+      fetchedBack: true,
+      receiptStatus: 'Handled.',
+      closes: open.chatKey,
+      intent: ctx.intent,
+      process: ctx.process,
+      chatKey: t.chatKey,
+      messageId: t.chatKey
+    };
+    try { await FlowStorage.appendLog(row); } catch (e) { /* the receipt still shows */ }
+    showReceipt(host, row, t.chatKey, 'googleTaskClose');
   }
 
   // The business cancelled a booking Glance put on the calendar from this chat: Do It removes that same event through the same undo the
@@ -276,6 +337,7 @@ const FlowChatTaskCard = (() => {
   async function onDoIt(host, chip, ctx) {
     const t = ctx.chatTask;
     if (t && t.remove) return removeHeld(host, chip, ctx);
+    if (t && t.close) return closePaid(host, chip, ctx);
     if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     const step = t.step;
     const params = step.params || {};
@@ -354,6 +416,48 @@ const FlowChatTaskCard = (() => {
       mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
       showReceipt(host, row, chatKey, row.connectorId);
       return { shown: true, reason: 'receipt' };
+    }
+
+    // The other side says they paid ("I transferred 500 NIS", «העברתי לך 500 ש"ח») while this chat has a "Waiting on ...: Payment" task
+    // Glance wrote (Google Tasks): the card offers to mark that task done. One amount matches one task; no amount needs exactly one.
+    if (!own && typeof FlowChatPaymentClaim !== 'undefined') {
+      let claim = null;
+      try { claim = FlowChatPaymentClaim.recognize(i.text); } catch (e) { claim = null; }
+      if (claim && claim.kind === 'claim') {
+        const open = await findOpenPaymentTasks(chatKey);
+        const fits = open.filter((c) => !claim.amount || (c.amount === claim.amount && (!claim.currency || c.currency === claim.currency)));
+        if (fits.length === 1 && (claim.amount || open.length === 1)) {
+          const pick = fits[0];
+          const heC = claim.lang === 'he';
+          const st = pick.row.process && pick.row.process.steps && pick.row.process.steps[0];
+          const title = String((st && st.params && st.params.title) || pick.row.label || '').slice(0, 120);
+          const ctxC = {
+            app: i.channel || 'chat',
+            doLabel: 'Do It',
+            messageId: chatKey,
+            intent: { type: 'request', label: (heC ? 'שולם? ' : 'Paid? ') + title, confidence: 0.9, personalClose: 'payment-claimed', signals: { score: 90, threshold: 50 }, entities: { what: title } },
+            process: { id: CHAIN, name: heC ? 'סמן כבוצע' : 'Mark done', closingLine: heC ? 'מסמן את המשימה כבוצעה.' : 'Marking the task done.', closedLine: heC ? 'המשימה סומנה כבוצעה.' : 'Task marked done.', needsDateChoice: false, dateChoices: null,
+              steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: (heC ? 'לסמן כבוצע: ' : 'Mark done: ') + title, params: { title: title }, dependsOn: null }] },
+            sender: i.sender || {},
+            bodyText: '',
+            subject: '',
+            uiLang: heC ? 'he' : 'en',
+            glanceChain: CHAIN,
+            chatTask: { connectorId: 'googleTaskClose', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heC, own: false, close: { chatKey: pick.row.chatKey, ref: pick.row.ref } }
+          };
+          const oldC = mount.querySelector('.flow-chip-host');
+          if (oldC) oldC.remove();
+          const hostC = FlowChipHost.inject(mount, ctxC, {
+            onDoIt: (h, chip, c) => onDoIt(h, chip, c),
+            onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
+          });
+          if (!hostC) return { shown: false, reason: 'inject-failed' };
+          mount.setAttribute('data-glance-key', chatKey);
+          mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
+          hostC.setAttribute('data-glance-chain', CHAIN);
+          return { shown: true, reason: 'close-offered' };
+        }
+      }
     }
 
     // A cancellation of a booking, a trip or an invitation this chat already put on the calendar offers to take that event off again.
