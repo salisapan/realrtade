@@ -2182,6 +2182,7 @@ function glanceUiCopy(kind) {
     // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
+    if (inboundMail && usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     const inboundAsk = inboundMail && text.length >= 20
@@ -3248,6 +3249,68 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  // A full quote/proposal Doc in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
+  // One Do It creates the Doc for preview; Glance never sends mail.
+  async function showFullDocumentChip(message, c) {
+    const lang = mailLanguage({ bodyText: c.text });
+    let styleSummary = null;
+    try {
+      if (typeof FlowStyle !== 'undefined' && FlowStorage.getStyleProfile) {
+        styleSummary = FlowStyle.summary(await FlowStorage.getStyleProfile(), lang);
+      }
+    } catch (e) { styleSummary = null; }
+    const template = await readCompanyTemplate();
+    let plan = null;
+    try {
+      plan = await sendRuntime(Object.assign({
+        type: 'flow:google-full-document-plan',
+        text: String(c.subject || '').trim() ? c.subject + '. ' + c.text : c.text,
+        lang: lang,
+        styleSummary: styleSummary,
+        companyTemplate: template
+      }, laneAccountContext()));
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.built || plan.built.blank) return false;
+    const he = lang === 'he';
+    const title = (plan.built && plan.built.title) || (plan.googleClose && plan.googleClose.templateName) || 'Document';
+    const process = {
+      id: 'full-document',
+      name: title,
+      closingLine: plan.cardLine,
+      closedLine: he ? 'המסמך מוכן לעיון — לא נשלח.' : 'Document ready to preview — not sent.',
+      steps: [{
+        id: 'full-doc',
+        kind: 'driveDoc',
+        label: 'Doc',
+        hint: he ? 'יוצר מסמך מלא ב-Drive לעיון' : 'Create the full document in Drive for preview',
+        dependsOn: null,
+        params: { title: title }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, {
+      label: plan.cardLine || title,
+      type: (c.intent && c.intent.type) || 'request',
+      googleClose: plan.googleClose || null
+    });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds,
+      intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail',
+      googleBuilt: plan.built, previewOnly: true
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.cardLine || title, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+      userContextEvent({ type: 'shown', partyKey: userContextParty({ sender: c.sender }), intentFamily: (plan.googleClose && plan.googleClose.artifact) || 'full-document', at: new Date().toISOString() });
+    }
+    return true;
+  }
+
   // A Meet link added to an event the person already organizes ("Can you add a Meet link to the Thursday sync?").
   // The worker decides (flow:google-event-link-plan, only with the switch EVENT_CALL_LINK on) and reads the
   // calendar; the page shows the canonical Do It card with a one-step list, or nothing.
@@ -3969,6 +4032,21 @@ function glanceUiCopy(kind) {
     }
   }
 
+  function userContextParty(ctx) {
+    const e = ctx && ctx.sender && ctx.sender.email;
+    return e ? String(e).trim().toLowerCase() : 'unknown';
+  }
+
+  function userContextFamily(ctx) {
+    const g = ctx && ctx.intent && ctx.intent.googleClose;
+    return (g && g.artifact) || (ctx && ctx.process && ctx.process.id) || 'unknown';
+  }
+
+  function userContextEvent(ev) {
+    if (!chromeLive()) return;
+    try { chrome.runtime.sendMessage({ type: 'flow:user-context-event', event: ev }); } catch (e) { /* worker off */ }
+  }
+
   function sendRuntime(msg) {
     return new Promise((resolve) => {
       if (!chromeLive()) {
@@ -4494,6 +4572,10 @@ function glanceUiCopy(kind) {
           result = { action, response: { ok: false, reason: 'unclear' } };
         } else {
           const response = await sendExecuteAction(payload);
+          if (ctx && ctx.previewOnly && response && response.ok === true) {
+            response.preview = true;
+            response.closes = false;
+          }
           assertWrittenTitle(action, payload, response);
           result = { action, response };
           if (response && response.ok) {
@@ -4959,6 +5041,44 @@ function glanceUiCopy(kind) {
     if (chip && typeof chip.replaceWith === 'function') chip.replaceWith(done);
   }
 
+  function showDocPreviewReceipt(host, chip, result, ctx) {
+    const response = result.response || {};
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('role', 'status');
+    const he = glanceUiHebrew();
+    done.appendChild(el('span', 'flow-chip-written', response.written || (he ? 'המסמך מוכן לעיון — לא נשלח.' : 'Document ready to preview — not sent.')));
+    if (response.url) {
+      const link = el('a', 'flow-chip-written', he ? 'פתח ב-Docs' : 'Open in Docs');
+      link.href = response.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      done.appendChild(link);
+    }
+    const undo = el('button', 'flow-chip-undo', glanceShow(glanceUiCopy('undo') || 'Undo'));
+    undo.type = 'button';
+    undo.addEventListener('click', () => {
+      undo.disabled = true;
+      undo.textContent = he ? 'מבטל…' : 'Undoing…';
+      sendLaneUndo('googleDoc', response.ref).then((undone) => {
+        undo.textContent = undone && undone.ok ? (he ? 'בוטל' : 'Undone') : (undone && undone.error) || (he ? 'לא בוטל' : 'Undo failed');
+        userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
+      });
+    });
+    const actionsRow = el('div', 'flow-chip-actions-row');
+    actionsRow.appendChild(undo);
+    done.appendChild(actionsRow);
+    placeReceipt(host, chip, done);
+    if (response.proof && response.proof.fetchedBack === true) {
+      userContextEvent({
+        type: 'approved',
+        partyKey: userContextParty(ctx),
+        intentFamily: userContextFamily(ctx),
+        fetchedBack: true,
+        at: new Date().toISOString()
+      });
+    }
+  }
+
   function showPreviewReceipt(host, chip, result) {
     const response = result.response || {};
     const done = el('div', 'flow-chip flow-chip-done');
@@ -5126,6 +5246,11 @@ function glanceUiCopy(kind) {
       return;
     }
     if (!succeeded.length) {
+      const docPreview = results.find((r) => r.response && r.response.ok === true && r.response.preview === true && r.action && r.action.kind === 'driveDoc');
+      if (docPreview) {
+        showDocPreviewReceipt(host, chip, docPreview, ctx);
+        return;
+      }
       const preview = results.find((r) => r.response && composeReadBack(r.response));
       if (preview) {
         showPreviewReceipt(host, chip, preview);
@@ -5460,7 +5585,7 @@ function glanceUiCopy(kind) {
     // (file-on-hold / file-on-task) has no template. artifactBody reports
     // that as blank, and returning here used to leave the Hold it card
     // exactly as it was: no Closing state, no activity row, no calendar write.
-    if (ctx.intent && ctx.intent.googleClose && typeof FlowGoogleCloses !== 'undefined' &&
+    if (!ctx.googleBuilt && ctx.intent && ctx.intent.googleClose && typeof FlowGoogleCloses !== 'undefined' &&
         typeof FlowGoogleCloses.needsArtifactBody === 'function' &&
         FlowGoogleCloses.needsArtifactBody(ctx.intent.googleClose)) {
       const fills = readSlotFills(host);
@@ -5556,6 +5681,7 @@ function glanceUiCopy(kind) {
     await Promise.all([
       FlowStorage.appendLog({ kind: 'dismissed', label: activityLabel(ctx), messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
         .catch((e) => console.error('[Glance] failed to record a dismiss in the activity log', e)),
+      Promise.resolve(userContextEvent({ type: 'dismissed', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() })),
       FlowStorage.calibrate('dismiss', ctx.intent.type)
         .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
       FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)

@@ -12,6 +12,9 @@ import '../core/recurring-reminder.js';
 import '../core/workspace-file.js';
 // FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
 import '../core/event-call-link.js';
+// FlowFullDocumentClose: a full quote/proposal Doc in the person's style (Gmail+Docs), switch FULL_DOCUMENT_CLOSE, off.
+import '../core/google-closes.js';
+import '../core/full-document-close.js';
 import '../core/google-tasks.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
@@ -694,7 +697,7 @@ async function prepareWrite(connectorId, input, cred) {
     };
   }
   if (connectorId === 'googleDriveSave') return i;
-  if (connectorId === 'googleDoc') {
+  if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
     const text = params.text || i.text || plainText(params.html || i.html || '');
     const documentId = i.documentId || params.documentId || '';
     return {
@@ -854,7 +857,7 @@ function verifyUrlFor(connectorId, ref) {
   }
   if (connectorId === 'gmailCompose') return '';
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
-  if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
+  if (fileId && /^google(DriveSave|DocFull|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
   }
   return '';
@@ -922,6 +925,22 @@ function onLaneMessage(msg, sender, sendResponse) {
       if (!W || typeof W.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(W.SWITCH))) return { action: 'off', reason: 'switch-off' };
       return W.plan({ flags: { [W.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000) });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-full-document-plan') {
+    const F = globalThis.FlowFullDocumentClose;
+    Promise.resolve((async () => {
+      if (!F || typeof F.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(F.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return F.plan({
+        flags: { [F.SWITCH]: true },
+        text: String(msg.text || '').slice(0, 8000),
+        lang: msg.lang === 'he' ? 'he' : 'en',
+        styleSummary: msg.styleSummary || null,
+        companyTemplate: msg.companyTemplate || null,
+        template: msg.companyTemplate || msg.template || null
+      });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
