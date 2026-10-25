@@ -502,7 +502,7 @@ console.log('\n--- host boundaries ---');
   check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
   check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
   check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
-  check('there is no compose scope', !manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) === -1);
+  check('compose trigger requires the compose scope', manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
 
   const withCompose = JSON.parse(JSON.stringify(manifest));
   withCompose.addOns.gmail.composeTrigger = { draftAccess: 'NONE' };
@@ -524,6 +524,7 @@ console.log('\n--- host boundaries ---');
     scopes.indexOf(scopeUrl('calendar')) === -1);
   check('host does not patch an event', !/Calendar\.Events\.patch|Calendar\.Events\.update/.test(host));
   check('contextual trigger is message open', manifest.addOns.gmail.contextualTriggers[0].onTriggerFunction === 'onGmailMessageOpen');
+  check('compose trigger runs onGmailCompose', manifest.addOns.gmail.composeTrigger.selectActions[0].runFunction === 'onGmailCompose');
   check('locale comes from the app', manifest.addOns.common.useLocaleFromApp === true);
   check('the script time zone is only the Asia/Jerusalem fallback', manifest.timeZone === 'Asia/Jerusalem');
   check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(host));
@@ -534,11 +535,27 @@ console.log('\n--- host boundaries ---');
 
 console.log('\n--- message path parity ---');
 {
+  const PARITY_NOW = new Date('2026-10-15T12:00:00Z');
+  const RealDate = Date;
+  function FrozenDate() {
+    if (new.target) {
+      if (arguments.length === 0) return new RealDate(PARITY_NOW.getTime());
+      return new RealDate(...arguments);
+    }
+    if (arguments.length === 0) return RealDate();
+    if (arguments.length === 1) return RealDate(arguments[0]);
+    return RealDate.apply(null, arguments);
+  }
+  FrozenDate.now = function () { return PARITY_NOW.getTime(); };
+  FrozenDate.parse = RealDate.parse;
+  FrozenDate.UTC = RealDate.UTC;
+  FrozenDate.prototype = RealDate.prototype;
   const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0, scopeChecks: [], granted: [] };
   const ALL_SCOPES = [
     'https://www.googleapis.com/auth/tasks',
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/gmail.addons.execute',
+    'https://www.googleapis.com/auth/gmail.addons.current.action.compose',
     'https://www.googleapis.com/auth/script.locale'
   ];
   function reset() {
@@ -566,6 +583,7 @@ console.log('\n--- message path parity ---');
   const sandbox = {
     console: console,
     module: undefined,
+    Date: FrozenDate,
     GmailApp: {
       setCurrentMessageAccessToken: function (token) {
         state.tokenCalls += 1;
@@ -698,6 +716,13 @@ console.log('\n--- message path parity ---');
         response.setNavigation = function (nav) { response.card = nav.card; return response; };
         response.build = function () { return { card: response.card }; };
         return response;
+      },
+      newUpdateDraftActionResponseBuilder: function () {
+        const response = { body: '', card: null };
+        response.setUpdateDraftBodyValue = function (value) { response.body = String(value || ''); return response; };
+        response.setUpdateCard = function (card) { response.card = card; return response; };
+        response.build = function () { return { draft: { body: response.body }, card: response.card }; };
+        return response;
       }
     }
   };
@@ -705,7 +730,10 @@ console.log('\n--- message path parity ---');
   vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
   const openMessage = vm.runInContext('onGmailMessageOpen', sandbox);
+  const openCompose = vm.runInContext('onGmailCompose', sandbox);
   const doIt = vm.runInContext('onDoIt', sandbox);
+  const composeDoIt = vm.runInContext('onComposeDoIt', sandbox);
+  const composeUndo = vm.runInContext('onComposeUndo', sandbox);
   const undo = vm.runInContext('onUndo', sandbox);
   const contentTitle = vm.runInContext('Glance.intent.contentTitle', sandbox);
   const prepareText = vm.runInContext('Glance.intent.prepareText', sandbox);
@@ -762,14 +790,97 @@ console.log('\n--- message path parity ---');
     if (!match) return { name: '', email: text.trim() };
     return { name: match[1].replace(/"/g, '').trim(), email: match[2].trim() };
   }
-  function judgedPlan(fields) {
+  function emailsIn_(raw) {
+    const found = String(raw || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    const out = [];
+    for (let i = 0; i < found.length; i++) {
+      const email = found[i].toLowerCase();
+      if (out.indexOf(email) === -1) out.push(email);
+    }
+    return out;
+  }
+  function engineForFields(fields) {
     const from = parsedFrom(fields.from);
-    const fromEmail = from.email || null;
-    const fromName = from.name || null;
-    const threadUrl = 'https://mail.google.com/mail/u/0/#all/' + encodeURIComponent(fields.threadId);
-    const bodyPlan = extensionOffer(String(fields.plain || ''), fromEmail, fromName, threadUrl);
-    if (bodyPlan) return bodyPlan;
-    return extensionOffer(String(fields.subject || ''), fromEmail, fromName, threadUrl);
+    const subject = String(fields.subject || '');
+    const toList = emailsIn_(fields.to == null ? 'owner@ai.local.flow' : fields.to);
+    return function engine(text) {
+      const judged = sandbox.Glance.judge({
+        text: String(text || ''),
+        subject: subject,
+        sender: { email: from.email || null, name: from.name || null },
+        to: toList,
+        ownAddresses: [],
+        now: PARITY_NOW,
+        surface: 'gmail',
+        attachmentCount: 0
+      });
+      if (!judged || !judged.show) {
+        return intent.normalizeEngineHit(
+          intent.prepareText(String(text || '')),
+          { intent: judged ? judged.intent : null, plan: null },
+          PARITY_NOW,
+          'Etc/UTC'
+        );
+      }
+      return intent.normalizeEngineHit(
+        intent.prepareText(String(text || '')),
+        { intent: judged.intent, plan: judged.process },
+        PARITY_NOW,
+        'Etc/UTC'
+      );
+    };
+  }
+  function planFromDecision(decision) {
+    if (!decision || !decision.speak) return null;
+    if (decision.kind === 'hold') {
+      return {
+        id: 'hold',
+        steps: [{
+          kind: 'calendar',
+          params: {
+            title: decision.title,
+            dateIso: decision.dateIso,
+            hour: decision.hour,
+            minute: decision.minute
+          }
+        }]
+      };
+    }
+    if (decision.kind === 'schedule') {
+      return {
+        id: 'schedule',
+        steps: [
+          {
+            kind: 'calendar',
+            params: {
+              title: decision.title,
+              dateIso: decision.dateIso,
+              hour: decision.hour,
+              minute: decision.minute
+            }
+          },
+          {
+            kind: 'googleTask',
+            params: {
+              title: decision.taskTitle || decision.title,
+              dateIso: decision.taskDue || decision.dateIso
+            }
+          }
+        ]
+      };
+    }
+    return {
+      id: decision.planId || 'log-it',
+      steps: [{ kind: 'googleTask', params: { title: decision.title, dateIso: decision.due || null } }]
+    };
+  }
+  function judgedPlan(fields) {
+    const engine = engineForFields(fields);
+    let decision = intent.resolveTask(String(fields.plain || ''), { now: PARITY_NOW, timeZone: 'Etc/UTC', engine: engine });
+    if (!decision.speak && fields.subject) {
+      decision = intent.resolveTask(String(fields.subject || ''), { now: PARITY_NOW, timeZone: 'Etc/UTC', engine: engine });
+    }
+    return planFromDecision(decision);
   }
   function shownTitle(sourceText, plan) {
     if (!plan) return '';
@@ -1273,6 +1384,53 @@ console.log('\n--- message path parity ---');
     missingLines.indexOf('Nothing to close.') === -1 &&
     missingRow && missingRow.calendarService === false,
     { errors: missingCalendar.errors, lines: missingLines, row: missingRow });
+
+  reset();
+  const draftMsg = {
+    id: 'draft1',
+    threadId: 'threaddraft',
+    subject: 'Report',
+    plain: 'Please send me the report by Friday.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow',
+    date: new Date('2026-10-15T08:00:00Z')
+  };
+  state.messages.draft1 = gmailMessage(draftMsg);
+  state.drafts = { 'draft-1': { body: '' } };
+  sandbox.GmailApp.getDraft = function (id) {
+    const row = state.drafts[id] || { body: '' };
+    return {
+      getPlainBody: function () { return row.body; },
+      setPlainBody: function (value) { row.body = String(value || ''); state.drafts[id] = row; }
+    };
+  };
+  const composeEvent = {
+    gmail: { messageId: 'draft1', accessToken: 'token', threadId: 'threaddraft', draftId: 'draft-1', draftBody: '' },
+    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
+  };
+  const composeCard = openCompose(composeEvent)[0];
+  const composeButtons = buttonsOf(composeCard);
+  check('compose offers one Do it for a reply-track mail', composeButtons.length === 1 && composeButtons[0].action === 'onComposeDoIt', { buttons: composeButtons, lines: linesOf(composeCard) });
+  const inserted = composeDoIt(Object.assign({}, composeEvent, {
+    parameters: { draftId: 'draft-1', source: 'compose' }
+  }));
+  check('compose Do it inserts the draft body', state.drafts['draft-1'].body.indexOf('Hi') !== -1, state.drafts['draft-1']);
+  const proofButtons = buttonsOf(inserted.card);
+  check('compose proof card has undo', proofButtons.length === 1 && proofButtons[0].action === 'onComposeUndo', proofButtons);
+  state.drafts['draft-1'].body = state.drafts['draft-1'].body + ' edited';
+  const refusedDraft = composeUndo(Object.assign({}, composeEvent, { parameters: { draftId: 'draft-1', source: 'compose' } }));
+  check('compose undo refuses when the draft was edited', plain(linesOf(refusedDraft.card)[0]).indexOf("won't undo") !== -1, linesOf(refusedDraft.card));
+  state.drafts['draft-1'].body = inserted.draft.body;
+  const undoneDraft = composeUndo(Object.assign({}, composeEvent, { parameters: { draftId: 'draft-1', source: 'compose' } }));
+  check('compose undo clears the draft when the read-back still matches', state.drafts['draft-1'].body === '' && plain(linesOf(undoneDraft.card)[0]) === 'Undone.', state.drafts['draft-1']);
+}
+
+console.log('\n--- draft compose ---');
+{
+  const draftCompose = require('../src/draft-compose.js');
+  check('draft read-back matches normalized text', draftCompose.matches('Hi,\n\nThanks.', 'Hi, Thanks.'));
+  check('draft mismatch is not confirmed', draftCompose.matches('one', 'two') === false);
 }
 
 if (failures) {

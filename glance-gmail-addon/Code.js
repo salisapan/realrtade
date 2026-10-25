@@ -5,6 +5,7 @@
 
 var GLANCE_TASK_LIST = 'Glance';
 var UNDO_PREFIX = 'glanceUndo_';
+var COMPOSE_UNDO_PREFIX = 'glanceComposeUndo_';
 var PREFETCH_KEY = 'glancePrefetch';
 
 function onHomepage(e) {
@@ -22,6 +23,140 @@ function onHomepage(e) {
     console.error(err && err.message ? err.message : err);
     return [render_(Glance.cards.homepage(null, lang))];
   }
+}
+
+function onGmailCompose(e) {
+  var lang = Glance.i18n.locale(localeOf_(e));
+  try {
+    if (!e || !e.gmail || !e.gmail.draftId) return [render_(Glance.cards.quiet(lang))];
+    var draftId = String(e.gmail.draftId);
+    var existing = readComposeUndo_(draftId);
+    if (existing && existing.view) {
+      return [render_(Glance.cards.draftProof(existing.view, lang, { draftId: draftId, undo: true }))];
+    }
+    var opened = readOpen_(e, emptyRead_(e));
+    if (!opened) throw readFail_('open', emptyRead_(e));
+    var draftText = draftTextForOpen_(opened, e);
+    if (!draftText) return [render_(Glance.cards.quiet(lang))];
+    var preview = Glance.intent.sanitizeTitle(draftText).slice(0, 240);
+    return [render_(Glance.cards.composeProposal(preview, draftId, lang))];
+  } catch (err) {
+    errorLog_(err);
+    return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose'))];
+  }
+}
+
+function onComposeDoIt(e) {
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var draftId = e && e.parameters && e.parameters.draftId ? String(e.parameters.draftId) : (e && e.gmail && e.gmail.draftId ? String(e.gmail.draftId) : '');
+  if (!draftId) return update_(render_(Glance.cards.readError(lang, 'no-draft')));
+  try {
+    var opened = readOpen_(e, emptyRead_(e));
+    if (!opened) throw readFail_('open', emptyRead_(e));
+    var draftText = draftTextForOpen_(opened, e);
+    if (!draftText) return update_(render_(Glance.cards.quiet(lang)));
+    var priorBody = readComposeDraftBody_(e, draftId);
+    setComposeDraftBody_(e, draftId, draftText);
+    var readBack = readComposeDraftBody_(e, draftId);
+    if (!Glance.draftCompose.matches(readBack, draftText)) {
+      stepLog_({ step: 'unconfirmed', reason: 'draft-read-back' });
+      return CardService.newUpdateDraftActionResponseBuilder()
+        .setUpdateDraftBodyValue(priorBody || '')
+        .setUpdateCard(render_(Glance.cards.unconfirmed(lang)))
+        .build();
+    }
+    var view = { id: draftId, preview: Glance.intent.sanitizeTitle(draftText).slice(0, 240), body: draftText };
+    saveComposeUndo_(draftId, { view: view, snapshot: { priorBody: priorBody || '', body: draftText } });
+    return CardService.newUpdateDraftActionResponseBuilder()
+      .setUpdateDraftBodyValue(draftText)
+      .setUpdateCard(render_(Glance.cards.draftProof(view, lang, { draftId: draftId, undo: true })))
+      .build();
+  } catch (err) {
+    errorLog_(err);
+    return CardService.newUpdateDraftActionResponseBuilder()
+      .setUpdateCard(render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose')))
+      .build();
+  }
+}
+
+function onComposeUndo(e) {
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var draftId = e && e.parameters && e.parameters.draftId ? String(e.parameters.draftId) : '';
+  if (!draftId) return update_(render_(Glance.cards.readError(lang, 'no-draft')));
+  var saved = readComposeUndo_(draftId);
+  if (!saved || !saved.snapshot) return update_(render_(Glance.cards.unconfirmed(lang)));
+  var current = readComposeDraftBody_(e, draftId);
+  if (!Glance.draftCompose.matches(current, saved.snapshot.body)) {
+    return update_(render_(Glance.cards.editedDraft(lang)));
+  }
+  setComposeDraftBody_(e, draftId, saved.snapshot.priorBody || '');
+  clearComposeUndo_(draftId);
+  return CardService.newUpdateDraftActionResponseBuilder()
+    .setUpdateDraftBodyValue(saved.snapshot.priorBody || '')
+    .setUpdateCard(render_(Glance.cards.undone(lang)))
+    .build();
+}
+
+function draftTextForOpen_(opened, e) {
+  var now = new Date();
+  var judged = judgedProcessForText_(opened.body, opened, now);
+  if (!judged) judged = judgedProcessForText_(opened.subject, opened, now);
+  if (!judged) return null;
+  if (typeof FlowIncomingJudge === 'undefined' || typeof FlowIncomingJudge.draftStepOf !== 'function') return null;
+  if (!FlowIncomingJudge.draftStepOf(judged)) return null;
+  return FlowIncomingJudge.draftText(judged, {
+    sender: { email: opened.fromEmail || null, name: opened.fromName || null },
+    subject: opened.subject || null
+  });
+}
+
+function judgedProcessForText_(text, opened, now) {
+  if (typeof Glance.judge !== 'function') return null;
+  var judged = Glance.judge({
+    text: text,
+    subject: opened.subject || '',
+    sender: { email: opened.fromEmail || null, name: opened.fromName || null },
+    to: opened.toList || [],
+    ownAddresses: (opened.toList && opened.toList.length) ? opened.toList : (opened.ownAddresses || []),
+    now: now,
+    surface: 'gmail',
+    attachmentCount: 0
+  });
+  if (!judged || !judged.show || !judged.process) return null;
+  return judged.process;
+}
+
+function readComposeDraftBody_(e, draftId) {
+  if (typeof GmailApp !== 'undefined' && typeof GmailApp.getDraft === 'function') {
+    var draft = GmailApp.getDraft(draftId);
+    if (draft && typeof draft.getPlainBody === 'function') return String(draft.getPlainBody() || '');
+  }
+  if (e && e.gmail && typeof e.gmail.draftBody === 'string') return e.gmail.draftBody;
+  return '';
+}
+
+function setComposeDraftBody_(e, draftId, body) {
+  if (typeof GmailApp !== 'undefined' && typeof GmailApp.getDraft === 'function') {
+    var draft = GmailApp.getDraft(draftId);
+    if (draft && typeof draft.setPlainBody === 'function') {
+      draft.setPlainBody(String(body || ''));
+    }
+  }
+  if (e && e.gmail) e.gmail.draftBody = String(body || '');
+}
+
+function readComposeUndo_(draftId) {
+  var raw = PropertiesService.getUserProperties().getProperty(COMPOSE_UNDO_PREFIX + draftId);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
+function saveComposeUndo_(draftId, record) {
+  PropertiesService.getUserProperties().setProperty(COMPOSE_UNDO_PREFIX + draftId, JSON.stringify(record || {}));
+}
+
+function clearComposeUndo_(draftId) {
+  PropertiesService.getUserProperties().deleteProperty(COMPOSE_UNDO_PREFIX + draftId);
 }
 
 function onGmailMessageOpen(e) {
@@ -409,6 +544,7 @@ function readOpen_(e, read) {
     read.from = parsed.email;
     toRaw = typeof message.getTo === 'function' ? message.getTo() : '';
     read.isSelf = isSelfMail_(parsed.email, toRaw);
+    read.toList = emailsIn_(toRaw);
   } catch (err) {
     throw readFail_('body', read, err);
   }
@@ -423,7 +559,9 @@ function readOpen_(e, read) {
     subject: read.subject,
     fromName: from.name,
     fromEmail: from.email,
-    isSelf: read.isSelf
+    isSelf: read.isSelf,
+    toList: read.toList || [],
+    ownAddresses: []
   };
 }
 
@@ -784,7 +922,7 @@ function render_(model) {
     var widget = widgets[i];
     if (widget.type === 'text') section.addWidget(text_(widget.text));
     if (widget.type === 'button' && widget.action === 'authorize') section.addWidget(authButton_(widget));
-    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo')) {
+    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onComposeDoIt' || widget.action === 'onComposeUndo')) {
       section.addWidget(button_(widget));
     }
   }

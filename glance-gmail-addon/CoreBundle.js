@@ -4531,6 +4531,237 @@ const FlowFileAttach = (() => {
 
 if (typeof module !== 'undefined') module.exports = { FlowFileAttach };
 
+// ----- flow-trial-extension/core/draft-reply.js -----
+// Shared reply-draft body for every surface (Gmail, Outlook, …). Portable: no chrome.*.
+// Used by background gmailDraftWrite / outlookDraftWrite and by any on-device composer.
+// One engine: the same greeting + body shape whether the draft lands in Gmail or Outlook Drafts.
+// Prefer reply-with-facts / plan content; acknowledge concrete asks with the facts we have;
+// never invent facts; keep placeholders only when the person still must fill something in.
+const FlowDraftReply = (() => {
+  // Prefer a real first name; skip display names that are just the email local-part
+  // (e.g. OWA "flow" for ai.local.flow@gmail.com) or a team/company signature line.
+  function greetingName(senderName, senderEmail) {
+    const email = String(senderEmail || '').toLowerCase();
+    const localFull = email.split('@')[0] || '';
+    const localParts = localFull.split(/[._+\-]/).filter(Boolean);
+    const name = String(senderName || '').trim();
+    if (!name) return null;
+    if (/\bteam\b/i.test(name) || /\b(llc|inc|ltd)\b/i.test(name)) return null;
+    const first = name.split(/\s+/)[0];
+    if (!first) return null;
+    const fl = first.toLowerCase();
+    // Skip when the display name is only an address fragment the mail app made up (one lower-case word equal to a
+    // local-part segment, e.g. "flow" for ai.local.flow@…). A real name such as "Dana Cohen" <dana@…> keeps "Hi Dana,".
+    const oneWord = name.split(/\s+/).length === 1;
+    if (oneWord && first === first.toLowerCase() && (localParts.some((p) => p === fl) || fl === localFull)) return null;
+    if (first.length <= 2 && first === first.toLowerCase()) return null;
+    return first;
+  }
+
+  const isHe = (params) => Boolean(params && params.lang === 'he');
+
+  // lang is the language of the mail being answered ('he' or anything else).
+  // The draft is written in it, whatever language Glance's own UI is in.
+  function draftGreeting(senderName, senderEmail, lang) {
+    const who = greetingName(senderName, senderEmail);
+    if (lang === 'he') return who ? ('היי ' + who + ',') : 'היי,';
+    return who ? ('Hi ' + who + ',') : 'Hi,';
+  }
+
+  function cleanLine(value) {
+    return String(value || '').replace(/[\r\n]+/g, ' ').trim();
+  }
+
+  // Strip greeting / sign-off wrappers so signal detection reads the asks.
+  function ownAskText(text) {
+    return String(text || '')
+      .replace(/\r/g, '')
+      .replace(/^[^\n]*\bHi\b[^\n]*,?\s*/i, '')
+      .replace(/\n+(?:Thanks|Thank you|Best|Regards|Cheers)[^\n]*\n[\s\S]*$/i, '')
+      .trim();
+  }
+
+  // Signals taken only from the ask text / planned `what` — never invented.
+  // The sender asks the reader for a time. One detector for the card and the draft (core/judgment.js).
+  function slotAsked(ask) {
+    let J = typeof FlowJudgment !== 'undefined' ? FlowJudgment : null;
+    if (!J && typeof require !== 'undefined') { try { J = require('./judgment.js').FlowJudgment; } catch (e) { J = null; } }
+    if (!J) return false;
+    if (typeof J.slotAskText === 'function' && J.slotAskText(ask)) return true;
+    const all = (J.SLOT_ASKS || []).concat(J.SLOT_ASKS_HE || []);
+    return all.some((re) => re.test(ask));
+  }
+
+  function askSignals(askText, what) {
+    const ask = (ownAskText(askText) + '\n' + String(what || '')).trim();
+    return {
+      ask: ask,
+      wantsReview: /\breview\b/i.test(ask) || /\bpilot proposal\b/i.test(ask) || /\bproposal\b/i.test(ask),
+      wantsConfirm: /\bconfirm\b/i.test(ask),
+      wantsOwner: /\b(?:onboarding owner|name of the (?:person|owner)|person on your side|who will own)\b/i.test(ask)
+        || /\bsend me the name\b/i.test(ask),
+      hasPilot: /\bpilot proposal\b/i.test(ask),
+      whetherStart: /\bwhether\b/i.test(ask) && /\bstart\b/i.test(ask),
+      // The sender wants a call or meeting and is waiting for a time from the reader.
+      wantsSlot: slotAsked(ask)
+    };
+  }
+
+  // Rich acknowledgment when the ask is concrete enough. Returns body lines
+  // (no greeting) or null when we should fall back to the short follow-up template.
+  function richAckLines(params, askText) {
+    const what = cleanLine(params && params.what);
+    const when = cleanLine(params && params.when) || null;
+    const sig = askSignals(askText, what);
+    if (!sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner && !sig.wantsSlot && !what) return null;
+
+    const he = isHe(params);
+    const lines = [];
+    // A scheduling ask gets a reply that offers times. The person fills the two
+    // slots in; nothing is invented and nothing is sent.
+    if (sig.wantsSlot && !sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner) {
+      if (he) { lines.push('תודה, אשמח לשיחה.', 'נוח לי ב: [מועד 1] או [מועד 2].'); }
+      else { lines.push('Thanks, happy to talk.', 'I can do [time 1] or [time 2].'); }
+      return lines;
+    }
+    if (he) {
+      if (sig.wantsReview && sig.wantsConfirm) {
+        lines.push('תודה. אעבור על זה ואחזור עם אישור' + (what ? (': ' + what) : '') + (when ? (' עד ' + when) : '') + '.');
+      } else if (what) {
+        lines.push('תודה. אחזור אליך בנוגע ל: ' + what + (when ? (' (' + when + ')') : '') + '.');
+      } else {
+        lines.push('תודה על ההודעה.');
+      }
+      if (sig.wantsOwner) lines.push('האחראי על ההטמעה אצלנו יהיה [שם].');
+      else if (!sig.wantsReview && !sig.wantsConfirm) lines.push('[כתוב כאן את התשובה]');
+      return lines;
+    }
+    if (sig.wantsReview && sig.wantsConfirm) {
+      if (sig.hasPilot) {
+        let line = "Thanks for sending the pilot proposal. I'll review it and confirm";
+        if (when) line += ' by ' + when;
+        // Echo the ask's own "whether we can start…" clause when present — not invented.
+        if (sig.whetherStart) line += ' whether we can start next week';
+        line += '.';
+        lines.push(line);
+      } else {
+        lines.push("Thanks. I'll review and confirm"
+          + (what ? (': ' + what) : ' on your request')
+          + (when ? (' by ' + when) : '')
+          + '.');
+      }
+    } else if (sig.wantsConfirm || sig.wantsReview) {
+      lines.push("Thanks. I'll follow up on: " + (what || 'your request')
+        + (when ? (' (' + when + ')') : '') + '.');
+    } else if (what) {
+      lines.push("Thanks. I'll follow up on: " + what + (when ? (' (' + when + ')') : '') + '.');
+    } else {
+      lines.push('Thanks for your note.');
+    }
+
+    if (sig.wantsOwner) {
+      lines.push('The onboarding owner on our side will be [name].');
+    } else if (!sig.wantsReview && !sig.wantsConfirm) {
+      lines.push('[Write your reply here]');
+    }
+    return lines;
+  }
+
+  function attachmentLines(attachment, attachmentSource, params) {
+    const lines = [];
+    if (attachment && (attachmentSource === 'found' || attachmentSource === 'template')) {
+      lines.push('', (isHe(params) ? 'מצורף: ' : 'Attached: ') + attachment.filename);
+      if (attachmentSource === 'template') {
+        const fields = (params && params.fields) || [];
+        for (const field of fields) {
+          if (field && field.label && String(field.value || '').trim()) {
+            lines.push(String(field.label) + ': ' + cleanLine(field.value));
+          }
+        }
+      }
+    }
+    return lines;
+  }
+
+  // Same contract as the former background.js draftBodyText: fact reply, share link,
+  // or a rich acknowledgment of what/when (with optional ask text), else a short
+  // follow-up + fill-in placeholder.
+  function draftBodyText(p, attachment, attachmentSource, shareUrl) {
+    const params = (p && p.params) || {};
+    if (params.inviteFile) {
+      if (params.body) return params.body;
+      const fileOnDraft = params.fileAttached === true || (attachment && (attachmentSource === 'found' || attachmentSource === 'thread'));
+      if (fileOnDraft) return params.lang === 'he' ? 'מצורף.' : 'Attached.';
+      return params.lang === 'he' ? 'אצרף בהקדם.' : "I'll attach it shortly.";
+    }
+    const he = isHe(params);
+    const greet = draftGreeting(p && p.senderName, p && p.senderEmail, he ? 'he' : '');
+    if (params.replyFact && !params.shareLink) {
+      const factLine = cleanLine(params.factLine);
+      return [greet, '', factLine].join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
+    }
+    const lines = [greet, ''];
+    if (shareUrl) {
+      // A line that is not in the mail's language is not used: the planned
+      // sentence for the file step is Glance's own English closing line.
+      const said = params.what && (!he || /[\u0590-\u05FF]/.test(String(params.what))) ? params.what : '';
+      lines.push(said || (he ? 'הקובץ מוכן.' : 'The file is ready.'));
+      lines.push(shareUrl);
+      return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
+    }
+
+    const askText = params.askText || params.text || null;
+    const rich = richAckLines(params, askText);
+    if (rich && rich.length) {
+      for (const line of rich) lines.push(line);
+      const att = attachmentLines(attachment, attachmentSource, params);
+      for (const line of att) lines.push(line);
+      // Trailing blank line matches the pre-unification Outlook reply shape.
+      if (lines[lines.length - 1] !== '') lines.push('');
+      return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
+    }
+
+    const follow = he ? 'בהמשך ל: ' : 'Following up on: ';
+    if (params.what && params.when) lines.push(follow + cleanLine(params.what) + ' (' + cleanLine(params.when) + ')');
+    else if (params.what) lines.push(follow + cleanLine(params.what));
+    else lines.push(he ? 'בהמשך להודעה שלך למטה.' : 'Following up on your message below.');
+    const att = attachmentLines(attachment, attachmentSource, params);
+    for (const line of att) lines.push(line);
+    lines.push('', he ? '[כתוב כאן את התשובה]' : '[Write your reply here]');
+    return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
+  }
+
+  // Build the payload shape writers expect from an Intent + Actions plan draft step.
+  // opts.text / opts.subject (optional) let the rich path see the original ask.
+  function bodyFromIntent(intent, senderName, senderEmail, opts) {
+    const o = opts || {};
+    const e = (intent && intent.entities) || {};
+    const what = e.requestWhat || e.what || (intent && intent.label) || null;
+    const when = e.when || (intent && intent.facts && intent.facts.date && intent.facts.date.raw) || null;
+    const askText = o.askText || o.text || e.askText || null;
+    const subject = o.subject || null;
+    const combined = askText
+      ? ((subject && String(askText).indexOf(subject) !== 0) ? (subject + '\n' + askText) : askText)
+      : (subject || null);
+    return draftBodyText({
+      senderName: senderName,
+      senderEmail: senderEmail,
+      params: {
+        what: what,
+        when: when,
+        replyFact: Boolean(intent && intent.signals && intent.signals.factReply),
+        factLine: e.factLine || null,
+        askText: combined
+      }
+    });
+  }
+
+  return { draftGreeting, draftBodyText, greetingName, bodyFromIntent, askSignals, richAckLines };
+})();
+
+if (typeof module !== 'undefined') module.exports = { FlowDraftReply };
+else if (typeof globalThis !== 'undefined') globalThis.FlowDraftReply = FlowDraftReply;
+
 // ----- flow-trial-extension/core/intent.js -----
 // The decision layer: takes one email's text and classifies it into exactly
 // one of five intent types, or into nothing at all.
@@ -9741,7 +9972,7 @@ const FlowIncomingJudge = (() => {
       return {
         intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'appointment', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute }, facts: { date: { iso: appt.dateIso } } },
         process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: appt.dateIso, hour: appt.hour, minute: appt.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, durationMinutes: appt.durationMinutes || undefined, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
     const tripApi = sibling(typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, './chat-travel-notice.js', 'FlowChatTravelNotice');
@@ -9775,7 +10006,7 @@ const FlowIncomingJudge = (() => {
       return {
         intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'invitation', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
         process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
-          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+          steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title: title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, durationMinutes: inv.durationMinutes || undefined, threadUrl: i.threadUrl || null }, dependsOn: null }] }
       };
     }
     const pick = firstHit(pickApi, body, now0, 'pickup');
@@ -9912,7 +10143,10 @@ var GlanceI18n = (function () {
       onCalendar: 'On your calendar.',
       schedule: 'Calendar and a reminder.',
       editedEvent: "The event was edited, so I won't undo it",
-      grant: 'Grant permission'
+      grant: 'Grant permission',
+      draftReady: 'Draft ready in Gmail.',
+      inDraft: 'In your reply draft.',
+      editedDraft: "The draft was edited, so I won't undo it"
     },
     he: {
       doIt: 'בצע',
@@ -9933,7 +10167,10 @@ var GlanceI18n = (function () {
       onCalendar: 'ביומן.',
       schedule: 'יומן ותזכורת.',
       editedEvent: 'האירוע נערך, אז לא אבטל אותו',
-      grant: 'תנו הרשאה'
+      grant: 'תנו הרשאה',
+      draftReady: 'טיוטת תשובה מוכנה ב-Gmail.',
+      inDraft: 'בטיוטת התשובה.',
+      editedDraft: 'הטיוטה נערכה, אז לא אבטל אותה'
     }
   };
 
@@ -10129,12 +10366,29 @@ var GlanceIntent = (function () {
     return { due: due, text: rest };
   }
 
+  function stripGreeting(raw) {
+    var text = collapse(raw);
+    text = text.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
+    text = text.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    text = text.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
+    return text;
+  }
+
+  // An explicit remember ask must start the message (after a short greeting).
+  // The same phrase buried after other sentences is not a local ask.
+  function buriedRemember(text) {
+    var head = String(text || '').split(/\nOn [A-Za-z]{3},/)[0].split(/\nwrote:/i)[0];
+    var raw = stripGreeting(head);
+    if (!raw) return false;
+    if (/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+/i.test(raw)) return false;
+    if (/^תזכיר(?:י)?\s+לי\s+/.test(raw) || /^אל תשכח(?:י)?\s+/.test(raw)) return false;
+    return /(?:^|[.!?]\s+)(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+/i.test(raw)
+      || /(?:^|[.!?]\s+)(?:תזכיר(?:י)?\s+לי|אל תשכח(?:י)?)\s+/.test(raw);
+  }
+
   function localRemember(text, now, timeZone) {
-    var raw = collapse(text);
+    var raw = stripGreeting(text);
     if (!raw || raw.length > 8000) return null;
-    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
-    raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
-    raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
     var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
     var lang = 'en';
     if (!match) {
@@ -10296,9 +10550,10 @@ var GlanceIntent = (function () {
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n');
     if (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.newContent === 'function') {
-      return FlowJudgment.newContent(raw);
+      raw = FlowJudgment.newContent(raw);
     }
-    return raw;
+    var quote = raw.split(/\nOn [A-Za-z]{3},/)[0].split(/\nwrote:/i)[0];
+    return collapse(quote);
   }
 
   // Card chrome follows the Gmail locale. The title written on the event
@@ -10323,6 +10578,27 @@ var GlanceIntent = (function () {
       if (raw.indexOf(MEETING_NOUNS_HE[i]) !== -1) return MEETING_NOUNS_HE[i];
     }
     return 'פגישה';
+  }
+
+  function explicitIsraeliDate(text, now, timeZone) {
+    if (!mailIsHebrew(text)) return null;
+    var match = String(text || '').match(/(\d{1,2})[./](\d{1,2})(?:[./](20\d{2}))?/);
+    if (!match) return null;
+    var year = match[3] ? +match[3] : +todayIso(now, timeZone).slice(0, 4);
+    var iso = year + '-' + pad(+match[2]) + '-' + pad(+match[1]);
+    return validIso(iso) ? iso : null;
+  }
+
+  function applyHebrewExplicitDate(prepared, decision, now, timeZone) {
+    if (!decision || !decision.speak) return decision;
+    var explicit = explicitIsraeliDate(prepared, now, timeZone);
+    if (!explicit) return contentTitle(prepared, decision);
+    if (decision.kind === 'schedule' || decision.kind === 'hold') {
+      decision.dateIso = explicit;
+      decision.due = explicit;
+      if (decision.kind === 'schedule') decision.taskDue = explicit;
+    }
+    return contentTitle(prepared, decision);
   }
 
   function writtenDate(text, dateIso) {
@@ -10376,6 +10652,65 @@ var GlanceIntent = (function () {
     };
   }
 
+  function hebrewScheduleFromIntent(prepared, intent, now, timeZone) {
+    if (!intent || intent.type !== 'event' || !mailIsHebrew(prepared)) return null;
+    var ent = intent.entities || {};
+    var dateIso = explicitIsraeliDate(prepared, now, timeZone) || isoOrNull(ent.dateIso, now, timeZone);
+    if (!dateIso) return null;
+    var clock = clockOf({ hour: ent.hour, minute: ent.minute });
+    var label = sanitizeTitle(intent.label || ent.what || '');
+    if (!label) return null;
+    var calendarParams = {
+      title: label,
+      dateIso: dateIso,
+      quote: prepared,
+      requireTime: Boolean(clock)
+    };
+    if (clock) {
+      calendarParams.hour = clock.hour;
+      calendarParams.minute = clock.minute;
+    }
+    return {
+      intent: intent,
+      plan: {
+        id: 'schedule',
+        steps: [
+          { kind: 'calendar', params: calendarParams },
+          { kind: 'googleTask', params: { title: label, dateIso: dateIso } }
+        ]
+      }
+    };
+  }
+
+  // Gmail add-on: Hebrew meetings the shared judge withholds still close as
+  // schedule (all-day or timed). A timed hold from the engine becomes schedule.
+  function normalizeEngineHit(prepared, hit, now, timeZone) {
+    if (!hit) return hit;
+    if (hit.plan && hit.plan.id === 'hold' && hit.plan.steps && hit.plan.steps[0] && mailIsHebrew(prepared)) {
+      var holdParams = (hit.plan.steps[0].params) || {};
+      if (Number.isInteger(holdParams.hour) && holdParams.requireTime === false) {
+        return {
+          intent: hit.intent,
+          plan: {
+            id: 'schedule',
+            steps: [
+              hit.plan.steps[0],
+              {
+                kind: 'googleTask',
+                params: {
+                  title: sanitizeTitle(holdParams.title || ''),
+                  dateIso: holdParams.dateIso || null
+                }
+              }
+            ]
+          }
+        };
+      }
+    }
+    if (hit.plan) return hit;
+    return hebrewScheduleFromIntent(prepared, hit.intent, now, timeZone) || hit;
+  }
+
   function resolveTask(text, ctx) {
     ctx = ctx || {};
     var prepared;
@@ -10383,6 +10718,7 @@ var GlanceIntent = (function () {
       err.diag = err.diag || 'judge';
       throw err;
     }
+    if (buriedRemember(prepared)) return silence('buried-remember', null);
     var local = localRemember(prepared, ctx.now, ctx.timeZone);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
@@ -10391,8 +10727,9 @@ var GlanceIntent = (function () {
         err.diag = err.diag || 'judge';
         throw err;
       }
+      hit = normalizeEngineHit(prepared, hit, ctx.now, ctx.timeZone);
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
-      if (mapped) return contentTitle(prepared, mapped);
+      if (mapped) return applyHebrewExplicitDate(prepared, mapped, ctx.now, ctx.timeZone);
       if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
@@ -10412,7 +10749,9 @@ var GlanceIntent = (function () {
     sanitizeTitle: sanitizeTitle,
     prepareText: prepareText,
     contentTitle: contentTitle,
-    silence: silence
+    silence: silence,
+    normalizeEngineHit: normalizeEngineHit,
+    buriedRemember: buriedRemember
   };
 })();
 
@@ -10914,6 +11253,10 @@ var GlanceCards = (function () {
     return button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' });
   }
 
+  function composeDoItButton(draftId, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { draftId: String(draftId || ''), source: 'compose' });
+  }
+
   function proposal(decision, messageId, lang) {
     var L = i18n();
     if (decision.kind === 'hold') {
@@ -11014,6 +11357,30 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
   }
 
+  function composeProposal(preview, draftId, lang) {
+    var widgets = [text(lang, i18n().t(lang, 'draftReady'))];
+    if (preview) widgets.push(text(lang, preview));
+    widgets.push(composeDoItButton(draftId, lang));
+    return card(lang, widgets);
+  }
+
+  function draftProof(view, lang, opts) {
+    opts = opts || {};
+    var L = i18n();
+    var widgets = [
+      text(lang, L.t(lang, 'inDraft')),
+      text(lang, view && view.preview ? view.preview : '')
+    ];
+    if (view && view.id) widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
+    var undo = opts.draftId ? button(lang, 'undo', 'onComposeUndo', { draftId: String(opts.draftId), source: 'compose' }) : null;
+    if (undo) widgets.push(undo);
+    return card(lang, widgets);
+  }
+
+  function editedDraft(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'editedDraft'))]);
+  }
+
   function homepage(next, lang) {
     var L = i18n();
     if (!next || !next.title) return card(lang, [text(lang, L.t(lang, 'openMessage'))]);
@@ -11040,6 +11407,9 @@ var GlanceCards = (function () {
     grant: grant,
     quiet: quiet,
     homepage: homepage,
+    composeProposal: composeProposal,
+    draftProof: draftProof,
+    editedDraft: editedDraft,
     buttons: buttons
   };
 })();
@@ -11156,6 +11526,23 @@ var GlanceRemote = (function () {
 
 if (typeof module !== 'undefined') module.exports = GlanceRemote;
 
+// ----- glance-gmail-addon/src/draft-compose.js -----
+// Draft read-back for the Gmail compose trigger. Never sends mail.
+
+var GlanceDraftCompose = (function () {
+  function norm(value) {
+    return String(value == null ? '' : value).replace(/\r\n/g, '\n').replace(/\s+/g, ' ').trim();
+  }
+
+  function matches(readBack, expected) {
+    return norm(readBack) === norm(expected);
+  }
+
+  return { norm: norm, matches: matches };
+})();
+
+if (typeof module !== 'undefined') module.exports = GlanceDraftCompose;
+
 var Glance = {
   i18n: GlanceI18n,
   urls: GlanceUrls,
@@ -11165,6 +11552,7 @@ var Glance = {
   cards: GlanceCards,
   prefetch: GlancePrefetch,
   remote: GlanceRemote,
+  draftCompose: GlanceDraftCompose,
   classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },
   plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },
   judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }
