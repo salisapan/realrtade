@@ -1487,8 +1487,7 @@
   }
 
   async function resolveExactOpenPaneMessageId(pane, own, openSender) {
-    if (!pane || !paneUrlOnlyMessageTarget(pane)) return null;
-    if (!conversationPanePathKey(pane)) return null;
+    if (!pane || !paneUrlOnlyMessageTarget(pane) || !conversationPanePathKey(pane)) return null;
     const pathId = pane.pathId || pane.conversationId;
     const convId = pane.conversationId;
     if (!pathId && !convId) return null;
@@ -1528,6 +1527,11 @@
     return null;
   }
 
+  function messageUrlPathKey(pane) {
+    const pathKey = String((pane && (pane.pathId || pane.rawUrlId)) || '').trim();
+    return pathKey && !isConversationId(pathKey) ? pathKey : '';
+  }
+
   function conversationPanePathKey(pane) {
     if (pane && pane.pathRestMessageUrl) return '';
     const pathKey = String((pane && (pane.pathId || pane.rawUrlId || pane.conversationId)) || '').trim();
@@ -1536,9 +1540,9 @@
 
   async function resolveJudgedReplyMessageId(pane, own, openSender) {
     if (pane && paneUrlOnlyMessageTarget(pane)) {
-      const exact = await resolveExactOpenPaneMessageId(pane, own, openSender);
-      if (exact && exact.id) return exact;
-      if (conversationPanePathKey(pane)) return null;
+      const pinned = await resolveMessageIdForFilePrepare(pane, own, openSender);
+      if (pinned && pinned.id) return pinned;
+      return null;
     }
     if (!pane) return null;
     return resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSender || pane.senderEmail);

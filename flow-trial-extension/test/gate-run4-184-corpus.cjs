@@ -1146,7 +1146,7 @@ async function runBehavioral(opts) {
   }
   function urlOnlyIdRegressionSrc(src) {
     const needle = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      if (!id && conversationPanePathKey(pane)) {\n        const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n        id = open && open.id;\n      }\n      if (!id) {\n        const found = conversationPanePathKey(pane)\n          ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)\n          : (paneUrlOnlyMessageTarget(pane)\n            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
-    const repl = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = Boolean(id && pathKey && (String(pane.itemId || \'\') === pathKey || (typeof FlowOwaParse !== \'undefined\' && FlowOwaParse.canonId && FlowOwaParse.canonId(pane.itemId || \'\') === FlowOwaParse.canonId(pathKey))));\n      if (!id) {\n        const found = paneUrlOnlyMessageTarget(pane)\n          ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n          : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
+    const repl = 'if (countGate) {\n      let id = openPaneGraphMessageId(pane);\n      const pathKey = String(pane.pathId || pane.conversationId || \'\');\n      const urlOnlyId = Boolean(id && pathKey && messageUrlPathKey(pane));\n      if (!id && conversationPanePathKey(pane)) {\n        const open = await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail);\n        id = open && open.id;\n      }\n      if (!id) {\n        const found = conversationPanePathKey(pane)\n          ? await exactConversationPaneMessageId(pane, ownAddresses, pane.senderEmail)\n          : (paneUrlOnlyMessageTarget(pane)\n            ? await resolveMessageIdForFilePrepare(pane, ownAddresses, pane.senderEmail)\n            : await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail));\n        if (found && found.unread) return { none: true, reason: found.reason };\n        id = found && found.id;\n      }\n      const ev = typeof FlowOutlookAttachmentEvidence';
     let out = src.replace(needle, repl);
     const extra = 'if (urlOnlyId) {\n        await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);\n      }';
     const anchor = 'if (merged.count == null) {\n        attachmentsUnread = true;';
@@ -1169,6 +1169,32 @@ async function runBehavioral(opts) {
   check('wrong-target urlOnlyId bite: identity outlook patch does not satisfy bite',
     !(msgUrlGraphNoOpSum.convFilter > msgUrlGraphSum.convFilter || msgUrlGraphNoOpSum.total > msgUrlGraphSum.total),
     { ctrl: msgUrlGraphSum, noop: msgUrlGraphNoOpSum });
+  console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:1134-1170 | before: message URL reply fell through to conversation-filter | after: path-rest id + zero convFilter | ruling: #184 urlOnlyId');
+  const msgUrlReplyGate = Object.assign({}, gateBase, {
+    htmlPatch: (h) => gateHtml(h1Body)(h),
+    mailBody: h1Body,
+    urlId: F3_RAW_MSG,
+    listedConversationId: GATE_CONV,
+    messageId: F3_GRAPH_MSG,
+    pathRestHit: true, pathRestId: F3_RAW_MSG, pathRestGraphId: F3_GRAPH_MSG, pathRestResponseId: F3_GRAPH_MSG,
+    gateAttachments: false, hasAttachments: false, attachmentFiles: [],
+    inboxLookupEmpty: true,
+    waitMs: 6000, clickDoIt: true,
+    store: cleanStore
+  });
+  const msgUrlReplyCtrl = await runPage(msgUrlReplyGate);
+  const msgUrlReplySum = graphEndpointSummary(msgUrlReplyCtrl.sent);
+  const msgUrlReplyDraft = (msgUrlReplyCtrl.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft')[0] || {}).payload;
+  logGateRun4Bite('urlOnlyId-reply', 'message URL H1 Do It', 'path-rest Graph id; never conversation id or conv filter');
+  function urlOnlyMessageIdOk(id) {
+    const s = String(id || '');
+    return s && (s === F3_GRAPH_MSG || s === F3_RAW_MSG || outlookMessageIdSpellings(F3_RAW_MSG).indexOf(s) >= 0);
+  }
+  check('urlOnlyId control: message URL reply Do It uses path-rest message id (zero conversation-filter)',
+    msgUrlReplySum.convFilter === 0 &&
+    msgUrlReplyDraft && urlOnlyMessageIdOk(msgUrlReplyDraft.outlookIncomingId) &&
+    String(msgUrlReplyDraft.outlookIncomingId) !== String(GATE_CONV),
+    { sum: msgUrlReplySum, id: msgUrlReplyDraft && msgUrlReplyDraft.outlookIncomingId });
   const wtAbsentBase = Object.assign({}, row31SaveUnreadGate, {
     urlId: 'M-older', listedConversationId: WRONG_TARGET_CONV, listedSubject: 'Gate Run 4',
     messageId: 'M-older',
