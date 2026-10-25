@@ -979,9 +979,9 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   logGateRun4Bite('fileitInboxSkew', 'OneDrive conv URL +7min non-empty inbox', 'fail closed; no M-newer draft');
   assertSkewFailClosed('file prepare conversation URL +7min with non-empty inbox fails closed (OneDrive chain)', fileitInboxSkew);
   function fileitInboxSkewBiteSrc(src) {
-    return fileitLegacyResolverOrderSrc(src);
+    return fileitLegacyResolverOrderSrc(legacySkewDraftsNewerSrc(src));
   }
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew | before: prepSkew+legacySkew stack bite | after: judged save skew + non-empty inbox; bite fileitLegacy(L5164) only | ruling: #184 item 5');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: fileitLegacy only (fails on strict sole rule) | after: fileitLegacy(L5164)+legacySkewDraftsNewerSrc | ruling: #184 item 5 bite sensitivity');
   const fileitInboxSkewMut = await runPage(Object.assign({}, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook(fileitInboxSkewBiteSrc)
   }));
