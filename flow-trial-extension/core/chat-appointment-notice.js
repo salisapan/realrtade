@@ -65,6 +65,72 @@ const FlowChatAppointmentNotice = (() => {
     return { iso: iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + (idx - at.getDay() + 7) % 7)) };
   }
 
+  // One clock text ("14:00", "2pm", "10") to { h, m } in 24 hours, or null. A bare hour under 7 is too ambiguous to take.
+  function clockOf(txt, marked) {
+    const m = String(txt || '').trim().match(/^(\d{1,2})(?::(\d{2}))?\s?(a\.?m\.?|p\.?m\.?)?$/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = m[2] ? parseInt(m[2], 10) : 0;
+    if (min > 59 || h > 23) return null;
+    if (m[3]) {
+      if (h < 1 || h > 12) return null;
+      const pm = /^p/i.test(m[3]);
+      if (pm && h < 12) h += 12;
+      if (!pm && h === 12) h = 0;
+    } else if (h < 7 && !m[2] && !marked) return null;
+    return { h: h, m: min };
+  }
+  const CLK = '\\d{1,2}(?::\\d{2})?\\s?(?:[ap]\\.?m\\.?)?';
+  const RANGE = new RegExp('(?:^|[^\\d:])(' + CLK + ')\\s?(?:-|–|—|to|until|till|עד)\\s?(' + CLK + ')(?![\\d:]|\\s?[ap]\\.?m)', 'i');
+  const RANGE_MK = new RegExp('(?:^|[^\\d:])(' + CLK + ')\\s?(?:-|–|—|to|until|till|עד)\\s?(\\d{1,2}(?::\\d{2})?\\s?[ap]\\.?m\\.?)', 'i');
+  const mk = (x) => { const k = String(x).match(/[ap]\.?m/i); return k ? k[0].toLowerCase().replace('.', '') : ''; };
+
+  // The start of "from 10:00 to 11:30" / "10:00-11:00" when the plain clock reader gave nothing for a range.
+  function rangeStart(text) {
+    const m = String(text == null ? '' : text).replace(/\s+/g, ' ').trim().match(RANGE_MK) || String(text == null ? '' : text).replace(/\s+/g, ' ').trim().match(RANGE);
+    if (!m) return null;
+    let sa = String(m[1]).trim();
+    let sb = String(m[2]).trim();
+    if (mk(sa) && !mk(sb)) sb = sb + mk(sa);
+    if (mk(sb) && !mk(sa)) sa = sa + mk(sb);
+    const from = clockOf(sa, Boolean(mk(sa) || mk(sb)));
+    const to = clockOf(sb, Boolean(mk(sa) || mk(sb)));
+    return from ? { hour: from.h, minute: from.m, endHour: to ? to.h : null, endMinute: to ? to.m : null } : null;
+  }
+
+  // How long the appointment lasts, in minutes (5 to 720), when the person was told: an end clock after the start ("10:00-11:30",
+  // "from 10:00 to 11:30"), or "for 45 minutes", "for an hour", "for an hour and a half", «למשך שעה», «למשך 45 דקות». Read from the
+  // person's own words. null when nothing says so; a range that does not start at the booked clock is not this appointment's length.
+  function lengthOf(text, start) {
+    const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    const m = t.match(RANGE_MK) || t.match(RANGE);
+    if (m && start) {
+      let sa = String(m[1]).trim();
+      let sb = String(m[2]).trim();
+      if (mk(sa) && !mk(sb)) sb = sb + mk(sa);
+      if (mk(sb) && !mk(sa)) sa = sa + mk(sb);
+      const marked = Boolean(mk(sa) || mk(sb));
+      const from = clockOf(sa, marked);
+      const to = clockOf(sb, marked);
+      if (from && to && from.h === start.hour && from.m === start.minute) {
+        const n = (to.h * 60 + to.m) - (from.h * 60 + from.m);
+        if (n >= 5 && n <= 720) return n;
+      }
+    }
+    let d = t.match(/\b(?:for|lasts?|lasting)\s+(?:about\s+|around\s+)?(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)\b/i);
+    let n = null;
+    if (d) n = Math.round(parseFloat(d[1]) * (/^h/i.test(d[2]) ? 60 : 1));
+    else if (/\b(?:for|lasts?|lasting)\s+(?:an?\s+|one\s+)hour\s+and\s+a\s+half\b|\b(?:for|lasts?)\s+1\.5\s*hours?\b/i.test(t)) n = 90;
+    else if (/\b(?:for|lasts?|lasting)\s+(?:an?\s+|one\s+)hour\b/i.test(t)) n = 60;
+    else if (/\b(?:for|lasts?|lasting)\s+(?:half\s+an?\s+hour|half-hour)\b/i.test(t)) n = 30;
+    else if ((d = t.match(/\b(\d{2,3})[- ]minute\s+(?:appointment|session|slot|consultation|lesson|class|treatment|fitting|visit)\b/i))) n = parseInt(d[1], 10);
+    else if (/למשך\s+שעה\s+וחצי/.test(t)) n = 90;
+    else if (/למשך\s+שעתיים/.test(t)) n = 120;
+    else if (/למשך\s+שעה(?![֐-׿])/.test(t)) n = 60;
+    else if ((d = t.match(/למשך\s+(\d{1,3})\s+דקות/))) n = parseInt(d[1], 10);
+    return n != null && n >= 5 && n <= 720 ? n : null;
+  }
+
   // { kind: 'appointment', dateIso, hour, minute, lang } or { kind: 'none', reason }.
   function movedTo(raw) {
     let m = raw.match(MOVE_EN);
@@ -88,12 +154,15 @@ const FlowChatAppointmentNotice = (() => {
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.iso || ''))) return { kind: 'none', reason: 'no-day' };
     let t = X.parseTime(raw);
     if (!(t && Number.isInteger(t.hour) && Number.isInteger(t.minute))) t = englishClock(raw);
+    if (!(t && Number.isInteger(t.hour) && Number.isInteger(t.minute))) t = rangeStart(text);
+    else { const rs = rangeStart(text); if (rs && rs.endHour === t.hour && rs.endMinute === t.minute) t = rs; } // "between 2 and 3pm": the plain reader took the end
     if (!t || !Number.isInteger(t.hour) || !Number.isInteger(t.minute) || t.hour < 0 || t.hour > 23 || t.minute < 0 || t.minute > 59) return { kind: 'none', reason: 'no-clock' };
     const today = new Date(at.getFullYear(), at.getMonth(), at.getDate());
     const ahead = Math.round((new Date(d.iso + 'T00:00:00') - today) / 86400000);
     if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
     if (ahead === 0 && (t.hour * 60 + t.minute) <= (at.getHours() * 60 + at.getMinutes())) return { kind: 'none', reason: 'already-past' };
-    return { kind: 'appointment', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    const len = lengthOf(text, t);
+    return Object.assign({ kind: 'appointment', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' }, len ? { durationMinutes: len } : {});
   }
 
   // A booking the business cancelled ("Your appointment on Sunday at 10:00 was cancelled", «התור שלך ביום ראשון ב-10:00 בוטל»): the day and
@@ -126,7 +195,7 @@ const FlowChatAppointmentNotice = (() => {
     return { kind: 'cancelled', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize, cancelled: cancelled };
+  return { recognize: recognize, cancelled: cancelled, lengthOf: lengthOf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatAppointmentNotice };

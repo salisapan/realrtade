@@ -81,5 +81,31 @@ const NOT_GONE = [
   ['התור שלך נדחה ליום שלישי ב-09:00', 'a move']
 ];
 for (const [text, why] of NOT_GONE) check('not a cancellation (' + why + '): ' + text.slice(0, 50), A.cancelled(text, NOW).kind === 'none', A.cancelled(text, NOW));
+
+// The told length of an appointment (durationMinutes), read from words and clocks the person was given; null when nothing says so.
+const LEN = [
+  ['Your appointment is confirmed for Sunday from 10:00 to 11:30', 90],
+  ['Your appointment on Sunday at 10:00-11:00 is confirmed', 60],
+  ['Your appointment is confirmed for Sunday 2pm-3pm', 60],
+  ['Your appointment is confirmed for Sunday at 10:00 for an hour and a half', 90],
+  ['Your appointment is confirmed for Sunday at 10am for 45 minutes', 45],
+  ['Your appointment is confirmed for Sunday at 10:00 for 2 hours', 120],
+  ['Your appointment is confirmed for Sunday at 10:00 for an hour', 60],
+  ['התור שלך נקבע ליום ראשון ב-10:00 למשך שעה', 60],
+  ['התור שלך נקבע ליום ראשון ב-10:00 למשך שעה וחצי', 90],
+  ['התור שלך נקבע ליום ראשון ב-10:00 למשך 45 דקות', 45],
+  ['התור שלך נקבע ליום ראשון 10:00-11:00', 60]
+];
+for (const [text, n] of LEN) { const r = A.recognize(text, NOW); check('length ' + n + ': ' + text.slice(0, 60), r.kind === 'appointment' && r.durationMinutes === n, r); }
+const NOLEN = [
+  'Your appointment is confirmed for Sunday at 10:00',
+  'Your appointment is confirmed for Sunday at 10:00, please arrive 10 minutes early',
+  'Your appointment is confirmed for Sunday at 10:00, lunch 12:00-13:00',
+  'Your appointment is confirmed for Sunday at 10:00 for 900 minutes',
+  'התור שלך נקבע ליום ראשון ב-10:00, נא להגיע 10 דקות לפני'
+];
+for (const text of NOLEN) { const r = A.recognize(text, NOW); check('no told length: ' + text.slice(0, 60), r.kind === 'appointment' && r.durationMinutes === undefined, r); }
+check('a range that starts at another clock is not its length', A.lengthOf('lunch 12:00-13:00', { hour: 10, minute: 0 }) === null);
+check('the range start is the clock when the plain reader fails', (() => { const r = A.recognize('Your appointment is confirmed for Sunday from 10:00 to 11:30', NOW); return r.hour === 10 && r.minute === 0; })());
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-appointment-notice checks passed');
 process.exit(failures ? 1 : 0);

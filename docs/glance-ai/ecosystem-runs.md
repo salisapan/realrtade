@@ -702,3 +702,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `e2e/gmail-booking-cancel.spec.js` (4 real-browser specs against the local Google lane server), `test/booking-cancel-corpus.cjs` extended (Gmail row shape), booking-notice specs on both surfaces green, every `test/*corpus.cjs` green.
 - **Open:** live Gate on both surfaces; Planner tasks not closed by the payment close; no cross-chat matching.
+
+## Run 85 (builder B, 2026-10-25): calendar holds take the told length of an appointment
+
+- **Capability shipped:** a confirmation like "your appointment is confirmed for Sunday from 14:00 to 15:30" or "...at 10:00 for an hour and a half" / «התור נקבע ל-10:00 למשך שעה» is now a calendar hold of that length (it was always 30 minutes) on Google Calendar and Outlook Calendar, from WhatsApp, Messenger, Instagram, Outlook mail and Gmail. The existing Hold It card, read back, Undo, nobody invited, nothing sent. Also fixed: a range written without "at" ("Sunday 10:00-11:00") is now read as an appointment starting at the first clock. Switches `BOOKING_NOTICE` and `CHAT_TASK_CARD` (off).
+- **Code:** `lengthOf` and `rangeStart` in `core/chat-appointment-notice.js`; `durationMinutes` carried by the judge's appointment step and the chat card's hold.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** 18 new lines in `test/chat-appointment-notice-corpus.cjs` (lengths in English and Hebrew, no length for "arrive 10 minutes early", a lunch range, an absurd length), three real-browser specs (Outlook mail, Gmail, WhatsApp) that check the end of the written event, booking and chat-hold specs unchanged and green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; "between 2 and 3pm" still starts at 15:00 (the plain clock reader takes the last clock; left as it was, needs its own fix and corpus); flights and invitations that name a length are not read.

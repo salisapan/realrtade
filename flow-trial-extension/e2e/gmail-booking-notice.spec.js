@@ -136,3 +136,16 @@ test('BOOKING_NOTICE on: a delivery window told in a mail is one Google Calendar
   await page.locator(MAIN + ' button.flow-chip-undo').click();
   await expect.poll(() => events().length).toBe(0);
 });
+
+test('BOOKING_NOTICE on: an appointment mail that names its length is one Google event of that length, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi, your appointment is confirmed for tomorrow at 14:00 for an hour and a half. See you then.');
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  const ev = events()[0];
+  expect(Date.parse(ev.end.dateTime) - Date.parse(ev.start.dateTime)).toBe(90 * 60000);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});
