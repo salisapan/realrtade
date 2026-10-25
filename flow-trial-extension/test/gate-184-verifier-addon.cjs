@@ -58,6 +58,15 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     const repl = 'const ctx = {\n      app: \'outlook\',\n      doLabel: \'Do It\',\n      pane: null,';
     return src.includes(needle) ? src.replace(needle, repl) : src;
   }
+  function minuteMatchDisabledSrc(src) {
+    return src.replace(
+      'let minOk = Boolean(pane && pane.clockFromPane === true && minute && minuteOf(m.receivedDateTime) === minute);',
+      'let minOk = true;'
+    );
+  }
+  function fileItLooseAmbiguityDisabledSrc(src) {
+    return src.replace('return looseHits > 1;', 'return false; /* bite: loose open-pane ambiguity off */');
+  }
   function fileitLegacyResolverOrderSrc(src) {
     const legacyBlock = `const judged = needsJudgedReplyTarget(proc);
               replyTarget = judged
@@ -774,11 +783,11 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       glanceTodoConsent: { mode: 'always', scope: 'Tasks.ReadWrite', revoked: false, at: 1 },
       outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Tasks.ReadWrite', 'Mail.ReadWrite'] }, account: { address: HME }, ownAddresses: [HME] }
     }),
-    contentOutlookSrc: patchOutlook(legacySkewDraftsNewerSrc)
+    contentOutlookSrc: patchOutlook((s) => fileitLegacyResolverOrderSrc(legacySkewDraftsNewerSrc(s)))
   }));
   const saveJudgedSkewMutDraft = replyDraftActs(saveJudgedSkewMut)[0] && replyDraftActs(saveJudgedSkewMut)[0].payload;
-  const saveJudgedSkewMutPatch = patchOutlook(legacySkewDraftsNewerSrc) !== OUTLOOK_PRODUCT_SRC;
-  check('saveJudgedSkew bite: disabling conversation fail-closed drafts M-newer on judged save skew',
+  const saveJudgedSkewMutPatch = patchOutlook((s) => fileitLegacyResolverOrderSrc(legacySkewDraftsNewerSrc(s))) !== OUTLOOK_PRODUCT_SRC;
+  check('saveJudgedSkew bite: fileit_legacy newest-from-sender drafts M-newer on judged save skew',
     saveJudgedSkewMutPatch && saveJudgedSkewMutDraft && saveJudgedSkewMutDraft.outlookIncomingId === 'M-newer',
     { patch: saveJudgedSkewMutPatch, id: saveJudgedSkewMutDraft && saveJudgedSkewMutDraft.outlookIncomingId });
   const saveJudgedSkewNoOp = await runPage(Object.assign({}, gateBase, {
@@ -1020,12 +1029,13 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const fileitInboxSkew = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase));
   logGateRun4Bite('fileitInboxSkew', 'file prepare skew + inbox lists both', 'fail closed; M-older attachment only');
   assertSkewFailClosed('file prepare conversation URL +7min with inbox listing both fails closed (never M-newer)', fileitInboxSkew);
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: fail-closed skew | after: legacySkewDraftsNewerSrc | ruling: #184 file prepare skew inbox both');
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: minute pin + loose ambiguity | after: disabled | ruling: #184 file prepare skew inbox both');
+  const fileitInboxSkewBiteSrc = (s) => legacySkewDraftsNewerSrc(minuteMatchDisabledSrc(s));
   const fileitInboxSkewMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
-    contentOutlookSrc: patchOutlook(legacySkewDraftsNewerSrc)
+    contentOutlookSrc: patchOutlook(fileitInboxSkewBiteSrc)
   }));
   const fileitInboxSkewMutDraft = replyDraftActs(fileitInboxSkewMut)[0] && replyDraftActs(fileitInboxSkewMut)[0].payload;
-  const fileitInboxSkewMutPatch = patchOutlook(legacySkewDraftsNewerSrc) !== OUTLOOK_PRODUCT_SRC;
+  const fileitInboxSkewMutPatch = patchOutlook(fileitInboxSkewBiteSrc) !== OUTLOOK_PRODUCT_SRC;
   const fileitInboxSkewMutExec = (fileitInboxSkewMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
   const fileitMutNewer = (fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId === 'M-newer') ||
     fileitInboxSkewMutExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
@@ -1033,7 +1043,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
     const blob = JSON.stringify(m.payload || '');
     return blob.indexOf('Gate-NEWER') >= 0 || blob.indexOf('att-new') >= 0;
   });
-  check('fileitInboxSkew bite: legacy skew fail-closed disabled drafts M-newer on skewed file-prepare',
+  check('fileitInboxSkew bite: minute gate off with legacy skew drafts M-newer on skewed file-prepare',
     fileitInboxSkewMutPatch && fileitMutNewer,
     { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId, exec: fileitInboxSkewMutExec.map((m) => m.payload.outlookIncomingId), newerAtt: fileitMutNewerAtt });
   const fileitInboxSkewNoOp = await runPage(Object.assign({}, fileitInboxSkewBase, {

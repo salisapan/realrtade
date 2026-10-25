@@ -1095,21 +1095,6 @@
     return canon(raw) || raw;
   }
 
-  const SOLE_BIDI_STRIP = /[\u200E\u200F\u202A-\u202E]/g;
-  function normalizeSoleBodyText(s) {
-    let t = String(s || '').replace(SOLE_BIDI_STRIP, '').replace(/\s+/g, ' ').trim().toLowerCase();
-    t = t.replace(/(?:\u2026|\.{3})\s*$/u, '').trim();
-    return t;
-  }
-  function soleBodyExactMatch(pane, m) {
-    const paneBody = normalizeSoleBodyText(pane && pane.text);
-    if (!paneBody) return false;
-    const preview = normalizeSoleBodyText(m && m.bodyPreview);
-    const fullGraph = normalizeSoleBodyText((m && m.body && m.body.content) || '');
-    if (preview && preview === paneBody) return true;
-    if (fullGraph && fullGraph === paneBody) return true;
-    return false;
-  }
   function openPaneExactGraphRow(pane, m) {
     if (!pane || !m) return false;
     const parse = typeof FlowOwaParse !== 'undefined' ? FlowOwaParse : null;
@@ -1179,7 +1164,6 @@
       if (!paneAnchored) return null;
       if (openPaneExactGraphRow(pane, sole)) return sole;
       if (pane.clockFromPane === true) return null;
-      if (soleBodyExactMatch(pane, sole)) return sole;
     }
     return null;
   }
