@@ -6232,12 +6232,18 @@ function outlookGraphAttachmentId(id) {
 async function outlookPickFileAttachment(messageId, pick) {
   const Files = globalThis.FlowOnedriveFile;
   if (!Files || !messageId) return null;
-  const listUrl = OUTLOOK_GRAPH + Files.attachmentsPath(messageId) + '?$select=id,name,contentType,size,isInline';
-  outlookAssertNotSend(listUrl);
-  const listed = await outlookFetch(listUrl, { method: 'GET' });
-  if (!listed || !listed.ok) return null;
-  const body = await outlookReadJson(listed);
-  const rows = body && Array.isArray(body.value) ? body.value : [];
+  const spells = typeof Files.messageIdSpellings === 'function' ? Files.messageIdSpellings(messageId) : [messageId];
+  let rows = null;
+  for (let si = 0; si < spells.length; si++) {
+    const listUrl = OUTLOOK_GRAPH + Files.attachmentsPath(spells[si]) + '?$select=id,name,contentType,size,isInline';
+    outlookAssertNotSend(listUrl);
+    const listed = await outlookFetch(listUrl, { method: 'GET' });
+    if (!listed || !listed.ok) continue;
+    const body = await outlookReadJson(listed);
+    const got = body && Array.isArray(body.value) ? body.value : null;
+    if (got) { rows = got; break; }
+  }
+  if (!rows) return null;
   const files = rows.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || '')));
   if (!files.length) return null;
   const wantName = pick && pick.fileName ? String(pick.fileName).trim() : '';
@@ -6250,11 +6256,15 @@ async function outlookPickFileAttachment(messageId, pick) {
   if (one.size && Number(one.size) > Files.MAX_BYTES) return null;
   let b64 = one.contentBytes || '';
   if (!b64 && one.id) {
-    const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(messageId, one.id);
-    outlookAssertNotSend(itemUrl);
-    const item = await outlookFetch(itemUrl, { method: 'GET' });
-    const itemBody = await outlookReadJson(item);
-    b64 = itemBody && itemBody.contentBytes;
+    for (let si = 0; si < spells.length; si++) {
+      const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(spells[si], one.id);
+      outlookAssertNotSend(itemUrl);
+      const item = await outlookFetch(itemUrl, { method: 'GET' });
+      if (!item || !item.ok) continue;
+      const itemBody = await outlookReadJson(item);
+      b64 = itemBody && itemBody.contentBytes;
+      if (b64) break;
+    }
   }
   const bytes = Files.bytesFromBase64(b64);
   if (!bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return null;

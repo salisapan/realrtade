@@ -1648,7 +1648,7 @@
   function whyCopy(why) {
     if (!why || !why.reason) return null;
     const line = (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.whyNotShownLine === 'function')
-      ? FlowDisplay.whyNotShownLine(why.reason)
+      ? FlowDisplay.whyNotShownLine(why.reason, uiLang())
       : '';
     if (!line) return null;
     const subject = String(why.subject || '').trim();

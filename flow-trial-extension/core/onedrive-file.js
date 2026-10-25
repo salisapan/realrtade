@@ -41,6 +41,22 @@ const FlowOnedriveFile = (() => {
     return encodeURIComponent(name);
   }
 
+  function messageIdCanon(id) {
+    if (!id) return '';
+    let s = String(id);
+    try { s = decodeURIComponent(s); } catch (e) { /* already decoded */ }
+    return s.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
+  }
+
+  function messageIdSpellings(id) {
+    const raw = String(id || '');
+    const canon = messageIdCanon(raw);
+    const out = [];
+    if (canon) out.push(canon);
+    if (raw && raw !== canon) out.push(raw);
+    return out;
+  }
+
   function rootItemPath(name) {
     return '/me/drive/root:/' + encodeName(FOLDER) + '/' + encodeName(name);
   }
@@ -194,6 +210,7 @@ const FlowOnedriveFile = (() => {
     restorePath: restorePath,
     attachmentsPath: attachmentsPath,
     attachmentItemPath: attachmentItemPath,
+    messageIdSpellings: messageIdSpellings,
     bytesFromBase64: bytesFromBase64,
     prepare: prepare,
     versionIdOf: versionIdOf
