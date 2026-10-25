@@ -347,11 +347,14 @@ const FlowChatTaskCard = (() => {
       return { shown: true, reason: 'receipt' };
     }
 
-    // A cancellation of a booking this chat already put on the calendar offers to take that event off again.
-    if (!own && typeof FlowChatAppointmentNotice !== 'undefined' && typeof FlowChatAppointmentNotice.cancelled === 'function') {
+    // A cancellation of a booking, a trip or an invitation this chat already put on the calendar offers to take that event off again.
+    if (!own) {
       let gone = null;
-      try { gone = FlowChatAppointmentNotice.cancelled(i.text, i.now); } catch (e) { gone = null; }
-      if (gone && gone.kind === 'cancelled') {
+      for (const reader of [typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null]) {
+        if (!reader || typeof reader.cancelled !== 'function') continue;
+        try { const g = reader.cancelled(i.text, i.now); if (g && g.kind === 'cancelled') { gone = g; break; } } catch (e) { /* the next reader */ }
+      }
+      if (gone) {
         const held = await findHeldHold(chatKey, gone);
         if (!held) return { shown: false, reason: 'no-hold-to-remove' };
         const heHold = gone.lang === 'he';

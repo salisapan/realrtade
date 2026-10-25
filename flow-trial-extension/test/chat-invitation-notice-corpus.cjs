@@ -43,5 +43,22 @@ const NO = [
 ];
 for (const [text, why] of NO) check('not an invitation (' + why + '): ' + text.slice(0, 50), A.recognize(text, NOW).kind === 'none', A.recognize(text, NOW));
 check('no throw on junk', (() => { try { A.recognize(null, null); A.recognize(undefined, 'x'); return true; } catch (e) { return false; } })());
+
+// The cancellation reader: the day and clock of what was cancelled, for removing the hold Glance made for it.
+const GONE = [
+  ['The launch party on Sunday at 19:00 has been cancelled', '2026-10-25', 19, 0],
+  ['The wedding on Thursday at 20:30 was cancelled', '2026-10-29', 20, 30],
+  ['האירוע ביום ראשון בשעה 19:00 בוטל', '2026-10-25', 19, 0],
+];
+for (const [text, day, h, m] of GONE) { const r = A.cancelled(text, NOW); check('cancelled: ' + text, r.kind === "cancelled" && r.dateIso === day && r.hour === h && r.minute === m, r); }
+const NOT_GONE = [
+  ['The launch party on Sunday at 19:00 has been moved to Monday at 20:00', 'a move'],
+  ['The party on Sunday was cancelled', 'no clock'],
+  ['Was the party on Sunday at 19:00 cancelled?', 'a question'],
+  ['Our offer on Sunday at 19:00 was cancelled', 'not an event noun'],
+  ['To cancel the party on Sunday at 19:00 reply 1', 'an offer to cancel'],
+];
+for (const [text, why] of NOT_GONE) check('not a cancellation (' + why + '): ' + text.slice(0, 50), A.cancelled(text, NOW).kind === 'none', A.cancelled(text, NOW));
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-invitation-notice checks passed');
 process.exit(failures ? 1 : 0);

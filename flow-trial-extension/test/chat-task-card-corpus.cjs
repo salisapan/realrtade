@@ -560,6 +560,26 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('a cancelled invitation offers nothing', !(await q.Card.offer(input('The party you were invited to was cancelled', { channel: 'whatsapp' }))).shown);
   }
 
+  // 5aa. A cancelled trip and a cancelled invitation take the hold made from this chat off the calendar too.
+  {
+    for (const [made, gone, label] of [
+      ['Your flight LY001 departs Monday at 06:30', 'Your flight LY001 departing Monday at 06:30 was cancelled', 'trip'],
+      ['You are invited to our launch party on Monday at 19:00', 'The launch party on Monday at 19:00 has been cancelled', 'invitation'],
+      ['הטיסה שלך ממריאה ביום שני ב-06:30', 'הטיסה שלך ביום שני ב-06:30 בוטלה', 'Hebrew trip']
+    ]) {
+      const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+      await w.Card.offer(input(made, { channel: 'whatsapp', key: label + '-1' }));
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+      const r = await w.Card.offer(input(gone, { channel: 'whatsapp', key: label + '-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('the cancelled ' + label + ' offers the removal', r.shown && r.reason === 'remove-offered' && !!last.ctx.chatTask.remove, r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      check('the ' + label + ' hold was undone', w.logRows[w.logRows.length - 1].kind === 'undone', w.logRows[w.logRows.length - 1]);
+    }
+    const none = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a cancelled flight with no hold offers nothing', !(await none.Card.offer(input('Your flight LY001 departing Monday at 06:30 was cancelled', { channel: 'whatsapp' }))).shown);
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });

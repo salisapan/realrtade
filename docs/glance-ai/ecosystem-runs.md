@@ -620,3 +620,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** invitation reader corpus (3 more invitations, 5 more quiet lines), chat card corpus (moved offered at the new time, cancelled quiet), a real-browser Outlook spec (fails on the previous reader), all corpora.
 - **Open:** live Gate; the first (old) hold stays until the person removes it; the cancelled-booking removal is chat only (no mail, no trip/invitation cancellations yet).
 
+## 2026-10-25 Ecosystems builder B (seventy-fourth run) — a cancelled flight or party comes off the calendar too
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off; chat only):** the seventy-second run removed a cancelled appointment's hold. The airline and the host cancel too: "Your flight LY001 departing Monday at 06:30 was cancelled", «הטיסה שלך ביום שני ב-06:30 בוטלה», "The launch party on Monday at 19:00 has been cancelled". `core/chat-travel-notice.js` and `core/chat-invitation-notice.js` now have a `cancelled` reader (plain past-tense cancellation, one day, one clock; a move, a delay, a rebook link, an offer to cancel, a policy line and a question stay quiet) and the chat card tries all three cancellation readers. As before the card appears only when this chat has a not-undone hold at exactly that day and clock, and Do It runs that hold's own undo (read back that it is gone; an edited event is left alone).
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; the "Remove It" card of the seventy-second run is reused.
+- **Tests:** trip and invitation reader corpora (cancellations and quiet lines), chat card corpus (trip, invitation, Hebrew trip removed and logged as undone; no hold, nothing), a real-browser Outlook spec (fails without the change), all corpora.
+- **Open:** live Gate; mail (Outlook/Gmail) does not offer the removal; the removal has no Undo of its own; a cancelled pickup task is not removed (a task, not a hold).
+

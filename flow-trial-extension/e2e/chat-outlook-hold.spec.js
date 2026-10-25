@@ -147,3 +147,16 @@ test('a cancellation with no hold from this chat offers nothing', async ({ glanc
   await page.waitForTimeout(3000);
   await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
 });
+
+test('a cancelled flight offers to remove the Trip hold Glance made from this chat; Do It removes that event', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Your flight LY001 departs tomorrow at 06:30');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML('Your flight LY001 departing tomorrow at 06:30 was cancelled'));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});

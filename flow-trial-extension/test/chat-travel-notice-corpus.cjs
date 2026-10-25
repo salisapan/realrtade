@@ -47,5 +47,22 @@ const NO = [
 ];
 for (const [text, why] of NO) check('not a trip (' + why + '): ' + text.slice(0, 50), A.recognize(text, NOW).kind === 'none', A.recognize(text, NOW));
 check('no throw on junk', (() => { try { A.recognize(null, null); A.recognize(undefined, 'x'); return true; } catch (e) { return false; } })());
+
+// The cancellation reader: the day and clock of what was cancelled, for removing the hold Glance made for it.
+const GONE = [
+  ['Your flight LY001 departing Sunday at 06:30 was cancelled', '2026-10-25', 6, 30],
+  ['Your train leaving tomorrow at 08:15 has been cancelled', '2026-10-24', 8, 15],
+  ['הטיסה שלך ביום ראשון ב-06:30 בוטלה', '2026-10-25', 6, 30],
+];
+for (const [text, day, h, m] of GONE) { const r = A.cancelled(text, NOW); check('cancelled: ' + text, r.kind === "cancelled" && r.dateIso === day && r.hour === h && r.minute === m, r); }
+const NOT_GONE = [
+  ['Your flight departing Sunday at 06:30 was cancelled. Click to rebook', 'a rebook link'],
+  ['Your flight departing Sunday at 06:30 was delayed', 'a delay'],
+  ['Your flight was cancelled', 'no day or clock'],
+  ['Was your flight departing Sunday at 06:30 cancelled?', 'a question'],
+  ['You can cancel your flight departing Sunday at 06:30 for free', 'a policy line'],
+];
+for (const [text, why] of NOT_GONE) check('not a cancellation (' + why + '): ' + text.slice(0, 50), A.cancelled(text, NOW).kind === 'none', A.cancelled(text, NOW));
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-travel-notice checks passed');
 process.exit(failures ? 1 : 0);
