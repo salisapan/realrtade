@@ -84,7 +84,7 @@ const FlowOwaParse = (() => {
 
   // Normalize for matching against Graph/sync entries.
   function norm(s) {
-    return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return String(s || '').replace(INLINE_MARKS, '').toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
   function normEmail(s) {

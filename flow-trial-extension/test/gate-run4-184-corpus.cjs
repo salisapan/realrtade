@@ -707,16 +707,17 @@ async function runBehavioral(opts) {
   };
   const soleNoClockDoIt = await runPage(soleNoClockGate);
   const soleNoClockActs = (soleNoClockDoIt.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
-  const soleNoClockTarget = soleNoClockActs.find((m) => m.payload.outlookIncomingId === 'M-older' || m.payload.messageId === 'M-older');
-  logGateRun4Bite('soleNoClock', 'single Graph row, no pane clock', 'sole conv-filter rule drafts M-older');
-  check('sole conv-filter row without pane clock: Do It drafts M-older not M-newer',
-    Boolean(soleNoClockTarget) && !soleNoClockActs.some((m) => m.payload.outlookIncomingId === 'M-newer'),
+  const soleNoClockWhy = (soleNoClockDoIt.store.outlookPageDiag || []).map((d) => d.reason);
+  logGateRun4Bite('soleNoClock', 'single Graph row, no pane clock', 'exact-or-unsure fail-closed');
+  console.log('gate-run4-184 expectation: gate-run4-184-corpus.cjs:711-720 | before: drafts M-older | after: page:reply-target-unsure | ruling: #184 delete sole rule');
+  check('sole conv-filter row without pane clock: Do It fails closed (exact-or-unsure)',
+    !soleNoClockActs.some((m) => m.payload.connectorId === 'outlookDraft') &&
+    soleNoClockWhy.some((r) => r === 'page:reply-target-unsure'),
     {
-      id: soleNoClockTarget && soleNoClockTarget.payload.outlookIncomingId,
       connectors: soleNoClockActs.map((m) => m.payload.connectorId),
       chip: Boolean(soleNoClockDoIt.chip),
       vmb: soleNoClockDoIt.parsed && soleNoClockDoIt.parsed.visibleMessageBodies,
-      why: (soleNoClockDoIt.store.outlookPageDiag || []).map((d) => d.reason)
+      why: soleNoClockWhy
     });
   const wtAttachBase = {
     htmlPatch: wtDom, mailBody: wtSaveBody,
@@ -767,6 +768,66 @@ async function runBehavioral(opts) {
   check('wrong-target product: open older message does not use newer attachments (bfbdd757 fails)',
     wtProdOlder && !wtProdNewer,
     { att: wtProdAtt });
+  const WRONG_TARGET_CONV_REST = FlowOwaParse.canonId(WRONG_TARGET_CONV);
+  function wtThreadForConv(convId) {
+    return wtThread.map((m) => Object.assign({}, m, { conversationId: convId }));
+  }
+  async function wtAttachInboxBothRow(transportLabel, convId) {
+    const thread = wtThreadForConv(convId);
+    const base = Object.assign({}, gateBase, wtAttachBase, {
+      urlId: convId, listedConversationId: convId,
+      threadMessages: thread,
+      inboxLookupEmpty: false,
+      clickDoIt: true,
+      waitMs: 8000
+    });
+    const page = await runPage(base);
+    const shown = (page.store.log || []).find((e) => e && e.kind === 'shown');
+    const att = graphFetches(page.sent).filter((u) => /\/attachments/.test(u));
+    const olderAtt = att.some((u) => decodeURIComponent(u).indexOf('/M-older/') >= 0);
+    const exec = (page.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
+    const draftAct = exec.find((m) => m.payload.connectorId === 'outlookDraft');
+    const saveAct = exec.find((m) => /onedriveFile|driveFile|attachmentSave/i.test(String(m.payload.connectorId || '')));
+    const saveBlob = saveAct ? JSON.stringify(saveAct.payload) : '';
+    const kinds = shown && shown.process && shown.process.steps && shown.process.steps.map((s) => s.kind);
+    logGateRun4Bite('wtAttachInboxBoth:' + transportLabel, 'inbox lists both; pane older minute', 'card M-older; Gate-OLDER attachment only');
+    check('wtAttach inbox both ' + transportLabel + ': shown card M-older; Do It saves Gate-OLDER not M-newer',
+      shown && shown.outlookIncomingId === 'M-older' && olderAtt &&
+      kinds && kinds.indexOf('onedriveFile') >= 0 &&
+      (!draftAct || draftAct.payload.outlookIncomingId === 'M-older') &&
+      saveBlob.indexOf('Gate-OLDER') >= 0 && saveBlob.indexOf('Gate-NEWER') < 0,
+      { id: shown && shown.outlookIncomingId, att, kinds, draft: draftAct && draftAct.payload.outlookIncomingId, save: saveBlob.slice(0, 200) });
+    const skewThread = [
+      Object.assign({}, thread[0], { receivedDateTime: new Date(Date.parse(paneClockIso) + 7 * 60 * 1000).toISOString() }),
+      thread[1]
+    ];
+    const skewPage = await runPage(Object.assign({}, base, { threadMessages: skewThread, waitMs: 8000 }));
+    const skewWhy = (skewPage.store.outlookPageDiag || []).map((d) => d.reason);
+    const skewAtt = graphFetches(skewPage.sent).filter((u) => /\/attachments/.test(u));
+    logGateRun4Bite('wtAttachInboxBothSkew:' + transportLabel, 'inbox both +7min skew', 'reply-target-unsure; no M-newer attachment');
+    const skewExec = (skewPage.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
+    check('wtAttach inbox both skew ' + transportLabel + ': reply-target-unsure; no Do It on M-newer',
+      skewWhy.some((r) => r === 'page:reply-target-unsure') &&
+      !skewExec.some((m) => m.payload.outlookIncomingId === 'M-newer'),
+      { why: skewWhy, att: skewAtt, exec: skewExec.map((m) => m.payload.outlookIncomingId) });
+  }
+  await wtAttachInboxBothRow('EWS', WRONG_TARGET_CONV);
+  await wtAttachInboxBothRow('REST', WRONG_TARGET_CONV_REST);
+  const bidiSubject = 'Gate Run 4\u200f';
+  const bidiThread = wtThread.map((m, i) => (i === 0 ? Object.assign({}, m, { subject: bidiSubject }) : m));
+  const bidiInbox = await runPage(Object.assign({}, gateBase, wtAttachBase, {
+    listedSubject: bidiSubject,
+    threadMessages: bidiThread,
+    inboxLookupEmpty: false,
+    waitMs: 7000
+  }));
+  const bidiShown = (bidiInbox.store.log || []).find((e) => e && e.kind === 'shown');
+  const bidiAtt = graphFetches(bidiInbox.sent).filter((u) => /\/attachments/.test(u));
+  logGateRun4Bite('wtAttachBidiSubject', 'U+200F in pane subject', 'exact minute still resolves M-older');
+  check('wtAttach bidi subject mark: still resolves M-older with inbox listing both',
+    bidiShown && bidiShown.outlookIncomingId === 'M-older' &&
+    bidiAtt.some((u) => decodeURIComponent(u).indexOf('/M-older/') >= 0),
+    { id: bidiShown && bidiShown.outlookIncomingId, att: bidiAtt });
   function newestOnlyResolveSrc(src) {
     const needle = 'async function messageIdForOpenPane(convId, own, openSender, pane) {';
     const start = src.indexOf(needle);
@@ -774,23 +835,18 @@ async function runBehavioral(opts) {
     const nextFn = src.indexOf('\n  async function ', start + needle.length);
     const end = nextFn > start ? nextFn : src.length;
     let chunk = src.slice(start, end);
-    const pickNeedle = 'const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender, { soleConvFilterComplete: false });';
-    const filterNeedle = 'const fromFilter = await exactOpenMessageInList(convList, pane, openSender, { soleConvFilterComplete: soleComplete });';
-    if (chunk.indexOf(filterNeedle) >= 0) {
-      chunk = chunk.replace(
-        filterNeedle,
-        'const knownFilter = await loadUserAddresses();\n          const fromFilter = newestOther(convList, own, openSender, knownFilter);'
-      );
-    }
+    const pickNeedle = 'const pickExactOnly = (list) => exactOpenMessageInList(list, pane, openSender);';
     if (chunk.indexOf(pickNeedle) >= 0) {
       chunk = chunk.replace(
         pickNeedle,
         'const known = await loadUserAddresses();\n      const pickExactOnly = (list) => Promise.resolve(newestOther(list, own, openSender, known));'
       );
-    } else {
+    }
+    const filterNeedle = 'const fromFilter = await exactOpenMessageInList(convList, pane, openSender);';
+    if (chunk.indexOf(filterNeedle) >= 0) {
       chunk = chunk.replace(
-        'const pick = (list) => exactOpenMessageInList(list, pane, openSender);',
-        'const known = await loadUserAddresses();\n      const pick = (list) => Promise.resolve(newestOther(list, own, openSender, known));'
+        filterNeedle,
+        'const knownFilter = await loadUserAddresses();\n          const fromFilter = newestOther(convList, own, openSender, knownFilter);'
       );
     }
     return src.slice(0, start) + chunk + src.slice(end);
@@ -829,7 +885,7 @@ async function runBehavioral(opts) {
         'function openPaneConversationRow(pane, m) {\n    if (!pane || !m) return false;\n    const parse = typeof FlowOwaParse !== \'undefined\' ? FlowOwaParse : null;\n    const canon = parse && parse.canonId ? parse.canonId.bind(parse) : (id) => String(id || \'\');\n    const wantConv = canon(pane.conversationId || pane.pathId);\n    const gotConv = canon(m.conversationId);\n    return Boolean(wantConv && gotConv && wantConv === gotConv);\n  }\n\n  function openPaneExactGraphRow(pane, m) {'
       );
     }
-    const needle = 'async function exactOpenMessageInList(list, pane, openSender, opts) {';
+    const needle = 'async function exactOpenMessageInList(list, pane, openSender) {';
     const start = out.indexOf(needle);
     if (start < 0) return out;
     const nextFn = out.indexOf('\n  function paneUrlOnlyMessageTarget', start + needle.length);
@@ -844,8 +900,8 @@ async function runBehavioral(opts) {
     );
     if (chunk.indexOf('if (convSender.length === 1) return convSender[0];') < 0) {
       chunk = chunk.replace(
-        'if (hits.length > 1) return null;\n    if (!soleConvFilterComplete) return null;',
-        'if (hits.length > 1) return null;\n    if (convSender.length === 1) return convSender[0];\n    if (!soleConvFilterComplete) return null;'
+        'if (hits.length === 1) return hits[0];\n    return null;',
+        'if (hits.length === 1) return hits[0];\n    if (hits.length > 1) return null;\n    if (convSender.length === 1) return convSender[0];\n    return null;'
       );
     }
     return out.slice(0, start) + chunk + out.slice(end);

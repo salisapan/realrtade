@@ -164,21 +164,7 @@ async function runPage(opts) {
           }
         }
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
-        let value = Array.isArray(o.threadMessages) ? o.threadMessages.slice() : (o.emptyInbox ? [] : [graphMsg]);
-        if (o.convFilterPadToTop && /conversationId/.test(decoded) && typeof o.convFilterPadToTop === 'number') {
-          const want = o.convFilterPadToTop;
-          const conv = String(o.listedConversationId || graphMsg.conversationId || '');
-          let n = 0;
-          while (value.length < want) {
-            value.push({
-              id: 'PAD-' + n, conversationId: conv, subject: 'Pad ' + n, isDraft: false, hasAttachments: false,
-              from: { emailAddress: { name: 'other', address: 'other' + n + '@example.com' } },
-              receivedDateTime: graphMsg.receivedDateTime, body: { contentType: 'text', content: 'padding' }
-            });
-            n++;
-          }
-          value = value.slice(0, want);
-        }
+        const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
         return { ok: true, status: 200, body: JSON.stringify({ value }) };
       }
       // Attachments are not the message. A conversation id on this path is a 400.
@@ -979,10 +965,11 @@ if (require.main === module) {
       clickDoIt: true, waitMs: 6000
     }));
     const soleDraft = soleNoClock.sent.filter((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookDraft')[0];
-    console.log('owa-page-harness expectation: owa-page-harness.cjs:soleNoClock | before: (missing) | after: sole conv-filter row without pane clock drafts M-sole-older | ruling: #184 item 1');
-    check('sole Graph row without pane clock: Do It drafts the listed message, not a newer guess',
-      soleDraft && soleDraft.payload && soleDraft.payload.outlookIncomingId === 'M-sole-older',
-      { id: soleDraft && soleDraft.payload && soleDraft.payload.outlookIncomingId });
+    console.log('owa-page-harness expectation: owa-page-harness.cjs:soleNoClock | before: drafts M-sole-older | after: fail-closed without pane clock (exact-or-unsure) | ruling: #184 delete sole rule');
+    const soleWhy = (soleNoClock.store.outlookPageDiag || []).map((d) => d.reason);
+    check('sole Graph row without pane clock: Do It fails closed (no draft guess)',
+      !soleDraft && soleWhy.some((r) => r === 'page:reply-target-unsure'),
+      { id: soleDraft && soleDraft.payload && soleDraft.payload.outlookIncomingId, why: soleWhy });
     const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
     const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
     // CTO silent-degradation ruling 23/10: owa-page-harness.cjs ~808 — before: chip OR reason; after: chip AND attachments-not-read copy AND not page:intent-null.
