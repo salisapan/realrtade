@@ -341,15 +341,12 @@ const FlowOutlook = (() => {
           ? E.scopeNames((prev && prev.token && prev.token.grantedScopes) || (prev && prev.requestedScopes) || [])
           : [];
         const keptOptional = prevNames.filter((s) => optional.indexOf(s) >= 0);
-        const Cfg = typeof globalThis.FlowOutlookConfig !== 'undefined' ? globalThis.FlowOutlookConfig : null;
-        const connectAllow = allow.slice();
-        if (Cfg && Cfg.CONNECT_SERVICES && typeof Cfg.scopesFor === 'function') {
-          Cfg.scopesFor(Cfg.CONNECT_SERVICES.map((svc) => svc.id)).forEach((s) => {
-            if (connectAllow.indexOf(s) < 0) connectAllow.push(s);
-          });
-        }
-        const fromUi = (chosen || []).filter((s) => connectAllow.indexOf(s) >= 0);
-        const base = fromUi.length ? fromUi : allow;
+        const chosenList = Array.isArray(chosen) ? chosen : [];
+        const CAL_SCOPE = 'Calendars.ReadWrite';
+        const SITES_SCOPE = 'Sites.ReadWrite.All';
+        const base = allow.slice();
+        if (chosenList.indexOf(CAL_SCOPE) >= 0 && base.indexOf(CAL_SCOPE) < 0) base.push(CAL_SCOPE);
+        if (chosenList.indexOf(SITES_SCOPE) >= 0 && base.indexOf(SITES_SCOPE) < 0) base.push(SITES_SCOPE);
         scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
           ? E.mergeMicrosoftScopes(base, keptOptional)
           : base.concat(keptOptional);
