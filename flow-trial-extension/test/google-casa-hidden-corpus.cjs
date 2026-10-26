@@ -50,8 +50,8 @@ async function run() {
   check('mailbox Drive search unavailable is not a why-not-shown line',
     C.searchSilence({ ok: false, reason: 'drive-search-unavailable' }) === null);
 
-  check('content-gmail skips the file chain when mailbox search is unavailable',
-    /drive-search-unavailable/.test(gmail) && /recordSilence\(messageId, 'file'\)/.test(gmail));
+  check('content-gmail still runs the close chain when mailbox search is unavailable',
+    /drive-search-unavailable/.test(gmail) && /searched = \{ ok: true, files: \[\] \}/.test(gmail));
 
   const draftBlocked = await D.write({
     to: 'dana@example.com',

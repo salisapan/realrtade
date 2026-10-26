@@ -697,7 +697,7 @@ function activityLogRefBehaviour(ref) {
     await wNo.__glanceGmailPage.rescan();
     await sleep(800);
     const needsNo = wNo.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
-    check('G1: without gmail.compose no needs-you card on the page', !needsNo, Boolean(needsNo));
+    check('G1: without gmail.compose the needs-you card has no holding-reply button', Boolean(needsNo) && !needsNo.querySelector('.flow-chip-do-label'), Boolean(needsNo));
     wNo.close();
   }
 
@@ -738,7 +738,7 @@ function activityLogRefBehaviour(ref) {
     wNo.close();
   }
 
-  console.log('\n--- I1/I2: drive-search-unavailable means no invoice needs-you or prepare card ---\n');
+  console.log('\n--- I1/I2: drive-search-unavailable still closes the file chain honestly ---\n');
   {
     const outbound = [];
     const bg = createBackground(baseStored, () => null, outbound, []);
@@ -749,7 +749,7 @@ function activityLogRefBehaviour(ref) {
     const { w } = bootGmailPage('Please send me the invoice by Thursday.', store, pageSent, bg.send, outbound, { searchDrive: () => unavailable });
     await w.__glanceGmailPage.rescan();
     await sleep(800);
-    check('I1: drive search unavailable — no needs-you card', !w.document.querySelector('[data-glance-chain="needs-you"]'), w.document.body.innerHTML.indexOf('needs-you'));
+    check('I1: drive search unavailable — needs-you names the invoice', Boolean(w.document.querySelector('[data-glance-chain="needs-you"]') && /invoice/i.test(w.document.body.textContent || '')), w.document.body.textContent && w.document.body.textContent.slice(0, 200));
     const store2 = JSON.parse(JSON.stringify(baseStored));
     store2.googleGrantedScopes = GRANTED_NO_DRIVE;
     const pageSent2 = [];
@@ -794,8 +794,8 @@ function activityLogRefBehaviour(ref) {
     });
     await wD1.__glanceGmailPage.rescan();
     await sleep(800);
-    check('D1: drive unavailable — no needs-you and no prepare card',
-      !wD1.document.querySelector('[data-glance-chain="needs-you"]') && !wD1.document.querySelector('[data-glance-chain="prepare"]'),
+    check('D1: drive unavailable — needs-you for the invoice, no prepare card',
+      Boolean(wD1.document.querySelector('[data-glance-chain="needs-you"]')) && !wD1.document.querySelector('[data-glance-chain="prepare"]'),
       wD1.document.body.innerHTML.slice(0, 200));
     wD1.close();
 
@@ -809,7 +809,7 @@ function activityLogRefBehaviour(ref) {
     });
     await wD3.__glanceGmailPage.rescan();
     await sleep(800);
-    check('D3: drive-find-one unavailable keeps the page quiet (no chip)', !wD3.document.querySelector('.flow-chip-host'), findOneCalls);
+    check('D3: drive-find-one unavailable still offers the calendar hold chip', Boolean(wD3.document.querySelector('.flow-chip-host')), findOneCalls);
     check('D3: googleWait path called drive-find-one', findOneCalls >= 1, findOneCalls);
     wD3.close();
 
