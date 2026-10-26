@@ -53,6 +53,65 @@ async function run() {
   check('googleReplyDraft write without gmail.compose stays hidden (compose-closed, no HTTP)',
     draftBlocked.ok === false && draftBlocked.reason === 'compose-closed');
 
+  const draftPosts = [];
+  const draftHttp = async (req) => {
+    const method = (req && req.method) || 'GET';
+    const url = String(req && req.url || '');
+    if (method === 'POST' && /\/users\/me\/drafts$/.test(url)) {
+      draftPosts.push(req);
+      return {
+        status: 200,
+        ok: true,
+        json: {
+          id: 'draft_casa_1',
+          message: {
+            id: 'msg_casa_1',
+            threadId: 'thread123456',
+            payload: {
+              headers: [
+                { name: 'To', value: 'dana@example.com' },
+                { name: 'Subject', value: 'Re: Hi' }
+              ],
+              body: { data: Buffer.from('Please see attached.').toString('base64') }
+            }
+          }
+        }
+      };
+    }
+    if (method === 'GET' && /\/users\/me\/drafts\/draft_casa_1/.test(url)) {
+      return {
+        status: 200,
+        ok: true,
+        json: {
+          id: 'draft_casa_1',
+          message: {
+            id: 'msg_casa_1',
+            threadId: 'thread123456',
+            payload: {
+              headers: [
+                { name: 'To', value: 'dana@example.com' },
+                { name: 'Subject', value: 'Re: Hi' }
+              ],
+              body: { data: Buffer.from('Please see attached.').toString('base64') }
+            }
+          }
+        }
+      };
+    }
+    return { status: 404, ok: false, json: null };
+  };
+  const withCompose = OAUTH_ONLY.concat(['https://www.googleapis.com/auth/gmail.compose']);
+  const draftOk = await D.write({
+    to: 'dana@example.com',
+    subject: 'Hi',
+    body: 'Please see attached.',
+    threadId: 'thread123456',
+    grantedScopes: withCompose
+  }, draftHttp);
+  check('googleReplyDraft creates the draft through the drafts API (no contacts lookup, no contacts scope)',
+    draftOk.ok === true && draftPosts.length === 1 && !draftPosts[0].body.includes('people.googleapis.com'),
+    { draftOk, posts: draftPosts.length });
+
   const bg = fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8');
   check('searchDriveFiles gates mailbox search before files.list',
     /mailboxDriveSearchAllowed/.test(bg) && /drive-search-unavailable/.test(bg));

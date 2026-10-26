@@ -183,7 +183,12 @@ function createBackground(stored, routeFn, outbound, googleReads) {
     }
     setTimeout(() => { if (!settled) resolve(undefined); }, 2500);
   });
-  return { send, sandbox, listeners, googleReads: reads };
+  const runtimeMessages = [];
+  sandbox.chrome.runtime.sendMessage = function(msg, cb) {
+    runtimeMessages.push(msg);
+    if (typeof cb === 'function') cb(undefined);
+  };
+  return { send, sandbox, listeners, googleReads: reads, runtimeMessages };
 }
 
 function pinDate(w) {
@@ -502,17 +507,38 @@ function activityLogRefBehaviour(ref) {
     w.close();
   }
 
-  console.log('\n--- classify/execute: masked prompt must not carry People sentinel ---\n');
+  console.log('\n--- classify/execute: masked prompt must not carry Google read sentinels ---\n');
   {
     const outbound = [];
     const googleReads = [];
-    const bg = createBackground(baseStored, (url, method) => {
+    const clsStored = JSON.parse(JSON.stringify(baseStored));
+    clsStored.glanceSwitches = { GOOGLE_CONTACTS: true };
+    const bg = createBackground(clsStored, (url, method) => {
+      if (/oauth2\/v3\/userinfo/.test(url)) return res(200, { email: 'me@x.com' });
       if (/glance-assist/.test(url) && method === 'POST') {
         return res(200, { ok: true, result: { kind: 'quiet' } });
       }
       if (/classify-remote/.test(url)) {
         return res(200, { ok: true, label: 'request', entities: {} });
       }
+      if (/people\.googleapis\.com/.test(url)) {
+        return res(200, {
+          results: [{
+            person: {
+              names: [{ displayName: SENT_CONTACT_NAME }],
+              emailAddresses: [{ value: SENT_CONTACT_EMAIL }]
+            }
+          }]
+        });
+      }
+      if (/calendar\.googleapis\.com/.test(url) && method === 'GET') {
+        return res(200, { items: [{ id: 'cal-sent', summary: SENT_CAL_TITLE, description: SENT_CAL_NOTE }] });
+      }
+      if (/\/lists\/LIST_A\/tasks$/.test(url) && method === 'POST') return res(200, { id: 'task_cls' });
+      if (/\/lists\/LIST_A\/tasks\/task_cls/.test(url) && method === 'GET') {
+        return res(200, { id: 'task_cls', title: SENT_TASK_TITLE, notes: SENT_TASK_NOTE, status: 'needsAction' });
+      }
+      if (/\/users\/@me\/lists/.test(url)) return res(200, { items: [{ id: 'LIST_A', title: 'Glance' }] });
       return null;
     }, outbound, googleReads);
     const masked = 'Please confirm billing for vendor@example.com';
@@ -526,8 +552,18 @@ function activityLogRefBehaviour(ref) {
       payload: { maskedPrompt: masked, lang: 'en', action: 'task', title: 'Billing follow-up' }
     });
     check('execute-action returns', exec !== undefined, exec);
-    check('CT2/CT3: classify/execute outbound has no contact sentinel', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
+    const contactPlan = await bg.send({
+      type: 'flow:google-contacts-plan',
+      text: "What's Dana's email for the vendor billing setup this week?"
+    });
+    check('contacts plan during classify row touches People API', googleReads.some((r) => /people\.googleapis/.test(r.url)), googleReads.map((r) => r.url));
+    check('CT2: calendar sentinel stays off cloud outbound', !JSON.stringify(outbound).includes(SENT_CAL_TITLE), outbound.length);
+    check('CT3: contact email and display name stay off cloud outbound',
+      !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL) && !JSON.stringify(outbound).includes(SENT_CONTACT_NAME),
+      outbound.length);
+    check('J:M5: runtime relay does not carry contact sentinel', !bg.runtimeMessages.some((m) => JSON.stringify(m).includes(SENT_CONTACT_EMAIL)), bg.runtimeMessages.length);
     assertNoSentinels('classify path', outbound.map((o) => o.body));
+    check('contacts plan returns a chip offer without echoing the seeded email off-device', contactPlan && contactPlan.action === 'offer', contactPlan);
   }
 
   console.log('\n--- G1: missing invoice needs-you only when gmail.compose is granted ---\n');
