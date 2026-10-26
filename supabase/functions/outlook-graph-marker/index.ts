@@ -321,7 +321,7 @@ async function runAccountMaintenance(
       outcomes.push({ skipped: "budget" });
       break;
     }
-    outcomes.push(await processMessage(supabase, token, msg, current));
+    outcomes.push(await processMessage(supabase, token, msg, current, budgetStartMs));
   }
   await supabase.from("outlook_graph_accounts").update({
     subscription_id: current.subscription_id,

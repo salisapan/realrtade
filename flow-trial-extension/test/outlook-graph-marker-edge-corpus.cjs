@@ -36,6 +36,51 @@ function asyncFnBody(src, fnName) {
   return '';
 }
 
+function forLoopBodies(fnBody) {
+  const bodies = [];
+  let i = 0;
+  while (i < fnBody.length) {
+    const idx = fnBody.indexOf('for (', i);
+    if (idx < 0) break;
+    const brace = fnBody.indexOf('{', idx);
+    if (brace < 0) break;
+    let depth = 0;
+    let closed = false;
+    for (let j = brace; j < fnBody.length; j++) {
+      const ch = fnBody[j];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          bodies.push(fnBody.slice(brace + 1, j));
+          i = j + 1;
+          closed = true;
+          break;
+        }
+      }
+    }
+    if (!closed) break;
+  }
+  return bodies;
+}
+
+function firstLoopBudgetCondition(loopBody) {
+  const m = loopBody.match(/if\s*\(\s*(maintenanceBudgetExceeded\s*\(\s*budgetStartMs\s*,\s*Date\.now\(\)\s*\))\s*\)\s*\{/);
+  return m ? m[1].trim() : '';
+}
+
+function evalBudgetGuard(condSrc, maintenanceBudgetExceeded, budgetStartMs, nowMs) {
+  if (!condSrc || condSrc === 'false') return false;
+  const DateShim = { now: function () { return nowMs; } };
+  const fn = new Function(
+    'maintenanceBudgetExceeded',
+    'budgetStartMs',
+    'Date',
+    'return !!(' + condSrc + ');',
+  );
+  return fn(maintenanceBudgetExceeded, budgetStartMs, DateShim);
+}
+
 function fetchHonoringAbort(url, init) {
   const signal = init && init.signal;
   return new Promise(function (resolve, reject) {
@@ -207,6 +252,74 @@ async function main() {
     emptyOpts.namesPending === true && emptyOpts.ownNames === null);
   check('index processMessage passes budgetStartMs into graphFetch patch',
     /graphFetch\(token,[\s\S]*budgetStartMs\)/.test(processBody));
+  check('index runAccountMaintenance passes budgetStartMs into processMessage',
+    /processMessage\(supabase,\s*token,\s*msg,\s*current,\s*budgetStartMs\)/.test(asyncFnBody(edge, 'runAccountMaintenance')));
+
+  const schedBody = asyncFnBody(edge, 'handleScheduled');
+  const notifLoops = forLoopBodies(notifBody);
+  const schedLoops = forLoopBodies(schedBody);
+  const maintLoops = forLoopBodies(asyncFnBody(edge, 'runAccountMaintenance'));
+  const notifBudgetCond = notifLoops[0] ? firstLoopBudgetCondition(notifLoops[0]) : '';
+  const schedBudgetCond = schedLoops[0] ? firstLoopBudgetCondition(schedLoops[0]) : '';
+  const deltaBudgetCond = maintLoops[0] ? firstLoopBudgetCondition(maintLoops[0]) : '';
+  const loopWallStart = 1_700_000_000_000;
+  const loopUnderWall = loopWallStart + 1000;
+  const loopOverWall = loopWallStart + core.MAINTENANCE_WALL_MS + 1;
+  check('notification loop budget guard is live (under wall)',
+    notifBudgetCond && !evalBudgetGuard(notifBudgetCond, core.maintenanceBudgetExceeded, loopWallStart, loopUnderWall));
+  check('notification loop budget guard trips on fake clock (over wall)',
+    notifBudgetCond && evalBudgetGuard(notifBudgetCond, core.maintenanceBudgetExceeded, loopWallStart, loopOverWall));
+  check('scheduled account loop budget guard is live (under wall)',
+    schedBudgetCond && !evalBudgetGuard(schedBudgetCond, core.maintenanceBudgetExceeded, loopWallStart, loopUnderWall));
+  check('scheduled account loop budget guard trips on fake clock (over wall)',
+    schedBudgetCond && evalBudgetGuard(schedBudgetCond, core.maintenanceBudgetExceeded, loopWallStart, loopOverWall));
+  check('delta message loop budget guard is live (under wall)',
+    deltaBudgetCond && !evalBudgetGuard(deltaBudgetCond, core.maintenanceBudgetExceeded, loopWallStart, loopUnderWall));
+  check('delta message loop budget guard trips on fake clock (over wall)',
+    deltaBudgetCond && evalBudgetGuard(deltaBudgetCond, core.maintenanceBudgetExceeded, loopWallStart, loopOverWall));
+
+  const serveChunk = edge.slice(edge.indexOf('Deno.serve'), edge.indexOf('Deno.serve') + 9000);
+  check('index returns 202 before awaiting notification or scheduled work',
+    /const work = scheduled \? handleScheduled\(supabase\) : handleNotifications\(supabase, payload\)/.test(serveChunk) &&
+    !/await\s+handleNotifications/.test(serveChunk) &&
+    !/await\s+handleScheduled/.test(serveChunk) &&
+    /EdgeRuntime\.waitUntil\(\s*work\.then/.test(serveChunk));
+
+  check('index bad clientState continues batch instead of returning',
+    /skipped:\s*"clientState"[\s\S]{0,120}continue/.test(notifBody) &&
+    !/skipped:\s*"clientState"[\s\S]{0,120}return\s+results/.test(notifBody));
+
+  check('index processMessage reads account.own_addresses for judge',
+    /const ownAddresses = \(account && account\.own_addresses\)/.test(processBody) &&
+    /judgeOutlookInboxMessage\(message,\s*ownAddresses/.test(processBody));
+
+  const judgeBundle = path.join(ROOT, 'supabase', 'functions', 'outlook-graph-marker', 'judge.bundle.mjs');
+  const judge = await import(pathToFileURL(judgeBundle).href);
+  const selfSentAsk = {
+    subject: 'Invoice',
+    body: { contentType: 'text', content: 'Please send the invoice by Friday.' },
+    from: { emailAddress: { name: 'Me', address: 'me@example.com' } },
+    toRecipients: [{ emailAddress: { address: 'me@example.com' } }],
+    hasAttachments: false,
+  };
+  const judgeOpts = { userName: 'Me', ownNames: ['Me'], namesPending: false };
+  const withOwn = judge.judgeOutlookInboxMessage(selfSentAsk, ['me@example.com'], judgeOpts);
+  const withoutOwn = judge.judgeOutlookInboxMessage(selfSentAsk, [], judgeOpts);
+  check('own_addresses: index must pass account list into judge (not empty)',
+    withOwn && withoutOwn && withOwn.show === true && withoutOwn.show === false);
+
+  const flaggedBeforeGlance = {
+    categories: ['Glance'],
+    flag: { flagStatus: 'flagged' },
+    singleValueExtendedProperties: [{ id: core.EXT_PROPERTY_ID, value: '1' }],
+  };
+  const userFlagSnap = { categories: ['Blue'], flagStatus: 'flagged', glanceWillSetFlag: false };
+  const closePatch = core.unmarkPatch(flaggedBeforeGlance, userFlagSnap);
+  check('close does not clear user flag when glanceWillSetFlag was false',
+    !closePatch.flag || closePatch.flag.flagStatus !== 'notFlagged');
+  const undoPatch = core.unmarkPatchForAction(flaggedBeforeGlance, userFlagSnap, 'undo');
+  check('undo restores snapshot flagStatus when user had flagged before Glance',
+    undoPatch && undoPatch.flag && undoPatch.flag.flagStatus === 'flagged');
 
   clearTimeout(watchdog);
   if (checks < 10) {
