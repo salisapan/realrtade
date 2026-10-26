@@ -2,6 +2,7 @@
 // Weekday name + Hebrew day-first date + clock: the numeric date wins (google-lane-http :465 class).
 // English and mixed mail keep US M/D unless a Hebrew יום/ביום weekday sits beside the date.
 // Run: TZ=UTC node test/hebrew-weekday-explicit-date-corpus.cjs && TZ=Asia/Jerusalem node test/hebrew-weekday-explicit-date-corpus.cjs
+// CI: included in Glance headless E2E via flow-trial-extension/** paths on integration PRs.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
