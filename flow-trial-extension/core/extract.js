@@ -138,40 +138,6 @@ const FlowExtract = (() => {
   // not in doubt. Two candidates in the window, or none, means the message
   // genuinely did not say — and per this file's rule, no date beats a
   // confidently wrong one, so it returns the sender's own words and no ISO.
-  // Weekday + a day-first date + בשעה HH:MM is one clock. 22/10 is 22 October,
-  // not October 22. The weekday has to be that calendar day. A mismatch is
-  // not a date: the caller stays quiet instead of picking one of the two.
-  function weekdayDayFirst(text, now) {
-    const src = String(text || '');
-    const dayName = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
-    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
-    const clock = src.match(/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/);
-    if (!dayName || !slash || !clock || !now) return null;
-    const weekday = DAYS_HE.indexOf(dayName[1]);
-    const day = +slash[1];
-    const month = +slash[2];
-    const raw = dayName[0] + ' ' + slash[1] + '/' + slash[2] + (slash[3] ? '/' + slash[3] : '');
-    if (weekday < 0 || month < 1 || month > 12 || day < 1 || day > 31) {
-      return { raw: raw, iso: null, contradictsWeekday: true };
-    }
-    let year = null;
-    if (slash[3]) {
-      year = +slash[3];
-      if (year < 100) year += 2000;
-    }
-    if (year) {
-      const dated = buildDate(year, month - 1, day);
-      if (!dated || dated.getDay() !== weekday) return { raw: raw, iso: null, contradictsWeekday: true };
-      return { raw: raw, iso: iso(dated) };
-    }
-    const y = now.getFullYear();
-    const candidates = [y - 1, y, y + 1]
-      .map((yy) => buildDate(yy, month - 1, day))
-      .filter((d) => d && d.getDay() === weekday && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
-    if (candidates.length !== 1) return { raw: raw, iso: null, contradictsWeekday: true };
-    return { raw: raw, iso: iso(candidates[0]) };
-  }
-
   function monthDay(raw, monthIdx, day, explicitYear, now) {
     if (explicitYear) {
       const d = buildDate(+explicitYear, monthIdx, day);
@@ -203,6 +169,14 @@ const FlowExtract = (() => {
     return false;
   }
   // A slash is a date only beside a preposition, a weekday, or a time or meeting word.
+  // Day-first for ambiguous N/N only beside a Hebrew יום/ביום weekday name,
+  // not anywhere Hebrew appears (mixed English mail with a signature stays M/D).
+  function hebrewWeekdayNear(text, index, span) {
+    const start = Math.max(0, index - 48);
+    const end = Math.min(text.length, index + (span || 0) + 48);
+    const window = text.slice(start, end);
+    return /(?:ביום|יום)\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window);
+  }
   function slashDateContext(text, index, raw) {
     const before = text.slice(Math.max(0, index - 40), index);
     const window = text.slice(Math.max(0, index - 48), Math.min(text.length, index + String(raw || '').length + 48));
@@ -230,8 +204,7 @@ const FlowExtract = (() => {
       let monthIdx = null;
       if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
       else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
-      // A Hebrew sentence writes day first (01/11 is 1 November): that is the convention in Israel. English stays ambiguous.
-      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; monthIdx = b - 1; }
+      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && hebrewWeekdayNear(src, m.index, m[0].length)) { day = a; monthIdx = b - 1; }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
       if (year != null && year < 100) year += 2000;
@@ -255,7 +228,7 @@ const FlowExtract = (() => {
     if (/(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
     return false;
   }
-  function numericDayMonth(src) {
+  function numericDayMonth(src, preferDayFirst) {
     const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
     const dotted = src.match(/(?:^|[^\d])(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?(?!\d)/);
     const m = slash || dotted;
@@ -266,8 +239,14 @@ const FlowExtract = (() => {
     let month = null;
     if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; month = b; }
     else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; month = a; }
+    else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && preferDayFirst) { day = a; month = b; }
     else return null;
-    return { day: day, month: month, yearRaw: m[3] || null, token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '') };
+    return {
+      day: day,
+      month: month,
+      yearRaw: m[3] || null,
+      token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '')
+    };
   }
   function namedWeekday(src) {
     const he = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
@@ -301,7 +280,7 @@ const FlowExtract = (() => {
   function weekdayDayFirst(text, now) {
     const src = String(text || '');
     const dayName = namedWeekday(src);
-    const num = numericDayMonth(src);
+    const num = numericDayMonth(src, dayName && dayName.he);
     if (!dayName || !num || !now) return null;
     const clock = hasStatedClock(src);
     const raw = dayName.raw + ' ' + num.token;
@@ -327,7 +306,6 @@ const FlowExtract = (() => {
       written = inWindow[0];
     }
     if (written.getDay() === dayName.index) {
-      if (!clock) return null;
       return { raw: raw, iso: iso(written), statedWeekday: true };
     }
     // No clock: leave the day to the older parser. A conflict with no

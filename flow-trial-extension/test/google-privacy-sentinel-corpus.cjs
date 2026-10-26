@@ -895,6 +895,63 @@ function activityLogRefBehaviour(ref) {
     check('lane host handles flow:google-write', lane !== undefined, lane);
   }
 
+  console.log('\n--- AV: verified Google account before lane write (live-gap-165-v2) ---\n');
+  {
+    const TAB = 'owner@ai.local.flow@gmail.com';
+    const posts = [];
+    const routeDeny = (u, method) => {
+      if (String(u).indexOf('/oauth2/v3/userinfo') >= 0) return res(404, {});
+      if (method === 'POST' && /tasks\.googleapis\.com/.test(u)) {
+        posts.push(u);
+        return res(200, { id: 'task-deny', title: 'x' });
+      }
+      if (method === 'GET' && /tasks\.googleapis\.com\/tasks\/v1\/users\/@me\/lists/.test(u)) {
+        return res(200, { items: [{ id: 'LIST_A', title: 'Glance' }] });
+      }
+      return null;
+    };
+    const stored = {
+      googleWebAuth: { accessToken: 'tok-deny', expiresAt: Date.now() + 3600000 },
+      googleConnectedAccount: { email: TAB, at: 1, source: 'web' }
+    };
+    const bg = createBackground(stored, routeDeny, [], posts);
+    const denied = await bg.send({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      tabAccount: TAB,
+      lang: 'en',
+      input: { title: 'x', taskListId: 'LIST_A' }
+    });
+    check('AV1: unreadable userinfo refuses lane write', denied && denied.ok === false && denied.reason === 'account-unverified', denied);
+    check('AV2: no Google write POST when account is unverified', posts.length === 0, posts);
+    check('AV3: refusal copy is not Handled', denied && !/\bHandled\b/i.test(String(denied.written || denied.error || '')), denied);
+    const postsOk = [];
+    const routeOk = (u, method) => {
+      if (String(u).indexOf('/oauth2/v3/userinfo') >= 0) return res(200, { email: TAB });
+      if (method === 'POST' && /tasks\.googleapis\.com/.test(u)) {
+        postsOk.push(u);
+        return res(200, { id: 'task-ok', title: 'x', status: 'needsAction' });
+      }
+      if (method === 'GET' && /tasks\.googleapis\.com\/tasks\/v1\/users\/@me\/lists/.test(u)) {
+        return res(200, { items: [{ id: 'LIST_A', title: 'Glance' }] });
+      }
+      if (method === 'GET' && /tasks\.googleapis\.com\/tasks\/v1\/lists\/LIST_A\/tasks\/task-ok/.test(u)) {
+        return res(200, { id: 'task-ok', title: 'x', status: 'needsAction' });
+      }
+      return null;
+    };
+    const bgOk = createBackground(stored, routeOk, [], postsOk);
+    const allowed = await bgOk.send({
+      type: 'flow:google-write',
+      connectorId: 'googleLaneTask',
+      tabAccount: TAB,
+      lang: 'en',
+      input: { title: 'x', taskListId: 'LIST_A' }
+    });
+    check('AV4: verified profile allows lane write', allowed && allowed.ok === true, allowed);
+    check('AV5: verified path issues Tasks POST', postsOk.length >= 1, postsOk.length);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })().catch((e) => {

@@ -362,6 +362,16 @@ test.describe('3b. no write without a positive match of the token account', () =
     await expect.poll(async () => { const s = await glance.storage(); return s.googleConnectedAccount && s.googleConnectedAccount.email; }).toBe(SELF);
   });
 
+  test('Handled banner never appears when account verification fails', async ({ glance }) => {
+    await glance.seedGmail({});
+    server.failGet('/oauth2/v3/userinfo');
+    const page = await glance.openGmail(opts('v-no-handled', 'en'));
+    await click(page);
+    await expect(main(page)).not.toContainText(/Handled/i, { timeout: 25000 });
+    await expect(page.locator('div[role="main"] .flow-chip-handled')).toHaveCount(0);
+    expect(posts()).toHaveLength(0);
+  });
+
   test('the Reconnect button asks Google for the tab account (login_hint, interactive) and writes nothing', async ({ glance }) => {
     await glance.seedGmail({});
     server.failGet('/oauth2/v3/userinfo');
