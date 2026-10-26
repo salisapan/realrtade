@@ -837,3 +837,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** new `test/polite-he-ask-corpus.cjs`; `regress-144` caught my first version (self-sent «האם תוכל לתאם…» tasks), fixed; every `test/*corpus.cjs` green. No real-browser spec this run.
 - **Open:** live Gate; no new write path, so no ProofOfClose or off switch is involved (a recognition fix on the existing card).
+
+### Run 101 (2026-10-26)
+- **Capability shipped:** six polite English forms of an ask with a deadline were quiet and now offer the same reply card as "could you ..." ("I'd be grateful if you could", "Do you think you could", "If you could send ... that would be perfect", "We need X back by Friday", "We need X from you", "It would be helpful to have X before Thursday").
+- **Code:** `core/judgment.js` only (the handoff reader).
+- **Grok sync:** nothing new in `card-requests-*.md`; no Gmail-side half missing for the recent B features (series, Meet link and booking cancel are on both).
+- **Tests:** new `test/polite-en-ask-corpus.cjs` (10 asks, 6 look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. One pre-existing false positive found, not caused by this change: "We need to talk about the budget back at the office" shows a card; recorded, not fixed.
+- **Open:** live Gate; the "talk ... back at the office" false positive; "I'd love to get X by Friday" and «אכפת לך לשלוח…» stay quiet.
