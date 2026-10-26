@@ -70,6 +70,9 @@ def entry_loads_remote_google_script(name: str, data: bytes) -> bool:
     if not name.endswith((".js", ".html")):
         return False
     cleaned = strip_js_html_comments(data.decode("utf-8", errors="replace"))
+    lowered = cleaned.lower()
+    if "apis.google.com" in lowered:
+        return True
     return APIS_GOOGLE_LOAD_RE.search(cleaned.encode("utf-8")) is not None
 
 
@@ -113,6 +116,18 @@ def check_apis_google_script_guard() -> None:
         "setattr.js", b"el.setAttribute('src', 'https://apis.google.com/js/api.js');"
     ):
         die("apis.google guard: must detect setAttribute src")
+    if not entry_loads_remote_google_script(
+        "url-var.js", b"const U='https://apis.google.com/js/api.js'; s.src=U;"
+    ):
+        die("apis.google guard: must detect apis.google.com URL in a variable assignment chain")
+    if not entry_loads_remote_google_script(
+        "proto-src.js", b"s.src='//apis.google.com/js/api.js';"
+    ):
+        die("apis.google guard: must detect protocol-relative //apis.google.com src")
+    if not entry_loads_remote_google_script(
+        "fetch-eval.js", b"fetch('https://apis.google.com/js/api.js').then(eval);"
+    ):
+        die("apis.google guard: must detect fetch().then(eval) to apis.google.com")
     background = package.EXTENSION_ROOT / "src" / "background.js"
     if entry_loads_remote_google_script("src/background.js", background.read_bytes()):
         die("apis.google guard: packaged background.js must not look like a remote gapi load")
