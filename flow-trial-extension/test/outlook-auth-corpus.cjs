@@ -49,6 +49,26 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
       driveSvc && driveSvc.defaultOn === true && (C.CONNECT_SERVICES || []).filter((s) => s.defaultOn === true).map((s) => s.id).join() === 'onedrive' &&
       C.defaultConnectIds().join() === 'mail' && /Glance/.test(driveSvc.detail || ''), { drive: driveSvc, ids: C.defaultConnectIds() });
     check('mail-only sign-in does not ask Calendars.ReadWrite or Tasks.ReadWrite', mailOnly.indexOf('Calendars.ReadWrite') === -1 && mailOnly.indexOf('Tasks.ReadWrite') === -1, mailOnly);
+    const calendarOnly = C.scopesFor(['mail', 'calendar']);
+    check('calendar-only selection requests mail scopes and Calendars.ReadWrite only',
+      calendarOnly.indexOf('Calendars.ReadWrite') >= 0 && calendarOnly.indexOf('Tasks.ReadWrite') < 0 &&
+      calendarOnly.indexOf('Files.ReadWrite') < 0 && calendarOnly.indexOf('Contacts.Read') < 0 &&
+      calendarOnly.indexOf('Mail.Read') >= 0 && calendarOnly.indexOf('Mail.ReadWrite') >= 0, calendarOnly);
+    const staleGrants = ['Mail.ReadWrite', 'Tasks.ReadWrite', 'Files.ReadWrite', 'Contacts.Read', 'Calendars.ReadWrite'];
+    const todoUi = C.connectServiceUi({ id: 'todo', scopes: ['Tasks.ReadWrite'] }, { tokenStatus: 'missing', granted: staleGrants });
+    check('a new sign-in does not pre-tick optional boxes from stale grants',
+      todoUi.checked === false && todoUi.granted === true, todoUi);
+    const calPick = C.connectServiceUi({ id: 'calendar', scopes: ['Calendars.ReadWrite'] }, { tokenStatus: 'missing', granted: [] });
+    check('a new sign-in leaves Calendar unchecked until the person ticks it', calPick.checked === false && calPick.granted === false, calPick);
+    const onedriveValid = C.connectServiceUi({ id: 'onedrive', defaultOn: true, scopes: ['Files.ReadWrite'] }, { tokenStatus: 'valid', granted: ['Mail.ReadWrite'] });
+    check('when connected, granted scopes show as ticked without defaultOn inventing OneDrive',
+      onedriveValid.checked === false && onedriveValid.granted === false, onedriveValid);
+    const calGranted = C.connectServiceUi({ id: 'calendar', scopes: ['Calendars.ReadWrite'] }, { tokenStatus: 'valid', granted: staleGrants });
+    check('when connected, calendar granted is a label not a pre-ticked box', calGranted.checked === false && calGranted.granted === true, calGranted);
+    const pickedIds = C.connectIdsFromChecked(C.CONNECT_SERVICES, (id) => id === 'calendar' || id === 'mail');
+    const pinned = C.scopesFor(pickedIds);
+    check('connectIdsFromChecked pins authorize scopes to the selection',
+      pinned.indexOf('Calendars.ReadWrite') >= 0 && pinned.indexOf('Tasks.ReadWrite') < 0 && pinned.indexOf('Files.ReadWrite') < 0, { pickedIds, pinned });
     check('a good redirect gives the code', A.parseRedirect(REDIRECT + '?code=abc&state=ST', 'ST').code === 'abc');
     check('a different state is refused (someone else\'s redirect)', A.parseRedirect(REDIRECT + '?code=abc&state=EVIL', 'ST').error === 'state-mismatch');
     check('a missing state is refused', A.parseRedirect(REDIRECT + '?code=abc', 'ST').error === 'state-mismatch');

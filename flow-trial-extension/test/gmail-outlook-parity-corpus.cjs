@@ -40,7 +40,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 // The engine, loaded as the content scripts load it (classic scripts in one realm).
 const engine = { module: undefined, console };
 vm.createContext(engine);
-for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js']) {
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'commitment-title.js', 'display-copy.js']) {
   const p = path.join(ROOT, 'core', f);
   if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), engine, { filename: f });
 }
@@ -474,6 +474,131 @@ const CASES = [
     check('Outlook mailbox, a delegate on a self-addressed mail stays quiet',
       fwd.incoming.length === 0 && (fwd.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
       { incoming: fwd.incoming.length, why: (fwd.diagnostics || []).map((d) => d.reason) });
+  }
+
+  console.log('\n--- Hebrew send-report notify (CTO item 4) ---\n');
+  {
+    const notifyHe = 'בבקשה תשלח את הדוח עד יום חמישי ואל תשכח להגיד לנו כשזה מוכן.';
+    const nG = FlowIntent.classify(notifyHe, { senderEmail: 'dana@acme.com', subject: 'דוח', now: new Date(NOW), inbound: true, to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] });
+    const nO = FlowIntent.classify(notifyHe, { senderEmail: 'dana@acme.com', subject: 'דוח', now: new Date(NOW), inbound: true, to: [ME], ownAddresses: [ME] });
+    check('Hebrew send-report notify classifies on Gmail', nG && nG.type === 'request' && !nG.quiet, nG);
+    check('Hebrew send-report notify classifies on Outlook', nO && nO.type === 'request' && !nO.quiet, nO);
+    const judged = J.judge({
+      text: notifyHe,
+      subject: 'דוח',
+      sender: { name: 'Dana Levi', email: 'dana@acme.com' },
+      to: [ME],
+      ownAddresses: [ME, 'ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      readerEmail: ME,
+      namesWaitDone: true,
+      now: new Date(NOW),
+      surface: 'outlook',
+      attachmentCount: 0,
+      inbound: true
+    }, { intent: FlowIntent, actions: FlowActions });
+    check('Hebrew send-report notify shows on Outlook judge', judged.show && judged.process && judged.process.id === 'reply-track', { reason: judged.reason, id: judged.process && judged.process.id });
+  }
+
+  console.log('\n--- extension: Hi Lior reader alone in To (CTO D3) ---\n');
+  {
+    const liorBody = 'Hi Lior,\n\nPlease pay invoice #4471 (3,200 ₪) by Sunday.\n\nDana';
+    const liorCtx = {
+      sender: { name: 'Dana Levi', email: 'dana@acme.com' },
+      to: ['Sali Sapan <ai.local.flow@gmail.com>'],
+      ownAddresses: ['ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      namesWaitDone: true,
+      now: new Date(NOW),
+      attachmentCount: 0,
+      inbound: true
+    };
+    for (const surface of ['gmail', 'outlook']) {
+      const judged = J.judge(Object.assign({ text: liorBody, subject: 'Invoice', surface }, liorCtx), { intent: FlowIntent, actions: FlowActions });
+      check('Hi Lior reader-alone shows on ' + surface, judged.show && judged.process && judged.process.id === 'reply-track', { reason: judged.reason, id: judged.process && judged.process.id });
+      const cls = FlowIntent.classify(liorBody, {
+        senderEmail: 'dana@acme.com',
+        subject: 'Invoice',
+        now: new Date(NOW),
+        inbound: true,
+        to: ['Sali Sapan <ai.local.flow@gmail.com>'],
+        ownAddresses: ['ai.local.flow@gmail.com'],
+        userName: 'Sali',
+        ownNames: ['Sali', 'Sali Sapan'],
+        readerEmail: 'ai.local.flow@gmail.com',
+        namesWaitDone: true
+      });
+      check('Hi Lior reader-alone classifies on ' + surface, cls && cls.type === 'request' && !cls.quiet, cls);
+    }
+  }
+
+  console.log('\n--- extension: remember-ask card titles match on Gmail and Outlook ---\n');
+  {
+    const FlowDisplay = E('FlowDisplay');
+    const NOW_CARD = '2026-10-22T12:00:00Z';
+    const depsCard = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    const rows = [
+      ['he transfer after greeting', 'היי,\n\nתזכור להעביר את התשלום עד יום ראשון.\n\nיוסי', /^לשלם את התשלום עד \d{1,2}\/\d{1,2}$/],
+      ['he tell me status', 'תזכור להגיד לי מה הסטטוס של הדוח עד יום חמישי.', /^להגיד מה הסטטוס של הדוח עד \d{1,2}\/\d{1,2}$/]
+    ];
+    for (const [name, text, re] of rows) {
+      const titles = {};
+      for (const surface of ['gmail', 'outlook']) {
+        const judged = J.judge({
+          text,
+          subject: '',
+          sender: { email: 'dana@acme.com', name: 'Dana Levi' },
+          to: [ME],
+          ownAddresses: [ME],
+          readerEmail: ME,
+          namesWaitDone: true,
+          now: new Date(NOW_CARD),
+          surface,
+          inbound: true
+        }, depsCard);
+        const face = judged.show && judged.process
+          ? FlowDisplay.cardFace(judged.process, judged.intent, { bodyText: text })
+          : null;
+        titles[surface] = face && face.title ? String(face.title) : '';
+      }
+      check(name + ' Gmail title shape', re.test(titles.gmail), titles.gmail);
+      check(name + ' Outlook title shape', re.test(titles.outlook), titles.outlook);
+      check(name + ' Gmail and Outlook titles are identical', titles.gmail === titles.outlook && titles.gmail.length > 0, titles);
+      check(name + ' no English by leak', !/\sby\s/i.test(titles.gmail), titles);
+    }
+  }
+
+  console.log('\n--- extension: greeting names a To recipient (FlowNameMatch) ---\n');
+  {
+    const NOA = 'noa@meridian.com';
+    const readerCtx = {
+      sender: { name: 'Dana Levi', email: 'dana@meridian.com' },
+      to: [ME, NOA],
+      toRecipients: [
+        { name: 'Glance', email: ME, localPart: 'glance.salisapan' },
+        { name: 'Noa Cohen', email: NOA, localPart: 'noa' }
+      ],
+      ownAddresses: [ME, 'ai.local.flow@gmail.com'],
+      userName: 'Sali',
+      ownNames: ['Sali', 'Sali Sapan'],
+      readerEmail: ME,
+      namesWaitDone: true,
+      now: new Date(NOW),
+      attachmentCount: 0,
+      inbound: true
+    };
+    const rows = [
+      ['Hi Noa', 'Hi Noa, please remember to call the client.'],
+      ['היי נועה', 'היי נועה, תזכיר לי להתקשר ללקוח.']
+    ];
+    for (const [label, text] of rows) {
+      for (const surface of ['gmail', 'outlook']) {
+        const judged = J.judge(Object.assign({ text, subject: 'Hi', surface }, readerCtx), { intent: FlowIntent, actions: FlowActions });
+        check(label + ' quiet on ' + surface + ' extension judge', !judged.show && (judged.reason === 'quiet:hedge' || String(judged.reason || '').indexOf('hedge') >= 0 || judged.reason === 'chip-low-confidence'), { reason: judged.reason });
+      }
+    }
   }
 
   console.log('\nTOTAL FAILURES:', failures);
