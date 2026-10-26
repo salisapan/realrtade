@@ -341,7 +341,14 @@ const FlowOutlook = (() => {
           ? E.scopeNames((prev && prev.token && prev.token.grantedScopes) || (prev && prev.requestedScopes) || [])
           : [];
         const keptOptional = prevNames.filter((s) => optional.indexOf(s) >= 0);
-        const fromUi = (chosen || []).filter((s) => allow.indexOf(s) >= 0);
+        const Cfg = typeof globalThis.FlowOutlookConfig !== 'undefined' ? globalThis.FlowOutlookConfig : null;
+        const connectAllow = allow.slice();
+        if (Cfg && Cfg.CONNECT_SERVICES && typeof Cfg.scopesFor === 'function') {
+          Cfg.scopesFor(Cfg.CONNECT_SERVICES.map((svc) => svc.id)).forEach((s) => {
+            if (connectAllow.indexOf(s) < 0) connectAllow.push(s);
+          });
+        }
+        const fromUi = (chosen || []).filter((s) => connectAllow.indexOf(s) >= 0);
         const base = fromUi.length ? fromUi : allow;
         scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
           ? E.mergeMicrosoftScopes(base, keptOptional)
