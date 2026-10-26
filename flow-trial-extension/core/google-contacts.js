@@ -64,8 +64,9 @@ const FlowGoogleContacts = (() => {
   }
 
   function contactLogHash(value) {
+    const salt = 'gc_v1_';
     let h = 5381;
-    const s = String(value || '');
+    const s = salt + String(value || '').trim().toLowerCase();
     for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
     return 'gc_' + h.toString(16);
   }

@@ -115,7 +115,8 @@ function load(opts) {
       },
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       tabs: { sendMessage: () => {} },
-      alarms: { create: () => {}, onAlarm: { addListener() {} } }
+      alarms: { create: () => {}, onAlarm: { addListener() {} } },
+      contextMenus: { create() {}, onClicked: { addListener() {} } }
     },
     // A bare vm context has no Node/browser globals beyond the ECMAScript
     // spec ones (encodeURIComponent, unescape, ... are already there) —
@@ -132,6 +133,9 @@ function load(opts) {
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
+  if (opts.loadGoogleConfig) {
+    vm.runInContext(require('./load-background.cjs').GOOGLE_CONFIG_SRC, sandbox, { filename: 'google-config.js' });
+  }
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
   vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return {
@@ -153,6 +157,14 @@ function check(name, cond, detail) {
 async function attempt(promise) {
   try { return await promise; }
   catch (e) { return { ok: false, threw: String((e && e.message) || e) }; }
+}
+
+function apiCalls(calls) {
+  return (calls || []).filter((c) => typeof c === 'string' && !c.startsWith('EVICT '));
+}
+
+function draftPostBody(env) {
+  return (env.bodies || []).find((b) => b && b.message && typeof b.message.raw === 'string') || null;
 }
 
 // Decodes a Gmail drafts.create request's base64url `raw` field back into
@@ -220,7 +232,7 @@ async function run() {
     check('the undo ref names the list it actually wrote to',
       (out.ref || {}).taskListId === 'LIST_A' && (out.ref || {}).taskId === 'task_1' && (out.ref || {}).externalId === 'task_1', out);
     check('POST then one read-back, no extra round trips',
-      env.calls.length === 2 && env.calls[0] === 'POST /lists/LIST_A/tasks' && env.calls[1] === 'GET /lists/LIST_A/tasks/task_1', env.calls);
+      apiCalls(env.calls).length === 2 && apiCalls(env.calls)[0] === 'POST /lists/LIST_A/tasks' && apiCalls(env.calls)[1] === 'GET /lists/LIST_A/tasks/task_1', env.calls);
     check('the read-back is a proof',
       out.proof && out.proof.fetchedBack === true && out.proof.system === 'google/tasks' && out.proof.externalId === 'task_1' && typeof out.proof.verifiedAt === 'string',
       out.proof);
@@ -436,7 +448,7 @@ async function run() {
     const missed = await attempt(miss.fn('googleTasksWrite')(PAYLOAD));
     check('a GET miss is not ok', missed.ok === false && missed.reason === 'verify_failed' && !missed.proof, missed);
     check('POST still happened, then the GET that missed',
-      miss.calls[0] === 'POST /lists/LIST_A/tasks' && miss.calls[1] === 'GET /lists/LIST_A/tasks/task_miss', miss.calls);
+      apiCalls(miss.calls)[0] === 'POST /lists/LIST_A/tasks' && apiCalls(miss.calls)[1] === 'GET /lists/LIST_A/tasks/task_miss', miss.calls);
     const missCopy = Receipt.confirmation({
       succeeded: 0, total: 1, priorCloses: 0, requireProof: true, proofs: [], verifyStatus: missed.reason
     });
@@ -450,7 +462,7 @@ async function run() {
     });
     const unconfirmed = await attempt(pending.fn('googleTasksWrite')(PAYLOAD));
     check('a create with no id is proof_pending and does not GET',
-      unconfirmed.ok === false && unconfirmed.reason === 'proof_pending' && pending.calls.length === 1 && pending.calls[0].startsWith('POST '),
+      unconfirmed.ok === false && unconfirmed.reason === 'proof_pending' && apiCalls(pending.calls).length === 1 && apiCalls(pending.calls)[0].startsWith('POST '),
       { out: unconfirmed, calls: pending.calls });
 
     const mismatch = load({
@@ -582,6 +594,7 @@ async function run() {
   console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');
   {
     const env = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -596,8 +609,9 @@ async function run() {
     check('target reads as a plain draft reply, no attachment claim', out.target === 'a draft reply', out.target);
     check('the receipt names the draft and the ask it wrote',
       out.written === 'Gmail draft · the signed contract', out.written);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    check('the Gmail drafts POST body is captured', Boolean(draftCall), { calls: env.calls });
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('no attachment filename ends up in the MIME message', decoded.attachmentFilename === null, decoded);
     check('no auto-find verification note when nothing was ever attached', !decoded.body.includes('found'), decoded.body);
     // Nobody supplied requestedObjectTerm — Drive must never be searched
@@ -608,6 +622,7 @@ async function run() {
   console.log('\n--- background.js: gmailDraftWrite — a resolved file is attached; a bare term is not a search ---\n');
   {
     const env = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -623,12 +638,13 @@ async function run() {
     check('the resolved file still produces a draft', out.ok === true, out);
     check('target names a real attachment, not an unverified guess', out.target === 'a draft reply with the attachment', out.target);
     check('the writer does not run a fresh Drive search when the file id is already known', !env.calls.some((c) => c.includes('/drive/v3/files?q=')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the resolved filename lands in the MIME attachment', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
     check('the body names the attached file', decoded.body.includes('Attached: Contract-Signed.pdf'), decoded.body);
 
     const termOnly = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -645,6 +661,7 @@ async function run() {
   console.log('\n--- background.js: a Google Doc match is exported, not downloaded as media ---\n');
   {
     const env = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -660,8 +677,8 @@ async function run() {
     check('a Doc export still attaches', out.ok === true, out);
     check('the Doc is exported as PDF', env.calls.some((c) => c.includes('/files/doc_1/export') && c.includes('application%2Fpdf')), env.calls);
     check('alt=media is not used for a Google Doc', !env.calls.some((c) => c.includes('doc_1') && c.includes('alt=media')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the exported PDF name is what gets attached', decoded.attachmentFilename === 'Invoice.pdf', decoded);
   }
 
@@ -781,6 +798,7 @@ async function run() {
     // silently masking the real bug — so the call log itself is the
     // assertion, not just the final attachment.
     const env = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -795,8 +813,8 @@ async function run() {
     check('a real thread attachment still produces a successful draft', out.ok === true, out);
     check('target reflects a confirmed attachment, not an unverified guess', out.target === 'a draft reply with the attachment', out.target);
     check('Drive is never queried once a real thread attachment already exists', !env.calls.some((c) => c.includes('/drive/v3/')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the thread attachment\'s own filename is what actually gets attached', decoded.attachmentFilename === 'from-thread.pdf', decoded);
     check('no "please confirm" note for a thread attachment the user already saw', !decoded.body.includes('confirm'), decoded.body);
   }
@@ -804,6 +822,7 @@ async function run() {
   console.log('\n--- background.js: a resolved file that cannot be read does not become a plain success ---\n');
   {
     const env = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -822,6 +841,7 @@ async function run() {
   console.log('\n--- background.js: create-when-missing copies a template, attaches it, and undo deletes both ---\n');
   {
     const env = load({
+      loadGoogleConfig: true,
       stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
@@ -848,12 +868,12 @@ async function run() {
     const upload = env.bodies.find((b) => typeof b === 'string' && b.includes('"name"') && b.includes('1042'));
     check('the uploaded file is named from the filled facts', Boolean(upload) && upload.includes('Dana'), upload && upload.slice(0, 220));
     check('the template itself is exported, not replaced', env.calls.some((c) => c.includes('/files/tpl/export')) && !env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/files/tpl')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the prepared file is the draft attachment', decoded.attachmentFilename === 'invoice — Dana — 1042.pdf', decoded);
     check('the draft body carries the filled fields', decoded.body.includes('Bill to: Dana') && decoded.body.includes('Invoice number: 1042'), decoded.body);
 
-    const empty = load({ stored: CONNECTED_GMAIL_DRAFT, routes: [] });
+    const empty = load({ loadGoogleConfig: true, stored: CONNECTED_GMAIL_DRAFT, routes: [] });
     const refused = await attempt(empty.fn('gmailDraftWrite')({
       senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Invoice',
       params: { templateId: 'tpl', fields: [{ id: 'number', label: 'Invoice number', value: '  ' }] }
@@ -1388,7 +1408,8 @@ async function run() {
   console.log('\n--- background.js: reply-with-facts writes one fact and undo deletes the draft ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/users\/me\/threads\?/, { reply: res(200, { threads: [{ id: 'th_fact' }] }) }],
         [/\/users\/me\/drafts$/, { reply: res(200, { id: 'dr_fact' }), method: 'POST' }],
@@ -1403,8 +1424,8 @@ async function run() {
     }));
     check('a fact reply creates a draft', out.ok === true && out.ref && out.ref.draftId === 'dr_fact' && !out.ref.replyFact && !out.ref.factLine, out);
     check('the receipt uses the shared draft undo sentence', !out.undoHint && !out.undoneLine, out);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the draft body is the greeting plus that one fact',
       decoded.body.indexOf('Hi Dana,') === 0 && decoded.body.indexOf('Q3 total: 12400') !== -1 && decoded.body.indexOf('[Write your reply here]') === -1 && !decoded.attachmentFilename,
       decoded);

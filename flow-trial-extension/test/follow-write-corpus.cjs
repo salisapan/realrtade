@@ -96,13 +96,15 @@ function load(opts) {
       runtime: { getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }), onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} }, lastError: null, getURL: (s) => s, id: 'ext' },
       identity: { getAuthToken: (o, cb) => cb('tok'), removeCachedAuthToken: (o, cb) => cb(), launchWebAuthFlow: () => {} },
       storage: { local: { get: async (k) => (typeof k === 'string' ? { [k]: stored[k] } : stored), set: async (p) => { Object.assign(stored, p); }, remove: async (k) => { delete stored[k]; } } },
-      windows: { create() {}, onRemoved: { addListener() {} } }, tabs: { sendMessage() {} }, alarms: { create() {}, onAlarm: { addListener() {} } }
+      windows: { create() {}, onRemoved: { addListener() {} } }, tabs: { sendMessage() {} }, alarms: { create() {}, onAlarm: { addListener() {} } },
+      contextMenus: { create() {}, onClicked: { addListener() {} } }
     },
     URLSearchParams, btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     crypto: webcrypto, TextEncoder, Uint8Array
   };
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
+  vm.runInContext(require('./load-background.cjs').GOOGLE_CONFIG_SRC, sandbox, { filename: 'google-config.js' });
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
   vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
@@ -111,8 +113,24 @@ const ok = (data) => ({ ok: true, status: 200, json: async () => data });
 const status = (s) => ({ ok: s < 300, status: s, json: async () => ({ error: { message: 'x' } }) });
 const decodeRaw = (raw) => Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
 
+const GMAIL_COMPOSE_SCOPES = {
+  version: [
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/tasks',
+    'https://www.googleapis.com/auth/contacts.readonly',
+    'https://www.googleapis.com/auth/drive.file',
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/gmail.compose'
+  ].join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+
 async function backgroundTests() {
-  const auth = { googleTasksAuth: { taskListId: 'LIST1' } };
+  const auth = { googleTasksAuth: { taskListId: 'LIST1' }, googleGrantedScopes: GMAIL_COMPOSE_SCOPES };
   const TASKS = /tasks\.googleapis\.com/;
 
   let w = load({ stored: {} });

@@ -56,6 +56,21 @@ async function run() {
   check('searchDriveFiles gates mailbox search before files.list',
     /mailboxDriveSearchAllowed/.test(bg) && /drive-search-unavailable/.test(bg));
 
+  check('followDraftCreate is gated before any Gmail drafts HTTP',
+    /async function followDraftCreate/.test(bg)
+    && /gmailComposeApiAllowedNow\(\)/.test(bg.slice(bg.indexOf('async function followDraftCreate'), bg.indexOf('async function followDraftCreate') + 400)));
+
+  check('compose-closed on the page is preview-only (no Handled close)',
+    /reason: 'compose-closed'/.test(gmail)
+    && /preview: true/.test(gmail.slice(gmail.indexOf('async function saveReplyDraft'), gmail.indexOf('async function saveReplyDraft') + 500))
+    && /closes: false/.test(gmail.slice(gmail.indexOf('async function saveReplyDraft'), gmail.indexOf('async function saveReplyDraft') + 500)));
+
+  const outlook = fs.readFileSync(path.join(ROOT, 'src', 'content-outlook.js'), 'utf8');
+  check('Outlook runs the file chain before a template close card (driveOk path)',
+    /function outlookFileChainNow/.test(outlook)
+    && /family === 'I'/.test(outlook)
+    && /create-missing/.test(outlook));
+
   if (failures) {
     console.log('\n' + failures + ' failure(s)');
     process.exit(1);

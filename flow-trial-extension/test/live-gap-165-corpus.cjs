@@ -72,7 +72,7 @@ console.log('\n--- a 401 is the token\'s fault only from the APIs a card writes 
   'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', 'https://gmail.googleapis.com/gmail/v1/users/me/drafts', 'https://docs.googleapis.com/v1/documents/x', 'https://sheets.googleapis.com/v4/spreadsheets/x'
 ].forEach((u) => check('critical: ' + u, Cfg.isCriticalUrl(u) === true));
 ['https://people.googleapis.com/v1/people:searchContacts', 'https://www.googleapis.com/oauth2/v2/userinfo', 'https://example.com/', 'not a url', ''].forEach((u) => check('not critical: ' + u, Cfg.isCriticalUrl(u) === false));
-check('the contacts scope is not on the allowlist', !Cfg.SCOPES.some((s) => /contacts/.test(s)));
+check('the contacts.readonly scope is on the OAuth allowlist (G8)', Cfg.SCOPES.some((s) => /contacts\.readonly/.test(s)));
 
 console.log('\n--- a half-done receipt reads in Hebrew ---\n');
 check('Partly done names what was done, in Hebrew', /^בוצע חלקית — /.test(Display.showChrome('he', 'Partly done — set a reminder.')), Display.showChrome('he', 'Partly done — set a reminder.'));

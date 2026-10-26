@@ -90,6 +90,13 @@ function forbiddenInPayload(json) {
   check('no match: not-found line', none.action === 'not-found' && /contact/i.test(none.line), none);
   check('oauthScopesForSwitch adds contacts.readonly only', G.oauthScopesForSwitch(ON).join() === G.READ_SCOPE && G.oauthScopesForSwitch({}).length === 0);
   check('contactLogHash never returns the raw email', G.contactLogHash(FIXTURE_EMAIL).indexOf('@') < 0 && G.contactLogHash(FIXTURE_EMAIL) === G.contactLogHash(FIXTURE_EMAIL));
+  check('contactLogHash is salted (differs from unsalted djb2)', (() => {
+    let h = 5381;
+    const raw = String(FIXTURE_EMAIL || '');
+    for (let i = 0; i < raw.length; i++) h = ((h * 33) ^ raw.charCodeAt(i)) >>> 0;
+    const unsalted = 'gc_' + h.toString(16);
+    return G.contactLogHash(FIXTURE_EMAIL) !== unsalted && G.contactLogHash('other@example.com') !== G.contactLogHash(FIXTURE_EMAIL);
+  })());
 
   console.log('\n--- wiring ---\n');
   const host = read('src', 'google-lane-host.js');

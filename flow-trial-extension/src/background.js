@@ -2831,12 +2831,12 @@ async function findThreadIdTo(recipientEmail, subject) {
 
 async function followDraftCreate(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
-  if (!(await gmailComposeApiAllowedNow())) {
-    return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false };
-  }
   const to = String((p && p.to) || '').trim();
   const text = String((p && p.body) || '').trim();
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
+  if (!(await gmailComposeApiAllowedNow())) {
+    return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false };
+  }
   const base = String(p.subject || '').trim();
   const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
   // A file prepared for this draft (docs/file-backed-closure-plan.md): either the one

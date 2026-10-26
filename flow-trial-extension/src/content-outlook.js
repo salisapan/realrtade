@@ -4534,19 +4534,34 @@
         await pageReason('page:third-party', pane);
         return;
       }
+      const askPrepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
+        ? FlowIncomingJudge.prepareForJudge(pane.text || '')
+        : (pane.text || '');
+      const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(askPrepared) : askPrepared;
+      function outlookFileChainNow(decidedRow) {
+        if (!decidedRow) return false;
+        if (decidedRow.none && (filePendingReason(decidedRow.reason) || fileSilenceReason(decidedRow.reason))) return true;
+        const intent = decidedRow.intent;
+        const proc = decidedRow.process;
+        if (!intent || decidedRow.none) return false;
+        const gate = (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.gate === 'function')
+          ? FlowFileAttach.gate(askText) : null;
+        if (gate && gate.kind === 'clear') return true;
+        const g = intent.googleClose;
+        if (g && g.family === 'I') return true;
+        if (proc && proc.id === 'create-missing') return true;
+        return false;
+      }
       // Either side saying this is a file ask is enough to run the chain.
-      // A stored schedule process used to skip this and leave the old card up
-      // while Why not shown already said drive-search-failed.
-      const fileNow = (decided && (filePendingReason(decided.reason) || fileSilenceReason(decided.reason))) || (planned && fileSilenceReason(planned.reason));
+      // A stored schedule process or a template close from the mailbox check
+      // used to skip this and leave the wrong card up while Drive had already
+      // been searched (driveOk) or the search was still a silence reason.
+      const fileNow = outlookFileChainNow(decided) || (planned && fileSilenceReason(planned.reason));
       const invitePlan = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.attachToInvitePlan === 'function')
         ? FlowIntent.attachToInvitePlan(pane.text || '') : null;
       if (fileNow && !invitePlan) {
           const tracing = traceArmed || localFileTrace();
           graphTrace = { attempts: [] };
-          const askPrepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
-            ? FlowIncomingJudge.prepareForJudge(pane.text || '')
-            : (pane.text || '');
-          const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(askPrepared) : askPrepared;
           let ran = null;
           let finalReason = 'file-chain-not-run';
           let prepareWhy = null;
