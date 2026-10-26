@@ -38,6 +38,7 @@ global.fetch = async (url, opts) => {
 };
 
 const { handler } = require('./confirm-signup.js');
+const download = require('../download-trial-zip/download-trial-zip.js');
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -49,6 +50,11 @@ function signedQuery(email, lang) {
   const exp = String(Date.now() + 3600000);
   const sig = crypto.createHmac('sha256', process.env.EMAIL_VERIFY_SECRET).update(email + '|' + exp).digest('base64url');
   return { email, exp, sig, lang: lang || 'en', kind: 'trial' };
+}
+
+function downloadHrefFromSuccessHtml(html) {
+  const m = String(html || '').match(/href="([^"]*download-trial-zip[^"]*)"/);
+  return m ? m[1] : null;
 }
 
 function captureLogs(fn) {
@@ -114,6 +120,26 @@ async function run() {
     check('send-trial-access receives a signed downloadUrl', Boolean(trialAccess && trialAccess.body && trialAccess.body.downloadUrl), trialAccess && trialAccess.body && { hasUrl: !!trialAccess.body.downloadUrl });
     const leaked = logLines.some((line) => /download-trial-zip/.test(line) || (trialAccess && trialAccess.body && line.includes(trialAccess.body.downloadUrl)));
     check('M5: signed download link never appears in function logs', !leaked, logLines.filter((l) => /confirm-signup/.test(l)));
+    const href = downloadHrefFromSuccessHtml(res.body);
+    check('success page download href is parseable', Boolean(href), href);
+    const u = new URL(href.startsWith('http') ? href : 'https://theflow-ai.com' + (href.startsWith('/') ? href : '/' + href));
+    const dl = await download.handler({
+      queryStringParameters: {
+        email: u.searchParams.get('email'),
+        exp: u.searchParams.get('exp'),
+        sig: u.searchParams.get('sig')
+      }
+    });
+    check('the minted link passes download-trial-zip token verification', dl.statusCode !== 400, { status: dl.statusCode });
+    const bad = await download.handler({
+      queryStringParameters: {
+        email: 'other@example.com',
+        exp: u.searchParams.get('exp'),
+        sig: u.searchParams.get('sig')
+      }
+    });
+    check('the same link does not work for a different address', bad.statusCode === 400, { status: bad.statusCode });
+    check('send-trial-access was called on first claim', Boolean(trialAccess), calls.map((c) => c.url));
   }
 
   console.log('\n--- Z2: lookup shows confirmed_at null is not already confirmed ---\n');
