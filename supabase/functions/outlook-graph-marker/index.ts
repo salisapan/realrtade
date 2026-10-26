@@ -31,6 +31,7 @@ import {
   judgeOptsForAccount,
   MAINTENANCE_WALL_MS,
   GRAPH_FETCH_TIMEOUT_MS,
+  fetchJsonWithTimeout,
   graphFetchWithTimeout,
 } from "./marker-core.mjs";
 
@@ -48,7 +49,10 @@ function clientSecret() {
   return env("OUTLOOK_GRAPH_CLIENT_STATE_SECRET") || env("OUTLOOK_GRAPH_CLIENT_STATE");
 }
 
-async function graphFetch(token: string, path: string, init?: RequestInit) {
+async function graphFetch(token: string, path: string, init?: RequestInit, budgetStartMs?: number) {
+  if (typeof budgetStartMs === "number" && maintenanceBudgetExceeded(budgetStartMs, Date.now())) {
+    return { status: 0, ok: false, json: null, budget: true };
+  }
   const headers: Record<string, string> = {
     Authorization: "Bearer " + token,
     "Content-Type": "application/json",
@@ -57,16 +61,8 @@ async function graphFetch(token: string, path: string, init?: RequestInit) {
   if (path.indexOf("/messages/") >= 0 && (!init || !init.method || init.method === "GET")) {
     headers.Prefer = GRAPH_TEXT_PREFER;
   }
-  const res = await graphFetchWithTimeout(GRAPH_FETCH_TIMEOUT_MS, (signal) =>
-    fetch(GRAPH + path, { ...init, headers, signal }),
-  );
-  let json: any = null;
-  try {
-    if (res.status !== 204) json = await res.json();
-  } catch {
-    json = null;
-  }
-  return { status: res.status, ok: res.ok, json };
+  const out = await fetchJsonWithTimeout(GRAPH_FETCH_TIMEOUT_MS, GRAPH + path, { ...init, headers });
+  return { status: out.status, ok: out.ok, json: out.json };
 }
 
 async function refreshAccessToken(refreshToken: string) {
@@ -79,12 +75,13 @@ async function refreshAccessToken(refreshToken: string) {
     refresh_token: refreshToken,
     scope,
   });
-  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+  const tokenUrl = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`;
+  const res = await fetchJsonWithTimeout(GRAPH_FETCH_TIMEOUT_MS, tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
-  const json = await res.json();
+  const json = res.json;
   if (!res.ok) return { ok: false, json };
   return {
     ok: true,
@@ -106,9 +103,11 @@ async function writeRefreshToken(supabase: ReturnType<typeof createClient>, secr
   return !error;
 }
 
-async function ensureAccessToken(supabase: ReturnType<typeof createClient>, row: any) {
+async function ensureAccessToken(supabase: ReturnType<typeof createClient>, row: any, budgetStartMs?: number) {
+  if (typeof budgetStartMs === "number" && maintenanceBudgetExceeded(budgetStartMs, Date.now())) return null;
   const refresh = await readRefreshToken(supabase, row.refresh_secret_id);
   if (!refresh) return null;
+  if (typeof budgetStartMs === "number" && maintenanceBudgetExceeded(budgetStartMs, Date.now())) return null;
   const refreshed = await refreshAccessToken(refresh);
   if (!refreshed.ok || !refreshed.accessToken) return null;
   if (shouldPersistRotatedRefresh(refresh, refreshed.refreshToken)) {
@@ -163,10 +162,12 @@ async function renewSubscription(token: string, row: any, notificationUrl: strin
   };
 }
 
-async function fetchMessage(token: string, messageId: string) {
+async function fetchMessage(token: string, messageId: string, budgetStartMs?: number) {
   return graphFetch(
     token,
     "/me/messages/" + encodeURIComponent(messageId) + "?" + graphMessageGetQuery(),
+    undefined,
+    budgetStartMs,
   );
 }
 
@@ -175,7 +176,11 @@ async function processMessage(
   token: string,
   message: any,
   account: any,
+  budgetStartMs?: number,
 ) {
+  if (typeof budgetStartMs === "number" && maintenanceBudgetExceeded(budgetStartMs, Date.now())) {
+    return { skipped: "budget" };
+  }
   const ownAddresses = (account && account.own_addresses) || [];
   const judgeOpts = judgeOptsForAccount(account);
   if (alreadyMarked(message)) return { skipped: "already-marked" };
@@ -187,9 +192,11 @@ async function processMessage(
   const marked = await graphFetch(token, "/me/messages/" + encodeURIComponent(message.id), {
     method: "PATCH",
     body: JSON.stringify(patch),
-  });
+  }, budgetStartMs);
+  if (marked.budget) return { skipped: "budget" };
   if (!marked.ok) return { judged: true, marked: false, status: marked.status };
-  const got = await fetchMessage(token, message.id);
+  const got = await fetchMessage(token, message.id, budgetStartMs);
+  if (got.budget) return { skipped: "budget" };
   const proof = got.ok && got.json ? readBackMarked(got.json) : { ok: false, fetchedBack: false };
   if (proof.ok === true && account && account.user_id && message.id) {
     await supabase.from("outlook_marker_undo_snap").upsert({
@@ -356,7 +363,7 @@ async function handleNotifications(supabase: ReturnType<typeof createClient>, pa
         results.push({ skipped: "account" });
         continue;
       }
-      const token = await ensureAccessToken(supabase, full);
+      const token = await ensureAccessToken(supabase, full, budgetStartMs);
       if (!token) {
         results.push({ skipped: "token" });
         continue;
@@ -366,12 +373,16 @@ async function handleNotifications(supabase: ReturnType<typeof createClient>, pa
         results.push({ skipped: "resource" });
         continue;
       }
-      const got = await fetchMessage(token, resourceId);
+      const got = await fetchMessage(token, resourceId, budgetStartMs);
+      if (got.budget) {
+        results.push({ skipped: "budget" });
+        continue;
+      }
       if (!got.ok || !got.json) {
         results.push({ skipped: "get", status: got.status });
         continue;
       }
-      results.push(await processMessage(supabase, token, got.json, full));
+      results.push(await processMessage(supabase, token, got.json, full, budgetStartMs));
     } catch (err) {
       results.push({ skipped: "error", detail: String(err && (err as Error).message || err) });
     }

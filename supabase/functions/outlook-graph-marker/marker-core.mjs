@@ -193,6 +193,20 @@ export async function graphFetchWithTimeout(timeoutMs, fetchFn) {
   }
 }
 
+/** Fetch + JSON body under the same abort deadline (headers alone must not clear the timer). */
+export async function fetchJsonWithTimeout(timeoutMs, url, init) {
+  return graphFetchWithTimeout(timeoutMs, async (signal) => {
+    const res = await fetch(url, { ...(init || {}), signal });
+    let json = null;
+    try {
+      if (res.status !== 204) json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { status: res.status, ok: res.ok, json };
+  });
+}
+
 export function judgeOptsForAccount(row) {
   const r = row || {};
   const own = Array.isArray(r.own_addresses) ? r.own_addresses : [];

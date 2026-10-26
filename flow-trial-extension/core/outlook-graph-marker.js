@@ -204,6 +204,19 @@ const FlowOutlookGraphMarker = (() => {
     }
   }
 
+  async function fetchJsonWithTimeout(timeoutMs, url, init) {
+    return graphFetchWithTimeout(timeoutMs, async function (signal) {
+      const res = await fetch(url, Object.assign({}, init || {}, { signal: signal }));
+      let json = null;
+      try {
+        if (res.status !== 204) json = await res.json();
+      } catch (err) {
+        json = null;
+      }
+      return { status: res.status, ok: res.ok, json: json };
+    });
+  }
+
   function judgeOptsForAccount(row) {
     const r = row || {};
     const own = Array.isArray(r.own_addresses) ? r.own_addresses : [];
@@ -375,6 +388,7 @@ const FlowOutlookGraphMarker = (() => {
     maintenanceBudgetExceeded: maintenanceBudgetExceeded,
     GRAPH_FETCH_TIMEOUT_MS: GRAPH_FETCH_TIMEOUT_MS,
     graphFetchWithTimeout: graphFetchWithTimeout,
+    fetchJsonWithTimeout: fetchJsonWithTimeout,
     judgeOptsForAccount: judgeOptsForAccount,
     parseDeltaPage: parseDeltaPage,
     mergeDeltaPages: mergeDeltaPages,
