@@ -193,19 +193,22 @@ async function run() {
     delete process.env.EMAIL_VERIFY_SECRET;
     const exp = String(Date.now() + 3600000);
     const email = 'nosecret@example.com';
+    const payload = email + '|' + exp;
     const sigVariants = [
-      '',
-      'undefined',
-      crypto.createHmac('sha256', saved).update(email + '|' + exp).digest('base64url')
+      { label: 'empty sig', sig: '' },
+      { label: 'literal undefined sig', sig: 'undefined' },
+      { label: 'HMAC keyed with empty string', sig: crypto.createHmac('sha256', '').update(payload).digest('base64url') },
+      { label: "HMAC keyed with 'undefined'", sig: crypto.createHmac('sha256', 'undefined').update(payload).digest('base64url') },
+      { label: 'HMAC with test secret while env unset', sig: crypto.createHmac('sha256', saved).update(payload).digest('base64url') }
     ];
-    for (const sig of sigVariants) {
+    for (const variant of sigVariants) {
       calls = [];
       const res = await handler({
-        queryStringParameters: { email, exp, sig, lang: 'en', kind: 'trial' }
+        queryStringParameters: { email, exp, sig: variant.sig, lang: 'en', kind: 'trial' }
       });
-      check('missing secret rejects sig=' + JSON.stringify(sig), res.statusCode === 400 && /isn.t valid|isn't valid|invalid/i.test(res.body || ''), res.statusCode);
-      check('missing secret: no PATCH for sig=' + JSON.stringify(sig), !calls.some((c) => c.method === 'PATCH'), calls);
-      check('missing secret: no send-trial-access for sig=' + JSON.stringify(sig), !calls.some((c) => c.url.includes('send-trial-access')), calls);
+      check('missing secret rejects ' + variant.label, res.statusCode === 400 && /isn.t valid|isn't valid|invalid/i.test(res.body || ''), res.statusCode);
+      check('missing secret: no PATCH for ' + variant.label, !calls.some((c) => c.method === 'PATCH'), calls);
+      check('missing secret: no send-trial-access for ' + variant.label, !calls.some((c) => c.url.includes('send-trial-access')), calls);
     }
     process.env.EMAIL_VERIFY_SECRET = saved;
   }
