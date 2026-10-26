@@ -813,3 +813,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-payment-ask-corpus.cjs` gained 4 polite Hebrew asks and 5 quiet lines, a real-browser WhatsApp spec for the polite Hebrew ask (task "לשלם 1200 NIS", Undo deletes it, nothing sent), the other chat specs (30) and every `test/*corpus.cjs` green.
 - **Open:** live Gate; «אשמח אם תוכל להעביר …» (an "if"-polite form) stays quiet as a hedge; a bill told without "your" ("The payment of 350 NIS is due tomorrow") is not read.
+
+## Run 98 (builder B, 2026-10-26): polite and "waiting for your ..." asks become Waiting-on tasks
+
+- **Capability shipped (behind `CHAT_PROMISE_CARD`, off):** when the person asks the other side for a thing by a day, Glance writes "Waiting on Dana: <thing>" (runs 70s) and, now, chases it (run 90) and closes it (runs 92 to 94). The reader behind it knew «תחתום על החוזה עד יום שישי» and "I need the report by Friday" but not the polite forms: «נא לשלוח את הטפסים החתומים עד יום רביעי», «אנא להחזיר את החוזה עד מחר», "Please let me have the signed copy by Friday", "Get me the invoice by Thursday", nor a wait phrased as a request: "I am waiting for your signed copy by Friday", «אנחנו מחכים לאישור שלכם עד מחר». They now give the task. A wait counts only when it is for the other person's thing (your, שלך, שלכם, ממך); "I'm waiting for the delivery by Friday", «אני מחכה לשליח עד מחר», «נא לא לשלוח», "Please let me know by Friday" and "waiting for the bus until 5" stay quiet.
+- **Found by:** the same probe habit as runs 96 and 97 (invented lines, not the corpus): 3 of 8 Hebrew and English asks were silent.
+- **Code:** `core/chat-deadline-ask.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-deadline-ask-corpus.cjs` gained 6 asks and 5 quiet lines, one real-browser WhatsApp spec for the polite Hebrew ask (task "מחכים ל-Dana: הטפסים החתומים", nothing sent), the 31 other chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; a polite English question ("Could you send me the photos by Thursday?") is still quiet by an earlier rule (a question is not an ask of record); the thing is kept as written ("קבצים שלך").

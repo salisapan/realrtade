@@ -218,6 +218,18 @@ test('WhatsApp, CHAT_PROMISE_CARD on: a Hebrew ask for a document by a day is on
   expect(await todo(glance)).toHaveLength(1);
 });
 
+test('WhatsApp, CHAT_PROMISE_CARD on: a polite Hebrew ask for a document («נא לשלוח את הטפסים החתומים עד יום רביעי») is one follow-up task, nothing is sent', async ({ glance }) => {
+  const page = await open(glance, { CHAT_PROMISE_CARD: true }, whatsappHtml('נא לשלוח את הטפסים החתומים עד יום רביעי', { own: true }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toContain('מחכים ל-Dana');
+  expect(JSON.stringify(list[0])).toContain('הטפסים החתומים');
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+});
+
 test('WhatsApp, CHAT_PROMISE_CARD on: "Reminder: please transfer …" typed to the other person is a Waiting-on follow-up, not a note to self with the message words', async ({ glance }) => {
   const page = await open(glance, { CHAT_PROMISE_CARD: true }, whatsappHtml('Reminder: please transfer 500 NIS to my account by Thursday', { own: true }));
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
