@@ -7,9 +7,14 @@
 // qualification, no attribution, and no analytics event, so there was no way to
 // tell which page produced it.
 //
-// Two things happen here: the lead is written to Supabase so it survives, and a
-// notification goes to sales so someone actually sees it. The write is the part
-// that must not fail silently; the email is best-effort.
+// An enquiry has two ways to reach a person: a row in Supabase (public.leads)
+// and a notification email to the owner. Either channel is enough. If the
+// write fails or Supabase is not configured, the email still goes out, the
+// visitor still gets success, and that email says the lead was NOT stored in
+// the database so someone can record it by hand, with every submitted field
+// in the body. If the write succeeds and the email fails, the visitor still
+// gets success and the failure is logged. The visitor gets an error, pointing
+// at hello@theflow-ai.com, only when both channels fail.
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,6 +22,7 @@ const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
 const LOG_PREFIX = '[submit-lead]';
+const HAND_BLANK = '(not provided)';
 
 // Bounded so a single field cannot be used to push megabytes into the database
 // or into the notification email.
@@ -53,10 +59,124 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// A gateway that echoes the bearer token must not land that token in the logs.
+function scrub(value) {
+  const secrets = [process.env.SUPABASE_SERVICE_ROLE_KEY, process.env.RESEND_API_KEY].filter(Boolean);
+  if (typeof value === 'string') {
+    return secrets.reduce((text, secret) => text.split(secret).join('[redacted]'), value);
+  }
+  if (Array.isArray(value)) return value.map(scrub);
+  if (value && typeof value === 'object') {
+    const copy = {};
+    for (const [k, v] of Object.entries(value)) copy[k] = scrub(v);
+    return copy;
+  }
+  return value;
+}
+
+// Same columns, same order as the notification that goes out after a stored
+// lead. Empty values stay omitted on that path.
+const STORED_FIELDS = [
+  ['Email', 'email'], ['Name', 'name'], ['Company', 'company'], ['Role', 'role'],
+  ['Seats', 'seats'], ['Deployment', 'deployment'], ['Timeline', 'timeline'],
+  ['Source', 'source'], ['Message', 'message'],
+];
+
+// Language is part of the submitted row. The stored-path email has never
+// included it; the hand-record email does, because that message is the only copy.
+const HAND_FIELDS = STORED_FIELDS.concat([['Language', 'lang']]);
+
+function emailSubject(lead, stored) {
+  const who = String(lead.company || lead.email).replace(/[\r\n]+/g, ' ');
+  if (stored) return 'Enterprise enquiry: ' + who;
+  return 'NOT stored in the database: Enterprise enquiry: ' + who;
+}
+
+function emailHtml(lead, stored) {
+  const pairs = stored
+    ? STORED_FIELDS.map(([label, key]) => [label, lead[key]]).filter(([, v]) => v)
+    : HAND_FIELDS.map(([label, key]) => [label, lead[key] || HAND_BLANK]);
+  const rows = pairs
+    .map(([k, v]) => '<tr><td style="padding:4px 12px 4px 0; color:#667; vertical-align:top;">' + k + '</td><td style="padding:4px 0;"><b>' + esc(v) + '</b></td></tr>')
+    .join('');
+  const intro = stored
+    ? '<p>New enterprise enquiry from the Flow contact form:</p>'
+    : '<p><b>This lead was NOT stored in the database.</b> Record it by hand. This email is the only copy.</p>' +
+      '<p>New enterprise enquiry from the Flow contact form:</p>';
+  return '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
+    intro +
+    '<table role="presentation" cellpadding="0" cellspacing="0">' + rows + '</table></div>';
+}
+
+async function storeLead(lead, serviceKey, log, logErr) {
+  if (!serviceKey) {
+    logErr('SUPABASE_SERVICE_ROLE_KEY not configured — cannot store lead');
+    return false;
+  }
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/leads', {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(lead),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      logErr('Supabase rejected the lead insert', { status: res.status, detail });
+      return false;
+    }
+    log('lead stored', { company: lead.company, seats: lead.seats, deployment: lead.deployment });
+    return true;
+  } catch (err) {
+    logErr('network error storing lead', String(err));
+    return false;
+  }
+}
+
+async function notifyOwner(lead, apiKey, stored, log, logErr) {
+  if (!apiKey) {
+    if (!stored) logErr('RESEND_API_KEY not configured — lead was not stored and owner was not notified');
+    return false;
+  }
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: FROM,
+        to: [OWNER_EMAIL],
+        reply_to: lead.email,
+        subject: emailSubject(lead, stored),
+        html: emailHtml(lead, stored),
+      }),
+    });
+    if (!r.ok) {
+      logErr('lead notification failed', { status: r.status, response: await r.text() });
+      return false;
+    }
+    if (!stored) log('owner notified; lead was not stored', { company: lead.company, seats: lead.seats, deployment: lead.deployment });
+    return true;
+  } catch (err) {
+    logErr('lead notification threw', String(err));
+    return false;
+  }
+}
+
+function failureResponse(serviceKey) {
+  if (!serviceKey) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Lead capture is not configured. Please email hello@theflow-ai.com.' }) };
+  }
+  return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email hello@theflow-ai.com.' }) };
+}
+
 exports.handler = async function (event) {
   const reqId = crypto.randomBytes(4).toString('hex');
-  const log = (msg, extra) => console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : '');
-  const logErr = (msg, extra) => console.error(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : '');
+  const log = (msg, extra) => console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? scrub(extra) : '');
+  const logErr = (msg, extra) => console.error(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? scrub(extra) : '');
 
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
@@ -101,63 +221,13 @@ exports.handler = async function (event) {
   };
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) {
-    logErr('SUPABASE_SERVICE_ROLE_KEY not configured — cannot store lead');
-    return { statusCode: 500, body: JSON.stringify({ error: 'Lead capture is not configured. Please email hello@theflow-ai.com.' }) };
-  }
+  const stored = await storeLead(lead, serviceKey, log, logErr);
+  const mailed = await notifyOwner(lead, process.env.RESEND_API_KEY, stored, log, logErr);
 
-  try {
-    const res = await fetch(SB_URL + '/rest/v1/leads', {
-      method: 'POST',
-      headers: {
-        apikey: serviceKey,
-        Authorization: 'Bearer ' + serviceKey,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(lead),
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      logErr('Supabase rejected the lead insert', { status: res.status, detail });
-      // Failing loudly matters here. A lead that is silently dropped is a lost
-      // deal nobody ever learns about.
-      return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email hello@theflow-ai.com.' }) };
-    }
-    log('lead stored', { company: lead.company, seats: lead.seats, deployment: lead.deployment });
-  } catch (err) {
-    logErr('network error storing lead', String(err));
-    return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email hello@theflow-ai.com.' }) };
+  // One channel reaching a person is enough. Tell the visitor it failed
+  // only when the row was not stored and the owner was not emailed.
+  if (stored || mailed) {
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   }
-
-  const apiKey = process.env.RESEND_API_KEY;
-  if (apiKey) {
-    try {
-      const rows = [
-        ['Email', lead.email], ['Name', lead.name], ['Company', lead.company], ['Role', lead.role],
-        ['Seats', lead.seats], ['Deployment', lead.deployment], ['Timeline', lead.timeline],
-        ['Source', lead.source], ['Message', lead.message],
-      ].filter(([, v]) => v)
-       .map(([k, v]) => '<tr><td style="padding:4px 12px 4px 0; color:#667; vertical-align:top;">' + k + '</td><td style="padding:4px 0;"><b>' + esc(v) + '</b></td></tr>')
-       .join('');
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: FROM,
-          to: [OWNER_EMAIL],
-          reply_to: lead.email,
-          subject: 'Enterprise enquiry: ' + (lead.company || lead.email),
-          html: '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
-                '<p>New enterprise enquiry from the Flow contact form:</p>' +
-                '<table role="presentation" cellpadding="0" cellspacing="0">' + rows + '</table></div>',
-        }),
-      });
-      if (!r.ok) logErr('lead notification failed', { status: r.status, response: await r.text() });
-    } catch (err) {
-      logErr('lead notification threw', String(err));
-    }
-  }
-
-  return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+  return failureResponse(serviceKey);
 };
