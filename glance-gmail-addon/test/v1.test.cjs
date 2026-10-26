@@ -707,7 +707,6 @@ console.log('\n--- host boundaries ---');
   expected.sort();
   const restricted = scopes.filter(isCasaRestrictedScope);
   check('manifest declares no CASA-restricted Google scopes', restricted.length === 0, { restricted: restricted });
-  const googleApiScopes = scopes.filter((url) => !/\/auth\/gmail\.addons\.|\/auth\/script\./.test(url) && url !== 'openid');
   const googleAllow = CASA_GOOGLE_OAUTH_ALLOWLIST.slice().sort();
   const googleDeclared = scopes.filter((url) => googleAllow.indexOf(url) >= 0).sort();
   check(
