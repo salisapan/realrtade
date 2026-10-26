@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
-      - claude/install-uiux-pro-max-skill-a4agox
+      - main
     paths:
       - "flow-trial-extension/**"
       - ".github/workflows/glance-e2e.yml"

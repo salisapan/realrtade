@@ -10,6 +10,8 @@ on:
       - "glance-gmail-addon/**"
       - "scripts/package_trial_extension.py"
       - "scripts/verify_trial_install.py"
+      - "scripts/build_cws_zip.py"
+      - "scripts/stamp_build.py"
       - "flow-landing/netlify/functions/download-trial-zip/**"
       - ".github/workflows/glance-install-zip.yml"
 
