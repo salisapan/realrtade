@@ -22,3 +22,6 @@ jobs:
           node glance-gmail-addon/test/build-stamp.test.cjs
           node flow-trial-extension/test/name-match-corpus.cjs
           node flow-trial-extension/test/docs-consistency-corpus.cjs
+          node flow-trial-extension/test/outlook-graph-marker-corpus.cjs
+          node flow-trial-extension/test/outlook-graph-marker-edge-corpus.cjs
+          node flow-trial-extension/test/outlook-marker-judge-parity.cjs

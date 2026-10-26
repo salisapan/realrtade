@@ -30,6 +30,8 @@ import {
   maintenanceBudgetExceeded,
   judgeOptsForAccount,
   MAINTENANCE_WALL_MS,
+  GRAPH_FETCH_TIMEOUT_MS,
+  graphFetchWithTimeout,
 } from "./marker-core.mjs";
 
 const PROJECT_REF = "zjquktirlrhbqcnkfaok";
@@ -55,7 +57,9 @@ async function graphFetch(token: string, path: string, init?: RequestInit) {
   if (path.indexOf("/messages/") >= 0 && (!init || !init.method || init.method === "GET")) {
     headers.Prefer = GRAPH_TEXT_PREFER;
   }
-  const res = await fetch(GRAPH + path, { ...init, headers });
+  const res = await graphFetchWithTimeout(GRAPH_FETCH_TIMEOUT_MS, (signal) =>
+    fetch(GRAPH + path, { ...init, headers, signal }),
+  );
   let json: any = null;
   try {
     if (res.status !== 204) json = await res.json();
@@ -334,35 +338,43 @@ async function handleNotifications(supabase: ReturnType<typeof createClient>, pa
   const allRows = await loadAllAccounts(supabase);
   const bySub = subscriptionMap(allRows);
   const secret = clientSecret();
-  const notificationUrl = env("OUTLOOK_GRAPH_NOTIFICATION_URL");
+  const budgetStartMs = Date.now();
   const results: any[] = [];
   for (const note of list) {
-    const row = resolveAccountForNotification(note, bySub, secret);
-    if (!row || !row.user_id) {
-      results.push({ skipped: "clientState" });
+    if (maintenanceBudgetExceeded(budgetStartMs, Date.now())) {
+      results.push({ skipped: "budget" });
       continue;
     }
-    const full = await loadAccount(supabase, row.user_id);
-    if (!full) {
-      results.push({ skipped: "account" });
-      continue;
+    try {
+      const row = resolveAccountForNotification(note, bySub, secret);
+      if (!row || !row.user_id) {
+        results.push({ skipped: "clientState" });
+        continue;
+      }
+      const full = await loadAccount(supabase, row.user_id);
+      if (!full) {
+        results.push({ skipped: "account" });
+        continue;
+      }
+      const token = await ensureAccessToken(supabase, full);
+      if (!token) {
+        results.push({ skipped: "token" });
+        continue;
+      }
+      const resourceId = note.resourceData && note.resourceData.id;
+      if (!resourceId) {
+        results.push({ skipped: "resource" });
+        continue;
+      }
+      const got = await fetchMessage(token, resourceId);
+      if (!got.ok || !got.json) {
+        results.push({ skipped: "get", status: got.status });
+        continue;
+      }
+      results.push(await processMessage(supabase, token, got.json, full));
+    } catch (err) {
+      results.push({ skipped: "error", detail: String(err && (err as Error).message || err) });
     }
-    const token = await ensureAccessToken(supabase, full);
-    if (!token) {
-      results.push({ skipped: "token" });
-      continue;
-    }
-    const resourceId = note.resourceData && note.resourceData.id;
-    if (!resourceId) {
-      results.push({ skipped: "resource" });
-      continue;
-    }
-    const got = await fetchMessage(token, resourceId);
-    if (!got.ok || !got.json) {
-      results.push({ skipped: "get", status: got.status });
-      continue;
-    }
-    results.push(await processMessage(supabase, token, got.json, full));
   }
   return results;
 }

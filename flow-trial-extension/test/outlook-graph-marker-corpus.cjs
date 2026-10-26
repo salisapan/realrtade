@@ -143,6 +143,8 @@ check('CTO4 README deploy uses no-verify-jwt and lists no SUPABASE secrets', /--
 
 check('CTO5 edge judge receives userName and own addresses', edge.indexOf('judgeOptsForAccount') >= 0 && edge.indexOf('judgeOutlookInboxMessage(message, ownAddresses, judgeOpts)') >= 0);
 check('CTO6 maintenance wall is under 150 seconds', M.MAINTENANCE_WALL_MS < 150000 && edge.indexOf('MAINTENANCE_WALL_MS') >= 0 && edge.indexOf('maintenanceBudgetExceeded') >= 0);
+check('CTO6 notification path uses graph fetch timeout', M.GRAPH_FETCH_TIMEOUT_MS > 0 && edge.indexOf('graphFetchWithTimeout') >= 0 && edge.indexOf('GRAPH_FETCH_TIMEOUT_MS') >= 0);
+check('CTO6 notification loop checks wall budget', edge.indexOf('budgetStartMs = Date.now()') >= 0 && edge.indexOf('skipped: "budget"') >= 0);
 
 const batchNotes = [
   { subscriptionId: 'subA', clientState: stateB },
@@ -150,6 +152,7 @@ const batchNotes = [
 ];
 const batchResults = batchNotes.map((n) => M.resolveAccountForNotification(n, rowBySub, SECRET));
 check('CTO7 one bad notification never fails the batch', batchResults[0] === null && batchResults[1] && batchResults[1].user_id === userA && edge.indexOf('skipped: "clientState"') >= 0);
+check('CTO7 edge catches per-notification errors and continues', edge.indexOf('skipped: "error"') >= 0 && /catch \(err\)/.test(edge) && edge.indexOf('handleNotifications') >= 0);
 
 if (failures) process.exit(1);
 console.log('outlook-graph-marker-corpus: all passed (' + checks + ' checks)');

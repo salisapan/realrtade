@@ -9,6 +9,7 @@ export const MAIL_SUBSCRIPTION_MAX_MINUTES = 4200;
 export const INITIAL_DELTA_LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000;
 export const MAX_DELTA_PAGES = 12;
 export const MAINTENANCE_WALL_MS = 149000;
+export const GRAPH_FETCH_TIMEOUT_MS = 45000;
 export const CHANGE_TYPE = "created";
 export const CRON_HEADER = "x-glance-cron";
 
@@ -179,6 +180,17 @@ export function maintenanceBudgetExceeded(startMs, nowMs) {
   const start = typeof startMs === "number" ? startMs : Date.now();
   const now = typeof nowMs === "number" ? nowMs : Date.now();
   return now - start >= MAINTENANCE_WALL_MS;
+}
+
+export async function graphFetchWithTimeout(timeoutMs, fetchFn) {
+  const ms = typeof timeoutMs === "number" ? timeoutMs : GRAPH_FETCH_TIMEOUT_MS;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetchFn(ctrl.signal);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function judgeOptsForAccount(row) {

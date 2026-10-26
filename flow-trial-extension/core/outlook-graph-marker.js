@@ -11,6 +11,7 @@ const FlowOutlookGraphMarker = (() => {
   const INITIAL_DELTA_LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000;
   const MAX_DELTA_PAGES = 12;
   const MAINTENANCE_WALL_MS = 149000;
+  const GRAPH_FETCH_TIMEOUT_MS = 45000;
   const MAIL_SCOPE = 'Mail.ReadWrite';
   const CHANGE_TYPE = 'created';
   const CRON_HEADER = 'x-glance-cron';
@@ -189,6 +190,20 @@ const FlowOutlookGraphMarker = (() => {
     return now - start >= MAINTENANCE_WALL_MS;
   }
 
+  async function graphFetchWithTimeout(timeoutMs, fetchFn) {
+    const ms = typeof timeoutMs === 'number' ? timeoutMs : GRAPH_FETCH_TIMEOUT_MS;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let timer = null;
+    if (ctrl) {
+      timer = setTimeout(function () { ctrl.abort(); }, ms);
+    }
+    try {
+      return await fetchFn(ctrl ? ctrl.signal : undefined);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   function judgeOptsForAccount(row) {
     const r = row || {};
     const own = Array.isArray(r.own_addresses) ? r.own_addresses : [];
@@ -358,6 +373,8 @@ const FlowOutlookGraphMarker = (() => {
     unmarkPatchForAction: unmarkPatchForAction,
     refreshTokenForVaultWrite: refreshTokenForVaultWrite,
     maintenanceBudgetExceeded: maintenanceBudgetExceeded,
+    GRAPH_FETCH_TIMEOUT_MS: GRAPH_FETCH_TIMEOUT_MS,
+    graphFetchWithTimeout: graphFetchWithTimeout,
     judgeOptsForAccount: judgeOptsForAccount,
     parseDeltaPage: parseDeltaPage,
     mergeDeltaPages: mergeDeltaPages,
