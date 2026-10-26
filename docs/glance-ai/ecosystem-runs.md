@@ -858,3 +858,18 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** new `test/reply-ask-corpus.cjs` (10 asks written after the patterns, 6 quiet look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. A probe of 12 invented negatives showed no new false positive.
 - **Open:** live Gate; «צריך לסגור את זה עד יום רביעי, אפשר שתאשר?» still quiet; the "We need to talk … back at the office" false positive (run 101) is still open.
+
+### Run 104 (2026-10-26)
+- **Capability shipped (behind `PAYMENT_ASK`, off):** a bill that names its number and due day but no amount (the commonest invoice reminder) used to give no card, because the payment reader needed an amount and a currency. It now becomes the task "Pay invoice 2231" on that day through the existing Log It card (Outlook and Gmail, shared judge).
+- **Code:** `core/chat-payment-ask.js` (`recognizeBill`), `core/incoming-judge.js` (fallback and the title).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/invoice-due-corpus.cjs` (5 bills, an amount-title check, 5 quiet lines, switch off; all 5 bills fail on the old code); every `test/*corpus.cjs` green. No real-browser spec: none exists for the mail payment task, so the Outlook and Gmail write is proved only through the existing Log It path, not on this title.
+- **Phone card:** `glance-gmail-addon/CoreBundle.js` rebuilt (it was behind the last runs' judge changes); the add-on test has the same red expectations as before (row 83), none new.
+- **Open:** live Gate; a real-browser spec for the mail payment task; the chat lane still needs an amount (not changed); «האם יש לך את הקישור…?», «תוכל לשתף איתי את התיקייה?» and «זכור להגיש את הדוח…» are still quiet.
+
+### Run 105 (2026-10-26)
+- **Capability shipped:** the everyday Hebrew ask for a link, a folder, the logo, a recording or a place in a group was quiet (the object words were missing, and «האם יש לך…» was not read as an ask); it now offers the same reply card as the English forms.
+- **Code:** `core/intent.js` (Hebrew request-object words; «האם יש לך/לכם» opening), `core/judgment.js` (short-ask nouns).
+- **Grok sync:** nothing new in `card-requests-*.md`; one other agent's commit (AI engine, #206) touched no file I changed.
+- **Tests:** new `test/hebrew-share-ask-corpus.cjs` (6 asks written after the change, 4 quiet lines; 4 of 6 asks fail on the old code; one held-out line failed on my first patterns and led to the wider short-ask nouns); every `test/*corpus.cjs` green. Phone-card `CoreBundle.js` rebuilt. No real-browser spec this run.
+- **Open:** live Gate; «זכור להגיש את הדוח השבועי…» (a reminder to the reader) still quiet; the run-101 «We need to talk … back at the office» false positive.

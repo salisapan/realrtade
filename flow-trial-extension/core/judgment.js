@@ -276,7 +276,7 @@ const FlowJudgment = (() => {
   // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
   // longer text, a bare "really?" and a greeting stay on the normal path.
   const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|would it be possible to (?:get|have|send|share)\b|are you able to (?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look|get me)\b|is it possible to (?:get|have|send|share)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
-  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
+  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון|לוגו|קובץ|מצגת|הקלטה|תמונות|טופס|חוזה|תיקייה)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
   function shortAskText(text) {
     const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
     if (t.length < 8 || t.length > 90) return false;

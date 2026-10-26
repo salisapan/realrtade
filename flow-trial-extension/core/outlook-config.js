@@ -88,7 +88,7 @@ FlowOutlookConfig.connectServiceUi = function connectServiceUi(svc, ctx) {
   const has = scopes.length > 0 && scopes.every((sc) => granted.indexOf(sc) >= 0);
   if (required) return { checked: true, disabled: true, granted: has || true };
   if (tokenStatus === 'valid' || tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
-    return { checked: has, disabled: false, granted: has };
+    return { checked: false, disabled: false, granted: has };
   }
   const checked = svc && svc.defaultOn === true;
   return { checked: Boolean(checked), disabled: false, granted: has };

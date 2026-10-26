@@ -738,10 +738,15 @@
         await refresh();
         return;
       }
-      const ids = services.filter((svc) => {
-        const box = boxes[svc.id];
-        return box && (box.checked || box.disabled);
-      }).map((svc) => svc.id);
+      const ids = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectIdsFromChecked === 'function')
+        ? FlowOutlookConfig.connectIdsFromChecked(services, (id) => {
+          const box = boxes[id];
+          return box && (box.checked || box.disabled);
+        })
+        : services.filter((svc) => {
+          const box = boxes[svc.id];
+          return box && (box.checked || box.disabled);
+        }).map((svc) => svc.id);
       const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
         ? FlowOutlookConfig.scopesFor(ids) : null;
       const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();

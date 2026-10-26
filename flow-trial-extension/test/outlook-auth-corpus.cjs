@@ -64,7 +64,7 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
     check('when connected, granted scopes show as ticked without defaultOn inventing OneDrive',
       onedriveValid.checked === false && onedriveValid.granted === false, onedriveValid);
     const calGranted = C.connectServiceUi({ id: 'calendar', scopes: ['Calendars.ReadWrite'] }, { tokenStatus: 'valid', granted: staleGrants });
-    check('when connected, calendar granted shows ticked', calGranted.checked === true && calGranted.granted === true, calGranted);
+    check('when connected, calendar granted is a label not a pre-ticked box', calGranted.checked === false && calGranted.granted === true, calGranted);
     const pickedIds = C.connectIdsFromChecked(C.CONNECT_SERVICES, (id) => id === 'calendar' || id === 'mail');
     const pinned = C.scopesFor(pickedIds);
     check('connectIdsFromChecked pins authorize scopes to the selection',

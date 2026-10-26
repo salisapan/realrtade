@@ -301,9 +301,7 @@ console.log('\n--- mailbox time zone, not the browser (fixed clock) ---\n');
     reverse && reverse.start.timeZone === browserNy && reverse.start.dateTime === FIXED + 'T10:00:00', reverse);
   check('holdTimeZone uses mailbox when the hold names no explicit zone',
     Cal.holdTimeZone(null, mailboxIl) === mailboxIl && Cal.holdTimeZone('', mailboxIl) === mailboxIl);
-  check('mutant browser fallback without mailbox differs from the mailbox hold (must fail if re-enabled in the worker)',
-    Cal.holdTimeZoneBrowserFallback(null, '', browserNy) === browserNy &&
-    Cal.holdTimeZone(null, mailboxIl) !== Cal.holdTimeZoneBrowserFallback(null, '', browserNy));
+  check('Bogus is not accepted as a hold zone', Cal.holdTimeZone('Bogus', mailboxIl) === '' && Cal.holdTimeZone('Bogus', '') === '');
   const noMailbox = Cal.meetingBody({ dateIso: FIXED, hour: 10, minute: 0, title: 'Review' });
   check('no mailbox zone and no explicit zone refuses the hold', noMailbox === null);
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
@@ -313,6 +311,8 @@ console.log('\n--- mailbox time zone, not the browser (fixed clock) ---\n');
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
   check('Connect uses connectServiceUi instead of ticking every granted scope on sign-in',
     popup.indexOf('connectServiceUi') >= 0 && popup.indexOf('has && granted.length') < 0, popup.length);
+  check('initial authorize routes checked ids through connectIdsFromChecked',
+    popup.indexOf('connectIdsFromChecked') >= 0, popup.length);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

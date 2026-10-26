@@ -2892,8 +2892,8 @@ async function outlookCalendarTimeZone(explicit) {
   const Cal = globalThis.FlowOutlookCalendar;
   const given = String(explicit || '').trim().slice(0, 80);
   if (given) {
-    if (Cal && Cal.zoneOk && Cal.zoneOk(given)) return { ok: true, timeZone: given };
-    if (given.indexOf('/') < 0 && given.length > 2) return { ok: true, timeZone: given };
+    if (Cal && typeof Cal.graphTimeZoneOk === 'function' && Cal.graphTimeZoneOk(given)) return { ok: true, timeZone: given };
+    return { ok: false, reason: 'invalid-timezone', error: 'That time zone is not valid for a calendar hold.' };
   }
   const mb = await outlookMailboxTimeZone();
   if (mb.ok) return mb;

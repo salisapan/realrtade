@@ -300,25 +300,20 @@ const FlowOutlookCalendar = (() => {
 
   // Calendar holds use the mailbox zone from Graph mailboxSettings.timeZone.
   // An explicit zone wins; the browser zone is never used here.
-  function holdTimeZone(explicit, mailboxZone) {
-    const given = String(explicit || '').trim().slice(0, 80);
-    if (given) {
-      if (zoneOk(given)) return given;
-      // Graph mailboxSettings uses Windows display names (not IANA).
-      if (given.indexOf('/') < 0 && given.length > 2) return given;
-      return '';
-    }
-    const mailbox = String(mailboxZone || '').trim().slice(0, 80);
-    if (mailbox) return mailbox;
-    return '';
+  // IANA zones and Graph mailboxSettings Windows display names (not the browser).
+  function graphTimeZoneOk(zone) {
+    const z = String(zone || '').trim().slice(0, 80);
+    if (!z) return false;
+    if (zoneOk(z)) return true;
+    if (z === 'UTC' || / Standard Time$/i.test(z)) return true;
+    return false;
   }
 
-  // Intentionally wrong path for corpus mutants (browser local, not mailbox).
-  function holdTimeZoneBrowserFallback(explicit, mailboxZone, browserZone) {
-    const z = holdTimeZone(explicit, mailboxZone);
-    if (z) return z;
-    const browser = String(browserZone || '').trim().slice(0, 80);
-    if (browser && zoneOk(browser)) return browser;
+  function holdTimeZone(explicit, mailboxZone) {
+    const given = String(explicit || '').trim().slice(0, 80);
+    if (given) return graphTimeZoneOk(given) ? given : '';
+    const mailbox = String(mailboxZone || '').trim().slice(0, 80);
+    if (mailbox && graphTimeZoneOk(mailbox)) return mailbox;
     return '';
   }
 
@@ -446,7 +441,7 @@ const FlowOutlookCalendar = (() => {
     contentHash: contentHash,
     zoneName: zoneName,
     holdTimeZone: holdTimeZone,
-    holdTimeZoneBrowserFallback: holdTimeZoneBrowserFallback,
+    graphTimeZoneOk: graphTimeZoneOk,
     zoneOk: zoneOk,
     whenLabel: whenLabel,
     undoRequest: undoRequest,
