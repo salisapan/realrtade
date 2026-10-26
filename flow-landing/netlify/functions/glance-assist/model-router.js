@@ -459,7 +459,7 @@ async function callRoutedLlm(opts) {
     throw piiError();
   }
 
-  const plan = planRoute(action, { env, state, now: clock, tier: opts.tier });
+  const plan = planRoute(action, { env, state, now: clock, tier: opts.tier, contentSource: opts.contentSource });
   if (!plan.length) {
     if (action === 'classify') return { silence: true, result: silenceResult() };
     throw configError();

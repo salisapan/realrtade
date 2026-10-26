@@ -1,5 +1,7 @@
-// Fail-closed gate: Google- or Microsoft-sourced attachment summaries may use
-// Gemini (generativelanguage.googleapis.com) only when GEMINI_PAID_TIER === 'true'.
+// Fail-closed: attachment summaries call Gemini only when GEMINI_PAID_TIER === 'true'
+// OR contentSource is on the explicit non-Google/Microsoft allowlist.
+
+const ALLOWED_WITHOUT_PAID_TIER = new Set(['dropbox', 'box', 'local', 'computer']);
 
 function mergedEnv(env) {
   return Object.assign({}, process.env, env || {});
@@ -10,19 +12,24 @@ function geminiPaidTierEnabled(env) {
 }
 
 function normalizeContentSource(raw) {
-  const s = String(raw || '').trim().toLowerCase();
+  if (raw === null || raw === undefined) return '';
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return '';
   if (s === 'gmail') return 'google';
   if (s === 'outlook') return 'microsoft';
   return s;
 }
 
-function isGoogleOrMicrosoftSource(contentSource) {
+function summarizeAttachmentAllowed(contentSource, env) {
+  if (geminiPaidTierEnabled(env)) return true;
   const n = normalizeContentSource(contentSource);
-  return n === 'google' || n === 'microsoft';
+  if (!n) return false;
+  if (n === 'google' || n === 'microsoft') return false;
+  return ALLOWED_WITHOUT_PAID_TIER.has(n);
 }
 
 function summarizeAttachmentGeminiBlocked(contentSource, env) {
-  return isGoogleOrMicrosoftSource(contentSource) && !geminiPaidTierEnabled(env);
+  return !summarizeAttachmentAllowed(contentSource, env);
 }
 
 function summarizeAttachmentSilenced(contentSource, env) {
@@ -30,9 +37,10 @@ function summarizeAttachmentSilenced(contentSource, env) {
 }
 
 module.exports = {
+  ALLOWED_WITHOUT_PAID_TIER,
   geminiPaidTierEnabled,
   normalizeContentSource,
-  isGoogleOrMicrosoftSource,
+  summarizeAttachmentAllowed,
   summarizeAttachmentGeminiBlocked,
   summarizeAttachmentSilenced
 };
