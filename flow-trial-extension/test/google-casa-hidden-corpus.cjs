@@ -31,11 +31,21 @@ function check(name, cond, detail) {
 async function run() {
   const gmail = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
 
-  const saveDraftSlice = gmail.slice(gmail.indexOf('async function saveReplyDraft'), gmail.indexOf('async function sendGmailCompose'));
+  const saveDraftSlice = gmail.slice(
+    gmail.indexOf('async function saveReplyDraft'),
+    gmail.indexOf('async function sendGmailCompose(payload)')
+  );
+  const sendComposeSlice = gmail.slice(
+    gmail.indexOf('async function sendGmailCompose(payload)'),
+    gmail.indexOf('async function sendLaneUndo')
+  );
   check('saveReplyDraft uses the lane googleReplyDraft path when the compose window is closed',
     /async function saveReplyDraft/.test(gmail)
     && /connectorId: 'googleReplyDraft'/.test(saveDraftSlice)
     && /type: 'flow:google-write'/.test(saveDraftSlice));
+  check('compose closed calls googleReplyDraft; compose open uses gmailCompose (not in saveReplyDraft slice)',
+    !/connectorId: 'gmailCompose'/.test(saveDraftSlice)
+    && /if \(!composeBodyOpen\(\)\) return saveReplyDraft/.test(sendComposeSlice));
 
   check('mailbox Drive search unavailable is not a why-not-shown line',
     C.searchSilence({ ok: false, reason: 'drive-search-unavailable' }) === null);

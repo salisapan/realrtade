@@ -4223,6 +4223,15 @@ function glanceUiCopy(kind) {
     const out = Object.assign({}, ref);
     delete out.to;
     delete out.target;
+    delete out.body;
+    delete out.subject;
+    if (out.before && typeof out.before === 'object') {
+      const before = Object.assign({}, out.before);
+      delete before.to;
+      delete before.body;
+      delete before.subject;
+      out.before = before;
+    }
     if (out.proof && typeof out.proof === 'object') {
       const proof = Object.assign({}, out.proof);
       delete proof.target;
@@ -4288,10 +4297,14 @@ function glanceUiCopy(kind) {
       } else {
         page = { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: 'Open Reply first. Glance does not press Send.' };
       }
-      await swPromise;
+      const sw = await swPromise;
       if (page && page.ok) {
         if (!composeReadBack(page)) {
           return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
+        }
+        if (sw && typeof sw === 'object') {
+          if (sw.ref) page.ref = Object.assign({}, page.ref, sw.ref);
+          if (sw.proof && !page.proof) page.proof = sw.proof;
         }
         const he = payload.lang === 'he' || glanceUiHebrew();
         page.written = composeIn.to && composeIn.body === payload.copyText
@@ -5231,7 +5244,7 @@ function glanceUiCopy(kind) {
     }
   }
 
-  function showPreviewReceipt(host, chip, result) {
+  function showPreviewReceipt(host, chip, result, ctx) {
     const response = result.response || {};
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('role', 'status');
@@ -5271,6 +5284,20 @@ function glanceUiCopy(kind) {
     });
     done.appendChild(undo);
     placeReceipt(host, chip, done);
+    if (ctx && composeReadBack(response)) {
+      FlowStorage.appendLog({
+        kind: 'written',
+        label: activityLabel(ctx),
+        messageId: ctx.messageId,
+        legacyMessageId: ctx.legacyMessageId || null,
+        threadId: ctx.threadId || null,
+        where: response.where,
+        url: response.url,
+        ref: activityLogRef(response.ref),
+        connectorId: result.action && (laneConnectorId(result.action.kind) || result.action.kind),
+        app: SOURCE_APP
+      }).catch((e) => console.error('[Glance] failed to record a compose preview in the activity log', e));
+    }
   }
 
   // A write Google accepted and has not shown back yet. It is in Google, so
@@ -5419,12 +5446,12 @@ function glanceUiCopy(kind) {
       }
       const preview = results.find((r) => r.response && composeReadBack(r.response));
       if (preview) {
-        showPreviewReceipt(host, chip, preview);
+        showPreviewReceipt(host, chip, preview, ctx);
         return;
       }
       const composeTry = results.find((r) => r.action && !(r.response && r.response.skipped) && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
       if (composeTry) {
-        showPreviewReceipt(host, chip, composeTry);
+        showPreviewReceipt(host, chip, composeTry, ctx);
         return;
       }
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));

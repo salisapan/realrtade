@@ -13,6 +13,7 @@ const { JSDOM } = require('jsdom');
 const ROOT = path.join(__dirname, '..');
 const lb = require('./load-background.cjs');
 const { FlowGoogleContacts: G } = require('../core/google-contacts.js');
+const { FlowCloseChains: CC } = require('../core/close-chains.js');
 
 const SENT_CAL_TITLE = 'GLN_PRIV_CAL_EVT_a91f02';
 const SENT_CAL_NOTE = 'GLN_PRIV_CAL_NOTE_a91f02';
@@ -249,7 +250,16 @@ function wireChrome(w, store, pageSent, bgSend, outbound, hooks) {
     if (t === 'flow:pro-status') return { ok: true, active: true, record: { key: 'k', valid: true, activeUntil: Date.now() + 1e9 } };
     if (t === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
     if (t === 'flow:follow-task') return { ok: true, ref: { taskListId: 'LIST_A', taskId: 'T1' } };
-    if (t === 'flow:execute-action' || t === 'flow:google-write' || t === 'flow:gmail-compose' || t === 'flow:google-contacts-plan') {
+    if (t === 'flow:gmail-compose') {
+      return {
+        ok: true,
+        where: 'Gmail',
+        written: 'Ready in compose. You send it.',
+        ref: { to: SENT_CONTACT_EMAIL, draftId: 'dr_priv', externalId: 'dr_priv' },
+        proof: { system: 'gmail/drafts', externalId: 'dr_priv', fetchedBack: true }
+      };
+    }
+    if (t === 'flow:execute-action' || t === 'flow:google-write' || t === 'flow:google-contacts-plan') {
       if (t === 'flow:execute-action') outbound.push({ kind: 'execute', body: msg.payload });
       return bgSend(msg);
     }
@@ -287,6 +297,7 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound, hooks) {
     + '<a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a>'
     + '<h2 class="hP">Billing</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1">'
     + '<span email="vendor@example.com">Vendor</span><div class="a3s aiL">' + bodyText + '</div></div></div>'
+    + '<textarea name="to"></textarea><input name="subjectbox" />'
     + '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></body></html>';
   const dom = new JSDOM(html, { url: 'https://mail.google.com/mail/u/0/#inbox/t1', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
@@ -307,7 +318,23 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound, hooks) {
     new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx);
   }
   patchJsdomInnerText(w.document);
-  return { w, doc: w.document, dom };
+  const activityLogRows = hookActivityLog(dom);
+  return { w, doc: w.document, dom, activityLogRows };
+}
+
+function hookActivityLog(dom) {
+  const ctx = dom.getInternalVMContext();
+  vm.runInContext(`
+    globalThis.__glancePrivacyActivityRows = [];
+    if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.appendLog === 'function') {
+      const __origAppend = FlowStorage.appendLog.bind(FlowStorage);
+      FlowStorage.appendLog = async function (entry) {
+        globalThis.__glancePrivacyActivityRows.push(JSON.parse(JSON.stringify(entry)));
+        return __origAppend(entry);
+      };
+    }
+  `, ctx);
+  return ctx.__glancePrivacyActivityRows || [];
 }
 
 function bootGmailThread(threadRows, store, pageSent, bgSend, outbound, hooks) {
@@ -325,6 +352,7 @@ function bootGmailThread(threadRows, store, pageSent, bgSend, outbound, hooks) {
   const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body>'
     + '<a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a>'
     + '<h2 class="hP">Vendor booking</h2><div role="main">' + items + '</div>'
+    + '<textarea name="to"></textarea><input name="subjectbox" />'
     + '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></body></html>';
   const dom = new JSDOM(html, { url: 'https://mail.google.com/mail/u/0/#inbox/t1', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
@@ -345,7 +373,8 @@ function bootGmailThread(threadRows, store, pageSent, bgSend, outbound, hooks) {
     new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx);
   }
   patchJsdomInnerText(w.document);
-  return { w, doc: w.document, dom };
+  const activityLogRows = hookActivityLog(dom);
+  return { w, doc: w.document, dom, activityLogRows };
 }
 
 function activityLogRefBehaviour(ref) {
@@ -353,6 +382,15 @@ function activityLogRefBehaviour(ref) {
   const out = Object.assign({}, ref);
   delete out.to;
   delete out.target;
+  delete out.body;
+  delete out.subject;
+  if (out.before && typeof out.before === 'object') {
+    const before = Object.assign({}, out.before);
+    delete before.to;
+    delete before.body;
+    delete before.subject;
+    out.before = before;
+  }
   if (out.proof && typeof out.proof === 'object') {
     const proof = Object.assign({}, out.proof);
     delete proof.target;
@@ -487,7 +525,7 @@ function activityLogRefBehaviour(ref) {
     const pageSent = [];
     const store = JSON.parse(JSON.stringify(baseStored));
     const contactAsk = "What's Dana's email for the vendor billing setup this week?";
-    const { w } = bootGmailPage(contactAsk, store, pageSent, bg.send, outbound);
+    const { w, activityLogRows } = bootGmailPage(contactAsk, store, pageSent, bg.send, outbound);
     const stable = { messageIds: ['m-contact'], laneIds: ['m-contact'] };
     const card = await w.__glanceGmailPage.planContactsChip({
       messageId: 'm-contact', stable, legacyId: 'm-contact', threadId: 't-contact',
@@ -504,6 +542,16 @@ function activityLogRefBehaviour(ref) {
     check('CT3: seeded contact email stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
     assertNoSentinels('contacts path', outbound.map((o) => o.body));
     check('CT2 mutant: sentinel contact email in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CONTACT_EMAIL) >= 0), outbound[0]);
+    check('J:M3: contact display name stays off page runtime messages', !JSON.stringify(pageSent).includes(SENT_CONTACT_NAME), pageSent.length);
+    check('J:M6: People API read does not leak sentinel into background fetch bodies',
+      !outbound.filter((o) => o.kind === 'google-api' || o.kind === 'fetch').some((o) => JSON.stringify(o.body || {}).includes(SENT_CONTACT_EMAIL)),
+      outbound.length);
+    const writtenRows = activityLogRows.filter((r) => r && r.kind === 'written');
+    check('J:P1: activity log written rows omit contact email', !writtenRows.some((r) => JSON.stringify(r).includes(SENT_CONTACT_EMAIL)), writtenRows);
+    check('P3c: activity log written ref strips ref.to from compose response',
+      writtenRows.length > 0 && writtenRows.every((r) => !r.ref || !r.ref.to),
+      writtenRows[0]);
+    assertNoSentinels('contacts activity log', writtenRows);
     w.close();
   }
 
@@ -649,6 +697,12 @@ function activityLogRefBehaviour(ref) {
     await w2.__glanceGmailPage.rescan();
     await sleep(800);
     check('I2: drive search unavailable — no prepare Do It card', !w2.document.querySelector('[data-glance-chain="prepare"]'), w2.document.body.innerHTML.indexOf('prepare'));
+    const failedSearch = { ok: false, reason: 'drive-search-failed' };
+    const evFail = CC.fileEvidence({ driveOk: Boolean(failedSearch && failedSearch.ok), driveFiles: [], threadFiles: [] });
+    check('I2: failed drive search keeps driveOk false (driveFiles null)', evFail.driveFiles === null, evFail);
+    const okSearch = { ok: true, files: [{ id: 'f1', name: 'invoice.pdf' }] };
+    const evOk = CC.fileEvidence({ driveOk: Boolean(okSearch && okSearch.ok), driveFiles: okSearch.files, threadFiles: [] });
+    check('I2: successful drive search keeps driveOk true (driveFiles array)', Array.isArray(evOk.driveFiles) && evOk.driveFiles.length === 1, evOk);
     w.close();
     w2.close();
   }
