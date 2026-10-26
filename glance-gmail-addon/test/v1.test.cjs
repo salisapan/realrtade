@@ -632,9 +632,7 @@ function scopesRequiredByManifest(manifest, hostSource) {
   const gmail = (manifest.addOns && manifest.addOns.gmail) || {};
   const services = (manifest.dependencies && manifest.dependencies.enabledAdvancedServices) || [];
 
-  if (common.useLocaleFromApp === true && manifest.oauthScopes && manifest.oauthScopes.indexOf(scopeUrl('script.locale')) !== -1) {
-    add('script.locale');
-  }
+  if (common.useLocaleFromApp === true) add('script.locale');
   if (common.homepageTrigger || gmail.homepageTrigger || (gmail.contextualTriggers && gmail.contextualTriggers.length) || gmail.composeTrigger) {
     add('gmail.addons.execute');
   }
@@ -647,9 +645,7 @@ function scopesRequiredByManifest(manifest, hostSource) {
     if (service.serviceId === 'tasks' || service.userSymbol === 'Tasks') add('tasks');
     if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
   });
-  if (hostSource && /UrlFetchApp/.test(hostSource) && manifest.oauthScopes && manifest.oauthScopes.indexOf(scopeUrl('script.external_request')) !== -1) {
-    add('script.external_request');
-  }
+  if (hostSource && /UrlFetchApp/.test(hostSource)) add('script.external_request');
   if (hostSource && /Session\.getActiveUser/.test(hostSource)) add('userinfo.email');
   if (hostSource && /GlanceMarker|GmailApp\.search|createLabel/.test(hostSource)) add('gmail.modify');
   if (hostSource && /newTrigger\(|installSweepTrigger/.test(hostSource)) add('script.scriptapp');
@@ -664,11 +660,7 @@ console.log('\n--- host boundaries ---');
   const scopes = manifest.oauthScopes.slice().sort();
   const expected = scopesRequiredByManifest(manifest, host);
   check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
-  if (scopes.indexOf(scopeUrl('script.locale')) !== -1) {
-    check('useLocaleFromApp requires script.locale when declared', expected.indexOf(scopeUrl('script.locale')) !== -1);
-  } else {
-    check('marker manifest may omit script.locale when locale scope is not declared', manifest.addOns.common.useLocaleFromApp === true);
-  }
+  check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
   check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
   check('there is no compose scope', !manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) === -1);
 
