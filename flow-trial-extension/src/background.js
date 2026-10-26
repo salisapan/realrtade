@@ -3842,7 +3842,7 @@ async function openDrivePicker(payload, sender) {
   const tabId = sender && sender.tab && sender.tab.id;
   if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
   if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
-    return { ok: false, unavailable: true, line: 'Drive picker is not available in this version.' };
+    return { ok: false, unavailable: true };
   }
 
   const win = await chrome.windows.create({

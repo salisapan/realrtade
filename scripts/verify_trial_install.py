@@ -50,7 +50,10 @@ APIS_GOOGLE_LOAD_RE = re.compile(
       \s*script\b[^>]*\ssrc\s*=\s*['"]https?://apis\.google\.com[^'"]*['"]
     |importScripts\(\s*['"]https?://apis\.google\.com[^'"]*['"]\s*\)
     |import\s+[^;\n]*\s+from\s+['"]https?://apis\.google\.com[^'"]*['"]
+    |import\s*\(\s*['"]https?://apis\.google\.com[^'"]*['"]\s*\)
     |(?:\.)?src\s*=\s*['"]https?://apis\.google\.com[^'"]*['"]
+    |(?:\.)?src\s*=\s*`https?://apis\.google\.com[^`]*`
+    |setAttribute\s*\(\s*['"]src['"]\s*,\s*['"]https?://apis\.google\.com[^'"]*['"]
     """,
     re.I | re.VERBOSE,
 )
@@ -82,6 +85,18 @@ def check_apis_google_script_guard() -> None:
         "comment.js", b"// whether https://apis.google.com's gapi loader is even\n"
     ):
         die("apis.google guard: must not match line comments")
+    if not entry_loads_remote_google_script(
+        "dynamic.js", b"import('https://apis.google.com/js/api.js');"
+    ):
+        die("apis.google guard V3: must detect dynamic import()")
+    if not entry_loads_remote_google_script(
+        "template.js", b"el.src = `https://apis.google.com/js/api.js`;"
+    ):
+        die("apis.google guard V4: must detect template-literal src")
+    if not entry_loads_remote_google_script(
+        "setattr.js", b"el.setAttribute('src', 'https://apis.google.com/js/api.js');"
+    ):
+        die("apis.google guard V5: must detect setAttribute src")
     background = package.EXTENSION_ROOT / "src" / "background.js"
     if entry_loads_remote_google_script("src/background.js", background.read_bytes()):
         die("apis.google guard: packaged background.js must not look like a remote gapi load")

@@ -20,33 +20,48 @@ const bg = read('src', 'background.js');
 
 check('build-stamp exports PICKER_BUNDLED on FlowBuild', /const PICKER_BUNDLED = (true|false)/.test(stamp) && /PICKER_BUNDLED:/.test(stamp));
 check('gmail renders the Drive chip only when PICKER_BUNDLED', /if\s*\(\s*typeof FlowBuild !== 'undefined' && FlowBuild\.PICKER_BUNDLED\s*\)[\s\S]{0,400}flow-chip-attach-drive/.test(gmail));
-check('background quiet line when picker is not bundled', /FlowBuild\.PICKER_BUNDLED[\s\S]{0,240}not available in this version/i.test(bg));
-check('background still opens a window when picker is bundled', /FlowBuild\.PICKER_BUNDLED[\s\S]{0,200}chrome\.windows\.create/.test(bg));
+check('background gates picker on FlowBuild.PICKER_BUNDLED', /FlowBuild\.PICKER_BUNDLED/.test(bg) && /unavailable:\s*true/.test(bg));
+check('background does not ship user-facing picker-unavailable copy', !/not available in this version/i.test(bg));
+
+function extractOpenDrivePicker(source) {
+  const start = source.indexOf('async function openDrivePicker');
+  if (start < 0) throw new Error('openDrivePicker not found');
+  const tail = source.slice(start);
+  const end = tail.indexOf('\nfunction deliverDrivePickerResult');
+  if (end < 0) throw new Error('deliverDrivePickerResult boundary not found');
+  return tail.slice(0, end);
+}
+
+function makePickerBox(pickerBundled) {
+  const windows = [];
+  const box = {
+    FlowBuild: { PICKER_BUNDLED: pickerBundled },
+    chrome: {
+      runtime: { getURL: (p) => 'chrome-extension://test/' + p },
+      windows: {
+        create: async (opts) => {
+          windows.push(opts);
+          return { id: 99 };
+        },
+      },
+    },
+    pendingDrivePickers: new Map(),
+    windows,
+  };
+  vm.createContext(box);
+  vm.runInContext(extractOpenDrivePicker(bg) + '\nthis.openDrivePicker = openDrivePicker;', box);
+  return box;
+}
 
 (async () => {
-  const guardSrc = `
-    async function openDrivePicker(payload, sender) {
-      const requestId = payload && payload.requestId;
-      const tabId = sender && sender.tab && sender.tab.id;
-      if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
-      if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
-        return { ok: false, unavailable: true, line: 'Drive picker is not available in this version.' };
-      }
-      return { ok: true, opened: true };
-    }
-  `;
-  const offBox = { FlowBuild: { PICKER_BUNDLED: false } };
-  vm.createContext(offBox);
-  vm.runInContext(guardSrc, offBox);
-  const quiet = await vm.runInContext('openDrivePicker({ requestId: "dp_1" }, { tab: { id: 1 } })', offBox);
-  check('PICKER_BUNDLED false: handler returns the quiet line', quiet && quiet.unavailable && /not available in this version/i.test(quiet.line), quiet);
+  const off = makePickerBox(false);
+  const quiet = await vm.runInContext('openDrivePicker({ requestId: "dp_1" }, { tab: { id: 1 } })', off);
+  check('C1: PICKER_BUNDLED false returns silent unavailable', quiet && quiet.ok === false && quiet.unavailable === true && quiet.line === undefined, quiet);
+  check('C2: no picker window when not bundled', off.windows.length === 0, off.windows);
 
-  const onBox = { FlowBuild: { PICKER_BUNDLED: true } };
-  vm.createContext(onBox);
-  vm.runInContext(guardSrc, onBox);
-  const open = await vm.runInContext('openDrivePicker({ requestId: "dp_2" }, { tab: { id: 1 } })', onBox);
-  check('PICKER_BUNDLED true: handler proceeds (no quiet line)', open && open.ok && open.opened && !open.unavailable, open);
-
+  const on = makePickerBox(true);
+  const open = await vm.runInContext('openDrivePicker({ requestId: "dp_2" }, { tab: { id: 2 } })', on);
+  check('C3: bundled picker opens a window', open && open.ok === true && on.windows.length === 1, { open, windows: on.windows.length });
   check('gmail does not append drive chip without the flag', !/appendChild\(driveChip\)[\s\S]{0,200}flow-chip-attach-drive/.test(gmail) || /FlowBuild\.PICKER_BUNDLED/.test(gmail));
 
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
