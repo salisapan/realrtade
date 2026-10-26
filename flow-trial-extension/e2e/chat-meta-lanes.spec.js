@@ -86,4 +86,21 @@ for (const L of LANES) {
     await page.locator(CARD + ' button.flow-chip-undo').click();
     await expect.poll(async () => (await events(glance)).length).toBe(0);
   });
+
+  for (const [label, text, want] of [['"bring" with a day', 'Please bring your passport tomorrow', /bring your passport/i], ['"call the bank on Monday"', 'Please call the bank on Monday', /call the bank/i], ['a friendly reminder', 'Friendly reminder to submit your expense report by Thursday', /expense report/i]]) {
+    test(L.name + ': ' + label + ' is one To Do task, read back, nothing is sent, and Undo deletes it', async ({ glance }) => {
+      await L.register(glance);
+      await glance.seedOutlook({ glanceSwitches: { CHAT_TASK_CARD: true } });
+      const page = await L.open(glance, L.html(text, 'them', 'r1'));
+      await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+      await page.locator(CARD + ' button.flow-chip').click();
+      await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      const tasks = await todo(glance);
+      expect(tasks).toHaveLength(1);
+      expect(JSON.stringify(tasks[0])).toMatch(want);
+      expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+      await page.locator(CARD + ' button.flow-chip-undo').click();
+      await expect.poll(async () => (await todo(glance)).length).toBe(0);
+    });
+  }
 }

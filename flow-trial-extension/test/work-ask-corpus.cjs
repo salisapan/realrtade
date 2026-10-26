@@ -20,7 +20,9 @@ const SHOW = [
   'Please fill out the onboarding form by Thursday',
   'Do you mind reviewing the draft by tomorrow?',
   'תוודאי שהטופס מולא עד יום שלישי',
-  'אפשר שתסתכל על ההצעה ותחזור אליי עד מחר?'
+  'אפשר שתסתכל על ההצעה ותחזור אליי עד מחר?',
+  'הלקוח רוצה צבע אחר בכפתור, אפשר לעדכן עד יום שלישי?',
+  'אפשר לתקן את שגיאת הכתיב בעמוד הראשי עד מחר?'
 ];
 const QUIET = [
   'Please find attached the signed agreement',
@@ -28,7 +30,9 @@ const QUIET = [
   'Please make sure to follow us on social media',
   'Please book now and save 20% this Friday',
   'Make sure you have a great weekend',
-  'Please contact support@example.com for help'
+  'Please contact support@example.com for help',
+  'אפשר לעדכן אותך מחר?',
+  'אפשר לעדכן את הסטטוס שלי בהמשך?'
 ];
 for (const t of SHOW) check('asks: ' + t, ask(t));
 for (const t of QUIET) check('stays quiet: ' + t, !ask(t));

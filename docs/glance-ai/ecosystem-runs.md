@@ -965,3 +965,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-reminder-corpus.cjs` +6 lines (all fail on the old code) and 3 quiet ones; 2 real-browser Outlook cases; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; no Messenger or Instagram spec for the reminder tasks; expiry notices without an action verb stay quiet.
+
+### Run 118 (2026-10-26)
+- **Capability shipped:** «אפשר לעדכן / לתקן / לסיים / להכין … עד <יום>?» (a common Hebrew way for a client to ask for a small change by a day) gave no card; it now offers the reply card. The writer's own «אפשר לעדכן אותך מחר?» stays quiet.
+- **Proof added (Meta row):** three more reminder tasks run on Messenger and Instagram in `e2e/chat-meta-lanes.spec.js` (10 of 10 pass).
+- **Investigated, not changed:** the 5 red add-on tests (open-tasks row 83) are not a bug in the add-on: the shared judge deliberately returns no process for a date-only meeting ("Meeting Oct 22" with no clock) and titles a hold in English, while the tests expect an all-day event with a Hebrew title. Whether a date-only meeting should offer a card is a product decision for the owner and David.
+- **Code:** `core/judgment.js` (one Hebrew handoff alternative).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/work-ask-corpus.cjs` +2 asks and 2 quiet lines; the new Meta cases; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; the date-only meeting decision; «אפשר לשלוח לך את החוזה עד מחר?» is routed to the file chain, not changed.
