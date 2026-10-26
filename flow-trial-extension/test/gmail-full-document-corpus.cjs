@@ -72,5 +72,35 @@ check('undo learning only on successful undo', /if \(undone && undone\.ok\)/.tes
 check('Do It emits approved learning event', /type: 'approved'/.test(gmail));
 check('edited learning when slot fills present', /type: 'edited'/.test(gmail));
 
+console.log('\n--- verifier mutants B9 / B10 (GFD wiring) ---\n');
+
+function extractPreviewStampBlock(source) {
+  const needle = 'if (ctx && ctx.previewOnly && response && response.ok === true)';
+  const i = source.indexOf(needle);
+  if (i < 0) throw new Error('previewOnly stamp block missing');
+  const tail = source.slice(i);
+  const end = tail.indexOf('assertWrittenTitle');
+  return tail.slice(0, end > 0 ? end : 200);
+}
+
+const previewBox = { console };
+vm.createContext(previewBox);
+vm.runInContext(
+  'function stampPreview(ctx, response) {\n' +
+  extractPreviewStampBlock(gmail) +
+  '  return response;\n}\nthis.stampPreview = stampPreview;',
+  previewBox
+);
+const stamped = vm.runInContext('stampPreview({ previewOnly: true }, { ok: true })', previewBox);
+check('B9: previewOnly Do It stamps response.preview=true (mutant false fails)', stamped && stamped.preview === true && stamped.closes === false, stamped);
+const notPreview = vm.runInContext('stampPreview({ previewOnly: false }, { ok: true })', previewBox);
+check('B9: without previewOnly the response stays unmarked', notPreview && notPreview.preview !== true, notPreview);
+
+const hostPlan = plan('Please prepare a quote for Dana Cole at $3,900 titled "Floor 14".');
+check('B10: worker plan path offers a non-blank built doc (GFD wiring)', hostPlan.action === 'offer' && hostPlan.built && !hostPlan.built.blank && hostPlan.previewOnly === true, hostPlan);
+
+const docPreviewSlice = gmail.slice(gmail.indexOf('function showDocPreviewReceipt'), gmail.indexOf('function showPreviewReceipt'));
+check('B10: doc preview receipt learns approved only with fetchedBack proof', /response\.proof/.test(docPreviewSlice) && /fetchedBack === true/.test(docPreviewSlice) && /type: 'approved'/.test(docPreviewSlice) && /fetchedBack: true/.test(docPreviewSlice));
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
 process.exit(failures ? 1 : 0);
