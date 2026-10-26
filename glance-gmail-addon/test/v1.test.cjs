@@ -647,10 +647,52 @@ function scopesRequiredByManifest(manifest, hostSource) {
   });
   if (hostSource && /UrlFetchApp/.test(hostSource)) add('script.external_request');
   if (hostSource && /Session\.getActiveUser/.test(hostSource)) add('userinfo.email');
-  if (hostSource && /GlanceMarker|GmailApp\.search|createLabel/.test(hostSource)) add('gmail.modify');
   if (hostSource && /newTrigger\(|installSweepTrigger/.test(hostSource)) add('script.scriptapp');
   return required.sort();
 }
+
+const CASA_RESTRICTED_SCOPE_IDS = [
+  'gmail.modify',
+  'gmail.readonly',
+  'gmail.compose',
+  'gmail.send',
+  'gmail.insert',
+  'gmail.metadata',
+  'gmail.labels',
+  'gmail.settings.basic',
+  'mail.google.com',
+  'drive',
+  'drive.readonly',
+  'drive.metadata.readonly',
+  'drive.appdata',
+  'documents',
+  'spreadsheets',
+  'calendar'
+];
+
+function isCasaRestrictedScope(url) {
+  const s = String(url || '').trim();
+  if (!s) return false;
+  if (s === 'https://mail.google.com/') return true;
+  for (let i = 0; i < CASA_RESTRICTED_SCOPE_IDS.length; i++) {
+    const id = CASA_RESTRICTED_SCOPE_IDS[i];
+    if (s === scopeUrl(id)) return true;
+    if (id === 'drive' && /\/auth\/drive$/.test(s)) return true;
+    if (id === 'calendar' && s === scopeUrl('calendar')) return true;
+    if (/gmail\.(modify|readonly|compose|send|insert|metadata)/.test(s)) return true;
+  }
+  return false;
+}
+
+const CASA_GOOGLE_OAUTH_ALLOWLIST = [
+  'calendar.events',
+  'tasks',
+  'contacts.readonly',
+  'drive.file',
+  'openid',
+  'userinfo.profile',
+  'userinfo.email'
+].map((id) => (id === 'openid' ? 'openid' : scopeUrl(id))).sort();
 
 console.log('\n--- host boundaries ---');
 {
@@ -659,6 +701,20 @@ console.log('\n--- host boundaries ---');
     fs.readFileSync(path.join(addon, 'Marker.js'), 'utf8');
   const scopes = manifest.oauthScopes.slice().sort();
   const expected = scopesRequiredByManifest(manifest, host);
+  CASA_GOOGLE_OAUTH_ALLOWLIST.forEach((url) => {
+    if (expected.indexOf(url) === -1) expected.push(url);
+  });
+  expected.sort();
+  const restricted = scopes.filter(isCasaRestrictedScope);
+  check('manifest declares no CASA-restricted Google scopes', restricted.length === 0, { restricted: restricted });
+  const googleApiScopes = scopes.filter((url) => !/\/auth\/gmail\.addons\.|\/auth\/script\./.test(url) && url !== 'openid');
+  const googleAllow = CASA_GOOGLE_OAUTH_ALLOWLIST.slice().sort();
+  const googleDeclared = scopes.filter((url) => googleAllow.indexOf(url) >= 0).sort();
+  check(
+    'Google OAuth scopes are only calendar.events, tasks, contacts.readonly, drive.file, openid, profile, and email',
+    JSON.stringify(googleDeclared) === JSON.stringify(googleAllow),
+    { googleDeclared: googleDeclared, googleAllow: googleAllow }
+  );
   check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
   check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
   check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
@@ -699,7 +755,6 @@ console.log('\n--- message path parity ---');
     'https://www.googleapis.com/auth/tasks',
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/gmail.addons.execute',
-    'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/script.scriptapp'
   ];
   function reset() {

@@ -7,9 +7,14 @@ var GLANCE_TASK_LIST = 'Glance';
 var UNDO_PREFIX = 'glanceUndo_';
 var PREFETCH_KEY = 'glancePrefetch';
 
+// Label/star inbox marker needs gmail.modify (CASA-restricted). Off until DOM or an explicit user action path ships.
+function glanceMarkerMailApiEnabled_() {
+  return false;
+}
+
 function onHomepage(e) {
   try {
-    if (typeof GlanceMarker !== 'undefined' && GlanceMarker.installSweepTriggerIfNeeded) {
+    if (glanceMarkerMailApiEnabled_() && typeof GlanceMarker !== 'undefined' && GlanceMarker.installSweepTriggerIfNeeded) {
       GlanceMarker.installSweepTriggerIfNeeded();
     }
   } catch (triggerErr) {
@@ -175,6 +180,9 @@ function silenceCard_(decision, messageId, lang) {
 }
 
 function sweep() {
+  if (!glanceMarkerMailApiEnabled_()) {
+    return { scanned: 0, marked: 0, stopped: 'mail-api-off' };
+  }
   var started = Date.now();
   var readerCtx = readerContextForSweep_();
   var sweepZone = sweepTimeZone_();
@@ -312,10 +320,12 @@ function onNotThis(e) {
   if (!messageId || !messageIdOk_(messageId)) {
     return update_(render_(Glance.cards.quiet(lang)));
   }
-  try {
-    GlanceMarker.onNotThis(messageId);
-  } catch (err) {
-    errorLog_(err);
+  if (glanceMarkerMailApiEnabled_()) {
+    try {
+      GlanceMarker.onNotThis(messageId);
+    } catch (err) {
+      errorLog_(err);
+    }
   }
   return update_(render_(Glance.cards.quiet(lang)));
 }
@@ -333,7 +343,7 @@ function remindTitle_(opened, lang) {
 }
 
 function markerOnProofClose_(messageId) {
-  if (!messageId || messageId === 'prefetch') return;
+  if (!glanceMarkerMailApiEnabled_() || !messageId || messageId === 'prefetch') return;
   try {
     if (typeof GlanceMarker !== 'undefined' && GlanceMarker.onProofClose) GlanceMarker.onProofClose(messageId);
   } catch (err) {
@@ -342,7 +352,7 @@ function markerOnProofClose_(messageId) {
 }
 
 function markerOnUndoRestore_(messageId) {
-  if (!messageId || messageId === 'prefetch') return;
+  if (!glanceMarkerMailApiEnabled_() || !messageId || messageId === 'prefetch') return;
   try {
     if (typeof GlanceMarker !== 'undefined' && GlanceMarker.onUndoRestore) GlanceMarker.onUndoRestore(messageId);
   } catch (err) {
