@@ -6,6 +6,15 @@ let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
   ['I transferred 500 NIS', '500', 'NIS'],
+  // casual claims without "I" (run 114)
+  ['Paid via Bit just now', null, null],
+  ['Sent you 500 NIS on Paybox', '500', 'NIS'],
+  ['Just transferred it', null, null],
+  ['I made the payment this morning', null, null],
+  ['The money is in your account', null, null],
+  ['שולם!', null, null],
+  ['התשלום יצא', null, null],
+  ['שלחתי לך 300 שקל', '300', 'NIS'],
   ['I paid you 1,200 ₪ yesterday', '1200', 'NIS'],
   ['Just sent the payment', null, null],
   ['Done, I transferred it', null, null],
@@ -22,6 +31,11 @@ const YES = [
 for (const text of ['I sent the invoice payment', 'I sent 500 NIS for the contract']) check('a payment that names a document is still a payment: ' + text, A.recognize(text).kind === 'claim', A.recognize(text));
 for (const [text, amount, currency] of YES) { const r = A.recognize(text); check('claim: ' + text, r.kind === 'claim' && r.amount === amount && r.currency === currency, r); }
 const NO = [
+  ['Sent it to Dana', 'a thing, not a payment'],
+  ['Sent you the signed contract', 'a document'],
+  ['Paid by who?', 'a question'],
+  ['שולם? כבר?', 'a question'],
+  ['The money is on its way, will arrive tomorrow', 'later'],
   ['I sent you the contract', 'a document'],
   ['I have sent the invoice', 'a document'],
   ['I just sent the signed agreement', 'a document'],

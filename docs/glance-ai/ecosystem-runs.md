@@ -934,3 +934,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** new `test/work-ask-corpus.cjs` (8 fresh asks, 6 quiet look-alikes; 7 of the 8 asks fail on the old code); a 16-line probe of polite notices and marketing; every `test/*corpus.cjs` green on the second sweep; phone-card bundle rebuilt. No real-browser spec this run.
 - **Open:** live Gate; "Do you mind if I call you later?" shows a card (pre-existing, not changed); "Please call/add/email/draft/book/cancel …" are still routed by their own readers, not by this list.
+
+### Run 114 (2026-10-26)
+- **Capability shipped (behind `CHAT_TASK_CARD` / `CHAT_PROMISE_CARD`, off):** the way people really say they paid ("Paid via Bit just now", "Sent you 500 NIS on Paybox", «שולם!», «התשלום יצא») did not close a "Waiting on Dana: Payment" task, because the claim reader wanted "I paid" or "I transferred". It now reads those casual forms; the card is the existing Mark done.
+- **Proof added (Meta row):** `e2e/chat-meta-lanes.spec.js`: invoice task, own "I paid" close on Microsoft To Do, and the Visit hold, on Messenger and Instagram (4 cases pass first time).
+- **Code:** `core/chat-payment-claim.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-claim-corpus.cjs` +8 claims (all fail on the old code) and 5 quiet lines; 3 new real-browser cases in `e2e/chat-payment-close.spec.js`; the new Meta spec; chat specs (payment-close, own-paid-close, meta-lanes, whatsapp-card, document-close) pass, 46; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; the other side's claim still needs a "Waiting on" payment task made from this chat; no spec for the document and chase closes on Messenger and Instagram.
