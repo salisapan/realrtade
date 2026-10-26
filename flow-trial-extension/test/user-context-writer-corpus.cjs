@@ -25,11 +25,22 @@ check('style summary becomes a note, not raw mail', /opens with hi-name/.test(p.
 p = W.recordKnowledge(p, 'We never discount below list.', 'user');
 check('knowledge is capped text only', p.knowledge.length === 1 && p.knowledge[0].note.indexOf('discount') >= 0);
 
-p = W.applyEvent(p, { type: 'shown', partyKey: 'dana@x.com', intentFamily: 'quote' });
-p = W.applyEvent(p, { type: 'approved', partyKey: 'dana@x.com', intentFamily: 'quote', fetchedBack: true });
-p = W.applyEvent(p, { type: 'approved', partyKey: 'dana@x.com', intentFamily: 'quote', fetchedBack: true });
-const hint = W.relevanceHint(p);
+const tHist = '2026-10-26T12:00:00.000Z';
+p = W.applyEvent(p, { type: 'shown', partyKey: 'dana@x.com', intentFamily: 'quote', at: tHist });
+p = W.applyEvent(p, { type: 'approved', partyKey: 'dana@x.com', intentFamily: 'quote', fetchedBack: true, at: tHist });
+p = W.applyEvent(p, { type: 'approved', partyKey: 'dana@x.com', intentFamily: 'quote', fetchedBack: true, at: tHist });
+const hint = W.relevanceHint(p, tHist);
 check('two fetched-back closes without dismissals read as relevant history', hint.relevance === 'relevant' && hint.reason === 'history_closed');
+
+let dismissedBlocks = W.empty('dismiss-blocks');
+dismissedBlocks = W.applyEvent(dismissedBlocks, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tHist });
+dismissedBlocks = W.applyEvent(dismissedBlocks, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tHist });
+dismissedBlocks = W.applyEvent(dismissedBlocks, { type: 'dismissed', partyKey: 'a@b.com', intentFamily: 'quote', at: tHist });
+check('N11b behavioral: a dismissal blocks a would-be relevant history', W.relevanceHint(dismissedBlocks, tHist).relevance !== 'relevant');
+
+const tPast = '2026-09-01T12:00:00.000Z';
+const cold = W.applyEvent(W.applyEvent(W.empty('n11d'), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tPast }), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tPast });
+check('N11d behavioral: injectable now changes relevance at weight boundary', W.relevanceHint(cold, tPast).relevance === 'relevant' && W.relevanceHint(cold, tHist).relevance === 'unknown');
 
 const tNow = new Date().toISOString();
 const t24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -137,7 +148,12 @@ function loadWorker(stored) {
     const keep = l(msg, {}, resolve);
     if (keep !== true) resolve(undefined);
   });
-  return { bag, send, W: sandbox.FlowUserContextWriter };
+  return {
+    bag,
+    send,
+    W: sandbox.FlowUserContextWriter,
+    seed: (patch) => vm.runInContext('seedUserContextFromConnect(' + JSON.stringify(patch || {}) + ')', sandbox)
+  };
 }
 
 (async () => {
@@ -164,6 +180,14 @@ function loadWorker(stored) {
 
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   check('seedUserContextFromConnect writes by account email key', /seedUserContextFromConnect/.test(bg) && /readUserContextProfile\(accountKey\)/.test(bg) && /writeUserContextProfile\(next, accountKey\)/.test(bg));
+
+  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: {} } });
+  await w.seed({ email: 'seed@co.com', name: 'Seed Person', title: 'Ops' });
+  check('S1: seedUserContextFromConnect stores profile under account email', w.bag.glanceUserContextV0.byAccount['seed@co.com'] && w.bag.glanceUserContextV0.byAccount['seed@co.com'].identity.title === 'Ops', w.bag.glanceUserContextV0.byAccount['seed@co.com']);
+
+  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: { 'other@co.com': W.empty('x') } } });
+  await w.seed({ email: 'other@co.com', name: 'Other' });
+  check('S2: seed merges into existing account bucket only', w.bag.glanceUserContextV0.byAccount['other@co.com'] && w.bag.glanceUserContextV0.byAccount['other@co.com'].identity.aliases.indexOf('Other') >= 0, w.bag.glanceUserContextV0.byAccount);
 
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
   process.exit(failures ? 1 : 0);
