@@ -44,7 +44,7 @@ const FlowConnectEcosystem = (() => {
 
   // Office surfaces named on the connect-3 screen (catalog only; one Graph sign-in covers them).
   const OFFICE_CATALOG = [
-    { id: 'ms-planner', label: 'Planner', detail: 'Add one task to a named plan. Undo deletes it.', group: 'microsoft' },
+    { id: 'ms-planner', label: 'Planner', detail: 'Add one task to a named plan. Undo deletes it. If Planner consent is denied or needs admin approval, the same task lands in To Do with an explanation.', group: 'microsoft' },
     { id: 'ms-onenote', label: 'OneNote', detail: 'Read notebooks you already use.', group: 'microsoft' },
     { id: 'ms-word', label: 'Word', detail: 'Create one empty document when a request asks for it.', group: 'microsoft' },
     { id: 'ms-excel', label: 'Excel', detail: 'Create one empty spreadsheet when a request asks for it.', group: 'microsoft' },
@@ -282,6 +282,9 @@ const FlowConnectEcosystem = (() => {
   function plannerExecutionRoute(access, consentOutcome) {
     const accessState = access || 'unavailable';
     const outcome = consentOutcome || null;
+    if (outcome === 'admin-required' || outcome === 'denied') {
+      return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: true };
+    }
     if (accessState === 'personal' || accessState === 'unavailable') {
       return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: false };
     }
