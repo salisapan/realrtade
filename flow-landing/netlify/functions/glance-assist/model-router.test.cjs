@@ -376,7 +376,7 @@ async function run() {
       global.fetch = script.fetchImpl;
       const res = await post({ action: 'summarize-attachment', maskedText: 'Lease body', contentSource: 'dropbox' });
       check('unusable summaries on allowlisted source are 502', res.status === 502, res);
-      check('the 502 body is not a fabricated summary', !res.json.summary && JSON.stringify(res.json).indexOf('Jane Doe') === -1, res.json);
+      check('the 502 body is not a fabricated summary', !res.json.summary && JSON.stringify(res.json).indexOf('Jane Doe') === -1 && JSON.stringify(res.json).indexOf('jane.doe') === -1, res.json);
     }
     {
       resetState();
