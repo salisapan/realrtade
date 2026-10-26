@@ -904,3 +904,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-delivery-window-corpus.cjs` +6 visits, 4 flag checks, 5 quiet lines; 3 new real-browser cases (WhatsApp English and Hebrew, Outlook); booking and WhatsApp specs pass (51); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; the Hebrew and service-noun gaps above; Messenger and Instagram have no visit spec of their own (same lane as WhatsApp).
+
+### Run 110 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the Hebrew gaps the run-109 probe found. A Hebrew table booking («השולחן שלכם נשמר…»), a car service or a check-up told without a possessive («הטיפול ברכב נקבע למחר…»), the English "car service" and "haircut", and a Hebrew pickup of an ID, a licence or photos used to give no card; they now give the existing hold or pickup task.
+- **Code:** `core/chat-appointment-notice.js`, `core/chat-pickup-notice.js` (vocabulary and frames only).
+- **Grok sync:** nothing new in `card-requests-*.md`; one other agent's commit (#254-line, "Breadth Y3") touched none of my files.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` +7 lines and 4 quiet ones (7 fail on the old code), `test/chat-pickup-notice-corpus.cjs` +3 (3 fail on the old code); a real-browser WhatsApp case for the Hebrew table; booking and WhatsApp specs pass (52); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; flights ("Your flight departs Thursday at 6:30"), a parent-teacher meeting, a webinar and a date written 5/11 are still quiet; no Hebrew pickup spec in a real browser.
