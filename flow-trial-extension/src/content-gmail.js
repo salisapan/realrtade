@@ -1479,7 +1479,8 @@ function glanceUiCopy(kind) {
       chrome.runtime.sendMessage({ type: 'flow:drive-find-one', term: term }, (res) => {
         resolve({
           match: res && res.match ? res.match : 'unknown',
-          file: res && res.file ? res.file : null
+          file: res && res.file ? res.file : null,
+          driveSearchUnavailable: !!(res && res.driveSearchUnavailable)
         });
       });
     });
@@ -1641,6 +1642,7 @@ function glanceUiCopy(kind) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
       const found = await driveFindOne(intent.googleWait.fileTerm);
+      if (found && found.driveSearchUnavailable) return { type: null };
       const match = found && typeof found === 'object' ? found.match : found;
       intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
       if (intent && found && found.file) intent.laneFile = found.file;
@@ -2408,6 +2410,8 @@ function glanceUiCopy(kind) {
       if (searched && searched.reason === 'drive-search-unavailable') {
         logScanSkip(messageId, 'file');
         recordSilence(messageId, 'file');
+        void flushSuggest(false);
+        return;
       } else {
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment

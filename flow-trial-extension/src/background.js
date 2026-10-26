@@ -3789,7 +3789,11 @@ async function driveFindOneByName(term) {
     if (needle.length < 2) return { match: 'unknown' };
     const escaped = needle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const q = "trashed = false and name contains '" + escaped + "'";
-    const files = await searchDriveFiles(q);
+    const detail = {};
+    const files = await searchDriveFiles(q, detail);
+    if (!files && detail.reason === 'drive-search-unavailable') {
+      return { match: 'none', driveSearchUnavailable: true };
+    }
     if (!files) return { match: 'unknown' };
     const hits = driveNameHits(files, needle);
     if (hits.length !== 1) return { match: hits.length === 0 ? 'none' : 'many' };

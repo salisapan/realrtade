@@ -1163,6 +1163,10 @@ const FlowFollow = (() => {
     if (examinedResolution.has(key)) return true;
     examinedResolution.add(key);
     const env = { need, facts, state, watch, sender, threadId, lastId, subject: ctx.subject, threadUrl: ctx.threadUrl(lastId), text, what: String(text).replace(/\s+/g, ' ').trim().slice(0, 160), personKey: (watch && watch.personKey) || null };
+    if (typeof FlowFilePath !== 'undefined') {
+      const probe = await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery({ label: need.label }) });
+      if (probe && probe.reason === 'drive-search-unavailable') return false;
+    }
     const world = await resolutionWorld(ctx, sender, env);
     const plan = planFor(env, world);
     if (watch) {
