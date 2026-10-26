@@ -65,6 +65,19 @@ test('WhatsApp, CHAT_TASK_CARD and RECURRING_HOLD on: a lesson that repeats ever
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
 
+test('WhatsApp, CHAT_TASK_CARD on: a polite Hebrew payment ask («נא להעביר ... עד מחר») is one To Do task, nothing is paid or sent, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml('נא להעביר את התשלום על 1200 ש"ח עד מחר'));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toMatch(/לשלם 1200 NIS/);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
+
 test('WhatsApp, CHAT_TASK_CARD on: a payment asked is one To Do task Pay 500 NIS, nothing is paid or sent', async ({ glance }) => {
   const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml('Please transfer 500 NIS to my account by Thursday'));
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });

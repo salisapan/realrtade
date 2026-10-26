@@ -804,3 +804,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-appointment-notice-corpus.cjs` gained 9 plain-reminder lines with their date and clock and 9 quiet lines, two real-browser Outlook specs (the reminder is one hold with Undo; the form deadline shows nothing), every `test/*corpus.cjs` green (including the booking, silence and parity corpora), and the 68 booking and hold specs green.
 - **Open:** live Gate; a day number with no month ("the 5th") and a bare hour ("tomorrow morning at 9") are not read.
+
+## Run 97 (builder B, 2026-10-26): the polite Hebrew payment ask
+
+- **Capability shipped (behind `CHAT_TASK_CARD`, off):** the payment-ask reader knew the Hebrew imperative («תעביר», «תשלם») but not the forms Israelis actually write: «נא להעביר את התשלום על 1200 ש"ח עד מחר», «אפשר להעביר את ה-400 שקל עד מחר?», «תוכל לשלם 300 ש"ח עד יום חמישי», «היי דנה, נא לשלם 250 שקל עד יום ראשון». They now give the task "לשלם 1200 NIS · Dana" due that day. Found by probing 10 invented payment lines (3 Hebrew polite forms were silent). «נא לא להעביר» (a polite refusal), «הוא צריך להעביר» (somebody else), «אני צריך להעביר» (the writer pays), a message with no amount and a non-money «תוכל לשלוח לי תמונה» stay quiet.
+- **A second defect found by the real-browser spec and fixed:** for the same Hebrew words the shared judge had already shown a generic card, so the task was "Reply requested by Oct 27, ₪1,200" and the payment reader never ran. In chat a payment with an amount and a day is now read by its own reader first: the card is the payment task, not the vague reply.
+- **Code:** `core/chat-payment-ask.js` (verbs, ask frame, refusal), one precedence rule in `src/chat-task-card.js`.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` gained 4 polite Hebrew asks and 5 quiet lines, a real-browser WhatsApp spec for the polite Hebrew ask (task "לשלם 1200 NIS", Undo deletes it, nothing sent), the other chat specs (30) and every `test/*corpus.cjs` green.
+- **Open:** live Gate; «אשמח אם תוכל להעביר …» (an "if"-polite form) stays quiet as a hedge; a bill told without "your" ("The payment of 350 NIS is due tomorrow") is not read.
