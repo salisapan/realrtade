@@ -31,6 +31,7 @@ const FlowProofOfClose = (() => {
   const SYSTEM_LINEAR = 'linear/issue';
   const SYSTEM_DOCUSIGN = 'docusign/envelope';
   const SYSTEM_DROPBOX = 'dropbox/file';
+  const SYSTEM_TEAMS_CHAT = 'teams/chat-message';
   const SYSTEM_COMPUTER_PREFIX = 'computer/';
   const LOCAL_FILE_PREFIX = 'computer/local/';
   const REASON_PENDING = 'proof_pending';
@@ -268,7 +269,7 @@ const FlowProofOfClose = (() => {
     }
     if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
     // Notion counts only with the read-back proof itself (the earlier token write kept none).
-    if (clean(row.system) === SYSTEM_NOTION || clean(row.system) === SYSTEM_ASANA || clean(row.system) === SYSTEM_JIRA || clean(row.system) === SYSTEM_LINEAR || clean(row.system) === SYSTEM_DOCUSIGN || clean(row.system) === SYSTEM_DROPBOX) return row.fetchedBack === true && !!clean(row.verifiedAt);
+    if (clean(row.system) === SYSTEM_NOTION || clean(row.system) === SYSTEM_ASANA || clean(row.system) === SYSTEM_JIRA || clean(row.system) === SYSTEM_LINEAR || clean(row.system) === SYSTEM_DOCUSIGN || clean(row.system) === SYSTEM_DROPBOX || clean(row.system) === SYSTEM_TEAMS_CHAT) return row.fetchedBack === true && !!clean(row.verifiedAt);
     return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row) || isOnedriveConnector(row);
   }
 
@@ -1171,6 +1172,7 @@ const FlowProofOfClose = (() => {
     SYSTEM_LINEAR: SYSTEM_LINEAR,
     SYSTEM_DOCUSIGN: SYSTEM_DOCUSIGN,
     SYSTEM_DROPBOX: SYSTEM_DROPBOX,
+    SYSTEM_TEAMS_CHAT: SYSTEM_TEAMS_CHAT,
     SYSTEM_COMPUTER_PREFIX: SYSTEM_COMPUTER_PREFIX,
     LOCAL_FILE_PREFIX: LOCAL_FILE_PREFIX,
     REASON_PENDING: REASON_PENDING,
