@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-delivery-window.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-delivery-window.js', 'chat-payment-claim.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -51,6 +51,7 @@ function world(opts) {
           calls.push(msg);
           let r = { ok: false };
           if (msg.type === 'flow:chat-task-target') r = o.target;
+          else if ((msg.type === 'flow:execute-action' || msg.type === 'flow:google-write') && typeof o.exec === 'function') r = o.exec(msg);
           else if (msg.type === 'flow:execute-action' || msg.type === 'flow:google-write') r = o.exec || { ok: true, ref: { taskId: 'T1', externalId: 'T1' }, written: 'Task added.', url: 'https://tasks.example/T1', proof: { system: 'googleTasks', externalId: 'T1', fetchedBack: true } };
           else if (msg.type === 'flow:undo-action' || msg.type === 'flow:google-undo') r = o.undo || { ok: true, written: 'Task removed.' };
           Promise.resolve().then(() => cb(r));
@@ -597,6 +598,93 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     }
   }
 
+  // 5ae. The other side says they paid while this chat has a "Waiting on ...: Payment" task: the card offers to mark that task done.
+  {
+    const proof = { system: 'google/tasks', externalId: 'T1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' };
+    const execOf = (calls) => (msg) => {
+      calls.push(msg);
+      if (msg.connectorId === 'googleTaskClose') return { ok: true, written: 'Google Task done · Waiting on Dana: Payment 500 NIS', where: 'Google Tasks', ref: { taskListId: 'L1', taskId: 'T1', externalId: 'T1', contentHash: 'h2', closedByGlance: true }, proof: { system: 'google/tasks-close', externalId: 'T1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+      return { ok: true, written: 'Task', where: 'Google Tasks', ref: { taskListId: 'L1', taskId: 'T1', externalId: 'T1', contentHash: 'h1' }, proof: proof };
+    };
+    const mine = (text, extra) => input(text, Object.assign({ fromMe: true, own: true, sender: { name: 'Dana' } }, extra || {}));
+    const make = async (w) => {
+      await w.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { key: 'pw-1' }));
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    };
+    {
+      const sent = [];
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf(sent) });
+      await make(w);
+      check('the waiting payment task is written first', w.logRows.length === 1 && /payment 500 nis$/.test(w.logRows[0].heldKey), w.logRows);
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'pw-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('the claim offers to mark the task done', r.shown && r.reason === 'close-offered' && !!last.ctx.chatTask.close && last.ctx.bodyText === '', r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      const closeCall = sent.find((m) => m.connectorId === 'googleTaskClose');
+      check('Do It closes the held task by its ids and content hash, nothing else', !!closeCall && closeCall.input.taskId === 'T1' && closeCall.input.taskListId === 'L1' && closeCall.input.contentHash === 'h1' && Object.keys(closeCall.input).length === 3, closeCall);
+      const closeRow = w.logRows[w.logRows.length - 1];
+      check('the close is logged as written with the task it closes', closeRow.kind === 'written' && closeRow.connectorId === 'googleTaskClose' && closeRow.closes === w.logRows[0].chatKey && closeRow.fetchedBack === true, closeRow);
+      const again = await w.Card.offer(input('העברתי לך 500 ש"ח', { key: 'pw-3' }));
+      check('once closed, a second claim offers nothing', !again.shown, again);
+      await w.receipts.filter((x) => x.receipt).pop().receipt.onUndo();
+      check('Undo of the close goes through the lane undo of googleTaskClose', w.calls.some((c) => c.type === 'flow:google-undo' && c.connectorId === 'googleTaskClose'), w.calls.map((c) => c.type + ':' + c.connectorId));
+      const after = await w.Card.offer(input('I transferred 500 NIS', { key: 'pw-4' }));
+      check('after Undo the task is open again and the claim is offered again', after.shown && after.reason === 'close-offered', after);
+    }
+    for (const [text, why] of [['I transferred 900 NIS', 'another amount'], ['I will pay tomorrow', 'a promise'], ['Did you get the 500 NIS?', 'a question'], ['I paid for the pizza', 'something else']]) {
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
+      await make(w);
+      const before = w.injected.length;
+      const r = await w.Card.offer(input(text, { key: 'q-1' }));
+      check('no close card for ' + why + ': ' + text, !(r.shown && r.reason === 'close-offered') && w.injected.length === before + (r.shown ? 1 : 0), r);
+    }
+    {
+      // A person on Microsoft only: the waiting task is a To Do task and the close goes through the worker, with the snapshot Glance took.
+      const sent = [];
+      const snap = { title: 'Waiting on Dana: Payment 500 NIS', status: 'notStarted' };
+      const exec = (msg) => {
+        sent.push(msg);
+        if (msg.payload && msg.payload.connectorId === 'outlookTaskClose') return { ok: true, fetchedBack: true, written: 'To Do task done · Waiting on Dana: Payment 500 NIS', where: 'Microsoft To Do', ref: { taskListId: 'ML1', taskId: 'MT1', externalId: 'MT1', closed: { title: snap.title, status: 'completed' }, closedByGlance: true }, proof: { system: 'microsoft/todo', externalId: 'MT1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+        return { ok: true, fetchedBack: true, written: 'To Do task', where: 'Microsoft To Do', ref: { taskListId: 'ML1', taskId: 'MT1', externalId: 'MT1', created: snap }, proof: { system: 'microsoft/todo', externalId: 'MT1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+      };
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'outlookTask' }, exec: exec });
+      await make(w);
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'o-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('a claim offers the close for a To Do task too', r.shown && r.reason === 'close-offered' && last.ctx.chatTask.connectorId === 'outlookTaskClose', r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      const call = sent.find((m) => m.payload && m.payload.connectorId === 'outlookTaskClose');
+      check('Do It closes the To Do task by its ids and the snapshot Glance took, nothing else', !!call && call.type === 'flow:execute-action' && call.payload.params.taskId === 'MT1' && call.payload.params.taskListId === 'ML1' && call.payload.params.created.status === 'notStarted' && Object.keys(call.payload.params).length === 3, call);
+      const row = w.logRows[w.logRows.length - 1];
+      check('the To Do close is logged as written with the task it closes', row.kind === 'written' && row.connectorId === 'outlookTaskClose' && row.closes === w.logRows[0].chatKey, row);
+      await w.receipts.filter((x) => x.receipt).pop().receipt.onUndo();
+      check('Undo of the To Do close goes through the worker undo of outlookTaskClose', w.calls.some((c) => c.type === 'flow:undo-action' && c.connectorId === 'outlookTaskClose'), w.calls.map((c) => c.type + ':' + c.connectorId));
+    }
+    {
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'n-1' }));
+      check('a claim with no waiting task offers nothing', !r.shown || r.reason !== 'close-offered', r);
+    }
+    {
+      const sent = [];
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: (msg) => { sent.push(msg); return msg.connectorId === 'googleTaskClose' ? { ok: false, reason: 'user-edited' } : execOf([])(msg); } });
+      await make(w);
+      await w.Card.offer(input('שילמתי', { key: 'e-1' }));
+      const last = w.injected[w.injected.length - 1];
+      check('an amount-less claim with exactly one waiting task offers the close', !!last.ctx.chatTask.close);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      check('a task the person changed is left alone and says so', w.receipts.some((x) => x.state === 'flow-chip-error' && /changed this task|שינית את המשימה/.test(x.text)) && w.logRows.every((r) => r.connectorId !== 'googleTaskClose'), w.receipts.map((x) => (x.state || 'receipt') + ':' + (x.text || '')));
+    }
+    {
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
+      await make(w);
+      await w.Card.offer(mine('Please send me the signed contract by Thursday', { key: 'pw-9' }));
+      await w.injected[w.injected.length - 1].handlers.onDoIt(w.injected[w.injected.length - 1].host, {}, w.injected[w.injected.length - 1].ctx);
+      const r = await w.Card.offer(input('שילמתי', { key: 'm-1' }));
+      check('two waiting asks but one payment: an amount-less claim still closes only the payment', r.reason !== 'close-offered' || w.injected[w.injected.length - 1].ctx.chatTask.close.chatKey === w.logRows[0].chatKey, r);
+    }
+  }
+
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
   for (const text of ['אפשר להיפגש ביום חמישי ב-15:00?', 'נוכל להיפגש מחר בשעה 10:00?', 'בא לך להיפגש ביום שלישי ב-16:30?', 'Can we meet tomorrow at 10:00?']) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -687,7 +775,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-delivery-window\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-delivery-window\.js', 'core\/chat-payment-claim\.js', 'core\/chat-sent-claim\.js', 'core\/chat-chase\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {

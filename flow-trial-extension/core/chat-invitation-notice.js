@@ -42,6 +42,12 @@ const FlowChatInvitationNotice = (() => {
     } catch (e) { return text; }
   }
 
+  // The told length and the range start are read by the appointment reader (core/chat-appointment-notice.js).
+  function lengthApi() {
+    if (typeof FlowChatAppointmentNotice !== 'undefined') return FlowChatAppointmentNotice;
+    try { return typeof require !== 'undefined' ? require('./chat-appointment-notice.js').FlowChatAppointmentNotice : null; } catch (e) { return null; }
+  }
+
   function pad(n) { return String(n).padStart(2, '0'); }
   function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 
@@ -88,12 +94,19 @@ const FlowChatInvitationNotice = (() => {
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.iso || ''))) return { kind: 'none', reason: 'no-day' };
     let t = X.parseTime(raw);
     if (!(t && Number.isInteger(t.hour) && Number.isInteger(t.minute))) t = englishClock(raw);
+    // "from 20:00 to 23:00": the start is the clock, the end is the length (the reader of appointments owns both).
+    const L = lengthApi();
+    if (L && typeof L.rangeStart === 'function') {
+      const rs = L.rangeStart(text);
+      if (rs && (!(t && Number.isInteger(t.hour)) || (rs.endHour === t.hour && rs.endMinute === t.minute))) t = rs;
+    }
     if (!t || !Number.isInteger(t.hour) || !Number.isInteger(t.minute) || t.hour < 0 || t.hour > 23 || t.minute < 0 || t.minute > 59) return { kind: 'none', reason: 'no-clock' };
     const today = new Date(at.getFullYear(), at.getMonth(), at.getDate());
     const ahead = Math.round((new Date(d.iso + 'T00:00:00') - today) / 86400000);
     if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
     if (ahead === 0 && (t.hour * 60 + t.minute) <= (at.getHours() * 60 + at.getMinutes())) return { kind: 'none', reason: 'already-past' };
-    return { kind: 'invitation', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    const len = L && typeof L.lengthOf === 'function' ? L.lengthOf(text, t) : null;
+    return Object.assign({ kind: 'invitation', dateIso: d.iso, hour: t.hour, minute: t.minute, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' }, len ? { durationMinutes: len } : {});
   }
 
   // A invitation that was cancelled ("The launch party on Sunday at 19:00 has been cancelled", «האירוע ביום ראשון בשעה 19:00 בוטל»): the day and the clock of what is gone, so the chat card can offer to

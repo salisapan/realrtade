@@ -46,7 +46,19 @@ const FlowChatCompose = (() => {
     return { ok: textOf(el).indexOf(body) >= 0, sends: false, reason: 'drafted' };
   }
 
-  return { insertDraft };
+  // Undo of a draft: the box is emptied only while it still holds exactly the words Glance put there. A box the person typed in is left alone.
+  function clearIfUnchanged(el, text) {
+    const body = String(text || '').replace(/[\r\n]+/g, ' ').trim();
+    if (!el || !body) return { ok: false, reason: el ? 'empty' : 'no-box' };
+    const now = textOf(el).replace(/[\r\n]+/g, ' ').trim();
+    if (!now) return { ok: true, reason: 'already-empty' };
+    if (now !== body) return { ok: false, reason: 'user-edited' };
+    writeBox(el, '');
+    if (typeof el.dispatchEvent === 'function') el.dispatchEvent(inputEvent(''));
+    return { ok: !textOf(el).trim(), reason: 'cleared' };
+  }
+
+  return { insertDraft, clearIfUnchanged };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatCompose };

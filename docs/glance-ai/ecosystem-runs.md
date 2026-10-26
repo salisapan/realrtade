@@ -663,3 +663,198 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Tests:** self-note corpus (3 more quiet lines), chat card corpus (the repeat with the real "Reminder:" wording is not a second task), a real-browser WhatsApp spec (fails without the fix), all corpora.
 - **Open:** live Gate; a self chat that says "Reminder: you owe me …" to oneself would now be quiet (acceptable: not a note to anyone).
 
+## 2026-10-25 Ecosystems builder B (eightieth run) — the payment loop closes: "I transferred it" marks the waiting task done
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off; Google Tasks):** Glance's loop is detect, carry, execute, true close. Runs 78 and 79 made the carry for a chased payment ("Waiting on Dana: Payment 500 NIS"). This run closes it. When the other side writes in the same chat that they paid ("I transferred 500 NIS", "Just sent the payment", «העברתי לך 500 ש"ח», «שילמתי», «התשלום בוצע») and this chat has that task open, the existing card offers "Mark done" (Hebrew «סמן כבוצע»). Do It completes that Google Task through the lane, reads it back (Handled only when a GET shows `status: completed`), logs it, and Undo reopens it. A task the person changed since Glance wrote it is left exactly as it is, the card says so; a task the person already ticked needs no write. One amount matches one task; an amount-less claim closes only when exactly one payment task is waiting. A promise to pay later, a denial, a question, another amount, somebody else's payment, a payment for something else, and no waiting task show nothing. The person's click is the deliberate part; Glance has not seen any money and says nothing about the bank.
+- **New:** `core/chat-payment-claim.js` (the claim reader), `core/google-task-close.js` (the lane writer `googleTaskClose`: hash-guarded complete, read-back, hash-guarded reopen), lane registration and verify URL in `src/google-lane*.js`, the claim branch and the close in `src/chat-task-card.js`, a PATCH on tasks in the e2e Google server.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; the existing task card is reused (title "Paid? Waiting on Dana: Payment 500 NIS", step "Mark done: …", closed line "Task marked done.", error "You changed this task, so I left it"; recorded in the card request file).
+- **Tests:** `test/chat-payment-claim-corpus.cjs` (13 claims, 17 quiet lines), `test/google-task-close-corpus.cjs` (complete, edited, already done, gone, denied, lag, undo guards, lane dispatch), the chat card corpus (offer, close call with ids and hash only, close row, second claim quiet, Undo through the lane, offered again after Undo, 4 quiet cases, no waiting task, edited task refused, amount-less claim), three real-browser specs on WhatsApp with the Google lane server (the whole loop with the task completed on the server and reopened by Undo; the edited task untouched; promise, other amount and denial show no close card), all corpora.
+- **Open:** live Gate; Microsoft To Do tasks (the person on Outlook) cannot be closed this way yet, the card is not offered for them: next run; an amount-less claim with two waiting payment tasks offers nothing; mail (a customer's email saying they paid) does not close a chat task; no cross-chat matching.
+
+## 2026-10-25 Ecosystems builder B (eighty-first run) — the payment loop closes on Microsoft To Do too
+
+- **Capability shipped (switch `CHAT_TASK_CARD`, off; Microsoft To Do):** run 80 closed a chased payment for Google Tasks. A person on Outlook has the "Waiting on Dana: Payment 500 NIS" task in Microsoft To Do, and the card was not offered. Now when the other side says they paid, the same "Mark done" card closes the To Do task: the worker connector `outlookTaskClose` first checks that the task still has the content Glance wrote (the same snapshot Undo uses: title, body, due day, status), PATCHes `status: completed`, and reports Handled only when a GET shows `completed`; a task the person changed is left exactly as it is and the card says so; a task already done needs no write; Undo reopens it (`notStarted`) only while it still has the content the close left. No new scope (Tasks.ReadWrite is what To Do already asks). The e2e Graph stand-in learned PATCH on To Do tasks and stores `status: notStarted` on create, like Graph.
+- **Grok sync:** `git log` and `card-requests-*.md` checked: nothing new from Grok; the "Mark done" card of run 80 is reused unchanged.
+- **Tests:** chat card corpus (a claim offers the close for a To Do task, the close call carries ids and the snapshot only, the row, Undo through the worker), two real-browser WhatsApp specs on the Graph stand-in (the whole loop: task completed on the stand-in then reopened by Undo; an edited task untouched with the card saying so), all corpora.
+- **Open:** live Gate (Graph PATCH on `/me/todo/lists/{id}/tasks/{id}` and Undo have never run against the real Graph); a task Glance wrote into Planner (a plan named in the message) is not closed this way; mail does not close a chat task; no cross-chat matching.
+
+
+## Run 82 (builder B, 2026-10-25): QA and proof run, no new capability
+
+- **Said plainly:** this run pushes no new user-facing capability. It was spent proving the previous runs.
+- **Proof:** the whole Playwright suite on the unpacked extension at `b3ff4c73`: 410 passed, 0 failed (18.8 minutes), including the WhatsApp, Business Suite, Instagram and payment-loop specs (Google Tasks and Microsoft To Do).
+- **Found:** `glance-gmail-addon/test/v1.test.cjs` has 5 red expectations (not run by CI, not caused by this work): the shared judge treats a meeting with a day and no clock as `no-process`, the add-on test expects an all-day hold. Recorded as `docs/open-tasks.md` row 83 for the owner or David; the judge policy was not changed.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Open:** unchanged from run 81 (live Gates; mail-side removal of a cancelled booking; Planner tasks; no cross-chat matching).
+
+## Run 83 (builder B, 2026-10-25): Outlook, a cancelled booking comes off the calendar
+
+- **Capability shipped:** the business that confirmed an appointment (and whose hold Glance wrote) sends "your appointment on Sunday at 10:00 was cancelled" / «התור שלך … בוטל». On Outlook web the mail now shows a Remove It card (the existing canonical Do It card, text from the chat version in `card-requests-2026-10-20.md`). Do It removes that same event through the hold's own undo, and Handled is shown only after the worker confirms it is gone. An event the person changed is left alone and the card says so. No hold from that sender at that day and clock: no card. Switch `BOOKING_NOTICE` (off). Nothing is sent; no new scope.
+- **Code:** `cancelledHold` and `removeHeldHold` in `src/content-outlook.js` (same readers and `FlowHeldHold.find` as the chat removal), `removeHeld` carried by `buildCtx`.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/booking-cancel-corpus.cjs` (new), `e2e/outlook-booking-cancel.spec.js` (4 real-browser specs: removed and read back; edited event stays; other clock or sender quiet; switch off), booking-notice and chat-hold specs unchanged and green, every `test/*corpus.cjs` green.
+- **Open:** live Gate on Outlook web; the same removal for Gmail mail (googleHold undo from the Gmail card); a hold the person undid by hand is not touched; no cross-chat matching.
+
+## Run 84 (builder B, 2026-10-25): Gmail, a cancelled booking comes off the calendar
+
+- **Capability shipped:** the Gmail twin of run 83. A cancellation mail from the sender whose confirmation Glance already put on Google Calendar shows a Remove It card (existing canonical Do It card). Do It removes that same event through the hold's lane undo; Handled is shown only when the lane confirms; an event the person changed is left alone and the card says so; no hold at that day and clock, or from another sender: no card. `BOOKING_NOTICE` (off). Nothing is sent, no new scope.
+- **Code:** `cancelledHoldIntent` and `removeHeldHold` in `src/content-gmail.js`; the cancellation mail itself is logged closed with `fetchedBack`, so the card does not come back on rescan (found by the real-browser spec: without that row the card reappeared).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `e2e/gmail-booking-cancel.spec.js` (4 real-browser specs against the local Google lane server), `test/booking-cancel-corpus.cjs` extended (Gmail row shape), booking-notice specs on both surfaces green, every `test/*corpus.cjs` green.
+- **Open:** live Gate on both surfaces; Planner tasks not closed by the payment close; no cross-chat matching.
+
+## Run 85 (builder B, 2026-10-25): calendar holds take the told length of an appointment
+
+- **Capability shipped:** a confirmation like "your appointment is confirmed for Sunday from 14:00 to 15:30" or "...at 10:00 for an hour and a half" / «התור נקבע ל-10:00 למשך שעה» is now a calendar hold of that length (it was always 30 minutes) on Google Calendar and Outlook Calendar, from WhatsApp, Messenger, Instagram, Outlook mail and Gmail. The existing Hold It card, read back, Undo, nobody invited, nothing sent. Also fixed: a range written without "at" ("Sunday 10:00-11:00") is now read as an appointment starting at the first clock. Switches `BOOKING_NOTICE` and `CHAT_TASK_CARD` (off).
+- **Code:** `lengthOf` and `rangeStart` in `core/chat-appointment-notice.js`; `durationMinutes` carried by the judge's appointment step and the chat card's hold.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** 18 new lines in `test/chat-appointment-notice-corpus.cjs` (lengths in English and Hebrew, no length for "arrive 10 minutes early", a lunch range, an absurd length), three real-browser specs (Outlook mail, Gmail, WhatsApp) that check the end of the written event, booking and chat-hold specs unchanged and green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; "between 2 and 3pm" still starts at 15:00 (the plain clock reader takes the last clock; left as it was, needs its own fix and corpus); flights and invitations that name a length are not read.
+
+## Run 86 (builder B, 2026-10-25): invitations take their told hours; "between 2 and 3pm" starts at 2pm
+
+- **Capability shipped:** an invitation that names its hours ("you're invited on Saturday from 20:00 to 23:00", "between 8 and 11pm", «20:00-23:00», "for 2 hours") is now held for those hours (was 30 minutes) in WhatsApp, Messenger, Instagram, Outlook mail and Gmail, on the existing Hold It card with read back and Undo. Also fixed the run 85 open item: "between 2 and 3pm" started the appointment at 15:00; it now starts at 14:00 and lasts an hour. Switches `BOOKING_NOTICE`, `CHAT_TASK_CARD` (off).
+- **Code:** `core/chat-invitation-notice.js` takes `lengthOf` and `rangeStart` from the appointment reader; `core/chat-appointment-notice.js` reads "between X and Y"; `durationMinutes` carried by the judge's invitation step and the chat card.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** corpus lines in `test/chat-invitation-notice-corpus.cjs` and `test/chat-appointment-notice-corpus.cjs`, one real-browser Outlook spec (end of the written event is 21:30), booking and chat-hold specs green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; flights that name a length are not read.
+
+## Run 87 (builder B, 2026-10-25): SharePoint, an empty Word or Excel file on the site a mail names
+
+- **Capability shipped (behind `SHAREPOINT_NEW_FILE`, off; owner approval 2026-10-24, row 79a):** "Could you create a Word document called Q4 plan on the Marketing SharePoint site?" / «תפתח מסמך בשם … באתר Marketing ב-SharePoint» in Outlook web gets the existing Do It card ("Create an empty Word document called "Q4 plan.docx" on the "Marketing" SharePoint site?"). Do It writes the empty file into the site's `Glance` folder, reads it back by id (name, a file, a size, not deleted; ProofOfClose system `microsoft/sharepoint`), and Undo deletes it unless the person edited it. The site is found by name through Graph search (read only): no site, or two sites of that name, is silence. Never replaces a file, nothing shared, nothing written into it, nothing sent. The Connect screen has a `SharePoint` box (`Sites.ReadWrite.All`, never pre-ticked) and the consent catalogue has `ms-sharepoint` (experimental).
+- **Code:** `core/sharepoint-new-file.js` (reads the ask with `core/onedrive-new-file.js`), worker plan, writer and undoer in `src/background.js`, chain `sharepoint-file` in `src/content-outlook.js`, Labs switch, scope canon in `core/outlook-calendar.js`. No `manifest.json` change (the Graph host is already allowed).
+- **Grok sync:** nothing new in `card-requests-*.md`; the card is the existing one.
+- **Tests:** `test/sharepoint-new-file-corpus.cjs` (recognition in both languages, silences with reasons, site resolution, create, read-back failures withdraw, scope, Undo edited or gone), `e2e/outlook-sharepoint-file.spec.js` (7 real-browser specs on the Graph stand-in: off, box not ticked, the whole loop with reload and Undo, Hebrew, edited file, name taken, site not found or ambiguous or content asked), Connect-screen and Labs specs green, every `test/*corpus.cjs` green.
+- **Open (owner, open-tasks row 84):** Entra permission and admin consent, privacy and store wording («מאשר», not edited here), live Gate. A SharePoint list item and saving an attachment to SharePoint are not built.
+
+## Run 88 (builder B, 2026-10-25): Hebrew new-file asks with an infinitive
+
+- **Capability shipped:** a Hebrew mail «אפשר לפתוח מסמך בשם הצעה לספק?», «תוכל להכין לנו גיליון בשם …», «נא לפתוח …», «צריך להקים …» now gets the Word or Excel card on Outlook (and on a named SharePoint site). Before, only the imperative («תפתח», «תיצור») was read on the Microsoft side; the Google twin already read the infinitive, so a Hebrew Outlook user was served worse than a Hebrew Gmail user. Also, on both readers: «היה אפשר לפתוח … אתמול» (a past ask) and «אני אפתח …» (the writer's own promise) stay quiet, and «… ולשתף» is not part of the file name (sharing stays the person's step). Switches `ONEDRIVE_NEW_FILE`, `SHAREPOINT_NEW_FILE`, `WORKSPACE_FILE` (off).
+- **Code:** `core/onedrive-new-file.js` and `core/workspace-file.js` (the SharePoint reader inherits the first).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** 10 new lines in `test/onedrive-new-file-corpus.cjs` and 4 in `test/workspace-file-corpus.cjs`, a real-browser Hebrew spec (the file is "הצעה לספק.docx", Undo deletes it), the OneDrive, SharePoint and Gmail new-file specs green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; «מתי אפשר לפתוח …?» (a question about when) still reads as an ask.
+
+## Run 89 (builder B, 2026-10-25): SharePoint, save the mail's attachment on the site it names
+
+- **Capability shipped (behind `SHAREPOINT_SAVE_FILE`, off; owner approval 2026-10-24, row 79a):** "Please save the attached contract on the Marketing SharePoint site." / «תשמור את הקובץ המצורף באתר Marketing ב-SharePoint, בבקשה» in Outlook web gets the existing Do It card ("Save "contract.pdf" on the "Marketing" SharePoint site?"). Do It writes the attachment, bytes untouched, into the site's `Glance` folder, reads it back by id (same name, a file, the same size; ProofOfClose `microsoft/sharepoint`), and Undo deletes it unless the person edited it. The file is the mail's only real attachment or the one whose name the mail says; two candidates, no site of that name, two sites of that name, an ask that also sends or shares, a question or a report, another target named (OneDrive, Dropbox, Google Drive) and a file over 3 MB are silence. Never replaces a file, nothing shared, nothing sent. Same scope and Connect box as run 87.
+- **Code:** `core/sharepoint-save-file.js`; `core/sharepoint-new-file.js` now exposes `writeFile` (the one write and read-back, used by both) and `core/onedrive-new-file.js` exposes `blockedBy` (the shared guards); worker plan (lists the attachments read only, after the page asks with the text alone and then sends the Graph message id), writer and undoer in `src/background.js`; chain `sharepoint-save` in `src/content-outlook.js`; Labs switch. No `manifest.json` change.
+- **Grok sync:** nothing new in `card-requests-*.md`; the card is the existing one.
+- **Tests:** `test/sharepoint-save-file-corpus.cjs` (recognition both languages, silences with reasons, which file, plan, save, read-back failures, scope, Undo), `e2e/outlook-sharepoint-save.spec.js` (7 real-browser specs on the Graph stand-in: off, box not ticked, the whole loop with reload and Undo, Hebrew, edited file, name taken, two attachments or unknown site or also-sends), run 87 specs and the new-file corpora green, every `test/*corpus.cjs` green.
+- **Open (owner, row 84):** Entra permission and admin consent, privacy and store wording («מאשר»), live Gate. Not built: a SharePoint list item, files over 3 MB (upload session), a site named only by URL.
+
+## Run 90 (builder B, 2026-10-25): chase a late "Waiting on" in the chat; full Playwright run
+
+- **Proof first:** the whole Playwright suite on the unpacked extension at `1a2ff65d` (runs 83 to 89): 436 of 437 passed (20.2 minutes). The one failure was mine and real: the Hebrew popup showed the English detail line of the new SharePoint Connect box (`e2e/hebrew-ui-lint.spec.js`). Fixed in `4e495d42` (a Hebrew line for the box; SharePoint is a brand in the lint) and pushed.
+- **Capability shipped (behind `CHAT_CHASE_DRAFT`, off; beside `CHAT_TASK_CARD` and `CHAT_PROMISE_CARD`):** the person asked Dana for 500 NIS by Thursday; Glance wrote "Waiting on Dana: Payment 500 NIS"; Thursday has passed; Dana writes "ok, I will check". The chat card now offers "Reminder to Dana in the chat" (existing canonical card). Do It puts "Hi Dana, a quick reminder: I'm still waiting on the 500 NIS payment (it was due Thursday). Could you let me know where it stands? Thanks!" in the box (Hebrew for a Hebrew task) and nowhere else: nothing is sent, no key is pressed, the task stays open, a box that already has text is left alone, Undo empties the box only while it holds exactly those words, one reminder per task per 3 days, a task due today is not late yet, and Dana saying she paid still gets the "Mark done" card instead.
+- **Code:** `core/chat-chase.js` (portable), `findOpenWaiting`, `offerChase` and `doChase` in `src/chat-task-card.js`, `FlowChatCompose.clearIfUnchanged`, the box passed by the three chat lanes, Labs switch, lane and manifest script lists (no permission, host or scope change).
+- **Grok sync:** nothing new in `card-requests-*.md`; the card is the existing one (the step row reads "Reminder to Dana in the chat · You").
+- **Tests:** `test/chat-chase-corpus.cjs` (title parse, overdue days, the words in both languages, which task, not twice, switch), `e2e/chat-chase-draft.spec.js` (7 real-browser specs on WhatsApp: off, the whole loop with Undo, edited draft kept, box with text kept, not late and nudged yesterday quiet, a payment claim still wins, Hebrew), the other chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; Messenger and Instagram pass the box the same way but are not exercised by a spec; no chase from mail; the reminder wording is fixed (no tone choice).
+
+## Run 91 (builder B, 2026-10-25): the late-"Waiting on" reminder reads well for a document and is proved on three surfaces
+
+- **Capability shipped (still behind `CHAT_CHASE_DRAFT`, off):** the reminder of run 90 spliced a document request into a sentence ("still waiting on send me the signed contract"). It now quotes the request: «Hi Dana, a quick reminder about "Send me the signed contract" (it was due Thursday). Could you let me know where it stands? Thanks!» and «היי Dana, תזכורת קטנה לגבי הבקשה "תשלח לי את החוזה החתום" (היה אמור להגיע עד יום חמישי). אשמח לעדכון. תודה!». A payment keeps its own sentence with the amount. Same card, same rules: the box only, nothing sent, the task stays open, Undo empties the box only while unchanged.
+- **Proof:** run 90 said Messenger and Instagram were not exercised. Now `e2e/chat-chase-messenger.spec.js` and `e2e/chat-chase-instagram.spec.js` (production lane registrations, fixture DOM, Microsoft To Do as the task store, the Graph stand-in) show the whole loop on both: the card, the draft in the box, no Send, the To Do task still open, Undo empties the box, and nothing with the switch off.
+- **Code:** `core/chat-chase.js` only (the wording).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-chase-corpus.cjs` (quoted request in both languages), one new WhatsApp spec for a document ask, the two new surface specs (4 tests), every `test/*corpus.cjs` green.
+- **Open:** live Gate; no chase from mail; the wording is fixed; this run adds no new switch and no new surface behaviour beyond the wording, so the user-visible change is small.
+
+## Run 92 (builder B, 2026-10-25): a document that was asked for and sent closes its "Waiting on" task
+
+- **Capability shipped (under `CHAT_TASK_CARD`, off, with `CHAT_PROMISE_CARD` having written the task):** the person asked Dana for the signed contract by Thursday ("Waiting on Dana: Send me the signed contract"). Dana writes "I just sent you the signed contract" / «שלחתי לך את החוזה החתום» / "Here is the invoice". When the words share a content word with exactly one open waiting task, the existing chat card offers Mark done; Do It completes the task and reads it back as completed; Undo reopens it unless the person changed it. A claim that names nothing ("I sent it") fits only when it is the one open waiting task. This is the document twin of the payment close (runs 80 and 81), so the loop "asked, chased (run 90), received, closed" now works for documents as well as money. Glance has not seen the file: the click is the person's, as with the payment.
+- **A real bug found on the way and fixed:** `core/chat-payment-claim.js` read "I sent you the contract", "I have sent the invoice" and «שלחתי לך את החוזה» as payment claims, so with exactly one open payment task the chat card could have offered to mark a payment done because a contract was sent. A document sent is now not a payment claim (a message that names an amount or a payment word still is).
+- **Code:** `core/chat-sent-claim.js` (new, portable), `offerClose` shared by the payment and the document close and the document branch in `src/chat-task-card.js`, script lists (manifest content scripts and the lane list: no permission, host or scope change).
+- **Grok sync:** nothing new in `card-requests-*.md`; it is the existing Mark done card (title "Received? Waiting on Dana: ...").
+- **Tests:** `test/chat-sent-claim-corpus.cjs` (14 sent lines, 17 quiet lines, which-task rules, the payment reader leaves documents alone), new lines in `test/chat-payment-claim-corpus.cjs`, `e2e/chat-document-close.spec.js` (5 real-browser specs on WhatsApp and Google Tasks: the whole loop with Undo, Hebrew, an edited task kept, no Mark done for a thing nobody waits for or a promise or a question, no payment close for a document), every `test/*corpus.cjs` green.
+- **Open:** live Gate; an attached file or photo bubble in the chat is not read (only words); Messenger and Instagram use the same card but have no spec for this close; no close from mail.
+
+## Run 93 (builder B, 2026-10-25): the person's own promise closes when they say they sent it
+
+- **Capability shipped (under `CHAT_PROMISE_CARD`, off):** the person wrote "I'll send you the signed contract on Thursday"; Glance wrote the task (run 70s). When the person later writes "I sent you the signed contract" / «שלחתי לך את החוזה החתום» in the same chat, the existing Mark done card offers to close that task; Do It completes it, reads it back as completed, Undo reopens it unless the person changed it. This is the person's own loop closing (what they promised), next to run 92 (what they were promised) and runs 80 and 81 (payments). The words must share a content word with exactly one of the person's own open tasks from the chat; a claim that names nothing fits only the one open task.
+- **Guard found while building it and fixed in the same change:** run 92 let any open task of the chat fit the other side's "I sent you ..." claim, so Dana saying she sent a contract could have offered to close the person's own task "Send the contract on Thursday". Now the other side's claim fits only "Waiting on ..." tasks and the person's own message fits only their own tasks (`waiting` flag in `findOpenWaiting`). A spec pins both directions.
+- **Code:** `src/chat-task-card.js` only (the own branch and the guard); `core/chat-sent-claim.js` is the run 92 reader.
+- **Grok sync:** nothing new in `card-requests-*.md`; the existing Mark done card (title "Done? ...").
+- **Tests:** `e2e/chat-document-close.spec.js` gained 3 real-browser specs (the own loop with Undo, Hebrew, and the two guards), the 5 specs of run 92 stay green, every `test/*corpus.cjs` green.
+- **Open:** live Gate; words only, an attached file bubble is not read; Messenger and Instagram have no spec for the two document closes; no close from mail.
+
+## Run 94 (builder B, 2026-10-25): the "sent" claim reads real short replies
+
+- **Capability shipped (same switches as runs 92 and 93: `CHAT_TASK_CARD` for the other side's claim, `CHAT_PROMISE_CARD` for the person's own):** run 92 and 93 recognised "I just sent you the signed contract" but not what people actually type: "Sent!", "Done, sent", "Just emailed it", "Sent you an email", "sent the quote", «שלחתי», «בוצע, שלחתי», «שלחתי במייל». They now count. The measure was a probe of invented lines, not the corpus I had tuned on, and it found three real defects, all fixed: (1) a short reply with no verb frame was not a claim; (2) a recipient ("I forwarded it to Dana") or a channel (email, מייל) was taken for the thing that was sent, so it could have matched a task by a name; (3) the Hebrew prefix strip cut מייל to ייל. A claim that names nothing still fits only when it is the one open task of its kind, so "Sent!" with two open tasks offers nothing.
+- **Code:** `core/chat-sent-claim.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-sent-claim-corpus.cjs` gained 9 sent lines, 2 quiet lines and 2 token checks; `e2e/chat-document-close.spec.js` gained the "Sent!" loop (9 specs, all green); every `test/*corpus.cjs` green.
+- **Open:** live Gate; words only; Messenger and Instagram have no spec for the document closes; no close from mail. This run changes recall only, so the user-visible gain is real but small.
+
+## Run 95 (builder B, 2026-10-26): a booking that repeats
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off, and the owner's `RECURRING_HOLD`, off):** "Your piano lesson is every Monday at 17:00", "Hi, your weekly yoga class is every Tuesday at 18:30", «השיעור שלך כל יום שני ב-17:00». Before, such a mail or chat message had no card at all (the appointment reader wanted "confirmed", "booked", "see you" or one named day, not "is every Monday"). Now the existing Hold It card is offered for the next lesson (said on a Monday morning, today at 17:00; said on Monday evening, next Monday), and with `RECURRING_HOLD` on the series path that already existed for meetings writes the weekly series (Google `RRULE:FREQ=WEEKLY;BYDAY=MO`, Outlook weekly pattern), reads the rule back by id, removes the event again if the rule did not land, and Undo deletes the series. With `RECURRING_HOLD` off it is the one next event. Shop opening hours, a team that "meets every Monday" (no booking noun), a repeat with no clock, a past or questioned repeat stay quiet.
+- **Why it matters:** weekly lessons, classes and treatments are the most common standing bookings of the first user's life; one card now covers the whole series instead of a card per week or none.
+- **Code:** `core/chat-appointment-notice.js` only (frame, `repeats`, the first date); the judge, the Gmail card, the Outlook card and the chat card carry the message words to the writers already.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` (6 repeating lines with their first date, 5 quiet lines, a one-off is not marked), 6 real-browser specs (Outlook mail on and off, Gmail on and off, WhatsApp on Outlook), every `test/*corpus.cjs` green.
+- **Open:** live Gate (both switches are the owner's); an end date for a course is not read; monthly and daily repeats of a booking are not offered here.
+
+## Run 96 (builder B, 2026-10-26): a plain reminder is a booking
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the appointment reader wanted a confirming word ("confirmed", "booked", "see you") and so ignored the commonest real message, the reminder: "Your appointment is tomorrow at 14:00", "Your dentist appointment is in 3 days at 14:00", "Your table is tonight at 8pm", «התור שלך מחר ב-14:00». Found by probing invented lines I had not tuned on (12 lines: 7 should have been bookings and 5 were silent for the wrong reason). Now the existing Hold It card is offered for them in chat, Outlook and Gmail.
+- **Precision work in the same change:** the first version also accepted "The deadline for your appointment form is in 3 days at 14:00" (the booking noun is the form's). The reader now stays quiet when the word after the booking noun is form, request, history, link, page, policy, details, fee or number, and on deadline, due and expires. Questions, past and cancelled messages, "unless you cancel", and a flight, a meeting, an order or an invoice (no booking noun) stay quiet, as before.
+- **Code:** `core/chat-appointment-notice.js` only (frame and a few quiet words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` gained 9 plain-reminder lines with their date and clock and 9 quiet lines, two real-browser Outlook specs (the reminder is one hold with Undo; the form deadline shows nothing), every `test/*corpus.cjs` green (including the booking, silence and parity corpora), and the 68 booking and hold specs green.
+- **Open:** live Gate; a day number with no month ("the 5th") and a bare hour ("tomorrow morning at 9") are not read.
+
+## Run 97 (builder B, 2026-10-26): the polite Hebrew payment ask
+
+- **Capability shipped (behind `CHAT_TASK_CARD`, off):** the payment-ask reader knew the Hebrew imperative («תעביר», «תשלם») but not the forms Israelis actually write: «נא להעביר את התשלום על 1200 ש"ח עד מחר», «אפשר להעביר את ה-400 שקל עד מחר?», «תוכל לשלם 300 ש"ח עד יום חמישי», «היי דנה, נא לשלם 250 שקל עד יום ראשון». They now give the task "לשלם 1200 NIS · Dana" due that day. Found by probing 10 invented payment lines (3 Hebrew polite forms were silent). «נא לא להעביר» (a polite refusal), «הוא צריך להעביר» (somebody else), «אני צריך להעביר» (the writer pays), a message with no amount and a non-money «תוכל לשלוח לי תמונה» stay quiet.
+- **A second defect found by the real-browser spec and fixed:** for the same Hebrew words the shared judge had already shown a generic card, so the task was "Reply requested by Oct 27, ₪1,200" and the payment reader never ran. In chat a payment with an amount and a day is now read by its own reader first: the card is the payment task, not the vague reply.
+- **Code:** `core/chat-payment-ask.js` (verbs, ask frame, refusal), one precedence rule in `src/chat-task-card.js`.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` gained 4 polite Hebrew asks and 5 quiet lines, a real-browser WhatsApp spec for the polite Hebrew ask (task "לשלם 1200 NIS", Undo deletes it, nothing sent), the other chat specs (30) and every `test/*corpus.cjs` green.
+- **Open:** live Gate; «אשמח אם תוכל להעביר …» (an "if"-polite form) stays quiet as a hedge; a bill told without "your" ("The payment of 350 NIS is due tomorrow") is not read.
+
+## Run 98 (builder B, 2026-10-26): polite and "waiting for your ..." asks become Waiting-on tasks
+
+- **Capability shipped (behind `CHAT_PROMISE_CARD`, off):** when the person asks the other side for a thing by a day, Glance writes "Waiting on Dana: <thing>" (runs 70s) and, now, chases it (run 90) and closes it (runs 92 to 94). The reader behind it knew «תחתום על החוזה עד יום שישי» and "I need the report by Friday" but not the polite forms: «נא לשלוח את הטפסים החתומים עד יום רביעי», «אנא להחזיר את החוזה עד מחר», "Please let me have the signed copy by Friday", "Get me the invoice by Thursday", nor a wait phrased as a request: "I am waiting for your signed copy by Friday", «אנחנו מחכים לאישור שלכם עד מחר». They now give the task. A wait counts only when it is for the other person's thing (your, שלך, שלכם, ממך); "I'm waiting for the delivery by Friday", «אני מחכה לשליח עד מחר», «נא לא לשלוח», "Please let me know by Friday" and "waiting for the bus until 5" stay quiet.
+- **Found by:** the same probe habit as runs 96 and 97 (invented lines, not the corpus): 3 of 8 Hebrew and English asks were silent.
+- **Code:** `core/chat-deadline-ask.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-deadline-ask-corpus.cjs` gained 6 asks and 5 quiet lines, one real-browser WhatsApp spec for the polite Hebrew ask (task "מחכים ל-Dana: הטפסים החתומים", nothing sent), the 31 other chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; a polite English question ("Could you send me the photos by Thursday?") is still quiet by an earlier rule (a question is not an ask of record); the thing is kept as written ("קבצים שלך").
+
+## Run 99 (builder B, 2026-10-26): a pickup told in days
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the pickup reader wanted a named last day. Real locker and post-office messages say how many days are left: "Your package arrived at the locker, pick it up within 3 days", «החבילה שלך הגיעה ללוקר, יש לאסוף תוך 3 ימים»; a pharmacy says "we hold it until Thursday" / «נשמור אותה עד יום חמישי». They now give the existing task "Pick up the order" due on the last day (a count of calendar days from today, 1 to 30), in chat, Outlook and Gmail, through the same reader. Found by probing 8 invented pickup lines (4 silent). Business days are not counted (no task rather than a wrong day), a delivery that arrives "within 3 days" is not a pickup, a question and a count over 30 stay quiet.
+- **Code:** `core/chat-pickup-notice.js` only (the count of days, the hold phrase, the prescription noun).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-pickup-notice-corpus.cjs` gained 5 pickups and 4 quiet lines, one real-browser Outlook spec (the task is due in three days with the date read back, Undo deletes it), the booking and chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; business-day counts are not offered.
+
+### Run 100 (2026-10-26)
+- **Capability shipped:** a polite Hebrew ask opened with «האם» («האם תוכל לשלוח לי את הקובץ?», «האם אפשר לקבל את הלוגו?») used to score below the card threshold and stayed quiet; it now offers the same reply card as the form without «האם». "Would it be possible to get …?" too.
+- **Code:** `core/intent.js` (rewrite of the two polite openings, skipped for a note to oneself), `core/judgment.js` (short-ask reader).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/polite-he-ask-corpus.cjs`; `regress-144` caught my first version (self-sent «האם תוכל לתאם…» tasks), fixed; every `test/*corpus.cjs` green. No real-browser spec this run.
+- **Open:** live Gate; no new write path, so no ProofOfClose or off switch is involved (a recognition fix on the existing card).
+
+### Run 101 (2026-10-26)
+- **Capability shipped:** six polite English forms of an ask with a deadline were quiet and now offer the same reply card as "could you ..." ("I'd be grateful if you could", "Do you think you could", "If you could send ... that would be perfect", "We need X back by Friday", "We need X from you", "It would be helpful to have X before Thursday").
+- **Code:** `core/judgment.js` only (the handoff reader).
+- **Grok sync:** nothing new in `card-requests-*.md`; no Gmail-side half missing for the recent B features (series, Meet link and booking cancel are on both).
+- **Tests:** new `test/polite-en-ask-corpus.cjs` (10 asks, 6 look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. One pre-existing false positive found, not caused by this change: "We need to talk about the budget back at the office" shows a card; recorded, not fixed.
+- **Open:** live Gate; the "talk ... back at the office" false positive; "I'd love to get X by Friday" and «אכפת לך לשלוח…» stay quiet.
+
+### Run 102 (2026-10-26)
+- **Capability shipped:** the most common Hebrew way to ask ("את/אתה יכול(ה) לשלוח…", "אתם יכולים…", "היית יכולה…") and "Are you able to …" were not read as asks at all (the probe returned no intent); they now offer the same reply card as «תוכל…».
+- **Code:** `core/judgment.js` only (the Hebrew handoff reader, the English handoff reader).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/can-you-he-corpus.cjs` (9 asks, 5 look-alikes; asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run.
+- **Open:** live Gate; two borderline lines now show (a «…לדנה במקום אליי» redirect and a «…כבר קיבלתי אותו» contradiction), the same as the «תוכל» forms did before; the «We need to talk … back at the office» false positive from run 101 is still open.
+
+### Run 103 (2026-10-26)
+- **Capability shipped:** the everyday asks for an answer, a decision or a signature ("get back to me", "let me know your decision", "kindly revert", "need your signature", «אשמח שתחזור אליי», «אני זקוק לחתימה שלך») were quiet; they now offer the reply card.
+- **Code:** `core/judgment.js` only (English and Hebrew handoff readers).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/reply-ask-corpus.cjs` (10 asks written after the patterns, 6 quiet look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. A probe of 12 invented negatives showed no new false positive.
+- **Open:** live Gate; «צריך לסגור את זה עד יום רביעי, אפשר שתאשר?» still quiet; the "We need to talk … back at the office" false positive (run 101) is still open.

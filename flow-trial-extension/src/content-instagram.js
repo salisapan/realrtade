@@ -109,7 +109,7 @@
       key: key
     };
     FlowChatLane.draftInto(box, input).then((r) => {
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }

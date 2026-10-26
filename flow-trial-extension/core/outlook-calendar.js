@@ -18,6 +18,7 @@ const FlowOutlookCalendar = (() => {
     'calendars.read': 'Calendars.Read',
     'calendars.readwrite.shared': 'Calendars.ReadWrite.Shared',
     'tasks.readwrite': 'Tasks.ReadWrite',
+    'sites.readwrite.all': 'Sites.ReadWrite.All',
     'mail.read': 'Mail.Read',
     'mail.readwrite': 'Mail.ReadWrite',
     'files.readwrite': 'Files.ReadWrite',

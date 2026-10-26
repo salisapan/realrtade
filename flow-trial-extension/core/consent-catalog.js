@@ -23,6 +23,8 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'microsoft-service', service: 'calendar' }] },
     { id: 'ms-onedrive', label: 'OneDrive', detail: 'Write one file, read it back, undo that write.', group: 'microsoft', state: 'built',
       steps: [{ type: 'microsoft-service', service: 'onedrive' }] },
+    { id: 'ms-sharepoint', label: 'SharePoint', detail: 'Create one empty Word or Excel file in the site a mail names, read it back, undo that write. Nothing is shared.', group: 'microsoft', state: 'experimental',
+      steps: [{ type: 'microsoft-service', service: 'sharepoint' }] },
     { id: 'ms-contacts', label: 'Outlook contacts', detail: 'Read contacts.', group: 'microsoft', state: 'built',
       steps: [{ type: 'microsoft-service', service: 'contacts' }] },
     { id: 'ms-teams', label: 'Teams chats', detail: 'Read chats you are in.', group: 'microsoft', state: 'built',

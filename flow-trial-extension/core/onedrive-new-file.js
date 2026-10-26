@@ -52,7 +52,7 @@ const FlowOnedriveNewFile = (() => {
 
   const NOUN_EN = '(?:word\\s+|excel\\s+)?(?:shared\\s+)?(doc(?:ument)?|notes?(?:\\s+doc)?|agenda|minutes|sheet|spreadsheet|workbook|tracker|budget\\s+sheet|checklist)';
   const MAKE_EN = new RegExp('\\b(?:create|set\\s+up|start|open|make|build|put\\s+together|prepare|begin)\\s+(?:up\\s+)?(?:a|an|the|one)?\\s*(?:new\\s+)?(?:shared\\s+)?' + NOUN_EN + '\\b', 'i');
-  const MAKE_HE = /(?:תפתח(?:י|ו)?|תיצור|תיצרי|תיצרו|פתח(?:י|ו)?|צור|צרי|תכין|תכיני|תכינו|הכן|הכיני|נפתח|נכין|נקים|תקים|תקימי|תקימו)\s+(?:לנו\s+|לי\s+)?(?:בבקשה\s+)?(מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|רשימת\s+משימות)/;
+  const MAKE_HE = /(?:לפתוח|ליצור|להכין|להקים|תפתח(?:י|ו)?|תיצור|תיצרי|תיצרו|פתח(?:י|ו)?|צור|צרי|תכין|תכיני|תכינו|הכן|הכיני|נפתח|נכין|נקים|תקים|תקימי|תקימו)\s+(?:לנו\s+|לי\s+)?(?:בבקשה\s+)?(מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|רשימת\s+משימות)/;
   const ASK_EN = /\b(?:please|can you|could you|would you|will you|kindly|i need you to|let'?s|we need you to|we need to)\b|^\s*(?:create|set up|start|open|make|build|prepare)\b/i;
   const ASK_HE = /(?:בבקשה|נא\s|אפשר|תוכל|תוכלי|תוכלו|אתה יכול|את יכולה|בוא|בואו|צריך|צריכים|תפתח|תיצור|תכין|תקים|פתח|צור|הכן)/;
   const EXISTING = /\b(?:update|edit|fill\s+in|add\s+to|finish|review|attached|enclosed|already|existing|we\s+have|you\s+have|the\s+one\s+(?:we|i)|latest\s+version|latest|current)\b|עדכן|עדכני|תעדכן|מצורף|קיים|כבר\s+יש|הקיים/i;
@@ -60,6 +60,9 @@ const FlowOnedriveNewFile = (() => {
   const OTHER_APP = /\b(?:google|gdoc|gsheet|pages|numbers|notion|confluence|onenote|powerpoint|slides?|deck|sharepoint|planner)\b|גוגל|נושן|וואן\s*נוט/i;
   const NEG = /\b(?:no need (?:to|for)|don'?t (?:need|create|make|open)|do not (?:create|make|open)|not necessary|without (?:a|an))\b|אין\s+צורך|אל\s+תפתח|לא\s+צריך/i;
   const HEDGE = /\b(?:maybe|perhaps|if you want|if you'?d like|if it helps|no pressure|sometime|at some point|one day|might)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם\s+בא\s+לך|אם\s+יש\s+זמן/i;
+  // Looking back ("it was possible yesterday") and the writer's own promise ("I'll open a doc") are not an ask of the reader.
+  const PAST_HE = /(?:^|[\s,.])(?:אתמול|שבוע\s+שעבר|בעבר)(?:[\s,.?!]|$)/;
+  const SELF_HE = /(?:^|[\s,.])(?:אני|אנחנו|אנו)\s+(?:א|נ)(?:פתח|יצור|כין|קים)(?![֐-׿])/;
   const FYI = /\b(?:fyi|for your information|no action needed)\b|לידיעתך|לידיעה/i;
   const THIRD = /\b(?:ask|have|get|tell|let)\s+(?!(?:me|us|you)\b)[A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,3}\s+(?:to\s+)?(?:create|set\s+up|start|open|make|build|prepare)\b|תבקש(?:י|ו)?\s*מ|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))/i;
   const NAMED_EN = /\b(?:called|named|titled|entitled)\s+["“'‘]?([^"”'’\n.;?!]{3,60}?)["”'’]?(?=\s*(?:[.;?!,]|\bso\b|\band\b|\bby\b|\bbefore\b|\bfor\s+(?:us|me|everyone|the\s+team)\b|$))/i;
@@ -83,6 +86,17 @@ const FlowOnedriveNewFile = (() => {
     return s;
   }
 
+  // The guards every ask of this family shares (a Glance own-promise, a past ask, a negation, FYI, a hedge, a third party): the reason or ''.
+  function blockedBy(text) {
+    const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
+    if (NEG.test(s)) return 'negation';
+    if (FYI.test(s)) return 'fyi';
+    if (HEDGE.test(s)) return 'hedge';
+    if (THIRD.test(s) || (attach && attach.asksThirdParty && attach.asksThirdParty(s))) return 'third-party';
+    if (PAST_HE.test(s) || SELF_HE.test(s)) return PAST_HE.test(s) ? 'past' : 'own-promise';
+    return '';
+  }
+
   // The ask, or silence with a reason.
   function recognize(text) {
     const s = String(text || '').replace(/[​-‏‪-‮ ]/g, ' ');
@@ -95,6 +109,7 @@ const FlowOnedriveNewFile = (() => {
     if (FYI.test(s)) return { kind: 'block', reason: 'fyi' };
     if (HEDGE.test(s)) return { kind: 'block', reason: 'hedge' };
     if (THIRD.test(s) || (attach && attach.asksThirdParty && attach.asksThirdParty(s))) return { kind: 'block', reason: 'third-party' };
+    if (PAST_HE.test(s) || SELF_HE.test(s)) return { kind: 'block', reason: PAST_HE.test(s) ? 'past' : 'own-promise' };
     if (EXISTING.test(s)) return { kind: 'block', reason: 'existing-file' };
     if (CONTENT.test(s)) return { kind: 'block', reason: 'asks-content' };
     if (!(ASK_EN.test(s) || ASK_HE.test(s))) return { kind: 'block', reason: 'no-request' };
@@ -112,6 +127,8 @@ const FlowOnedriveNewFile = (() => {
         name = name.slice(0, 60);
       }
     }
+    // "... בשם הצעה ולשתף": the share is the person's own step; it is not part of the name.
+    name = name.replace(/\s+ו(?:לשתף|לשלוח|להוסיף|לכתוב|למלא|לסכם|תשתף|תשלח)(?:\s.*)?$/, '').trim();
     if (!name) return { kind: 'block', reason: 'no-name' };
     return { kind: 'clear', lang: lang, fileKind: kind, name: name };
   }
@@ -235,7 +252,7 @@ const FlowOnedriveNewFile = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.itemId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, CONNECTOR, enabled, recognize, plan, create, undo };
+  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, CONNECTOR, enabled, recognize, blockedBy, plan, create, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOnedriveNewFile };

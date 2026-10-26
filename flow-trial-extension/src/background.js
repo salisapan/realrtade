@@ -66,6 +66,8 @@ import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
 import '../core/outlook-excel.js'; // classic: sets globalThis.FlowOutlookExcel (an empty .xlsx for a new file)
 import '../core/onedrive-new-file.js'; // classic: sets globalThis.FlowOnedriveNewFile (switch ONEDRIVE_NEW_FILE, off)
+import '../core/sharepoint-new-file.js'; // classic: sets globalThis.FlowSharepointNewFile (switch SHAREPOINT_NEW_FILE, off)
+import '../core/sharepoint-save-file.js'; // classic: sets globalThis.FlowSharepointSaveFile (switch SHAREPOINT_SAVE_FILE, off)
 import '../core/event-call-link.js'; // classic: sets globalThis.FlowEventCallLink (the event picker the Outlook twin uses)
 import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOutlookEventCallLink (switch OUTLOOK_EVENT_CALL_LINK, off)
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
@@ -632,7 +634,7 @@ const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
 function laneChatScripts(lane) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
   const out = [];
-  for (const f of base.concat(lane.js, ['core/day-words.js', 'core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-travel-notice.js', 'core/chat-delivery-window.js', 'core/chat-invitation-notice.js', 'core/chat-self-note.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
+  for (const f of base.concat(lane.js, ['core/day-words.js', 'core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-travel-notice.js', 'core/chat-delivery-window.js', 'core/chat-payment-claim.js', 'core/chat-sent-claim.js', 'core/chat-chase.js', 'core/chat-invitation-notice.js', 'core/chat-self-note.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
   return out;
 }
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
@@ -5705,6 +5707,88 @@ async function onedriveNewFileUndo(ref) {
   return { ok: false, reason: (u && u.reason) || 'undo-failed' };
 }
 
+// An empty Word document or Excel workbook in the Glance folder of the ONE SharePoint site a mail names
+// (core/sharepoint-new-file.js, owner approval 2026-10-24). Off unless the owner's switch SHAREPOINT_NEW_FILE is
+// true. The plan reads the site by name (Graph search, read only) and is silent unless exactly one site has that
+// name; the write reads the file back by id; Undo deletes it only while the file is still the one Glance made.
+// Needs Sites.ReadWrite.All, asked only when the SharePoint box is ticked. Nothing is shared, written into, or sent.
+async function sharepointFilePlan(msg) {
+  const N = globalThis.FlowSharepointNewFile;
+  if (!N || typeof N.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  if (!(await glanceSwitchOn(N.SWITCH))) return { action: 'off', reason: 'switch-off' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { action: 'silence', reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  if (scopes != null && N.hasScope(scopes) === false) return { action: 'silence', reason: 'sharepoint-not-granted' };
+  return N.plan({ flags: { [N.SWITCH]: true }, text: String((msg && msg.text) || '').slice(0, 4000), now: new Date() }, { call: onedriveNewFileCall });
+}
+
+async function sharepointNewFileWrite(p) {
+  const N = globalThis.FlowSharepointNewFile;
+  if (!N) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(N.SWITCH);
+  const r = await N.create({ flags: { [N.SWITCH]: on }, fileKind: params.fileKind, fileName: params.fileName, siteId: params.siteId, siteName: params.siteName, grantedScopes: scopes }, { call: onedriveNewFileCall });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
+async function sharepointNewFileUndo(ref) {
+  const N = globalThis.FlowSharepointNewFile;
+  if (!N) return { ok: false };
+  const u = await N.undo(ref, { call: onedriveNewFileCall });
+  if (u && u.ok) return { ok: true, written: 'File removed from SharePoint.' };
+  if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.error || '' };
+  return { ok: false, reason: (u && u.reason) || 'undo-failed' };
+}
+
+// The mail's own attachment saved, unchanged, into the Glance folder of the ONE SharePoint site the mail names
+// ("please save the attached contract on the Marketing SharePoint site", core/sharepoint-save-file.js). Off unless the owner's
+// switch SHAREPOINT_SAVE_FILE is true. The page first asks with the text alone; only an ask that reads as an explicit save is
+// answered 'need-message-id', and then the page sends the Graph message id so the worker can list the attachments (read only).
+// The write reads the bytes of the one attachment the card named, uploads without replacing, reads back by id (name, file,
+// same size). Undo deletes it only while it is still the file Glance made. Nothing is shared, changed or sent.
+async function sharepointSavePlan(msg) {
+  const V = globalThis.FlowSharepointSaveFile;
+  if (!V || typeof V.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+  if (!(await glanceSwitchOn(V.SWITCH))) return { action: 'off', reason: 'switch-off' };
+  const text = String((msg && msg.text) || '').slice(0, 4000);
+  const ask = V.recognize(text);
+  if (ask.kind !== 'clear') return { action: 'silence', reason: ask.reason || 'no-ask' };
+  const id = String((msg && msg.graphMessageId) || '').trim();
+  if (!id || /^A[AQ]Qk/i.test(id)) return { action: 'need-message-id' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { action: 'silence', reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const S = globalThis.FlowSharepointNewFile;
+  if (scopes != null && S && S.hasScope(scopes) === false) return { action: 'silence', reason: 'sharepoint-not-granted' };
+  const list = await onedriveNewFileCall({ method: 'GET', path: '/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,size,contentType,isInline' });
+  if (!list || list.ok !== true || !list.body || !Array.isArray(list.body.value)) return { action: 'silence', reason: 'attachments-unread' };
+  return V.plan({ flags: { [V.SWITCH]: true }, text: text, attachments: list.body.value }, { call: onedriveNewFileCall });
+}
+
+async function sharepointSaveWrite(p) {
+  const V = globalThis.FlowSharepointSaveFile;
+  if (!V) return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const params = (p && p.params) || {};
+  const on = await glanceSwitchOn(V.SWITCH);
+  const got = await outlookAttachmentBytes(String(params.graphMessageId || ''), String(params.attachmentId || ''));
+  if (!got) return { ok: false, reason: 'no-bytes' };
+  const r = await V.save({ flags: { [V.SWITCH]: on }, fileName: params.fileName, siteId: params.siteId, siteName: params.siteName, base64: got.base64, contentType: got.contentType, attachmentName: got.name, grantedScopes: scopes }, { call: onedriveNewFileCall });
+  if (r && r.ok) return Object.assign({}, r, { fetchedBack: true });
+  return r || { ok: false, reason: 'write-failed' };
+}
+
 // A Teams link on an event that is already on the calendar ("add a Teams link to the Thursday sync"),
 // core/outlook-event-call-link.js. Off unless the owner's switch OUTLOOK_EVENT_CALL_LINK is true. The
 // worker lists the next fortnight of the person's events (read only), the module picks the one event
@@ -6248,6 +6332,70 @@ async function outlookTaskWrite(p) {
   return Object.assign({ ok: true, ref: ref, proof: proof }, base);
 }
 
+// Closing a To Do task Glance wrote (the other side said they paid): PATCH status completed, and Handled only when a GET shows it
+// completed. A task the person changed since Glance wrote it (title, body, due day, status ...) is left as it is. Undo reopens it, and only
+// while it still has the content the close left.
+async function outlookTaskCloseWrite(p) {
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) {
+    if (session && (session.needsSignIn || session.error === 'expired' || session.error === 'login_required')) return { ok: false, reason: 'token-expired' };
+    return { ok: false, reason: 'not-connected' };
+  }
+  if (outlookHasTasksScope(session.token) === false) return { ok: false, reason: 'tasks-not-granted' };
+  const params = (p && p.params) || {};
+  const listId = String(params.taskListId || '').trim();
+  const taskId = String(params.taskId || '').trim();
+  if (!listId || !taskId || plannerRawId(taskId) || !outlookHasSnap(params.created)) return { ok: false, reason: 'unclear', error: 'No single task to close.' };
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const refused = await outlookRefuseIfEdited(url, params.created);
+  if (refused && refused.alreadyGone) return { ok: false, reason: 'not-found', error: 'That task is gone, so there is nothing to close.' };
+  if (refused) return refused;
+  const Proof = globalThis.FlowProofOfClose;
+  const doneRef = (task, wrote) => ({ taskListId: listId, taskId: taskId, externalId: taskId, closed: outlookCreationSnap(task), closedByGlance: wrote === true });
+  const finish = (task, wrote) => {
+    const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
+    const proof = Proof && Proof.buildProof({ system: Proof.SYSTEM_MICROSOFT_TODO, externalId: taskId, url: link || undefined, fetchedBack: true, verifiedAt: new Date().toISOString() });
+    const base = { where: 'Microsoft To Do', target: 'default list', written: 'To Do task done · ' + String(task.title || ''), url: link, title: String(task.title || '') };
+    if (!proof) return Object.assign({ ok: false, reason: (Proof && Proof.REASON_PENDING) || 'proof_pending', ref: doneRef(task, wrote), proof: null }, base);
+    return Object.assign({ ok: true, ref: doneRef(task, wrote), proof: proof, fetchedBack: true }, base);
+  };
+  const before = await outlookTaskFetchOnce(listId, taskId);
+  if (before.ok && before.task && before.task.status === 'completed') return finish(before.task, false);
+  const res = await outlookFetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'completed' }) });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && res.status === 401) return { ok: false, reason: 'token-expired' };
+  if (res && res.status === 403) return { ok: false, reason: 'tasks-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  const waits = [0, 250, 500, 1000, 1250];
+  let last = { ok: false };
+  for (let attempt = 0; attempt < waits.length; attempt++) {
+    if (waits[attempt]) await new Promise((resolve) => setTimeout(resolve, waits[attempt]));
+    last = await outlookTaskFetchOnce(listId, taskId);
+    if (last.ok && last.task && last.task.status === 'completed') return finish(last.task, true);
+  }
+  return { ok: false, reason: (Proof && Proof.REASON_FAILED) || 'verify_failed', ref: { taskListId: listId, taskId: taskId, externalId: taskId, closed: null, closedByGlance: true }, proof: null, fetchedBack: false };
+}
+
+async function outlookTaskCloseUndo(ref) {
+  const taskId = ref && (ref.externalId || ref.taskId);
+  const listId = ref && ref.taskListId;
+  if (!taskId || !listId) return { ok: false };
+  if (ref.closedByGlance === false) return { ok: true, fetchedBack: true, written: 'It was already done before, so it stays done.' };
+  if (!outlookHasSnap(ref.closed)) return outlookUnconfirmed();
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const refused = await outlookRefuseIfEdited(url, ref.closed);
+  if (refused && refused.alreadyGone) return { ok: true, fetchedBack: true, written: 'The task is gone.' };
+  if (refused) return refused;
+  const res = await outlookFetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'notStarted' }) });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  const back = await outlookTaskFetchOnce(listId, taskId);
+  if (!back.ok || !back.task || back.task.status === 'completed') return { ok: false, reason: 'unverified', written: 'Not verified: To Do still shows the task as done.' };
+  return { ok: true, fetchedBack: true, written: 'To Do task is open again.' };
+}
+
 function outlookZoneKey(zone) {
   const s = String(zone || '').trim().toLowerCase();
   if (!s) return '';
@@ -6666,8 +6814,8 @@ const WRITERS = {
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
-  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
-  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, outlookEventCallLink: eventLinkWrite,
+  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite, outlookTaskClose: outlookTaskCloseWrite,
+  onedriveFile: outlookFileWrite, onedriveNewFile: onedriveNewFileWrite, sharepointNewFile: sharepointNewFileWrite, sharepointSaveFile: sharepointSaveWrite, outlookEventCallLink: eventLinkWrite,
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
@@ -6679,8 +6827,8 @@ const UNDOERS = {
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
-  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
-  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, outlookEventCallLink: eventLinkUndo,
+  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo, outlookTaskClose: outlookTaskCloseUndo,
+  onedriveFile: outlookFileUndo, onedriveNewFile: onedriveNewFileUndo, sharepointNewFile: sharepointNewFileUndo, sharepointSaveFile: sharepointNewFileUndo, outlookEventCallLink: eventLinkUndo,
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
@@ -6873,6 +7021,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:new-file-plan') {
     return reply(sendResponse, newFilePlan(msg));
+  }
+
+  if (msg.type === 'flow:sharepoint-file-plan') {
+    return reply(sendResponse, sharepointFilePlan(msg));
+  }
+
+  if (msg.type === 'flow:sharepoint-save-plan') {
+    return reply(sendResponse, sharepointSavePlan(msg));
   }
 
   if (msg.type === 'flow:execute-action') {

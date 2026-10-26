@@ -159,6 +159,18 @@ test('ONEDRIVE_NEW_FILE on: Do It makes an empty .docx in OneDrive > Glance, rea
   await expect.poll(async () => (await drive(glance)).items.length).toBe(0);
 });
 
+test('ONEDRIVE_NEW_FILE on: a Hebrew ask with an infinitive («אפשר לפתוח מסמך בשם …») makes the file, and the share is left to the person', async ({ glance }) => {
+  const page = await newFileMail(glance, { ONEDRIVE_NEW_FILE: true }, 'שלום, אפשר לפתוח מסמך בשם הצעה לספק ולשתף?', 'AQMk-nf-he-inf');
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const made = await drive(glance);
+  expect(made.items).toHaveLength(1);
+  expect(made.items[0].name).toBe('הצעה לספק.docx');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await drive(glance)).items.length).toBe(0);
+});
+
 test('ONEDRIVE_NEW_FILE on: Undo leaves a file the person edited', async ({ glance }) => {
   const page = await newFileMail(glance, { ONEDRIVE_NEW_FILE: true }, ASK_DOC, 'AQMk-nf-edit');
   await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });

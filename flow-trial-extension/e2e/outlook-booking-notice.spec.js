@@ -271,3 +271,95 @@ test('BOOKING_NOTICE on: a delivery window told in a mail is one hold titled Del
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
+
+test('BOOKING_NOTICE on: an appointment mail that names its length is one hold of that length, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi, your appointment is confirmed for tomorrow from 14:00 to 15:30. See you then.', true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0].start)).toContain('14:00');
+  expect(JSON.stringify(list[0].end)).toContain('15:30');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+test('BOOKING_NOTICE on: an invitation that names its hours is one hold for those hours, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, "Hi, you're invited to our product launch tomorrow from 19:00 to 21:30. We'd love to see you.", true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Invitation/);
+  expect(list[0].attendees || []).toEqual([]);
+  expect(JSON.stringify(list[0].start)).toContain('19:00');
+  expect(JSON.stringify(list[0].end)).toContain('21:30');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+const WEEKLY = 'Hi, your weekly piano lesson is every Monday at 17:00. See you then.';
+
+test('BOOKING_NOTICE on, RECURRING_HOLD off: a lesson that repeats is one hold, the next one, with no rule', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, WEEKLY, true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Appointment/);
+  expect(JSON.stringify(list[0].start)).toContain('17:00');
+  expect(list[0].recurrence).toBeNull();
+  expect(new Date(list[0].start.dateTime.slice(0, 10) + 'T12:00:00').getDay()).toBe(1);
+});
+
+test('BOOKING_NOTICE and RECURRING_HOLD on: a lesson that repeats every Monday is the weekly series, the rule read back, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true, RECURRING_HOLD: true }, WEEKLY, true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].recurrence.pattern.type).toBe('weekly');
+  expect(list[0].recurrence.pattern.daysOfWeek).toEqual(['monday']);
+  expect(list[0].attendees || []).toEqual([]);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+test('BOOKING_NOTICE on: a plain reminder with no "confirmed" ("Your appointment is tomorrow at 14:00") is one hold, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi, a reminder: your appointment is tomorrow at 14:00. Please arrive 10 minutes early.', true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0].start)).toContain('14:00');
+  expect(list[0].attendees || []).toEqual([]);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+test('BOOKING_NOTICE on: a form deadline that mentions an appointment shows no card', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi, the deadline for your appointment form is in 3 days at 14:00. Thanks.', true);
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .chip-hold')).toHaveCount(0);
+  expect(await events(glance)).toHaveLength(0);
+});
+
+test('BOOKING_NOTICE on: a locker parcel with "pick it up within 3 days" is one To Do task due in three days, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi, your package arrived at the locker, pick it up within 3 days.', false);
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toMatch(/Pick up the order/);
+  const due = new Date(Date.now() + 3 * 86400000);
+  const iso = due.getFullYear() + '-' + String(due.getMonth() + 1).padStart(2, '0') + '-' + String(due.getDate()).padStart(2, '0');
+  expect(JSON.stringify(list[0])).toContain(iso);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});

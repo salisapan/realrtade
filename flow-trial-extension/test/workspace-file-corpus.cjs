@@ -30,7 +30,8 @@ const yes = [
   ['Could you start a deck for the offsite by Friday?', 'slides', 'offsite deck'],
   ['Can you create a doc called Latest pricing update?', 'doc', 'Latest pricing update'],
   ['תפתח בבקשה מצגת בשם עדכון דירקטוריון', 'slides', 'עדכון דירקטוריון'],
-  ['אפשר ליצור מצגת לפגישת לקוח', 'slides', 'מצגת פגישת לקוח']
+  ['אפשר ליצור מצגת לפגישת לקוח', 'slides', 'מצגת פגישת לקוח'],
+  ['אפשר לפתוח מסמך בשם הצעה ולשתף?', 'doc', 'הצעה']
 ];
 for (const [text, kind, name] of yes) {
   const r = W.recognize(text);
@@ -51,7 +52,10 @@ const no = [
   ['אולי תפתח מסמך בשם סיכום', 'hedge'],
   ['תפתח בבקשה מסמך.', 'no-name'],
   ['בבקשה תפתח מסמך בשם סיכום ותכתוב בו את התוצאות', 'asks-content'],
-  ['אין צורך ליצור מסמך בשם סיכום', 'negation']
+  ['אין צורך ליצור מסמך בשם סיכום', 'negation'],
+  ['היה אפשר לפתוח מסמך בשם הצעה אתמול', 'past'],
+  ['אני אפתח מסמך בשם הצעה', 'own-promise'],
+  ['אנחנו נפתח מסמך בשם הצעה', 'own-promise']
 ];
 for (const [text, why] of no) {
   const r = W.recognize(text);

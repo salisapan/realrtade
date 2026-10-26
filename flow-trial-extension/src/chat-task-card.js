@@ -251,7 +251,199 @@ const FlowChatTaskCard = (() => {
       ? { type: 'flow:google-undo', connectorId: 'googleHold', ref: ref, tabAccount: '' }
       : connectorId === 'googleTask'
       ? { type: 'flow:google-undo', connectorId: 'googleLaneTask', ref: ref, tabAccount: '' }
+      : connectorId === 'googleTaskClose'
+      ? { type: 'flow:google-undo', connectorId: 'googleTaskClose', ref: ref, tabAccount: '' }
       : { type: 'flow:undo-action', connectorId: connectorId, ref: ref, created: ref && ref.created };
+  }
+
+  // The open "Waiting on Dana: Payment 500 NIS" tasks Glance wrote from this chat: written, not undone, not already closed here.
+  // Newest first. A close and its Undo are rows of their own, so Undo of a close puts the task back among the open ones.
+  async function findOpenPaymentTasks(chatKey) {
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return [];
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    const thread = String(chatKey).split('|').slice(0, 3).join('|');
+    const undone = {};
+    const closed = {};
+    const out = [];
+    for (const e of log) {
+      if (!e) continue;
+      if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
+      if (e.kind !== 'written' || !e.ref) continue;
+      if (String(e.chatKey || '').split('|').slice(0, 3).join('|') !== thread) continue;
+      if (e.connectorId === 'googleTaskClose' || e.connectorId === 'outlookTaskClose') { if (!undone[e.chatKey] && e.closes) closed[e.closes] = true; continue; }
+      if ((e.connectorId !== 'googleTask' && e.connectorId !== 'outlookTask') || undone[e.chatKey] || closed[e.chatKey] || !e.ref.taskId) continue;
+      const m = /(?:payment|תשלום) (\d+(?:\.\d+)?) ([a-z]{3})$/.exec(String(e.heldKey || ''));
+      if (m) out.push({ row: e, amount: m[1], currency: m[2].toUpperCase(), connectorId: e.connectorId });
+    }
+    return out;
+  }
+
+  // The open "Waiting on ..." tasks Glance wrote from this chat, newest first, each with its title, its due day and the last time a reminder was
+  // drafted for it (a 'nudge' row). A task that was undone or closed here is not open.
+  async function findOpenWaiting(chatKey) {
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return [];
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    const thread = String(chatKey).split('|').slice(0, 3).join('|');
+    const undone = {};
+    const closed = {};
+    const nudged = {};
+    const out = [];
+    for (const e of log) {
+      if (!e) continue;
+      if (e.kind === 'nudge' && e.nudgeFor) { if (!nudged[e.nudgeFor] || e.at > nudged[e.nudgeFor]) nudged[e.nudgeFor] = e.at; continue; }
+      if (e.kind === 'undone' && e.chatKey) { undone[e.chatKey] = true; continue; }
+      if (e.kind !== 'written' || !e.ref) continue;
+      if (String(e.chatKey || '').split('|').slice(0, 3).join('|') !== thread) continue;
+      if (e.connectorId === 'googleTaskClose' || e.connectorId === 'outlookTaskClose') { if (!undone[e.chatKey] && e.closes) closed[e.closes] = true; continue; }
+      if ((e.connectorId !== 'googleTask' && e.connectorId !== 'outlookTask') || undone[e.chatKey] || closed[e.chatKey] || !e.ref.taskId) continue;
+      const st = e.process && Array.isArray(e.process.steps) ? e.process.steps[0] : null;
+      const p = st && st.params;
+      if (!p || !p.title || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.dateIso || ''))) continue;
+      out.push({ row: e, title: String(p.title), dueIso: p.dateIso, lastNudgeAt: 0, waiting: /^(?:Waiting on|מחכים ל)/.test(String(p.title)) });
+    }
+    out.forEach((t) => { t.lastNudgeAt = nudged[t.row.chatKey] || 0; });
+    return out;
+  }
+
+  // A "Waiting on Dana: ..." task whose day has passed, and the other side wrote something that is not the answer: the card offers the short,
+  // polite reminder as a draft in the box (core/chat-chase.js, CHAT_CHASE_DRAFT). Do It only writes the box; the person reads it and sends it.
+  async function offerChase(i, chatKey, mount) {
+    if (typeof FlowChatChase === 'undefined' || typeof FlowChatCompose === 'undefined') return null;
+    if (!(await switchOn(FlowChatChase.SWITCH))) return null;
+    const box = i.composer || null;
+    if (!box) return null;
+    const open = await findOpenWaiting(chatKey);
+    const now = Date.now(); // today, not the message's own time
+    const pick = FlowChatChase.pick(open, now);
+    if (!pick) return null;
+    const text = FlowChatChase.draft(pick, now);
+    if (!text) return null;
+    const w = FlowChatChase.parseWaiting(pick.title);
+    const he = !!(w && w.he);
+    const label = (he ? 'תזכורת ל' + (/[\u0590-\u05FF]/.test(w.name) ? '' : '-') + w.name : 'Remind ' + w.name).slice(0, 100);
+    const ctx = {
+      app: i.channel || 'chat',
+      doLabel: 'Do It',
+      messageId: chatKey,
+      intent: { type: 'request', label: label, confidence: 0.9, personalClose: 'waiting-chase', signals: { score: 90, threshold: 50 }, entities: { what: pick.title } },
+      process: { id: CHAIN, name: he ? 'טיוטת תזכורת' : 'Draft a reminder', closingLine: he ? 'מכין טיוטה בתיבה.' : 'Putting a draft in the box.', closedLine: he ? 'הטיוטה בתיבה.' : 'The draft is in the box.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'reminder', kind: 'reminder', label: he ? 'תזכורת ל' + (/[\u0590-\u05FF]/.test(w.name) ? '' : '-') + w.name + ' בצ\'אט' : 'Reminder to ' + w.name + ' in the chat', hint: text, params: { text: text }, dependsOn: null }] },
+      sender: i.sender || {},
+      bodyText: '',
+      subject: '',
+      uiLang: he ? 'he' : 'en',
+      glanceChain: CHAIN,
+      chatTask: { connectorId: 'chatChase', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: he, own: false, chase: { text: text, box: box, taskChatKey: pick.row.chatKey, title: pick.title } }
+    };
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: (h, chip, c) => onDoIt(h, chip, c),
+      onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
+    });
+    if (!host) return { shown: false, reason: 'inject-failed' };
+    mount.setAttribute('data-glance-key', chatKey);
+    mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
+    host.setAttribute('data-glance-chain', CHAIN);
+    return { shown: true, reason: 'chase-offered' };
+  }
+
+  // Do It on the reminder: the words go into the box and nowhere else (a box that already has text is left alone). Nothing is sent, and the
+  // waiting task stays open: the loop closes when the other side answers, not when a draft exists. Undo empties the box only while it still
+  // holds exactly these words.
+  async function doChase(host, chip, ctx) {
+    const t = ctx.chatTask;
+    const c = t.chase;
+    const r = FlowChatCompose.insertDraft(c.box, c.text);
+    if (!(r && r.ok)) {
+      const text = r && r.reason === 'composer-not-empty' ? (t.he ? 'יש כבר טקסט בתיבה, השארתי אותו' : 'The box already has text, so I left it') : (t.he ? 'לא הצלחתי לכתוב בתיבה' : "Couldn't write in the box");
+      if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-error', text);
+      return;
+    }
+    try { await FlowStorage.appendLog({ kind: 'nudge', label: t.he ? 'טיוטת תזכורת בצ\'אט. לא נשלחה.' : 'Reminder drafted in the chat. Not sent.', app: 'chat', connectorId: 'chatChase', chatKey: t.chatKey, nudgeFor: c.taskChatKey, at: Date.now() }); } catch (e) { /* the draft is in the box */ }
+    if (typeof FlowChipHost !== 'undefined' && typeof FlowChipHost.showDraftReceipt === 'function') {
+      FlowChipHost.showDraftReceipt(host, {
+        status: t.he ? 'הטיוטה בתיבה.' : 'Draft ready.',
+        written: t.he ? 'התזכורת בתיבת הצ\'אט. לא נשלחה.' : 'Reminder in the chat box. Not sent.',
+        onUndo: async () => {
+          const u = FlowChatCompose.clearIfUnchanged(c.box, c.text);
+          if (u.ok) { try { host.remove(); } catch (e) { /* gone already */ } dismissed.delete(t.chatKey); return { ok: true, written: t.he ? 'הטיוטה הוסרה.' : 'Draft removed.', reopen: true }; }
+          return { ok: false, reason: u.reason, written: u.reason === 'user-edited' ? (t.he ? 'ערכת את הטיוטה. ביטול השאיר אותה.' : 'You edited this. Undo left it alone.') : '' };
+        }
+      });
+    }
+  }
+
+  // The card that marks one waiting task done, read back as completed, Undo reopens it. prefix is the question it asks ("Paid? ", "Received? ").
+  async function offerClose(i, chatKey, mount, pick, heC, prefix, personalClose) {
+    const st = pick.row.process && pick.row.process.steps && pick.row.process.steps[0];
+    const title = String((st && st.params && st.params.title) || pick.row.label || '').slice(0, 120);
+    const ctxC = {
+      app: i.channel || 'chat',
+      doLabel: 'Do It',
+      messageId: chatKey,
+      intent: { type: 'request', label: prefix + title, confidence: 0.9, personalClose: personalClose, signals: { score: 90, threshold: 50 }, entities: { what: title } },
+      process: { id: CHAIN, name: heC ? 'סמן כבוצע' : 'Mark done', closingLine: heC ? 'מסמן את המשימה כבוצעה.' : 'Marking the task done.', closedLine: heC ? 'המשימה סומנה כבוצעה.' : 'Task marked done.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'task', kind: pick.connectorId === 'outlookTask' ? 'outlookTask' : 'googleTask', label: 'Task', hint: (heC ? 'לסמן כבוצע: ' : 'Mark done: ') + title, params: { title: title }, dependsOn: null }] },
+      sender: i.sender || {},
+      bodyText: '',
+      subject: '',
+      uiLang: heC ? 'he' : 'en',
+      glanceChain: CHAIN,
+      chatTask: { connectorId: pick.connectorId === 'outlookTask' ? 'outlookTaskClose' : 'googleTaskClose', channel: i.channel || 'chat', step: null, chatKey: chatKey, he: heC, own: false, close: { chatKey: pick.row.chatKey, ref: pick.row.ref, connectorId: pick.connectorId } }
+    };
+    const oldC = mount.querySelector('.flow-chip-host');
+    if (oldC) oldC.remove();
+    const hostC = FlowChipHost.inject(mount, ctxC, {
+      onDoIt: (h, chip, c) => onDoIt(h, chip, c),
+      onDismiss: (h) => { dismissed.add(chatKey); h.remove(); }
+    });
+    if (!hostC) return { shown: false, reason: 'inject-failed' };
+    mount.setAttribute('data-glance-key', chatKey);
+    mount.setAttribute('data-glance-raw', String(i.key != null ? i.key : i.text));
+    hostC.setAttribute('data-glance-chain', CHAIN);
+    return { shown: true, reason: 'close-offered' };
+  }
+
+  // The other side says they paid: Do It marks the waiting task done, through the same Google lane, read back that it shows completed.
+  // The person's click is the deliberate part; Glance has not seen any money. A task the person changed is left as it is.
+  async function closePaid(host, chip, ctx) {
+    const t = ctx.chatTask;
+    const open = t.close;
+    if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', t.he ? 'מסמן…' : 'Marking…');
+    const closeId = open.connectorId === 'outlookTask' ? 'outlookTaskClose' : 'googleTaskClose';
+    const r = closeId === 'outlookTaskClose'
+      ? await send({ type: 'flow:execute-action', payload: { connectorId: 'outlookTaskClose', params: { taskListId: open.ref.taskListId, taskId: open.ref.taskId, created: open.ref.created } } })
+      : await send({ type: 'flow:google-write', connectorId: 'googleTaskClose', input: { taskListId: open.ref.taskListId, taskId: open.ref.taskId, contentHash: open.ref.contentHash }, tabAccount: '', lang: t.he ? 'he' : 'en' });
+    const ref = r && r.ref;
+    const proved = !!(r && (r.fetchedBack === true || (r.proof && r.proof.fetchedBack === true)));
+    if (!(r && r.ok && ref && ref.taskId && proved)) {
+      const edited = r && r.reason === 'user-edited';
+      const text = edited ? (t.he ? 'שינית את המשימה, השארתי אותה' : 'You changed this task, so I left it') : (t.he ? 'לא הצלחתי לסמן, נסה שוב' : "Couldn't mark it, try again");
+      if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-error', text);
+      return;
+    }
+    const row = {
+      kind: 'written',
+      label: r.written || 'Google Task done.',
+      app: 'chat',
+      connectorId: closeId,
+      ref: ref,
+      where: r.where,
+      url: r.url || null,
+      proof: r.proof || null,
+      fetchedBack: true,
+      receiptStatus: 'Handled.',
+      closes: open.chatKey,
+      intent: ctx.intent,
+      process: ctx.process,
+      chatKey: t.chatKey,
+      messageId: t.chatKey
+    };
+    try { await FlowStorage.appendLog(row); } catch (e) { /* the receipt still shows */ }
+    showReceipt(host, row, t.chatKey, closeId);
   }
 
   // The business cancelled a booking Glance put on the calendar from this chat: Do It removes that same event through the same undo the
@@ -275,7 +467,9 @@ const FlowChatTaskCard = (() => {
 
   async function onDoIt(host, chip, ctx) {
     const t = ctx.chatTask;
+    if (t && t.chase) return doChase(host, chip, ctx);
     if (t && t.remove) return removeHeld(host, chip, ctx);
+    if (t && t.close) return closePaid(host, chip, ctx);
     if (typeof FlowChipHost !== 'undefined' && chip) FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     const step = t.step;
     const params = step.params || {};
@@ -356,6 +550,52 @@ const FlowChatTaskCard = (() => {
       return { shown: true, reason: 'receipt' };
     }
 
+    // The person says they sent what they had promised ("Sent you the contract", «שלחתי לך את החוזה») while this chat has a task Glance wrote for that
+    // promise ("Send the contract on Thursday"): the card offers to mark it done. The words must share a content word with exactly one of the person's
+    // own open tasks from this chat (a claim that names nothing fits only the one open task); a "Waiting on ..." task is the other side's, not this.
+    if (own && typeof FlowChatSentClaim !== 'undefined') {
+      let sentOwn = null;
+      try { sentOwn = FlowChatSentClaim.recognize(i.text); } catch (e) { sentOwn = null; }
+      if (sentOwn && sentOwn.kind === 'sent') {
+        const mine = (await findOpenWaiting(chatKey)).filter((t) => !t.waiting);
+        const fittingOwn = FlowChatSentClaim.fits(sentOwn, mine, mine.length);
+        if (fittingOwn.length === 1) {
+          return offerClose(i, chatKey, mount, { row: fittingOwn[0].row, connectorId: fittingOwn[0].row.connectorId }, sentOwn.lang === 'he', sentOwn.lang === 'he' ? 'בוצע? ' : 'Done? ', 'own-sent');
+        }
+      }
+    }
+
+    // The other side says they paid ("I transferred 500 NIS", «העברתי לך 500 ש"ח») while this chat has a "Waiting on ...: Payment" task
+    // Glance wrote (Google Tasks): the card offers to mark that task done. One amount matches one task; no amount needs exactly one.
+    if (!own && typeof FlowChatPaymentClaim !== 'undefined') {
+      let claim = null;
+      try { claim = FlowChatPaymentClaim.recognize(i.text); } catch (e) { claim = null; }
+      if (claim && claim.kind === 'claim') {
+        const open = await findOpenPaymentTasks(chatKey);
+        const fits = open.filter((c) => !claim.amount || (c.amount === claim.amount && (!claim.currency || c.currency === claim.currency)));
+        if (fits.length === 1 && (claim.amount || open.length === 1)) {
+          return offerClose(i, chatKey, mount, fits[0], claim.lang === 'he', claim.lang === 'he' ? 'שולם? ' : 'Paid? ', 'payment-claimed');
+        }
+      }
+    }
+
+    // The other side says they sent what was asked for ("I just sent you the signed contract", «שלחתי לך את החוזה החתום») while this chat has a
+    // "Waiting on ...: <that thing>" task Glance wrote: the card offers to mark it done. The words must name the thing (a shared content word) and
+    // fit exactly one task; a claim that names nothing fits only when it is the one open waiting task. Glance has not seen the file.
+    if (!own && typeof FlowChatSentClaim !== 'undefined') {
+      let sent = null;
+      try { sent = FlowChatSentClaim.recognize(i.text); } catch (e) { sent = null; }
+      if (sent && sent.kind === 'sent') {
+        const waiting = (await findOpenWaiting(chatKey)).filter((t) => t.waiting);
+        const docs = waiting.filter((t) => !/^(?:Waiting on|מחכים ל-?)[^:]*:\s*(?:Payment|תשלום) /.test(t.title));
+        const fitting = FlowChatSentClaim.fits(sent, docs, waiting.length);
+        if (fitting.length === 1) {
+          const t = fitting[0];
+          return offerClose(i, chatKey, mount, { row: t.row, connectorId: t.row.connectorId }, sent.lang === 'he', sent.lang === 'he' ? 'התקבל? ' : 'Received? ', 'document-claimed');
+        }
+      }
+    }
+
     // A cancellation of a booking, a trip or an invitation this chat already put on the calendar offers to take that event off again.
     if (!own) {
       let gone = null;
@@ -407,6 +647,7 @@ const FlowChatTaskCard = (() => {
     let trip = null;
     let dlv = null;
     let deliveryWindow = null;
+    let holdMinutes = null; // an appointment's told length
     let ownAskTitle = '';
     try { dlv = (!own && typeof FlowChatDeliveryWindow !== 'undefined') ? FlowChatDeliveryWindow.recognize(i.text, i.now) : null; } catch (e) { dlv = null; }
     try { trip = (!own && typeof FlowChatTravelNotice !== 'undefined') ? FlowChatTravelNotice.recognize(i.text, i.now) : null; } catch (e) { trip = null; }
@@ -440,10 +681,16 @@ const FlowChatTaskCard = (() => {
       };
       callProposal = held === dlv ? 'delivery' : held === trip ? 'trip' : held === inv ? 'invitation' : 'appointment';
       if (held === dlv) deliveryWindow = dlv;
+      if ((held === appt || held === inv) && held.durationMinutes) holdMinutes = held.durationMinutes;
     } else {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
       } catch (e) { judged = null; }
+      // A payment asked with an amount and a day is read by its own reader (a task "Pay 1200 NIS · Dana"); the shared judge's generic
+      // "Reply requested by Oct 27, ₪1,200" for the same words is the weaker reading and gives way to it.
+      if (!own && judged && judged.show && typeof FlowChatPaymentAsk !== 'undefined') {
+        try { const pa = FlowChatPaymentAsk.recognize(i.text, i.now); if (pa && pa.kind === 'ask') judged = null; } catch (e) { /* keep the judge's reading */ }
+      }
       // "Can we do a Teams call Thursday at 3pm?" is a call proposal the shared judge leaves to core/teams-meeting.js:
       // one day, one clock, no other tool named. It becomes the same hold, titled as a call; the Meet or Teams link is the
       // worker's, behind its own switch.
@@ -551,7 +798,10 @@ const FlowChatTaskCard = (() => {
         }
       }
     }
-    if (!judged || !judged.show) return { shown: false, reason: (judged && judged.reason) || 'silent' };
+    if (!judged || !judged.show) {
+      if (!own) { const chased = await offerChase(i, chatKey, mount); if (chased) return chased; }
+      return { shown: false, reason: (judged && judged.reason) || 'silent' };
+    }
     let taskStep = taskStepOf(judged.process);
     // Something the sender promised the person ("I'll send you the contract on Sunday") is logged to follow up on, not to do:
     // the judge's "Log commitment for Oct 25" becomes "Waiting on Dana: send the contract on Sunday", due that day.
@@ -587,7 +837,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? 'משלוח' : 'Delivery') + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '', durationMinutes: callProposal === 'delivery' && deliveryWindow && deliveryWindow.durationMinutes ? deliveryWindow.durationMinutes : undefined }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? 'משלוח' : 'Delivery') + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '', durationMinutes: callProposal === 'delivery' && deliveryWindow && deliveryWindow.durationMinutes ? deliveryWindow.durationMinutes : holdMinutes || undefined }) });
     }
     if (own && !(selfNote && selfNote.kind === 'note')) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").
@@ -627,10 +877,11 @@ const FlowChatTaskCard = (() => {
 
   // The call sites hand over what draftInto answered: a place or fact draft keeps the chat to itself; anything else
   // (silence, no answer, no box) lets the card see the same message. Never throws into the page's scan.
-  function afterDraft(result, input) {
+  // box is the open chat's input (optional): a reminder to someone who is late is offered only when there is a box to put it in.
+  function afterDraft(result, input, box) {
     if (result && result.reason === 'invalidated') return Promise.resolve({ shown: false, reason: 'invalidated' });
     if (result && result.ok && result.judged && result.judged.draft) return Promise.resolve({ shown: false, reason: 'drafted' });
-    return offer(input).catch(() => ({ shown: false, reason: 'error' }));
+    return offer(box ? Object.assign({}, input, { composer: box }) : input).catch(() => ({ shown: false, reason: 'error' }));
   }
 
   // The card belongs to one inbound message. When the newest message in the open chat is another one (or the person's

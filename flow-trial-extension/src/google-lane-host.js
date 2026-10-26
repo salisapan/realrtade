@@ -13,6 +13,7 @@ import '../core/workspace-file.js';
 // FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
 import '../core/event-call-link.js';
 import '../core/google-tasks.js';
+import '../core/google-task-close.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
@@ -642,6 +643,13 @@ async function prepareWrite(connectorId, input, cred) {
       dueIso: params.dateIso || i.dueIso || null
     };
   }
+  if (connectorId === 'googleTaskClose') {
+    return {
+      taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
+      taskId: i.taskId || params.taskId || i.externalId || '',
+      contentHash: i.contentHash || params.contentHash || ''
+    };
+  }
   if (connectorId === 'googleHold') {
     let zone = String(params.timeZone || i.timeZone || '').trim();
     if (!zone) zone = await storedTimeZone();
@@ -721,7 +729,7 @@ async function prepareWrite(connectorId, input, cred) {
 }
 
 async function prepareUndo(connectorId, ref) {
-  if (connectorId !== 'googleLaneTask') return ref;
+  if (connectorId !== 'googleLaneTask' && connectorId !== 'googleTaskClose') return ref;
   const next = ref && typeof ref === 'object' ? Object.assign({}, ref) : { externalId: ref };
   if (!next.taskListId && !next.listId) {
     const id = await storedTaskListId();
@@ -851,7 +859,7 @@ function verifyUrlFor(connectorId, ref) {
     const id = r.eventId || r.externalId;
     return id ? 'https://www.googleapis.com/calendar/v3/calendars/' + enc(r.calendarId || 'primary') + '/events/' + enc(id) : '';
   }
-  if (connectorId === 'googleLaneTask') {
+  if (connectorId === 'googleLaneTask' || connectorId === 'googleTaskClose') {
     const id = r.taskId || r.externalId;
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
