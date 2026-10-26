@@ -39,7 +39,7 @@ function widgetText(model) {
 function loadEngine() {
   const files = [
     'domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js',
-    'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
+    'fact-reply.js', 'file-attach.js', 'name-match.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
   ];
   const sandbox = { console, module: undefined };
   vm.createContext(sandbox);
@@ -79,6 +79,11 @@ function judge(text, extra) {
   const eng = opts.reader ? function (t) { return engine(t, opts.reader); } : engine;
   const rest = Object.assign({}, opts);
   delete rest.reader;
+  if (opts.reader) {
+    rest.userName = opts.reader.userName;
+    rest.ownNames = opts.reader.ownNames;
+    rest.namesWaitDone = true;
+  }
   return intent.resolveTask(text, Object.assign({
     now: NOW,
     timeZone: TZ,
@@ -154,7 +159,7 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
   const repo = path.join(__dirname, '..', '..');
   const files = [
     'domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js',
-    'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
+    'fact-reply.js', 'file-attach.js', 'name-match.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
   ];
   const sandbox = { console, module: undefined };
   vm.createContext(sandbox);
