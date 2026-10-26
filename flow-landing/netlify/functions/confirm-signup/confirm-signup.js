@@ -54,6 +54,8 @@ const COPY = {
       home: 'Back to theflow-ai.com',
       errTitle: 'This link isn’t valid',
       errBody: 'This confirmation link is expired or invalid. Please rejoin the waitlist to get a fresh one.',
+      writeFailTitle: 'Please try again',
+      writeFailBody: 'We could not save your confirmation just now. Open this link again in a moment.',
     },
     he: {
       title: 'האימייל אושר',
@@ -61,6 +63,8 @@ const COPY = {
       home: 'חזרה ל-theflow-ai.com',
       errTitle: 'הקישור אינו תקין',
       errBody: 'קישור האישור פג תוקף או שאינו תקין. הצטרפו שוב לרשימת ההמתנה כדי לקבל קישור חדש.',
+      writeFailTitle: 'נסו שוב',
+      writeFailBody: 'לא הצלחנו לשמור את האישור כרגע. פתחו את הקישור שוב בעוד רגע.',
     },
   },
   trial: {
@@ -70,6 +74,8 @@ const COPY = {
       home: 'Back to theflow-ai.com',
       errTitle: 'This link isn’t valid',
       errBody: 'This confirmation link is expired or invalid. Please request access again on the Glance page.',
+      writeFailTitle: 'Please try again',
+      writeFailBody: 'We could not save your confirmation just now. Open this link again in a moment.',
     },
     he: {
       title: 'האימייל אושר',
@@ -77,6 +83,8 @@ const COPY = {
       home: 'חזרה ל-theflow-ai.com',
       errTitle: 'הקישור אינו תקין',
       errBody: 'קישור האישור פג תוקף או שאינו תקין. בקשו גישה מחדש בעמוד Glance.',
+      writeFailTitle: 'נסו שוב',
+      writeFailBody: 'לא הצלחנו לשמור את האישור כרגע. פתחו את הקישור שוב בעוד רגע.',
     },
   },
   pro: {
@@ -86,6 +94,8 @@ const COPY = {
       home: 'Back to theflow-ai.com',
       errTitle: 'This link isn’t valid',
       errBody: 'This confirmation link is expired or invalid. Please sign up again on the Pricing page.',
+      writeFailTitle: 'Please try again',
+      writeFailBody: 'We could not save your confirmation just now. Open this link again in a moment.',
     },
     he: {
       title: 'האימייל אושר',
@@ -93,16 +103,20 @@ const COPY = {
       home: 'חזרה ל-theflow-ai.com',
       errTitle: 'הקישור אינו תקין',
       errBody: 'קישור האישור פג תוקף או שאינו תקין. הירשמו שוב בעמוד התמחור.',
+      writeFailTitle: 'נסו שוב',
+      writeFailBody: 'לא הצלחנו לשמור את האישור כרגע. פתחו את הקישור שוב בעוד רגע.',
     },
   },
 };
 
-function page(lang, ok, kind, downloadUrl) {
+// outcome: success | invalid | writeFailure
+function page(lang, outcome, kind, downloadUrl) {
   var isHe = lang === 'he';
   var dir = isHe ? 'rtl' : 'ltr';
   var c = (COPY[kind] || COPY.playbook)[lang] || (COPY[kind] || COPY.playbook).en;
-  var title = ok ? c.title : c.errTitle;
-  var body = ok ? c.body : c.errBody;
+  var ok = outcome === 'success';
+  var title = ok ? c.title : (outcome === 'writeFailure' ? c.writeFailTitle : c.errTitle);
+  var body = ok ? c.body : (outcome === 'writeFailure' ? c.writeFailBody : c.errBody);
   var iconColor = ok ? '#1A4EF5' : '#C0392B';
   var icon = ok
     ? '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
@@ -133,7 +147,7 @@ function page(lang, ok, kind, downloadUrl) {
     '<script async src="https://www.googletagmanager.com/gtag/js?id=' + GA_ID + '"></script>' +
     '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}' +
     "gtag('js',new Date());gtag('config','" + GA_ID + "',{anonymize_ip:true});" +
-    "gtag('event','" + (ok ? 'confirm_success' : 'confirm_invalid') + "',{kind:'" + kind + "'});</script>" +
+    "gtag('event','" + (ok ? 'confirm_success' : (outcome === 'writeFailure' ? 'confirm_write_failure' : 'confirm_invalid')) + "',{kind:'" + kind + "'});</script>" +
     '</head><body>' +
     '<div class="card">' + icon + '<h1>' + title + '</h1><p>' + body + '</p>' +
     downloadBtn +
@@ -209,6 +223,17 @@ function maskEmail(value) {
   return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
 }
 
+async function loadWaitlistRow(email) {
+  if (!SB_SERVICE_KEY) return null;
+  var res = await fetch(
+    SB_URL + '/rest/v1/waitlist?email=eq.' + encodeURIComponent(email) + '&select=confirmed_at',
+    { headers: { apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY } }
+  );
+  if (!res.ok) return null;
+  var rows = await res.json();
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
 exports.handler = async function (event) {
   var reqId = crypto.randomBytes(4).toString('hex');
   var log = function (msg, extra) { console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : ''); };
@@ -226,7 +251,7 @@ exports.handler = async function (event) {
 
   if (invalid) {
     logErr('rejected: invalid or expired token', { email: maskEmail(email), hasSecret: !!secret });
-    return { statusCode: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, false, kind) };
+    return { statusCode: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, 'invalid', kind) };
   }
 
   // 'pro' has nothing to fulfil yet — Glance Pro isn't built (see
@@ -234,15 +259,6 @@ exports.handler = async function (event) {
   // there is no follow-up function to trigger until a real Pro flow exists.
   var followUpFn = kind === 'trial' ? 'send-trial-access' : kind === 'pro' ? null : 'send-playbook';
   log('token verified', { email: maskEmail(email), kind: kind, followUpFn: followUpFn });
-
-  var downloadUrl;
-  if (kind === 'trial') {
-    var downloadExp = Date.now() + DOWNLOAD_TTL_MS;
-    var downloadSig = signDownload(email, downloadExp, secret);
-    downloadUrl =
-      SITE_URL + '/.netlify/functions/download-trial-zip?email=' + encodeURIComponent(email) +
-      '&exp=' + downloadExp + '&sig=' + encodeURIComponent(downloadSig);
-  }
 
   // A confirmation link is a plain GET that stays valid for 72 hours, and
   // nothing marked it used. So every reload re-sent the email, and — worse —
@@ -254,7 +270,9 @@ exports.handler = async function (event) {
   // one that actually changed it, makes the send happen exactly once. The
   // filter requires confirmed_at to still be null, so two concurrent requests
   // cannot both match — Postgres serialises them and the loser updates nothing.
+  // A failed claim must not mint a download link — the person can retry this URL.
   var alreadyConfirmed = false;
+  var claimRecorded = false;
   try {
     if (!SB_SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
     var claim = await fetch(
@@ -268,13 +286,34 @@ exports.handler = async function (event) {
         body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
       }
     );
-    var claimed = claim.ok ? await claim.json() : null;
-    alreadyConfirmed = Array.isArray(claimed) && claimed.length === 0;
-    if (alreadyConfirmed) log('already confirmed — showing the page without re-sending', { email: maskEmail(email) });
+    if (!claim.ok) throw new Error('Supabase PATCH failed: HTTP ' + claim.status);
+    var claimed = await claim.json();
+    if (!Array.isArray(claimed)) throw new Error('Unexpected claim response');
+    if (claimed.length > 0) {
+      claimRecorded = true;
+      alreadyConfirmed = false;
+    } else {
+      var existing = await loadWaitlistRow(email);
+      if (existing && existing.confirmed_at) {
+        claimRecorded = true;
+        alreadyConfirmed = true;
+        log('already confirmed — showing the page without re-sending', { email: maskEmail(email) });
+      } else {
+        throw new Error('Supabase PATCH updated zero rows');
+      }
+    }
   } catch (err) {
-    // If the claim cannot be recorded we still send, because a signup that
-    // silently receives nothing is a worse failure than a duplicate email.
-    logErr('failed to claim waitlist row (will send anyway)', String(err));
+    logErr('failed to claim waitlist row — not issuing download link', { email: maskEmail(email), detail: String(err) });
+    return { statusCode: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, 'writeFailure', kind) };
+  }
+
+  var downloadUrl;
+  if (kind === 'trial' && claimRecorded) {
+    var downloadExp = Date.now() + DOWNLOAD_TTL_MS;
+    var downloadSig = signDownload(email, downloadExp, secret);
+    downloadUrl =
+      SITE_URL + '/.netlify/functions/download-trial-zip?email=' + encodeURIComponent(email) +
+      '&exp=' + downloadExp + '&sig=' + encodeURIComponent(downloadSig);
   }
 
   if (!alreadyConfirmed && followUpFn) {
@@ -307,5 +346,5 @@ exports.handler = async function (event) {
     }
   }
 
-  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind, downloadUrl) };
+  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, 'success', kind, downloadUrl) };
 };

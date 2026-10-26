@@ -1,30 +1,15 @@
-// Glance sign-up: one server call that (1) records the signup in Supabase,
-// (2) hands back a signed download link immediately, and (3) emails the same
-// link as a backup.
+// Glance sign-up: one server call that (1) records the signup in Supabase when
+// possible, (2) triggers the double opt-in confirmation email, and (3) answers
+// the browser with "check your email" only — no download link in this response.
 //
-// Why this exists. The trial form used to insert into Supabase straight from
-// the browser with the public anon key and swallow any failure
-// (`.catch(function(){})`), then made people confirm an email link before the
-// extension would download. So a dead database looked exactly like success,
-// and the person who just asked for the product had to leave the page, open
-// their inbox and come back. This keeps the signed-link gate (nobody can
-// fetch the zip without a link minted here) but removes the detour.
-//
-// Order of priorities:
-//   - Never make someone wait for, or lose, the thing they asked for because
-//     OUR database or mail provider is down. The download link is returned
-//     regardless.
-//   - Never lose the lead silently. If the database write fails, the owner
-//     gets an email carrying the address, the log says so, and the response
-//     says `stored:false` so the failure is visible instead of masquerading
-//     as success.
+// The signed zip link is minted only in confirm-signup.js after confirmed_at is
+// written. trial-signup must never hand out a link, so calling this endpoint
+// directly cannot bypass email confirmation.
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
 const SITE_URL = 'https://theflow-ai.com';
-const DOWNLOAD_PATH = '/.netlify/functions/download-trial-zip';
-const DOWNLOAD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FROM_GLANCE = 'Glance <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOG_PREFIX = '[trial-signup]';
@@ -62,10 +47,6 @@ function maskEmail(value) {
   const at = s.indexOf('@');
   if (at < 1) return '(invalid)';
   return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
-}
-
-function signDownload(email, exp, secret) {
-  return crypto.createHmac('sha256', secret).update(email + '|download|' + exp).digest('base64url');
 }
 
 function withTimeout(promiseFactory) {
@@ -153,10 +134,10 @@ exports.handler = async function (event) {
   const refCode = /^[A-Za-z0-9_-]{1,32}$/.test(refRaw) ? refRaw : '';
 
   // Honeypot: a real visitor never fills the hidden field. Answer like a
-  // success so a bot learns nothing, but hand it no link and store nothing.
+  // success so a bot learns nothing, but store nothing and send no mail.
   if (String(payload.company || '').trim()) {
-    log('honeypot tripped: accepting without storing or issuing a link');
-    return json(200, { ok: true, stored: false });
+    log('honeypot tripped: accepting without storing or sending confirmation');
+    return json(200, { ok: true, stored: false, checkEmail: false });
   }
 
   if (!EMAIL_RE.test(email)) return json(400, { error: 'Please enter a valid email address.' });
@@ -167,12 +148,6 @@ exports.handler = async function (event) {
   if (tooMany(RATE_IP, ip, RATE_MAX_IP, now) || tooMany(RATE_EMAIL, email.toLowerCase(), RATE_MAX_EMAIL, now)) {
     logErr('rate limited');
     return json(429, { error: 'Too many attempts. Please try again in a few minutes.' });
-  }
-
-  const secret = process.env.EMAIL_VERIFY_SECRET;
-  if (!secret) {
-    logErr('EMAIL_VERIFY_SECRET is not set: cannot mint a download link');
-    return json(500, { error: 'Signup is not configured. Please email hello@theflow-ai.com.' });
   }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -198,10 +173,8 @@ exports.handler = async function (event) {
   if (stored) {
     log('signup stored', { email: maskEmail(email), alreadyExisted });
   } else {
-    logErr('SIGNUP NOT STORED (download link still issued)', String(storeError));
+    logErr('SIGNUP NOT STORED (confirmation email will still be attempted)', String(storeError));
     if (apiKey) {
-      // The lead must not vanish with the database. Put the address in the
-      // owner's inbox so it can be added by hand.
       sendMail(apiKey, {
         from: FROM_GLANCE,
         to: [OWNER_EMAIL],
@@ -209,33 +182,39 @@ exports.handler = async function (event) {
         html: '<p>A Glance signup was <b>not</b> saved to the database, so it is recorded here instead.</p><p>Email: <b>' + email + '</b><br>Language: ' + lang +
           (refCode ? '<br>Referral: ' + refCode : '') + '<br>Time: ' + new Date().toISOString() +
           '</p><p>Reason: <code>' + String(storeError && storeError.message || storeError).replace(/[<>&]/g, '') + '</code></p>' +
-          '<p>If the Supabase project shows as paused, restore it in the dashboard. The person already received their download link.</p>',
+          '<p>If the Supabase project shows as paused, restore it in the dashboard. The person was asked to confirm by email.</p>',
       }).catch((e) => logErr('owner failure alert could not be sent', String(e)));
     }
   }
 
-  // 2) Mint the signed download link (same scheme download-trial-zip verifies).
-  const exp = Date.now() + DOWNLOAD_TTL_MS;
-  const sig = signDownload(email, exp, secret);
-  const downloadUrl = SITE_URL + DOWNLOAD_PATH + '?email=' + encodeURIComponent(email) + '&exp=' + exp + '&sig=' + encodeURIComponent(sig);
-
-  // 3) Backup copy by email plus the bottom-up lead signal. Awaited, because a
-  // serverless function may be frozen the moment it responds, and neither one
-  // may delay or block the download if it fails.
-  let emailed = false;
-  const tasks = [
-    withTimeout((signal) => fetch(SITE_URL + '/.netlify/functions/send-trial-access', {
+  // 2) Double opt-in only — send-confirmation mints the confirm link, not a zip link.
+  let confirmationSent = false;
+  try {
+    const confRes = await withTimeout((signal) => fetch(SITE_URL + '/.netlify/functions/send-confirmation', {
       method: 'POST',
       signal,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, lang, downloadUrl }),
-    })).then((r) => { emailed = r.ok; if (!r.ok) logErr('install email not sent', r.status); })
-      .catch((e) => logErr('install email request failed', String(e))),
-  ];
-  if (stored && !alreadyExisted) {
-    tasks.push(checkDomainCluster(email, serviceKey, apiKey, log, logErr).catch((e) => logErr('domain cluster check failed (non-fatal)', String(e))));
+      body: JSON.stringify({ email, lang, kind: 'trial' }),
+    }));
+    confirmationSent = confRes.ok;
+    if (!confirmationSent) logErr('send-confirmation failed', confRes.status);
+  } catch (err) {
+    logErr('send-confirmation request failed', String(err));
   }
-  await Promise.all(tasks);
 
-  return json(200, { ok: true, stored, emailed, downloadUrl });
+  if (stored && !alreadyExisted && serviceKey && apiKey) {
+    await checkDomainCluster(email, serviceKey, apiKey, log, logErr).catch((e) => logErr('domain cluster check failed (non-fatal)', String(e)));
+  }
+
+  if (!confirmationSent) {
+    return json(502, { error: 'Could not send the confirmation email. Please try again in a moment.' });
+  }
+
+  return json(200, {
+    ok: true,
+    stored,
+    emailed: true,
+    checkEmail: true,
+    message: lang === 'he' ? 'בדקו את תיבת המייל לאישור.' : 'Check your email for a confirmation link.',
+  });
 };
