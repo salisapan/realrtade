@@ -225,6 +225,12 @@ async function clickDo(host) {
   return Boolean(go);
 }
 
+function readComposeValue(el) {
+  if (!el) return '';
+  if (el.isContentEditable) return el.textContent || '';
+  return el.value != null ? String(el.value) : (el.textContent || '');
+}
+
 function wireChrome(w, store, pageSent, bgSend, outbound, hooks) {
   const h = hooks || {};
   function snapshotGet(k, cb) {
@@ -247,6 +253,10 @@ function wireChrome(w, store, pageSent, bgSend, outbound, hooks) {
       if (typeof h.searchDrive === 'function') return h.searchDrive(msg);
       return { ok: true, files: [] };
     }
+    if (t === 'flow:drive-find-one') {
+      if (typeof h.driveFindOne === 'function') return h.driveFindOne(msg);
+      return bgSend(msg);
+    }
     if (t === 'flow:pro-status') return { ok: true, active: true, record: { key: 'k', valid: true, activeUntil: Date.now() + 1e9 } };
     if (t === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
     if (t === 'flow:follow-task') return { ok: true, ref: { taskListId: 'LIST_A', taskId: 'T1' } };
@@ -255,7 +265,13 @@ function wireChrome(w, store, pageSent, bgSend, outbound, hooks) {
         ok: true,
         where: 'Gmail',
         written: 'Ready in compose. You send it.',
-        ref: { to: SENT_CONTACT_EMAIL, draftId: 'dr_priv', externalId: 'dr_priv' },
+        ref: {
+          to: SENT_CONTACT_EMAIL,
+          draftId: 'dr_priv',
+          externalId: 'dr_priv',
+          contentHash: 'lane-host-empty-compose',
+          before: { to: '', subject: '', body: '' }
+        },
         proof: { system: 'gmail/drafts', externalId: 'dr_priv', fetchedBack: true }
       };
     }
@@ -526,9 +542,13 @@ function activityLogRefBehaviour(ref) {
     const store = JSON.parse(JSON.stringify(baseStored));
     const contactAsk = "What's Dana's email for the vendor billing setup this week?";
     const { w, activityLogRows } = bootGmailPage(contactAsk, store, pageSent, bg.send, outbound);
-    const stable = { messageIds: ['m-contact'], laneIds: ['m-contact'] };
+    const prefilledTo = w.document.querySelector('textarea[name="to"]');
+    const prefilledSub = w.document.querySelector('input[name="subjectbox"]');
+    if (prefilledTo) prefilledTo.value = SENT_CONTACT_EMAIL;
+    if (prefilledSub) prefilledSub.value = SENT_TASK_TITLE;
+    const stable = { messageIds: ['m1'], laneIds: ['m1'] };
     const card = await w.__glanceGmailPage.planContactsChip({
-      messageId: 'm-contact', stable, legacyId: 'm-contact', threadId: 't-contact',
+      messageId: 'm1', stable, legacyId: 'm1', threadId: 't1',
       sender: { name: 'Vendor', email: 'vendor@example.com' }, subject: 'Billing', text: contactAsk,
       intent: { label: 'Contact lookup', type: 'request', signals: { score: 80 } }
     });
@@ -551,7 +571,49 @@ function activityLogRefBehaviour(ref) {
     check('P3c: activity log written ref strips ref.to from compose response',
       writtenRows.length > 0 && writtenRows.every((r) => !r.ref || !r.ref.to),
       writtenRows[0]);
-    assertNoSentinels('contacts activity log', writtenRows);
+    check('R-subj/R-before: activity log omits seeded subject and prefilled To',
+      !activityLogRows.some((r) => JSON.stringify(r).includes(SENT_TASK_TITLE) || JSON.stringify(r).includes(SENT_CONTACT_EMAIL)),
+      activityLogRows);
+    assertNoSentinels('contacts activity log (all rows)', activityLogRows);
+    w.close();
+  }
+
+  console.log('\n--- R-merge: prefilled reply compose Undo restores To/Subject ---\n');
+  {
+    const outbound = [];
+    const googleReads = [];
+    const bg = createBackground(baseStored, (url, method) => {
+      if (/oauth2\/v3\/userinfo/.test(url)) return res(200, { email: 'me@x.com' });
+      if (/glance-assist/.test(url) && method === 'POST') return res(200, { ok: true, result: { kind: 'quiet' } });
+      if (/people\.googleapis\.com/.test(url) && method === 'GET') {
+        return res(200, { results: [{ person: { names: [{ displayName: SENT_CONTACT_NAME }], emailAddresses: [{ value: SENT_CONTACT_EMAIL }] } }] });
+      }
+      if (/\/users\/me\/drafts$/.test(url) && method === 'POST') return res(200, { id: 'dr_undo' });
+      return null;
+    }, outbound, googleReads);
+    const pageSent = [];
+    const store = JSON.parse(JSON.stringify(baseStored));
+    const contactAsk = "What's Dana's email for the vendor billing setup this week?";
+    const { w } = bootGmailPage(contactAsk, store, pageSent, bg.send, outbound);
+    const vendorTo = 'vendor@example.com';
+    const vendorSub = 'Re: Billing';
+    const toEl = w.document.querySelector('textarea[name="to"]');
+    const subEl = w.document.querySelector('input[name="subjectbox"]');
+    if (toEl) toEl.value = vendorTo;
+    if (subEl) subEl.value = vendorSub;
+    const card = await w.__glanceGmailPage.planContactsChip({
+      messageId: 'm1', stable: { messageIds: ['m1'], laneIds: ['m1'] }, legacyId: 'm1', threadId: 't1',
+      sender: { name: 'Vendor', email: 'vendor@example.com' }, subject: 'Billing', text: contactAsk,
+      intent: { label: 'Contact lookup', type: 'request', signals: { score: 80 } }
+    });
+    check('R-merge: contacts chip painted', Boolean(card), null);
+    await clickDo(card);
+    const undoBtn = w.document.querySelector('.flow-chip-undo');
+    check('R-merge: compose receipt offers Undo', Boolean(undoBtn), null);
+    if (undoBtn) undoBtn.click();
+    await sleep(600);
+    check('R-merge: Undo restores prefilled To', toEl && readComposeValue(toEl) === vendorTo, toEl && readComposeValue(toEl));
+    check('R-merge: Undo restores prefilled Subject', subEl && readComposeValue(subEl) === vendorSub, subEl && readComposeValue(subEl));
     w.close();
   }
 
@@ -697,14 +759,82 @@ function activityLogRefBehaviour(ref) {
     await w2.__glanceGmailPage.rescan();
     await sleep(800);
     check('I2: drive search unavailable — no prepare Do It card', !w2.document.querySelector('[data-glance-chain="prepare"]'), w2.document.body.innerHTML.indexOf('prepare'));
-    const failedSearch = { ok: false, reason: 'drive-search-failed' };
-    const evFail = CC.fileEvidence({ driveOk: Boolean(failedSearch && failedSearch.ok), driveFiles: [], threadFiles: [] });
-    check('I2: failed drive search keeps driveOk false (driveFiles null)', evFail.driveFiles === null, evFail);
-    const okSearch = { ok: true, files: [{ id: 'f1', name: 'invoice.pdf' }] };
-    const evOk = CC.fileEvidence({ driveOk: Boolean(okSearch && okSearch.ok), driveFiles: okSearch.files, threadFiles: [] });
-    check('I2: successful drive search keeps driveOk true (driveFiles array)', Array.isArray(evOk.driveFiles) && evOk.driveFiles.length === 1, evOk);
     w.close();
     w2.close();
+  }
+
+  console.log('\n--- I2b: failed mailbox drive search stays quiet (no needs-you) ---\n');
+  {
+    const outbound = [];
+    const bg = createBackground(baseStored, () => null, outbound, []);
+    const store = JSON.parse(JSON.stringify(baseStored));
+    const pageSent = [];
+    const invoiceAsk = 'Please send me the invoice by Thursday.';
+    const { w } = bootGmailPage(invoiceAsk, store, pageSent, bg.send, outbound, {
+      searchDrive: () => ({ ok: false, reason: 'drive-search-failed' })
+    });
+    await w.__glanceGmailPage.rescan();
+    await sleep(800);
+    check('I2b: failed drive search — no needs-you card', !w.document.querySelector('[data-glance-chain="needs-you"]'), w.document.body.innerHTML.indexOf('needs-you'));
+    w.close();
+  }
+
+  console.log('\n--- D1–D4: drive-search-unavailable quiet paths ---\n');
+  {
+    const unavailable = { ok: false, reason: 'drive-search-unavailable' };
+    const outbound = [];
+    const bg = createBackground(baseStored, () => null, outbound, []);
+    const store = JSON.parse(JSON.stringify(baseStored));
+    store.googleGrantedScopes = GRANTED_NO_DRIVE;
+    const pageSent = [];
+    let driveSearchCalls = 0;
+    const invoiceAsk = 'Please send me the invoice by Thursday.';
+    const { w: wD1 } = bootGmailPage(invoiceAsk, store, pageSent, bg.send, outbound, {
+      searchDrive: () => { driveSearchCalls++; return unavailable; }
+    });
+    await wD1.__glanceGmailPage.rescan();
+    await sleep(800);
+    check('D1: drive unavailable — no needs-you and no prepare card',
+      !wD1.document.querySelector('[data-glance-chain="needs-you"]') && !wD1.document.querySelector('[data-glance-chain="prepare"]'),
+      wD1.document.body.innerHTML.slice(0, 200));
+    wD1.close();
+
+    const holdAsk = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+    const storeD3 = JSON.parse(JSON.stringify(baseStored));
+    storeD3.googleGrantedScopes = GRANTED_NO_DRIVE;
+    const pageSent3 = [];
+    let findOneCalls = 0;
+    const { w: wD3 } = bootGmailPage(holdAsk, storeD3, pageSent3, bg.send, outbound, {
+      driveFindOne: () => { findOneCalls++; return { match: 'none', driveSearchUnavailable: true }; }
+    });
+    await wD3.__glanceGmailPage.rescan();
+    await sleep(800);
+    check('D3: drive-find-one unavailable keeps the page quiet (no chip)', !wD3.document.querySelector('.flow-chip-host'), findOneCalls);
+    check('D3: googleWait path called drive-find-one', findOneCalls >= 1, findOneCalls);
+    wD3.close();
+
+    const noDriveStored = JSON.parse(JSON.stringify(baseStored));
+    noDriveStored.googleGrantedScopes = GRANTED_NO_DRIVE;
+    const bgD4 = createBackground(noDriveStored, () => null, outbound, []);
+    const found = await bgD4.send({ type: 'flow:drive-find-one', term: 'invoice' });
+    check('D4: background flags driveSearchUnavailable when mailbox search is off',
+      found && found.match === 'none' && found.driveSearchUnavailable === true, found);
+
+    const receiptAsk = 'Hi, could you send me the receipt for the ₪3,850 retainer payment?';
+    const thread = [{ messageId: 'm1', fromEmail: 'vendor@example.com', fromName: 'Vendor', body: receiptAsk }];
+    const pageSentF = [];
+    let followDriveSearches = 0;
+    const { w: wD2 } = bootGmailThread(thread, store, pageSentF, bg.send, outbound, {
+      searchDrive: (msg) => {
+        followDriveSearches++;
+        return unavailable;
+      }
+    });
+    await wD2.__glanceGmailPage.rescan();
+    await sleep(1200);
+    check('D2: follow resolution probe does not duplicate Drive search', followDriveSearches <= 1, followDriveSearches);
+    check('D2: unavailable Drive search leaves follow resolution quiet', !wD2.document.getElementById('flow-follow-host'), followDriveSearches);
+    wD2.close();
   }
 
   console.log('\n--- P1/P3: activity log ref strips recipient fields (behaviour, not source grep) ---\n');

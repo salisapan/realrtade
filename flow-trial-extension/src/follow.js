@@ -1011,7 +1011,12 @@ const FlowFollow = (() => {
     const person = { email: sender.email, personKey: env.personKey || null };
     const payment = FlowResolution.paymentStatus({ facts: env.facts, person, watches, paymentsSeen: await FlowStorage.getPaymentsSeen(), state: env.state, now: Date.now() });
     const issuer = await FlowStorage.getIssuer(need.object);
-    return { evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null }, payment, issuer };
+    return {
+      evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null },
+      payment,
+      issuer,
+      driveSearch: found
+    };
   }
 
   function planFor(env, world) {
@@ -1161,13 +1166,10 @@ const FlowFollow = (() => {
     }
     const key = threadId + '|' + lastId;
     if (examinedResolution.has(key)) return true;
-    examinedResolution.add(key);
     const env = { need, facts, state, watch, sender, threadId, lastId, subject: ctx.subject, threadUrl: ctx.threadUrl(lastId), text, what: String(text).replace(/\s+/g, ' ').trim().slice(0, 160), personKey: (watch && watch.personKey) || null };
-    if (typeof FlowFilePath !== 'undefined') {
-      const probe = await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery({ label: need.label }) });
-      if (probe && probe.reason === 'drive-search-unavailable') return false;
-    }
     const world = await resolutionWorld(ctx, sender, env);
+    if (world.driveSearch && world.driveSearch.reason === 'drive-search-unavailable') return false;
+    examinedResolution.add(key);
     const plan = planFor(env, world);
     if (watch) {
       // Say it again only when the move changed, and keep the stored line true. A held loop stays quiet.

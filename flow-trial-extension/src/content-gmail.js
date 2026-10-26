@@ -4307,7 +4307,6 @@ function glanceUiCopy(kind) {
           return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
         }
         if (sw && typeof sw === 'object') {
-          if (sw.ref) page.ref = Object.assign({}, page.ref, sw.ref);
           if (sw.proof && !page.proof) page.proof = sw.proof;
         }
         const he = payload.lang === 'he' || glanceUiHebrew();
