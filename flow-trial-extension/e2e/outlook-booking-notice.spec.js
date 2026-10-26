@@ -407,3 +407,16 @@ for (const [label, body, want] of [['English', 'Hi Sali, please bring your passp
     await expect.poll(async () => (await todo(glance)).length).toBe(0);
   });
 }
+
+test('BOOKING_NOTICE on: a mail that says the technician will come between two hours is one hold titled Visit 14:00–18:00, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi Sali, the technician will arrive tomorrow between 14:00 and 18:00. Please make sure someone is home.', true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Visit 14:00–18:00/);
+  expect(list[0].attendees || []).toEqual([]);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});

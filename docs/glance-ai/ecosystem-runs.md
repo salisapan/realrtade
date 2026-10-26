@@ -895,3 +895,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** new `e2e/chat-own-paid-close.spec.js` (4 cases: close and Undo, Hebrew, an edited task, no card for a promise, another invoice or a question); `test/chat-payment-claim-corpus.cjs` +7 checks (one caught a real bug of mine, Hebrew invoice numbers with letters, fixed); the five chat specs pass (43); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; an own "I paid" does not yet close a Pay task written from mail (only chat-written ones are in this chat's log); no Messenger or Instagram spec for this close; the own-message path needs `CHAT_PROMISE_CARD` too (the existing own-message switch).
+
+### Run 109 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** a plumber's, technician's or electrician's "I'll come between 8 and 12 on Tuesday" (English and Hebrew) gave no card; it is now a calendar hold titled "Visit 08:00–12:00" / «ביקור», no guest, in mail and chat.
+- **Probe:** 18 invented lines across the chat readers (flights, tables, car service, plumber windows, parent meetings, passport pickup, webinars) found real gaps; this run took the service-visit window. Still quiet: Hebrew table booking («השולחן שלכם נשמר…»), «התעודה שלך מוכנה לאיסוף עד…» (Hebrew pickup), «הטיפול ברכב נקבע למחר…», flights ("Your flight departs Thursday at 6:30"), a parent-teacher meeting, a webinar, "Your visit to the clinic is on 5/11 at 10:20".
+- **The run-101 "We need to talk … back at the office" item:** re-probed; "We need to talk about the budget" is a fair reply-needed card, so it is not logged as a false positive any more.
+- **Code:** `core/chat-delivery-window.js`, `core/incoming-judge.js` (title), `src/chat-task-card.js` (title).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-delivery-window-corpus.cjs` +6 visits, 4 flag checks, 5 quiet lines; 3 new real-browser cases (WhatsApp English and Hebrew, Outlook); booking and WhatsApp specs pass (51); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; the Hebrew and service-noun gaps above; Messenger and Instagram have no visit spec of their own (same lane as WhatsApp).
