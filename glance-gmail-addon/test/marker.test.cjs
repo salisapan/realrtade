@@ -353,7 +353,7 @@ const starOnlyThread = {
     return [{
       isStarred() { return false; },
       star() { starOnlyStarred = true; },
-      unstar() {}
+      unstar() { starOnlyStarred = false; }
     }];
   }
 };
@@ -364,8 +364,41 @@ const failLbl = { addToThread() { throw new Error('deny'); }, removeFromThread()
 const applyRes = Mu._test.applyMark_(starOnlyThread, failLbl, true);
 Mu._test.rememberMarkMeta('m-star-only', { userHadStar: applyRes.userHadStar });
 Mu.onProofClose('m-star-only', GmailApp);
+check('proof close clears glance-only star before undo', starOnlyStarred === false);
 Mu.onUndoRestore('m-star-only', GmailApp);
 check('undo restores glance-only star', starOnlyStarred === true);
+
+let hadMarkLabelReadded = false;
+let hadMarkGlanceStar = false;
+let threadHasGlanceLabel = true;
+const glanceLblHadMark = {
+  getName() { return 'Glance'; },
+  addToThread() { hadMarkLabelReadded = true; threadHasGlanceLabel = true; },
+  removeFromThread() { threadHasGlanceLabel = false; }
+};
+const hadMarkUndoThread = {
+  getLabels() { return threadHasGlanceLabel ? [glanceLblHadMark] : []; },
+  getMessages() {
+    return [{
+      isStarred() { return false; },
+      star() { hadMarkGlanceStar = true; },
+      unstar() { hadMarkGlanceStar = false; }
+    }];
+  }
+};
+GmailApp.getUserLabelByName = function () { return glanceLblHadMark; };
+GmailApp.getMessageById = function (id) {
+  return { getId() { return id; }, getThread() { return hadMarkUndoThread; } };
+};
+const propsHadMark = mockProps(false);
+const MhadMark = loadMarker(propsHadMark);
+const hadMarkApply = MhadMark._test.applyMark_(hadMarkUndoThread, glanceLblHadMark, true);
+MhadMark._test.rememberMarkMeta('m-had-mark', { userHadStar: hadMarkApply.userHadStar });
+MhadMark.onProofClose('m-had-mark', GmailApp);
+hadMarkLabelReadded = false;
+MhadMark.onUndoRestore('m-had-mark', GmailApp);
+check('hadMark undo re-adds Glance label', hadMarkLabelReadded === true);
+check('hadMark undo re-stars glance-only message', hadMarkGlanceStar === true);
 
 let undoUserStarCalled = false;
 const userStarUndoThread = {
