@@ -1171,6 +1171,7 @@ const FlowFollow = (() => {
     if (world.driveSearch && world.driveSearch.reason === 'drive-search-unavailable') return false;
     examinedResolution.add(key);
     const plan = planFor(env, world);
+    if (plan && (plan.move === 'choose-file' || plan.why === 'several-fit')) return true;
     if (watch) {
       // Say it again only when the move changed, and keep the stored line true. A held loop stays quiet.
       if (state.move === plan.move) return true;

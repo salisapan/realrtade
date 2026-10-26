@@ -110,9 +110,7 @@ const FlowGoogleCalendar = (() => {
     const link = fileLink(i.fileUrl);
     const name = String(i.fileName || i.fileTerm || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     const wantsFile = Boolean(String(i.fileUrl || i.fileName || i.fileTerm || '').trim());
-    // A named file in the mail can be held without a Drive URL when mailbox
-    // search is off the grant; the event title still names the file.
-    if (wantsFile && !name) return null;
+    if (wantsFile && (!link || !name)) return null;
     const title = String(i.title || i.quote || name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
     const zone = zoneName(i.timeZone);

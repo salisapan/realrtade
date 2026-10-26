@@ -1642,25 +1642,10 @@ function glanceUiCopy(kind) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
       const found = await driveFindOne(intent.googleWait.fileTerm);
+      if (found && found.driveSearchUnavailable) return { type: null };
       const match = found && typeof found === 'object' ? found.match : found;
-      const mailboxBlocked = !!(found && found.driveSearchUnavailable);
-      if (mailboxBlocked && (match === 'one' || match === 'many')) return { type: null };
-      const unresolved = mailboxBlocked || match === 'unknown' || match == null;
-      if (unresolved) {
-        // Without drive.readonly the mailbox cannot be searched, and an
-        // unknown/many match is the same for planning. A named file on the
-        // calendar or a task still plans with fileMatch 'one'; template
-        // closes use 'none' when the mail names a creatable artifact.
-        let next = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: 'one' }));
-        if (!next || !next.type) {
-          next = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: 'none' }));
-        }
-        if (!next || !next.type) return { type: null };
-        intent = next;
-      } else {
-        intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match }));
-        if (intent && found && found.file) intent.laneFile = found.file;
-      }
+      intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
+      if (intent && found && found.file) intent.laneFile = found.file;
     }
     return intent || { type: null };
   }
@@ -2419,16 +2404,15 @@ function glanceUiCopy(kind) {
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
     if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && typeof FlowFileAttach !== 'undefined') {
-      let searched = await new Promise((resolve) => {
+      const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
       if (searched && searched.reason === 'drive-search-unavailable') {
-        // Without drive.readonly the mailbox was not searched. The close
-        // chain still runs on this thread with an empty Drive result so the
-        // Hebrew not-found card and the skipped-source lines stay honest.
-        searched = { ok: true, files: [] };
-      }
-      {
+        logScanSkip(messageId, 'file');
+        recordSilence(messageId, 'file');
+        void flushSuggest(false);
+        return;
+      } else {
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment
       // search is not connected (compose-only Gmail). Null Drive means the
@@ -2455,14 +2439,18 @@ function glanceUiCopy(kind) {
           })
         });
         if (chain && chain.move === 'needs-you') {
-          const composeDraft = await gmailComposeApiAllowedFromStorage();
-          injectNeedsYou(message, {
-            messageId, intent, sender, subject, attachment, attachments,
-            threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain,
-            composeDraft: composeDraft
-          });
-          watchCopiedOnly(message, messageId, text, ownEmail, audience);
-          return;
+          if (!(await gmailComposeApiAllowedFromStorage())) {
+            logScanSkip(messageId, 'compose-closed');
+            recordSilence(messageId, 'file');
+            chainSettled = true;
+          } else {
+            injectNeedsYou(message, {
+              messageId, intent, sender, subject, attachment, attachments,
+              threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
+            });
+            watchCopiedOnly(message, messageId, text, ownEmail, audience);
+            return;
+          }
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
           logScanSkip(messageId, 'file-chain');
@@ -2866,19 +2854,17 @@ function glanceUiCopy(kind) {
     dismiss.setAttribute('aria-label', glanceChrome().dismiss);
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
     mainRow.appendChild(dismiss);
-    const composeDraft = ctx.composeDraft !== false;
-    if (composeDraft) {
-      const chip = el('button', 'flow-chip');
-      chip.type = 'button';
-      chip.appendChild(el('span', 'shell'));
-      chip.appendChild(el('span', 'ring'));
-      chip.appendChild(el('span', 'shine'));
-      chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().holdingReply));
-      mainRow.appendChild(chip);
-      host.appendChild(mainRow);
+    const chip = el('button', 'flow-chip');
+    chip.type = 'button';
+    chip.appendChild(el('span', 'shell'));
+    chip.appendChild(el('span', 'ring'));
+    chip.appendChild(el('span', 'shine'));
+    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().holdingReply));
+    mainRow.appendChild(chip);
+    host.appendChild(mainRow);
 
-      let busy = false;
-      chip.addEventListener('click', async () => {
+    let busy = false;
+    chip.addEventListener('click', async () => {
       if (busy) return;
       const holding = chain.holding && chain.holding.text;
       if (!holding || !ctx.sender || !ctx.sender.email) {
@@ -2928,10 +2914,7 @@ function glanceUiCopy(kind) {
       });
       done.appendChild(undo);
       host.replaceChildren(done);
-      });
-    } else {
-      host.appendChild(mainRow);
-    }
+    });
     messageNode.insertBefore(host, messageNode.firstChild);
   }
 

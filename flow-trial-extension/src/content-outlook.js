@@ -4544,9 +4544,6 @@
         const intent = decidedRow.intent;
         const proc = decidedRow.process;
         if (!intent || decidedRow.none) return false;
-        const gate = (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.gate === 'function')
-          ? FlowFileAttach.gate(askText) : null;
-        if (gate && gate.kind === 'clear') return true;
         const g = intent.googleClose;
         if (g && g.family === 'I') return true;
         if (proc && proc.id === 'create-missing') return true;

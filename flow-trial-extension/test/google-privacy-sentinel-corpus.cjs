@@ -702,7 +702,7 @@ function activityLogRefBehaviour(ref) {
     await wNo.__glanceGmailPage.rescan();
     await sleep(800);
     const needsNo = wNo.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
-    check('G1: without gmail.compose the needs-you card has no holding-reply button', Boolean(needsNo) && !needsNo.querySelector('.flow-chip-do-label'), Boolean(needsNo));
+    check('G1: without gmail.compose no needs-you card on the page', !needsNo, Boolean(needsNo));
     wNo.close();
   }
 
@@ -754,7 +754,7 @@ function activityLogRefBehaviour(ref) {
     const { w } = bootGmailPage('Please send me the invoice by Thursday.', store, pageSent, bg.send, outbound, { searchDrive: () => unavailable });
     await w.__glanceGmailPage.rescan();
     await sleep(800);
-    check('I1: drive search unavailable — needs-you names the invoice', Boolean(w.document.querySelector('[data-glance-chain="needs-you"]') && /invoice/i.test(w.document.body.textContent || '')), w.document.body.textContent && w.document.body.textContent.slice(0, 200));
+    check('I1: drive search unavailable — no needs-you card', !w.document.querySelector('[data-glance-chain="needs-you"]'), w.document.body.innerHTML.indexOf('needs-you'));
     const store2 = JSON.parse(JSON.stringify(baseStored));
     store2.googleGrantedScopes = GRANTED_NO_DRIVE;
     const pageSent2 = [];
@@ -799,13 +799,9 @@ function activityLogRefBehaviour(ref) {
     });
     await wD1.__glanceGmailPage.rescan();
     await sleep(800);
-    check('D1: drive unavailable — needs-you for the invoice, no prepare card',
-      Boolean(wD1.document.querySelector('[data-glance-chain="needs-you"]')) && !wD1.document.querySelector('[data-glance-chain="prepare"]'),
+    check('D1: drive unavailable — no needs-you and no prepare card',
+      !wD1.document.querySelector('[data-glance-chain="needs-you"]') && !wD1.document.querySelector('[data-glance-chain="prepare"]'),
       wD1.document.body.innerHTML.slice(0, 200));
-    check('D1: drive unavailable — only needs-you, no Reply & Track chip',
-      Boolean(wD1.document.querySelector('[data-glance-chain="needs-you"]'))
-      && !wD1.document.querySelector('.flow-chip-host:not([data-glance-chain="needs-you"])'),
-      wD1.document.body.innerHTML.slice(0, 300));
     wD1.close();
 
     const holdAsk = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
@@ -816,11 +812,7 @@ function activityLogRefBehaviour(ref) {
     const { w: wD3 } = bootGmailPage(holdAsk, storeD3, pageSent3, bg.send, outbound, {
       driveFindOne: () => {
         findOneCalls++;
-        return {
-          match: 'one',
-          file: { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' },
-          driveSearchUnavailable: true
-        };
+        return { match: 'none', driveSearchUnavailable: true };
       }
     });
     await wD3.__glanceGmailPage.rescan();
@@ -875,6 +867,21 @@ function activityLogRefBehaviour(ref) {
     check('P1/P3: activityLogRef removes proof.target', logged && logged.proof && !logged.proof.target && logged.proof.fetchedBack === true, logged && logged.proof);
     const mirrored = activityLogRefBehaviour({ to: 'x', target: 'y', proof: { target: 'z', system: 'gmail' } });
     check('P1/P3: mirrored strip matches page helper', !mirrored.to && !mirrored.target && !(mirrored.proof && mirrored.proof.target), mirrored);
+  }
+
+  console.log('\n--- R12: googleWait / file-chain / calendar pins (D3all, U1–U3, UNK, GC, CAL) ---\n');
+  {
+    const gmail = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
+    const cal = fs.readFileSync(path.join(ROOT, 'core', 'google-calendar.js'), 'utf8');
+    const waitSlice = gmail.slice(gmail.indexOf('intent.googleWait.fileTerm'), gmail.indexOf('intent.googleWait.fileTerm') + 900);
+    check('D3all: driveSearchUnavailable on googleWait stays quiet', /driveSearchUnavailable\) return \{ type: null \}/.test(waitSlice));
+    check('D3all: no fake replan when mailbox search is off', !/fileMatch: 'one'/.test(waitSlice) && !/fileMatch: 'none'/.test(waitSlice));
+    check('UNK: unknown match is not re-planned as a found file', !/unresolved/.test(waitSlice));
+    check('U1: no unresolved bypass flag', !/unresolved = false/.test(gmail));
+    check('U2/U3: no one-then-none replan ladder', !/fileMatch: 'none'/.test(waitSlice));
+    check('GC: googleClose intents skip the file-attach chain', /!intent\.googleClose/.test(gmail));
+    check('CAL: file holds need a link and a name', /wantsFile && \(!link \|\| !name\)/.test(cal));
+    check('I1 product: unavailable Drive search does not fake ok', !/searched = \{ ok: true, files: \[\] \}/.test(gmail));
   }
 
   {

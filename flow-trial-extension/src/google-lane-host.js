@@ -244,7 +244,12 @@ function noteGoogleAuthFailure(reason, account) {
       if (account) flag.account = String(account);
       const patch = { [RECONNECT_KEY]: flag };
       if (!ever) patch[EVER_KEY] = { connected: true };
-      return chrome.storage.local.set(patch);
+      const why = String(reason || '');
+      const clearConnected = why === 'wrong-account' || why === 'account-unverified';
+      return chrome.storage.local.set(patch).then(() => {
+        if (!clearConnected) return null;
+        return chrome.storage.local.remove(CONNECTED_ACCOUNT_KEY);
+      });
     })
     .catch(() => {});
 }

@@ -898,7 +898,10 @@ async function boot() {
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
       googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
       googleGrantedScopes: {
-        version: manifestGoogleGrantedVersion(),
+        // Headless lane exercises mailbox Drive search and Gmail drafts; production OAuth never requests these.
+        version: manifestGoogleGrantedVersion()
+          + '\nhttps://www.googleapis.com/auth/drive.readonly'
+          + '\nhttps://www.googleapis.com/auth/gmail.compose',
         status: 'granted',
         source: 'chrome',
         at: Date.now()
