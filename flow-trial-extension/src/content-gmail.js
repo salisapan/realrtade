@@ -5875,11 +5875,14 @@ function glanceUiCopy(kind) {
     const rect = chip.getBoundingClientRect();
 
     const cached = attachmentCache.get(meta.url);
+    if (cached === 'gemini-gate') {
+      return;
+    }
     if (cached === 'unsupported') {
       FlowSidebar.showFloatingCard(rect, { state: 'unsupported', message: 'Preview isn’t available for this file type yet.' });
       return;
     }
-    if (cached) {
+    if (cached && typeof cached === 'object' && cached.summary) {
       FlowSidebar.showFloatingCard(rect, { state: 'ready', summary: cached.summary, entities: cached.entities });
       return;
     }
@@ -5895,7 +5898,6 @@ function glanceUiCopy(kind) {
       return;
     }
 
-    FlowSidebar.showFloatingCard(rect, { state: 'loading' });
     try {
       const res = await fetch(meta.url, { credentials: 'include' });
       if (!res.ok) throw new Error('attachment download failed (' + res.status + ')');
@@ -5904,7 +5906,12 @@ function glanceUiCopy(kind) {
       if (!rawText.trim()) throw new Error('empty document');
 
       const masked = FlowPrivacyShield.mask(rawText);
-      chrome.runtime.sendMessage({ type: 'flow:summarize-attachment', payload: { maskedText: masked.maskedText } }, (response) => {
+      chrome.runtime.sendMessage({ type: 'flow:summarize-attachment', payload: { maskedText: masked.maskedText, contentSource: 'google' } }, (response) => {
+        if (response && response.code === 'gemini_paid_gate' && response.silent) {
+          FlowSidebar.hideFloatingCard();
+          attachmentCache.set(meta.url, 'gemini-gate');
+          return;
+        }
         if (!response || !response.ok) {
           FlowSidebar.showFloatingCard(rect, { state: 'error', message: aiErrorMessage(response, 'Couldn’t read this attachment.') });
           return;

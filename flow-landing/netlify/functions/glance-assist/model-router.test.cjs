@@ -94,7 +94,7 @@ async function run() {
   console.log('--- planRoute: per action, no Opus ---\n');
   {
     const state = createState();
-    const summarize = planRoute('summarize-attachment', { env: KEYS, state, now: CLOCK });
+    const summarize = planRoute('summarize-attachment', { env: KEYS, state, now: CLOCK, contentSource: 'dropbox' });
     const draft = planRoute('draft-reply', { env: KEYS, state, now: CLOCK });
     const classify = planRoute('classify', { env: KEYS, state, now: CLOCK });
     check('summarize starts on slot C Gemini', summarize[0].provider === 'gemini' && summarize[0].slot === 'C' && summarize[0].model === MODELS.gemini.id, summarize);
@@ -113,7 +113,7 @@ async function run() {
     noteSuccess(state, MODELS.haiku.id, 280);
     const draft = planRoute('draft-reply', { env: KEYS, state, now: CLOCK });
     check('draft prefers the faster healthy model', draft[0].model === MODELS.grokFast.id && draft[1].model === MODELS.haiku.id, draft);
-    const summarize = planRoute('summarize-attachment', { env: KEYS, state, now: CLOCK });
+    const summarize = planRoute('summarize-attachment', { env: KEYS, state, now: CLOCK, contentSource: 'dropbox' });
     check('summary fallback uses that same faster-then-other order', summarize.slice(1).map((item) => item.model).join(',') === [MODELS.grokFast.id, MODELS.haiku.id].join(','), summarize);
   }
   {
@@ -124,7 +124,7 @@ async function run() {
   }
   {
     const noGemini = Object.assign({}, KEYS, { GEMINI_API_KEY: '' });
-    const plan = planRoute('summarize-attachment', { env: noGemini, state: createState(), now: CLOCK });
+    const plan = planRoute('summarize-attachment', { env: noGemini, state: createState(), now: CLOCK, contentSource: 'dropbox' });
     check('missing Gemini promotes OpenAI mini into slot C', plan[0].provider === 'openai' && plan[0].slot === 'C' && plan[0].model === MODELS.openaiMini.id, plan);
   }
   {
@@ -132,7 +132,7 @@ async function run() {
     noteFailure(state, MODELS.gemini.id, CLOCK, 503);
     noteFailure(state, MODELS.gemini.id, CLOCK, 503);
     noteFailure(state, MODELS.gemini.id, CLOCK, 503);
-    const plan = planRoute('summarize-attachment', { env: KEYS, state, now: CLOCK + 1 });
+    const plan = planRoute('summarize-attachment', { env: KEYS, state, now: CLOCK + 1, contentSource: 'dropbox' });
     check('an open Gemini circuit promotes OpenAI mini', plan[0].provider === 'openai' && plan.every((item) => item.provider !== 'gemini'), plan);
   }
   {
@@ -147,7 +147,7 @@ async function run() {
   {
     const { calls, fetchImpl } = scriptedFetch([gemini(SUMMARY)]);
     const out = await callRoutedLlm({
-      action: 'summarize-attachment', system: 'sum', userText: 'Lease text', maxTokens: 500,
+      action: 'summarize-attachment', contentSource: 'dropbox', system: 'sum', userText: 'Lease text', maxTokens: 500,
       env: KEYS, state: createState(), now: CLOCK, fetchImpl,
       accept: (text) => text.indexOf('"summary"') !== -1
     });
@@ -177,7 +177,7 @@ async function run() {
   {
     const { calls, fetchImpl } = scriptedFetch([{ status: 500, raw: '' }, anthropic(SUMMARY)]);
     const out = await callRoutedLlm({
-      action: 'summarize-attachment', system: 'sum', userText: 'Lease', maxTokens: 400,
+      action: 'summarize-attachment', contentSource: 'dropbox', system: 'sum', userText: 'Lease', maxTokens: 400,
       env: KEYS, state: createState(), now: CLOCK, fetchImpl,
       accept: (text) => text.indexOf('"summary"') !== -1
     });
@@ -189,7 +189,7 @@ async function run() {
     noteFailure(state, MODELS.gemini.id, CLOCK, 401);
     const { calls, fetchImpl } = scriptedFetch([chat(SUMMARY)]);
     const out = await callRoutedLlm({
-      action: 'summarize-attachment', system: 'sum', userText: 'Lease', maxTokens: 400,
+      action: 'summarize-attachment', contentSource: 'dropbox', system: 'sum', userText: 'Lease', maxTokens: 400,
       env: KEYS, state, now: CLOCK + 1, fetchImpl,
       accept: (text) => text.indexOf('"summary"') !== -1
     });
@@ -363,15 +363,27 @@ async function run() {
         chat('Here is a summary of Jane Doe at jane.doe@acme.com for $4,200.')
       ]).fetchImpl;
       const res = await post({ action: 'summarize-attachment', maskedText: 'Lease body' });
-      check('unusable summaries are 502', res.status === 502, res);
+      check('missing contentSource is silent gemini_paid_gate, not 502', res.status === 200 && res.json.ok === false && res.json.code === 'gemini_paid_gate' && res.json.silent === true, res.json);
+      check('missing source body has no fabricated summary', !res.json.summary && JSON.stringify(res.json).indexOf('Jane Doe') === -1, res.json);
+    }
+    {
+      resetState();
+      const script = scriptedFetch([
+        gemini('Here is a summary of Jane Doe at jane.doe@acme.com for $4,200.'),
+        anthropic('Here is a summary of Jane Doe at jane.doe@acme.com for $4,200.'),
+        chat('Here is a summary of Jane Doe at jane.doe@acme.com for $4,200.')
+      ]);
+      global.fetch = script.fetchImpl;
+      const res = await post({ action: 'summarize-attachment', maskedText: 'Lease body', contentSource: 'dropbox' });
+      check('unusable summaries on allowlisted source are 502', res.status === 502, res);
       check('the 502 body is not a fabricated summary', !res.json.summary && JSON.stringify(res.json).indexOf('Jane Doe') === -1 && JSON.stringify(res.json).indexOf('jane.doe') === -1, res.json);
     }
     {
       resetState();
       const script = scriptedFetch([gemini(SUMMARY)]);
       global.fetch = script.fetchImpl;
-      const res = await post({ action: 'summarize-attachment', maskedText: 'Lease body' });
-      check('a real summary JSON is returned', res.status === 200 && res.json.summary === 'Updated lease — indemnification removed.', res.json);
+      const res = await post({ action: 'summarize-attachment', maskedText: 'Lease body', contentSource: 'dropbox' });
+      check('a real summary JSON is returned for allowlisted source', res.status === 200 && res.json.summary === 'Updated lease — indemnification removed.', res.json);
       check('handler summarize did not call OpenAI', script.calls.every((call) => call.url.indexOf('openai.com') === -1), hosts(script.calls));
     }
     {

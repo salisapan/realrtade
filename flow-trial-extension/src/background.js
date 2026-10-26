@@ -4829,6 +4829,9 @@ async function callGlanceAssist(body) {
     await chrome.storage.local.set({ [PRO_STORAGE_KEY]: Object.assign({}, record, { valid: false, activeUntil: 0, checkedAt: Date.now() }) });
     throw proRequiredError();
   }
+  if (!data.ok && data.code === 'gemini_paid_gate') {
+    return { ok: false, code: 'gemini_paid_gate', silent: data.silent === true };
+  }
   if (!res.ok || !data.ok) {
     const message = (data && data.error) || ('Request failed (' + res.status + ')');
     const err = new Error(message);
@@ -4848,7 +4851,12 @@ async function draftReplyViaBackend(payload) {
 // payload: { maskedText } — already masked by the caller; see
 // glance-assist.js's summarizeAttachment().
 async function summarizeAttachmentViaBackend(payload) {
-  const data = await callGlanceAssist({ action: 'summarize-attachment', maskedText: payload.maskedText });
+  const data = await callGlanceAssist({
+    action: 'summarize-attachment',
+    maskedText: payload.maskedText,
+    contentSource: payload.contentSource || 'google'
+  });
+  if (data && data.code === 'gemini_paid_gate') return { ok: false, code: 'gemini_paid_gate', silent: true };
   return { ok: true, summary: data.summary, entities: data.entities };
 }
 
