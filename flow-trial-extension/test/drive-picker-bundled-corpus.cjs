@@ -146,6 +146,7 @@ function entryLoadsRemoteGoogleScript(name, data) {
 
   check('V3: line-commented import from apis.google.com passes guard', !entryLoadsRemoteGoogleScript('x.js', "// import x from 'https://apis.google.com/js/api.js'\n"));
   check('V3: block-commented import from apis.google.com passes guard', !entryLoadsRemoteGoogleScript('x.js', "/* import x from 'https://apis.google.com/js/api.js' */"));
+  check('V7: dynamic import() of apis.google.com fails guard', entryLoadsRemoteGoogleScript('dynamic.js', "import('https://apis.google.com/js/api.js');"));
   check('V4: import from apis.google.com fails guard', entryLoadsRemoteGoogleScript('x.js', "import x from 'https://apis.google.com/js/api.js';"));
   check('V5: script.src assignment to apis.google.com fails guard', entryLoadsRemoteGoogleScript('x.js', "s.src='https://apis.google.com/js/api.js';"));
   check('V5b: background.js comment does not trip guard', !entryLoadsRemoteGoogleScript('src/background.js', read('src', 'background.js')));

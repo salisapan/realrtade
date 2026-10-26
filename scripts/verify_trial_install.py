@@ -94,6 +94,10 @@ def check_apis_google_script_guard() -> None:
     ):
         die("apis.google guard V3: must not match block-commented import from apis.google.com")
     if not entry_loads_remote_google_script(
+        "dynamic.js", b"import('https://apis.google.com/js/api.js');"
+    ):
+        die("apis.google guard V7: must detect dynamic import()")
+    if not entry_loads_remote_google_script(
         "import-from.js", b"import x from 'https://apis.google.com/js/api.js';"
     ):
         die("apis.google guard V4: must detect import from apis.google.com")
