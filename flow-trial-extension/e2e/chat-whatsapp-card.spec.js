@@ -37,6 +37,23 @@ test('WhatsApp, CHAT_TASK_CARD on: a courier\'s delivery window is one hold titl
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
 
+for (const [label, text, want, end] of [['English', 'The plumber will come between 8 and 12 on Tuesday', /Visit 08:00–12:00/, '12:00'], ['Hebrew', 'האינסטלטור יגיע ביום שלישי בין 8 ל-12', /ביקור 08:00–12:00/, '12:00']]) {
+  test('WhatsApp, CHAT_TASK_CARD on: a plumber\'s visit window (' + label + ') is one hold titled Visit 08:00–12:00, no guest, read back, and Undo deletes it', async ({ glance }) => {
+    const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml(text));
+    await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+    await page.locator(CARD + ' button.flow-chip').click();
+    await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+    const list = await events(glance);
+    expect(list).toHaveLength(1);
+    expect(list[0].subject).toMatch(want);
+    expect(list[0].attendees || []).toEqual([]);
+    expect(JSON.stringify(list[0].end)).toContain(end);
+    expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+    await page.locator(CARD + ' button.flow-chip-undo').click();
+    await expect.poll(async () => (await events(glance)).length).toBe(0);
+  });
+}
+
 test('WhatsApp, CHAT_TASK_CARD on: an appointment that names its length is one hold of that length, no guest, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml('Your appointment is confirmed for tomorrow from 14:00 to 15:30'));
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
