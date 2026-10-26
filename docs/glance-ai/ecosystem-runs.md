@@ -926,3 +926,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-appointment-notice-corpus.cjs` +5 lines and 4 quiet ones (6 fail on the old code); 2 real-browser Outlook cases; booking and WhatsApp specs pass (55); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; an ambiguous slash date is still quiet; no Messenger or Instagram spec for these forms.
+
+### Run 113 (2026-10-26)
+- **Capability shipped:** common work asks that gave no card ("make sure X is signed by Thursday", "proofread … and send it back", "order … by Tuesday", "fill out the form", "do you mind uploading", «תוודא ש…», «אפשר שתעיף מבט…») now offer the reply card.
+- **Caught by the sweep:** my first version added a broad "please + verb" list (call, add, email, draft, book, cancel, …); three other corpora went red (`chat-task-card`: "Please call me back tomorrow" is the call-back task; `close-families` and `flip-sample-0956`: add-to-calendar and draft-from-template routing). Narrowed to proofread, check, order, look over, take a look, fill in/out, complete, verify, validate, plus a standalone "make sure the/we/all/this/it" and the Hebrew forms; all corpora green again. "Please make sure to follow us on social media" had also turned into a card and is quiet again.
+- **Code:** `core/judgment.js` only (English and Hebrew handoff readers).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/work-ask-corpus.cjs` (8 fresh asks, 6 quiet look-alikes; 7 of the 8 asks fail on the old code); a 16-line probe of polite notices and marketing; every `test/*corpus.cjs` green on the second sweep; phone-card bundle rebuilt. No real-browser spec this run.
+- **Open:** live Gate; "Do you mind if I call you later?" shows a card (pre-existing, not changed); "Please call/add/email/draft/book/cancel …" are still routed by their own readers, not by this list.
