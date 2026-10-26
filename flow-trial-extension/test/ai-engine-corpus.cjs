@@ -9,7 +9,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const FILES = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'step-list.js', 'json-enforce.js',
-  'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js', 'privacyShield.js', 'mask-ids.js', 'exec-router.js', 'understanding-router.js', 'ai-engine.js'];
+  'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js', 'privacyShield.js', 'mask-ids.js', 'exec-router.js', 'understanding-router.js', 'ai-floor.js', 'ai-engine.js'];
 const sb = { module: undefined, console, setTimeout, clearTimeout, Promise };
 vm.createContext(sb);
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sb, { filename: f });
@@ -46,6 +46,20 @@ const ALL = { aiPrimary: true, aiPlanV1: true };
   check('a file save goes to suggest-save, not silence and not a model plan', fsv.card && fsv.card.step === 'file_save' && fsv.card.suggestSave === true && fsv.card.plan === null, fsv.card);
   const s = await E.read(mail(), deps({ intentions: [] }), ALL);
   check('a model that says nothing: no card', s.card === null);
+
+  console.log('\n--- the production floor when the host injects none ---\n');
+  {
+    const bare = (answer) => ({ tier1: async () => answer });
+    const ok = await E.read(mail(), bare(ask), ALL);
+    check('no host gate or veto: core/ai-floor.js passes a clean dated ask', ok.card && ok.card.source === 'model' && ok.card.step === 'draft', ok);
+    const pay = 'Hi Sali,\nCould you pay the invoice by Friday? We need it for the bank.\nDana';
+    const money = await E.read(mail({ text: pay }), bare({ intentions: [Object.assign({}, ask.intentions[0], { ask_span: 'Could you pay the invoice by Friday?' })] }), ALL);
+    check('...and silences a money movement', money.card === null && money.reason === 'veto:money-movement', money);
+    const own = await E.read(mail({ direction: 'outbound' }), bare(ask), ALL);
+    check('...and the person\'s own mail', own.card === null, own);
+    const host = await E.read(mail({ text: pay }), { tier1: async () => ({ intentions: [Object.assign({}, ask.intentions[0], { ask_span: 'Could you pay the invoice by Friday?' })] }), gate: () => ({ pass: true }), veto: () => null }, ALL);
+    check('a host gate and veto win over the floor', host.card && host.card.step === 'draft', host);
+  }
 
   console.log('\n--- portability ---\n');
   const src = fs.readFileSync(path.join(__dirname, '../core/ai-engine.js'), 'utf8').replace(/\/\/.*$/gm, '');

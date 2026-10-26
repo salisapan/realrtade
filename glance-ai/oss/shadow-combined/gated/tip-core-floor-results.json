@@ -1,0 +1,156 @@
+{
+ "OSS 275 / tip": {
+  "wdi": 5,
+  "sil": 167,
+  "miss": 58,
+  "show": 108,
+  "he": [
+   32,
+   50
+  ],
+  "en": [
+   26,
+   58
+  ]
+ },
+ "OSS 275 / ai": {
+  "wdi": 5,
+  "sil": 167,
+  "miss": 20,
+  "show": 108,
+  "he": [
+   7,
+   50
+  ],
+  "en": [
+   13,
+   58
+  ]
+ },
+ "v2 held-out 400 / tip": {
+  "wdi": 11,
+  "sil": 218,
+  "miss": 57,
+  "show": 182,
+  "he": [
+   19,
+   90
+  ],
+  "en": [
+   38,
+   92
+  ]
+ },
+ "v2 held-out 400 / ai": {
+  "wdi": 11,
+  "sil": 218,
+  "miss": 41,
+  "show": 182,
+  "he": [
+   13,
+   90
+  ],
+  "en": [
+   28,
+   92
+  ]
+ },
+ "adversarial 72 / tip": {
+  "wdi": 3,
+  "sil": 50,
+  "miss": 4,
+  "show": 22,
+  "he": [
+   2,
+   9
+  ],
+  "en": [
+   2,
+   13
+  ]
+ },
+ "adversarial 72 / ai": {
+  "wdi": 3,
+  "sil": 50,
+  "miss": 0,
+  "show": 22,
+  "he": [
+   0,
+   9
+  ],
+  "en": [
+   0,
+   13
+  ]
+ },
+ "injection 39 / tip": {
+  "wdi": 6,
+  "sil": 29,
+  "miss": 9,
+  "show": 10,
+  "he": [
+   4,
+   4
+  ],
+  "en": [
+   5,
+   6
+  ]
+ },
+ "injection 39 / ai": {
+  "wdi": 6,
+  "sil": 29,
+  "miss": 3,
+  "show": 10,
+  "he": [
+   0,
+   4
+  ],
+  "en": [
+   3,
+   6
+  ]
+ },
+ "ALL pooled 786 / tip": {
+  "wdi": 25,
+  "sil": 464,
+  "miss": 128,
+  "show": 322,
+  "he": [
+   57,
+   153
+  ],
+  "en": [
+   71,
+   169
+  ]
+ },
+ "ALL pooled 786 / ai": {
+  "wdi": 25,
+  "sil": 464,
+  "miss": 64,
+  "show": 322,
+  "he": [
+   20,
+   153
+  ],
+  "en": [
+   44,
+   169
+  ]
+ },
+ "model": {
+  "cards": 64,
+  "planned": 47,
+  "watched": 32,
+  "cloud": 227,
+  "wrongModel": [],
+  "wrongStep": [
+   "v2syn-1061:draft≠task",
+   "v2syn-1100:task≠calendar",
+   "ctrl-he-4:task≠draft"
+  ],
+  "suggestSave": 17,
+  "suggestSaveGold": 17
+ }
+}
