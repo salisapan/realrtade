@@ -74,17 +74,42 @@ function isCloudOutbound(url) {
   return /glance-assist|token-relay|classify-remote|generativelanguage\.googleapis\.com/.test(u);
 }
 
-function createBackground(stored, routeFn, outbound) {
+function loadGoogleLaneHost(sandbox) {
+  const cores = [
+    'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
+    'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js',
+    'extract.js', 'file-attach.js', 'proof-of-close.js',
+    'google-contacts.js', 'event-call-link.js', 'meet-link.js', 'recurring-reminder.js', 'workspace-file.js',
+    'google-closes.js', 'style-profile.js', 'full-document-close.js', 'google-task-close.js'
+  ];
+  for (const f of cores) {
+    if (!sandbox.FlowGoogleTasks && f === 'google-tasks.js') { /* config already loaded */ }
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), sandbox, { filename: f });
+  }
+  if (!sandbox.FlowGoogleLane) {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'src', 'google-lane.js'), 'utf8'), sandbox, { filename: 'google-lane.js' });
+  }
+  const hostSrc = fs.readFileSync(path.join(ROOT, 'src', 'google-lane-host.js'), 'utf8').replace(/^import .*;$/gm, '');
+  vm.runInContext(hostSrc, sandbox, { filename: 'google-lane-host.js' });
+}
+
+function createBackground(stored, routeFn, outbound, googleReads) {
   const listeners = [];
   let tokenSeq = 0;
+  const reads = googleReads || [];
   const bag = JSON.parse(JSON.stringify(stored || {}));
   const sandbox = {
     console,
     fetch: async (url, options) => {
       const method = (options && options.method) || 'GET';
+      const u = String(url);
       const body = options && options.body ? (() => { try { return JSON.parse(options.body); } catch (e) { return options.body; } })() : null;
-      if (isCloudOutbound(url)) outbound.push({ kind: 'fetch', url: String(url), body });
-      const routed = routeFn(String(url), method, body);
+      if (/tasks\.googleapis\.com|calendar\.googleapis\.com|www\.googleapis\.com\/calendar|people\.googleapis\.com/.test(u)) {
+        reads.push({ url: u, method });
+        outbound.push({ kind: 'google-api', url: u, method, body });
+      }
+      if (isCloudOutbound(u)) outbound.push({ kind: 'fetch', url: u, body });
+      const routed = routeFn(u, method, body);
       if (routed) return routed;
       return res(500, { error: 'unrouted' });
     },
@@ -127,6 +152,7 @@ function createBackground(stored, routeFn, outbound) {
   vm.runInContext(lb.GOOGLE_CONFIG_SRC, sandbox, { filename: 'google-config.js' });
   vm.runInContext(lb.backgroundScript(), sandbox, { filename: 'background.js' });
   vm.runInContext(lb.LANE_ACCOUNT_STUB, sandbox);
+  loadGoogleLaneHost(sandbox);
   const send = (msg) => new Promise((resolve) => {
     let settled = false;
     const reply = (r) => {
@@ -143,7 +169,7 @@ function createBackground(stored, routeFn, outbound) {
     }
     setTimeout(() => { if (!settled) resolve(undefined); }, 2500);
   });
-  return { send, sandbox, listeners };
+  return { send, sandbox, listeners, googleReads: reads };
 }
 
 function pinDate(w) {
@@ -254,15 +280,26 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     connectorId: 'googleTasks',
     glanceSwitches: { GOOGLE_CONTACTS: true },
     googleTasksAuth: { taskListId: 'LIST_A' },
+    googleWebAuth: { accessToken: 'ya29.sentinel', expiresAt: Date.now() + 60 * 60 * 1000 },
+    googleConnectedAccount: { email: 'me@x.com' },
+    googleProfile: { mail: 'me@x.com' },
     googleGrantedScopes: GRANTED,
     googleEverConnected: true,
     proLicense: { key: 'sentinel-test-key', valid: true, activeUntil: Date.now() + 7 * 86400000 }
   };
 
+  function assertLaneTraffic(label, outbound, googleReads) {
+    check(label + ': Google API read-back traffic', googleReads.length > 0, googleReads.length);
+    const lane = outbound.filter((o) => o.kind === 'google-api' || o.kind === 'fetch' || o.kind === 'execute' || o.kind === 'classify-remote');
+    check(label + ': non-empty lane or cloud outbound', lane.length > 0, lane.length);
+  }
+
   console.log('--- task: plan -> Do It -> background proof read-back (sentinel only in Tasks API) ---\n');
   {
     const outbound = [];
+    const googleReads = [];
     const bg = createBackground(baseStored, (url, method) => {
+      if (/oauth2\/v3\/userinfo/.test(url)) return res(200, { email: 'me@x.com' });
       if (/glance-assist/.test(url) && method === 'POST') {
         return res(200, { ok: true, result: { kind: 'quiet' } });
       }
@@ -270,8 +307,10 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
       if (/\/lists\/LIST_A\/tasks\/task_sent/.test(url) && method === 'GET') {
         return res(200, { id: 'task_sent', title: SENT_TASK_TITLE, notes: SENT_TASK_NOTE, status: 'needsAction' });
       }
+      if (/\/lists\/LIST_A\/tasks\?/.test(url) && method === 'GET') return res(200, { items: [] });
+      if (/\/users\/@me\/lists/.test(url)) return res(200, { items: [{ id: 'LIST_A', title: 'Glance' }] });
       return null;
-    }, outbound);
+    }, outbound, googleReads);
     const pageSent = [];
     const store = JSON.parse(JSON.stringify(baseStored));
     const { w } = bootGmailPage('Please log the vendor agreement by Friday October 17.', store, pageSent, bg.send, outbound);
@@ -290,57 +329,57 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     check('task card painted', Boolean(card), null);
     await clickDo(card);
     check('task Do It reached background write', pageSent.some((m) => m.type === 'flow:google-write' || m.type === 'flow:execute-action'), pageSent.map((m) => m.type));
-    check('task path: page or cloud saw traffic', outbound.length > 0 || pageSent.length > 0, { outbound: outbound.length, pageSent: pageSent.length });
+    assertLaneTraffic('task path', outbound, googleReads);
     check('LT: seeded task title stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_TASK_TITLE), outbound.length);
     assertNoSentinels('task path', outbound.map((o) => o.body));
     check('LT mutant: sentinel task title in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_TASK_TITLE) >= 0), outbound[0]);
     w.close();
   }
 
-  console.log('\n--- calendar: plan -> Do It -> list event with sentinel title/notes (Calendar API only) ---\n');
+  console.log('\n--- calendar: lane host lists events (sentinel only in Calendar API) ---\n');
   {
     const outbound = [];
-    const start = { dateTime: '2026-09-18T15:00:00+00:00', timeZone: 'UTC' };
-    const end = { dateTime: '2026-09-18T15:30:00+00:00', timeZone: 'UTC' };
-    const bg = createBackground(baseStored, (url, method) => {
+    const googleReads = [];
+    const calStored = JSON.parse(JSON.stringify(baseStored));
+    calStored.glanceSwitches = Object.assign({}, calStored.glanceSwitches, { EVENT_CALL_LINK: true });
+    const start = { dateTime: '2026-10-22T15:00:00+00:00', timeZone: 'UTC' };
+    const end = { dateTime: '2026-10-22T15:30:00+00:00', timeZone: 'UTC' };
+    const bg = createBackground(calStored, (url, method) => {
+      if (/oauth2\/v3\/userinfo/.test(url)) return res(200, { email: 'me@x.com' });
       if (/glance-assist/.test(url) && method === 'POST') return res(200, { ok: true, result: { kind: 'quiet' } });
       if (/\/calendars\/primary\/events/.test(url) && method === 'GET') {
-        return res(200, { items: [{ id: 'ev_sent', summary: SENT_CAL_TITLE, description: SENT_CAL_NOTE, status: 'confirmed', start, end }] });
+        return res(200, {
+          items: [{
+            id: 'ev_sent',
+            summary: 'Thursday vendor sync',
+            description: SENT_CAL_NOTE,
+            status: 'confirmed',
+            start,
+            end,
+            organizer: { self: true }
+          }]
+        });
       }
-      if (/\/calendars\/primary\/events\/ev_sent$/.test(url) && method === 'DELETE') return res(204, {});
       return null;
-    }, outbound);
-    const pageSent = [];
-    const store = JSON.parse(JSON.stringify(baseStored));
-    const { w } = bootGmailPage('Please cancel my hold on Friday at 3pm.', store, pageSent, bg.send, outbound);
-    const ctx = {
-      app: 'gmail', uiLang: 'en', messageId: 'm-cal', threadId: 't-cal',
-      subject: 'Hold', bodyText: 'Please cancel my hold on Friday at 3pm.',
-      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/t-cal',
-      sender: { name: 'Vendor', email: 'vendor@example.com' },
-      intent: { label: 'Cancel hold', type: 'request', signals: { score: 80 } },
-      process: {
-        id: 'hold', name: 'Hold It', closingLine: 'Off calendar.',
-        steps: [{
-          id: 'calendar', kind: 'calendar', label: 'Calendar',
-          params: { calendarOp: 'delete', title: 'Hold', dateIso: '2026-09-18', hour: 15, minute: 0, requireTime: true }
-        }]
-      }
-    };
-    const card = w.__glanceGmailPage.paintPlan(ctx);
-    await clickDo(card);
-    check('calendar Do It reached background write', pageSent.some((m) => m.type === 'flow:google-write' || m.type === 'flow:execute-action'), pageSent.map((m) => m.type));
-    check('calendar path: page or cloud saw traffic', outbound.length > 0 || pageSent.length > 0, { outbound: outbound.length, pageSent: pageSent.length });
-    check('LC: seeded calendar summary stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CAL_TITLE), outbound.length);
+    }, outbound, googleReads);
+    const plan = await bg.send({
+      type: 'flow:google-event-link-plan',
+      text: 'Can you add a Meet link to the Thursday vendor sync?'
+    });
+    check('calendar event-link plan returns', plan && typeof plan.action === 'string', plan);
+    check('calendar event-link plan is not switch-off', plan && plan.action !== 'off' && plan.reason !== 'switch-off', plan);
+    assertLaneTraffic('calendar path', outbound, googleReads);
+    check('LC: seeded calendar note stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CAL_NOTE), outbound.length);
     assertNoSentinels('calendar path', outbound.map((o) => o.body));
-    check('LC mutant: sentinel calendar summary in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CAL_TITLE) >= 0), outbound[0]);
-    w.close();
+    check('LC mutant: sentinel calendar note in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CAL_NOTE) >= 0), outbound[0]);
   }
 
   console.log('\n--- contacts: plan -> chip -> Do It compose (sentinel only in People) ---\n');
   {
     const outbound = [];
+    const googleReads = [];
     const bg = createBackground(baseStored, (url, method) => {
+      if (/oauth2\/v3\/userinfo/.test(url)) return res(200, { email: 'me@x.com' });
       if (/glance-assist/.test(url) && method === 'POST') return res(200, { ok: true, result: { kind: 'quiet' } });
       if (/people\.googleapis\.com/.test(url) && method === 'GET') {
         return res(200, {
@@ -355,78 +394,68 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
       if (/\/users\/me\/threads\?/.test(url)) return res(200, { threads: [] });
       if (/\/users\/me\/drafts$/.test(url) && method === 'POST') return res(200, { id: 'dr_ct' });
       return null;
-    }, outbound);
+    }, outbound, googleReads);
     const pageSent = [];
     const store = JSON.parse(JSON.stringify(baseStored));
     const contactAsk = "What's Dana's email for the vendor billing setup this week?";
     const { w } = bootGmailPage(contactAsk, store, pageSent, bg.send, outbound);
-    const plan = await G.plan({ text: contactAsk, flags: { GOOGLE_CONTACTS: true } }, {
-      grantedScopes: OAUTH_SCOPES_EXACT.concat(['https://www.googleapis.com/auth/contacts.readonly']),
-      http: async (req) => {
-        const u = String(req.url || '');
-        if (/people\.googleapis\.com/.test(u)) {
-          return {
-            status: 200,
-            ok: true,
-            json: {
-              results: [{
-                person: {
-                  names: [{ displayName: 'Dana ' + SENT_CONTACT_NAME }],
-                  emailAddresses: [{ value: SENT_CONTACT_EMAIL }]
-                }
-              }]
-            }
-          };
-        }
-        return { status: 404, ok: false, json: null };
-      }
+    const stable = { messageIds: ['m-contact'], laneIds: ['m-contact'] };
+    const card = await w.__glanceGmailPage.planContactsChip({
+      messageId: 'm-contact', stable, legacyId: 'm-contact', threadId: 't-contact',
+      sender: { name: 'Vendor', email: 'vendor@example.com' }, subject: 'Billing', text: contactAsk,
+      intent: { label: 'Contact lookup', type: 'request', signals: { score: 80 } }
     });
-    check('contacts plan offers from People data', plan && plan.action === 'offer' && plan.email === SENT_CONTACT_EMAIL, plan);
-    const process = {
-      id: 'google-contact',
-      name: plan.title || plan.line,
-      closingLine: plan.line || plan.title,
-      closedLine: 'Ready in compose. You send it.',
-      steps: [{
-        id: 'compose',
-        kind: 'googleContactAnswer',
-        label: 'Compose',
-        hint: 'Fill Gmail compose — nothing is sent',
-        params: {
-          mode: plan.mode,
-          email: plan.email,
-          displayName: plan.displayName || plan.name,
-          name: plan.name,
-          lang: plan.lang || 'en'
-        }
-      }]
-    };
-    const ctx = {
-      app: 'gmail', uiLang: 'en', messageId: 'm-contact', threadId: 't-contact',
-      subject: 'Billing', bodyText: contactAsk,
-      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/t-contact',
-      sender: { name: 'Vendor', email: 'vendor@example.com' },
-      intent: { label: plan.title || plan.line, type: 'request', signals: { score: 80 } },
-      process
-    };
-    const card = w.__glanceGmailPage.paintPlan(ctx);
-    check('contacts chip painted from plan', Boolean(card), null);
+    check('contacts chip painted from page plan path', Boolean(card), null);
+    check('contacts plan reached flow:google-contacts-plan', pageSent.some((m) => m.type === 'flow:google-contacts-plan'), pageSent.map((m) => m.type));
     await clickDo(card);
     check('contacts Do It reached compose write',
       pageSent.some((m) => m.type === 'flow:gmail-compose' || m.type === 'flow:google-write'),
       pageSent.map((m) => m.type));
-    check('contacts path: page or cloud saw traffic', outbound.length > 0 || pageSent.length > 0, { outbound: outbound.length, pageSent: pageSent.length });
+    assertLaneTraffic('contacts path', outbound, googleReads);
     check('CT3: seeded contact email stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
     assertNoSentinels('contacts path', outbound.map((o) => o.body));
     check('CT2 mutant: sentinel contact email in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CONTACT_EMAIL) >= 0), outbound[0]);
     w.close();
   }
 
-  check('harness dispatches main onMessage (not lane-only)', () => {
+  console.log('\n--- classify/execute: masked prompt must not carry People sentinel ---\n');
+  {
     const outbound = [];
-    const bg = createBackground(baseStored, () => null, outbound);
+    const googleReads = [];
+    const bg = createBackground(baseStored, (url, method) => {
+      if (/glance-assist/.test(url) && method === 'POST') {
+        return res(200, { ok: true, result: { kind: 'quiet' } });
+      }
+      if (/classify-remote/.test(url)) {
+        return res(200, { ok: true, label: 'request', entities: {} });
+      }
+      return null;
+    }, outbound, googleReads);
+    const masked = 'Please confirm billing for vendor@example.com';
+    const cls = await bg.send({
+      type: 'flow:classify-remote',
+      payload: { maskedPrompt: masked, lang: 'en', senderEmail: 'vendor@example.com' }
+    });
+    check('classify-remote returns', cls && cls.ok !== false, cls);
+    const exec = await bg.send({
+      type: 'flow:execute-action',
+      payload: { maskedPrompt: masked, lang: 'en', action: 'task', title: 'Billing follow-up' }
+    });
+    check('execute-action returns', exec !== undefined, exec);
+    check('CT2/CT3: classify/execute outbound has no contact sentinel', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
+    assertNoSentinels('classify path', outbound.map((o) => o.body));
+  }
+
+  {
+    const outbound = [];
+    const googleReads = [];
+    const bg = createBackground(baseStored, () => null, outbound, googleReads);
     check('background registered onMessage listeners', bg.listeners.length >= 1, bg.listeners.length);
-  });
+    const stamp = await bg.send({ type: 'flow:build-stamp' });
+    check('harness dispatches main onMessage (build-stamp)', Boolean(stamp && stamp.ok), stamp);
+    const lane = await bg.send({ type: 'flow:google-write', connectorId: 'googleLaneTask', input: { title: 'x', listId: 'LIST_A' } });
+    check('lane host handles flow:google-write', lane !== undefined, lane);
+  }
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

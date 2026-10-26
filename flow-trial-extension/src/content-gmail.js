@@ -6422,6 +6422,12 @@ function glanceUiCopy(kind) {
       document.body.appendChild(mount);
       injectChip(mount, ctx);
       return mount.querySelector('.flow-chip-host');
+    },
+    planContactsChip: async (c) => {
+      const message = document.querySelector('[role="listitem"]');
+      if (!message) return null;
+      const shown = await showGoogleContactsChip(message, c);
+      return shown ? message.querySelector('.flow-chip-host') : null;
     }
   };
 
