@@ -686,6 +686,11 @@ const FlowChatTaskCard = (() => {
       try {
         judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
       } catch (e) { judged = null; }
+      // A payment asked with an amount and a day is read by its own reader (a task "Pay 1200 NIS · Dana"); the shared judge's generic
+      // "Reply requested by Oct 27, ₪1,200" for the same words is the weaker reading and gives way to it.
+      if (!own && judged && judged.show && typeof FlowChatPaymentAsk !== 'undefined') {
+        try { const pa = FlowChatPaymentAsk.recognize(i.text, i.now); if (pa && pa.kind === 'ask') judged = null; } catch (e) { /* keep the judge's reading */ }
+      }
       // "Can we do a Teams call Thursday at 3pm?" is a call proposal the shared judge leaves to core/teams-meeting.js:
       // one day, one clock, no other tool named. It becomes the same hold, titled as a call; the Meet or Teams link is the
       // worker's, behind its own switch.

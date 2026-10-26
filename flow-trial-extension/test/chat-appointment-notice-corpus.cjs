@@ -108,5 +108,36 @@ for (const text of NOLEN) { const r = A.recognize(text, NOW); check('no told len
 for (const [text, h, n] of [['Your appointment is confirmed for Sunday between 2 and 3pm', 14, 60], ['Your appointment is confirmed for Sunday between 14:00 and 15:30', 14, 90]]) { const r = A.recognize(text, NOW); check('between X and Y starts at X: ' + text.slice(0, 60), r.kind === 'appointment' && r.hour === h && r.durationMinutes === n, r); }
 check('a range that starts at another clock is not its length', A.lengthOf('lunch 12:00-13:00', { hour: 10, minute: 0 }) === null);
 check('the range start is the clock when the plain reader fails', (() => { const r = A.recognize('Your appointment is confirmed for Sunday from 10:00 to 11:30', NOW); return r.hour === 10 && r.minute === 0; })());
+
+// A booking that repeats ("Your lesson is every Monday at 17:00"): the hold is the next one and the card marks it as repeating.
+const MON_MORNING = new Date(2026, 9, 26, 10, 0, 0); // Monday 10:00
+const MON_EVENING = new Date(2026, 9, 26, 18, 0, 0); // Monday 18:00
+const REPEATS = [
+  ['Your piano lesson is every Monday at 17:00', MON_MORNING, '2026-10-26'],
+  ['Your piano lesson is every Monday at 17:00', MON_EVENING, '2026-11-02'],
+  ['Hi, your weekly yoga class is every Tuesday at 18:30. See you!', MON_MORNING, '2026-10-27'],
+  ['Your swimming lesson takes place every Thursday at 16:00', MON_MORNING, '2026-10-29'],
+  ['השיעור שלך כל יום שני ב-17:00', MON_EVENING, '2026-11-02'],
+  ['התור שלך כל יום ראשון ב-10:00', MON_MORNING, '2026-11-01']
+];
+for (const [text, now, day] of REPEATS) { const r = A.recognize(text, now); check('repeats: ' + text.slice(0, 50) + ' -> ' + day, r.kind === 'appointment' && r.repeats === true && r.dateIso === day, r); }
+for (const text of ['The shop is open every Monday at 9:00', 'Our team meets every Monday at 10:30', 'Your lesson is every Monday', 'Your lesson was every Monday at 17:00 until it was cancelled', 'Does your lesson run every Monday at 17:00?']) { const r = A.recognize(text, MON_MORNING); check('not a repeating booking: ' + text.slice(0, 50), r.kind === 'none', r); }
+check('a one-off booking is not marked as repeating', A.recognize('Your appointment is confirmed for Tuesday at 17:00', MON_MORNING).repeats === undefined);
+
+// Plain reminders with no "confirmed": the possessive booking noun, "is", and a day or a clock ("Your appointment is tomorrow at 14:00").
+const NOW2 = new Date(2026, 9, 26, 10, 0, 0); // Monday 10:00
+const PLAIN = [
+  ['Your appointment is tomorrow at 14:00', '2026-10-27', 14, 0],
+  ['Your appointment is next Tuesday at 17:00', '2026-11-03', 17, 0],
+  ['Your dentist appointment is in 3 days at 14:00', '2026-10-29', 14, 0],
+  ['Your appointment is tomorrow at 9am', '2026-10-27', 9, 0],
+  ['Your appointment at 17:00 on Tuesday, parking is available', '2026-10-27', 17, 0],
+  ['Your table is tonight at 8pm', '2026-10-26', 20, 0],
+  ['התור שלך מחר ב-14:00', '2026-10-27', 14, 0],
+  ['התור שלך מחר בבוקר ב-9:00', '2026-10-27', 9, 0],
+  ['התור שלך בעוד 3 ימים ב-14:00', '2026-10-29', 14, 0]
+];
+for (const [text, day, h, m] of PLAIN) { const r = A.recognize(text, NOW2); check('plain reminder: ' + text, r.kind === 'appointment' && r.dateIso === day && r.hour === h && r.minute === m, r); }
+for (const text of ['Is your appointment tomorrow at 14:00?', 'Your last appointment was yesterday at 14:00', 'Your order is ready tomorrow at 14:00', 'Your invoice is due tomorrow at 14:00', 'The deadline for your appointment form is in 3 days at 14:00', 'Your appointment details are tomorrow at 14:00', 'Your appointment is tomorrow at 14:00 unless you cancel', 'Your flight is tomorrow at 14:00', 'Your meeting is tomorrow at 14:00']) check('not a booking: ' + text, A.recognize(text, NOW2).kind === 'none', A.recognize(text, NOW2));
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-appointment-notice checks passed');
 process.exit(failures ? 1 : 0);

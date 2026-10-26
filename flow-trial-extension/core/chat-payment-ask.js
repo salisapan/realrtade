@@ -6,12 +6,12 @@
 // task, "Pay 500 NIS", that the person approves. Portable: no chrome.*, no DOM, no network.
 const FlowChatPaymentAsk = (() => {
   const VERB_EN = /\b(?:transfer|pay|send|wire|settle|bit|paybox)\b/i;
-  const VERB_HE = /(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע\s+העברה|תסגור|תסגרי)/;
+  const VERB_HE = /(?:(?:נא|אפשר|תוכל(?:י|ו)?|מבקש(?:ת)?|צריך|צריכה|חייב(?:ת)?)\s+(?:בבקשה\s+)?(?:להעביר|לשלם|לשלוח|לבצע\s+העברה|לסגור)|תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע\s+העברה|תסגור|תסגרי)/;
   const ASK_EN = /^(?:(?:hey|hi|hello)[\s,]+\S+[\s,]+)?(?:please\s+|pls\s+|kindly\s+)?(?:can|could|would|will)?\s*(?:you\s+)?(?:please\s+)?(?:transfer|pay|send|wire|settle|bit|paybox)\b|^(?:please\s+)(?:transfer|pay|send|wire|settle)\b|\byou\s+(?:owe|need\s+to\s+pay|still\s+owe)\b|\b(?:need|want)\s+you\s+to\s+(?:transfer|pay|send)\b/i;
-  const ASK_HE = /^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:בבקשה\s+)?(?:אפשר\s+ש)?(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע|תסגור|תסגרי)|אתה\s+חייב|את\s+חייבת|אתם\s+חייבים|אני\s+צריך\s+שתעביר|צריך\s+שתשלם/;
+  const ASK_HE = /^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:נא|אפשר|תוכל(?:י|ו)?|מבקש(?:ת)?|אשמח\s+אם\s+תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להעביר|לשלם|לשלוח|לבצע\s+העברה|לסגור)|^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:בבקשה\s+)?(?:אפשר\s+ש)?(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע|תסגור|תסגרי)|אתה\s+חייב|את\s+חייבת|אתם\s+חייבים|אני\s+צריך\s+שתעביר|צריך\s+שתשלם/;
   const AMOUNT = /(?:(?:[$€£₪])\s?(\d[\d,]*(?:\.\d{1,2})?))|(?:(\d[\d,]*(?:\.\d{1,2})?)\s?(?:nis|ils|usd|eur|gbp|dollars?|euros?|shekels?|bucks|₪|\$|€|£|שקל(?:ים)?|שקלים|ש"ח|ש״ח|שח|דולר(?:ים)?|אירו|יורו))/i;
   const NO_EN = /\b(?:receipt|refunded|thank(?:s|\s+you)\s+for\s+(?:your\s+)?payment|has\s+been\s+paid|was\s+paid|autopay|auto-?pay|will\s+be\s+charged|direct\s+debit|don'?t|do\s+not|no\s+need|never\s*mind|already|paid|sent|yesterday|last\s+(?:week|night)|maybe|might|if\s+you\s+(?:want|can|like)|cancel(?:l?ed)?|refund|i'?ll|i\s+will|i\s+can|i\s+sent|i\s+paid|(?:he|she|they)\s+(?:will|should|can))\b/i;
-  const NO_HE = /(?:קבלה|שולם|שולמה|תודה\s+על\s+התשלום|הוראת\s+קבע|יחויב|תחויב|אל\s+תעביר|אל\s+תשלם|אין\s+צורך|לא\s+צריך|כבר\s|שילמתי|העברתי|אתמול|שבוע שעבר|אולי|אם\s+(?:בא|תוכל|אפשר)|לבטל|בוטל|החזר|אני\s+(?:אעביר|אשלם|אשלח))/;
+  const NO_HE = /(?:נא\s+לא|קבלה|שולם|שולמה|תודה\s+על\s+התשלום|הוראת\s+קבע|יחויב|תחויב|אל\s+תעביר|אל\s+תשלם|אין\s+צורך|לא\s+צריך|כבר\s|שילמתי|העברתי|אתמול|שבוע שעבר|אולי|אם\s+(?:בא|תוכל|אפשר)|לבטל|בוטל|החזר|אני\s+(?:אעביר|אשלם|אשלח))/;
   const MAX_AHEAD_DAYS = 60;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];

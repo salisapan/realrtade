@@ -6,6 +6,10 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['נא להעביר את התשלום על 1200 ש"ח עד מחר', '2026-10-24', '1200', 'NIS'],
+  ['אפשר להעביר את ה-400 שקל עד מחר?', '2026-10-24', '400', 'NIS'],
+  ['תוכל לשלם 300 ש"ח עד יום חמישי', '2026-10-29', '300', 'NIS'],
+  ['היי דנה, נא לשלם 250 שקל עד יום ראשון', '2026-10-25', '250', 'NIS'],
   ['Please transfer 500 NIS to my account by Sunday', '2026-10-25', '500', 'NIS'],
   ['Can you pay the 1,200 ₪ invoice before Thursday?', '2026-10-29', '1200', 'NIS'],
   ['Could you send $250 tomorrow?', '2026-10-24', '250', 'USD'],
@@ -32,6 +36,11 @@ const YES = [
 ];
 for (const [text, day, amount, cur] of YES) { const r = A.recognize(text, NOW); check('payment ask: ' + text, r.kind === 'ask' && r.dateIso === day && r.amount === amount && r.currency === cur, r); }
 const NO = [
+  ['נא לא להעביר 500 שקל עד מחר', 'a polite refusal'],
+  ['הוא צריך להעביר 500 שקל עד מחר', 'somebody else'],
+  ['אני צריך להעביר 500 שקל עד מחר', 'the writer pays'],
+  ['אפשר להעביר?', 'no amount'],
+  ['תוכל לשלוח לי תמונה עד מחר', 'not money'],
   'Reminder: the group is paying 500 NIS on Sunday',
   'A reminder that rent was paid on Sunday, 500 NIS',
   'Reminder: payment of 500 NIS went out on Sunday',
