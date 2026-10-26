@@ -942,3 +942,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-payment-claim-corpus.cjs` +8 claims (all fail on the old code) and 5 quiet lines; 3 new real-browser cases in `e2e/chat-payment-close.spec.js`; the new Meta spec; chat specs (payment-close, own-paid-close, meta-lanes, whatsapp-card, document-close) pass, 46; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; the other side's claim still needs a "Waiting on" payment task made from this chat; no spec for the document and chase closes on Messenger and Instagram.
+
+### Run 115 (2026-10-26)
+- **Capability shipped (behind `TASK_ASK` / `CHAT_TASK_CARD`, off):** an instruction to call or write to a named third party on a day ("Call the plumber tomorrow", «תתקשר לבנק ביום שני») gave no card (only "call me" did); it is now a To Do reminder task.
+- **Probe finding that is not a gap:** an undated call-back ("Call me when you get a chance") stays quiet on purpose (no day, no task).
+- **Code:** `core/chat-reminder.js` only (two cues).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-reminder-corpus.cjs` +6 lines (all fail on the old code) and 6 quiet ones; 2 real-browser Outlook cases; booking, WhatsApp and Meta-lane specs pass (61); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; no Messenger or Instagram spec for this task; "Please ring me back this afternoon" (no day) stays quiet.

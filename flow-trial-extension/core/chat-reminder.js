@@ -10,6 +10,11 @@ const FlowChatReminder = (() => {
   // התעודה ביום חמישי») is the same task. The cue is zero-width: the thing starts at the verb.
   const CUE_BRING_EN = /\b(?:please\s+)?(?=bring\s+(?:your|the|a|an|along|with)\b)/i;
   const CUE_BRING_HE = /(?:^|[\s,.])(?:נא\s+)?(?=(?:תביא|תביאי|תביאו|להביא)\s)/;
+  // A plain imperative to call or write to a third party with a day ("Call the plumber tomorrow and confirm the time", «תתקשר לבנק ביום שני») is the same
+  // task. "call me" is the call-back ask (core/chat-callback-ask.js), so the target must be a named third party: an article or a title in English,
+  // «ל» + a word in Hebrew (not «אליי»).
+  const CUE_CALL_EN = /\b(?:please\s+)?(?=(?:call|phone|ring|email|text|message|contact)\s+(?:the|your|our|a|an|dr\.?|mr\.?|mrs\.?|ms\.?)\s)/i;
+  const CUE_CALL_HE = /(?:^|[\s,.])(?:נא\s+)?(?=(?:תתקשר|תתקשרי|תצלצל|תצלצלי|לתקשר)\s+ל(?!י(?:\s|$))[^\s])/;
   // Not a reminder to act: a look back, a refusal, a hedge, a thing already done, a thing for someone else.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|maybe|might|if\s+you\s+want|cancel(?:l?ed)?)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|שכחתי|כבר\s|עזוב|תעזוב|לא\s+משנה|אני\s+אעשה|אולי|בוטל|לבטל)/;
@@ -66,7 +71,7 @@ const FlowChatReminder = (() => {
     if (raw.length > 240) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-reminder' };
-    const m = raw.match(CUE_EN) || raw.match(CUE_HE) || raw.match(CUE_BRING_EN) || raw.match(CUE_BRING_HE);
+    const m = raw.match(CUE_EN) || raw.match(CUE_HE) || raw.match(CUE_BRING_EN) || raw.match(CUE_BRING_HE) || raw.match(CUE_CALL_EN) || raw.match(CUE_CALL_HE);
     if (!m) return { kind: 'none', reason: 'no-cue' };
     // A bare "Reminder:" in front of a request ("Reminder: please send it by Monday") is a deadline ask, and in front of a look back
     // ("Reminder: the form was due Monday") is nothing to do: neither is a reminder to act.

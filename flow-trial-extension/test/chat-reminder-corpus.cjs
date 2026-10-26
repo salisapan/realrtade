@@ -19,7 +19,14 @@ const YES = [
   ['Please bring a printed copy on Wednesday', '2026-10-28', /printed copy/],
   ['תביא איתך את הרישיון מחר', '2026-10-24', /הרישיון/],
   ['נא להביא את הטפסים ביום רביעי', '2026-10-28', /הטפסים/],
-  ['תביאי את הציוד ביום ראשון', '2026-10-25', /הציוד/]
+  ['תביאי את הציוד ביום ראשון', '2026-10-25', /הציוד/],
+  // call or write to a third party on a day (run 115)
+  ['Call the plumber tomorrow and confirm the time', '2026-10-24', /Call the plumber/],
+  ['Please call the bank on Monday', '2026-10-26', /call the bank/],
+  ['Email the landlord on Wednesday', '2026-10-28', /Email the landlord/],
+  ['תתקשר לבנק ביום שני', '2026-10-26', /לבנק/],
+  ['תתקשר ליוסי מחר', '2026-10-24', /ליוסי/],
+  ['נא לתקשר ללקוח ביום חמישי', '2026-10-29', /ללקוח/]
 ];
 for (const [text, day, what] of YES) {
   const r = R.recognize(text, NOW);
@@ -44,6 +51,12 @@ const NO = [
   ['I will bring the contract on Monday', 'own promise'],
   ['Bring cash, parking is not free, see you tomorrow', 'no thing for the cue'],
   ['תביא קפה', 'no day'],
+  ['Call me tomorrow', 'call me is the call-back ask'],
+  ['תתקשר אליי מחר', 'call me is the call-back ask'],
+  ['תתקשר לי ביום שלישי', 'call me is the call-back ask'],
+  ['I will call the bank tomorrow', 'own promise'],
+  ['Call the bank', 'no day'],
+  ['Can you call the bank on Monday?', 'question'],
   ['', 'empty'],
   ['x'.repeat(300), 'long']
 ];
