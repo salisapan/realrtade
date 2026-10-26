@@ -795,3 +795,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-appointment-notice-corpus.cjs` (6 repeating lines with their first date, 5 quiet lines, a one-off is not marked), 6 real-browser specs (Outlook mail on and off, Gmail on and off, WhatsApp on Outlook), every `test/*corpus.cjs` green.
 - **Open:** live Gate (both switches are the owner's); an end date for a course is not read; monthly and daily repeats of a booking are not offered here.
+
+## Run 96 (builder B, 2026-10-26): a plain reminder is a booking
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the appointment reader wanted a confirming word ("confirmed", "booked", "see you") and so ignored the commonest real message, the reminder: "Your appointment is tomorrow at 14:00", "Your dentist appointment is in 3 days at 14:00", "Your table is tonight at 8pm", «התור שלך מחר ב-14:00». Found by probing invented lines I had not tuned on (12 lines: 7 should have been bookings and 5 were silent for the wrong reason). Now the existing Hold It card is offered for them in chat, Outlook and Gmail.
+- **Precision work in the same change:** the first version also accepted "The deadline for your appointment form is in 3 days at 14:00" (the booking noun is the form's). The reader now stays quiet when the word after the booking noun is form, request, history, link, page, policy, details, fee or number, and on deadline, due and expires. Questions, past and cancelled messages, "unless you cancel", and a flight, a meeting, an order or an invoice (no booking noun) stay quiet, as before.
+- **Code:** `core/chat-appointment-notice.js` only (frame and a few quiet words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` gained 9 plain-reminder lines with their date and clock and 9 quiet lines, two real-browser Outlook specs (the reminder is one hold with Undo; the form deadline shows nothing), every `test/*corpus.cjs` green (including the booking, silence and parity corpora), and the 68 booking and hold specs green.
+- **Open:** live Gate; a day number with no month ("the 5th") and a bare hour ("tomorrow morning at 9") are not read.
