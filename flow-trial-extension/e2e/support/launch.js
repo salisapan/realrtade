@@ -8,6 +8,12 @@ const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
 
+function manifestGoogleGrantedVersion() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(EXT_ROOT, 'manifest.json'), 'utf8'));
+  const scopes = (manifest.oauth2 && manifest.oauth2.scopes) || [];
+  return scopes.slice().sort().join('\n');
+}
+
 function copyExtension(opts) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-ext-'));
   fs.cpSync(EXT_ROOT, dest, {
@@ -874,16 +880,7 @@ async function boot() {
       // then this stored Connect token. Production never reads an e2e hook for it.
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
       googleGrantedScopes: {
-        version: [
-          'https://www.googleapis.com/auth/calendar.events',
-          'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/gmail.compose',
-          'https://www.googleapis.com/auth/tasks',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/userinfo.email',
-          'openid'
-        ].slice().sort().join('\n'),
+        version: manifestGoogleGrantedVersion(),
         status: 'granted',
         source: 'chrome',
         at: Date.now()
