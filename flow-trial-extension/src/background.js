@@ -57,7 +57,7 @@ import '../core/profile-hook.js'; // classic: sets globalThis.FlowProfileHook (C
 import '../core/graph-mail.js'; // classic: sets globalThis.FlowGraphMail (Outlook Graph sync)
 import '../core/outlook-sync.js'; // classic: sets globalThis.FlowOutlookSync (ecosystem Graph sync when OWA closed)
 import '../src/outlook.js'; // classic: sets globalThis.FlowOutlook
-import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras } from './connect-ecosystem-sw.js';
+import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras, requestMicrosoftOptionalScopes } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/day-words.js'; // classic: sets globalThis.FlowDayWords (extract.js makes the day forms people write explicit with it)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
@@ -2421,6 +2421,18 @@ async function connectGoogleTasks(interactive, preset) {
   await chrome.storage.local.set({
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
+  });
+  const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
+    ? await globalThis.FlowGoogleLaneAccount.read()
+    : '';
+  const profBag = await chrome.storage.local.get({ googleProfile: null, glanceOwnNames: [] });
+  const names = Array.isArray(profBag.glanceOwnNames) ? profBag.glanceOwnNames : [];
+  const gp = profBag.googleProfile && typeof profBag.googleProfile === 'object' ? profBag.googleProfile : null;
+  await seedUserContextFromConnect({
+    email: accountEmail,
+    name: (gp && (gp.name || gp.given_name)) || names[0] || '',
+    title: gp && gp.title,
+    department: gp && gp.department
   });
   return true;
 }
@@ -5239,6 +5251,7 @@ async function outlookConsentScope(msg) {
     return { ok: false, reason: 'not-configured' };
   }
   const scope = String((msg && msg.scope) || '');
+  if (scope === 'Contacts.Read' || scope === 'Chat.Read') return { ok: false, reason: 'scope-refused' };
   const todoScope = scope === 'Tasks.ReadWrite';
   const calendarScope = scope === 'Calendars.ReadWrite';
   if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
@@ -5830,6 +5843,7 @@ async function readUserContextProfile(accountKey) {
 async function writeUserContextProfile(profile, accountKey) {
   const W = globalThis.FlowUserContextWriter;
   if (!W || !profile) return false;
+  if (!(await glanceSwitchOn(W.SWITCH))) return false;
   const key = String(accountKey || profile.userId || 'default').trim().toLowerCase() || 'default';
   try {
     const store = await readUserContextStore();
@@ -5845,8 +5859,13 @@ async function writeUserContextProfile(profile, accountKey) {
 async function seedUserContextFromConnect(connectPatch) {
   const W = globalThis.FlowUserContextWriter;
   if (!W || !(await glanceSwitchOn(W.SWITCH))) return;
-  const next = W.fromConnect(await readUserContextProfile(), connectPatch || {});
-  await writeUserContextProfile(next);
+  const patch = connectPatch || {};
+  const accountKey = userContextAccountKey({
+    accountKey: patch.email || patch.mail || patch.accountKey,
+    tabAccount: patch.email || patch.mail
+  });
+  const next = W.fromConnect(await readUserContextProfile(accountKey), patch);
+  await writeUserContextProfile(next, accountKey);
 }
 
 async function applyUserContextEvent(msg) {
@@ -7181,6 +7200,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:google-reconnect') {
     if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
     return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
+  }
+
+  if (msg.type === 'flow:microsoft-optional-scopes') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    const bucket = msg.bucket || msg.optionalBucket;
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
   }
 
   if (msg.type === 'flow:connect') {

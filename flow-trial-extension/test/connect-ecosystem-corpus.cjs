@@ -300,22 +300,43 @@ await ok('stepsFor microsoft is exactly one Graph step with ecosystem consent sc
   assert.strictEqual(r.steps.length, 1);
   assert.strictEqual(r.steps[0].type, 'microsoft-ecosystem');
   assert.deepStrictEqual(r.steps[0].scopes, MS_EXPECTED);
-  assert.strictEqual(r.steps[0].scopes.length, 12);
+  assert.strictEqual(r.steps[0].scopes.length, 7);
   assert.ok(r.steps[0].scopes.indexOf('openid') >= 0);
   assert.ok(r.steps[0].scopes.indexOf('profile') >= 0);
   assert.ok(r.steps[0].scopes.indexOf('Chat.Read') < 0);
 });
 
-await ok('microsoft base consent never includes Group.*, Chat.Read, or OnlineMeetings; optional is planner and teamsChat', () => {
+await ok('microsoft base consent never includes Group.*, Chat.Read, or OnlineMeetings; optional is teamsChat and contacts', () => {
   assert.ok(!MS_EXPECTED.some((s) => /^Group\./i.test(s)));
   assert.ok(MS_EXPECTED.indexOf('OnlineMeetings.ReadWrite') < 0);
   assert.ok(MS_EXPECTED.indexOf('Chat.Read') < 0);
-  assert.deepStrictEqual(E.microsoftOptionalScopes.planner, ['Group.Read.All']);
+  assert.ok(MS_EXPECTED.indexOf('Calendars.ReadWrite') < 0);
+  assert.ok(MS_EXPECTED.indexOf('Contacts.Read') < 0);
+  assert.ok(MS_EXPECTED.indexOf('Notes.ReadWrite') < 0);
+  assert.ok(MS_EXPECTED.indexOf('MailboxSettings.Read') < 0);
+  assert.ok(MS_EXPECTED.indexOf('People.Read') < 0);
+  assert.ok(E.microsoftOptionalScopes.planner === undefined);
+  assert.ok(!Object.keys(E.microsoftOptionalScopes).some((k) => /Group/i.test(String(E.microsoftOptionalScopes[k]))));
   assert.deepStrictEqual(E.microsoftOptionalScopes.teamsChat, ['Chat.Read']);
-  assert.ok(E.microsoftOptionalScopes.teamsMeeting === undefined);
+  assert.deepStrictEqual(E.microsoftOptionalScopes.contacts, ['Contacts.Read']);
   assert.ok(MS_EXPECTED.indexOf('Tasks.ReadWrite') >= 0);
   assert.ok(E.microsoftRequiredScopes().indexOf('openid') < 0);
   assert.ok(E.microsoftRequiredScopes().indexOf('profile') < 0);
+});
+
+await ok('incremental optional scopes merge on Labs Teams or Outlook contacts', () => {
+  assert.strictEqual(E.optionalScopeBucketForLabsSwitch('TEAMS_MEETING'), 'teamsChat');
+  assert.strictEqual(E.optionalScopeBucketForOutlookService('contacts'), 'contacts');
+  const work = { microsoftAccountKind: 'work' };
+  assert.deepStrictEqual(E.incrementalScopesForBucket('teamsChat', work), ['Chat.Read']);
+  const merged = E.mergeMicrosoftScopes(MS_EXPECTED, ['Chat.Read', 'Contacts.Read']);
+  assert.ok(merged.indexOf('Chat.Read') >= 0);
+  assert.ok(merged.indexOf('Contacts.Read') >= 0);
+  assert.ok(E.TEAMS_OPTIONAL_HOST_ORIGINS.indexOf('https://teams.microsoft.com/*') >= 0);
+  const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
+  assert.ok(/teams\.microsoft\.com/.test(manifest));
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
+  assert.ok(/flow:microsoft-optional-scopes/.test(bg) && /requestMicrosoftOptionalScopes/.test(bg));
 });
 
 function fakeIdToken(tid) {
@@ -374,31 +395,24 @@ await ok('plannerAccess personal Microsoft account: no card, silent To Do, never
   assert.strictEqual(route.explainTodoFallback, false);
 });
 
-await ok('plannerAccess work account without Group.Read.All: needs-consent with EN+HE why copy', () => {
+await ok('plannerAccess work account without Group.Read.All: no Planner card or group consent in this build', () => {
   const account = { address: 'you@contoso.com', mail: 'you@contoso.com', userPrincipalName: 'you@contoso.com', microsoftAccountKind: 'work' };
   const access = E.plannerAccess(account, MS_EXPECTED);
-  assert.strictEqual(access, 'needs-consent');
-  assert.strictEqual(E.plannerShowsPlannerCard(access), true);
-  assert.strictEqual(E.plannerShouldRequestGroupConsent(access), true);
+  assert.strictEqual(access, 'unavailable');
+  assert.strictEqual(E.plannerShowsPlannerCard(access), false);
+  assert.strictEqual(E.plannerShouldRequestGroupConsent(access), false);
   const route = E.plannerExecutionRoute(access, null);
-  assert.strictEqual(route.requestGroupConsent, true);
-  const en = D.chrome('en').plannerGroupConsentWhy;
-  const he = D.chrome('he').plannerGroupConsentWhy;
-  assert.ok(en && en.length > 20);
-  assert.ok(he && he.length > 20);
-  assert.ok(/Planner/i.test(en));
-  assert.ok(/Planner/.test(he));
+  assert.strictEqual(route.destination, 'todo');
+  assert.strictEqual(route.requestGroupConsent, false);
 });
 
 await ok('plannerConsentOutcome admin or denied falls back to To Do with explanation, not a dead end', () => {
-  const account = { address: 'you@contoso.com', userPrincipalName: 'you@contoso.com', microsoftAccountKind: 'work' };
-  const access = E.plannerAccess(account, MS_EXPECTED);
   const admin = E.plannerConsentOutcome({ ok: false, aadsts: 'AADSTS65001', error: 'invalid_grant' });
   const denied = E.plannerConsentOutcome({ ok: false, error: 'access_denied', reason: 'permission-denied' });
   assert.strictEqual(admin, 'admin-required');
   assert.strictEqual(denied, 'denied');
-  const routeAdmin = E.plannerExecutionRoute(access, admin);
-  const routeDenied = E.plannerExecutionRoute(access, denied);
+  const routeAdmin = E.plannerExecutionRoute('unavailable', admin);
+  const routeDenied = E.plannerExecutionRoute('unavailable', denied);
   assert.strictEqual(routeAdmin.destination, 'todo');
   assert.strictEqual(routeDenied.destination, 'todo');
   assert.strictEqual(routeAdmin.explainTodoFallback, true);
@@ -1026,6 +1040,59 @@ await ok('personal microsoft one-consent succeeds without OnlineMeetings.ReadWri
   assert.ok(MS_EXPECTED.indexOf('OnlineMeetings.ReadWrite') < 0);
   const granted = MS_EXPECTED.slice();
   assert.strictEqual(E.hasScopes(granted, E.microsoftRequiredScopes()), true);
+});
+
+await ok('K1: ecosystem microsoft sign-in sends only base consent scopes', async () => {
+  const world = loadMicrosoftEcosystemConnect();
+  await world.connect();
+  const auth = world.stored.outlookAuth;
+  assert.ok(auth && Array.isArray(auth.requestedScopes));
+  assert.deepStrictEqual(sortScopes(auth.requestedScopes), sortScopes(MS_EXPECTED));
+});
+
+await ok('K2: popup requests optional scopes via flow:microsoft-optional-scopes not outlook-consent', () => {
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  const addBlock = popup.slice(popup.indexOf('data-glance-add-scope'), popup.indexOf('data-glance-add-scope') + 2200);
+  assert.ok(/flow:microsoft-optional-scopes/.test(addBlock));
+  assert.ok(/optionalScopeBucketForOutlookService/.test(addBlock));
+  const labs = popup.slice(popup.indexOf('async function labsOptionalScopeAfterFlip'), popup.indexOf('async function renderLabs'));
+  assert.ok(/flow:microsoft-optional-scopes/.test(labs));
+  assert.ok(!/renderLabs[\s\S]{0,800}flow:microsoft-optional-scopes/.test(popup));
+});
+
+await ok('K3: outlook-consent-scope refuses Contacts.Read and Chat.Read', async () => {
+  const { backgroundScript } = require('./load-background.cjs');
+  const stored = { outlookAuth: { token: { accessToken: 't' }, requestedScopes: MS_EXPECTED } };
+  const chrome = {
+    storage: { local: { async get() { return stored; }, async set() {} } },
+    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' }
+  };
+  const sandbox = { console, chrome, crypto: require('crypto').webcrypto, fetch: async () => ({ ok: false }) };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(backgroundScript(), sandbox, { filename: 'background.js', timeout: 120000 });
+  const fn = vm.runInContext('outlookConsentScope', sandbox);
+  const contacts = await fn({ scope: 'Contacts.Read' });
+  const chat = await fn({ scope: 'Chat.Read' });
+  assert.strictEqual(contacts.reason, 'scope-refused');
+  assert.strictEqual(chat.reason, 'scope-refused');
+});
+
+await ok('ecosystem reconnect keeps already-granted Contacts.Read', async () => {
+  const withContacts = MS_EXPECTED.concat(['Contacts.Read']);
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: withContacts,
+        token: { accessToken: 'old', grantedScopes: withContacts },
+        account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+      }
+    }
+  });
+  await inst.connect({ scopes: MS_EXPECTED.concat(['Mail.Read']) });
+  assert.ok(w.signInScopes.indexOf('Contacts.Read') >= 0);
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(withContacts));
 });
 
 console.log('\n' + n + ' passed, ' + failures + ' failed');

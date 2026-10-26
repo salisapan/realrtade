@@ -20,7 +20,7 @@ const CARRY_IMPORT = /^import \{ CARRY \} from '\.\.\/config\/carry\.public\.js'
 const CONNECTORS_IMPORT = /^import \{ CONNECTORS \} from '\.\.\/config\/connectors\.public\.js';\r?\n/m;
 const LANE_HOST_IMPORT = /^import '\.\/google-lane-host\.js';\r?\n/m;
 const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.\.\/src|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
-const ECOSYSTEM_SW_IMPORT = /^import \{ connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras \} from '\.\/connect-ecosystem-sw\.js';\r?\n/m;
+const ECOSYSTEM_SW_IMPORT = /^import \{ connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras(?:, requestMicrosoftOptionalScopes)? \} from '\.\/connect-ecosystem-sw\.js';\r?\n/m;
 
 function stripEsmExports(source) {
   return source

@@ -6,6 +6,8 @@ const FlowUserContextWriter = (() => {
   const VERSION = 'user-context-v0';
   const SWITCH = 'USER_CONTEXT_WRITER';
   const DECAY_HALF_LIFE_DAYS = 30;
+  const RELEVANT_MIN_APPROVED = 2;
+  const NOT_RELEVANT_MIN_DISMISS = 3;
 
   function normId(userId) {
     const s = String(userId || '').trim();
@@ -67,11 +69,33 @@ const FlowUserContextWriter = (() => {
     const key = String(party || 'unknown').trim().toLowerCase();
     let row = findDecision(p.decisionHistory, fam, key);
     if (!row) {
-      row = { intentFamily: fam, party: key, approvedFetchedBack: 0, dismissed: 0, undo: 0, edited: 0, missedClose: 0, lastAt: null };
+      row = {
+        intentFamily: fam,
+        party: key,
+        approvedFetchedBack: 0,
+        dismissed: 0,
+        undo: 0,
+        edited: 0,
+        missedClose: 0,
+        lastAt: null,
+        approvalAts: [],
+        dismissAts: []
+      };
       p.decisionHistory.push(row);
     }
+    const atIso = at || new Date().toISOString();
     row[field] = (Number(row[field]) || 0) + 1;
-    row.lastAt = at || new Date().toISOString();
+    row.lastAt = atIso;
+    if (field === 'approvedFetchedBack') {
+      if (!Array.isArray(row.approvalAts)) row.approvalAts = [];
+      row.approvalAts.push(atIso);
+      row.approvedFetchedBack = row.approvalAts.length;
+    }
+    if (field === 'dismissed') {
+      if (!Array.isArray(row.dismissAts)) row.dismissAts = [];
+      row.dismissAts.push(atIso);
+      row.dismissed = row.dismissAts.length;
+    }
     return p;
   }
 
@@ -169,20 +193,27 @@ const FlowUserContextWriter = (() => {
     return p;
   }
 
-  function relevanceHint(profile) {
+  function relevanceHint(profile, nowIso) {
     const p = norm(profile);
     const rows = p.decisionHistory || [];
-    let approved = 0;
-    let dismissed = 0;
-    const now = new Date().toISOString();
+    let approvalWeight = 0;
+    let dismissCount = 0;
+    const now = nowIso || new Date().toISOString();
     for (const r of rows) {
-      const w = decayWeight(r.lastAt, now);
-      approved += (Number(r.approvedFetchedBack) || 0) * w;
-      dismissed += (Number(r.dismissed) || 0) * w;
+      const approvalAts = Array.isArray(r.approvalAts) && r.approvalAts.length
+        ? r.approvalAts
+        : (Number(r.approvedFetchedBack) > 0 && r.lastAt ? [r.lastAt] : []);
+      for (let i = 0; i < approvalAts.length; i++) {
+        approvalWeight += decayWeight(approvalAts[i], now);
+      }
+      dismissCount += Number(r.dismissed) || 0;
     }
-    const relevantFloor = 2 - 1e-2;
-    if (dismissed === 0 && approved >= relevantFloor) return { relevance: 'relevant', reason: 'history_closed' };
-    if (dismissed >= 3 && approved === 0) return { relevance: 'not_relevant', reason: 'history_dismissed' };
+    if (dismissCount <= 0 && approvalWeight >= RELEVANT_MIN_APPROVED) {
+      return { relevance: 'relevant', reason: 'history_closed' };
+    }
+    if (dismissCount >= NOT_RELEVANT_MIN_DISMISS && approvalWeight <= 0) {
+      return { relevance: 'not_relevant', reason: 'history_dismissed' };
+    }
     return { relevance: 'unknown', reason: 'cold_profile' };
   }
 

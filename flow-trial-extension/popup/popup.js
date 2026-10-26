@@ -499,6 +499,14 @@
     }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
+      const msIds = ['microsoft', 'microsoftTodo', 'outlook'];
+      if (live.some((k) => msIds.indexOf(k) >= 0)) {
+        stampMicrosoft(pill, microsoft);
+        stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+        pill.textContent = microsoftFaceLabel(microsoft);
+        pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+        return;
+      }
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
       pill.textContent = uiLang() === 'he' ? 'מחובר' : ((conn ? conn.label : live[0]) + ' connected');
       pill.className = 'ver on';
@@ -1921,7 +1929,21 @@
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
         });
         for (let i = 0; i < add.length; i++) {
-          const scopes = add[i].scopes || [];
+          const svc = add[i];
+          const bucket = (globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForOutlookService === 'function')
+            ? FlowConnectEcosystem.optionalScopeBucketForOutlookService(svc.id)
+            : null;
+          if (bucket) {
+            const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
+            if (!grantedScope || grantedScope.ok !== true) {
+              addScope.disabled = false;
+              note.hidden = false;
+              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              return;
+            }
+            continue;
+          }
+          const scopes = svc.scopes || [];
           for (let j = 0; j < scopes.length; j++) {
             if (grantedNow.indexOf(scopes[j]) >= 0) continue;
             const grantedScope = await send({ type: 'flow:outlook-consent-scope', scope: scopes[j], policy: 'always' });
@@ -2260,6 +2282,15 @@
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
   }
 
+  async function labsOptionalScopeAfterFlip(switchId) {
+    if (!globalThis.FlowConnectEcosystem || typeof FlowConnectEcosystem.optionalScopeBucketForLabsSwitch !== 'function') return;
+    const bucket = FlowConnectEcosystem.optionalScopeBucketForLabsSwitch(switchId);
+    if (!bucket) return;
+    try {
+      await chrome.runtime.sendMessage({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
+    } catch (e) { /* optional consent */ }
+  }
+
   // The off switches, one row each, in the rows the popup already uses. It reads and writes one storage object and nothing else.
   async function renderLabs() {
     const host = document.getElementById('labs-list');
@@ -2288,7 +2319,9 @@
       btn.type = 'button';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        const turningOn = !on;
+        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, turningOn) });
+        if (turningOn) await labsOptionalScopeAfterFlip(r.id);
         await renderLabs();
       });
       acts.appendChild(btn);
