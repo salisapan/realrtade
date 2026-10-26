@@ -295,11 +295,12 @@ const FlowIncomingJudge = (() => {
     return out;
   }
 
-  function firstHit(api, body, now, kind) {
-    if (!api || typeof api.recognize !== 'function') return null;
+  function firstHit(api, body, now, kind, fn) {
+    const method = fn || 'recognize';
+    if (!api || typeof api[method] !== 'function') return null;
     const wins = windowsOf(body);
     for (let k = 0; k < wins.length; k++) {
-      const r = api.recognize(wins[k], now);
+      const r = api[method](wins[k], now);
       if (r && r.kind === kind) return r;
     }
     return null;
@@ -342,10 +343,11 @@ const FlowIncomingJudge = (() => {
   function paymentAsk(i, body) {
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const api = sibling(typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk : null, './chat-payment-ask.js', 'FlowChatPaymentAsk');
-    const pay = firstHit(api, body, now0, 'ask');
+    const pay = firstHit(api, body, now0, 'ask') || firstHit(api, body, now0, 'ask', 'recognizeBill');
     if (!pay) return null;
     const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+    const what = pay.ref ? (pay.lang === 'he' ? 'חשבונית ' : 'invoice ') + pay.ref : pay.amount + ' ' + pay.currency;
+    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + what + (who ? ' · ' + who : '')).slice(0, 120);
     return {
       intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
       process: { id: 'log-it', name: 'Log It', closingLine: pay.lang === 'he' ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: pay.lang === 'he' ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, paymentAsk: true,
