@@ -2,6 +2,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -16,13 +17,78 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 
+function asyncFnBody(src, fnName) {
+  const re = new RegExp('(?:export\\s+)?async function ' + fnName);
+  const m = re.exec(src);
+  const i = m ? m.index : -1;
+  if (i < 0) return '';
+  const brace = src.indexOf('{', i);
+  if (brace < 0) return '';
+  let depth = 0;
+  for (let j = brace; j < src.length; j++) {
+    const ch = src[j];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return src.slice(brace + 1, j);
+    }
+  }
+  return '';
+}
+
+function fetchHonoringAbort(url, init) {
+  const signal = init && init.signal;
+  return new Promise(function (resolve, reject) {
+    if (signal && typeof signal.addEventListener === 'function') {
+      signal.addEventListener('abort', function () {
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      });
+    }
+    resolve({
+      status: 200,
+      ok: true,
+      json: function () {
+        return new Promise(function (_resolve, rejectJson) {
+          if (signal && typeof signal.addEventListener === 'function') {
+            signal.addEventListener('abort', function () {
+              rejectJson(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+            });
+          }
+        });
+      }
+    });
+  });
+}
+
+async function graphFetchBudgeted(core, budgetStartMs, nowMs) {
+  if (typeof budgetStartMs === 'number' && core.maintenanceBudgetExceeded(budgetStartMs, nowMs)) {
+    return { budget: true };
+  }
+  await core.fetchJsonWithTimeout(30, 'https://graph.microsoft.com/v1.0/me/messages/x', { method: 'GET' });
+  return { budget: false };
+}
+
 async function main() {
+  const watchdog = setTimeout(function () {
+    console.error('FAIL: edge-corpus watchdog (main hung or produced no checks)');
+    process.exit(1);
+  }, 90000);
+
   const core = await import(pathToFileURL(MARKER_CORE).href);
   const edge = fs.readFileSync(EDGE_INDEX, 'utf8');
+  const coreSrc = fs.readFileSync(MARKER_CORE, 'utf8');
+
+  check('marker-core GRAPH_FETCH_TIMEOUT_MS is 45s', core.GRAPH_FETCH_TIMEOUT_MS === 45000);
+  check('marker-core MAINTENANCE_WALL_MS under 150s', core.MAINTENANCE_WALL_MS === 149000 && core.MAINTENANCE_WALL_MS < 150000);
+
+  let uint8Throws = false;
+  try { core.assertStorageSecret(new Uint8Array([1])); } catch (e) { uint8Throws = /Uint8Array/.test(String(e.message || e)); }
+  check('marker-core assertStorageSecret rejects Uint8Array', uint8Throws);
 
   let slowAborted = false;
+  const t0 = Date.now();
   try {
-    await core.graphFetchWithTimeout(30, function (signal) {
+    await core.graphFetchWithTimeout(80, function (signal) {
       return new Promise(function (resolve, reject) {
         if (signal && typeof signal.addEventListener === 'function') {
           signal.addEventListener('abort', function () { reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); });
@@ -32,39 +98,88 @@ async function main() {
   } catch (e) {
     slowAborted = /abort/i.test(String(e && e.name || e));
   }
-  check('marker-core graphFetchWithTimeout aborts hung fetch', slowAborted);
+  check('marker-core graphFetchWithTimeout aborts hung fetchFn', slowAborted && Date.now() - t0 < 500);
 
-  const coreSrc = fs.readFileSync(MARKER_CORE, 'utf8');
-  check('marker-core fetchJsonWithTimeout reads JSON inside timeout callback', /export async function fetchJsonWithTimeout[\s\S]*?await res\.json\(\)/.test(coreSrc));
-
-  if (typeof globalThis.fetch === 'function') {
-    const original = global.fetch;
-    global.fetch = function () {
-      return Promise.resolve({
-        status: 200,
-        ok: true,
-        json: function () { return Promise.resolve({ token: 'ok' }); }
-      });
-    };
-    const tokenOut = await core.fetchJsonWithTimeout(500, 'https://login.microsoftonline.com/common/oauth2/v2.0/token', { method: 'POST', body: 'x' });
-    global.fetch = original;
-    check('marker-core fetchJsonWithTimeout returns parsed JSON', tokenOut.ok === true && tokenOut.json && tokenOut.json.token === 'ok');
-  } else {
-    check('marker-core fetchJsonWithTimeout returns parsed JSON', typeof core.fetchJsonWithTimeout === 'function', 'skip: no fetch');
-  }
+  const originalFetch = global.fetch;
+  global.fetch = fetchHonoringAbort;
+  let stallOut = null;
+  const stallT0 = Date.now();
+  stallOut = await core.fetchJsonWithTimeout(120, 'https://graph.microsoft.com/v1.0/me/messages/stall', { method: 'GET' });
+  global.fetch = originalFetch;
+  const stallMs = Date.now() - stallT0;
+  check('marker-core fetchJsonWithTimeout aborts stalled res.json()',
+    stallMs >= 80 && stallMs < 400 && stallOut && stallOut.ok === true && stallOut.json === null);
 
   let sawSignal = false;
+  global.fetch = function (_url, init) {
+    sawSignal = Boolean(init && init.signal && typeof init.signal.addEventListener === 'function');
+    return fetchHonoringAbort(_url, init);
+  };
   try {
-    await core.graphFetchWithTimeout(25, async function (signal) {
-      sawSignal = Boolean(signal && typeof signal.addEventListener === 'function');
-      await new Promise(function (r) { setTimeout(r, 200); });
-      return { ok: true };
-    });
-  } catch (e) { /* timeout */ }
-  check('marker-core timeout passes AbortSignal into fetchFn', sawSignal);
+    await core.fetchJsonWithTimeout(60, 'https://example.com/signal', { method: 'GET' });
+  } catch (e) { /* abort */ }
+  global.fetch = originalFetch;
+  check('marker-core fetchJsonWithTimeout passes AbortSignal to fetch', sawSignal);
 
-  const budgetStart = Date.now() - core.MAINTENANCE_WALL_MS - 5;
-  check('marker-core maintenanceBudgetExceeded trips on wall', core.maintenanceBudgetExceeded(budgetStart, Date.now()));
+  const fetchJsonBody = asyncFnBody(coreSrc, 'fetchJsonWithTimeout');
+  check('marker-core fetchJsonWithTimeout reads JSON inside timeout callback',
+    fetchJsonBody.indexOf('await res.json()') >= 0 && fetchJsonBody.indexOf('graphFetchWithTimeout') >= 0);
+
+  const budgetStart = 1000;
+  const overWall = budgetStart + core.MAINTENANCE_WALL_MS + 1;
+  check('graphFetch budget guard trips when wall exceeded',
+    (await graphFetchBudgeted(core, budgetStart, overWall)).budget === true);
+  global.fetch = function () {
+    return Promise.resolve({ status: 200, ok: true, json: function () { return Promise.resolve({}); } });
+  };
+  check('graphFetch budget guard allows fetch under wall',
+    (await graphFetchBudgeted(core, budgetStart, budgetStart + 1)).budget === false);
+  global.fetch = originalFetch;
+
+  const graphBody = asyncFnBody(edge, 'graphFetch');
+  const ensureBody = asyncFnBody(edge, 'ensureAccessToken');
+  const processBody = asyncFnBody(edge, 'processMessage');
+  const fetchMsgBody = asyncFnBody(edge, 'fetchMessage');
+  const refreshBody = asyncFnBody(edge, 'refreshAccessToken');
+  const notifBody = asyncFnBody(edge, 'handleNotifications');
+
+  check('index graphFetch checks budget before fetchJsonWithTimeout',
+    /maintenanceBudgetExceeded\(budgetStartMs,\s*Date\.now\(\)\)/.test(graphBody) &&
+    graphBody.indexOf('maintenanceBudgetExceeded') < graphBody.indexOf('fetchJsonWithTimeout'));
+  check('index graphFetch uses fetchJsonWithTimeout not raw fetch to GRAPH',
+    graphBody.indexOf('fetchJsonWithTimeout') >= 0 && !/\bfetch\s*\(\s*GRAPH/.test(graphBody));
+  check('index graphFetch passes GRAPH_FETCH_TIMEOUT_MS to fetchJsonWithTimeout',
+    graphBody.indexOf('fetchJsonWithTimeout(GRAPH_FETCH_TIMEOUT_MS') >= 0);
+  check('index ensureAccessToken checks budget before refresh token read and refresh',
+    (ensureBody.match(/maintenanceBudgetExceeded\(budgetStartMs,\s*Date\.now\(\)\)/g) || []).length >= 2 &&
+    ensureBody.indexOf('readRefreshToken') > ensureBody.indexOf('maintenanceBudgetExceeded') &&
+    ensureBody.lastIndexOf('maintenanceBudgetExceeded') < ensureBody.indexOf('refreshAccessToken'));
+  check('index refreshAccessToken uses fetchJsonWithTimeout for token endpoint',
+    refreshBody.indexOf('fetchJsonWithTimeout') >= 0 && refreshBody.indexOf('login.microsoftonline.com') >= 0);
+  check('index processMessage checks budget at entry',
+    /^\s*if \(typeof budgetStartMs === "number" && maintenanceBudgetExceeded\(budgetStartMs/.test(processBody));
+  check('index fetchMessage forwards budgetStartMs into graphFetch',
+    /graphFetch\([\s\S]*budgetStartMs/.test(fetchMsgBody));
+  check('index handleNotifications passes budgetStartMs to fetchMessage',
+    /fetchMessage\(token,\s*resourceId,\s*budgetStartMs\)/.test(notifBody));
+
+  const catchBlock = (notifBody.match(/catch \(err\) \{[\s\S]*?\n    \}/) || [])[0] || '';
+  check('index notification catch records error without aborting batch',
+    catchBlock.indexOf('skipped: "error"') >= 0 && !/return results/.test(catchBlock));
+
+  check('marker-core graphFetchWithTimeout wires abort timer (kills timeout-noop mutant)',
+    /const timer = setTimeout\(\(\) => ctrl\.abort\(\), ms\)/.test(coreSrc));
+  global.fetch = fetchHonoringAbort;
+  const abortRace = await Promise.race([
+    core.fetchJsonWithTimeout(100, 'https://example.com/abort-race', { method: 'GET' }).then(function () { return 'finished'; }),
+    new Promise(function (resolve) { setTimeout(function () { resolve('stalled'); }, 250); })
+  ]);
+  global.fetch = originalFetch;
+  check('marker-core stalled json finishes before outer race loses (abort timer live)',
+    abortRace === 'finished');
+
+  check('index graphFetch has per-fetch budget guard (kills graphfetch-budget-off mutant)',
+    /if \(typeof budgetStartMs === "number" && maintenanceBudgetExceeded\(budgetStartMs, Date\.now\(\)\)\)/.test(graphBody));
 
   const opts = core.judgeOptsForAccount({
     own_addresses: ['me@example.com'],
@@ -73,20 +188,42 @@ async function main() {
   });
   check('judgeOptsForAccount passes own name and addresses', opts.userName === 'Sali' && opts.namesPending === false);
 
-  check('index token refresh uses fetchJsonWithTimeout', /async function refreshAccessToken[\s\S]*?fetchJsonWithTimeout/.test(edge));
-  check('index graphFetch reads JSON inside fetchJsonWithTimeout', /async function graphFetch[\s\S]*?fetchJsonWithTimeout/.test(edge));
-  check('index processMessage checks budget before work', /async function processMessage[\s\S]*?maintenanceBudgetExceeded\(budgetStartMs/.test(edge));
-  check('index passes budgetStartMs into ensureAccessToken', /ensureAccessToken\(supabase, full, budgetStartMs\)/.test(edge));
+  check('index uses maintenanceBudgetExceeded from marker-core',
+    edge.indexOf('maintenanceBudgetExceeded') >= 0 && edge.indexOf('from "./marker-core.mjs"') >= 0);
 
-  const notifFn = edge.slice(edge.indexOf('async function handleNotifications'));
-  const catchBlock = (notifFn.match(/catch \(err\) \{[\s\S]*?\n    \}/) || [])[0] || '';
-  check('notification catch records error without aborting batch', catchBlock.indexOf('skipped: "error"') >= 0 && !/return results/.test(catchBlock));
+  const deltaBody = asyncFnBody(edge, 'deltaCatchUp');
+  check('index deltaCatchUp checks maintenance budget in page loop',
+    (deltaBody.match(/maintenanceBudgetExceeded\(budgetStart/g) || []).length >= 1 &&
+    deltaBody.indexOf('graphFetch(token, path)') >= 0);
+  check('index runAccountMaintenance passes budgetStartMs into deltaCatchUp',
+    /deltaCatchUp\(token, current\.delta_link, Date\.now\(\), budgetStartMs\)/.test(edge));
 
+  check('marker-core clientStateTag is base64url not hex',
+    core.clientStateTagBase64('user-1', 'secret').indexOf('+') < 0 && core.clientStateTagBase64('user-1', 'secret').length > 8);
+  check('marker-core resolveAccountForNotification rejects bad clientState',
+    core.resolveAccountForNotification({ subscriptionId: 'sub1', clientState: 'bad' }, { sub1: { client_state: 'good:tag' } }, 'secret') === null);
+  const emptyOpts = core.judgeOptsForAccount({ own_addresses: [], own_names: [], user_name: null });
+  check('marker-core judgeOptsForAccount without own names is namesPending',
+    emptyOpts.namesPending === true && emptyOpts.ownNames === null);
+  check('index processMessage passes budgetStartMs into graphFetch patch',
+    /graphFetch\(token,[\s\S]*budgetStartMs\)/.test(processBody));
+
+  clearTimeout(watchdog);
+  if (checks < 10) {
+    console.error('FAIL: edge-corpus ran too few checks', checks);
+    process.exit(1);
+  }
   if (failures) process.exit(1);
   console.log('outlook-graph-marker-edge-corpus: all passed (' + checks + ' checks)');
 }
 
-main().catch((e) => {
+const run = main().catch(function (e) {
   console.error(e);
   process.exit(1);
 });
+
+const hangGuard = setTimeout(function () {
+  console.error('FAIL: edge-corpus outer watchdog');
+  process.exit(1);
+}, 95000);
+run.finally(function () { clearTimeout(hangGuard); });
