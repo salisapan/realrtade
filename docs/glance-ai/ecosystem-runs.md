@@ -950,3 +950,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-reminder-corpus.cjs` +6 lines (all fail on the old code) and 6 quiet ones; 2 real-browser Outlook cases; booking, WhatsApp and Meta-lane specs pass (61); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; no Messenger or Instagram spec for this task; "Please ring me back this afternoon" (no day) stays quiet.
+
+### Run 116 (2026-10-26)
+- **Capability shipped:** Hebrew and formal-English asks to confirm or acknowledge (a few forms the reader missed) now offer the reply card, and the Hebrew soft-ask words that were missing ("אין לחץ", "כשיתאפשר", "בהזדמנות") now keep a soft ask quiet, as "no rush" does in English. My first pass made «אשמח לאישור שלך על ההצעה, אין לחץ» show a card; the soft words fixed it before the sweep.
+- **Code:** `core/judgment.js` (handoff readers), `core/intent.js` (soft Hebrew words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/confirm-ask-corpus.cjs` (6 asks, 5 quiet lines; the 6 asks fail on the old code); every `test/*corpus.cjs` green; phone-card bundle rebuilt. No real-browser spec this run (recognition only, no new write).
+- **Open:** live Gate; "Let me know if Thursday works for you" and «תודיע לי אם זה מתאים לך» (scheduling replies) stay quiet on purpose; «תוכל לאשר שהתשלום התקבל?» stays a hedge.
