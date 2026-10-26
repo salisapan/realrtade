@@ -341,9 +341,11 @@ const FlowOutlook = (() => {
           ? E.scopeNames((prev && prev.token && prev.token.grantedScopes) || (prev && prev.requestedScopes) || [])
           : [];
         const keptOptional = prevNames.filter((s) => optional.indexOf(s) >= 0);
+        const fromUi = (chosen || []).filter((s) => allow.indexOf(s) >= 0);
+        const base = fromUi.length ? fromUi : allow;
         scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
-          ? E.mergeMicrosoftScopes(allow, keptOptional)
-          : allow.concat(keptOptional);
+          ? E.mergeMicrosoftScopes(base, keptOptional)
+          : base.concat(keptOptional);
       } else {
         scopeSources = (chosen || []).concat(cfg.SCOPES || []);
       }
