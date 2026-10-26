@@ -821,6 +821,17 @@ function activityLogRefBehaviour(ref) {
     check('D3: googleWait path called drive-find-one', findOneCalls >= 1, findOneCalls);
     wD3.close();
 
+    const pageSentD3c = [];
+    const { w: wD3c } = bootGmailPage(holdAsk, JSON.parse(JSON.stringify(baseStored)), pageSentD3c, bg.send, outbound, {
+      driveFindOne: () => ({ match: 'one', file: { id: 'f1', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' } })
+    });
+    await wD3c.__glanceGmailPage.rescan();
+    await sleep(800);
+    check('D3c: googleWait replan with one Drive match offers the calendar hold chip',
+      Boolean(wD3c.document.querySelector('.flow-chip-host')),
+      wD3c.document.body.innerHTML.slice(0, 200));
+    wD3c.close();
+
     const noDriveStored = JSON.parse(JSON.stringify(baseStored));
     noDriveStored.googleGrantedScopes = GRANTED_NO_DRIVE;
     const bgD4 = createBackground(noDriveStored, () => null, outbound, []);

@@ -2403,7 +2403,7 @@ function glanceUiCopy(kind) {
       ? FlowIntent.attachToInvitePlan(text) : null;
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
-    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && typeof FlowResolution !== 'undefined' && typeof FlowResolution.owns === 'function' && fileGate.ask && FlowResolution.owns(fileGate.ask.id)) {
+    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesOwnedDeliverable === 'function' && FlowIncomingJudge.silencesOwnedDeliverable(text)) {
       logScanSkip(messageId, 'resolution');
       recordSilence(messageId, 'resolution');
       void flushSuggest(false);
