@@ -816,19 +816,65 @@ console.log('\n--- marker mail-api gate ---');
   vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Marker.js'), 'utf8'), sandbox, { filename: 'Marker.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
+  function widget(kind) {
+    const w = { kind, text: '' };
+    w.setText = function (t) { w.text = t; return w; };
+    return w;
+  }
+  sandbox.CardService = {
+    newTextParagraph() { return widget('text'); },
+    newCardSection() {
+      const section = { widgets: [] };
+      section.addWidget = function (item) { section.widgets.push(item); return section; };
+      return section;
+    },
+    newCardHeader() {
+      const header = { title: '' };
+      header.setTitle = function (value) { header.title = value; return header; };
+      return header;
+    },
+    newCardBuilder() {
+      const builder = { header: null, sections: [] };
+      builder.setHeader = function (header) { builder.header = header; return builder; };
+      builder.addSection = function (section) { builder.sections.push(section); return builder; };
+      builder.build = function () { return builder; };
+      return builder;
+    }
+  };
   const sweepFn = vm.runInContext('sweep', sandbox);
   const gateOff = vm.runInContext('glanceMarkerMailApiEnabled_()', sandbox);
   check('glanceMarkerMailApiEnabled_ is false', gateOff === false);
   const sweepOut = sweepFn();
   check('sweep returns mail-api-off with zero GmailApp calls', sweepOut.stopped === 'mail-api-off' && sweepOut.marked === 0 && sweepOut.scanned === 0 && gmailCalls === 0, { sweepOut, gmailCalls });
+  const keepOther = {
+    getHandlerFunction() { return 'dailyDigest'; },
+    getEventType() { return sandbox.ScriptApp.EventType.CLOCK; }
+  };
   triggers.push({
     getHandlerFunction() { return 'sweep'; },
     getEventType() { return sandbox.ScriptApp.EventType.CLOCK; }
   });
-  const removed = vm.runInContext('GlanceMarker.removeLegacySweepTriggersIfPresent(ScriptApp)', sandbox);
-  check('legacy hourly sweep trigger is removed when gate is off', removed === 1 && triggers.length === 0, { removed, triggers: triggers.length });
-  check('Code.js wires removeLegacySweepTriggersIfPresent on homepage when gate is off',
-    /removeLegacySweepTriggersIfPresent/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
+  triggers.push(keepOther);
+  let installs = 0;
+  sandbox.ScriptApp.newTrigger = function (name) {
+    installs += 1;
+    const self = {
+      getHandlerFunction() { return name; },
+      getEventType() { return sandbox.ScriptApp.EventType.CLOCK; }
+    };
+    return {
+      timeBased() {
+        return {
+          everyHours() {
+            return { create() { triggers.push(self); } };
+          }
+        };
+      }
+    };
+  };
+  vm.runInContext('onHomepage({})', sandbox);
+  check('homepage with gate off removes a legacy sweep trigger and does not install another',
+    installs === 0 && triggers.length === 1 && triggers[0] === keepOther, { installs, triggers: triggers.map((t) => t.getHandlerFunction()) });
 }
 
 console.log('\n--- message path parity ---');
