@@ -103,6 +103,21 @@ const no = [
 ];
 for (const text of no) check('silent: ' + text.slice(0, 56), T.detectRequest(text) === null, T.detectRequest(text));
 
+console.log('\n--- Hebrew frame must-not-fire (detectRequest only) ---\n');
+const noHeFrame = [
+  'לא צריך לשלוח את החוזה.',
+  'אין צורך לשלוח את הקבלה.',
+  'מצטער, אני לא אוכל לחתום על זה',
+  'אוכל לשלוח את רשימת האורחים עד הערב.',
+  'מקווה לשלוח לך משהו מועיל בקרוב.',
+  'תבקש מחשבונאות לשלוח לי את החשבונית',
+  'כל השותפים חייבים לחתום על ההסכם',
+  'לשלוח באוויר או בים?',
+  'יש לשלוח עד סוף היום',
+  'היית אמור לשלוח את הקבצים אתמול.'
+];
+for (const text of noHeFrame) check('no frame: ' + text.slice(0, 56), T.detectRequest(text) === null, T.detectRequest(text));
+
 console.log('\n--- the same sentences through classifyOutgoing keep the silence ---\n');
 for (const text of no) {
   const long = text + ' Anyway, that is all from my side for now.';
@@ -140,7 +155,7 @@ const mine = [
 ];
 for (const [text, action] of mine) {
   const c = T.detectCommitmentSentence(text);
-  check('promise: ' + text.slice(0, 54), c && c.type.startsWith('owe:') && (action === 'reply' || c.action === action || true) && c.action, c);
+  check('promise: ' + text.slice(0, 54), c && c.type.startsWith('owe:') && (action === 'reply' || c.action === action) && c.action, c);
 }
 const notMine = [
   'Let me know if you have any questions about it.',
