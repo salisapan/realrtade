@@ -9,12 +9,19 @@ process.env.RESEND_API_KEY = 'test-resend-key';
 
 let calls = [];
 let patchResult = () => ({ ok: true, status: 200, json: async () => [{ id: 1, email: 'ada@example.com' }] });
+let waitlistRow = null;
 
 global.fetch = async (url, opts) => {
   opts = opts || {};
   const u = String(url);
   calls.push({ url: u, method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null });
   if (u.includes('/rest/v1/waitlist') && opts.method === 'PATCH') return patchResult();
+  if (u.includes('/rest/v1/waitlist') && u.includes('select=confirmed_at')) {
+    return { ok: true, status: 200, json: async () => (waitlistRow ? [waitlistRow] : []) };
+  }
+  if (u.includes('/rest/v1/waitlist') && u.includes('confirmed_at=not.is.null')) {
+    return { ok: true, status: 200, json: async () => [] };
+  }
   if (u.includes('send-trial-access') || u.includes('send-playbook') || u.includes('api.resend.com')) {
     return { ok: true, status: 200, text: async () => '' };
   }
@@ -29,35 +36,87 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 
-function signedQuery(email) {
+function signedQuery(email, lang) {
   const exp = String(Date.now() + 3600000);
   const sig = crypto.createHmac('sha256', process.env.EMAIL_VERIFY_SECRET).update(email + '|' + exp).digest('base64url');
-  return { email, exp, sig, lang: 'en', kind: 'trial' };
+  return { email, exp, sig, lang: lang || 'en', kind: 'trial' };
+}
+
+function captureLogs(fn) {
+  const lines = [];
+  const log = console.log;
+  const err = console.error;
+  console.log = function () { lines.push(Array.from(arguments).join(' ')); log.apply(console, arguments); };
+  console.error = function () { lines.push(Array.from(arguments).join(' ')); err.apply(console, arguments); };
+  return fn().finally(() => {
+    console.log = log;
+    console.error = err;
+  }).then(() => lines);
 }
 
 async function run() {
   console.log('--- claim failure: no download link ---\n');
   {
     calls = [];
+    waitlistRow = null;
     patchResult = () => ({ ok: false, status: 503, json: async () => [] });
     const q = signedQuery('ada@example.com');
     const res = await handler({ queryStringParameters: q });
     check('503 when confirmed_at cannot be written', res.statusCode === 503, res);
+    check('write-failure page (EN) is retryable, not invalid-link copy', /Please try again/.test(res.body || '') && /Open this link again/.test(res.body || ''), res.body && res.body.slice(0, 300));
     check('error page has no download button href', !/download-trial-zip/.test(res.body || ''), res.body && res.body.slice(0, 200));
     const trialAccess = calls.find((c) => c.url.includes('send-trial-access'));
     check('send-trial-access not called when claim fails', !trialAccess, calls.map((c) => c.url));
   }
 
+  console.log('\n--- zero-row PATCH without confirmed row: write failure ---\n');
+  {
+    calls = [];
+    waitlistRow = null;
+    patchResult = () => ({ ok: true, status: 200, json: async () => [] });
+    const q = signedQuery('ghost@example.com');
+    const res = await handler({ queryStringParameters: q });
+    check('503 when PATCH updates zero rows and no confirmed row exists', res.statusCode === 503, res);
+    check('no download link minted on zero-row PATCH', !/download-trial-zip/.test(res.body || ''), res.body);
+    check('send-trial-access not called on zero-row PATCH', !calls.some((c) => c.url.includes('send-trial-access')), calls.map((c) => c.url));
+  }
+
+  console.log('\n--- write-failure page Hebrew ---\n');
+  {
+    calls = [];
+    waitlistRow = null;
+    patchResult = () => ({ ok: true, status: 200, json: async () => [] });
+    const q = signedQuery('ghost@example.com', 'he');
+    const res = await handler({ queryStringParameters: q });
+    check('write-failure page (HE) uses distinct retry copy', /נסו שוב/.test(res.body || '') && /פתחו את הקישור שוב/.test(res.body || ''), res.body && res.body.slice(0, 400));
+  }
+
   console.log('\n--- claim success: trial may issue link ---\n');
   {
     calls = [];
+    waitlistRow = null;
     patchResult = () => ({ ok: true, status: 200, json: async () => [{ id: 2, email: 'bob@example.com' }] });
     const q = signedQuery('bob@example.com');
-    const res = await handler({ queryStringParameters: q });
+    let res;
+    const logLines = await captureLogs(async () => { res = await handler({ queryStringParameters: q }); });
     check('200 on successful claim', res.statusCode === 200, res);
     check('success page includes download button', /download-trial-zip/.test(res.body || ''), res.body && res.body.indexOf('id="dl"'));
     const trialAccess = calls.find((c) => c.url.includes('send-trial-access'));
     check('send-trial-access receives a signed downloadUrl', Boolean(trialAccess && trialAccess.body && trialAccess.body.downloadUrl), trialAccess && trialAccess.body && { hasUrl: !!trialAccess.body.downloadUrl });
+    const leaked = logLines.some((line) => /download-trial-zip/.test(line) || (trialAccess && trialAccess.body && line.includes(trialAccess.body.downloadUrl)));
+    check('M5: signed download link never appears in function logs', !leaked, logLines.filter((l) => /confirm-signup/.test(l)));
+  }
+
+  console.log('\n--- already confirmed: zero-row PATCH still allows re-download ---\n');
+  {
+    calls = [];
+    waitlistRow = { confirmed_at: '2026-01-01T00:00:00.000Z' };
+    patchResult = () => ({ ok: true, status: 200, json: async () => [] });
+    const q = signedQuery('repeat@example.com');
+    const res = await handler({ queryStringParameters: q });
+    check('200 when row was already confirmed', res.statusCode === 200, res);
+    check('re-visit still shows download button', /download-trial-zip/.test(res.body || ''), res.body);
+    check('send-trial-access skipped on re-visit', !calls.some((c) => c.url.includes('send-trial-access')), calls.map((c) => c.url));
   }
 
   console.log('\n' + (failures ? failures + ' FAILED' : 'all passed'));
