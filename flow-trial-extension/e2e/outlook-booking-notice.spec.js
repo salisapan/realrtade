@@ -299,3 +299,32 @@ test('BOOKING_NOTICE on: an invitation that names its hours is one hold for thos
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
+
+const WEEKLY = 'Hi, your weekly piano lesson is every Monday at 17:00. See you then.';
+
+test('BOOKING_NOTICE on, RECURRING_HOLD off: a lesson that repeats is one hold, the next one, with no rule', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, WEEKLY, true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].subject).toMatch(/Appointment/);
+  expect(JSON.stringify(list[0].start)).toContain('17:00');
+  expect(list[0].recurrence).toBeNull();
+  expect(new Date(list[0].start.dateTime.slice(0, 10) + 'T12:00:00').getDay()).toBe(1);
+});
+
+test('BOOKING_NOTICE and RECURRING_HOLD on: a lesson that repeats every Monday is the weekly series, the rule read back, no guest, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true, RECURRING_HOLD: true }, WEEKLY, true);
+  await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' .chip-hold').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(list[0].recurrence.pattern.type).toBe('weekly');
+  expect(list[0].recurrence.pattern.daysOfWeek).toEqual(['monday']);
+  expect(list[0].attendees || []).toEqual([]);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});

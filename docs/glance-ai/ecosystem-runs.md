@@ -786,3 +786,12 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-sent-claim-corpus.cjs` gained 9 sent lines, 2 quiet lines and 2 token checks; `e2e/chat-document-close.spec.js` gained the "Sent!" loop (9 specs, all green); every `test/*corpus.cjs` green.
 - **Open:** live Gate; words only; Messenger and Instagram have no spec for the document closes; no close from mail. This run changes recall only, so the user-visible gain is real but small.
+
+## Run 95 (builder B, 2026-10-26): a booking that repeats
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off, and the owner's `RECURRING_HOLD`, off):** "Your piano lesson is every Monday at 17:00", "Hi, your weekly yoga class is every Tuesday at 18:30", «השיעור שלך כל יום שני ב-17:00». Before, such a mail or chat message had no card at all (the appointment reader wanted "confirmed", "booked", "see you" or one named day, not "is every Monday"). Now the existing Hold It card is offered for the next lesson (said on a Monday morning, today at 17:00; said on Monday evening, next Monday), and with `RECURRING_HOLD` on the series path that already existed for meetings writes the weekly series (Google `RRULE:FREQ=WEEKLY;BYDAY=MO`, Outlook weekly pattern), reads the rule back by id, removes the event again if the rule did not land, and Undo deletes the series. With `RECURRING_HOLD` off it is the one next event. Shop opening hours, a team that "meets every Monday" (no booking noun), a repeat with no clock, a past or questioned repeat stay quiet.
+- **Why it matters:** weekly lessons, classes and treatments are the most common standing bookings of the first user's life; one card now covers the whole series instead of a card per week or none.
+- **Code:** `core/chat-appointment-notice.js` only (frame, `repeats`, the first date); the judge, the Gmail card, the Outlook card and the chat card carry the message words to the writers already.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` (6 repeating lines with their first date, 5 quiet lines, a one-off is not marked), 6 real-browser specs (Outlook mail on and off, Gmail on and off, WhatsApp on Outlook), every `test/*corpus.cjs` green.
+- **Open:** live Gate (both switches are the owner's); an end date for a course is not read; monthly and daily repeats of a booking are not offered here.

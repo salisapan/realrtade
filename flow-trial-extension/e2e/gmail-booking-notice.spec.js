@@ -149,3 +149,28 @@ test('BOOKING_NOTICE on: an appointment mail that names its length is one Google
   await page.locator(MAIN + ' button.flow-chip-undo').click();
   await expect.poll(() => events().length).toBe(0);
 });
+
+const WEEKLY = 'Hi, your weekly piano lesson is every Monday at 17:00. See you then.';
+
+test('BOOKING_NOTICE and RECURRING_HOLD on: a lesson that repeats every Monday is the weekly Google series, read back, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true, RECURRING_HOLD: true }, WEEKLY);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  expect(events()[0].recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO']);
+  expect(events()[0].attendees || []).toEqual([]);
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});
+
+test('BOOKING_NOTICE on, RECURRING_HOLD off: the same lesson is one Google event with no rule', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, WEEKLY);
+  const chip = page.locator(MAIN + ' button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(events()).toHaveLength(1);
+  expect(events()[0].recurrence || null).toBeNull();
+});
