@@ -204,7 +204,13 @@ const FlowExtract = (() => {
       let monthIdx = null;
       if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
       else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
-      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && hebrewWeekdayNear(src, m.index, m[0].length)) { day = a; monthIdx = b - 1; }
+      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12) {
+        const heDayFirst = hebrewWeekdayNear(src, m.index, m[0].length) ||
+          (/[\u0590-\u05FF]/.test(src.slice(Math.max(0, m.index - 48), Math.min(src.length, m.index + m[0].length + 48))) &&
+            slashDateContext(src, m.index, m[0]));
+        if (heDayFirst) { day = a; monthIdx = b - 1; }
+        else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
+      }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
       if (year != null && year < 100) year += 2000;

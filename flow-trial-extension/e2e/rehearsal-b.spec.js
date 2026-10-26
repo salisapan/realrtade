@@ -38,7 +38,7 @@ test('B1 one receipt in Drive: the card names it, the reply is drafted with it, 
   await expect(card).toContainText('לא נשלחה');
   await expect(card).toContainText('3,850 ₪');
   await expect(page.locator('div[role="main"] .flow-chip-host')).toHaveCount(0);
-  await card.getByRole('button', { name: 'Prepare reply with file' }).click();
+  await card.getByRole('button', { name: 'הכיני תשובה עם הקובץ' }).click();
   await expect.poll(() => server.calls.some((c) => c.method === 'POST' && c.path === '/gmail/v1/users/me/drafts'), { timeout: 20000 }).toBe(true);
   await expect(card).not.toContainText('Handled');
   expect(server.calls.some((c) => SEND_URL.test(c.path))).toBe(false);
@@ -51,7 +51,7 @@ test('B2 no file and no payment seen: the card asks whether it was paid and draf
   const page = await open(glance, 'none', ASK, []);
   const card = page.locator(CARD);
   await expect(card).toContainText('האם שולם', { timeout: 20000 });
-  await expect(card.getByRole('button', { name: 'Yes, it is paid' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'כן, שולם' })).toBeVisible();
   await page.waitForTimeout(1500);
   expect(writes()).toHaveLength(0);
 });
