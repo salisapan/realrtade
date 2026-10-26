@@ -822,3 +822,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-deadline-ask-corpus.cjs` gained 6 asks and 5 quiet lines, one real-browser WhatsApp spec for the polite Hebrew ask (task "מחכים ל-Dana: הטפסים החתומים", nothing sent), the 31 other chat specs and every `test/*corpus.cjs` green.
 - **Open:** live Gate; a polite English question ("Could you send me the photos by Thursday?") is still quiet by an earlier rule (a question is not an ask of record); the thing is kept as written ("קבצים שלך").
+
+## Run 99 (builder B, 2026-10-26): a pickup told in days
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the pickup reader wanted a named last day. Real locker and post-office messages say how many days are left: "Your package arrived at the locker, pick it up within 3 days", «החבילה שלך הגיעה ללוקר, יש לאסוף תוך 3 ימים»; a pharmacy says "we hold it until Thursday" / «נשמור אותה עד יום חמישי». They now give the existing task "Pick up the order" due on the last day (a count of calendar days from today, 1 to 30), in chat, Outlook and Gmail, through the same reader. Found by probing 8 invented pickup lines (4 silent). Business days are not counted (no task rather than a wrong day), a delivery that arrives "within 3 days" is not a pickup, a question and a count over 30 stay quiet.
+- **Code:** `core/chat-pickup-notice.js` only (the count of days, the hold phrase, the prescription noun).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-pickup-notice-corpus.cjs` gained 5 pickups and 4 quiet lines, one real-browser Outlook spec (the task is due in three days with the date read back, Undo deletes it), the booking and chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; business-day counts are not offered.

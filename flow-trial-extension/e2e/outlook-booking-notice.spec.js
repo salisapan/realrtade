@@ -348,3 +348,18 @@ test('BOOKING_NOTICE on: a form deadline that mentions an appointment shows no c
   await expect(page.locator(PANE + ' .chip-hold')).toHaveCount(0);
   expect(await events(glance)).toHaveLength(0);
 });
+
+test('BOOKING_NOTICE on: a locker parcel with "pick it up within 3 days" is one To Do task due in three days, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { BOOKING_NOTICE: true }, 'Hi, your package arrived at the locker, pick it up within 3 days.', false);
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toMatch(/Pick up the order/);
+  const due = new Date(Date.now() + 3 * 86400000);
+  const iso = due.getFullYear() + '-' + String(due.getMonth() + 1).padStart(2, '0') + '-' + String(due.getDate()).padStart(2, '0');
+  expect(JSON.stringify(list[0])).toContain(iso);
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
