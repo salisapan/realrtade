@@ -2,15 +2,24 @@ name: Glance headless E2E
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - claude/install-uiux-pro-max-skill-a4agox
+    paths:
+      - "flow-trial-extension/**"
+      - ".github/workflows/glance-e2e.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e:
     name: e2e (${{ matrix.tz }})
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +32,8 @@ jobs:
       TZ: ${{ matrix.tz }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
