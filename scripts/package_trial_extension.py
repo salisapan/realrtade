@@ -58,6 +58,11 @@ SECRET_ASSIGNMENT_RE = re.compile(
     re.I,
 )
 
+# The Drive picker is a hosted page, not part of the extension install.
+# verify_trial_install.py rejects picker/ in both the signup and store zips.
+def is_picker_archive_path(rel: str) -> bool:
+    return rel == "picker" or rel.startswith("picker/")
+
 
 def die(message: str) -> None:
     print(f"package_trial_extension: {message}", file=sys.stderr)
@@ -93,6 +98,8 @@ def add_file(files: dict[str, Path], path: Path) -> None:
     if any(part.startswith(".") for part in rel.parts):
         die(f"refusing to package dotfile {rel}")
     key = posix(rel)
+    if is_picker_archive_path(key):
+        return
     files[key] = path
 
 
@@ -298,21 +305,26 @@ def collect(profile: str = "full") -> dict[str, Path]:
         if SECRET_ASSIGNMENT_RE.search(text):
             die(f"{rel} looks like it contains a secret assignment; refusing to package it")
 
+    for key in list(files):
+        if is_picker_archive_path(key):
+            del files[key]
+
     return files
 
 
-def write_zip(files: dict[str, Path], out: Path) -> int:
+def write_zip(files: dict[str, Path], out: Path, replacements: dict[str, bytes] | None = None) -> int:
     if "manifest.json" not in files:
         die("install zip has no manifest.json at its root")
     for rel in files:
         if rel.startswith("flow-trial-extension/") or rel.startswith("/") or ".." in Path(rel).parts:
             die(f"install zip entry would not sit at the extension root: {rel}")
+    replacements = replacements or {}
+    picker_bundled = "picker/picker.html" in files
     sha = os.environ.get("GLANCE_BUILD_STAMP") or git_sha7()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
         tmp.unlink()
-    replacements = replacements or {}
     # Fixed timestamps keep two builds of the same tree byte-identical.
     info_date = (2026, 1, 1, 0, 0, 0)
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -320,7 +332,8 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, stamped_bytes(rel, files[rel].read_bytes(), sha))
+            raw = replacements[rel] if rel in replacements else files[rel].read_bytes()
+            archive.writestr(info, stamped_bytes(rel, raw, sha, picker_bundled=picker_bundled))
     os.replace(tmp, out)
     return out.stat().st_size
 
