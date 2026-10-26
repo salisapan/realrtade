@@ -830,3 +830,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-pickup-notice-corpus.cjs` gained 5 pickups and 4 quiet lines, one real-browser Outlook spec (the task is due in three days with the date read back, Undo deletes it), the booking and chat specs and every `test/*corpus.cjs` green.
 - **Open:** live Gate; business-day counts are not offered.
+
+### Run 100 (2026-10-26)
+- **Capability shipped:** a polite Hebrew ask opened with «האם» («האם תוכל לשלוח לי את הקובץ?», «האם אפשר לקבל את הלוגו?») used to score below the card threshold and stayed quiet; it now offers the same reply card as the form without «האם». "Would it be possible to get …?" too.
+- **Code:** `core/intent.js` (rewrite of the two polite openings, skipped for a note to oneself), `core/judgment.js` (short-ask reader).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/polite-he-ask-corpus.cjs`; `regress-144` caught my first version (self-sent «האם תוכל לתאם…» tasks), fixed; every `test/*corpus.cjs` green. No real-browser spec this run.
+- **Open:** live Gate; no new write path, so no ProofOfClose or off switch is involved (a recognition fix on the existing card).
