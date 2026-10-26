@@ -66,7 +66,6 @@ test('B3 asking accounting to send the receipt shows no card and writes nothing'
 
 // Known Gate failures. test.fail: the step fails today; when it is fixed the run turns red and the row is updated.
 test('B4 Gate: two receipts with the same kind of name show no card', async ({ glance }) => {
-  test.fail(true, 'Today the resolution card shows "יותר מקבלה אחד מתאים. לא אבחר בשבילך" with Prepare my reply (src/follow.js resolutionCard). Gate slice 3 says no card. Owner decision.');
   const page = await open(glance, 'two', ASK, [RECEIPT, { id: 'rcpt-3850-b', name: 'קבלה 3850 (1).pdf', mimeType: 'application/pdf' }]);
   await page.waitForTimeout(7000);
   await expect(page.locator(CARD)).toHaveCount(0, { timeout: 1000 });

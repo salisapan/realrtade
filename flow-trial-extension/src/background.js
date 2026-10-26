@@ -52,6 +52,12 @@ import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/connect-ecosystem.js'; // classic: sets globalThis.FlowConnectEcosystem (C1)
+import '../core/profile-hook.js'; // classic: sets globalThis.FlowProfileHook (C1 learn-signal hook)
+import '../core/graph-mail.js'; // classic: sets globalThis.FlowGraphMail (Outlook Graph sync)
+import '../core/outlook-sync.js'; // classic: sets globalThis.FlowOutlookSync (ecosystem Graph sync when OWA closed)
+import '../src/outlook.js'; // classic: sets globalThis.FlowOutlook
+import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras, requestMicrosoftOptionalScopes } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/day-words.js'; // classic: sets globalThis.FlowDayWords (extract.js makes the day forms people write explicit with it)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
@@ -90,8 +96,10 @@ import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClos
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
+import '../core/google-contacts.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
+import '../core/user-context-writer.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -1535,9 +1543,18 @@ function launchGoogleWebAuthFlow(details) {
   });
 }
 
-function googleManifestScopes() {
+async function googleManifestScopes() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
-  return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+  const base = googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+  const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+  const flags = bag.glanceSwitches || {};
+  const G = globalThis.FlowGoogleContacts;
+  if (G && typeof G.oauthScopesForSwitch === 'function') {
+    G.oauthScopesForSwitch(flags).forEach((scope) => {
+      if (scope && base.indexOf(scope) < 0) base.push(scope);
+    });
+  }
+  return base;
 }
 
 async function readGoogleWebAuth() {
@@ -1582,10 +1599,11 @@ async function runGoogleWebAuth(interactive) {
   if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
   const state = randomOAuthState();
   const hint = await googleLoginHint();
+  const scopes = await googleManifestScopes();
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
-    scopes: googleManifestScopes(),
+    scopes,
     state,
     prompt: interactive ? 'select_account' : 'none',
     loginHint: hint
@@ -1712,9 +1730,10 @@ async function readGoogleGrantedScopes() {
 }
 
 async function writeGoogleGrantedScopes(status, source) {
+  const scopes = await googleManifestScopes();
   await chrome.storage.local.set({
     [GOOGLE_GRANTED_SCOPES_KEY]: {
-      version: scopeVersion(googleManifestScopes()),
+      version: scopeVersion(scopes),
       status: status,
       source: source || null,
       at: Date.now()
@@ -1788,7 +1807,8 @@ async function recordGoogleConsent(token, source) {
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
-  if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
+  const requiredScopes = await googleManifestScopes();
+  if (googleScopeAction(granted, requiredScopes, wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
   try {
@@ -1832,6 +1852,9 @@ async function clearCachedChromeGoogleTokens() {
 }
 
 async function disconnectConnector(connectorId) {
+  if (connectorId === 'microsoft' || connectorId === 'meta') {
+    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
+  }
   const STORAGE_KEYS = {
     hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
     googleTasks: 'googleTasksAuth'
@@ -1857,6 +1880,10 @@ async function disconnectConnector(connectorId) {
       'glanceOwnNames'
     ]));
     googleNamesFilled = false;
+    const hook = globalThis.FlowProfileHook;
+    if (hook && typeof hook.onDisconnect === 'function') {
+      try { hook.onDisconnect('google'); } catch (e) { /* profile store not wired */ }
+    }
     return { ok: true };
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
@@ -2395,6 +2422,18 @@ async function connectGoogleTasks(interactive, preset) {
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
   });
+  const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
+    ? await globalThis.FlowGoogleLaneAccount.read()
+    : '';
+  const profBag = await chrome.storage.local.get({ googleProfile: null, glanceOwnNames: [] });
+  const names = Array.isArray(profBag.glanceOwnNames) ? profBag.glanceOwnNames : [];
+  const gp = profBag.googleProfile && typeof profBag.googleProfile === 'object' ? profBag.googleProfile : null;
+  await seedUserContextFromConnect({
+    email: accountEmail,
+    name: (gp && (gp.name || gp.given_name)) || names[0] || '',
+    title: gp && gp.title,
+    department: gp && gp.department
+  });
   return true;
 }
 
@@ -2778,6 +2817,7 @@ async function followTaskReopen(ref, dueIso) {
 
 async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -2794,6 +2834,9 @@ async function followDraftCreate(p) {
   const to = String((p && p.to) || '').trim();
   const text = String((p && p.body) || '').trim();
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
+  if (!(await gmailComposeApiAllowedNow())) {
+    return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false };
+  }
   const base = String(p.subject || '').trim();
   const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
   // A file prepared for this draft (docs/file-backed-closure-plan.md): either the one
@@ -3244,6 +3287,7 @@ function buildMimeMessage(opts) {
 // whole action because a search query came back empty.
 async function findThreadId(senderEmail, subject) {
   if (!senderEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -3351,12 +3395,50 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
+// Mailbox-wide Drive search needs drive.readonly, which is not in the OAuth
+// grant. Without it, stay quiet — never call files.list and surface a 403.
+async function googleGrantedScopeList() {
+  try {
+    const bag = await chrome.storage.local.get('googleGrantedScopes');
+    const rec = bag.googleGrantedScopes;
+    if (!rec) return null;
+    const v = rec.version;
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string' && v) return v.split('\n').filter(Boolean);
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function gmailComposeApiAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.gmailDraftApiAllowed(scopes));
+}
+
+async function mailboxDriveSearchAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.mailboxDriveSearchAllowed(scopes));
+}
+
 // One 403 for a missing Drive scope drops the cached Chrome token and asks
 // once more, silently. A grant that already includes drive.readonly can be
 // reused. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
+    return null;
+  }
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.mailboxDriveSearchAllowed(scopes)) {
+    if (detail) {
+      detail.status = 0;
+      detail.reason = 'drive-search-unavailable';
+      detail.error = 'mailbox-search-not-granted';
+    }
     return null;
   }
   const files = [];
@@ -3476,6 +3558,7 @@ function driveQuote(value) {
 
 async function factSources(ask) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, sources: [], truncated: false };
   const factLabel = driveQuote(ask && ask.factLabel);
   const sourceName = driveQuote(ask && ask.sourceName);
   const kind = ask && (ask.sourceKind === 'sheet' || ask.sourceKind === 'doc') ? ask.sourceKind : null;
@@ -3516,6 +3599,18 @@ async function factSources(ask) {
 
 async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.gmailDraftApiAllowed(scopes)) {
+    return {
+      ok: false,
+      reason: 'compose-closed',
+      preview: true,
+      closes: false,
+      sent: false,
+      error: 'Open Reply first. Glance does not press Send.'
+    };
+  }
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
 
   const params = p.params || {};
@@ -3694,7 +3789,11 @@ async function driveFindOneByName(term) {
     if (needle.length < 2) return { match: 'unknown' };
     const escaped = needle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const q = "trashed = false and name contains '" + escaped + "'";
-    const files = await searchDriveFiles(q);
+    const detail = {};
+    const files = await searchDriveFiles(q, detail);
+    if (!files && detail.reason === 'drive-search-unavailable') {
+      return { match: 'none', driveSearchUnavailable: true };
+    }
     if (!files) return { match: 'unknown' };
     const hits = driveNameHits(files, needle);
     if (hits.length !== 1) return { match: hits.length === 0 ? 'none' : 'many' };
@@ -3821,6 +3920,7 @@ async function deleteDriveFile(fileId) {
 
 async function gmailDraftUndo(ref) {
   if (!ref || !ref.draftId) return { ok: false };
+  if (!(await gmailComposeApiAllowedNow())) return { ok: false, reason: 'compose-closed' };
   const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
     method: 'DELETE'
   });
@@ -3836,7 +3936,7 @@ async function gmailDraftUndo(ref) {
 // content-gmail.js can't open chrome.windows itself (that API isn't exposed
 // to content scripts), and the picker has to live in its own extension page
 // rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether https://apis.google.com's gapi loader is even
+// one deciding whether Google's hosted gapi loader is even
 // allowed to run there, and there is no reason to depend on that. So the
 // content script asks this worker to open the window, and this worker
 // remembers which Gmail tab asked, keyed by the requestId the content
@@ -3848,6 +3948,9 @@ async function openDrivePicker(payload, sender) {
   const requestId = payload && payload.requestId;
   const tabId = sender && sender.tab && sender.tab.id;
   if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
+  if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
+    return { ok: false, unavailable: true };
+  }
 
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
@@ -5033,6 +5136,74 @@ const OUTLOOK_AUTH_KEY = 'outlookAuth';
 const OUTLOOK_STATE_KEY = 'outlookSync';
 const OUTLOOK_KEEPALIVE_ALARM = 'glance-outlook-keepalive';
 const OUTLOOK_KEEPALIVE_MINUTES = 30;
+const OUTLOOK_OWA_URLS = ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'];
+
+let outlookEcosystemRunner = null;
+
+function outlookEcosystemRunnerDeps() {
+  const storage = {
+    get: async () => chrome.storage.local.get(null),
+    set: async (bag) => chrome.storage.local.set(bag),
+    getWatches: async () => {
+      const b = await chrome.storage.local.get('glanceWatches');
+      return (b && b.glanceWatches) || [];
+    },
+    getIdentityGraph: async () => {
+      const b = await chrome.storage.local.get('glanceIdentityGraph');
+      return (b && b.glanceIdentityGraph) || { parties: {} };
+    },
+    observeIdentity: async () => null,
+    updateWatch: async () => null,
+    upsertWatch: async (x) => x,
+    recordOutcomeLabel: async () => true
+  };
+  return {
+    storage,
+    cfg: globalThis.FlowOutlookConfig,
+    auth: globalThis.FlowOutlookAuth,
+    plan: globalThis.FlowOutlookSync && globalThis.FlowOutlookSync.plan,
+    fetch: (u, i) => fetch(u, i),
+    redirectUri: () => chrome.identity.getRedirectURL(),
+    launch: outlookLaunchInteractive,
+    launchSilent: outlookLaunchSilent,
+    permissions: chrome.permissions,
+    send: async (m) => {
+      try { return await chrome.runtime.sendMessage(m); } catch (e) { return null; }
+    },
+    random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+    sha256: (b) => crypto.subtle.digest('SHA-256', b),
+    now: () => Date.now(),
+    planDeps: {
+      extract: globalThis.FlowExtract || null,
+      intent: globalThis.FlowIntent || null,
+      factReply: globalThis.FlowFactReply || null,
+      actions: globalThis.FlowActions || null
+    },
+    actions: globalThis.FlowActions || null,
+    identity: globalThis.FlowIdentity || null,
+    followUp: globalThis.FlowFollowUp || null
+  };
+}
+
+async function outlookEcosystemSync(opts) {
+  const o = opts || {};
+  let owaOpen = false;
+  try {
+    const tabs = await chrome.tabs.query({ url: OUTLOOK_OWA_URLS });
+    (tabs || []).forEach((tab) => {
+      if (tab && tab.id) {
+        owaOpen = true;
+        chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }).catch(() => {});
+      }
+    });
+  } catch (e) { /* OWA may be closed */ }
+  if (owaOpen) return { ok: true, mode: 'rescan' };
+  const O = globalThis.FlowOutlook;
+  if (!O || typeof O.create !== 'function' || !globalThis.FlowOutlookSync) return { ok: false, error: 'not-configured', mode: 'graph' };
+  outlookEcosystemRunner = outlookEcosystemRunner || O.create(outlookEcosystemRunnerDeps());
+  const r = await outlookEcosystemRunner.sync({ force: Boolean(o.force) });
+  return Object.assign({ mode: 'graph' }, r || {});
+}
 
 // ---- the durable Outlook session (core/outlook-auth.js session) -----------------------------------------------
 // The service worker keeps the Microsoft session alive on its own: an alarm every 30 minutes (alarms survive the worker
@@ -5087,6 +5258,7 @@ async function outlookConsentScope(msg) {
     return { ok: false, reason: 'not-configured' };
   }
   const scope = String((msg && msg.scope) || '');
+  if (scope === 'Contacts.Read' || scope === 'Chat.Read') return { ok: false, reason: 'scope-refused' };
   const todoScope = scope === 'Tasks.ReadWrite';
   const calendarScope = scope === 'Calendars.ReadWrite';
   if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
@@ -5645,6 +5817,73 @@ async function glanceSwitchOn(name) {
     const bag = await chrome.storage.local.get({ glanceSwitches: {} });
     return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
   } catch (e) { return false; }
+}
+
+const USER_CONTEXT_STORAGE_KEY = 'glanceUserContextV0';
+
+function userContextAccountKey(msg) {
+  const raw = msg && (msg.accountKey || msg.tabAccount || (msg.event && msg.event.accountKey));
+  const k = String(raw || '').trim().toLowerCase();
+  return k || 'default';
+}
+
+async function readUserContextStore() {
+  try {
+    const bag = await chrome.storage.local.get({ [USER_CONTEXT_STORAGE_KEY]: null });
+    const root = bag[USER_CONTEXT_STORAGE_KEY];
+    if (root && root.byAccount && typeof root.byAccount === 'object') return root;
+    if (root && root.schemaVersion) {
+      return { byAccount: { default: root } };
+    }
+    return { byAccount: {} };
+  } catch (e) { return { byAccount: {} }; }
+}
+
+async function readUserContextProfile(accountKey) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W) return null;
+  const key = String(accountKey || 'default').trim().toLowerCase() || 'default';
+  const store = await readUserContextStore();
+  return W.norm((store.byAccount && store.byAccount[key]) || W.empty(key));
+}
+
+async function writeUserContextProfile(profile, accountKey) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !profile) return false;
+  if (!(await glanceSwitchOn(W.SWITCH))) return false;
+  const key = String(accountKey || profile.userId || 'default').trim().toLowerCase() || 'default';
+  try {
+    const store = await readUserContextStore();
+    const byAccount = Object.assign({}, store.byAccount || {});
+    const norm = W.norm(profile);
+    norm.userId = key;
+    byAccount[key] = norm;
+    await chrome.storage.local.set({ [USER_CONTEXT_STORAGE_KEY]: { byAccount: byAccount } });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function seedUserContextFromConnect(connectPatch) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !(await glanceSwitchOn(W.SWITCH))) return;
+  const patch = connectPatch || {};
+  const accountKey = userContextAccountKey({
+    accountKey: patch.email || patch.mail || patch.accountKey,
+    tabAccount: patch.email || patch.mail
+  });
+  const next = W.fromConnect(await readUserContextProfile(accountKey), patch);
+  await writeUserContextProfile(next, accountKey);
+}
+
+async function applyUserContextEvent(msg) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !(await glanceSwitchOn(W.SWITCH))) return { ok: false, reason: 'switch-off' };
+  const ev = msg && msg.event;
+  if (!ev || !ev.type) return { ok: false, reason: 'missing-event' };
+  const accountKey = userContextAccountKey(msg);
+  const next = W.applyEvent(await readUserContextProfile(accountKey), Object.assign({}, ev, { accountKey: accountKey }));
+  await writeUserContextProfile(next, accountKey);
+  return { ok: true, profile: next };
 }
 
 async function outlookTeamsWanted(callText) {
@@ -6848,7 +7087,8 @@ async function connectorStatus() {
     try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   }
   const grantedRec = reconnectBag[GOOGLE_GRANTED_SCOPES_KEY] || null;
-  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(googleManifestScopes()));
+  const manifestScopes = await googleManifestScopes();
+  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(manifestScopes));
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
     detail: GLANCE_TASK_LIST_TITLE + ' list',
@@ -6859,8 +7099,13 @@ async function connectorStatus() {
     laneUndo: reconnectBag.glanceLaneUndo || null,
     scopesGranted: scopesGranted
   });
+  const ecoBag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
+  const ecoSnap = await ecosystemStatusExtras(Object.assign({}, reconnectBag, ecoBag, { googleTasks: googleTasks }));
   return {
     googleTasks: googleTasks,
+    google: ecoSnap.google,
+    microsoft: ecoSnap.microsoft,
+    meta: ecoSnap.meta,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
@@ -6964,8 +7209,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
   }
 
+  if (msg.type === 'flow:microsoft-optional-scopes') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    const bucket = msg.bucket || msg.optionalBucket;
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
+  }
+
   if (msg.type === 'flow:connect') {
-    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
+    const ecoConnector = msg.connectorId === 'googleTasks' || msg.connectorId === 'microsoft' || msg.connectorId === 'meta';
+    if (ecoConnector) {
+      return reply(sendResponse, glanceSwitchOn('CONNECT_ECOSYSTEM').then((ecoOn) => {
+        if (ecoOn) {
+          const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
+          return connectEcosystemConnector(msg.connectorId, {
+            connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
+            launchInteractive: outlookLaunchInteractive,
+            enableSurface: enableSurface,
+            syncOutlook: (syncOpts) => outlookEcosystemSync(syncOpts)
+          });
+        }
+        if (msg.connectorId === 'googleTasks') {
+          return connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true }));
+        }
+        return { ok: false, reason: 'connector-not-live' };
+      }));
+    }
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
@@ -7029,6 +7297,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:sharepoint-save-plan') {
     return reply(sendResponse, sharepointSavePlan(msg));
+  }
+
+  if (msg.type === 'flow:user-context-get') {
+    return reply(sendResponse, readUserContextProfile().then((p) => ({ ok: true, profile: p })));
+  }
+
+  if (msg.type === 'flow:user-context-event') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, applyUserContextEvent(msg));
   }
 
   if (msg.type === 'flow:execute-action') {
@@ -7123,6 +7400,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:outside-drive') {
     return reply(sendResponse, (async () => {
       if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, files: [] };
       const since = Number(msg.sinceMs);
       const terms = (Array.isArray(msg.terms) ? msg.terms : []).map((t) => String(t).replace(/['\\]/g, '')).filter((t) => t.length >= 2).slice(0, 8);
       if (!(since > 0) || !terms.length) return { ok: false, reason: 'bad-request' };
