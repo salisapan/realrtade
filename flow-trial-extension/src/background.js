@@ -2836,8 +2836,7 @@ function localTimeZone() {
   }
 }
 
-// glanceTimeZone wins, then the host zone. A meeting hold does not
-// silently write UTC when the person is in another zone.
+// glanceTimeZone wins, then the host zone. Gmail calendar still uses this.
 async function outlookGlanceZone(explicit) {
   const given = String(explicit || '').trim();
   if (given) return given.slice(0, 80);
@@ -2848,6 +2847,57 @@ async function outlookGlanceZone(explicit) {
     if (raw && typeof raw.timeZone === 'string' && raw.timeZone.trim()) return raw.timeZone.trim().slice(0, 80);
   } catch (e) { /* storage is optional */ }
   return localTimeZone();
+}
+
+let outlookMailboxZoneCache = null;
+
+function outlookPreferTimezone(zone) {
+  const z = String(zone || '').replace(/"/g, '').trim().slice(0, 80);
+  if (!z) return {};
+  return { Prefer: 'outlook.timezone="' + z + '"' };
+}
+
+// Graph mailboxSettings.timeZone (Windows name). Never the browser zone.
+async function outlookMailboxTimeZone(force) {
+  if (!force && outlookMailboxZoneCache && outlookMailboxZoneCache.ok) return outlookMailboxZoneCache;
+  const url = OUTLOOK_GRAPH + '/me/mailboxSettings?$select=timeZone';
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); }
+  catch (e) { res = null; }
+  if (!res || res.notConnected) {
+    outlookMailboxZoneCache = { ok: false, reason: 'not-connected' };
+    return outlookMailboxZoneCache;
+  }
+  if (res.status === 401) {
+    outlookMailboxZoneCache = { ok: false, reason: 'not-connected' };
+    return outlookMailboxZoneCache;
+  }
+  if (!res.ok) {
+    outlookMailboxZoneCache = { ok: false, reason: 'mailbox-settings-unreadable', error: 'Could not read your mailbox time zone from Microsoft. Open Outlook on the web once, then try again.' };
+    return outlookMailboxZoneCache;
+  }
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  const tz = body && typeof body.timeZone === 'string' ? body.timeZone.trim() : '';
+  if (!tz) {
+    outlookMailboxZoneCache = { ok: false, reason: 'mailbox-timezone-missing', error: 'Microsoft did not return a mailbox time zone. Set your time zone in Outlook settings, then try again.' };
+    return outlookMailboxZoneCache;
+  }
+  outlookMailboxZoneCache = { ok: true, timeZone: tz.slice(0, 80) };
+  return outlookMailboxZoneCache;
+}
+
+async function outlookCalendarTimeZone(explicit) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const given = String(explicit || '').trim().slice(0, 80);
+  if (given) {
+    if (Cal && Cal.zoneOk && Cal.zoneOk(given)) return { ok: true, timeZone: given };
+    if (given.indexOf('/') < 0 && given.length > 2) return { ok: true, timeZone: given };
+  }
+  const mb = await outlookMailboxTimeZone();
+  if (mb.ok) return mb;
+  return mb;
 }
 
 // No duration is ever stated in an email the way a date or time is, so
@@ -5434,20 +5484,31 @@ function outlookUnverifiedLine() {
 
 const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance,recurrence';
 
-async function outlookStoredEventSnap(eventId) {
+async function outlookStoredEventSnap(eventId, zone) {
+  let prefer = outlookPreferTimezone(zone);
+  if (!prefer.Prefer) {
+    const mb = await outlookMailboxTimeZone();
+    prefer = mb.ok ? outlookPreferTimezone(mb.timeZone) : {};
+  }
   return outlookReadSnap(
-    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT,
+    prefer
   );
 }
 
 // The proof is a GET of the event just created, not the POST body.
-async function outlookEventRead(eventId) {
+async function outlookEventRead(eventId, zone) {
   const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT;
   outlookAssertNotSend(url);
+  let prefer = outlookPreferTimezone(zone);
+  if (!prefer.Prefer) {
+    const mb = await outlookMailboxTimeZone();
+    prefer = mb.ok ? outlookPreferTimezone(mb.timeZone) : {};
+  }
   let last = { snap: null, raw: null };
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
-    try { res = await outlookFetch(url, { method: 'GET' }); }
+    try { res = await outlookFetch(url, { method: 'GET', headers: prefer }); }
     catch (e) { res = null; }
     if (!res || !res.ok) continue;
     const raw = await outlookReadJson(res);
@@ -5921,7 +5982,11 @@ async function outlookMeetingWrite(p) {
   }
   const title = String(params.title || 'Meeting').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting';
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
-  const zone = await outlookGlanceZone(params.timeZone);
+  const zoneBag = await outlookCalendarTimeZone(params.timeZone);
+  if (!zoneBag.ok) {
+    return { ok: false, reason: zoneBag.reason || 'mailbox-timezone-unavailable', error: zoneBag.error || 'Could not read your mailbox time zone.' };
+  }
+  const zone = zoneBag.timeZone;
   const lines = [];
   if (quote && quote !== title) lines.push(quote);
   if (p && p.threadUrl) lines.push(String(p.threadUrl));
@@ -5932,7 +5997,8 @@ async function outlookMeetingWrite(p) {
     title: title,
     quote: lines.length ? lines.join('\n') : title,
     durationMinutes: params.durationMinutes,
-    timeZone: zone
+    timeZone: zone,
+    mailboxTimeZone: zone
   });
   if (!built) return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
   const body = built;
@@ -5995,13 +6061,14 @@ async function outlookMeetingWrite(p) {
     } catch (e) { removed = false; }
     return { ok: false, reason: 'series-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
   }
-  const proved = await outlookEventRead(event.id);
+  const proved = await outlookEventRead(event.id, zone);
   const eventSnap = proved && proved.snap;
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
   const ref = {
     eventId: event.id,
     created: eventSnap,
-    contentHash: Cal.contentHash(proved && proved.raw)
+    contentHash: Cal.contentHash(proved && proved.raw),
+    timeZone: zone
   };
   const base = {
     where: 'Outlook Calendar',
@@ -6029,11 +6096,17 @@ async function outlookCalendarWrite(p) {
   if (!Cal.hasWriteScope(fileScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
+  const zoneBag = await outlookCalendarTimeZone(params.timeZone);
+  if (!zoneBag.ok) {
+    return { ok: false, reason: zoneBag.reason || 'mailbox-timezone-unavailable', error: zoneBag.error || 'Could not read your mailbox time zone.' };
+  }
+  const zone = zoneBag.timeZone;
   const body = Cal.eventBody({
     dateIso: params.dateIso,
     hour: params.hour,
     minute: params.minute,
-    timeZone: localTimeZone(),
+    timeZone: zone,
+    mailboxTimeZone: zone,
     fileName: params.fileName || params.fileTerm,
     fileTerm: params.fileTerm,
     fileUrl: params.fileUrl,
@@ -6047,9 +6120,10 @@ async function outlookCalendarWrite(p) {
   if (invited > 0 || body.isOnlineMeeting) return { ok: false, reason: 'refused' };
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
+  const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
   const res = await outlookFetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, outlookPreferTimezone(zoneHeader)),
     body: JSON.stringify(body)
   });
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
@@ -6063,8 +6137,8 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  const eventSnap = await outlookStoredEventSnap(event.id);
-  const ref = { eventId: event.id, created: eventSnap };
+  const eventSnap = await outlookStoredEventSnap(event.id, zone);
+  const ref = { eventId: event.id, created: eventSnap, timeZone: zone };
   const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
@@ -6099,7 +6173,13 @@ async function outlookCalendarUndo(ref, hint) {
   outlookAssertNotSend(url);
   const calSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
   if (!outlookHasSnap(calSnap)) return outlookUnconfirmed();
-  const edited = await outlookRefuseIfEdited(url, calSnap);
+  let eventZone = ref && ref.timeZone;
+  if (!eventZone) {
+    const mb = await outlookMailboxTimeZone();
+    eventZone = mb.ok ? mb.timeZone : '';
+  }
+  const prefer = outlookPreferTimezone(eventZone);
+  const edited = await outlookRefuseIfEdited(url, calSnap, prefer);
   if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del.notConnected) return { ok: false, reason: 'not-connected' };

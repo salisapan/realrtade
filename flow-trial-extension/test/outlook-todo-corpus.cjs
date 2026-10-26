@@ -442,8 +442,8 @@ console.log('\n--- a Jerusalem hold is one event at local 14:00 ---\n');
 {
   const posted = background({
     scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite', 'offline_access'],
-    store: { glanceTimeZone: 'Asia/Jerusalem' },
     routes: [
+      { method: 'GET', test: /\/me\/mailboxSettings/, reply: () => ({ ok: true, status: 200, json: async () => ({ timeZone: 'Asia/Jerusalem' }), text: async () => '' }) },
       { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => Object.assign({ id: 'EVT1', webLink: 'https://outlook.office.com/calendar/item/EVT1' }, body), text: async () => '' }) },
       { method: 'GET', test: /\/me\/events\/EVT1/, reply: () => ({ ok: true, status: 200, json: async () => ({
         id: 'EVT1',

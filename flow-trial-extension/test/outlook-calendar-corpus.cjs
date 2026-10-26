@@ -283,5 +283,37 @@ check('an unknown zone is not written',
 check('a meeting body hashes the subject, the text, and the start',
   Cal.contentHash(heHold.body) === Cal.contentHash(heHold.body) && Cal.contentHash(heHold.body) !== Cal.contentHash(Object.assign({}, heHold.body, { subject: 'other' })));
 
+console.log('\n--- mailbox time zone, not the browser (fixed clock) ---\n');
+{
+  const FIXED = '2026-10-22';
+  const browserNy = 'America/New_York';
+  const mailboxIl = 'Israel Standard Time';
+  const good = Cal.meetingBody({
+    dateIso: FIXED, hour: 10, minute: 0, title: 'Review', mailboxTimeZone: mailboxIl
+  });
+  check('10:00 uses Graph mailbox Israel Standard Time when the browser is elsewhere',
+    good && good.start.dateTime === FIXED + 'T10:00:00' && good.start.timeZone === mailboxIl &&
+    good.end.dateTime === FIXED + 'T10:30:00', good);
+  const reverse = Cal.meetingBody({
+    dateIso: FIXED, hour: 10, minute: 0, title: 'Review', timeZone: browserNy, mailboxTimeZone: 'UTC'
+  });
+  check('explicit IANA zone wins over mailbox on the reverse pairing',
+    reverse && reverse.start.timeZone === browserNy && reverse.start.dateTime === FIXED + 'T10:00:00', reverse);
+  check('holdTimeZone uses mailbox when the hold names no explicit zone',
+    Cal.holdTimeZone(null, mailboxIl) === mailboxIl && Cal.holdTimeZone('', mailboxIl) === mailboxIl);
+  check('mutant browser fallback without mailbox differs from the mailbox hold (must fail if re-enabled in the worker)',
+    Cal.holdTimeZoneBrowserFallback(null, '', browserNy) === browserNy &&
+    Cal.holdTimeZone(null, mailboxIl) !== Cal.holdTimeZoneBrowserFallback(null, '', browserNy));
+  const noMailbox = Cal.meetingBody({ dateIso: FIXED, hour: 10, minute: 0, title: 'Review' });
+  check('no mailbox zone and no explicit zone refuses the hold', noMailbox === null);
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
+  check('the worker reads mailboxSettings.timeZone and sends Prefer outlook.timezone',
+    /mailboxSettings\?\$select=timeZone/.test(bg) && /outlookPreferTimezone/.test(bg) &&
+    /outlookCalendarTimeZone/.test(bg) && /outlook\.timezone=/.test(bg), bg.length);
+  const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
+  check('Connect uses connectServiceUi instead of ticking every granted scope on sign-in',
+    popup.indexOf('connectServiceUi') >= 0 && popup.indexOf('has && granted.length') < 0, popup.length);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

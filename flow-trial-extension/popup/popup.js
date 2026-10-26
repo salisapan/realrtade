@@ -670,6 +670,7 @@
       { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite'] }
     ];
     const granted = grantedOutlookScopes();
+    const connectCtx = { granted: granted, tokenStatus: tokenStatus };
     const boxes = {};
     services.forEach((svc) => {
       const lab = document.createElement('label');
@@ -677,11 +678,12 @@
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.setAttribute('data-glance-service', svc.id);
-      const required = Boolean(svc.required || svc.id === 'mail');
-      const has = (svc.scopes || []).every((sc) => granted.indexOf(sc) >= 0);
-      if (required) { box.checked = true; box.disabled = true; }
-      else if (has && granted.length) box.checked = true;
-      else if (svc.defaultOn === true && !has) box.checked = true;
+      const ui = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectServiceUi === 'function')
+        ? FlowOutlookConfig.connectServiceUi(svc, connectCtx)
+        : { checked: Boolean(svc.required || svc.id === 'mail'), disabled: Boolean(svc.required || svc.id === 'mail'), granted: false };
+      box.checked = ui.checked;
+      box.disabled = ui.disabled;
+      if (ui.granted) lab.setAttribute('data-glance-granted', '1');
       boxes[svc.id] = box;
       const copy = el('span', null, serviceLabel(svc));
       if (svc.detail) {
@@ -689,7 +691,7 @@
         small.textContent = svc.detail;
         copy.appendChild(small);
       }
-      if (!required && !has) appendMissingScopeLine(copy, svc);
+      if (!ui.granted && !ui.disabled) appendMissingScopeLine(copy, svc);
       lab.appendChild(box);
       lab.appendChild(copy);
       screen.appendChild(lab);
@@ -1901,10 +1903,12 @@
         const box = document.createElement('input');
         box.type = 'checkbox';
         box.setAttribute('data-glance-service', svc.id);
-        const required = Boolean(svc.required || svc.id === 'mail');
-        const has = (svc.scopes || []).every((sc) => grantedNow.indexOf(sc) >= 0);
-        if (required) { box.checked = true; box.disabled = true; }
-        else box.checked = has || svc.defaultOn === true;
+        const ui = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectServiceUi === 'function')
+          ? FlowOutlookConfig.connectServiceUi(svc, { granted: grantedNow, tokenStatus: 'valid' })
+          : { checked: false, disabled: false, granted: false };
+        box.checked = ui.checked;
+        box.disabled = ui.disabled;
+        if (ui.granted) lab.setAttribute('data-glance-granted', '1');
         scopeBoxes[svc.id] = box;
         lab.appendChild(box);
         lab.appendChild(el('span', null, serviceLabel(svc)));

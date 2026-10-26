@@ -233,6 +233,7 @@ function listsRoute() {
 
   console.log('\n--- Hold It writes one meeting event ---\n');
   const meet = background({ routes: [
+    { method: 'GET', test: /\/me\/mailboxSettings/, reply: () => ({ ok: true, status: 200, json: async () => ({ timeZone: 'UTC' }), text: async () => '' }) },
     { method: 'POST', test: /\/me\/events$/, reply: () => ({ ok: true, status: 201, json: async () => ({
       id: 'EV-BUDGET',
       subject: 'CREATED-STUB',

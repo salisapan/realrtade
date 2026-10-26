@@ -218,7 +218,8 @@ const FlowOutlookCalendar = (() => {
     const link = fileLink(i.fileUrl);
     const name = String(i.fileName || i.fileTerm || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!date || hour == null || minute == null || !link || !name) return null;
-    const zone = String(i.timeZone || 'UTC').trim().slice(0, 80) || 'UTC';
+    const zone = holdTimeZone(i.timeZone, i.mailboxTimeZone);
+    if (!zone) return null;
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     const lines = [];
     if (quote) lines.push(quote);
@@ -297,8 +298,31 @@ const FlowOutlookCalendar = (() => {
     };
   }
 
-  // The person's zone, never a silent UTC default. An explicit zone wins.
-  // Otherwise the host zone (Intl). An empty result means the hold stays quiet.
+  // Calendar holds use the mailbox zone from Graph mailboxSettings.timeZone.
+  // An explicit zone wins; the browser zone is never used here.
+  function holdTimeZone(explicit, mailboxZone) {
+    const given = String(explicit || '').trim().slice(0, 80);
+    if (given) {
+      if (zoneOk(given)) return given;
+      // Graph mailboxSettings uses Windows display names (not IANA).
+      if (given.indexOf('/') < 0 && given.length > 2) return given;
+      return '';
+    }
+    const mailbox = String(mailboxZone || '').trim().slice(0, 80);
+    if (mailbox) return mailbox;
+    return '';
+  }
+
+  // Intentionally wrong path for corpus mutants (browser local, not mailbox).
+  function holdTimeZoneBrowserFallback(explicit, mailboxZone, browserZone) {
+    const z = holdTimeZone(explicit, mailboxZone);
+    if (z) return z;
+    const browser = String(browserZone || '').trim().slice(0, 80);
+    if (browser && zoneOk(browser)) return browser;
+    return '';
+  }
+
+  // Legacy name: browser Intl only. Do not use for Graph event writes.
   function zoneName(explicit) {
     const given = String(explicit || '').trim().slice(0, 80);
     if (given) return given;
@@ -375,8 +399,8 @@ const FlowOutlookCalendar = (() => {
     if (String(i.fileUrl || i.fileName || i.fileTerm || '').trim()) return null;
     const title = String(i.title || i.quote || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
-    const zone = zoneName(i.timeZone);
-    if (!zone || !zoneOk(zone)) return null;
+    const zone = holdTimeZone(i.timeZone, i.mailboxTimeZone);
+    if (!zone) return null;
     const startIso = wallIso(date, hour, minute, 0);
     const endIso = wallIso(date, hour, minute, durationOf(i.durationMinutes));
     if (!startIso || !endIso || /Z$/i.test(startIso)) return null;
@@ -421,6 +445,9 @@ const FlowOutlookCalendar = (() => {
     meetingBody: meetingBody,
     contentHash: contentHash,
     zoneName: zoneName,
+    holdTimeZone: holdTimeZone,
+    holdTimeZoneBrowserFallback: holdTimeZoneBrowserFallback,
+    zoneOk: zoneOk,
     whenLabel: whenLabel,
     undoRequest: undoRequest,
     decide: decide
