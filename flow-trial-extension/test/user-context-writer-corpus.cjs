@@ -38,11 +38,12 @@ dismissedBlocks = W.applyEvent(dismissedBlocks, { type: 'approved', partyKey: 'a
 dismissedBlocks = W.applyEvent(dismissedBlocks, { type: 'dismissed', partyKey: 'a@b.com', intentFamily: 'quote', at: tHist });
 check('N11b behavioral: a dismissal blocks a would-be relevant history', W.relevanceHint(dismissedBlocks, tHist).relevance !== 'relevant');
 
-const tPast = '2026-09-01T12:00:00.000Z';
-const cold = W.applyEvent(W.applyEvent(W.empty('n11d'), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tPast }), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tPast });
-check('N11d behavioral: injectable now changes relevance at weight boundary', W.relevanceHint(cold, tPast).relevance === 'relevant' && W.relevanceHint(cold, tHist).relevance === 'unknown');
-
 const tNow = new Date().toISOString();
+const t200d = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString();
+let n11d = W.applyEvent(W.empty('n11d'), { type: 'dismissed', partyKey: 'a@b.com', intentFamily: 'quote', at: t200d });
+n11d = W.applyEvent(n11d, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tNow });
+n11d = W.applyEvent(n11d, { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: tNow });
+check('N11d behavioral: ~200-day-old dismissal plus two fresh approvals is not relevant', W.relevanceHint(n11d, tNow).relevance !== 'relevant');
 const t24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
 const lone24 = W.applyEvent(W.empty('one-24h'), { type: 'approved', partyKey: 'a@b.com', intentFamily: 'quote', fetchedBack: true, at: t24h });
 check('24h: one decayed approval stays below 2.0', W.relevanceHint(lone24, tNow).relevance === 'unknown');
@@ -97,12 +98,25 @@ check('N11e per-event approvalAts decay sum', /approvalAts\[i\]/.test(ucSrc) && 
 
 console.log('\n--- worker guards (switch off does not persist) ---\n');
 
-function loadWorker(stored) {
+function res(status, body) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+function loadWorker(stored, workerOpts) {
+  workerOpts = workerOpts || {};
   const bag = JSON.parse(JSON.stringify(stored || { glanceSwitches: {}, glanceUserContextV0: { byAccount: {} } }));
+  if (workerOpts.googleProfile) bag.googleProfile = workerOpts.googleProfile;
   const listeners = [];
+  const laneEmail = String(workerOpts.laneEmail || '').trim().toLowerCase();
   const sandbox = {
     console,
-    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+    fetch: async (url, options) => {
+      const method = String((options && options.method) || 'GET').toUpperCase();
+      if (method === 'GET' && /\/users\/@me\/lists/.test(String(url))) {
+        return res(200, { items: [{ id: 'LIST_UC', title: 'Glance' }] });
+      }
+      return res(500, { error: { message: 'unrouted: ' + method + ' ' + url } });
+    },
     chrome: {
       runtime: {
         getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
@@ -124,7 +138,11 @@ function loadWorker(stored) {
             keys.forEach((key) => { out[key] = bag[key] !== undefined ? bag[key] : defaults[key]; });
             return out;
           },
-          set: async (patch) => { Object.assign(bag, patch); }
+          set: async (patch) => { Object.assign(bag, patch); },
+          remove: async (keys) => {
+            const list = Array.isArray(keys) ? keys : [keys];
+            list.forEach((k) => { delete bag[k]; });
+          }
         }
       },
       contextMenus: { onClicked: { addListener() {} }, create() {}, removeAll(cb) { if (cb) cb(); } },
@@ -143,6 +161,10 @@ function loadWorker(stored) {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  const laneStub = laneEmail
+    ? `globalThis.FlowGoogleLaneAccount = { read: async () => '${laneEmail}', accountOf: async () => '${laneEmail}', record: async () => {}, ensureGlanceList: async () => 'LIST_UC' };`
+    : require('./load-background.cjs').LANE_ACCOUNT_STUB;
+  vm.runInContext(laneStub, sandbox);
   const send = (msg) => new Promise((resolve) => {
     const l = listeners[listeners.length - 1];
     const keep = l(msg, {}, resolve);
@@ -152,7 +174,8 @@ function loadWorker(stored) {
     bag,
     send,
     W: sandbox.FlowUserContextWriter,
-    seed: (patch) => vm.runInContext('seedUserContextFromConnect(' + JSON.stringify(patch || {}) + ')', sandbox)
+    seed: (patch) => vm.runInContext('seedUserContextFromConnect(' + JSON.stringify(patch || {}) + ')', sandbox),
+    connectGoogleTasks: () => vm.runInContext('connectGoogleTasks(true)', sandbox)
   };
 }
 
@@ -185,9 +208,14 @@ function loadWorker(stored) {
   await w.seed({ email: 'seed@co.com', name: 'Seed Person', title: 'Ops' });
   check('S1: seedUserContextFromConnect stores profile under account email', w.bag.glanceUserContextV0.byAccount['seed@co.com'] && w.bag.glanceUserContextV0.byAccount['seed@co.com'].identity.title === 'Ops', w.bag.glanceUserContextV0.byAccount['seed@co.com']);
 
-  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: { 'other@co.com': W.empty('x') } } });
-  await w.seed({ email: 'other@co.com', name: 'Other' });
-  check('S2: seed merges into existing account bucket only', w.bag.glanceUserContextV0.byAccount['other@co.com'] && w.bag.glanceUserContextV0.byAccount['other@co.com'].identity.aliases.indexOf('Other') >= 0, w.bag.glanceUserContextV0.byAccount);
+  w = loadWorker({
+    glanceSwitches: { USER_CONTEXT_WRITER: true },
+    glanceUserContextV0: { byAccount: { 'lane@co.com': W.empty('lane@co.com') } },
+    googleProfile: { name: 'Lane Person', title: 'Lead' }
+  }, { laneEmail: 'lane@co.com' });
+  const connected = await w.connectGoogleTasks();
+  check('S2: connectGoogleTasks seeds via lane account email', connected === true && w.bag.glanceUserContextV0.byAccount['lane@co.com'], w.bag.glanceUserContextV0.byAccount);
+  check('S2: connect merges into existing byAccount bucket only', w.bag.glanceUserContextV0.byAccount['lane@co.com'].identity.aliases.indexOf('Lane Person') >= 0 && w.bag.glanceUserContextV0.byAccount['lane@co.com'].identity.title === 'Lead', w.bag.glanceUserContextV0.byAccount['lane@co.com']);
 
   console.log('\n--- verifier mutants B5 / B6 (worker learning) ---\n');
 
