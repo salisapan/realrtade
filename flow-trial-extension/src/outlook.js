@@ -331,9 +331,19 @@ const FlowOutlook = (() => {
         const allow = (E && typeof E.microsoftConsentScopes === 'function')
           ? E.microsoftConsentScopes()
           : ((E && typeof E.microsoftScopes === 'function') ? E.microsoftScopes() : ((E && E.MICROSOFT_SCOPES) ? E.MICROSOFT_SCOPES.slice() : []));
-        const allowSet = new Set(allow);
-        scopeSources = (chosen || []).filter((s) => allowSet.has(s));
-        if (!scopeSources.length && allow.length) scopeSources = allow.slice();
+        const optional = [];
+        if (E && E.microsoftOptionalScopes) {
+          Object.keys(E.microsoftOptionalScopes).forEach((k) => {
+            (E.microsoftOptionalScopes[k] || []).forEach((s) => { if (optional.indexOf(s) < 0) optional.push(s); });
+          });
+        }
+        const prevNames = (E && typeof E.scopeNames === 'function')
+          ? E.scopeNames((prev && prev.token && prev.token.grantedScopes) || (prev && prev.requestedScopes) || [])
+          : [];
+        const keptOptional = prevNames.filter((s) => optional.indexOf(s) >= 0);
+        scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
+          ? E.mergeMicrosoftScopes(allow, keptOptional)
+          : allow.concat(keptOptional);
       } else {
         scopeSources = (chosen || []).concat(cfg.SCOPES || []);
       }
