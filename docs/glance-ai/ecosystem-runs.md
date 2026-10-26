@@ -844,3 +844,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; no Gmail-side half missing for the recent B features (series, Meet link and booking cancel are on both).
 - **Tests:** new `test/polite-en-ask-corpus.cjs` (10 asks, 6 look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. One pre-existing false positive found, not caused by this change: "We need to talk about the budget back at the office" shows a card; recorded, not fixed.
 - **Open:** live Gate; the "talk ... back at the office" false positive; "I'd love to get X by Friday" and «אכפת לך לשלוח…» stay quiet.
+
+### Run 102 (2026-10-26)
+- **Capability shipped:** the most common Hebrew way to ask ("את/אתה יכול(ה) לשלוח…", "אתם יכולים…", "היית יכולה…") and "Are you able to …" were not read as asks at all (the probe returned no intent); they now offer the same reply card as «תוכל…».
+- **Code:** `core/judgment.js` only (the Hebrew handoff reader, the English handoff reader).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/can-you-he-corpus.cjs` (9 asks, 5 look-alikes; asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run.
+- **Open:** live Gate; two borderline lines now show (a «…לדנה במקום אליי» redirect and a «…כבר קיבלתי אותו» contradiction), the same as the «תוכל» forms did before; the «We need to talk … back at the office» false positive from run 101 is still open.

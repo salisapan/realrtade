@@ -128,7 +128,7 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:(?:אתה|את|אתם|אתן)\s+יכול(?:ה|ים|ות)?|היית(?:י)?\s+יכול(?:ה)?)\s+(?:בבקשה\s+)?ל(?:שלוח|העביר|אשר|בדוק|עבור|חתום|חזור|עדכן|שלם|הכין|סדר|תאם|מלא|הזמין|השיב|ענות|הוסיף|צרף|פתוח|ארגן|טפל|שמור|העלות|העלות|הגיש|הוציא|שחרר)(?![א-ת])|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
@@ -275,7 +275,7 @@ const FlowJudgment = (() => {
   // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
   // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
   // longer text, a bare "really?" and a greeting stay on the normal path.
-  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|would it be possible to (?:get|have|send|share)\b|is it possible to (?:get|have|send|share)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
+  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|would it be possible to (?:get|have|send|share)\b|are you able to (?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look|get me)\b|is it possible to (?:get|have|send|share)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
   const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
   function shortAskText(text) {
     const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
