@@ -42,6 +42,7 @@
 
 const crypto = require('crypto');
 const { callRoutedLlm, silenceResult } = require('./model-router.js');
+const { summarizeAttachmentSilenced } = require('./gemini-paid-gate.js');
 const license = require('../verify-license/license-core.js');
 const { styleLine } = require('./style-hints.js');
 const { FlowJsonEnforce } = require('../../../../flow-trial-extension/core/json-enforce.js');
@@ -133,15 +134,25 @@ function safeParseJson(text) {
   return null;
 }
 
+function geminiPaidGateError() {
+  const err = new Error('Attachment summarization is not available for Google or Microsoft mail without the paid Gemini tier.');
+  err.code = 'gemini_paid_gate';
+  err.silent = true;
+  err.status = 403;
+  return err;
+}
+
 async function summarizeAttachment(payload) {
   const text = clean(payload.maskedText, LIMITS.attachmentText);
   if (!text) throw badRequest('No attachment text provided.');
+  if (summarizeAttachmentSilenced(payload.contentSource, process.env)) throw geminiPaidGateError();
 
   // A response that is not the summary JSON is not a summary. The router
   // tries the next provider; if none produce one, this throws 502 rather
   // than returning the attachment text or a sentence we made up.
   const out = await callRoutedLlm({
     action: 'summarize-attachment',
+    contentSource: payload.contentSource,
     system: SUMMARY_SYSTEM,
     userText: text,
     maxTokens: 500,
@@ -367,6 +378,9 @@ exports.handler = async function (event) {
     if (err.pii || err.refusal) {
       logErr(err.pii ? 'blocked unmasked contact details' : 'model refused');
       return { statusCode: 422, body: JSON.stringify({ error: 'Could not complete that request.' }) };
+    }
+    if (err.code === 'gemini_paid_gate' && err.silent) {
+      return { statusCode: 200, body: JSON.stringify({ ok: false, code: 'gemini_paid_gate', silent: true }) };
     }
     logErr(action + ' failed', String(err.message || err));
     return { statusCode: err.status || 502, body: JSON.stringify({ error: err.status === 400 ? err.message : 'We could not complete that. Please try again.' }) };

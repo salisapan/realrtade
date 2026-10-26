@@ -5902,7 +5902,12 @@ function glanceUiCopy(kind) {
       if (!rawText.trim()) throw new Error('empty document');
 
       const masked = FlowPrivacyShield.mask(rawText);
-      chrome.runtime.sendMessage({ type: 'flow:summarize-attachment', payload: { maskedText: masked.maskedText } }, (response) => {
+      chrome.runtime.sendMessage({ type: 'flow:summarize-attachment', payload: { maskedText: masked.maskedText, contentSource: 'google' } }, (response) => {
+        if (response && response.code === 'gemini_paid_gate' && response.silent) {
+          FlowSidebar.hideFloatingCard();
+          attachmentCache.set(meta.url, 'gemini-gate');
+          return;
+        }
         if (!response || !response.ok) {
           FlowSidebar.showFloatingCard(rect, { state: 'error', message: aiErrorMessage(response, 'Couldn’t read this attachment.') });
           return;
