@@ -47,6 +47,7 @@ async function run() {
     check('it reports stored:true only because Supabase accepted it', json.stored === true, json);
     check('send-confirmation is triggered for trial', confirmCalls().length === 1 && confirmCalls()[0].body.kind === 'trial' && confirmCalls()[0].body.email === 'ada@example.com', confirmCalls());
     check('send-confirmation payload has no download link', !confirmCalls()[0].body.downloadUrl, confirmCalls()[0].body);
+    check('emailed:true on the happy path (install mail is triggered separately)', json.emailed === true, json);
   }
 
   console.log('\n--- repeat visitor ---\n');

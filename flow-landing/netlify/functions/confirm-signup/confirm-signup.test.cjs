@@ -57,6 +57,24 @@ function downloadHrefFromSuccessHtml(html) {
   return m ? m[1] : null;
 }
 
+function downloadTokenKey(urlOrHref) {
+  const raw = String(urlOrHref || '').replace(/&amp;/g, '&');
+  const u = new URL(raw.startsWith('http') ? raw : 'https://theflow-ai.com' + (raw.startsWith('/') ? raw : '/' + raw));
+  return [u.searchParams.get('email'), u.searchParams.get('exp'), u.searchParams.get('sig')].join('|');
+}
+
+async function verifyDownloadLink(hrefOrUrl) {
+  const raw = String(hrefOrUrl || '').replace(/&amp;/g, '&');
+  const u = new URL(raw.startsWith('http') ? raw : 'https://theflow-ai.com' + (raw.startsWith('/') ? raw : '/' + raw));
+  return download.handler({
+    queryStringParameters: {
+      email: u.searchParams.get('email'),
+      exp: u.searchParams.get('exp'),
+      sig: u.searchParams.get('sig')
+    }
+  });
+}
+
 function captureLogs(fn) {
   const lines = [];
   const log = console.log;
@@ -139,7 +157,39 @@ async function run() {
       }
     });
     check('the same link does not work for a different address', bad.statusCode === 400, { status: bad.statusCode });
+    check('the emailed downloadUrl matches the success-page link', Boolean(trialAccess && trialAccess.body && href) && downloadTokenKey(trialAccess.body.downloadUrl) === downloadTokenKey(href), { emailed: trialAccess && trialAccess.body && trialAccess.body.downloadUrl, href });
+    const emailedDl = trialAccess && trialAccess.body && trialAccess.body.downloadUrl ? await verifyDownloadLink(trialAccess.body.downloadUrl) : null;
+    check('the emailed link passes download-trial-zip verification', emailedDl && emailedDl.statusCode !== 400, emailedDl && { status: emailedDl.statusCode });
     check('send-trial-access was called on first claim', Boolean(trialAccess), calls.map((c) => c.url));
+  }
+
+  console.log('\n--- EM2: send-trial-access failure does not block download ---\n');
+  {
+    const savedFetch = global.fetch;
+    global.fetch = async (url, opts) => {
+      if (String(url).includes('send-trial-access')) throw new Error('send-trial-access down');
+      return savedFetch(url, opts);
+    };
+    calls = [];
+    waitlistRow = null;
+    patchResult = () => ({ ok: true, status: 200, json: async () => [{ id: 3, email: 'em2@example.com' }] });
+    const q = signedQuery('em2@example.com');
+    const res = await handler({ queryStringParameters: q });
+    global.fetch = savedFetch;
+    check('200 when send-trial-access throws', res.statusCode === 200, res);
+    check('success page still includes download button after mail failure', /download-trial-zip/.test(res.body || ''), res.body && res.body.indexOf('id="dl"'));
+  }
+
+  console.log('\n--- C1: bad signature returns 400, not a crash ---\n');
+  {
+    calls = [];
+    const email = 'bad-sig@example.com';
+    const exp = String(Date.now() + 3600000);
+    const res = await handler({
+      queryStringParameters: { email, exp, sig: 'not-a-valid-sig', lang: 'en', kind: 'trial' }
+    });
+    check('invalid signature is 400', res.statusCode === 400, res.statusCode);
+    check('invalid signature: no PATCH', !calls.some((c) => c.method === 'PATCH'), calls);
   }
 
   console.log('\n--- Z2: lookup shows confirmed_at null is not already confirmed ---\n');
