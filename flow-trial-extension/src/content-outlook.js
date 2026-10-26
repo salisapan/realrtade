@@ -1161,6 +1161,7 @@
         (pane && pane.internetMessageId && (pane.clockFromPane || pane.idSource === 'open-mail')) ||
         (paneMinute && pane && pane.clockFromPane === true)
       );
+      // Fail-closed if pane lacks clock/id anchor (openPaneExactGraphRow invariant on sole-row path).
       if (!paneAnchored) return null;
       if (openPaneExactGraphRow(pane, sole)) return sole;
       if (pane.clockFromPane === true) return null;

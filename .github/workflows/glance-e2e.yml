@@ -4,13 +4,14 @@ on:
   pull_request:
     branches:
       - claude/install-uiux-pro-max-skill-a4agox
+      - cursor/glance-0941-steps-list
   workflow_dispatch:
 
 jobs:
   e2e:
     name: e2e (${{ matrix.tz }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:

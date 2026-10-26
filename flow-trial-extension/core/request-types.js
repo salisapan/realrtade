@@ -100,6 +100,13 @@ const FlowRequestTypes = (() => {
     }
     return null;
   }
+  function heSignViaAdjectiveForm(sentence) {
+    const s = String(sentence || '');
+    if (/(?:^|[^\u0590-\u05FF])(?:החתום|חתומה)(?=[\s,.!?]|$)/.test(s)) return true;
+    if (/[\u0590-\u05FF]{2,}\s+החתום/.test(s)) return true;
+    if (/חוזה החתום|החוזה החתום|עותק חתום|מסמך חתום/.test(s)) return true;
+    return false;
+  }
   function findAction(sentence) {
     const s = String(sentence || '');
     const he = hasHebrew(s);
@@ -107,7 +114,8 @@ const FlowRequestTypes = (() => {
       const send = ACTIONS.find((a) => a.id === 'send');
       const sign = ACTIONS.find((a) => a.id === 'sign');
       if (send && sign && send.heRe.some((r) => r.test(s)) && sign.heRe.some((r) => r.test(s))) {
-        return send;
+        if (heSignViaAdjectiveForm(s)) return send;
+        return find(ACTIONS, s);
       }
     }
     return find(ACTIONS, s);

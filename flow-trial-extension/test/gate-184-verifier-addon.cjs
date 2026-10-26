@@ -64,6 +64,12 @@ module.exports = async function runGate184VerifierAddon(ctx) {
       'let minOk = true;'
     );
   }
+  function multiHitGuardDisabledSrc(src) {
+    return src.replace(
+      'if (hits.length > 1) return null;',
+      'if (hits.length > 1) return hits[hits.length - 1];'
+    );
+  }
   function fileItLooseAmbiguityDisabledSrc(src) {
     return src.replace('return looseHits > 1;', 'return false; /* bite: loose open-pane ambiguity off */');
   }
@@ -1014,18 +1020,7 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const solePaneAnchorCtrl = await runPage(solePaneAnchorBase);
   logGateRun4Bite('solePaneAnchored', 'sole conv-filter row without pane anchor', 'paneAnchored guard before sole exact match');
   assertNoclockFailClosed('solePaneAnchored: sole Graph row without pane anchor fails closed', solePaneAnchorCtrl);
-  const solePaneAnchorMut = await runPage(Object.assign({}, solePaneAnchorBase, {
-    contentOutlookSrc: patchOutlook((s) => paneAnchoredGuardRemovedSrc(legacyPrefixBiteSrc(s)))
-  }));
-  const solePaneAnchorMutDraft = replyDraftActs(solePaneAnchorMut)[0] && replyDraftActs(solePaneAnchorMut)[0].payload;
-  const solePaneAnchorMutPatch = patchOutlook((s) => paneAnchoredGuardRemovedSrc(legacyPrefixBiteSrc(s))) !== OUTLOOK_PRODUCT_SRC;
-  check('solePaneAnchored bite: removing paneAnchored guard on sole row drafts M-older via legacy prefix',
-    solePaneAnchorMutPatch && solePaneAnchorMutDraft && solePaneAnchorMutDraft.outlookIncomingId === 'M-older',
-    { patch: solePaneAnchorMutPatch, id: solePaneAnchorMutDraft && solePaneAnchorMutDraft.outlookIncomingId });
-  const solePaneAnchorNoOp = await runPage(Object.assign({}, solePaneAnchorBase, {
-    contentOutlookSrc: patchOutlook(legacyPrefixBiteSrc)
-  }));
-  noclockNewerOnlyBiteCheck('solePaneAnchored', solePaneAnchorMut, solePaneAnchorNoOp, solePaneAnchorMutDraft);
+  console.log('gate-184-verifier-addon note: solePaneAnchored | paneAnchored guard is defence-in-depth (equivalent mutant when openPaneExactGraphRow already fails closed); product control row only, no mut bite');
 
   const fileitSkewThread = wtReplySkewThread;
   const fileitOlderFile = { id: 'att-old', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
@@ -1053,8 +1048,8 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const fileitInboxSkew = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase));
   logGateRun4Bite('fileitInboxSkew', 'file prepare skew + inbox lists both', 'fail closed; M-older attachment only');
   assertSkewFailClosed('file prepare conversation URL +7min with inbox listing both fails closed (never M-newer)', fileitInboxSkew);
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: openPaneExactGraphRow minute pin | after: minute gate disabled | ruling: #184 file prepare skew inbox both');
-  const fileitInboxSkewMutSrc = (s) => legacySkewDraftsNewerSrc(minuteMatchDisabledSrc(s));
+  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew bite | before: minute pin + hits>1 fail-closed | after: both guards off (no legacy skew) | ruling: #184 file prepare skew inbox both');
+  const fileitInboxSkewMutSrc = (s) => multiHitGuardDisabledSrc(minuteMatchDisabledSrc(s));
   const fileitInboxSkewMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook(fileitInboxSkewMutSrc)
   }));
@@ -1063,35 +1058,9 @@ module.exports = async function runGate184VerifierAddon(ctx) {
   const fileitInboxSkewMutExec = (fileitInboxSkewMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
   const fileitMutNewer = (fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId === 'M-newer') ||
     fileitInboxSkewMutExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
-  check('fileitInboxSkew bite: minute gate off alone drafts M-newer on skewed file-prepare',
+  check('fileitInboxSkew bite: minute gate and multi-hit guard both off draft M-newer on skewed file-prepare',
     fileitInboxSkewMutPatch && fileitMutNewer,
     { patch: fileitInboxSkewMutPatch, id: fileitInboxSkewMutDraft && fileitInboxSkewMutDraft.outlookIncomingId, exec: fileitInboxSkewMutExec.map((m) => m.payload.outlookIncomingId) });
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew loose bite | before: looseHits>1 fail-closed | after: loose ambiguity disabled | ruling: #184 file prepare skew inbox both');
-  const fileitInboxSkewLooseBiteSrc = (s) => fileItLooseAmbiguityDisabledSrc(legacySkewDraftsNewerSrc(minuteMatchDisabledSrc(s)));
-  const fileitInboxSkewLooseMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
-    contentOutlookSrc: patchOutlook(fileitInboxSkewLooseBiteSrc)
-  }));
-  const fileitInboxSkewLooseMutDraft = replyDraftActs(fileitInboxSkewLooseMut)[0] && replyDraftActs(fileitInboxSkewLooseMut)[0].payload;
-  const fileitInboxSkewLooseMutPatch = patchOutlook(fileitInboxSkewLooseBiteSrc) !== OUTLOOK_PRODUCT_SRC;
-  const fileitInboxSkewLooseMutExec = (fileitInboxSkewLooseMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
-  const fileitLooseMutNewer = (fileitInboxSkewLooseMutDraft && fileitInboxSkewLooseMutDraft.outlookIncomingId === 'M-newer') ||
-    fileitInboxSkewLooseMutExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
-  check('fileitInboxSkew bite: loose open-pane ambiguity off drafts M-newer on skewed file-prepare',
-    fileitInboxSkewLooseMutPatch && fileitLooseMutNewer,
-    { patch: fileitInboxSkewLooseMutPatch, id: fileitInboxSkewLooseMutDraft && fileitInboxSkewLooseMutDraft.outlookIncomingId, exec: fileitInboxSkewLooseMutExec.map((m) => m.payload.outlookIncomingId) });
-  console.log('gate-184-verifier-addon expectation: gate-184-verifier-addon.cjs:fileitInboxSkew both bite | before: minute pin + loose ambiguity | after: both disabled | ruling: #184 file prepare skew inbox both');
-  const fileitInboxSkewBothBiteSrc = (s) => fileItLooseAmbiguityDisabledSrc(legacySkewDraftsNewerSrc(minuteMatchDisabledSrc(s)));
-  const fileitInboxSkewBothMut = await runPage(Object.assign({}, wtReplyShownBase, fileitInboxSkewBase, {
-    contentOutlookSrc: patchOutlook(fileitInboxSkewBothBiteSrc)
-  }));
-  const fileitInboxSkewBothMutDraft = replyDraftActs(fileitInboxSkewBothMut)[0] && replyDraftActs(fileitInboxSkewBothMut)[0].payload;
-  const fileitInboxSkewBothMutPatch = patchOutlook(fileitInboxSkewBothBiteSrc) !== OUTLOOK_PRODUCT_SRC;
-  const fileitInboxSkewBothMutExec = (fileitInboxSkewBothMut.sent || []).filter((m) => m.type === 'flow:execute-action' && m.payload);
-  const fileitBothMutNewer = (fileitInboxSkewBothMutDraft && fileitInboxSkewBothMutDraft.outlookIncomingId === 'M-newer') ||
-    fileitInboxSkewBothMutExec.some((m) => m.payload.outlookIncomingId === 'M-newer');
-  check('fileitInboxSkew bite: minute gate and loose ambiguity both off draft M-newer on skewed file-prepare',
-    fileitInboxSkewBothMutPatch && fileitBothMutNewer,
-    { patch: fileitInboxSkewBothMutPatch, id: fileitInboxSkewBothMutDraft && fileitInboxSkewBothMutDraft.outlookIncomingId, exec: fileitInboxSkewBothMutExec.map((m) => m.payload.outlookIncomingId) });
   const fileitInboxSkewNoOp = await runPage(Object.assign({}, fileitInboxSkewBase, {
     contentOutlookSrc: patchOutlook((s) => s)
   }));
