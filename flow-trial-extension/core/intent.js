@@ -91,7 +91,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגישה|שיחה)|(?:אפשר|נוכל|תוכל(?:י|ו)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח))/;
 
   // "This is not happening at the time this message names."
   //
@@ -217,6 +217,46 @@ const FlowIntent = (() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const sameYear = dt.getFullYear() === new Date().getFullYear();
     return months[dt.getMonth()] + ' ' + dt.getDate() + (sameYear ? '' : ' ' + dt.getFullYear());
+  }
+
+  function heSlashDate(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const parts = iso.split('-');
+    return parts[2] + '/' + parts[1];
+  }
+
+  function stripOpeningGreetingLine(text) {
+    return String(text || '')
+      .replace(/^(?:hi|hello|hey|dear)(?:\s+[^,!\n]{1,40})?[,!]\s*/i, '')
+      .replace(/^(?:שלום|היי|הי)\s+[^,!\n]{1,40}[,!]\s*/, '')
+      .replace(/^(?:שלום|היי|הי)\s*,\s*/, '')
+      .trim();
+  }
+
+  function noReplyDraftLabel(text, ctx, intent) {
+    const subject = ctx && ctx.subject;
+    const he = /[\u0590-\u05FF]/.test(text);
+    const whatRaw = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
+    let titled = /^renew the parking permit$/i.test(whatRaw)
+      ? whatRaw
+      : selfAskTitle(text, subject, ctx);
+    if (!usableSelfTitle(titled)) {
+      let what = whatRaw;
+      what = stripOpeningGreetingLine(what).replace(/[.!?]+$/, '').trim();
+      titled = what;
+    }
+    const iso = intent.entities && intent.entities.dateIso;
+    if (iso) {
+      titled = String(titled || '')
+        .replace(HE_DATE_TAIL, '')
+        .replace(EN_DATE_TAIL, '')
+        .replace(/\s+by\s+[\s\S]*$/i, '')
+        .replace(/\s+עד(?:\s|$).*$/, '')
+        .trim();
+      if (he) titled += ' עד ' + heSlashDate(iso);
+      else titled += ' by ' + humanDateFallback({ iso: iso });
+    }
+    return titled;
   }
 
   // The same HANDOFF/HANDOFF_HE patterns FlowJudgment.score() already tested
@@ -469,7 +509,10 @@ const FlowIntent = (() => {
     list.forEach((a) => {
       if (!a) return;
       const email = typeof a === 'string' ? a : (a.email || a.address || (a.emailAddress && a.emailAddress.address) || '');
-      const norm = String(email || '').trim().toLowerCase();
+      let norm = String(email || '').trim();
+      const bracket = norm.match(/<([^>]+)>/);
+      if (bracket) norm = bracket[1].trim();
+      norm = norm.toLowerCase();
       if (norm) out.push(norm);
     });
     return out;
@@ -717,7 +760,39 @@ const FlowIntent = (() => {
   function nameIsReader(token, ctx) {
     const named = String(token || '').trim().toLowerCase();
     if (!named) return false;
-    return readerNameList(ctx).indexOf(named) !== -1;
+    if (readerNameList(ctx).indexOf(named) !== -1) return true;
+    const list = readerNameList(ctx);
+    for (let a = 0; a < scriptAliases(named).length; a++) {
+      if (list.indexOf(scriptAliases(named)[a]) !== -1) return true;
+    }
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.equivalent) {
+      for (let r = 0; r < list.length; r++) {
+        if (FlowNameMatch.equivalent(named, list[r])) return true;
+      }
+    }
+    const c = ctx || {};
+    if (!c.readerEmail && c.namesWaitDone !== true) return false;
+    const own = addressList(c.ownAddresses || c.own || []);
+    const readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (readerEmail && own.indexOf(readerEmail) === -1) own.push(readerEmail);
+    for (let i = 0; i < own.length; i++) {
+      const local = (String(own[i] || '').split('@')[0] || '').toLowerCase();
+      if (!local || named.length < 3) continue;
+      if (local === named || local.startsWith(named)) return true;
+      const parts = local.split(/[._-]+/);
+      for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        if (!part || part.length < 3) continue;
+        if (part === named || part.startsWith(named)) return true;
+      }
+      for (let n = 0; n < NAME_SCRIPT.length; n++) {
+        const latin = NAME_SCRIPT[n][0];
+        const heb = NAME_SCRIPT[n][1];
+        if (latin.length < 3 || !local.startsWith(latin)) continue;
+        if (named === latin || named === heb) return true;
+      }
+    }
+    return false;
   }
   // Display name, profile given name and surname, and the names the
   // person already stored. Hosts pass this list as ownNames. Latin and
@@ -861,17 +936,68 @@ const FlowIntent = (() => {
     if (!unresolved) return false;
     return greetedPerson(text);
   }
+  function readerAloneGreetingShows(text, ctx) {
+    const c = ctx || {};
+    if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
+    if (!readerNameList(c).length) return false;
+    const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
+    let greeted = '';
+    for (let i = 0; i < chunks.length; i++) {
+      const who = vocativeAt(chunks[i], text);
+      if (!who) continue;
+      if (!greeted) greeted = who;
+      if (nameIsReader(who, c)) return false;
+    }
+    const toOnly = addressList(c.to || []);
+    let readerEmail = String(c.readerEmail || '').trim().toLowerCase();
+    if (!readerEmail && toOnly.length === 1) {
+      const own = addressList(c.ownAddresses || c.own || []);
+      if (own.length && own.indexOf(toOnly[0]) !== -1) readerEmail = toOnly[0];
+    }
+    if (!greeted || !readerEmail || toOnly.length !== 1 || toOnly[0] !== readerEmail) return false;
+    const others = [];
+    const pushRecip = (entry) => {
+      if (!entry) return;
+      if (typeof entry === 'string') {
+        let e = entry.trim();
+        const bracket = e.match(/<([^>]+)>/);
+        if (bracket) e = bracket[1].trim();
+        e = e.toLowerCase();
+        if (e && e !== readerEmail) others.push({ email: e, localPart: (e.split('@')[0] || '') });
+        return;
+      }
+      const e = String(entry.email || '').trim().toLowerCase();
+      if (!e || e === readerEmail) return;
+      others.push({ email: e, name: entry.name || '', localPart: entry.localPart || (e.split('@')[0] || '') });
+    };
+    (c.toRecipients || c.to || []).forEach(pushRecip);
+    (c.ccRecipients || c.cc || []).forEach(pushRecip);
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient && FlowNameMatch.matchesRecipient(greeted, others)) return false;
+    return true;
+  }
   function greetingUnconfirmed(text, ctx) {
     const c = ctx || {};
     if (c.namesWaitDone !== true || !greetedPerson(text)) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
     for (let i = 0; i < chunks.length; i++) {
       const who = vocativeAt(chunks[i], text);
-      if (who && nameIsReader(who, c)) return false;
+      if (!who) continue;
+      if (nameIsReader(who, c)) return false;
     }
+    if (readerAloneGreetingShows(text, ctx)) return false;
     return true;
   }
+  function buriedReaderRememberAsk(text) {
+    const raw = String(text || '');
+    if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+      if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
+      return true;
+    }
+    return false;
+  }
   function vocativeIsOther(text, ctx) {
+    if (readerAloneGreetingShows(text, ctx)) return false;
     const names = readerNameList(ctx);
     if (!names.length) return false;
     const chunks = String(text || '').split(/\n+|(?<=[.!?])\s+/);
@@ -1279,7 +1405,7 @@ const FlowIntent = (() => {
       if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
-      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל|אל\s+תשכח(?:י|ו)?)(?![\u0590-\u05FF])/.test(text)) intent.noReplyDraft = true;
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       // A note to self is a plain task. Family A is the file chain, and
       // this mail is not that chain and not an attach to an invite.
@@ -1312,11 +1438,18 @@ const FlowIntent = (() => {
         intent.inviteDraft = invitePlan.draft;
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft && !intent.inviteFile) {
-        const what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
-        const iso = intent.entities && intent.entities.dateIso;
-        const dateText = iso ? humanDateFallback({ iso: iso }) : '';
-        if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
+      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
+        const createTask = text.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n]+)/i);
+        if (createTask) {
+          let clause = createTask[1].trim();
+          clause = clause.replace(/\.\s*(?:thanks|thank you|best regards|cheers|many thanks|regards)\b.*$/i, '').trim();
+          clause = clause.replace(/\s+(?:thanks|thank you|best regards|cheers|many thanks|regards)\b.*$/i, '').trim();
+          clause = clause.replace(/[.!?]+$/, '').trim();
+          if (clause) intent.label = clause;
+        } else {
+          const titled = noReplyDraftLabel(text, ctx, intent);
+          if (titled) intent.label = titled;
+        }
       }
       // A note to self is that task. "I will <verb> X" is verb plus object.
       // Log commitment is a promise in a mail to someone else, never this note.
@@ -1495,7 +1628,7 @@ const FlowIntent = (() => {
       if (/\b(?:was|were) due\b/i.test(blob) && /\bpaid\b/i.test(blob)) return 'past';
       if (/\bwe had our\b/i.test(blob)) return 'past';
       if (/\b(?:was|were) on\s+(?:moday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(blob)) return 'past';
-      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || /\bgreat (?:meeting|chatting)\b/i.test(blob)) return 'past';
+      if (/\bit was great (?:speaking|meeting|chatting)\b/i.test(blob) || (/\bgreat (?:meeting|chatting)\b/i.test(blob) && !/\bplease remember to\b/i.test(blob))) return 'past';
       if (/\bthanks for the\b/i.test(blob) && /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday)\b/i.test(blob)) return 'past';
       if (/אתמול|בשבוע שעבר|היה נעים|נהניתי|שמחתי שדיברנו|תודה שהקדשת|הייתה ביום|היה ביום|הפגישה הייתה/.test(blob)) return 'past';
       const year = blob.match(/\b(19\d{2}|20\d{2})\b/);
@@ -2846,6 +2979,8 @@ const FlowIntent = (() => {
   // The title is the body's verb and its object. The subject is not the object.
   function selfBodyTitle(src) {
     const t = String(src || '');
+    const tellStatus = t.match(/להגיד\s+(?:לי|לנו)\s+מה\s+(?:ה)?סטטוס\s+של\s+(.+?)(?:\s+עד(?:\s|$)|[.!?]|$)/);
+    if (tellStatus) return 'להגיד מה הסטטוס של ' + tellStatus[1].replace(/\s+עד.*$/, '').trim();
     const call = t.match(/להתקשר\s+ל([^\s.,!?]{1,24})/);
     if (call) return 'להתקשר ל' + call[1];
     const about = t.match(/(?:לעדכן|תעדכ[נן][ייו]?|לדכן)\s+(?:אותי\s+)?לגבי\s+(ה[\u0590-\u05FF]+)/);
