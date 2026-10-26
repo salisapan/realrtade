@@ -213,8 +213,23 @@ function judgeOpen_(opened, e) {
 }
 
 function engineHit_(text, opened, now) {
+  // The same decision every Glance surface makes: FlowIncomingJudge (judgment, quiets, veto, gates, plan). This card only
+  // differs in what it can write: a task or a calendar hold. A reply draft in the plan is left to the surfaces that can draft.
+  if (typeof Glance.judge === 'function') {
+    var judged = Glance.judge({
+      text: text,
+      subject: opened.subject || '',
+      sender: { email: opened.fromEmail || null, name: opened.fromName || null },
+      to: opened.toList || [],
+      ownAddresses: opened.ownAddresses || [],
+      now: now,
+      surface: 'gmail',
+      attachmentCount: 0
+    });
+    if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
+    return { intent: judged.intent, plan: judged.process };
+  }
   if (typeof Glance.classify !== 'function' || typeof Glance.plan !== 'function') return null;
-  // A mail the person sent to themself is still judged. senderIsUser is not set.
   var intent = Glance.classify(text, {
     senderEmail: opened.fromEmail || null,
     senderName: opened.fromName || null,

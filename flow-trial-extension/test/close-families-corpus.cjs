@@ -121,7 +121,6 @@ const kills = [
   ['maybe cancel named', 'Maybe cancel the Friday, September 18 at 3pm sync.'],
   ['dont cancel named', "Please don't cancel the Friday, September 18 at 3pm sync."],
   ['reschedule no new clock', 'Can we reschedule the Friday, September 18 at 3pm sync to a better week?'],
-  ['find a time', "Let's find a time."],
   ['maybe chase later', 'Maybe chase the invoice later.'],
   ['chase nothing named', 'Please chase when you can.'],
   ['about amount', 'Confirming the fee is about $4,200.'],
@@ -139,7 +138,6 @@ const kills = [
   ['he quote no template', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.'],
   ['unclear template', 'Please draft something from our company template and send it to Dana.'],
   ['ask glance', 'Hey Glance, can we chat about what to do with this thread?'],
-  ['general chat', 'Let\'s chat and you can ask me whatever you need about the quote.'],
   ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
   ['retract', 'Could you send the invoice?\nNever mind.'],
   ['quote', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')]
@@ -716,8 +714,6 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
     ['maybe meet', "Maybe let's meet Tuesday at 3pm."],
     ['he hedge', 'נראה לי מחר.'],
     ['he hedge hold', 'נראה לי נקבע מחר ב-15:00.'],
-    ['find a time', 'Can we find a time on Thursday?'],
-    ['find a time he', 'בוא נמצא זמן ביום חמישי.'],
     ['ambiguous hour', "Let's meet Tuesday at 3."],
     ['past promise', "I'll send it by March 3, 2024."],
     ['two clocks', "Let's meet Tuesday at 3pm or Thursday at 4pm."],
@@ -726,6 +722,12 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
   for (const [name, text] of quiet) {
     const row = plan(text);
     check('D silence: ' + name, row.show === false, { type: row.intent.type, family: row.intent.closeFamily, hour: row.intent.entities && row.intent.entities.hour });
+  }
+  // Asking the reader for a time names no slot, so it is never a hold. Since 2026-10-20 it is a request: the card is a reply
+  // that offers times (owner: every way of asking for a time must be recognised).
+  for (const [name, text] of [['find a time', "Let's find a time."], ['find a time on a day', 'Can we find a time on Thursday?'], ['find a time he', 'בוא נמצא זמן ביום חמישי.'], ['general chat', "Let's chat and you can ask me whatever you need about the quote."]]) {
+    const row = plan(text);
+    check('D asking for a time is a request, not a hold: ' + name, row.show === true && row.intent.type === 'request' && row.process && row.process.id === 'reply-track', { type: row.intent.type, proc: row.process && row.process.id });
   }
   const bareDigit = plan('נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.');
   check('D a bare digit hour is a Meeting at 15:00 with a calendar step, not 03:00',
@@ -821,7 +823,6 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
   const kills = [];
   for (const day of days) {
     kills.push(`Maybe let's meet ${day} at 3pm.`);
-    kills.push(`Can we find a time on ${day}?`);
     kills.push(`Let's meet ${day} at 3.`);
   }
   kills.push("I'll send it next week.", 'נראה לי מחר.', 'עד יום שישי.', 'by Friday', "I'll send it by March 3, 2024.");

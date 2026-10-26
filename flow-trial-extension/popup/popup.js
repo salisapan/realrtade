@@ -236,6 +236,7 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderLabs().catch(() => {});
   renderMetaChats().catch(() => {});
   try {
     if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
@@ -1826,7 +1827,8 @@
           calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
           onedrive: 'שומר קובץ אחד ב-OneDrive > Glance, קורא אותו, וביטול מוחק אותו. מייל לא מחפש בקבצים.',
           contacts: 'קורא אנשי קשר.',
-          teams: 'קורא צ׳אטים שאתה בהם.'
+          teams: 'קורא צ׳אטים שאתה בהם.',
+          sharepoint: 'יוצר קובץ ריק, או שומר את הקובץ המצורף, בתיקיית Glance של אתר SharePoint אחד ששמו נכתב במייל. קורא בחזרה, וביטול מוחק אם לא ערכת. לא משתף.'
         };
         const detail = uiLang() === 'he' ? (heDetail[svc.id] || '') : svc.detail;
         if (detail) {
@@ -2258,6 +2260,43 @@
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
   }
 
+  // The off switches, one row each, in the rows the popup already uses. It reads and writes one storage object and nothing else.
+  async function renderLabs() {
+    const host = document.getElementById('labs-list');
+    if (!host || typeof FlowLabsSwitches === 'undefined') return;
+    let bag = {};
+    try { bag = ((await chrome.storage.local.get({ glanceSwitches: {} })).glanceSwitches) || {}; } catch (e) { bag = {}; }
+    host.replaceChildren();
+    const setAll = el('div', 'wait-acts');
+    const onAll = el('button', 'ghost sm', 'הפעל הכל');
+    const offAll = el('button', 'ghost sm', 'כבה הכל');
+    onAll.type = 'button'; offAll.type = 'button';
+    onAll.addEventListener('click', async () => { await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.all(bag, true) }); await renderLabs(); });
+    offAll.addEventListener('click', async () => { await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.all(bag, false) }); await renderLabs(); });
+    setAll.appendChild(onAll); setAll.appendChild(offAll);
+    host.appendChild(setAll);
+    FlowLabsSwitches.LIST.forEach((r) => {
+      const on = FlowLabsSwitches.isOn(bag, r.id);
+      const row = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', r.who));
+      top.appendChild(el('span', 'wait-state' + (on ? ' ok' : ''), on ? 'פעיל' : 'כבוי'));
+      row.appendChild(top);
+      row.appendChild(el('div', 'wait-note', r.note + ' · לא נבדק חי'));
+      const acts = el('div', 'wait-acts');
+      const btn = el('button', 'ghost sm', on ? 'כבה' : 'הפעל');
+      btn.type = 'button';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        await renderLabs();
+      });
+      acts.appendChild(btn);
+      row.appendChild(acts);
+      host.appendChild(row);
+    });
+  }
+
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
     if (!host) return;
@@ -2408,6 +2447,9 @@
     host.appendChild(item);
   }
 
+  // Carry until closed (config/carry.public.js, off): read once per render through the service worker.
+  // var, not let: the panel's startup calls renderWaiting before this line runs.
+  var carrySw = {};
   async function renderWaiting() {
     const all = await FlowStorage.getWatches();
     const now = Date.now();
@@ -2427,6 +2469,7 @@
     const status = await send({ type: 'flow:pro-status' });
     const record = status && status.record;
     const pro = FlowEntitlements.isActive(record, now);
+    try { const sw = await send({ type: 'flow:carry' }); carrySw = sw && sw.ok ? sw : {}; } catch (e) { carrySw = {}; }
     renderClosed(recent, active.length, record, now);
     await renderDebrief(active.length, record, now);
     await renderRecurrence(pro, now);
@@ -2535,6 +2578,65 @@
     return pick;
   }
 
+  // The card the owner approved (mock 2026-10-11, approved 2026-10-20): one question, the prepared words, two buttons.
+  // Nothing is sent: a mail move is a Gmail draft, a chat move is copied for the person to paste. The loop stays open.
+  function moveActions(w, move, acts, note, item) {
+    item.appendChild(el('div', 'wait-what', move.question));
+    if (move.draft) item.appendChild(el('div', 'wait-note', move.draft));
+    const done = async (text) => {
+      await FlowStorage.updateWatch(w.id, FlowFollowUp.moveDonePatch(w, move, Date.now()));
+      note.hidden = false; note.textContent = text;
+      send({ type: 'flow:track', event: 'carry_move_done', params: { move: move.type } });
+    };
+    const no = el('button', 'ghost sm', w.lang === 'he' ? 'לא עכשיו' : 'Not now');
+    no.type = 'button';
+    no.addEventListener('click', async () => {
+      await FlowStorage.updateWatch(w.id, FlowFollowUp.moveDismissPatch(w, move, Date.now()));
+      send({ type: 'flow:track', event: 'carry_move_dismissed', params: { move: move.type } });
+      await renderWaiting();
+    });
+    if (move.type === 'release') {
+      const keep = el('button', 'ghost sm', w.lang === 'he' ? 'להמשיך לעקוב' : 'Keep chasing');
+      keep.type = 'button';
+      keep.addEventListener('click', async () => { await FlowStorage.updateWatch(w.id, FlowFollowUp.moveDismissPatch(w, move, Date.now())); await renderWaiting(); });
+      const go = el('button', 'ghost sm', w.lang === 'he' ? 'לשחרר' : 'Let it go');
+      go.type = 'button';
+      go.addEventListener('click', async () => {
+        await FlowStorage.updateWatch(w.id, FlowFollowUp.releasePatch(w, Date.now()));
+        if (w.taskRef) send({ type: 'flow:follow-complete', ref: w.taskRef });
+        send({ type: 'flow:track', event: 'carry_released', params: {} });
+        await renderWaiting();
+      });
+      acts.appendChild(keep); acts.appendChild(go);
+      return;
+    }
+    if (move.type === 'channel' && move.app === 'whatsapp') {
+      const copy = el('button', 'ghost sm', w.lang === 'he' ? 'להעתיק ולפתוח את וואטסאפ' : 'Copy and open WhatsApp');
+      copy.type = 'button';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(move.draft); } catch (e) { note.hidden = false; note.textContent = w.lang === 'he' ? 'לא הצלחתי להעתיק. נסה שוב.' : 'Could not copy. Try again.'; return; }
+        const phone = w.counterpart && w.counterpart.phone ? String(w.counterpart.phone).replace(/\D/g, '') : '';
+        window.open(phone ? 'https://wa.me/' + phone : 'https://web.whatsapp.com/', '_blank', 'noopener');
+        await done(w.lang === 'he' ? 'הועתק. הדבק בצ׳אט ושלח בעצמך. הלולאה נשארת פתוחה עד שיענו.' : 'Copied. Paste it in the chat and send it yourself. The loop stays open until they answer.');
+      });
+      acts.appendChild(copy);
+    } else {
+      const to = move.type === 'colleague' ? move.to : w.counterpart;
+      if (!to || !to.email) return;
+      const draft = el('button', 'ghost sm', w.lang === 'he' ? 'לפתוח טיוטה' : 'Open a draft');
+      draft.type = 'button';
+      draft.addEventListener('click', async () => {
+        draft.disabled = true;
+        const res = await send({ type: 'flow:follow-draft', payload: { to: to.email, toName: to.name || null, subject: w.subject, body: move.draft } });
+        draft.disabled = false;
+        if (res && res.ok) await done(w.lang === 'he' ? 'טיוטה מחכה בג׳ימייל. שום דבר לא נשלח.' : 'A draft is waiting in Gmail. Nothing was sent.');
+        else { note.hidden = false; note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.'; }
+      });
+      acts.appendChild(draft);
+    }
+    acts.appendChild(no);
+  }
+
   function waitingItem(w, now, record, all) {
     const state = FlowFollowUp.watchState(w, now);
     const isPay = w.kind === 'payment';
@@ -2555,7 +2657,11 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
 
-    if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && w.counterpart.email) {
+    // After the third unanswered nudge: one other way to close it (CARRY.nextMove, off). Without a move, the nudge as before.
+    const move = (carrySw || {}).nextMove === true && FlowFollowUp.nextMove ? FlowFollowUp.nextMove(all || [], w, now, { enabled: true, threadPeople: w.threadPeople || [], apps: ['gmail', 'whatsapp'] }) : null;
+    if (move) {
+      moveActions(w, move, acts, note, item);
+    } else if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && w.counterpart.email) {
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
       const base = nudgeLabel(level) || (state === 'overdue' ? 'Draft a nudge' : 'Nudge now');

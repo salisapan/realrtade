@@ -439,6 +439,8 @@ function listsRoute() {
   const editedBtn = await waitFor(edited.doc, '.flow-chip-undo', 4000);
   if (editedBtn) editedBtn.click();
   const editedLine = await waitForText(edited.doc, heLine('You edited this. Undo left it alone.'), 4000);  check('a refused Undo says You edited this', editedLine, { text: chipText(edited.doc) });
+  // The refusal is written to the store after the line shows; copy the store only once it is there, not on a race.
+  await new Promise((r) => setTimeout(r, 600));
   const editedAgain = await boot({
     id: 'MSG-PARK',
     subject: 'Parking permit - please renew by Sunday',

@@ -1,6 +1,6 @@
 ---
 tags: [locked, rules]
-updated: 2026-10-16
+updated: 2026-10-20
 source: bots' shared memory, export 2026-10-16
 ---
 # Shared rules & product locks (Sali) — read first
@@ -71,3 +71,9 @@ These lines had no date in the 2026-10-16 export. The standing rule at the top o
 - Token use: one live Gate at a time, and only after CTO parity is a pass. No interim updates to Sali. The only messages to him are a live pass, or a decision only he can make. No acknowledgement replies to bots. The 07:30 standup is the only digest. Few screenshots.
 - A draft Sali approved is sent exactly as approved. Never close a ClickUp task on an assumption. Verify it from evidence.
 - Deploy to Netlify only when Sali writes the explicit approval «מאשר».
+- **2026-10-20.** Designs belong to the Grok bot. A coding agent does not design cards or wait on a mock: it builds the logic behind an off switch and writes what the card must show (example: `docs/glance-ai/card-requests-2026-10-20.md`), and the Grok bot designs it.
+- **2026-10-20.** All code an agent writes lives on git (pushed branches and PRs into the working branch), so every agent can see it. Nothing stays only in one session.
+- **2026-10-20.** Every agent uses Graphify (`scripts/graphify-setup.sh`, then `graphify query/path/explain` before reading code) to cut token use: `docs/glance-ai/graphify.md`. Whatever a routine builds and verifies lands in git and is part of the working code; a run that pushed nothing is not done, so every agent can see it and stay in sync.
+- **2026-10-21.** Wiring a new close into an existing card is the agent's job, not the Grok bot's: use the canonical Do It card, its existing text slots and the existing step list, behind the off switch. Only a card that has no existing equivalent is requested from the Grok bot. A run that ships logic nobody can click is partial; the next run wires it.
+- **2026-10-21.** Anyone who says the work 'did not reach the code' checks `docs/glance-ai/shipped-in-code.md` first (generated from git): the working branch carries the code, `main` and the store package do not yet, and that merge needs the owner's «מאשר».
+- **2026-10-23.** Owner (Sali): the ecosystems builders never idle; every run creates a new capability (English and Hebrew), and every run starts by syncing with git, where the Grok bot's designs and answers to `docs/glance-ai/card-requests-*.md` arrive. Everything either side does lives on git so the other sees it.

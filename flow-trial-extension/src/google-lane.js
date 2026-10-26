@@ -5,9 +5,13 @@ const FlowGoogleLane = (() => {
   const WRITERS = {
     googleHold: 'FlowGoogleCalendar',
     googleLaneTask: 'FlowGoogleTasks',
+    googleTaskClose: 'FlowGoogleTaskClose',
     googleDriveSave: 'FlowGoogleDrive',
     googleDoc: 'FlowGoogleDocs',
     googleSheetAppend: 'FlowGoogleSheets',
+    googleNewFile: 'FlowWorkspaceFile',
+    googleEventCallLink: 'FlowEventCallLink',
+    googleRecurringReminder: 'FlowRecurringReminder',
     googleReplyDraft: 'FlowGoogleDrafts'
   };
 

@@ -179,6 +179,12 @@ var GlanceIntent = (function () {
     if (!result || !result.plan || !result.plan.steps) return null;
     var steps = result.plan.steps;
     if (!steps.length) return null;
+    // The shared plan may carry a reply draft beside the task ("Draft reply" + "Task"). This card writes no draft, so it
+    // offers the task or hold step only; the detection is the same one every surface made.
+    var writable = steps.filter(function (st) { var k = stepKind(st); return k === 'googleTask' || k === 'calendar'; });
+    if (writable.length && writable.length < steps.length && steps.every(function (st) { var k = stepKind(st); return k === 'googleTask' || k === 'calendar' || k === 'gmailDraft' || k === 'outlookDraft'; })) {
+      steps = writable;
+    }
     for (var i = 0; i < steps.length; i++) {
       var kind = stepKind(steps[i]);
       var params = (steps[i] && steps[i].params) || {};

@@ -15,6 +15,7 @@ const out = path.join(__dirname, '..', 'CoreBundle.js');
 
 const files = [
   'domains.js',
+  'day-words.js',
   'extract.js',
   'judgment.js',
   'google-closes.js',
@@ -22,7 +23,10 @@ const files = [
   'fact-reply.js',
   'file-attach.js',
   'intent.js',
-  'actions.js'
+  'actions.js',
+  'resolution.js',
+  'system-notice.js',
+  'incoming-judge.js'
 ].map((name) => path.join(core, name)).concat([
   'i18n.js',
   'urls.js',
@@ -54,7 +58,8 @@ const footer = [
   '  prefetch: GlancePrefetch,',
   '  remote: GlanceRemote,',
   '  classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },',
-  '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); }',
+  '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },',
+  '  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }',
   '};',
   ''
 ].join('\n');

@@ -91,7 +91,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגישה|שיחה)|(?:אפשר|נוכל|תוכל(?:י|ו)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
 
   // "This is not happening at the time this message names."
   //
@@ -342,7 +342,7 @@ const FlowIntent = (() => {
   // list (e.g. "חשבונית מס" needs no fix because bare "חשבונית" already
   // matches regardless), so only the handful with no such fallback needed
   // this treatment.
-  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים|תיקייה|תיקיה|תיקיית|לוגו|תמונה|תמונות|צילומים|הקלטה|סרטון|קבוצה|ערוץ|כתובת|פרטי קשר|לוח (?:ה)?משימות)/;
 
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
@@ -749,8 +749,8 @@ const FlowIntent = (() => {
   // not the reader's name. The reader's names are the account display
   // name and ownNames, in either script. A name in the other script is
   // still someone else.
-  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|greetings|greeting|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
-  const DISCOURSE_OPEN = /^(?:also|separately)\b\s*[,:،]+\s*/i;
+  const NOT_A_VOCABLE = /^(?:thanks|thank|regards|best|cheers|sincerely|yours|hi|hey|hello|dear|greetings|greeting|morning|afternoon|evening|all|team|everyone|everybody|folks|guys|colleagues|both|also|separately|actually|however|first|second|third|finally|meanwhile|otherwise|anyway|anyways|wait|sorry|yes|no|sure|please|to|cc|bcc|from|subject|body|reminder|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|שלום|היי|הי|תודה|תודות|בברכה|בתודה|נעים|בעצם|אגב|כמובן|סליחה|נכון|לכן|בנוסף|יום|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)$/i;
+  const DISCOURSE_OPEN = /^(?:also|separately|actually|however|first|second|third|finally|meanwhile|otherwise|anyway|anyways|בעצם|אגב|לכן|בנוסף)(?:\b|(?=\s*[,:،]))\s*[,:،]+\s*/i;
   // A status word that opens a line is a label, not a person. "Agreed —"
   // and "אושר:" decide or remind. "Tom —" and "Dana:" name someone.
   // To, Cc, Subject, and Body are header labels, not names.
@@ -812,7 +812,7 @@ const FlowIntent = (() => {
         return name;
       }
       if (/^\s*(?:,|،)/.test(after)) {
-        if (GROUP_ADDRESSEE.test(name) || NOT_A_VOCABLE.test(name) || LABEL_OPEN.test(name)) return '';
+        if (!personToken(name)) return '';
         return name;
       }
       // "אבי שלום," is the same vocative as "שלום אבי,". שלום is already the
@@ -1003,6 +1003,8 @@ const FlowIntent = (() => {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
     if (/\b(?:please|kindly|do you)\s+(?:agree|accept)\b/i.test(raw)) return true;
+    // Approving is the same decision. With a deadline it becomes a task (see the readerDecisionAsk caller); without one it stays quiet.
+    if (/\b(?:can|could|would|will) you\s+(?:please\s+)?approve\b/i.test(raw) || /\b(?:please|kindly)\s+approve\b/i.test(raw)) return true;
     if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw) && !/\bconfirm\s+by\b/i.test(raw)) return true;
     if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
     if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
@@ -1062,6 +1064,10 @@ const FlowIntent = (() => {
   function classify(text, ctx) {
     ctx = ctx || {};
     text = FlowJudgment.newContent(text);
+    // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
+    // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
+    // A note to oneself keeps its own reading («האם תוכל לתאם...» there is a task, not an ask of someone else).
+    if (!addressedToSelf(ctx) && !mailIsOwn(ctx)) text = String(text || '').replace(/(^|[.!?\n]\s*)(?:(?:היי|הי|שלום)[,!]?\s+)?האם\s+(?=(?:תוכל(?:י|ו)?\s|אפשר\s+לקבל\s|יש\s+(?:לך|לכם)\s))/g, '$1');
     // A quoted older ask is not a live close. Family H strips it before
     // any gate can draft or file it.
     if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.stripQuotedAsks) {
@@ -1214,6 +1220,7 @@ const FlowIntent = (() => {
     const signals = {
       hasMeetingNoun, hasConcreteAnchor, hasConcreteRequestObject, hasConcreteCommitmentObject, isReaderCommit,
       handoff: s.flags.handoff,
+      slotAsk: Boolean(s.flags.slotAsk),
       hasDate: Boolean(facts.date && facts.date.iso),
       hasTime: Boolean(facts.time),
       hasMoney: Boolean(facts.money),
@@ -1629,6 +1636,7 @@ const FlowIntent = (() => {
     // A greeting with no cached name is not that quiet and not an offer.
     // The host judges the same mail again once the profile names are stored,
     // or after the name wait (at most 2s), with whatever names are known.
+    if (mailIsOwn(ctx) || thirdPartyQuote(text)) return stayQuiet('hedge');
     if (greetingAwaitingNames(text, ctx)) {
       return { type: null, namesPending: true, signals: signals, facts: facts };
     }
@@ -1651,7 +1659,10 @@ const FlowIntent = (() => {
         dateIso: null
       });
     }
-    if (familyBox.hit && familyBox.hit.suppress) {
+    // "Find a time" names no slot, so family D keeps it off the calendar, and family H reads "perhaps we could" as a hedge. Asking the reader for a time is still a
+    // request: the card is a reply that offers times, not a hold.
+    const slotOnly = Boolean(familyBox.hit && (familyBox.hit.family === 'D' || familyBox.hit.family === 'H') && s.flags && s.flags.slotAsk);
+    if (familyBox.hit && familyBox.hit.suppress && !slotOnly) {
       if (ctx.debug) {
         let matched = familyBox.hit.matched || null;
         if (Array.isArray(matched)) matched = matched.join(', ').slice(0, 80);
@@ -1974,7 +1985,8 @@ const FlowIntent = (() => {
     const inboundAsk = /\b(?:any chance you could|please (?:email|e-mail) me|please loop in)\b/i.test(text);
     const selfPhrase = addressedToSelf(ctx) && /\b(?:any chance you could|please (?:email|e-mail|loop in)|kindly (?:email|loop in))\b/i.test(text);
     const datedAsk = hasResolvedDate && !isPast && (/\bplease\s+create\s+a\s+task\b/i.test(text) || selfPhrase || inboundAsk);
-    const requestEvidence = (s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped);
+    // A slot ask ("when works for you?") names no object and no day on purpose: the time is the reply.
+    const requestEvidence = ((s.flags.handoff || datedAsk) && ((hasResolvedDate && !isPast) || hasConcreteRequestObject || dateDropped)) || s.flags.slotAsk || s.flags.workAsk || s.flags.shortAsk;
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     // "any chance" is a hedge for every other sentence. These three
@@ -1982,6 +1994,21 @@ const FlowIntent = (() => {
     const familyBlocks = familiesBlockAsk && !inboundAsk;
     if (!quietHint && (askIsSoft || familyBlocks) && requestEvidence) quietHint = 'hedge';
     if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && readerDecisionAsk(text) && !replyAsk) {
+      // Owner, 2026-10-24: a request to approve or accept, with a deadline, is a task: the decision stays the person's, the
+      // deadline is not lost. No reply draft and no answer on their behalf. Without a date it stays the reader's own and quiet.
+      if (hasResolvedDate && !isPast) {
+        const approve = finish(TYPES.REQUEST, 'medium', {
+          who, amount,
+          what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
+          when: humanWhen(facts.date, facts.time),
+          dateIso: facts.date && facts.date.iso
+        }, 'follow-up-ask');
+        if (approve && approve.type) {
+          approve.noReplyDraft = true;
+          approve.label = /[\u0590-\u05FF]/.test(text) ? 'אישור נדרש' : 'Approval requested';
+        }
+        return approve;
+      }
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familyBlocks && replyAsk && !replyOk) {
       quietHint = quietHint || 'hedge';
@@ -2342,8 +2369,15 @@ const FlowIntent = (() => {
     t = t.replace(re, (_, q) => {
       try { return decodeURIComponent(q); } catch (e) { return q; }
     });
+    const urlParam = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s&]*&)*url=([^&#\s]+)(?:&[^#\s&]*)*/gi;
+    t = t.replace(urlParam, (_, u) => {
+      try { return decodeURIComponent(u); } catch (e) { return u; }
+    });
+    const strip = /(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^#\s&]*(?:&[^#\s&]+)*)/gi;
+    t = t.replace(strip, '');
     t = t.replace(/https?:\/\//gi, '');
     if (/^(?:www\.)?google\.com\/url\b/i.test(t.trim())) return '';
+    t = t.replace(/\s+(?:the|on)\s*$/i, '').replace(/\s{2,}/g, ' ').trim();
     return t.replace(/\s+/g, ' ').trim();
   }
   function takeObject(rest, keepThe) {
@@ -3072,6 +3106,9 @@ const FlowIntent = (() => {
       if (next === clause) break;
       clause = next;
     }
+    clause = unwrapGoogleRedirectUrl(clause);
+    clause = clause.replace(/(?:https?:\/\/)?(?:www\.)?google\.com\/url\?(?:[^\s]+\s*)*/gi, ' ');
+    clause = clause.replace(/\bthe\s+on\b/i, 'on');
     clause = clause.replace(/[?].*$/, ' ').replace(/[.!]+$/g, '').replace(/\s+/g, ' ').trim();
     clause = clause.replace(/^מקווה[\s\S]*?[.]\s*/, '').trim();
     if (/\b(?:swing|stop|come|drop|pass)\s+by\b/i.test(clause)) {
@@ -3114,7 +3151,11 @@ const FlowIntent = (() => {
         const q = s.match(/google\.com\/url\?[^\s#]+/i);
         if (q) obj = unwrapGoogleRedirectUrl('https://www.' + q[0]);
       }
-      if (obj) return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      if (obj && !/google\.com\/url\b/i.test(obj)) {
+        return 'Renew ' + String(obj).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      }
+      const renewWhen = s.match(/\bremind me to\s+renew(?:\s+the\s+https?:\/\/\S+)?\s+on\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i);
+      if (renewWhen) return 'Remind me to renew on ' + renewWhen[1].trim();
     }
     // "Remind me to renew the domain on Friday" is Renew the domain.
     // The day stays on the task. It is not a new verb.

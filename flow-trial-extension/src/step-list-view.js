@@ -94,6 +94,8 @@ const FlowStepListView = (() => {
     const Files = (typeof FlowOnedriveFile !== 'undefined') ? FlowOnedriveFile : null;
     const folder = (Files && Files.FOLDER) || 'Glance';
     const params = (row.step && row.step.params) || {};
+    // A step that knows exactly where it writes says so (a new empty file lands in My Drive, not in the Glance folder).
+    if (params.destinationText) return String(params.destinationText);
     let names = (files || []).filter(function (f) { return f.on && !f.skipped && f.name; }).map(function (f) { return f.name; });
     if (!names.length && !(files || []).length && params.fileName) names = [String(params.fileName)];
     const where = tool.tool === 'drive' ? 'Drive' : 'OneDrive';

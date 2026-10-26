@@ -39,22 +39,21 @@ function widgetText(model) {
 function loadEngine() {
   const files = [
     'domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js',
-    'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js'
+    'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js'
   ];
   const sandbox = { console, module: undefined };
   vm.createContext(sandbox);
   for (const name of files) {
     vm.runInContext(fs.readFileSync(path.join(repo, 'flow-trial-extension', 'core', name), 'utf8'), sandbox, { filename: name });
   }
-  const classify = vm.runInContext('FlowIntent.classify', sandbox);
-  const planFor = vm.runInContext('FlowActions.planFor', sandbox);
+  const judgeShared = vm.runInContext('FlowIncomingJudge.judge', sandbox);
+  // The same call Code.js engineHit_ makes: the one decision every Glance surface shares.
   return function engine(text) {
-    const classified = classify(text, { now: NOW, senderEmail: 'dana@meridian.com', calibration: null, calibrationByType: null });
-    if (!classified || !classified.type) return { intent: classified, plan: null };
-    return {
-      intent: classified,
-      plan: planFor(classified, { threadUrl: null, hasThreadAttachment: false, executionMemory: null })
-    };
+    const judged = judgeShared({
+      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [], ownAddresses: [], now: NOW, surface: 'gmail', attachmentCount: 0
+    }, {});
+    if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
+    return { intent: judged.intent, plan: judged.process };
   };
 }
 
@@ -118,7 +117,7 @@ check('a send ask is not rewritten into a task', judge('Could you please send th
   const mixed = intent.mapEngine({
     plan: { steps: [{ kind: 'gmailDraft', params: {} }, { kind: 'googleTask', params: { title: 'Reply' } }] }
   }, NOW, TZ);
-  check('a draft plus a task is not a task card', mixed === null, mixed);
+  check('a draft plus a task offers the task only: this card writes no draft, the detection is the shared one', mixed && mixed.speak === true && mixed.kind === 'task' && mixed.title === 'Reply', mixed);
   const two = intent.mapEngine({
     plan: { steps: [{ kind: 'googleTask', params: { title: 'One' } }, { kind: 'googleTask', params: { title: 'Two' } }] }
   }, NOW, TZ);

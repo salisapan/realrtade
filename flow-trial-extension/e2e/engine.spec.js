@@ -259,8 +259,13 @@ test('a truncated bodyPreview is outlook:body-preview-only and not a card', asyn
   expect(onPage.shortPreview).toBe(true);
 });
 
-const SELF_SAVE = 'please save the report to Drive by 20/10';
-const SELF_HOLD = 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00';
+// Dates are a week ahead of the real clock, so the spec does not go stale.
+const AHEAD = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+// Month names, not 2/11: a slash date whose day and month both fit either way is unresolved on purpose, so these were red on days 1 to 12.
+const AHEAD_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][AHEAD.getMonth()] + ' ' + AHEAD.getDate();
+const AHEAD_HE = AHEAD.getDate() + ' ב' + ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'][AHEAD.getMonth()];
+const SELF_SAVE = 'please save the report to Drive by ' + AHEAD_EN;
+const SELF_HOLD = 'תשמור לי את הזמן לפגישה ב-' + AHEAD_HE + ' ב-14:00';
 
 function reportFile() {
   return [{ id: 'att-report', name: 'report.pdf', contentType: 'application/pdf', size: 4096, isInline: false }];

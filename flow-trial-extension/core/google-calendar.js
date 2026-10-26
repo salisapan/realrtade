@@ -95,6 +95,12 @@ const FlowGoogleCalendar = (() => {
     return u;
   }
 
+  // An event is 30 minutes unless the caller names a length (a delivery window): a whole number of minutes from 5 to 720, anything else is 30.
+  function durationOf(v) {
+    const n = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,3}$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+    return Number.isInteger(n) && n >= 5 && n <= 720 ? n : DURATION_MIN;
+  }
+
   function eventBody(input) {
     const i = input || {};
     const date = isoDate(i.dateIso);
@@ -113,7 +119,7 @@ const FlowGoogleCalendar = (() => {
     let endIso = '';
     try {
       startIso = instantIso(date, hour, minute, 0, zone);
-      endIso = instantIso(date, hour, minute, DURATION_MIN, zone);
+      endIso = instantIso(date, hour, minute, durationOf(i.durationMinutes), zone);
     } catch (e) {
       return null;
     }
@@ -381,6 +387,7 @@ const FlowGoogleCalendar = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     DURATION_MIN: DURATION_MIN,
+    durationOf: durationOf,
     hasWriteScope: hasWriteScope,
     eventBody: eventBody,
     contentHash: contentHash,

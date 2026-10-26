@@ -14,7 +14,13 @@ export const OAUTH_PUBLIC = {
   hubspotClientId: 'REPLACE_WITH_HUBSPOT_CLIENT_ID',
   salesforceClientId: 'REPLACE_WITH_SALESFORCE_CLIENT_ID',
   slackClientId: 'REPLACE_WITH_SLACK_CLIENT_ID',
-  mondayClientId: 'REPLACE_WITH_MONDAY_CLIENT_ID'
+  mondayClientId: 'REPLACE_WITH_MONDAY_CLIENT_ID',
+  notionClientId: 'REPLACE_WITH_NOTION_CLIENT_ID',
+  asanaClientId: 'REPLACE_WITH_ASANA_CLIENT_ID',
+  jiraClientId: 'REPLACE_WITH_JIRA_CLIENT_ID',
+  linearClientId: 'REPLACE_WITH_LINEAR_CLIENT_ID',
+  docusignClientId: 'REPLACE_WITH_DOCUSIGN_INTEGRATION_KEY',
+  dropboxAppKey: 'REPLACE_WITH_DROPBOX_APP_KEY'
 };
 
 // Web application OAuth client for chrome.identity.launchWebAuthFlow.

@@ -181,6 +181,7 @@ function glanceUiCopy(kind) {
     }
     clearLaneTimers();
     removeOwnCards();
+    try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.stop(document, window); } catch (e) { /* nothing to stop */ }
   }
 
   // One read of chrome.runtime.id. When the extension context is gone that
@@ -606,6 +607,12 @@ function glanceUiCopy(kind) {
       intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, ctx) : null;
     }
     if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
+    if (intent.plannedProcess && intent.plannedProcess.steps && intent.plannedProcess.steps.length) {
+      return { show: true, intent: intent, process: intent.plannedProcess };
+    }
+    if (intent.systemNotice && intent.notice && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeProcess === 'function') {
+      return { show: true, intent: intent, process: FlowIncomingJudge.noticeProcess(intent.notice, ctx.threadUrl) };
+    }
     if (typeof FlowIntent !== 'undefined' && typeof FlowIntent.shouldShowChip === 'function' && !FlowIntent.shouldShowChip(intent)) {
       return { show: false, reason: 'chip-low-confidence', intent: intent };
     }
@@ -1096,14 +1103,29 @@ function glanceUiCopy(kind) {
     }
   }
 
+  function messageDetailsOpen(messageNode) {
+    return !!(messageNode && messageNode.querySelector
+      && messageNode.querySelector('.ajB table, table.ajC, table.ajB'));
+  }
+
+  function removeMessageDetailsPanels(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return;
+    messageNode.querySelectorAll('.ajA').forEach((n) => n.remove());
+    messageNode.querySelectorAll('.ajB').forEach((n) => {
+      if (n.closest && n.closest('.ajA')) return;
+      n.remove();
+    });
+  }
+
   async function expandMessageDetails(messageNode) {
     const toggle = messageNode && messageNode.querySelector
       ? messageNode.querySelector(DETAILS_TOGGLE)
       : null;
     if (!toggle) return false;
+    if (messageDetailsOpen(messageNode)) return true;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 200));
-    return true;
+    return messageDetailsOpen(messageNode);
   }
 
   async function collapseMessageDetails(messageNode) {
@@ -1111,15 +1133,16 @@ function glanceUiCopy(kind) {
       ? messageNode.querySelector(DETAILS_TOGGLE)
       : null;
     if (!toggle || !messageNode.querySelector) return false;
-    if (!messageNode.querySelector('.ajB table, table.ajC, table.ajB')) return false;
+    if (!messageDetailsOpen(messageNode)) return true;
     try { toggle.click(); } catch (e) { return false; }
     await new Promise((r) => setTimeout(r, 120));
+    removeMessageDetailsPanels(messageNode);
     const row = toggle.closest('td') || toggle.parentElement;
     if (row) {
       const open = row.querySelector('.ajB');
       if (open) open.remove();
     }
-    return true;
+    return !messageDetailsOpen(messageNode);
   }
 
   // Collapsed Gmail header: "to me", and the me chip has no email attribute.
@@ -1520,12 +1543,99 @@ function glanceUiCopy(kind) {
   // A Drive / Doc / Sheet close has to know whether exactly one file
   // already matches before the chip can claim "didn't find it". The
   // check is one name lookup, not a picker and not a Drive browser.
+  // A reminder for an appointment this sender's confirmation already put on the calendar (and was not undone) is not offered twice.
+  async function holdAlreadyMade(senderEmail, intent, ownIds) {
+    if (typeof FlowHeldHold === 'undefined' || !senderEmail || !FlowHeldHold.keyOf(intent)) return false;
+    try {
+      const bag = await FlowStorage.get();
+      return !!FlowHeldHold.find((bag && bag.log) || [], senderEmail, FlowHeldHold.keyOf(intent), ownIds);
+    } catch (e) { return false; }
+  }
+
+  // The business cancelled a booking, a trip or an invitation that Glance put on this calendar from its own earlier mail: Do It takes that
+  // same event off again through the hold's own undo (Google Calendar read back that it is gone; an event the person changed is left
+  // alone and says so). Quiet when no hold of this sender at that day and clock is on the calendar. Never sends anything.
+  async function cancelledHoldIntent(text, senderEmail) {
+    if (typeof FlowHeldHold === 'undefined' || !senderEmail) return null;
+    let gone = null;
+    for (const reader of [typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null]) {
+      if (!reader || typeof reader.cancelled !== 'function') continue;
+      try { const g = reader.cancelled(text, new Date()); if (g && g.kind === 'cancelled') { gone = g; break; } } catch (e) { /* the next reader */ }
+    }
+    if (!gone) return null;
+    let held = null;
+    try {
+      const bag = await FlowStorage.get();
+      held = FlowHeldHold.find((bag && bag.log) || [], senderEmail, FlowHeldHold.holdAt(gone), []);
+    } catch (e) { return null; }
+    if (!held || !held.ref || (held.connectorId !== 'calendar' && held.connectorId !== 'googleHold')) return null;
+    const he = gone.lang === 'he';
+    const title = String(held.label || '').replace(/^Calendar\s*·\s*/i, '').slice(0, 80);
+    return {
+      type: 'event', label: (he ? 'בוטל: ' : 'Cancelled: ') + title, confidence: 0.9, personalClose: 'booking-cancelled', signals: { score: 90, threshold: 50 },
+      entities: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute },
+      removeHeld: { ref: held.ref, messageId: held.messageId || null, he: he },
+      plannedProcess: { id: 'booking-cancelled', name: he ? 'הסר מהיומן' : 'Remove It', closingLine: he ? 'מסיר מהיומן.' : 'Removing it from your calendar.', closedLine: he ? 'הוסר מהיומן.' : 'Removed from your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: (he ? 'להסיר מהיומן: ' : 'Remove from calendar: ') + title, params: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute, title: title }, dependsOn: null }] }
+    };
+  }
+
+  // Do It on a cancellation: remove the hold through the lane's undo. A changed event stays and the card says so.
+  async function removeHeldHold(host, chip, ctx) {
+    const held = ctx.intent.removeHeld;
+    setChipState(chip, 'flow-chip-pending', held.he ? 'מסיר…' : 'Removing…');
+    const ref = laneUndoSnapshot('googleHold', held.ref) || held.ref;
+    const u = await sendLaneUndo('googleHold', ref);
+    if (!(u && u.ok)) {
+      const edited = u && laneEditedReason(u.reason);
+      setChipState(chip, 'flow-chip-error', edited ? (held.he ? 'שינית את האירוע, השארתי אותו' : 'You changed this event, so I left it') : (held.he ? 'לא הצלחתי להסיר, נסה שוב' : "Couldn't remove it, try again"));
+      return;
+    }
+    // The hold's own row is undone (so a later mail of that booking can be offered again); this cancellation mail is closed, read back.
+    try { await FlowStorage.appendLog({ kind: 'undone', label: 'Calendar event removed.', messageId: held.messageId, app: SOURCE_APP, connectorId: 'calendar' }); } catch (e) { /* the receipt still shows */ }
+    try { await FlowStorage.appendLog({ kind: 'written', label: 'Calendar event removed.', messageId: ctx.messageId, legacyMessageId: ctx.legacyMessageId || null, threadId: ctx.threadId || null, app: SOURCE_APP, connectorId: 'calendar', fetchedBack: true, receiptStatus: 'Handled.' }); } catch (e) { /* the receipt still shows */ }
+    host.classList.add('flow-chip-settled');
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const icon = el('span', 'flow-chip-done-icon', '✓');
+    icon.setAttribute('aria-hidden', 'true');
+    done.appendChild(icon);
+    done.appendChild(el('span', 'flow-chip-handled', glanceShow('Handled.')));
+    done.appendChild(el('span', 'flow-chip-written', glanceShow(u.written || (held.he ? 'הוסר מהיומן.' : 'Removed from your calendar.'))));
+    host.replaceChildren(done);
+  }
+
   async function classifyForChip(text, base) {
     const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
       ? FlowIncomingJudge.prepareForJudge(text)
       : text;
     const template = await readCompanyTemplate();
     const ctx = Object.assign({ now: new Date() }, base, { companyTemplate: template });
+    // A known service's notice with a deadline and a preventing action is a task with the date (core/system-notice.js).
+    // Off unless glanceSwitches.SYSTEM_NOTICE is true.
+    let noticeOn = false;
+    try { const bag = await chrome.storage.local.get({ glanceSwitches: {} }); noticeOn = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); } catch (e) { noticeOn = false; }
+    if (noticeOn && typeof FlowSystemNotice !== 'undefined' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeIntent === 'function' && base && base.inbound !== false) {
+      const notice = FlowSystemNotice.detect({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now });
+      if (notice) return FlowIncomingJudge.noticeIntent(FlowIntent, notice);
+    }
+    // A booking, an invitation or a pickup told to the person, and a payment asked of them (core/chat-appointment-notice.js,
+    // chat-invitation-notice.js, chat-pickup-notice.js, chat-payment-ask.js): the same readers Outlook uses through the shared
+    // judge. Each is behind its own switch, glanceSwitches.BOOKING_NOTICE and PAYMENT_ASK, default off. Nothing is paid or sent.
+    if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.bookingNotice === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true) {
+      let bag = null;
+      try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { bag = null; }
+      const sw = (bag && bag.glanceSwitches) || {};
+      const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null };
+      if (sw.BOOKING_NOTICE === true) {
+        const gone = await cancelledHoldIntent(prepared, ctx.senderEmail);
+        if (gone) return gone;
+      }
+      const hit = (sw.PAYMENT_ASK === true ? FlowIncomingJudge.paymentAsk(judgeIn, prepared) : null) || (sw.BOOKING_NOTICE === true ? FlowIncomingJudge.bookingNotice(judgeIn, prepared) : null) || (sw.TASK_ASK === true ? FlowIncomingJudge.taskAsk(judgeIn, prepared) : null);
+      if (hit && await holdAlreadyMade(ctx.senderEmail, hit.intent, [ctx.messageId])) return { type: null };
+      if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
+    }
     let intent = FlowIntent.classify(prepared, ctx);
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
@@ -2128,6 +2238,12 @@ function glanceUiCopy(kind) {
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
     const inboundMail = String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase();
+    // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
+    // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
+    // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
+    if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (inboundMail && usingGoogle && await showRecurringChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     const inboundAsk = inboundMail && text.length >= 20
       && /\b(?:can you|could you|would you|please send|send me|any chance you could)\b/i.test(text);
     const inboundHeAsk = inboundMail && text.length >= 12
@@ -3082,6 +3198,128 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  // A Meet link added to an event the person already organizes ("Can you add a Meet link to the Thursday sync?").
+  // The worker decides (flow:google-event-link-plan, only with the switch EVENT_CALL_LINK on) and reads the
+  // calendar; the page shows the canonical Do It card with a one-step list, or nothing.
+  async function showEventLinkChip(message, c) {
+    let plan = null;
+    try {
+      // The body only: a subject like "Sync notes" must not steer which event is picked.
+      plan = await sendRuntime(Object.assign({ type: 'flow:google-event-link-plan', text: c.text }, laneAccountContext()));
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.event || !plan.event.id) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'event-call-link',
+      name: plan.event.summary || 'Meet link',
+      closingLine: plan.line,
+      closedLine: he ? 'נוסף קישור Meet לאירוע.' : 'Meet link added to the event.',
+      steps: [{
+        id: 'link',
+        kind: 'calendarCallLink',
+        label: 'Calendar',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create a Meet link on the event and read it back',
+        dependsOn: null,
+        params: { event: plan.event }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.line, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
+  // A repeating commitment ("please send the sales report every Monday at 9:00") as one repeating reminder on the
+  // calendar, no guest (switch RECURRING_REMINDER, off). The worker owns the switch; the page only shows what it offers.
+  async function showRecurringChip(message, c) {
+    // A meeting that repeats is the Hold It card's (RECURRING_HOLD), not a second reminder.
+    if (c.intent && c.intent.type === 'event') return false;
+    let plan = null;
+    try {
+      plan = await sendRuntime({ type: 'flow:google-recurring-plan', text: c.text });
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.title || !plan.rrule || !plan.when) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'recurring-reminder',
+      name: plan.title,
+      closingLine: plan.line,
+      closedLine: he ? 'נקבעה תזכורת חוזרת ביומן.' : 'Repeating reminder added to your calendar.',
+      steps: [{
+        id: 'series',
+        kind: 'calendarRecurring',
+        label: 'Calendar',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create the repeating event and read it back (no guests)',
+        dependsOn: null,
+        params: { title: plan.title, rrule: plan.rrule, when: plan.when, destinationText: 'Calendar · ' + plan.title }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.line, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
+  async function showNewFileChip(message, c) {
+    let plan = null;
+    try {
+      plan = await sendRuntime({ type: 'flow:google-new-file-plan', text: String(c.subject || '').trim() ? c.subject + '. ' + c.text : c.text });
+    } catch (e) { plan = null; }
+    if (!plan || plan.action !== 'offer' || !plan.name || !plan.fileKind) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'new-file',
+      name: plan.name,
+      closingLine: plan.line,
+      closedLine: plan.fileKind === 'form' ? (he ? 'נוצר ב-Google Forms.' : 'Created in Google Forms.') : (he ? 'נוצר ב-Drive.' : 'Created in Drive.'),
+      steps: [{
+        id: 'file',
+        kind: 'driveNewFile',
+        label: plan.fileKind === 'sheet' ? 'Sheet' : plan.fileKind === 'slides' ? 'Slides' : plan.fileKind === 'form' ? 'Form' : 'Doc',
+        hint: (plan.steps && plan.steps[0] && plan.steps[0].label) || 'Create the file in Drive and read it back',
+        dependsOn: null,
+        params: { fileKind: plan.fileKind, name: plan.name, destinationText: (plan.fileKind === 'form' ? 'Forms · ' : 'Drive · ') + plan.name }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.name, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.name, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   function injectChip(messageNode, ctx) {
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
@@ -3449,6 +3687,28 @@ function glanceUiCopy(kind) {
       });
     }
 
+    // A repeating reminder (switch RECURRING_REMINDER, off): the title, the one rule and the first start travel.
+    if (action.kind === 'calendarRecurring') {
+      const rp = action.params || {};
+      if (!rp.title || !rp.rrule || !rp.when) return null;
+      const zone = await glanceUserTimeZone();
+      return Object.assign(base, { params: { title: rp.title, rrule: rp.rrule, when: rp.when, timeZone: zone || '' } });
+    }
+
+    // A Meet link on an event already on the calendar (switch EVENT_CALL_LINK, off): only the event's id and title travel.
+    if (action.kind === 'calendarCallLink') {
+      const ev = action.params && action.params.event;
+      if (!ev || !ev.id) return null;
+      return Object.assign(base, { params: { event: { id: ev.id, summary: ev.summary || '', day: ev.day || '' } } });
+    }
+
+    // An empty Doc, Sheet or Slides deck asked for by name (switch WORKSPACE_FILE, off). Nothing is written into it.
+    if (action.kind === 'driveNewFile') {
+      const nf = action.params || {};
+      if (!nf.fileKind || !nf.name) return null;
+      return Object.assign(base, { params: { fileKind: nf.fileKind, name: nf.name } });
+    }
+
     if (action.kind === 'driveFile') {
       if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
       const listed = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
@@ -3473,6 +3733,9 @@ function glanceUiCopy(kind) {
         if (zone) params.timeZone = zone;
       }
       params.title = renderedTitleFor(ctx, params.title);
+      // The worker adds a Meet link only when this text proposes a video call and
+      // the MEET_LINK switch is on (off by default). Text stays local.
+      if (ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
       return Object.assign(base, { params: params, ownEmail: ownEmailFromThread() || lastOwnEmail || '' });
     }
 
@@ -3622,6 +3885,9 @@ function glanceUiCopy(kind) {
     attachmentSave: 'googleDriveSave',
     driveDoc: 'googleDoc',
     driveSheet: 'googleSheetAppend',
+    driveNewFile: 'googleNewFile',
+    calendarCallLink: 'googleEventCallLink',
+    calendarRecurring: 'googleRecurringReminder',
     gmailDraft: 'gmailCompose'
   };
 
@@ -4226,6 +4492,9 @@ function glanceUiCopy(kind) {
     calendar: 'scheduled',
     gmailDraft: 'drafted a reply',
     googleTask: 'set a reminder',
+    driveNewFile: 'created the file',
+    calendarCallLink: 'added a call link',
+    calendarRecurring: 'set a repeating reminder',
     driveDoc: 'wrote the doc',
     driveSheet: 'wrote the sheet',
     driveFile: 'saved the file'
@@ -4357,7 +4626,7 @@ function glanceUiCopy(kind) {
     const nothingLeft = verdict.every((x) => x === 'missing');
     const anyUnknown = verdict.some((x) => x === 'unknown');
     const total = (record && record.total) || steps.length;
-    const partialReceipt = allPresent && total > steps.length;
+    const partialReceipt = allPresent && total > steps.length && !!(record && record.partial);
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
     host.setAttribute('data-glance-chain', 'lane-proof');
@@ -4512,10 +4781,13 @@ function glanceUiCopy(kind) {
       done.appendChild(detail);
     }
 
-    const undo = el('button', 'flow-chip-undo', glanceShow(copy.undoHint));
+    const undoLabel = glanceUiCopy('undo');
+    const undo = el('button', 'flow-chip-undo', glanceShow(undoLabel));
     undo.type = 'button';
+    undo.setAttribute('aria-label', glanceShow(undoLabel));
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (copy.undoHint && copy.undoHint !== undoLabel) hint.textContent = glanceShow(copy.undoHint);
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (copy.url) {
@@ -4666,6 +4938,27 @@ function glanceUiCopy(kind) {
     return !!(res && res.ok === true && res.ref && res.ref.draftId && r.action && laneConnectorId(r.action.kind) === 'gmailCompose');
   }
 
+  function draftReadBackVerified(r) {
+    if (!savedReplyDraft(r)) return false;
+    const gate = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+    const proof = r.response && r.response.proof;
+    if (gate && typeof gate.isProof === 'function' && gate.isProof(proof)) return true;
+    return r.response && r.response.fetchedBack === true;
+  }
+
+  function composeDraftClosed(r) {
+    const res = r && r.response;
+    if (!res || res.ok !== true || res.skipped) return false;
+    if (!r.action || laneConnectorId(r.action.kind) !== 'gmailCompose') return false;
+    if (draftReadBackVerified(r)) return true;
+    return !!composeReadBack(res);
+  }
+
+  function receiptClosedStep(r) {
+    if (stepHandled(r)) return true;
+    return composeDraftClosed(r);
+  }
+
   function orphanLine(r) {
     const line = laneStepLine(laneConnectorId(r.action.kind), r.response);
     return line + ' — ' + glanceUiCopy('notVerified');
@@ -4803,14 +5096,16 @@ function glanceUiCopy(kind) {
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
     const taskSteps = results.filter(taskKind);
+    const attempted = results.filter((r) => r && r.action && !(r.response && r.response.skipped));
+    const closedSteps = attempted.filter(receiptClosedStep);
     const copy = FlowReceipt.confirmation({
-      succeeded: succeeded.length,
-      total: results.length,
+      succeeded: closedSteps.length,
+      total: attempted.length,
       priorCloses,
       lang: glanceUiLang(),
       requireProof: taskSteps.length > 0,
       proofs: taskSteps.length
-        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        ? closedSteps.filter(taskKind).map((r) => r.response && r.response.proof)
         : undefined,
       verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
@@ -4859,11 +5154,13 @@ function glanceUiCopy(kind) {
 
     const sole = succeeded.length === 1 && !extra.length ? succeeded[0].response : null;
     const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres.concat(extra.map((r) => r.response && r.response.where).filter(Boolean)));
-    // The sentence is the control. A filled pill would be a second Do It.
-    const undo = el('button', 'flow-chip-undo', glanceShow(undoHint));
+    const undoLabel = glanceShow(copy.undoLabel || (attempted.length > 1 ? glanceUiCopy('undoAll') : glanceUiCopy('undo')));
+    const undo = el('button', 'flow-chip-undo', undoLabel);
     undo.type = 'button';
+    undo.setAttribute('aria-label', undoLabel);
     const hint = el('span', 'flow-chip-undo-hint');
     hint.hidden = true;
+    if (undoHint) hint.textContent = glanceShow(undoHint);
 
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
@@ -5023,6 +5320,8 @@ function glanceUiCopy(kind) {
         url: r.response.url,
         ref: r.response.ref,
         connectorId: r.action.kind,
+        holdAt: (typeof FlowHeldHold !== 'undefined') ? FlowHeldHold.keyOf(ctx.intent) || undefined : undefined,
+        holdSender: (ctx.sender && ctx.sender.email) || undefined,
         app: SOURCE_APP
       }, proofFields))
         .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e));
@@ -5087,6 +5386,7 @@ function glanceUiCopy(kind) {
       checkBrief();
       return;
     }
+    if (ctx.intent && ctx.intent.removeHeld) return removeHeldHold(host, chip, ctx);
 
     // Every pill removed is a deliberate "do nothing" — the same outcome as
     // dismissing the chip, not a disabled button with no explanation. It also
@@ -5764,6 +6064,9 @@ function glanceUiCopy(kind) {
       return mount.querySelector('.flow-chip-host');
     }
   };
+
+  // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.
+  try { if (typeof FlowChipPeek !== 'undefined') FlowChipPeek.start(document, window); } catch (e) { /* the card itself still works */ }
 
   init();
 })();

@@ -22,3 +22,11 @@ Every new rule or setting saved to the bots' shared memory must be added to `doc
 - **Signup gate.** It lives only on the Glance page, `flow-landing/trial.html`: email, required Terms and Privacy, a mailing-list opt-in that is not pre-checked, double opt-in, then the store. The main Flow site keeps the top Glance intro and a nav link. The bottom Get Glance card stays off the main site.
 - **Public release.** A polished, complete product, not a friends-only build.
 - **Always ProofOfClose and Undo.** No auto-send. Never clobber a user edit. Undo refuses rather than overwriting one.
+
+## Graphify — every agent, to save tokens
+
+Run `scripts/graphify-setup.sh` once per checkout, then `graphify query "<question>"`, `graphify path`, `graphify explain` before reading or grepping code. Work that a routine or agent finishes and verifies goes to git on the working branch so every agent sees it. Rules: `docs/glance-ai/graphify.md`.
+
+## What changed in the code — read this before saying nothing shipped
+
+`docs/glance-ai/shipped-in-code.md` is generated from git (`scripts/what-changed.sh`): every commit that changed `core/`, `src/`, `manifest.json` or the Gmail add-on, with its files. The working branch is far ahead of `main` and the manifest on it is 0.9.56; the paragraph above that says 0.9.55 is the last package written up, not the last code. How detection is shared across Gmail, Outlook, the phone card and chat: `docs/glance-ai/one-algorithm.md`.

@@ -4,7 +4,16 @@
 import '../core/google-config.js';
 import '../core/google-account.js';
 import '../core/google-calendar.js';
+// FlowMeetLink: the Meet link on a hold, switch MEET_LINK, off.
+import '../core/meet-link.js';
+// FlowRecurringReminder: a repeat on the Hold It, switch RECURRING_HOLD, off.
+import '../core/recurring-reminder.js';
+// FlowWorkspaceFile: an empty Doc, Sheet or Slides deck from a request, switch WORKSPACE_FILE, off.
+import '../core/workspace-file.js';
+// FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
+import '../core/event-call-link.js';
 import '../core/google-tasks.js';
+import '../core/google-task-close.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
@@ -499,8 +508,48 @@ async function resolveExistingTaskList() {
   return id;
 }
 
+// The owner's off switches live in one storage object. A missing key is off.
+async function laneSwitchOn(name) {
+  try {
+    const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+    return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+  } catch (e) { return false; }
+}
+
+// A Hold It for a mail that proposes a video call carries a Google Meet link,
+// only when MEET_LINK is on (default off). The link is read back by id; with no
+// link the event is deleted again. No attendee is added, so nobody is invited.
+async function meetWanted(connectorId, msgInput) {
+  const M = globalThis.FlowMeetLink;
+  if (connectorId !== 'googleHold' || !M || typeof M.callAsked !== 'function') return false;
+  const text = msgInput && msgInput.params && msgInput.params.callText;
+  if (!text || !M.callAsked(text)) return false;
+  return laneSwitchOn(M.SWITCH);
+}
+
+// A Hold It for "every Tuesday at 10:00" creates the repeating series, only when RECURRING_HOLD
+// is on (default off) and the hold's own date is an occurrence of the one rule the mail states.
+async function seriesWanted(connectorId, msgInput, first) {
+  const R = globalThis.FlowRecurringReminder;
+  if (connectorId !== 'googleHold' || !R || typeof R.seriesFor !== 'function') return '';
+  const text = msgInput && msgInput.params && msgInput.params.callText;
+  if (!text) return '';
+  const rule = R.seriesFor(text, first && first.dateIso);
+  if (!rule) return '';
+  return (await laneSwitchOn(R.HOLD_SWITCH)) ? rule : '';
+}
+
 async function writeWithListRecovery(connectorId, msgInput, cred) {
   const first = await prepareWrite(connectorId, msgInput, cred);
+  const rule = await seriesWanted(connectorId, msgInput, first);
+  const meet = await meetWanted(connectorId, msgInput);
+  if (rule || meet) {
+    const http = rule ? globalThis.FlowRecurringReminder.withRecurrence(laneHttp, rule) : laneHttp;
+    const written = meet
+      ? await globalThis.FlowMeetLink.holdWithMeet(first, http, undefined, globalThis.FlowGoogleCalendar)
+      : await globalThis.FlowGoogleCalendar.write(first, http);
+    return rule ? globalThis.FlowRecurringReminder.confirmSeries(written, rule, laneHttp) : written;
+  }
   const result = await Lane.write(connectorId, first);
   const given = msgInput && (msgInput.taskListId || (msgInput.params && msgInput.params.taskListId));
   if (connectorId !== 'googleLaneTask' || !result || result.reason !== 'list-missing' || given) return result;
@@ -594,6 +643,13 @@ async function prepareWrite(connectorId, input, cred) {
       dueIso: params.dateIso || i.dueIso || null
     };
   }
+  if (connectorId === 'googleTaskClose') {
+    return {
+      taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
+      taskId: i.taskId || params.taskId || i.externalId || '',
+      contentHash: i.contentHash || params.contentHash || ''
+    };
+  }
   if (connectorId === 'googleHold') {
     let zone = String(params.timeZone || i.timeZone || '').trim();
     if (!zone) zone = await storedTimeZone();
@@ -604,6 +660,7 @@ async function prepareWrite(connectorId, input, cred) {
       dateIso: params.dateIso || i.dateIso,
       hour: params.hour != null ? params.hour : i.hour,
       minute: params.minute != null ? params.minute : i.minute,
+      durationMinutes: params.durationMinutes != null ? params.durationMinutes : i.durationMinutes,
       fileName: params.fileName || params.fileTerm || i.fileName || '',
       fileUrl: params.fileUrl || params.shareUrl || i.fileUrl || '',
       fileTerm: params.fileTerm || i.fileTerm || '',
@@ -611,6 +668,40 @@ async function prepareWrite(connectorId, input, cred) {
       quote: params.quote || i.quote || '',
       timeZone: zone,
       expectAccount: cred && cred.email ? cred.email : ''
+    };
+  }
+  if (connectorId === 'googleRecurringReminder') {
+    const R = globalThis.FlowRecurringReminder;
+    let zone = String(params.timeZone || i.timeZone || '').trim();
+    if (!zone) zone = await storedTimeZone();
+    if (!zone) {
+      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
+    }
+    return {
+      flags: R ? { [R.SWITCH]: await laneSwitchOn(R.SWITCH) } : {},
+      title: params.title || i.title || '',
+      rrule: params.rrule || i.rrule || '',
+      when: params.when || i.when || null,
+      timeZone: zone,
+      expectAccount: cred && cred.email ? cred.email : '',
+      now: new Date().toISOString()
+    };
+  }
+  if (connectorId === 'googleEventCallLink') {
+    const E = globalThis.FlowEventCallLink;
+    return {
+      flags: E ? { [E.SWITCH]: await laneSwitchOn(E.SWITCH) } : {},
+      event: params.event || i.event || null,
+      now: new Date().toISOString()
+    };
+  }
+  if (connectorId === 'googleNewFile') {
+    const W = globalThis.FlowWorkspaceFile;
+    return {
+      flags: W ? { [W.SWITCH]: await laneSwitchOn(W.SWITCH) } : {},
+      fileKind: params.fileKind || i.fileKind || '',
+      name: params.name || i.name || '',
+      now: new Date().toISOString()
     };
   }
   if (connectorId === 'googleDriveSave') return i;
@@ -638,7 +729,7 @@ async function prepareWrite(connectorId, input, cred) {
 }
 
 async function prepareUndo(connectorId, ref) {
-  if (connectorId !== 'googleLaneTask') return ref;
+  if (connectorId !== 'googleLaneTask' && connectorId !== 'googleTaskClose') return ref;
   const next = ref && typeof ref === 'object' ? Object.assign({}, ref) : { externalId: ref };
   if (!next.taskListId && !next.listId) {
     const id = await storedTaskListId();
@@ -764,11 +855,11 @@ async function fetchAttachment(msg) {
 function verifyUrlFor(connectorId, ref) {
   const r = ref || {};
   const enc = encodeURIComponent;
-  if (connectorId === 'googleHold') {
+  if (connectorId === 'googleHold' || connectorId === 'googleEventCallLink' || connectorId === 'googleRecurringReminder') {
     const id = r.eventId || r.externalId;
     return id ? 'https://www.googleapis.com/calendar/v3/calendars/' + enc(r.calendarId || 'primary') + '/events/' + enc(id) : '';
   }
-  if (connectorId === 'googleLaneTask') {
+  if (connectorId === 'googleLaneTask' || connectorId === 'googleTaskClose') {
     const id = r.taskId || r.externalId;
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
@@ -777,7 +868,7 @@ function verifyUrlFor(connectorId, ref) {
     return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
   }
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
-  if (fileId && /^google(DriveSave|Doc|SheetAppend)$/.test(connectorId)) {
+  if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
   }
   return '';
@@ -817,6 +908,45 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve(guardedWrite(msg.connectorId, msg.input, { tab: msg.tabAccount, lang: msg.lang }))
       .then((result) => decorate(result))
       .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-event-link-plan') {
+    // The page asks; the worker owns the switch and reads the calendar (the lane's own account check
+    // applies). Off, unreadable or no single event that fits: the page shows nothing.
+    const E = globalThis.FlowEventCallLink;
+    Promise.resolve((async () => {
+      if (!E || typeof E.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(E.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      const text = String(msg.text || '').slice(0, 4000);
+      // Nothing is read from the calendar unless the mail asks for a call link at all.
+      if (E.recognize(text, Date.now()).kind !== 'clear') return { action: 'silence', reason: 'no-ask' };
+      const from = new Date();
+      const to = new Date(from.getTime() + 60 * 24 * 3600 * 1000);
+      const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=100&timeMin=' + encodeURIComponent(from.toISOString()) + '&timeMax=' + encodeURIComponent(to.toISOString());
+      const listed = await laneHttp({ method: 'GET', url: url });
+      if (!listed || !listed.ok || !listed.json || !Array.isArray(listed.json.items)) return { action: 'silence', reason: 'not-searched' };
+      return E.plan({ flags: { [E.SWITCH]: true }, text: text, events: listed.json.items, now: from });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-recurring-plan') {
+    // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
+    const R = globalThis.FlowRecurringReminder;
+    Promise.resolve((async () => {
+      if (!R || typeof R.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(R.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return R.plan({ flags: { [R.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000), todayIso: new Date().toISOString().slice(0, 10) });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-new-file-plan') {
+    // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
+    const W = globalThis.FlowWorkspaceFile;
+    Promise.resolve((async () => {
+      if (!W || typeof W.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(W.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return W.plan({ flags: { [W.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000) });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
   if (msg.type === 'flow:google-verify') {

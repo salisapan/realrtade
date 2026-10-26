@@ -34,11 +34,19 @@ function copyExtension(opts) {
     // spec registers the chat scripts against a fixture on this host.
     'https://www.messenger.com/*',
     'https://messenger.com/*',
+    // This copy only. The repo manifest lists WhatsApp Web as an optional host;
+    // the scenario rehearsal registers the WhatsApp lane against a fixture here.
+    'https://web.whatsapp.com/*',
     // This copy only. The repo manifest already lists these as optional hosts.
     'https://business.facebook.com/latest/inbox',
     'https://business.facebook.com/latest/inbox/*',
     'https://www.business.facebook.com/latest/inbox',
-    'https://www.business.facebook.com/latest/inbox/*'
+    'https://www.business.facebook.com/latest/inbox/*',
+    // This copy only: the Instagram lane against a fixture on this host.
+    'https://www.instagram.com/direct',
+    'https://www.instagram.com/direct/*',
+    'https://instagram.com/direct',
+    'https://instagram.com/direct/*'
   ];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
@@ -50,6 +58,8 @@ function outlookAuth(opts) {
   const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'];
   if (o.tasks !== false) scopes.push('Tasks.ReadWrite');
   if (o.files !== false) scopes.push('Files.ReadWrite');
+  if (o.calendar === true) scopes.push('Calendars.ReadWrite');
+  if (o.sharepoint === true) scopes.push('Sites.ReadWrite.All');
   const now = Date.now();
   return {
     token: {
@@ -101,6 +111,7 @@ function installE2EHooks() {
   e2e.googleTasks = e2e.googleTasks || {};
   e2e.tokenAccounts = e2e.tokenAccounts || {};
   e2e.todoTasks = e2e.todoTasks || {};
+  e2e.outlookEvents = e2e.outlookEvents || {};
   e2e.drafts = e2e.drafts || {};
   e2e.driveItems = e2e.driveItems || {};
   e2e.driveByName = e2e.driveByName || {};
@@ -227,14 +238,56 @@ function installE2EHooks() {
       if (att && method === 'POST') {
         return Promise.resolve(json(201, { id: 'e2e-att-' + (e2e.seq++) }));
       }
+      // SharePoint: sites found by name, and each site's own library (the same item store as OneDrive, keyed with the site id).
+      const SITES = scenario.sites || [{ id: 'contoso.sharepoint.com,s1,w1', displayName: 'Marketing', name: 'marketing', webUrl: 'https://contoso.sharepoint.com/sites/marketing' }];
+      if (/\/sites$/.test(path) && method === 'GET') {
+        const q = String(parsed.searchParams.get('search') || '').toLowerCase();
+        return Promise.resolve(json(200, { value: SITES.filter((x) => (String(x.displayName) + ' ' + String(x.name)).toLowerCase().indexOf(q) >= 0) }));
+      }
+      const siteOne = path.match(/\/sites\/([^/]+)$/);
+      if (siteOne && method === 'GET') {
+        const hit = SITES.find((x) => x.id === siteOne[1]);
+        return Promise.resolve(hit ? json(200, hit) : json(404, { error: { code: 'itemNotFound' } }));
+      }
+      const siteContent = path.match(/\/sites\/([^/]+)\/drive\/root:\/(.+):\/content$/);
+      if (siteContent && method === 'PUT') {
+        const key = siteContent[1] + '/' + siteContent[2];
+        if (/conflictBehavior=fail/.test(parsed.search || '') && e2e.driveByName[key]) return Promise.resolve(json(409, { error: { code: 'nameAlreadyExists' } }));
+        const id = 'e2e-spfile-' + (e2e.seq++);
+        const bodyLen = init && init.body && (init.body.byteLength != null ? init.body.byteLength : init.body.length);
+        const item = { id: id, name: siteContent[2].split('/').pop(), webUrl: 'https://contoso.sharepoint.com/sites/marketing/Shared Documents/' + siteContent[2], file: { mimeType: (init && init.headers && init.headers['Content-Type']) || 'application/octet-stream' }, size: bodyLen || 1, eTag: '"{e2e-' + id + '},1"', lastModifiedDateTime: '2026-10-25T09:00:00Z' };
+        item.__key = key;
+        item.__site = siteContent[1];
+        e2e.driveItems[id] = item;
+        e2e.driveByName[key] = item;
+        e2e.drivePuts = (e2e.drivePuts || []).concat([key]);
+        return Promise.resolve(json(201, item));
+      }
+      const siteItem = path.match(/\/sites\/([^/]+)\/drive\/items\/([^/]+)$/);
+      if (siteItem) {
+        const id = siteItem[2];
+        const cur = e2e.driveItems[id];
+        if (method === 'DELETE') {
+          if (cur && cur.__key) delete e2e.driveByName[cur.__key];
+          e2e.driveDeletes = (e2e.driveDeletes || []).concat([id]);
+          delete e2e.driveItems[id];
+          return Promise.resolve(empty(204));
+        }
+        return Promise.resolve(cur && cur.__site === siteItem[1] ? json(200, cur) : json(404, { error: { code: 'itemNotFound' } }));
+      }
       const driveContent = path.match(/\/me\/drive\/root:\/(.+):\/content$/);
       if (driveContent && scenario.driveUnauthorized) {
         return Promise.resolve(json(401, { error: { code: 'InvalidAuthenticationToken' } }));
       }
       if (driveContent && method === 'PUT') {
         const key = driveContent[1];
+        // conflictBehavior=fail on a name that is taken is a 409, as Graph answers; nothing is replaced.
+        if (/conflictBehavior=fail/.test(parsed.search || '') && e2e.driveByName[key]) {
+          return Promise.resolve(json(409, { error: { code: 'nameAlreadyExists' } }));
+        }
         const id = 'e2e-file-' + (e2e.seq++);
-        const item = { id: id, name: decodeURIComponent(key.split('/').pop()), webUrl: 'https://onedrive.live.com/file/' + id, parentReference: { path: '/drive/root:/' + key.split('/').slice(0, -1).join('/') } };
+        const bodyLen = init && init.body && (init.body.byteLength != null ? init.body.byteLength : init.body.length);
+        const item = { id: id, name: decodeURIComponent(key.split('/').pop()), webUrl: 'https://onedrive.live.com/file/' + id, parentReference: { path: '/drive/root:/' + key.split('/').slice(0, -1).join('/') }, file: { mimeType: (init && init.headers && init.headers['Content-Type']) || 'application/octet-stream' }, size: bodyLen || 1, eTag: '"{e2e-' + id + '},1"', lastModifiedDateTime: '2026-10-21T09:00:00Z' };
         item.__key = key;
         e2e.driveItems[id] = item;
         e2e.driveByName[key] = item;
@@ -273,6 +326,60 @@ function installE2EHooks() {
         };
         return Promise.resolve(json(201, e2e.drafts[id]));
       }
+      // Outlook calendar events. An online meeting gets a Teams join link and, on read, Microsoft's
+      // own join block appended to the body, as Graph does. scenario.eventNoTeams leaves the link out;
+      // scenario.eventDropsRule stores the event without its repeat rule.
+      const eventOne = path.match(/\/me\/events\/([^/?]+)$/);
+      const eventCol = path.match(/\/me\/events$/);
+      if (eventCol && method === 'POST') {
+        const id = 'e2e-event-' + (e2e.seq++);
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        const stored = Object.assign({}, posted, { id: id, isCancelled: false, webLink: 'https://outlook.office.com/calendar/item/' + id, organizer: { emailAddress: { address: 'glance.salisapan@outlook.com' } } });
+        ['start', 'end'].forEach((k) => {
+          if (stored[k] && stored[k].dateTime && !/\./.test(stored[k].dateTime)) stored[k] = { dateTime: stored[k].dateTime + '.0000000', timeZone: stored[k].timeZone };
+        });
+        if (posted.isOnlineMeeting === true && !scenario.eventNoTeams) {
+          stored.onlineMeeting = { joinUrl: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_e2e%40thread.v2/0?context=%7b%7d' };
+        } else {
+          stored.isOnlineMeeting = false;
+          stored.onlineMeeting = null;
+        }
+        if (scenario.eventDropsRule) stored.recurrence = null;
+        else if (stored.recurrence == null) stored.recurrence = null;
+        e2e.outlookEvents[id] = stored;
+        e2e.lastEvent = id;
+        return Promise.resolve(json(201, { id: id, webLink: stored.webLink }));
+      }
+      // Only when a spec seeded Outlook events; otherwise the scenario's place events (below) answer.
+      if (/\/me\/calendarView$/.test(path) && method === 'GET' && Object.keys(e2e.outlookEvents || {}).length) {
+        return Promise.resolve(json(200, { value: Object.values(e2e.outlookEvents).map((ev) => JSON.parse(JSON.stringify(ev))) }));
+      }
+      if (eventOne) {
+        const id = eventOne[1];
+        if (method === 'DELETE') {
+          delete e2e.outlookEvents[id];
+          return Promise.resolve(empty(204));
+        }
+        const event = e2e.outlookEvents[id];
+        if (!event) return Promise.resolve(json(404, { error: { message: 'missing' } }));
+        if (method === 'PATCH') {
+          let patch = {};
+          try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
+          Object.assign(event, patch);
+          if (patch.isOnlineMeeting === true && !scenario.eventNoTeams) {
+            event.onlineMeeting = { joinUrl: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_e2e_patch%40thread.v2/0?context=%7b%7d' };
+          } else if (patch.isOnlineMeeting === false) {
+            event.onlineMeeting = null;
+          }
+          return Promise.resolve(json(200, event));
+        }
+        const shown = JSON.parse(JSON.stringify(event));
+        if (shown.isOnlineMeeting === true && shown.body && !/Microsoft Teams/.test(String(shown.body.content || ''))) {
+          shown.body = { contentType: 'html', content: '<div>' + String((shown.body && shown.body.content) || '') + '</div><div>________________________________________________________________________________</div><div>Microsoft Teams meeting</div><div><a href="' + shown.onlineMeeting.joinUrl + '">Join the meeting now</a></div>' };
+        }
+        return Promise.resolve(json(200, shown));
+      }
       const todoOne = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks\/([^/]+)$/);
       const todoCol = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks$/);
       if (todoOne) {
@@ -285,6 +392,14 @@ function installE2EHooks() {
           return Promise.resolve(json(404, { error: { message: 'verify-fail' } }));
         }
         const task = e2e.todoTasks[id];
+        if (task && method === 'PATCH') {
+          let patch = {};
+          try { patch = JSON.parse((init && init.body) || '{}'); } catch (err) { patch = {}; }
+          if (patch.status === 'completed') task.completedDateTime = { dateTime: '2026-10-25T09:00:00.0000000', timeZone: 'UTC' };
+          if (patch.status === 'notStarted') delete task.completedDateTime;
+          Object.assign(task, patch);
+          return Promise.resolve(json(200, task));
+        }
         return Promise.resolve(task ? json(200, task) : json(404, { error: { message: 'missing' } }));
       }
       if (todoCol && method === 'POST') {
@@ -292,12 +407,38 @@ function installE2EHooks() {
         let posted = {};
         try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
         // Read-back compares this body with the POST. A stand-in title is a mismatch.
-        const stored = { id: id };
-        ['title', 'body', 'dueDateTime', 'status', 'importance'].forEach((key) => {
+        const stored = { id: id, status: 'notStarted' };
+        ['title', 'body', 'dueDateTime', 'status', 'importance', 'recurrence', 'isReminderOn', 'reminderDateTime'].forEach((key) => {
           if (posted[key] != null) stored[key] = posted[key];
         });
         e2e.todoTasks[id] = stored;
         return Promise.resolve(json(200, stored));
+      }
+      // Planner, like Graph: the person's plans, a task with an entity tag, and a delete that needs If-Match.
+      if (path.endsWith('/me/planner/plans') && method === 'GET') {
+        return Promise.resolve(json(200, { value: scenario.plannerPlans || [{ id: 'plan-web', title: 'Website relaunch' }, { id: 'plan-off', title: 'Offsite' }] }));
+      }
+      if (path.endsWith('/planner/tasks') && method === 'POST') {
+        let posted = {};
+        try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+        const id = 'e2e-planner-' + (e2e.seq++);
+        e2e.plannerTasks = e2e.plannerTasks || {};
+        const stored = Object.assign({ id: id, '@odata.etag': 'W/"p1"' }, posted);
+        e2e.plannerTasks[id] = stored;
+        return Promise.resolve(json(201, stored));
+      }
+      const plannerOne = path.match(/\/planner\/tasks\/([^/]+)$/);
+      if (plannerOne) {
+        const tasksNow = e2e.plannerTasks || {};
+        const task = tasksNow[decodeURIComponent(plannerOne[1])];
+        if (!task) return Promise.resolve(json(404, { error: { message: 'missing' } }));
+        if (method === 'DELETE') {
+          const given = init && init.headers && (init.headers['If-Match'] || init.headers['if-match']);
+          if (given !== task['@odata.etag']) return Promise.resolve(json(412, { error: { message: 'etag' } }));
+          delete tasksNow[task.id];
+          return Promise.resolve(empty(204));
+        }
+        return Promise.resolve(json(200, task));
       }
       if (path === '/v1.0/me/todo/lists' || path.endsWith('/me/todo/lists')) {
         return Promise.resolve(json(200, { value: [{ id: 'todo-list', wellknownListName: 'defaultList', displayName: 'Tasks' }] }));
@@ -470,6 +611,9 @@ async function boot() {
   const extDir = copyExtension();
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-profile-'));
   const context = await chromium.launchPersistentContext(userData, {
+    // Cloud sessions ship one Chromium whose build differs from this Playwright
+    // pin. GLANCE_CHROMIUM=/opt/pw-browsers/chromium uses it; CI leaves it unset.
+    executablePath: process.env.GLANCE_CHROMIUM || undefined,
     headless: false,
     viewport: { width: 1280, height: 800 },
     ignoreDefaultArgs: ['--disable-extensions'],
@@ -484,7 +628,7 @@ async function boot() {
   });
 
   const documents = new Map();
-  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com)\//, async (route) => {
+  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com|www\.instagram\.com)\//, async (route) => {
     const req = route.request();
     const bare = req.url().split('#')[0];
     if (req.resourceType() === 'document' && documents.has(bare)) {
@@ -617,7 +761,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }
@@ -634,6 +778,7 @@ async function boot() {
       e.scenario = { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
       e.googleTasks = {};
       e.todoTasks = {};
+      e.outlookEvents = {};
       e.drafts = {};
       e.driveItems = {};
       e.driveByName = {};
@@ -673,6 +818,16 @@ async function boot() {
   harness.openMessenger = async function openMessenger(html) {
     await watchSend();
     return openDocument('https://www.messenger.com/t/100012345678', html);
+  };
+
+  harness.openWhatsApp = async function openWhatsApp(html) {
+    await watchSend();
+    return openDocument('https://web.whatsapp.com/', html);
+  };
+
+  harness.openInstagram = async function openInstagram(html) {
+    await watchSend();
+    return openDocument('https://www.instagram.com/direct/t/abc/', html);
   };
 
   harness.openFixture = async function openFixture(search) {
