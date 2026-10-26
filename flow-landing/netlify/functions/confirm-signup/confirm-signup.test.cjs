@@ -187,6 +187,29 @@ async function run() {
     check('Z2: claim PATCH only targets confirmed_at null rows', patch && patch.url.includes('confirmed_at=is.null'), patch && patch.url);
   }
 
+  console.log('\n--- missing EMAIL_VERIFY_SECRET: invalid page, no PATCH or trial access ---\n');
+  {
+    const saved = process.env.EMAIL_VERIFY_SECRET;
+    delete process.env.EMAIL_VERIFY_SECRET;
+    const exp = String(Date.now() + 3600000);
+    const email = 'nosecret@example.com';
+    const sigVariants = [
+      '',
+      'undefined',
+      crypto.createHmac('sha256', saved).update(email + '|' + exp).digest('base64url')
+    ];
+    for (const sig of sigVariants) {
+      calls = [];
+      const res = await handler({
+        queryStringParameters: { email, exp, sig, lang: 'en', kind: 'trial' }
+      });
+      check('missing secret rejects sig=' + JSON.stringify(sig), res.statusCode === 400 && /isn.t valid|isn't valid|invalid/i.test(res.body || ''), res.statusCode);
+      check('missing secret: no PATCH for sig=' + JSON.stringify(sig), !calls.some((c) => c.method === 'PATCH'), calls);
+      check('missing secret: no send-trial-access for sig=' + JSON.stringify(sig), !calls.some((c) => c.url.includes('send-trial-access')), calls);
+    }
+    process.env.EMAIL_VERIFY_SECRET = saved;
+  }
+
   console.log('\n--- Z4: PATCH HTTP 500 is write failure with no lookup GET ---\n');
   {
     calls = [];
