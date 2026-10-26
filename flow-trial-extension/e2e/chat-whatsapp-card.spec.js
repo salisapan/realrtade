@@ -92,6 +92,23 @@ test('WhatsApp, CHAT_TASK_CARD on: a payment asked is one To Do task Pay 500 NIS
   expect(calls.some((c) => SEND_URL.test(c.url))).toBe(false);
 });
 
+for (const [label, text, want] of [['English', 'Reminder: your invoice 2231 is due on Thursday', /Pay invoice 2231/], ['Hebrew', 'חשבונית מספר 2231 לתשלום עד יום חמישי', /לשלם חשבונית 2231/]]) {
+  test('WhatsApp, CHAT_TASK_CARD on: an invoice with a number and a day but no amount (' + label + ') is one To Do task, nothing is paid or sent, Undo deletes it', async ({ glance }) => {
+    const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml(text));
+    await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+    await page.locator(CARD + ' button.flow-chip').click();
+    await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+    const list = await todo(glance);
+    expect(list).toHaveLength(1);
+    expect(JSON.stringify(list[0])).toMatch(want);
+    expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+    const calls = await glance.apiCalls();
+    expect(calls.some((c) => SEND_URL.test(c.url))).toBe(false);
+    await page.locator(CARD + ' button.flow-chip-undo').click();
+    await expect.poll(async () => (await todo(glance)).length).toBe(0);
+  });
+}
+
 test('WhatsApp, CHAT_TASK_CARD on: a cancelled booking offers to remove the hold made from this chat', async ({ glance }) => {
   let page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml('Your appointment is confirmed for tomorrow at 14:00'));
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });

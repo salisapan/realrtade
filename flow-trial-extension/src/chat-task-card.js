@@ -726,9 +726,14 @@ const FlowChatTaskCard = (() => {
       if ((!judged || !judged.show) && !own && typeof FlowChatPaymentAsk !== 'undefined') {
         let pay = null;
         try { pay = FlowChatPaymentAsk.recognize(i.text, i.now); } catch (e) { pay = null; }
+        // An invoice that names its number and day but no amount ("Your invoice 2231 is due on Friday"): the task is "Pay invoice 2231".
+        if (!(pay && pay.kind === 'ask') && typeof FlowChatPaymentAsk.recognizeBill === 'function') {
+          try { pay = FlowChatPaymentAsk.recognizeBill(i.text, i.now); } catch (e) { pay = null; }
+        }
         if (pay && pay.kind === 'ask') {
           const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-          const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+          const what = pay.ref ? (pay.lang === 'he' ? 'חשבונית ' : 'invoice ') + pay.ref : pay.amount + ' ' + pay.currency;
+          const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + what + (who ? ' · ' + who : '')).slice(0, 120);
           judged = {
             show: true,
             intent: { type: 'request', label: title, entities: { dateIso: pay.dateIso, what: title } },

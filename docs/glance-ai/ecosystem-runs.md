@@ -881,3 +881,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; two other agents' AI-engine commits (#206, #240) touched none of my files.
 - **Tests:** `test/chat-reminder-corpus.cjs` +6 lines and 5 quiet ones (6 fail on the old code); 5 new cases in `e2e/outlook-booking-notice.spec.js` (all 28 + 3 pass), `chat-whatsapp-card` and `outlook-teams-and-series` specs green (33); every `test/*corpus.cjs` green.
 - **Open:** live Gate; Messenger and Instagram have no spec for the "bring" task (same lane as WhatsApp); «Hi Sali, make sure the invoice is signed before Friday» still quiet.
+
+### Run 107 (2026-10-26)
+- **Capability shipped (behind `CHAT_TASK_CARD`, off):** a vendor's or landlord's chat message that names an invoice number and a due day but no amount ("Reminder: your invoice 2231 is due on Thursday", «חשבונית מספר 2231 לתשלום עד יום חמישי») gave no card in chat (the payment reader needed an amount); it is now the task "Pay invoice 2231" through the existing Log It card, the mail path of run 104 carried to chat.
+- **Code:** `src/chat-task-card.js` (fallback to `FlowChatPaymentAsk.recognizeBill`, the title).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` +4 bills and 6 quiet lines; 2 new cases in `e2e/chat-whatsapp-card.spec.js`; the chat specs (whatsapp-card, payment-close, chase-draft, document-close) pass, 39; every `test/*corpus.cjs` green. Phone-card `CoreBundle.js` rebuilt.
+- **Open:** live Gate; a "paid" claim does not close an invoice-number task (the close matches by amount); no Messenger or Instagram spec for this task.
