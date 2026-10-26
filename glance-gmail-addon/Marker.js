@@ -235,6 +235,21 @@ var GlanceMarker = (function () {
     return true;
   }
 
+  function removeLegacySweepTriggersIfPresent(scriptApp) {
+    var Script = scriptApp || ScriptApp;
+    if (!Script.getProjectTriggers || !Script.deleteTrigger) return 0;
+    var triggers = Script.getProjectTriggers();
+    var removed = 0;
+    for (var i = triggers.length - 1; i >= 0; i--) {
+      var tr = triggers[i];
+      if (tr.getHandlerFunction() === 'sweep' && tr.getEventType() === Script.EventType.CLOCK) {
+        Script.deleteTrigger(tr);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   function isDismissed(messageId) {
     return hasId(DISMISSED_KEY, messageId);
   }
@@ -386,6 +401,7 @@ var GlanceMarker = (function () {
     SWEEP_BUDGET_MS: SWEEP_BUDGET_MS,
     SWEEP_QUERY: SWEEP_QUERY,
     installSweepTriggerIfNeeded: installSweepTriggerIfNeeded,
+    removeLegacySweepTriggersIfPresent: removeLegacySweepTriggersIfPresent,
     sweep: sweep,
     isDismissed: isDismissed,
     dismiss: dismiss,

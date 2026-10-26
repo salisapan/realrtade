@@ -16,6 +16,8 @@ function onHomepage(e) {
   try {
     if (glanceMarkerMailApiEnabled_() && typeof GlanceMarker !== 'undefined' && GlanceMarker.installSweepTriggerIfNeeded) {
       GlanceMarker.installSweepTriggerIfNeeded();
+    } else if (typeof GlanceMarker !== 'undefined' && GlanceMarker.removeLegacySweepTriggersIfPresent) {
+      GlanceMarker.removeLegacySweepTriggersIfPresent();
     }
   } catch (triggerErr) {
     console.error(triggerErr && triggerErr.message ? triggerErr.message : triggerErr);

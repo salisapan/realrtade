@@ -192,8 +192,18 @@ const ScriptApp = {
     };
   }
 };
+ScriptApp.deleteTrigger = function (tr) {
+  const idx = triggers.indexOf(tr);
+  if (idx !== -1) triggers.splice(idx, 1);
+};
 check('no duplicate trigger', M.installSweepTriggerIfNeeded(ScriptApp) === true && triggers.length === 1);
 check('second install skips', M.installSweepTriggerIfNeeded(ScriptApp) === false && triggers.length === 1);
+check('remove legacy sweep trigger', M.removeLegacySweepTriggersIfPresent(ScriptApp) === 1 && triggers.length === 0);
+triggers.push({
+  getHandlerFunction() { return 'sweep'; },
+  getEventType() { return ScriptApp.EventType.CLOCK; }
+});
+check('remove is idempotent when none', M.removeLegacySweepTriggersIfPresent(ScriptApp) === 1 && M.removeLegacySweepTriggersIfPresent(ScriptApp) === 0 && triggers.length === 0);
 
 for (let i = 0; i < 2005; i++) M._test.pushId('glanceMarkerProcessed', 'id' + i);
 const list = M._test.readList('glanceMarkerProcessed');
