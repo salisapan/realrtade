@@ -1,0 +1,11 @@
+# Personal Obsidian files — private, never committed.
+# Shared vault settings under .obsidian/ stay tracked (see .obsidian/README.md).
+.obsidian/workspace.json
+.obsidian/workspace*.json
+.obsidian/plugins/
+.obsidian/themes/
+.obsidian/graph.json
+.obsidian/trash/
+.obsidian/cache/
+.trash/
+trash/

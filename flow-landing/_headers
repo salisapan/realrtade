@@ -23,6 +23,8 @@
   Cache-Control: public, max-age=31536000, immutable
 /*.webp
   Cache-Control: public, max-age=31536000, immutable
+/*.avif
+  Cache-Control: public, max-age=31536000, immutable
 /*.svg
   Cache-Control: public, max-age=31536000, immutable
 /*.ico
@@ -38,20 +40,16 @@
 /assets/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
-# fonts.css specifically: still under /assets/* above (day-cache + SWR), but
-# it earns a longer ceiling than the rest of that bucket. Unlike
-# home.css/flow-premium.css, which get edited in place across a session as
-# copy and layout change, fonts.css holds font BINARY DATA under a name that
-# has no reason to change unless a weight or family is added -- much closer
-# to how the image rules above treat logo-header.png than to how the rest of
-# /assets/* is treated. It's also the one /assets/* file every one of the
-# 47 pages requests with the identical URL, so the gap between "cached a day"
-# and "cached a month" is the gap between re-fetching 131KB on most repeat
-# visits and re-fetching it on almost none. Netlify combines matching _headers
-# blocks and the LATER block wins for a header set in both, so this rule
-# (listed after /assets/* above) overrides just its Cache-Control for this
-# one file without needing its own exemption from the block above.
+# fonts.css and the woff2 files it points at. Unlike home.css, which is
+# edited in place as copy and layout change, these change only when a
+# family or subset is replaced. Every page requests the same URLs, so a
+# month of caching beats re-fetching them on the next visit. Netlify
+# combines matching _headers blocks and the LATER block wins for a header
+# set in both, so these rules (listed after /assets/* above) override just
+# Cache-Control for the font files.
 /assets/fonts.css
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=31536000
+/assets/fonts/*
   Cache-Control: public, max-age=2592000, stale-while-revalidate=31536000
 
 # HTML must revalidate: these pages carry the copy and the CTAs, and shipping a
