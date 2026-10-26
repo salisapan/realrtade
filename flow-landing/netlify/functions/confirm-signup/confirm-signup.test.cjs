@@ -2,6 +2,8 @@
 // Run: node netlify/functions/confirm-signup/confirm-signup.test.cjs
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 process.env.EMAIL_VERIFY_SECRET = 'test-verify-secret';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
@@ -10,6 +12,7 @@ process.env.RESEND_API_KEY = 'test-resend-key';
 let calls = [];
 let patchResult = () => ({ ok: true, status: 200, json: async () => [{ id: 1, email: 'ada@example.com' }] });
 let waitlistRow = null;
+let selectFails = false;
 
 global.fetch = async (url, opts) => {
   opts = opts || {};
@@ -17,6 +20,7 @@ global.fetch = async (url, opts) => {
   calls.push({ url: u, method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null });
   if (u.includes('/rest/v1/waitlist') && opts.method === 'PATCH') return patchResult();
   if (u.includes('/rest/v1/waitlist') && u.includes('select=confirmed_at')) {
+    if (selectFails) return { ok: false, status: 500, json: async () => [] };
     return { ok: true, status: 200, json: async () => (waitlistRow ? [waitlistRow] : []) };
   }
   if (u.includes('/rest/v1/waitlist') && u.includes('confirmed_at=not.is.null')) {
@@ -105,6 +109,22 @@ async function run() {
     check('send-trial-access receives a signed downloadUrl', Boolean(trialAccess && trialAccess.body && trialAccess.body.downloadUrl), trialAccess && trialAccess.body && { hasUrl: !!trialAccess.body.downloadUrl });
     const leaked = logLines.some((line) => /download-trial-zip/.test(line) || (trialAccess && trialAccess.body && line.includes(trialAccess.body.downloadUrl)));
     check('M5: signed download link never appears in function logs', !leaked, logLines.filter((l) => /confirm-signup/.test(l)));
+    const patch = calls.find((c) => c.method === 'PATCH');
+    check('Z2: claim PATCH only targets confirmed_at null rows', patch && /confirmed_at=is\.null/.test(patch.url), patch && patch.url);
+    check('Z7: claim PATCH filters by email', patch && /email=eq\./.test(patch.url) && patch.url.includes(encodeURIComponent('bob@example.com')), patch && patch.url);
+  }
+
+  console.log('\n--- Z3: lookup HTTP error is not treated as confirmed ---\n');
+  {
+    calls = [];
+    waitlistRow = null;
+    selectFails = true;
+    patchResult = () => ({ ok: true, status: 200, json: async () => [] });
+    const q = signedQuery('lookup-fail@example.com');
+    const res = await handler({ queryStringParameters: q });
+    check('Z3: zero-row PATCH with failed lookup returns 503', res.statusCode === 503, res);
+    check('Z3: no download link when lookup fails', !/download-trial-zip/.test(res.body || ''), res.body);
+    selectFails = false;
   }
 
   console.log('\n--- already confirmed: zero-row PATCH still allows re-download ---\n');
@@ -113,11 +133,18 @@ async function run() {
     waitlistRow = { confirmed_at: '2026-01-01T00:00:00.000Z' };
     patchResult = () => ({ ok: true, status: 200, json: async () => [] });
     const q = signedQuery('repeat@example.com');
-    const res = await handler({ queryStringParameters: q });
+    let res;
+    const logLines = await captureLogs(async () => { res = await handler({ queryStringParameters: q }); });
     check('200 when row was already confirmed', res.statusCode === 200, res);
     check('re-visit still shows download button', /download-trial-zip/.test(res.body || ''), res.body);
     check('send-trial-access skipped on re-visit', !calls.some((c) => c.url.includes('send-trial-access')), calls.map((c) => c.url));
+    check('M5b: re-visit does not log the download URL', !logLines.some((line) => /download-trial-zip/.test(line)), logLines.filter((l) => /confirm-signup/.test(l)));
+    const patch = calls.find((c) => c.method === 'PATCH');
+    check('Z7: re-visit PATCH still scopes by email', patch && patch.url.includes(encodeURIComponent('repeat@example.com')), patch && patch.url);
   }
+
+  const src = fs.readFileSync(path.join(__dirname, 'confirm-signup.js'), 'utf8');
+  check('Z2 source: PATCH URL keeps confirmed_at=is.null filter', /confirmed_at=is\.null/.test(src));
 
   console.log('\n' + (failures ? failures + ' FAILED' : 'all passed'));
   process.exit(failures ? 1 : 0);
