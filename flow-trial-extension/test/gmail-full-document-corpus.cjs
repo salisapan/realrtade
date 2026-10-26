@@ -1,16 +1,9 @@
-// Full-document Gmail+Docs wiring — behaviour rows (no source-text guards).
-// Run: TZ=UTC node test/gmail-full-document-corpus.cjs
+// Full-document Gmail+Docs wiring (switch FULL_DOCUMENT_CLOSE, off).
+// Run: node test/gmail-full-document-corpus.cjs
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-const sandbox = { module: undefined, console, globalThis: {} };
-vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'google-closes.js'), 'utf8'), sandbox, { filename: 'google-closes.js' });
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'style-profile.js'), 'utf8'), sandbox, { filename: 'style-profile.js' });
-globalThis.FlowGoogleCloses = sandbox.FlowGoogleCloses;
-globalThis.FlowStyle = sandbox.FlowStyle;
 const { FlowFullDocumentClose: F } = require('../core/full-document-close.js');
 
 let failures = 0;
@@ -18,6 +11,21 @@ function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail).slice(0, 400) : ''); }
 }
+const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
+
+const lane = read('src', 'google-lane.js');
+const host = read('src', 'google-lane-host.js');
+const gmail = read('src', 'content-gmail.js');
+const bg = read('src', 'background.js');
+
+check('lane maps googleDocFull to FlowGoogleDocs', /googleDocFull: 'FlowGoogleDocs'/.test(lane));
+check('host imports full-document-close and answers the plan with the switch', /full-document-close\.js/.test(host) && /flow:google-full-document-plan/.test(host) && /laneSwitchOn\(F\.SWITCH\)/.test(host));
+check('Gmail shows a card only when the worker offers a non-blank build', /showFullDocumentChip\(/.test(gmail) && /flow:google-full-document-plan/.test(gmail) && /plan\.built\.blank/.test(gmail));
+check('full-document inject carries built body and previewOnly', /googleBuilt: plan\.built/.test(gmail) && /previewOnly: true/.test(gmail));
+check('Do It marks lane writes as preview when previewOnly', /ctx\.previewOnly/.test(gmail) && /response\.preview = true/.test(gmail));
+check('receipt path for doc preview exists', /showDocPreviewReceipt/.test(gmail));
+check('user context events reach the worker', /flow:user-context-event/.test(gmail) && /flow:user-context-event/.test(bg) && /USER_CONTEXT_STORAGE_KEY/.test(bg));
+check('module switch names match', F.SWITCH === 'FULL_DOCUMENT_CLOSE');
 
 const flagsOn = { [F.SWITCH]: true };
 const template = {
@@ -55,12 +63,9 @@ check('stray digit in title does not block price stripping', (() => {
   return invented.filled && !invented.filled.amount;
 })());
 
-const host = fs.readFileSync(path.join(__dirname, '..', 'src', 'google-lane-host.js'), 'utf8');
 check('worker imports style-profile for lane writes', /style-profile\.js/.test(host));
 check('googleDocFull verify uses Drive files API', /connectorId === 'googleDocFull'/.test(host) && /drive\/v3\/files/.test(host));
 check('gmail-new-file verify regex restored', /google\(DriveSave\|Doc\|SheetAppend\|NewFile\)/.test(host));
-
-const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
 check('page gates full-document plan on FULL_DOCUMENT_CLOSE', /FULL_DOCUMENT_CLOSE === true/.test(gmail));
 check('previewOnly false would fail preview receipt path', !/previewOnly:\s*false/.test(gmail));
 check('undo learning only on successful undo', /if \(undone && undone\.ok\)/.test(gmail) && /type: 'undo'/.test(gmail));

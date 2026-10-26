@@ -8,8 +8,6 @@ const FlowUserContextWriter = (() => {
   const DECAY_HALF_LIFE_DAYS = 30;
   const RELEVANT_MIN_APPROVED = 2;
   const NOT_RELEVANT_MIN_DISMISS = 3;
-  // Approvals or dismissals below this weight are too stale to count (half-life 30d → ~60d).
-  const DECAY_ACTIVE_FLOOR = 0.25;
 
   function normId(userId) {
     const s = String(userId || '').trim();
@@ -195,45 +193,25 @@ const FlowUserContextWriter = (() => {
     return p;
   }
 
-  function activeDecayCounts(ats, legacyCount, lastAt, now) {
-    const stamps = Array.isArray(ats) && ats.length ? ats : null;
-    let active = 0;
-    let weight = 0;
-    if (stamps) {
-      for (const atIso of stamps) {
-        const w = decayWeight(atIso, now);
-        if (w >= DECAY_ACTIVE_FLOOR) {
-          active += 1;
-          weight += w;
-        }
-      }
-      return { active, weight };
-    }
-    const n = Number(legacyCount) || 0;
-    if (n <= 0) return { active: 0, weight: 0 };
-    const w = decayWeight(lastAt, now);
-    if (w < DECAY_ACTIVE_FLOOR) return { active: 0, weight: 0 };
-    return { active: n, weight: n * w };
-  }
-
-  function relevanceHint(profile) {
+  function relevanceHint(profile, nowIso) {
     const p = norm(profile);
     const rows = p.decisionHistory || [];
-    let activeApprovals = 0;
     let approvalWeight = 0;
-    let activeDismiss = 0;
-    const now = new Date().toISOString();
+    let dismissCount = 0;
+    const now = nowIso || new Date().toISOString();
     for (const r of rows) {
-      const a = activeDecayCounts(r.approvalAts, r.approvedFetchedBack, r.lastAt, now);
-      const d = activeDecayCounts(r.dismissAts, r.dismissed, r.lastAt, now);
-      activeApprovals += a.active;
-      approvalWeight += a.weight;
-      activeDismiss += d.active;
+      const approvalAts = Array.isArray(r.approvalAts) && r.approvalAts.length
+        ? r.approvalAts
+        : (Number(r.approvedFetchedBack) > 0 && r.lastAt ? [r.lastAt] : []);
+      for (let i = 0; i < approvalAts.length; i++) {
+        approvalWeight += decayWeight(approvalAts[i], now);
+      }
+      dismissCount += Number(r.dismissed) || 0;
     }
-    if (activeDismiss <= 0 && activeApprovals >= RELEVANT_MIN_APPROVED) {
+    if (dismissCount <= 0 && approvalWeight >= RELEVANT_MIN_APPROVED) {
       return { relevance: 'relevant', reason: 'history_closed' };
     }
-    if (activeDismiss >= NOT_RELEVANT_MIN_DISMISS && approvalWeight <= 0) {
+    if (dismissCount >= NOT_RELEVANT_MIN_DISMISS && approvalWeight <= 0) {
       return { relevance: 'not_relevant', reason: 'history_dismissed' };
     }
     return { relevance: 'unknown', reason: 'cold_profile' };

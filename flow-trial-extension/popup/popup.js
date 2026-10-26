@@ -499,6 +499,14 @@
     }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
+      const msIds = ['microsoft', 'microsoftTodo', 'outlook'];
+      if (live.some((k) => msIds.indexOf(k) >= 0)) {
+        stampMicrosoft(pill, microsoft);
+        stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+        pill.textContent = microsoftFaceLabel(microsoft);
+        pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+        return;
+      }
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
       pill.textContent = uiLang() === 'he' ? 'מחובר' : ((conn ? conn.label : live[0]) + ' connected');
       pill.className = 'ver on';
@@ -2288,7 +2296,14 @@
       btn.type = 'button';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        const turningOn = !on;
+        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, turningOn) });
+        if (turningOn && globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForLabsSwitch === 'function') {
+          const bucket = FlowConnectEcosystem.optionalScopeBucketForLabsSwitch(r.id);
+          if (bucket) {
+            try { await send({ type: 'flow:microsoft-optional-scopes', bucket: bucket }); } catch (e) { /* consent optional */ }
+          }
+        }
         await renderLabs();
       });
       acts.appendChild(btn);

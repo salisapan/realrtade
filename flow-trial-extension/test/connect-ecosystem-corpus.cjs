@@ -306,7 +306,7 @@ await ok('stepsFor microsoft is exactly one Graph step with ecosystem consent sc
   assert.ok(r.steps[0].scopes.indexOf('Chat.Read') < 0);
 });
 
-await ok('microsoft base consent never includes Group.*, Chat.Read, or OnlineMeetings; optional is planner and teamsChat', () => {
+await ok('microsoft base consent never includes Group.*, Chat.Read, or OnlineMeetings; optional is teamsChat and contacts', () => {
   assert.ok(!MS_EXPECTED.some((s) => /^Group\./i.test(s)));
   assert.ok(MS_EXPECTED.indexOf('OnlineMeetings.ReadWrite') < 0);
   assert.ok(MS_EXPECTED.indexOf('Chat.Read') < 0);
@@ -315,13 +315,28 @@ await ok('microsoft base consent never includes Group.*, Chat.Read, or OnlineMee
   assert.ok(MS_EXPECTED.indexOf('Notes.ReadWrite') < 0);
   assert.ok(MS_EXPECTED.indexOf('MailboxSettings.Read') < 0);
   assert.ok(MS_EXPECTED.indexOf('People.Read') < 0);
-  assert.deepStrictEqual(E.microsoftOptionalScopes.planner, ['Group.Read.All']);
+  assert.ok(E.microsoftOptionalScopes.planner === undefined);
+  assert.ok(!Object.keys(E.microsoftOptionalScopes).some((k) => /Group/i.test(String(E.microsoftOptionalScopes[k]))));
   assert.deepStrictEqual(E.microsoftOptionalScopes.teamsChat, ['Chat.Read']);
   assert.deepStrictEqual(E.microsoftOptionalScopes.contacts, ['Contacts.Read']);
-  assert.ok(E.microsoftOptionalScopes.teamsMeeting === undefined);
   assert.ok(MS_EXPECTED.indexOf('Tasks.ReadWrite') >= 0);
   assert.ok(E.microsoftRequiredScopes().indexOf('openid') < 0);
   assert.ok(E.microsoftRequiredScopes().indexOf('profile') < 0);
+});
+
+await ok('incremental optional scopes merge on Labs Teams or Outlook contacts', () => {
+  assert.strictEqual(E.optionalScopeBucketForLabsSwitch('TEAMS_MEETING'), 'teamsChat');
+  assert.strictEqual(E.optionalScopeBucketForOutlookService('contacts'), 'contacts');
+  const work = { microsoftAccountKind: 'work' };
+  assert.deepStrictEqual(E.incrementalScopesForBucket('teamsChat', work), ['Chat.Read']);
+  const merged = E.mergeMicrosoftScopes(MS_EXPECTED, ['Chat.Read', 'Contacts.Read']);
+  assert.ok(merged.indexOf('Chat.Read') >= 0);
+  assert.ok(merged.indexOf('Contacts.Read') >= 0);
+  assert.ok(E.TEAMS_OPTIONAL_HOST_ORIGINS.indexOf('https://teams.microsoft.com/*') >= 0);
+  const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
+  assert.ok(/teams\.microsoft\.com/.test(manifest));
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
+  assert.ok(/flow:microsoft-optional-scopes/.test(bg) && /requestMicrosoftOptionalScopes/.test(bg));
 });
 
 function fakeIdToken(tid) {
@@ -380,31 +395,24 @@ await ok('plannerAccess personal Microsoft account: no card, silent To Do, never
   assert.strictEqual(route.explainTodoFallback, false);
 });
 
-await ok('plannerAccess work account without Group.Read.All: needs-consent with EN+HE why copy', () => {
+await ok('plannerAccess work account without Group.Read.All: no Planner card or group consent in this build', () => {
   const account = { address: 'you@contoso.com', mail: 'you@contoso.com', userPrincipalName: 'you@contoso.com', microsoftAccountKind: 'work' };
   const access = E.plannerAccess(account, MS_EXPECTED);
-  assert.strictEqual(access, 'needs-consent');
-  assert.strictEqual(E.plannerShowsPlannerCard(access), true);
-  assert.strictEqual(E.plannerShouldRequestGroupConsent(access), true);
+  assert.strictEqual(access, 'unavailable');
+  assert.strictEqual(E.plannerShowsPlannerCard(access), false);
+  assert.strictEqual(E.plannerShouldRequestGroupConsent(access), false);
   const route = E.plannerExecutionRoute(access, null);
-  assert.strictEqual(route.requestGroupConsent, true);
-  const en = D.chrome('en').plannerGroupConsentWhy;
-  const he = D.chrome('he').plannerGroupConsentWhy;
-  assert.ok(en && en.length > 20);
-  assert.ok(he && he.length > 20);
-  assert.ok(/Planner/i.test(en));
-  assert.ok(/Planner/.test(he));
+  assert.strictEqual(route.destination, 'todo');
+  assert.strictEqual(route.requestGroupConsent, false);
 });
 
 await ok('plannerConsentOutcome admin or denied falls back to To Do with explanation, not a dead end', () => {
-  const account = { address: 'you@contoso.com', userPrincipalName: 'you@contoso.com', microsoftAccountKind: 'work' };
-  const access = E.plannerAccess(account, MS_EXPECTED);
   const admin = E.plannerConsentOutcome({ ok: false, aadsts: 'AADSTS65001', error: 'invalid_grant' });
   const denied = E.plannerConsentOutcome({ ok: false, error: 'access_denied', reason: 'permission-denied' });
   assert.strictEqual(admin, 'admin-required');
   assert.strictEqual(denied, 'denied');
-  const routeAdmin = E.plannerExecutionRoute(access, admin);
-  const routeDenied = E.plannerExecutionRoute(access, denied);
+  const routeAdmin = E.plannerExecutionRoute('unavailable', admin);
+  const routeDenied = E.plannerExecutionRoute('unavailable', denied);
   assert.strictEqual(routeAdmin.destination, 'todo');
   assert.strictEqual(routeDenied.destination, 'todo');
   assert.strictEqual(routeAdmin.explainTodoFallback, true);
