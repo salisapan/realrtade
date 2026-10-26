@@ -1659,6 +1659,11 @@ const FlowIntent = (() => {
         dateIso: null
       });
     }
+    // "Find us 30 minutes" names a length, not a slot on the calendar. The Gate
+    // stays quiet (rehearsal D5). "Find a time" / "find 20 minutes" stays a reply.
+    if (!blocked && /\bfind us \d+\s*(?:min(?:ute)?s?)\b/i.test(text)) {
+      return stayQuiet('family');
+    }
     // "Find a time" names no slot, so family D keeps it off the calendar, and family H reads "perhaps we could" as a hedge. Asking the reader for a time is still a
     // request: the card is a reply that offers times, not a hold.
     const slotOnly = Boolean(familyBox.hit && (familyBox.hit.family === 'D' || familyBox.hit.family === 'H') && s.flags && s.flags.slotAsk);

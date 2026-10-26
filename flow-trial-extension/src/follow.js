@@ -1098,12 +1098,13 @@ const FlowFollow = (() => {
       if (saved) receipt('Draft ready in Gmail' + (attached && !withoutFile ? ' with ' + attached : '') + '. Nothing was sent. I will close this when you send the ' + env.need.label + '.' + (withoutFile ? ' I could not attach the file, so add it yourself.' : ''), null);
     };
     const move = (fn) => () => { fn().catch((e) => { console.error('[Glance] resolution step failed', e); receipt('Something did not work. Try again in a moment.', null); }); };
+    const btn = (en, heLabel) => (he ? heLabel : en);
     plan.actions.forEach((a, idx) => {
       const primary = idx === 0 ? 'primary' : 'ghost';
-      if (a === 'prepare-reply-with-file') row.appendChild(button('Prepare reply with file', primary, move(reply({}, true))));
-      else if (a === 'prepare-plain-reply') row.appendChild(button('Prepare my reply', primary, move(reply({}, false))));
-      else if (a === 'mark-paid') row.appendChild(button(plan.move === 'verify-payment' ? 'Yes, it is paid' : 'It is paid now', primary, move(async () => { const saved = await saveResolution(env, FlowResolution.markPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
-      else if (a === 'not-paid') row.appendChild(button('Not yet', 'ghost', move(async () => { const saved = await saveResolution(env, FlowResolution.markNotPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
+      if (a === 'prepare-reply-with-file') row.appendChild(button(btn('Prepare reply with file', 'הכיני תשובה עם הקובץ'), primary, move(reply({}, true))));
+      else if (a === 'prepare-plain-reply') row.appendChild(button(btn('Prepare my reply', 'הכיני תשובה'), primary, move(reply({}, false))));
+      else if (a === 'mark-paid') row.appendChild(button(btn(plan.move === 'verify-payment' ? 'Yes, it is paid' : 'It is paid now', plan.move === 'verify-payment' ? 'כן, שולם' : 'שולם עכשיו'), primary, move(async () => { const saved = await saveResolution(env, FlowResolution.markPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
+      else if (a === 'not-paid') row.appendChild(button(btn('Not yet', 'עדיין לא'), 'ghost', move(async () => { const saved = await saveResolution(env, FlowResolution.markNotPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
       else if (a === 'request-issuer') row.appendChild(button('Ask ' + (plan.issuer.name || plan.issuer.email) + ' to issue it', primary, move(async () => {
         const dateText = null;
         const body = FlowResolution.issuerRequestDraft(env.need, env.facts, plan.issuer, { dateText });
@@ -1136,7 +1137,7 @@ const FlowFollow = (() => {
       }
       else if (a === 'create-from-template' && ctx.openCreateCard) row.appendChild(button('Fill in the details', primary, () => { dismiss(); ctx.openCreateCard({ ask: { id: env.need.object, creatable: true, lang: env.need.lang, label: env.need.label, synonym: env.need.synonym, line: plan.line }, decision: plan.template, sender: env.sender, subject: env.subject, bodyText: env.text, threadId: env.threadId }); }));
     });
-    row.appendChild(button('Not now', 'ghost', dismiss));
+    row.appendChild(button(he ? 'לא עכשיו' : 'Not now', 'ghost', dismiss));
   }
 
   // An ask for a financial artifact in a thread with no loop, or a new message in a thread that carries a resolution.

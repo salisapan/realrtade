@@ -72,7 +72,6 @@ test('B4 Gate: two receipts with the same kind of name show no card', async ({ g
 });
 
 test('B5 Gate: a Hebrew receipt card has no English buttons', async ({ glance }) => {
-  test.fail(true, 'src/follow.js resolutionCard writes the title and line in Hebrew but the buttons in English (Prepare reply with file, Not now, Yes, it is paid, Not yet).');
   const page = await open(glance, 'he', ASK, [RECEIPT]);
   const card = page.locator(CARD);
   await expect(card).toContainText('קבלה 3850.pdf', { timeout: 20000 });
